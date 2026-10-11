@@ -45,6 +45,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-554 | TD-060's summary row and header still say *undecided*, *two systemd units* and **Owner:** paul after the rename was built and split | Low | Open |
 | TD-555 | `service._remove_legacy_system_units` — the root step that stops `agentorc-tmux` and ends every session in it unless the server is empty — has no test: gut the function and `tests/test_service.py` stays green | Medium | Open |
 | TD-556 | `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green | Low | Open |
+| TD-557 | Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists | Low | Open |
 
 ---
 
@@ -666,3 +667,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when:** each probe in **Why** fails `tests/test_migrate.py`.
 
 **Related:** TD-060 (#1505), TD-555.
+
+## TD-557: Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (grinder-ao-2, met on TD-552; its independent review counted them)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md` — nineteen `src/agentorc/` paths in open entries' **Location:**, **Why** and **Fix** lines (`git grep -n "src/agentorc/" docs/technical_debt.md`).
+
+**Why:** the package moved to `src/shiftlead/` on 2026-10-10 (TD-060), and TD-552 left the ledger out of its sweep. A grinder that follows a Location to a file finds nothing, and `ao repo` / the Inbox's ledger fold show the dead path.
+
+**Fix:** in the open entries only, `src/agentorc/` → `src/shiftlead/` where the file exists at the new path (check each); a quoted dated sentence (a probe's output, a commit message) stays as written. Leave `docs/technical_debt_archive.md` alone.
+
+**Done when:** `git grep -n "src/agentorc/" docs/technical_debt.md` finds only quoted dated text.
+
+**Related:** TD-552, TD-060.
