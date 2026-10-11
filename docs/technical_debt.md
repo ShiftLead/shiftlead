@@ -43,7 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-554 | TD-060's summary row and header still say *undecided*, *two systemd units* and **Owner:** paul after the rename was built and split | Low | Open |
-| TD-555 | `service._remove_legacy_system_units` — the root step that stops `agentorc-tmux` and ends every session in it unless the server is empty — has no test: gut the function and `tests/test_service.py` stays green | Medium | Open |
 | TD-556 | `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green | Low | Open |
 | TD-557 | Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists | Low | Open |
 
@@ -631,24 +630,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** TD-060's row title and `**Owner:**` agree with its Status.
 
 **Related:** TD-060, TD-552, TD-553.
-
-## TD-555: `service._remove_legacy_system_units` — the root step that stops `agentorc-tmux` and ends every session in it unless the server is empty — has no test: gut the function and `tests/test_service.py` stays green
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-11 (test-audit-ao-1, auditing #1505)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/service.py` (`_remove_legacy_system_units`, `LEGACY_SYSTEM_UNITS`, its call in `install_system`); `tests/test_service.py::test_install_system_writes_the_unit_made_again_as_root_and_starts_it`
-
-**Why:** #1505's description says *"`install --system` stops and removes the old system units first, refused while their server holds a session"*, and the function's docstring gives the reason: *"stopping `agentorc-tmux` ends every session in it"*. It runs as root, once per machine, and `grep -rn "_remove_legacy\|LEGACY_SYSTEM" tests/` finds nothing; `test_install_system_*` write into a `tmp_path` `SYSTEM_DIR` that never holds an old unit, so the branch is not taken. Probes, over `tests/test_service.py`, the ledger, promote, settings and org tests (314 tests): replace the `present = [...]` line with `present = []` — `314 passed`; replace `if live is None or live:` with `if False:` — `314 passed`. So neither the refusal that protects a server holding sessions, nor the stop/unlink/`daemon-reload` that removes the old units, nor the *unreadable* case (`_server_sessions` returning None) is held; a change that stops the old server with sessions in it, or leaves the old unit to restart beside the new one, is green.
-
-**Fix:** in `test_service.py`, with `SYSTEM_DIR` a `tmp_path` holding `agentorc-tmux.service`, `agentorc-watch.timer` and `agentorc-watch.service`, `subprocess.run` recorded and `_server_sessions` monkeypatched: (a) it answers `["ao-x"]` — `install_system` raises `RuntimeError` naming the old units and the session, the files are still there and no `systemctl` ran; (b) it answers `None` — the same refusal, saying *unreadable*; (c) it answers `[]` — `disable --now` names exactly the present units, the files are gone, `daemon-reload` follows, and a unit that is absent is not named.
-
-**Done when:** each of the two probes in **Why** fails `tests/test_service.py`.
-
-**Related:** TD-060 (#1505), TD-556.
 
 ## TD-556: `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green
 

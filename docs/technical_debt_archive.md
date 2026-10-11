@@ -9628,3 +9628,23 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-060, TD-553, dev-cadence TD-091.
 
 **Resolved:** 2026-10-11 (PR #1520) — `gen.py` and its regeneration (every artboard equal to main's with the one word changed), the design's §10, §4.1, §4.4a, §4.7, §4.9 and §4.9c, the glossary, the mockups' README and `shot.sh`, `split_design.py`'s blurbs, the memories' live pointers (two slugs renamed with their links) and the board's live commands (lines 11, 12, 15, 16) name ShiftLead's names. `git grep -i agentorc` outside the dated records, the synced files, the fallback (TD-553), `src/`, `tests/` and the ledger now finds only dated text: §10's 2026-09-04 *Name* line and its two `.agentorc.yml` answers (TD-553 keeps them), the canvas brief, `docs/mockups/reviews/`, CLAUDE.md's ADR title, the README's *was* line, memories' dated incidents, board lines 19–20.
+
+## TD-555: `service._remove_legacy_system_units` — the root step that stops `agentorc-tmux` and ends every session in it unless the server is empty — has no test: gut the function and `tests/test_service.py` stays green
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1505)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/service.py` (`_remove_legacy_system_units`, `LEGACY_SYSTEM_UNITS`, its call in `install_system`); `tests/test_service.py::test_install_system_writes_the_unit_made_again_as_root_and_starts_it`
+
+**Why:** #1505's description says *"`install --system` stops and removes the old system units first, refused while their server holds a session"*, and the function's docstring gives the reason: *"stopping `agentorc-tmux` ends every session in it"*. It runs as root, once per machine, and `grep -rn "_remove_legacy\|LEGACY_SYSTEM" tests/` finds nothing; `test_install_system_*` write into a `tmp_path` `SYSTEM_DIR` that never holds an old unit, so the branch is not taken. Probes, over `tests/test_service.py`, the ledger, promote, settings and org tests (314 tests): replace the `present = [...]` line with `present = []` — `314 passed`; replace `if live is None or live:` with `if False:` — `314 passed`. So neither the refusal that protects a server holding sessions, nor the stop/unlink/`daemon-reload` that removes the old units, nor the *unreadable* case (`_server_sessions` returning None) is held; a change that stops the old server with sessions in it, or leaves the old unit to restart beside the new one, is green.
+
+**Fix:** in `test_service.py`, with `SYSTEM_DIR` a `tmp_path` holding `agentorc-tmux.service`, `agentorc-watch.timer` and `agentorc-watch.service`, `subprocess.run` recorded and `_server_sessions` monkeypatched: (a) it answers `["ao-x"]` — `install_system` raises `RuntimeError` naming the old units and the session, the files are still there and no `systemctl` ran; (b) it answers `None` — the same refusal, saying *unreadable*; (c) it answers `[]` — `disable --now` names exactly the present units, the files are gone, `daemon-reload` follows, and a unit that is absent is not named.
+
+**Done when:** each of the two probes in **Why** fails `tests/test_service.py`.
+
+**Related:** TD-060 (#1505), TD-556.
+
+**Resolved:** 2026-10-11 (PR #1521) — `test_install_system_removes_the_old_units_only_when_their_server_holds_no_session` holds the refusal for a server with a session and for one that cannot be read (files kept, no `systemctl`), and with an empty server the `disable --now` of exactly the present units, their removal and the `daemon-reload`. Both probes in **Why** fail it, as do `if live:` and dropping the `unlink`.
