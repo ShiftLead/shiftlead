@@ -9481,3 +9481,40 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-539 (the design), TD-062 (the promoted install), TD-120 / TD-132 (Promote; slice 5 built the first chip), TD-226 (rollback and its hold), TD-233 (the usage chip beside it).
 
 **Resolved:** 2026-10-10 (PR #1500) — `promote.read_since` puts `live_at` and `pending` (ten, `pending_more` the rest) on each repo's reading in the full pass; `build.chip` is always drawn, *live <MM-DD HH:MM>* then *· promoting…* / *· held* / *· main unknown* / *· main +n*, the hover the live sha and subject, *not live yet:* with the pending list, the page's own build where it differs and each stale node; `app.chip_build` puts it on every page and on the Inbox poll, `app.js` prints the time in the browser's zone. `tests/test_promote.py`, `test_build.py` and `test_ui_promote.py` pin it; the UI check on a scratch home held *live*, *main +1* with its subject, *promoting…* and the promoted build's new time (PR body).
+
+## TD-497: Build the watch (TD-489): `agentorc-watch` and its system timer beside the tmux unit, the manager's restart, the three Telegram lines under `notify.telegram`, the doctor's agent line
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-09 (the designer, TD-489's round)
+**Owner:** anchor
+**Kind:** live-check #1407
+**Status:** Resolved
+**Location:** design §4.10 *When the home itself is down: the watch*, §4.1 (the press), §4.4a *When the home is lost*, §4.7 **agent**, §5 `notify:`; a new `src/agentorc/watch.py` (the `agentorc-watch` console script, `pyproject.toml`), `src/agentorc/service.py` (the two unit texts, `install`'s file under `~/.agentorc/systemd/`, `--system`, `status`), `src/sessionorc/notify.py` (the child, reused), the `doctor` RPC's agent reading, `src/sessionorc/agent_common.py` (`WATCH_EVERY`, `WATCH_SILENCE`)
+
+**Why:** TD-489: nothing outside `user@1000` noticed the host agent gone for 4h20m, and nothing started the user manager again; the design now says the watch does both.
+
+**Fix:** as §4.10 says. (1) `service.py`: `agentorc-watch.service` — `[Service] Type=oneshot, User=<the person>, ExecStartPre=+/usr/bin/systemctl start user@<uid>.service, ExecStart=<venv>/agentorc-watch` — and `agentorc-watch.timer` — `OnBootSec=2min, OnUnitActiveSec=5min, [Install] WantedBy=timers.target` — written beside the tmux unit when absent or differing, installed by the same `--system`, named by `status`. (2) `watch.py`: one never-gated read of the home's socket with a ten-second bound; `~/.agentorc/watch.json` holding `silent_since`, `manager_started_at`, `told` (which of the three lines went for this outage); the three lines in §4.10's words, sent as `notify.argv(secrets)`'s Doppler child with the line on its stdin, `secrets` from `notify.telegram` read from `settings.yml`, nothing sent with `on: false`; a failed send logged to `~/.agentorc/watch.log`, not retried; the manager's start is the unit's `ExecStartPre`, and the run reads `systemctl is-active user@<uid>.service` before and after to know it happened. (3) The doctor's **agent** reading adds the timer's presence and `LastTriggerUSec`, the two lines in §4.7's words. (4) TD-495's board line for Paul extends to the watch: after the press, `systemctl --user stop agentorc-agent` for eleven minutes brings the *has not answered* line and `start` the *answers again* line. **Done when** a fake socket (silent / answering), a fake `systemctl` and a fake clock drive `watch.json` through stopped-manager → started → told, and silence → told at 10 min → recovery → told, exactly one message each and none under `on: false`; the unit texts are pinned; `install` writes the watch files beside the tmux unit and `--system` installs both; the doctor's two lines read from fixtures; the board line is extended.
+
+**Related:** TD-489 (the design), TD-488 / TD-495 (the press), TD-319 (the Telegram child), TD-111 / TD-465 (the doctor).
+
+**Resolved:** 2026-10-10 (PR #1407; the root press 2026-10-10) — Paul's press: `sudo ao service install --system` installed `agentorc-tmux.service` and `agentorc-watch.timer`, `ao service status` names both. Live check: `systemctl --user exit` left the tmux server and a session up, the watch started the user manager again ~200 s later with no login (`told: manager`), and `ao status` found the session; `systemctl --user stop agentorc-agent` brought the *has not answered* line at ten minutes and, on `start`, the *answers again* line at 22:42 (silent 15 min); Paul saw all three Telegram lines arrive.
+
+## TD-489: A session killed `systemd --user` by killing a stray process's parent, and nothing noticed the host agent was down for 4h20m
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-09 (ao-paul, the cause of the 2026-10-09 outage, found from designer-ao-1's transcript)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Blocked by:** TD-496, TD-497
+**Location:** `src/agentorc/briefs/` (the role briefs) and `docs/briefs/` (held paths); design §6 (supervision, alarms), §4.4a (the home); designer-ao-1's transcript `2acd2a63-…` at 18:30:53Z
+
+**Why:** to stop its own `sleep 90` polling loops, designer-ao-1 ran `for p in $(ps … grep '[s]leep 90' …); do pp=$(ps -o ppid= -p $p); kill $pp $p; done`. One of those `sleep`s had been orphaned, so its parent was `/usr/lib/systemd/systemd --user`. The loop killed it, which is TD-488's outage. Two gaps: (1) nothing tells a session never to signal a process it did not start, and "kill the parent" is how a cleanup reaches pid 1 or the user manager; (2) no alarm fired. The host agent, the UI and every session were gone for 4h20m, and the person found out only by logging in.
+
+**Fix:** design first, two parts. (1) A rule in every role brief and in `ao --skill`: signal only a pid this session started itself and still holds (a `$!`, a background task id), never a parent, and never by matching a name across the machine. Look at whether a guard fits too, such as a `PreToolUse` hook that refuses a `kill` of pid 1, the user manager, the tmux server or the host agent; a guard is wiring, so it goes in the adapter. (2) An alarm that does not need the host agent alive: something outside `user@1000` that sees the agent socket silent past a bound and reaches the person through the board's push or Telegram (§4.10; TD-092, built as TD-319). **Done when** the briefs and the skill carry the rule, the guard is built or written down as not built, and stopping the host agent on a scratch home raises the alarm within the bound.
+
+**Related:** TD-488, TD-092 and TD-319 (Telegram), TD-111 (`ao doctor`).
+
+**Resolved:** 2026-10-10 — both builds landed: TD-496 (the process rule and the kill guard) and TD-497 (the watch, live-checked 2026-10-10).
