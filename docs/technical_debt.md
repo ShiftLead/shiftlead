@@ -43,6 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-552 | The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc` | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
+| TD-554 | TD-060's summary row and header still say *undecided*, *two systemd units* and **Owner:** paul after the rename was built and split | Low | Open |
 
 ---
 
@@ -628,3 +629,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
 
 **Related:** TD-060, TD-552.
+
+## TD-554: TD-060's summary row says the name is undecided and its **Owner:** is still `paul` after the rename was built and split
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (docs-audit-ao-1, auditing #1511–#1516)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md`: TD-060's summary row and its `**Owner:**` line.
+
+**Why:** the row's title reads *"rename the project — `shiftlead` leads, undecided; two packages, seven env vars, a state directory, two systemd units …"*, while its own Status (#1516) says Paul decided on 2026-09-22 and 2026-09-21 (*go with the rename to shiftlead*), that the machine names, four units and the repo carry `shiftlead` since 2026-10-10/11, and that the entry now only waits for TD-552 and TD-553. The row's title is what a reader of the table takes the entry to be. And `**Owner:** paul` contradicts the same Status: *"what is left is no longer Paul's and no longer here … TD-552 (a grinder's)"*; `Owner` is *who moves the entry next* (this file's header), and nothing in TD-060 is Paul's to move.
+
+**Fix:** reword the row's title to what the entry now is (*the rename's loose ends: TD-552's text sweep and TD-553's fallback; archives when both are done*), and set `**Owner:**` to the seat that archives it (`anchor`, as TD-060's *This entry archives when TD-552 and TD-553 are done* implies) — the row's Status column already says what is left. Nothing else in the entry changes.
+
+**Done when** TD-060's row title and `**Owner:**` agree with its Status.
+
+**Related:** TD-060, TD-552, TD-553.
