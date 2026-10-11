@@ -12,4 +12,4 @@ On 2026-09-22 a Sonnet reviewer of PR #434, whose prompt said "modify no checkou
 
 **Why:** the prompt pointed the reviewer at the anchor's path, and "modify nothing" did not stop a checkout used as a way to read files.
 
-**How to apply:** in a reviewer prompt, name the anchor path only for `git fetch`. Tell it to read with `git show origin/<branch>:<path>` or `git diff`, and to do everything else in its own `git worktree add ~/.cache/<name>` worktree. Say in so many words: never run `checkout`, `reset`, `stash` or `restore` in /home/kmaster/agentorc. Related: [[agentorc-td-grind-mechanics]], [[no-vscode-windows-for-agent-worktrees]].
+**How to apply:** in a reviewer prompt, name the anchor path only for `git fetch`. Tell it to read with `git show origin/<branch>:<path>` or `git diff`, and to do everything else in its own `git worktree add ~/.cache/<name>` worktree. Say in so many words: never run `checkout`, `reset`, `stash` or `restore` in /home/kmaster/shiftlead (the anchor; `~/agentorc` until 2026-10-11). Related: [[agentorc-td-grind-mechanics]], [[no-vscode-windows-for-agent-worktrees]].
