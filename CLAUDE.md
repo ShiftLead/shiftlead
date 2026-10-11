@@ -47,7 +47,7 @@ every worker for 31 minutes, and any branch checked out in this checkout was liv
 
 ```bash
 V=~/.local/share/shiftlead-venv/bin
-$V/pip install --upgrade '/home/kmaster/agentorc[ui]' && $V/ao service install
+$V/pip install --upgrade '/home/kmaster/shiftlead[ui]' && $V/ao service install
 ```
 
 — pip rebuilds a local directory even at an unchanged version and picks up a new dependency; the
@@ -59,7 +59,7 @@ TD-120 step 2; TD-132 builds it); until that lands, the pair above is the press.
 is still read from the checkout: a team's `brief:` files under `docs/briefs/`, at team start, so
 a team still follows the branch checked out here at that moment.
 
-**Going back** (design §6 *A rollback*, TD-226): `ao promote agentorc --back`, or `--sha <commit>` for a
+**Going back** (design §6 *A rollback*, TD-226): `ao promote shiftlead --back`, or `--sha <commit>` for a
 commit of `origin/main`, makes that commit live from a detached worktree and leaves this checkout as
 it is; the policy then promotes nothing for the repo until a Promote concludes or Dismiss
 (`ao promote clear`) ends the hold. A rollback to a commit older than `8841800` (#757) is concluded by
@@ -69,7 +69,7 @@ with its path. It writes no hold, and the pair restarts the host agent, so turn 
 (`settings.yml`, or the Settings page once it answers) and on again once main holds the cure:
 
 ```bash
-R=/home/kmaster/agentorc T=~/.shiftlead/promotes/agentorc/tree V=~/.local/share/shiftlead-venv/bin
+R=/home/kmaster/shiftlead T=~/.shiftlead/promotes/shiftlead/tree V=~/.local/share/shiftlead-venv/bin
 git -C $R fetch -q origin && git -C $R worktree remove --force $T; git -C $R worktree add --detach $T <commit>
 $V/pip install --upgrade "$T[ui]" && $V/ao service install
 ```

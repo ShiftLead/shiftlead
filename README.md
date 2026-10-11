@@ -2,9 +2,8 @@
 
 *The project is **ShiftLead** ([shiftlead.dev](https://shiftlead.dev)), decided 2026-09-21; the command is `ao`.
 The packages, the state directory, the units and the config file carry the name since 2026-10-10 (TD-060;
-`ao migrate` moves a machine from the old names once); the repo is still `eyecantell/agentorc` until it is
-renamed. Was `sessionherd` for the first day of design, and `agentorc` from 2026-09-04 to 2026-10-10, to sit
-beside [cmdorc](https://github.com/eyecantell/textual-cmdorc).*
+`ao migrate` moves a machine from the old names once), and the repo is `eyecantell/shiftlead` since 2026-10-11.
+Was `sessionherd` for the first day of design, and `agentorc` from 2026-09-04 to 2026-10-10, to sit beside [cmdorc](https://github.com/eyecantell/textual-cmdorc).*
 
 A self-hosted web dashboard that orchestrates interactive AI coding-agent sessions (Claude Code first;
 Gemini CLI, Codex CLI, and on-prem harnesses via adapters) — and plain shells — running in tmux across one or more
@@ -80,10 +79,10 @@ a stable, non-editable copy and point the units at it, then promote a merge deli
 
 ```bash
 python3 -m virtualenv ~/.local/share/shiftlead-venv          # (pipx works the same way, if you have it)
-~/.local/share/shiftlead-venv/bin/pip install '/path/to/agentorc[ui]'
+~/.local/share/shiftlead-venv/bin/pip install '/path/to/shiftlead[ui]'
 ~/.local/share/shiftlead-venv/bin/ao service install          # units now run the stable copy; restarts them
 # after a merge you want live:
-~/.local/share/shiftlead-venv/bin/pip install --upgrade '/path/to/agentorc[ui]' && ~/.local/share/shiftlead-venv/bin/ao service install
+~/.local/share/shiftlead-venv/bin/pip install --upgrade '/path/to/shiftlead[ui]' && ~/.local/share/shiftlead-venv/bin/ao service install
 ```
 
 Reaching the UI from elsewhere: never a bare public port (design §4.5). Use a private network

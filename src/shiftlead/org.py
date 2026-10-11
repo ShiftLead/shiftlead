@@ -3,7 +3,7 @@
 
 ```yaml
 projects:
-  agentorc:  {repos: {agentorc: {kmaster: ~/agentorc}}}
+  shiftlead: {repos: {shiftlead: {kmaster: ~/shiftlead}}}
   guardians: {repos: {guardians: {devenv: /workspaces/guardians}, guardians-api: {devenv: /workspaces/guardians/api}}}
 teams:
   ao-grind:

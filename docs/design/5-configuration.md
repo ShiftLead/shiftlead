@@ -45,7 +45,7 @@ teams:                                        # per team, by the name org.yml or
     flow: build-review                        # §4.9c: which of the team's flows it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
-  agentorc: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
+  shiftlead: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
@@ -197,11 +197,11 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
 ```yaml
 projects:
-  agentorc:  {repos: {agentorc: {kmaster: ~/agentorc}}}
+  shiftlead: {repos: {shiftlead: {kmaster: ~/shiftlead}}}
   guardians: {repos: {guardians: {devenv: /workspaces/guardians}, guardians-api: {devenv: /workspaces/guardians/api}}}
 teams:
   ao-grind:
-    projects: [agentorc]
+    projects: [shiftlead]
     manager: {role: manager, name: manager-ao-1}
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
