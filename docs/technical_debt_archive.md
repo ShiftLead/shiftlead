@@ -9707,4 +9707,4 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 
 **Related:** TD-060, TD-552, TD-553.
 
-**Resolved:** 2026-10-11 (PR #PRNUM) — TD-060's row title reads *The rename to ShiftLead's loose ends: TD-552's text sweep and TD-553's fallback; archives when both are done*, and its `**Owner:**` is `anchor`, the seat that archives it; nothing else in the entry changed.
+**Resolved:** 2026-10-11 (PR #1518) — TD-060's row title reads *The rename to ShiftLead's loose ends: TD-552's text sweep and TD-553's fallback; archives when both are done*, and its `**Owner:**` is `anchor`, the seat that archives it; nothing else in the entry changed.
