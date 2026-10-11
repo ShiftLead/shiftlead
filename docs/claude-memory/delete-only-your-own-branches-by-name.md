@@ -12,4 +12,4 @@ Branches are shared by every worktree of the repo. On 2026-09-27 grinder-ao-1 ra
 
 **Why:** `git branch` lists every session's branches, not yours; a squash-merged-looking branch may hold a sibling's unpushed work.
 
-**How to apply:** after `gh pr view N` shows MERGED, `git branch -D <that PR's exact head name>` — one name at a time, only branches this session created. Never pipe `git branch` into a delete. See [[agentorc-td-grind-mechanics]].
+**How to apply:** after `gh pr view N` shows MERGED, `git branch -D <that PR's exact head name>` — one name at a time, only branches this session created. Never pipe `git branch` into a delete. See [[shiftlead-td-grind-mechanics]].

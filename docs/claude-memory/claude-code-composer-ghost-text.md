@@ -16,4 +16,4 @@ was swallowed", and fixes the wrong thing.
 **How to apply:** before calling a prompt unsubmitted, `tmux capture-pane -p -e` and look at
 the attributes: typed text is `\e[39m`, a slash command `\e[38;5;153m`, ghost text `\e[2m`. In
 code use `sessionorc.screen.painted_text` / the adapter's `composer()`. Related:
-[[agentorc-td-grind-mechanics]].
+[[shiftlead-td-grind-mechanics]].

@@ -60,7 +60,7 @@
   .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
-  /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
+  /* the role badge's picture, sized to sit on the badge's baseline (src/shiftlead/ui/static/app.css) */
   .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -166,13 +166,13 @@
 </div>
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
   <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.agentorc/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.shiftlead/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
     <div class="note">The definition as the file holds it, with the session holding each entry. <b>Add</b> edits one line of the file (a <span class="mono">count:</span> bumped, or one member line added) and, while the team runs, creates the member under the manager at once; <b>Remove</b> edits the line the same way and winds that one session down — never a kill — and its card stays until Forget. Comments in the file are kept: the edit is one line, never a rewrite.</div>
     <div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
   <span class="badge"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>Manager</span>
   <span class="mono">manager-ao-1</span><span class="meta">lane —</span>
   <span style="flex-grow: 1;"></span>
-  <span class="mono muted" style="font-size: 12px;">ao-agentorc-manager-ao-1</span><span class="pill s-working"><span class="dot"></span>working</span><span class="meta">the manager: a different definition, by hand</span>
+  <span class="mono muted" style="font-size: 12px;">ao-shiftlead-manager-ao-1</span><span class="pill s-working"><span class="dot"></span>working</span><span class="meta">the manager: a different definition, by hand</span>
 </div><div style="display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid #eceef1;">
   <span class="badge">Tech Lead</span>
   <span class="mono">techlead-ao-1</span><span class="meta">lane —</span>
@@ -187,7 +187,7 @@
   <span class="badge">Designer</span>
   <span class="mono">designer-ao-1</span><span class="meta">lane design-first</span>
   <span style="flex-grow: 1;"></span>
-  <span class="mono muted" style="font-size: 12px;">ao-agentorc-designer-ao-1</span><span class="pill s-idle"><span class="dot"></span>idle</span><span class="btn sm ghost">Remove</span>
+  <span class="mono muted" style="font-size: 12px;">ao-shiftlead-designer-ao-1</span><span class="pill s-idle"><span class="dot"></span>idle</span><span class="btn sm ghost">Remove</span>
 </div>
     <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
       <span style="font-weight: 600;">Add member</span>
@@ -199,7 +199,7 @@
     </div>
     <div class="note" style="color: #7c3d00;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>Remove grinder-ao-2? Edits org.yml (count: 2 → 1) and winds down grinder-ao-2 — it finishes what it holds and exits; its card stays until Forget.</div>
   </div>
-  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.agentorc.yml</span> shows no Members…: that file is a PR's.</div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.shiftlead.yml</span> shows no Members…: that file is a PR's.</div>
 </div>
 </div>
 </x-dc>

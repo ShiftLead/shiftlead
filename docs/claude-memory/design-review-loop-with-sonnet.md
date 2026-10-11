@@ -16,7 +16,7 @@ fact-check as the cadence-review comment, cadence check, squash merge.
 four Fable rounds and three Sonnet rounds to converge.
 **How to apply:** when asked to review a design, deliver findings first and wait for the go;
 then loop reviews to convergence rather than stopping after one. See
-[[agentorc-td-grind-mechanics]] for the cadence comment shape.
+[[shiftlead-td-grind-mechanics]] for the cadence comment shape.
 
 Added 2026-09-22 (TD-103, eight rounds): after round 3 each round returned one finding that was a
 consistency follow-on of the previous adoption, never a new hole. Fable may close the loop then,

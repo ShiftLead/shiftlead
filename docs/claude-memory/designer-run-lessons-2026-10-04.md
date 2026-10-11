@@ -12,4 +12,4 @@ Three things that cost CI cycles on 2026-10-04 (PRs #981, #1006, #1009, #1022), 
 - **While a reviewer agent reads this worktree, the branch stays put.** It reads files from the working tree, so no checkout, rebase or edit until it reports; read for the next entry meanwhile. A second design that touches the same passages is stacked on the first's branch (see [[retarget-a-stacked-pr-with-the-api]]).
 
 **Why:** each is a merge that failed after a green gate, or a number that pointed at someone else's entry.
-**How to apply:** when writing the dated history line, the build entry, and when starting the fact-check. Related: [[agentorc-td-grind-mechanics]], [[summary-table-conflicts-resolve-row-wise]].
+**How to apply:** when writing the dated history line, the build entry, and when starting the fact-check. Related: [[shiftlead-td-grind-mechanics]], [[summary-table-conflicts-resolve-row-wise]].

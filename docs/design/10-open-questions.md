@@ -6,7 +6,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       Tailscale) or an authenticated tunnel (Cloudflare Tunnel + Access); no VPS needed. For
       non-technical users and a hosted service, the agent-initiated **relay** transport (§4.5b),
       kept compatible now and scheduled later.
-- [x] Where the UI process runs (2026-09-05): **wherever `agentorc[ui]` is installed**; nothing
+- [x] Where the UI process runs (2026-09-05): **wherever `shiftlead[ui]` is installed**; nothing
       in the design assumes a particular host. `hosts.yml` lives on the UI host, which may or
       may not also be a session host; for Paul it is kmaster. A hosted service is the `relay`
       transport (§4.5b), after phase 5.
@@ -20,19 +20,20 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
 - [x] "Done when" (2026-09-04): renamed **Ready to close** — Focus side panel with a Close
       button; a card shows "ready to close ✓" or the failing items; `closed` is reached only by
       the person's Close (§4.5a).
-- [x] Name (2026-09-04): `sessionherd` → **`agentorc`**, beside cmdorc; CLI alias `ao`.
+- [x] Name (2026-09-04): `sessionherd` → **`agentorc`**, beside cmdorc; CLI alias `ao`. Then **ShiftLead** (2026-09-21;
+      the machine names on 2026-10-10, TD-060) — see *Product name* below.
 - [x] ttyd vs a Python pty bridge (2026-09-05): **pty bridge in the UI process** — a pty around
       `ssh -tt host tmux attach -t <name>`, bridged to xterm.js with `asyncio` + `os.openpty`;
       resize is `TIOCSWINSZ` on the local pty. The host agent stays the only per-host process.
       ttyd remains the fallback if the bridge proves flaky on slow links (§4.5b).
-- [x] `.agentorc.yml` vs. a section in dev-cadence's per-repo config (2026-09-04): its own
-      file; dev-cadence stays the cadence system, agentorc reads its registry and, via the host
+- [x] `.shiftlead.yml` vs. a section in dev-cadence's per-repo config (2026-09-04): its own
+      file; dev-cadence stays the cadence system, ShiftLead reads its registry and, via the host
       agent only, edits and commits board items (§4.7).
 - [x] Repo layout (2026-09-04): **one repo, two packages**, `sessionorc` below the adapter
-      contract and `agentorc` above it; `sessionorc` imports nothing from `agentorc`; split into
+      contract and `shiftlead` above it; `sessionorc` imports nothing from `shiftlead`; split into
       two repos only when a second consumer (cmdorc) appears. Packaging (2026-09-05): **one
-      distribution, `agentorc`, with a `[ui]` extra**; base deps `pyyaml`, `typer`; one version
-      crosses the RPC boundary; `pipx install agentorc` on a new host; `requires-python >= 3.12`
+      distribution, `shiftlead`, with a `[ui]` extra**; base deps `pyyaml`, `typer`; one version
+      crosses the RPC boundary; `pipx install shiftlead` on a new host; `requires-python >= 3.12`
       (§4.3, §5).
 - [x] Attention sort vs Attention tab (2026-09-04): sort renamed Urgent first; overdue/due-today
       board items on a Due strip with Snooze/Done; the tab keeps the full board and loses its
@@ -77,7 +78,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       acting RPC passes only with the grant *and* membership in the target's list; empty means
       nobody may act; several controllers allowed; create adds the creator with the child's
       grants ⊆ the creator's; `set_controllers` is gated on the target; defaults from
-      `.agentorc.yml` (§4.8, §4.5a, invariant 11). Rejected: per repo — the boundary is the one
+      `.shiftlead.yml` (§4.8, §4.5a, invariant 11). Rejected: per repo — the boundary is the one
       the person set, not one inferred from a path. From prior art
       ([ADR](../decisions/2026-09-12-orchestrator-membership-prior-art.md)): a restart ceiling,
       `one_for_one` restart scope, an exited orchestrator neither kills nor loses its workers
@@ -110,13 +111,15 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       repos" is which checkouts a team starts in, not credential scoping. Design in §4.9
       (org.yml, `ao team start|stop|status|list`, team groups, a role's `profile`, home and
       reach); code under TD-040.
-- [ ] **Product name.** (raised 2026-09-13) agentorc.com is taken by a pre-launch product and
-      `agentorg` collides with AgentOrgs (table in the
-      [ADR](../decisions/2026-09-13-org-teams-projects.md)). Keep `agentorc` as repo and package
-      until there is a product to name; decide before the relay transport ships (§4.5c).
+- [x] **Product name.** (raised 2026-09-13; decided 2026-09-21, Paul): **ShiftLead**
+      (shiftlead.dev; [ADR](../decisions/2026-09-16-rename.md)). agentorc.com was taken by a
+      pre-launch product and `agentorg` collided with AgentOrgs (table in the
+      [ADR](../decisions/2026-09-13-org-teams-projects.md)). The distribution, the product
+      package, the state directory, the units and the venv took the name on 2026-10-10 (TD-060);
+      `sessionorc` keeps its own.
 - [x] **A session that is meant to run inside a devcontainer** (raised 2026-09-13; decided
       2026-09-13, confirmed 2026-09-17): **a second host** — a host is wherever an
-      `agentorc-agent` runs beside a tmux server, a devcontainer that runs one is a host, and a
+      `shiftlead-agent` runs beside a tmux server, a devcontainer that runs one is a host, and a
       project's repo entry names it per host. Rejected: (a) run on the host against the same
       checkout, leaving the container to the person; (c) a container-exec launch in the adapter,
       which breaks invariant 8 the moment `docker exec` picks up an rc file. The mechanism is
@@ -125,7 +128,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       supervises the agent from its tick; the link is a per-node socket at the home,
       bind-mounted in; occupancy across the home and its container is derived from the
       `container:` entry; a runtime host has `ao host forget`. Rejected: bind-mounting the home's
-      whole `~/.agentorc` (its `agent.sock` makes an unqualified caller a person at the home).
+      whole `~/.shiftlead` (its `agent.sock` makes an unqualified caller a person at the home).
       Built: TD-057 step 3c. Brief: `docs/briefs/guardians-orchestrator.md`.
 - [x] **What may a manager do with the repo's numbers?** (raised 2026-09-25, Paul: *if I want to
       make sure the team is balanced, I can make sure the PR count is not growing too much — the
@@ -170,7 +173,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
 - [x] **How do sessions on different hosts talk?** (2026-09-16, TD-057): not routing but a
       **session graph that spans hosts** → **§4.4a**: one always-on **home** host agent (kmaster)
       holds the org's graph and mail; other host agents are **nodes** that keep tmux, the pty and
-      hooks and dial home over ssh (`agentorc-agent link`); §4.10 runs in one place. Addresses
+      hooks and dial home over ssh (`shiftlead-agent link`); §4.10 runs in one place. Addresses
       are `id@host`, a bare id meaning the record's own host; mail to an unreachable host lands
       at home, an act onto one is refused; a host that cannot reach home lets a person act but
       refuses its sessions' mail and acts; the link is written as the relay's protocol. Rejected:

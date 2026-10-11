@@ -1,6 +1,6 @@
 ---
 name: pdm-run-fmt-sweeps-other-sessions-files
-description: In an agentorc worktree, `pdm run fmt` reformats the whole repo — including files another session just merged — and `git add -A` then sweeps them into your commit.
+description: In a ShiftLead worktree, `pdm run fmt` reformats the whole repo — including files another session just merged — and `git add -A` then sweeps them into your commit.
 metadata:
   type: feedback
 ---
@@ -9,4 +9,4 @@ metadata:
 
 **Why:** it is TD-061's failure from the other side — a change riding a PR whose author did not write it and whose review did not cover it — and in a two-worker team it also breaks the lane split the briefs depend on.
 
-**How to apply:** don't run `pdm run fmt` bare; `pdm run lint` is what the cadence needs and it does not rewrite files. If you do run it, `git show --stat HEAD` before pushing and `git checkout origin/main -- <paths>` anything outside your lane, then `git commit --amend`. Never `git add -A` after a formatter. Related: [[check-in-flight-before-a-td-step]], [[agentorc-td-grind-mechanics]].
+**How to apply:** don't run `pdm run fmt` bare; `pdm run lint` is what the cadence needs and it does not rewrite files. If you do run it, `git show --stat HEAD` before pushing and `git checkout origin/main -- <paths>` anything outside your lane, then `git commit --amend`. Never `git add -A` after a formatter. Related: [[check-in-flight-before-a-td-step]], [[shiftlead-td-grind-mechanics]].

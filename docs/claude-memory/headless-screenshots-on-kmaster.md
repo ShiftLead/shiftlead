@@ -1,6 +1,6 @@
 ---
 name: headless-screenshots-on-kmaster
-description: "How to screenshot the live agentorc UI on kmaster — snap Firefox headless, from a non-hidden home directory"
+description: "How to screenshot the live ShiftLead UI on kmaster — snap Firefox headless, from a non-hidden home directory"
 metadata: 
   node_type: memory
   type: reference
@@ -25,7 +25,7 @@ Paul's own screenshots arrive at `/mounted/dev/tmp.png`.
 **Playwright for anything after load (set up 2026-10-02, Paul's go):** the system Python has no `ensurepip`, so it lives in its own folder, installed with the live venv's pip (`--target`, the live venv untouched), with Chromium headless shell in `~/.cache/ms-playwright/`:
 
 ```bash
-PYTHONPATH=~/ao-shots/pwlib ~/.local/share/agentorc-venv/bin/python ~/ao-shots/scripts/<script>.py
+PYTHONPATH=~/ao-shots/pwlib ~/.local/share/shiftlead-venv/bin/python ~/ao-shots/scripts/<script>.py
 ```
 
-`~/ao-shots/scripts/focus_font.py` (a Focus terminal's font size after it draws) and `inbox_md.py` (the Inbox after its scripts run) are the first two. It waits for scripts, reads live values with `page.evaluate`, and shoots in the dark theme. Against the live UI it stays read-only: GETs and reads, never a press. Presses go to a scratch home ([[scratchpad-too-long-for-unix-sockets]]). **A scratch home is not isolated by `AGENTORC_HOME` alone** (2026-10-03, TD-298): `agentorc-agent serve` on one still read the real repo registry and fast-forwarded `/home/kmaster/agentorc`, and it ignores `AGENTORC_TMUX_SOCKET`. Use `scripts/look_home.py` (TD-291, #970) once merged; until then a `hosts.yml` in the home with `local: {repos_registry: <home>/repos.txt}` and `HostAgent(tmux=Tmux(socket_name=…))` started in-process, as `tests/conftest.py` does. Paul's own screenshots still arrive at `/mounted/dev/tmp*.png`; check the file's mtime, an old one is sometimes left there. See [[ui-review-screenshots]].
+`~/ao-shots/scripts/focus_font.py` (a Focus terminal's font size after it draws) and `inbox_md.py` (the Inbox after its scripts run) are the first two. It waits for scripts, reads live values with `page.evaluate`, and shoots in the dark theme. Against the live UI it stays read-only: GETs and reads, never a press. Presses go to a scratch home ([[scratchpad-too-long-for-unix-sockets]]). **A scratch home is not isolated by `SHIFTLEAD_HOME` alone** (2026-10-03, TD-298): `shiftlead-agent serve` on one still read the real repo registry and fast-forwarded the main checkout (`/home/kmaster/shiftlead`), and it ignores `SHIFTLEAD_TMUX_SOCKET`. Use `scripts/look_home.py` (TD-291, #970) once merged; until then a `hosts.yml` in the home with `local: {repos_registry: <home>/repos.txt}` and `HostAgent(tmux=Tmux(socket_name=…))` started in-process, as `tests/conftest.py` does. Paul's own screenshots still arrive at `/mounted/dev/tmp*.png`; check the file's mtime, an old one is sometimes left there. See [[ui-review-screenshots]].

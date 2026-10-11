@@ -20,4 +20,4 @@ Paul runs several sessions at once and does not always say which holds what.
 **How to apply:** when a step is held elsewhere, do the conformance read of what lands instead of
 building; coordinate over Claude Code's session messages for anchor-to-session talk, but use
 `ao msg` for anything to an unattended lead — a peer message to a lead is held for approval and
-stalls it ([[agentorc-td-grind-mechanics]], TD-064).
+stalls it ([[shiftlead-td-grind-mechanics]], TD-064).
