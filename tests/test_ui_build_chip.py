@@ -16,7 +16,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-UI = pathlib.Path(__file__).resolve().parents[1] / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parents[1] / "src" / "shiftlead" / "ui"
 
 PROBE = """
 const fs = require("fs");

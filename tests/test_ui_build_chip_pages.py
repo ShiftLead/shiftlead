@@ -14,9 +14,9 @@ from test_ui_entry import client as entry_client
 from test_ui_entry import fake, world
 from test_ui_inbox import send, sender_session
 
-from agentorc.ui import app as uiapp
+from shiftlead.ui import app as uiapp
 
-UI = pathlib.Path(__file__).resolve().parents[1] / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parents[1] / "src" / "shiftlead" / "ui"
 CHIP = {"text": "live 10-10 15:41 · main +7", "title": "td549", "cls": "behind", "at": "", "rest": ""}
 DRAWN = '<span class="mono behind" id="buildchip" title="td549">live 10-10 15:41 · main +7</span>'
 
