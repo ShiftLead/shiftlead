@@ -41,7 +41,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-547 | The build chip's browser half (`drawBuildChip`, `buildStamp`, the Inbox poll's redraw) has no test: delete it and the suite stays green | Low | Open |
 | TD-548 | `common.build_chip`'s stale-node list and the page's own build are untested: the two lines can go and `test_build.py` and `test_ui_promote.py` stay green | Low | Open |
 | TD-549 | "Every page" draws the build chip, but only `/` and `/inbox` are tested: `Focus`'s line can be removed with the suite green | Low | Open |
 
@@ -592,22 +591,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-547: The build chip's browser half (`drawBuildChip`, `buildStamp`, the Inbox poll's redraw) has no test: delete it and the suite stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.js` (`buildStamp`, `drawBuildChip`, the `if (got.build_chip) drawBuildChip(...)` line in the Inbox poll); `tests/test_ui_promote.py::test_every_page_and_the_inbox_poll_draw_the_build_chip`
-
-**Why:** the comment #1500 wrote says the chip is *"Drawn at load and again from each Inbox poll's `build_chip`, so a merge shows without a reload"* and reprints *live <MM-DD HH:MM>* "in the browser's zone — the year in front only when it is not this one". Every test of it is server-side: `test_ui_promote.py` greps the HTML for `data-at`/`data-rest` and the poll's JSON for `build_chip`, and `grep -rn 'drawBuildChip\|buildStamp' tests/` finds nothing. Probes, each run over all of `tests/` in a scratch worktree: delete `drawBuildChip(null);` (the load draw), delete `if (got.build_chip) drawBuildChip(got.build_chip);` (the poll redraw), and replace the year rule with `return false ? md` — each `pytest -x` run passes. So the page can show the server's sentence in the server's zone, never refresh after a merge, or print the wrong year, and nothing fails.
-
-**Fix:** a node probe in the style of `tests/test_recent_links.py::PROBE`: load `app.js`, call `drawBuildChip({at, rest, ...})` on a stub element and expect `live <MM-DD HH:MM><rest>` (with TZ set), the year in front for an `at` of another year, `text` kept when there is no `at`, and a call with `null` re-stamping from `dataset`. A second line: the poll function handed `{build_chip: {...}}` reaches `drawBuildChip`.
-
-**Related:** TD-539 (the build), TD-546 (the probe pattern).
 
 ## TD-548: `common.build_chip`'s stale-node list and the page's own build are untested: the two lines can go and `test_build.py` and `test_ui_promote.py` stay green
 
