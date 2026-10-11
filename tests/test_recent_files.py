@@ -138,6 +138,18 @@ async def test_the_tick_reads_the_list_when_the_status_moves_and_a_shell_session
         assert await tick() == ["made by a script.py"]
         n = len(reads)
         assert await tick() == ["made by a script.py"] and len(reads) == n  # a quiet status reads nothing again
+        # a read that fails keeps the list it had and is not marked read, so the next tick takes it again (TD-550)
+        (repo / "second.py").write_text("2")
+        fails = [None]
+        monkeypatch.setattr(agent_tick, "_recent_files", lambda d: fails.pop() if fails else reads.append(d) or real(d))
+        was = agent._files_read[sid]
+        assert await tick() == ["made by a script.py"] and agent._files_read[sid] == was
+        assert sorted(await tick()) == ["made by a script.py", "second.py"]
+        # the list moving with `git` unchanged (a fetch moves the base) is saved, not only set in memory
+        agent._files_read.pop(sid)
+        monkeypatch.setattr(agent_tick, "_recent_files", lambda d: [])
+        assert await tick() == [] and agent.store.load(sid).files == []
+        monkeypatch.setattr(agent_tick, "_recent_files", lambda d: reads.append(d) or real(d))
         run("git", "add", ".", cwd=repo)
         sha = commit(repo, "one", 1_700_000_000)
         await tick()

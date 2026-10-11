@@ -9518,3 +9518,39 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-488, TD-092 and TD-319 (Telegram), TD-111 (`ao doctor`).
 
 **Resolved:** 2026-10-10 — both builds landed: TD-496 (the process rule and the kill guard) and TD-497 (the watch, live-checked 2026-10-10).
+
+## TD-550: The tick keeps a record's `files` when a read fails and saves when only the list moved: neither is tested, and the failing form empties the list
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1497, TD-538)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_refresh_git`: `files = {... if isinstance(r, list)}` and `changed = changed or files[s.id] != live.files`); `tests/test_recent_files.py::test_the_tick_reads_the_list_when_the_status_moves_and_a_shell_session_shows_it`
+
+**Why:** the comment #1497 wrote says *"a read that failed keeps the list it had, and is taken again next time"*, and `changed_files`'s docstring says *"None when a read fails, so the record keeps what it had"*. The unit test holds the None at `changed_files`; the tick test never makes a read fail. Probes on `tests/test_recent_files.py` and `tests/test_ui_focus_recent_files.py`: replace `if isinstance(r, list)}` with `if not isinstance(r, BaseException)}` — a failing read would then set `live.files = None`, and it is marked read, so it is not taken again — passes; replace `changed = changed or files[s.id] != live.files` with `pass` (the list moving with no change in `git`, as a commit after a fetch does) — passes, and the test reads through `get`, never the store.
+
+**Fix:** in the tick test, monkeypatch `_recent_files` to return None once: expect the list unchanged and `_files_read` not advanced, then a next tick that reads it; and a read whose list differs while `git` is equal expects `store.save` (read the record back from the store, not `get`).
+
+**Related:** TD-538 (the build).
+
+**Resolved:** 2026-10-11 (PR #1507) — `test_the_tick_reads_the_list_when_the_status_moves_and_a_shell_session_shows_it` now fails a read once (the list kept, `_files_read` not advanced, the next tick reads it) and reads a moved list with `git` unchanged back from the store. Probes: both mutations named in **Why** fail it.
+
+## TD-551: The links read's `state == "closed"` skip is untested: a closed record's transcript is read every minute with the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1501, TD-544)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_refresh_links`: `if not (s.adapter_id and s.dir) or s.state == "closed":`); `tests/test_recent_links.py::test_the_tick_merges_newest_first_a_url_once_and_keeps_twenty`
+
+**Why:** `_refresh_links`'s docstring reads each *live* record. The test asserts the no-`adapter_id` skip, the cadence, the cursor and the merge, but never a closed record. Probe: drop `or s.state == "closed"` and run `tests/test_recent_links.py` — passes. A closed record reads its transcript (a file, off the loop in a thread) every `LINKS_EVERY` for as long as the record is kept.
+
+**Fix:** after the merge assertions, `kill` and `close` the session (without `remove`), reset `_links_checked`, tick, and expect `asked` to gain nothing.
+
+**Related:** TD-544 (the build), TD-543 (the design).
+
+**Resolved:** 2026-10-11 (PR #1507) — `test_the_tick_merges_newest_first_a_url_once_and_keeps_twenty` now kills and closes the record without removing it, and a tick with `_links_checked` cleared asks nothing. Probe: dropping `or s.state == "closed"` fails it.

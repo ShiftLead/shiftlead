@@ -214,7 +214,14 @@ async def test_the_tick_merges_newest_first_a_url_once_and_keeps_twenty(agent, t
         agent._links_checked.clear()
         await agent.tick()
         assert (await person.call("get", id=sid))["links"] == got
+        # a closed record is not read, though it is kept (TD-551)
+        monkeypatch.setattr(adapters.get("shell"), "links", links, raising=False)
         await person.call("kill", id=sid)
+        await person.call("close", id=sid)
+        n = len(asked)
+        agent._links_checked.clear()
+        await agent.tick()
+        assert len(asked) == n
         await person.call("remove", id=sid)
         assert sid not in agent._links_checked and sid not in agent._links_cursor  # no key outlives the record
 
