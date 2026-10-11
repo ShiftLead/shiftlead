@@ -22,7 +22,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-UI = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
 
 
 def iso(dt: datetime) -> str:
@@ -67,7 +67,7 @@ def test_the_three_sections_their_order_and_what_the_count_is():
     """§4.5 screen 6: **Needs you** is open `ask`s to the person and paused `steer`s, oldest first;
     **Steering** is the `steer`s whose clock runs, soonest first; **FYI** is everything else. The
     count is the first section and nothing else — a running `steer` and a `note` are never in it."""
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     ask_old = entry("m-1", "ask", at="2026-09-19T08:00:00Z")
@@ -93,7 +93,7 @@ def test_a_snoozed_entry_is_in_no_section_and_in_no_count_until_its_time():
     """§4.10 *Snooze*: the entry leaves its section and the page's count until that time — and is
     listed in the **Snoozed (n)** fold, because a snooze is never a way to lose mail. A `snoozed_until` that
     has passed, or that cannot be read at all, puts the entry back where it belongs."""
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     ahead = entry("m-1", "ask", snoozed_until=iso(now + timedelta(hours=1)))
@@ -109,7 +109,7 @@ def test_every_closed_shape_lands_in_fyi_and_nothing_is_dropped():
     """§4.5a **Inbox row: `note` and the rest of FYI**: lapsed `steer`s, declined `ask`s and late
     replies are listed until retention prunes them. Every entry is in exactly one section: a page
     that silently drops mail is worse than a full one."""
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     es = [
         entry("m-1", "ask", closed_reason="declined", closed_at="2026-09-19T11:00:00Z"),
@@ -136,7 +136,7 @@ def needs_line(html):
 
 
 def rows(section, es):
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     return templates.get_template("inbox_rows.html").render(rows=es, section=section)
 
@@ -174,7 +174,7 @@ def test_a_short_message_has_no_disclosure_and_an_old_long_one_folds_at_a_senten
 def test_a_message_never_draws_markup_or_a_link_to_the_page_itself():
     """§4.10: raw HTML is its characters, and a link is drawn only when absolute, `http(s)` and not
     the page's own origin — which the row knows from the page it is rendered into."""
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     text = "<script>x</script> [Allow](/api/x) [kill](http://ui:8765/api/k) [docs](https://example.com/p)"
     html = templates.get_template("inbox_rows.html").render(
@@ -327,9 +327,9 @@ def test_the_page_renders_its_three_sections_the_count_and_the_snoozed_affordanc
     """§4.5 screen 6: three sections, FYI folded by default, and the **Snoozed (n)** fold under the
     sections, closed, listing what is set aside. The Steering section says doing nothing is a valid
     answer."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import inbox_sections, templates
+    from shiftlead.ui.app import inbox_sections, templates
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     es = [
@@ -456,7 +456,7 @@ def test_a_poll_never_swaps_rows_out_from_under_the_person():
 def client(subprocess_agent):
     """The agent is module-scoped, so the person inbox carries over between tests: each starts from
     an empty one — a decline first (an open question does not strip), then the strip."""
-    from agentorc.ui.app import create_app
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         for _ in range(2):
@@ -636,7 +636,7 @@ def rec(sid, state, **kw):
 
 
 def state_rows_of(records, **kw):
-    from agentorc.ui.app import state_rows, view
+    from shiftlead.ui.app import state_rows, view
 
     return state_rows([view(r, list(records)) for r in records], **kw)
 
@@ -654,7 +654,7 @@ def test_each_state_row_kind_carries_its_own_controls_and_no_others(tmp_path, mo
     time left; a question and `stalled?` get the text and **Open**; `limited` says the cap holds
     it; an exited session with unpushed work says what Ready to close says. No row offers another
     row's control, and none offers Snooze — a state has nowhere to keep one (TD-069 step 2)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     records = [
         rec("ao-p", "needs-you", pending=PERMISSION, team="ao-grind"),
         rec("ao-q", "needs-you", pending={"kind": "question", "text": "which branch?"}),
@@ -690,7 +690,7 @@ def test_a_manager_the_tick_told_and_could_not_close_is_a_row_with_open_alone(tm
 
     from sessionorc.agent_common import WRAPUP_GRACE
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     now = datetime.now(UTC)
     late = (now - WRAPUP_GRACE - timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
     soon = (now - WRAPUP_GRACE + timedelta(minutes=1)).isoformat().replace("+00:00", "Z")
@@ -719,7 +719,7 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     crash or the fill ceiling, one whose wanted restart is held by work left, and an `early`
     `restart_wanted` each raise one row — as old as the mark, beside any state row the record also
     has — with **Resume**, **Open** and **Snooze**. A superseded record raises none."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     at = "2026-09-19T11:00:00Z"
     early = {"at": at, "why": "context full\nmore", "early": True}
     again = "repeats TD-229: reported done by an earlier run too"
@@ -755,7 +755,7 @@ def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeyp
     assert 'data-act="attention_snooze"' in html and 'data-row="restart"' in html and 'data-act="allow"' not in html
     assert f'data-until="dismissed:{at}"' in html and ">Dismiss<" in html
     # **Dismiss** hides that one mark's row; a new mark (a new `at`) raises a new row
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     gone = inbox_sections([], states=[restart["ao-c"]], attention_snoozed={"ao-c|restart": f"dismissed:{at}"})
     assert all(restart["ao-c"] not in rows_ for rows_ in gone.values() if isinstance(rows_, list))
@@ -772,7 +772,7 @@ def test_a_state_row_carries_the_cards_own_marks_and_none_of_them_is_pressable(t
     """§4.5 screen 6: the row shows the session's name, team, role badge, its `title` and its
     `doing` line with age — the card's own view, so the two cannot drift. TD-071 item 8: the state
     mark is the card's pill, a `<span>`, and what a session wrote is text and nothing else."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     r = rec("ao-p", "needs-you", pending={"kind": "permission", "text": "run <b>rm</b>?", "tool_use_id": "t"},
             team="ao-grind", role="grinder", title="Error <i>Checker</i>",
             doing={"text": "reading <script>x</script>", "at": "2026-09-19T09:50:00Z"})  # fmt: skip
@@ -791,8 +791,8 @@ def test_a_state_row_carries_the_cards_own_marks_and_none_of_them_is_pressable(t
 def test_needs_you_is_the_tools_clock_first_then_oldest_across_states_and_mail(tmp_path, monkeypatch):
     """§4.5 screen 6: *what is on the tool's clock first (a permission's countdown), then oldest
     first* — and the order is one order over states and mail together, not two lists stapled."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import inbox_sections
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import inbox_sections
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     soon = {**PERMISSION, "deadline": iso(now + timedelta(minutes=2))}
@@ -812,8 +812,8 @@ def test_needs_you_is_the_tools_clock_first_then_oldest_across_states_and_mail(t
 def test_the_count_is_states_plus_asks_plus_paused_steers_minus_snoozed(tmp_path, monkeypatch):
     """§4.5a **Inbox page**: one computation, and what it counts. A running `steer`, a `note` and a
     snoozed entry are outside it; a state row is inside it and cannot be snoozed away."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import inbox_sections
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import inbox_sections
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     hour = iso(now + timedelta(hours=1))
@@ -836,7 +836,7 @@ def test_the_filters_cover_state_rows(tmp_path, monkeypatch):
     """§4.5 screen 6: the team filter narrows all three sections — a state carries its session's
     badge — and the free-text filter matches the name, the title, the `doing` line and the pending
     text, which `data-find` carries in one place, lowercased on the server."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     r = rec("ao-p", "needs-you", name="w1", team="ao-grind", title="Error Checker",
             doing={"text": "reading the fetcher", "at": "2026-09-19T09:00:00Z"},
             pending={"kind": "permission", "text": "run PYTEST?", "tool_use_id": "t"})  # fmt: skip
@@ -852,7 +852,7 @@ def test_the_filters_cover_state_rows(tmp_path, monkeypatch):
 def test_a_state_row_is_not_a_mail_row_and_nothing_a_session_wrote_becomes_a_control(tmp_path, monkeypatch):
     """One row renderer per kind (§4.5 screen 6): a state row is dispatched by `row`, marked as a
     state, and carries none of the mail controls — Reply, Delete, Dismiss, Snooze, Pause."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     html = rows("needs", state_rows_of([rec("ao-p", "needs-you", pending=PERMISSION)]))
     assert 'class="mailrow staterow"' in html and 'data-kind="state"' in html and 'data-row="permission"' in html
     for dead in ("reply", "unmail", "snooze", "pause", "gowithit", "resume"):
@@ -871,8 +871,8 @@ def test_the_card_marks_a_record_with_identity_alarms_and_the_mark_is_not_a_cont
     """§4.8a: *a mark on the card*. It says the newest alarm in words on hover, it is a `<span>` —
     never pressable (TD-071 item 8) — and a malformed alarm entry costs that card its mark and not
     the grid, exactly as a malformed `doing` or `run_until` does."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     card = templates.get_template("card.html")
     assert "alarmmark" not in card.render(s=view(rec("ao-x", "idle")))
@@ -898,8 +898,8 @@ def test_the_inbox_has_a_row_per_record_with_alarms_and_one_for_the_hosts_own_li
     misbehaving and a person should know which. The row lists the alarms in words, says which mode
     the host is in, and offers **Dismiss**; the host's own list is a row of its own, blaming no
     record. `(others)` is read as what it stands for, never printed as a row of empty fields."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import alarm_view, inbox_sections
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import alarm_view, inbox_sections
 
     others = {"channel": "", "claimed": "(others)", "rpc": "", "count": 7,
               "at": "2026-09-19T10:00:00Z", "last": "2026-09-19T11:00:00Z"}  # fmt: skip
@@ -941,8 +941,8 @@ def test_the_two_counts_say_how_they_differ(tmp_path, monkeypatch):
     """§4.5a **Inbox page**: the top bar and the page both say the Inbox number is not the Org's
     needs-you count — and from step 2 they say precisely how: the states are in both, the asks and
     paused steers only in this one."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import inbox_sections, templates
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import inbox_sections, templates
 
     sections = inbox_sections([], states=[])
     html = templates.get_template("inbox.html").render(
@@ -972,11 +972,11 @@ def test_a_permission_is_a_row_the_page_the_poll_and_the_top_bar_all_count(clien
     before = client.get("/api/person/inbox").json()["needs"]
     r = client.post("/new", data={"dir": str(tmp_path), "name": "perm", "adapter": "hookstub"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
-    env = {**os.environ, "AGENTORC_SESSION": sid, "AGENTORC_PERMISSION_WAIT": "30"}
+    env = {**os.environ, "SHIFTLEAD_SESSION": sid, "SHIFTLEAD_PERMISSION_WAIT": "30"}
     payload = {"hook_event_name": "PermissionRequest", "tool_name": "Bash",
                "tool_input": {"command": "rm -rf x"}, "tool_use_id": "tu-inbox"}  # fmt: skip
     proc = subprocess.Popen(
-        [sys.executable, "-m", "agentorc.adapters.claude_code.hook"],
+        [sys.executable, "-m", "shiftlead.adapters.claude_code.hook"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env,
     )  # fmt: skip
     proc.stdin.write(json.dumps(payload))
@@ -1066,7 +1066,7 @@ def test_log_td_is_a_persons_own_route_and_a_controller_gone_since_the_draw_is_t
     assert bad.status_code == 400 and "no session ao-nope" in bad.json()["detail"]
 
 
-MANAGER = {"id": "ao-agentorc-manager-ao-1", "name": "manager-ao-1"}
+MANAGER = {"id": "ao-shiftlead-manager-ao-1", "name": "manager-ao-1"}
 
 
 @pytest.mark.unit
@@ -1075,16 +1075,16 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     controller, and is **offered only where there is such a session**. The page does not work that
     out — the home does, as `alarm_to` on the record's view, and the RPC reads the same answer — so
     the button is here exactly when a press can succeed, and the row says so in words where not."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     states = state_rows_of(
         # the home's own shape, `_answers_for`: `{"id", "name"}` (tests/test_identity.py holds it)
         [rec("ao-x", "working", identity_alarms=[ALARM], alarm_to=MANAGER)],
         host="kmaster", identity_mode="enforce",
     )  # fmt: skip
-    assert states[0]["alarm_to"] == {"id": "ao-agentorc-manager-ao-1", "name": "manager-ao-1"}
+    assert states[0]["alarm_to"] == {"id": "ao-shiftlead-manager-ao-1", "name": "manager-ao-1"}
     html = rows("needs", states)
     assert 'data-act="identity_log" data-id="person" data-who="ao-x" data-to="manager-ao-1"' in html
-    assert ">Log TD</button>" in html and "Hand these alarms to manager-ao-1 (ao-agentorc-manager-ao-1)?" in html
+    assert ">Log TD</button>" in html and "Hand these alarms to manager-ao-1 (ao-shiftlead-manager-ao-1)?" in html
     assert "owes you an outcome" in html and "no session answers" not in html
     # a record's alarm is on the session that made the request, not the one it named (TD-077)
     assert "Requests this session made under another session's name." in html
@@ -1120,11 +1120,11 @@ def test_one_poll_reads_the_fleet_once(tmp_path, monkeypatch):
     two on the hot path would be two for no reason (review of PR #251)."""
     from fastapi.testclient import TestClient
 
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     calls: list[str] = []
     idreport = {"host": "kmaster", "mode": "off", "detached_check": False, "tally": {}}
@@ -1165,8 +1165,8 @@ def test_every_session_the_org_counts_as_needs_you_has_exactly_one_row(tmp_path,
     not a dict at all, and a kind this build does not know. A plain *needs you* row carries
     **Open** and no Allow / Deny: nothing structured came with it, and a control built from what is
     not there is what §4.2 forbids (review of PR #251)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import NEEDS_YOU_ROWS, state_kind, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import NEEDS_YOU_ROWS, state_kind, view
 
     records = [
         rec("ao-a", "needs-you", pending=PERMISSION),
@@ -1355,9 +1355,9 @@ def test_the_page_is_one_centred_column_and_a_section_is_a_heading_not_a_box(mon
     """§4.5 screen 6 *Layout* (TD-082 findings 1–3): the page is one centred column of at most
     1100 px — so a message's text runs the width of its row instead of wrapping at a measure of its
     own inside an empty box — and a section is a heading, not a bordered card."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import inbox_sections, templates
+    from shiftlead.ui.app import inbox_sections, templates
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     sections = inbox_sections([entry("m-1", "ask")], now=now)
@@ -1388,9 +1388,9 @@ def test_each_section_keeps_its_blurb_behind_an_i_mark_that_a_screen_reader_can_
     press it, carrying `aria-expanded` and `aria-controls`; its `title` is the same text as the
     paragraph it describes, and the paragraph is in the page **always**, merely `hidden`, because
     `aria-describedby` may point at a hidden node and never at a missing one."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import inbox_sections, templates
+    from shiftlead.ui.app import inbox_sections, templates
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     sections = inbox_sections([entry("m-1", "ask")], now=now)
@@ -1422,7 +1422,7 @@ def test_a_time_left_is_words_from_the_server_and_never_a_placeholder():
     """§4.5 screen 6 *Layout* (TD-082 finding 4): a duration needs no time zone, so the server
     renders it — a screenshot, a slow phone and a script error all read the number rather than the
     `…` the row showed until its script ran. The words are `fmtLeft`'s, so nothing jumps."""
-    from agentorc.ui.app import _countdown, _left
+    from shiftlead.ui.app import _countdown, _left
 
     now = datetime(2026, 9, 20, 12, tzinfo=UTC)
     assert _left(iso(now + timedelta(minutes=21, seconds=5)), now) == "21m 05s"
@@ -1433,7 +1433,7 @@ def test_a_time_left_is_words_from_the_server_and_never_a_placeholder():
     # `TypeError` — which no `except ValueError` catches. One record from another build would have
     # taken the page down rather than costing its row a line (review of PR #281). Read as UTC,
     # which is what every stamp in the store means.
-    from agentorc.ui.app import _age
+    from shiftlead.ui.app import _age
 
     assert _left("2026-09-20T13:00:00", now) == "1h 0m" and _age("2026-09-20T11:00:00", now) == "1h 0m"
     assert _left(12345, now) == "" and _age({"at": "x"}, now) == ""  # not even a string
@@ -1477,7 +1477,7 @@ def answered(mid, **kw):
 
 def sections_of(entries, *, states=(), trail=(), snoozed=None, fleet=None, now=None):
     """`inbox_sections` over entries the page has already annotated, as `person_inbox` does."""
-    from agentorc.ui.app import _owing, inbox_sections
+    from shiftlead.ui.app import _owing, inbox_sections
 
     at = now or datetime(2026, 9, 19, 12, tzinfo=UTC)
     records = {r["id"]: r for r in (fleet or [])}
@@ -1543,10 +1543,10 @@ def handed_entry(mid, **kw):
     """An entry the person handed a seat, as the `inbox` read lists it under `handed` (TD-218 slice 3):
     the holder's own copy, from the person, `handed`, with its holder named."""
     return {
-        "id": mid, "from": "person", "to": [kw.pop("holder", "ao-agentorc-techlead-ao-1")], "kind": "ask",
+        "id": mid, "from": "person", "to": [kw.pop("holder", "ao-shiftlead-techlead-ao-1")], "kind": "ask",
         "text": kw.pop("text", "the Inbox hides a board item\n\nseen on the ao-grind board"),
-        "at": "2026-09-19T10:00:00Z", "handed": True, "entry": {"repo": "agentorc", "type": "debt"},
-        "holder": "ao-agentorc-techlead-ao-1", "holder_name": "techlead-ao-1",
+        "at": "2026-09-19T10:00:00Z", "handed": True, "entry": {"repo": "shiftlead", "type": "debt"},
+        "holder": "ao-shiftlead-techlead-ao-1", "holder_name": "techlead-ao-1",
         "holder_state": kw.pop("holder_state", "working"), **kw,
     }  # fmt: skip
 
@@ -1557,20 +1557,20 @@ def test_an_entry_handed_to_a_seat_waits_on_them_until_its_outcome_and_blocked_i
     press until the seat reports, uncounted, whatever its holder's state — a seat that exited is
     filled again — and is under **Needs you**, counted, once it came back `blocked`. The row names
     the holder and opens it, and **Dismiss** names the entry's id (the holder's copy)."""
-    from agentorc.ui.app import handed_rows, inbox_sections
+    from shiftlead.ui.app import handed_rows, inbox_sections
 
     at = datetime(2026, 9, 19, 12, tzinfo=UTC)
     fleet = {
-        "ao-agentorc-techlead-ao-1": {
-            "id": "ao-agentorc-techlead-ao-1", "team": "ao-grind", "state": "working",
+        "ao-shiftlead-techlead-ao-1": {
+            "id": "ao-shiftlead-techlead-ao-1", "team": "ao-grind", "state": "working",
             "doing": {"text": "drafting TD-240", "at": "2026-09-19T11:50:00Z"},
         }
     }  # fmt: skip
     got = inbox_sections([], now=at, handed=handed_rows([handed_entry("m-h1"), "junk", {}], fleet, at))
     assert [x["id"] for x in got["waiting"]] == ["m-h1"] and got["count"] == 0 and not got["needs"]
     html = rows("waiting", got["waiting"])
-    assert "entry · debt" in html and "for agentorc" in html and "the Inbox hides a board item" in html
-    assert 'href="/focus/ao-agentorc-techlead-ao-1"' in html and "ao-grind" in html
+    assert "entry · debt" in html and "for shiftlead" in html and "the Inbox hides a board item" in html
+    assert 'href="/focus/ao-shiftlead-techlead-ao-1"' in html and "ao-grind" in html
     assert "waiting on techlead-ao-1 to report the entry and its PR" in html
     assert "doing: drafting TD-240 · says 10m ago" in html
     assert 'data-act="dismiss" data-id="person" data-msg="m-h1"' in html
@@ -1596,11 +1596,11 @@ def test_the_handed_row_reaches_the_page_its_own_page_and_the_org_count(tmp_path
     in the Org's top bar as it does on the Inbox — one `inbox_sections` for both."""
     from fastapi.testclient import TestClient
 
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     blocked = {"state": "blocked", "text": "which board?", "at": "2026-09-19T11:30:00Z"}
     inbox = {
@@ -1609,7 +1609,7 @@ def test_the_handed_row_reaches_the_page_its_own_page_and_the_org_count(tmp_path
     }  # fmt: skip
     idreport = {"host": "kmaster", "mode": "off", "detached_check": False, "tally": {}}
     answers = {
-        "list": [rec("ao-agentorc-techlead-ao-1", "working", name="techlead-ao-1")],
+        "list": [rec("ao-shiftlead-techlead-ao-1", "working", name="techlead-ao-1")],
         "inbox": inbox,
         "identity": {**idreport, "alarms": [], "sessions": {}},
         "usage": {},
@@ -1618,7 +1618,7 @@ def test_the_handed_row_reaches_the_page_its_own_page_and_the_org_count(tmp_path
     }
     # the seat's question on the entry's thread, in the person inbox; `thread` reads the person
     # inbox alone and refuses the holder's copy's id, so the page must not ask it
-    inbox["entries"].append(entry("m-q1", "ask", from_="ao-agentorc-techlead-ao-1", root="m-h1", text="which board?"))
+    inbox["entries"].append(entry("m-q1", "ask", from_="ao-shiftlead-techlead-ao-1", root="m-h1", text="which board?"))
 
     class FakeClient:
         async def __aenter__(self):
@@ -1671,7 +1671,7 @@ def test_the_trail_puts_a_row_that_resolved_without_you_into_fyi():
 def test_a_board_reply_on_the_trail_says_where_it_went_and_not_that_it_resolved():
     """§4.5a *Inbox board row → Reply* (TD-142): the trail says what the press's result said, and
     never the state row's *left the Inbox without you answering it* — the person did answer."""
-    t = {"id": "t-2", "sid": "", "name": "agentorc", "team": "", "kind": "board reply",
+    t = {"id": "t-2", "sid": "", "name": "shiftlead", "team": "", "kind": "board reply",
          "text": "Merged, live check pending — Paul: rebase it", "since": "2026-10-04T11:00:00Z",
          "resolved_at": "2026-10-04T11:00:00Z", "how": "written on the board · sent to w1 (holds TD-122)",
          "count": 1, "first": "2026-10-04T11:00:00Z", "last": "2026-10-04T11:00:00Z"}  # fmt: skip
@@ -1679,7 +1679,7 @@ def test_a_board_reply_on_the_trail_says_where_it_went_and_not_that_it_resolved(
     assert "replied: written on the board · sent to w1 (holds TD-122)" in html and "resolved:" not in html
     assert "you replied on the board; the line stays open until it is carried out" in html
     assert "without you answering it" not in html and "rebase it" in html
-    assert 'title="the repo whose board was replied on">agentorc<' in html  # no record: the repo names it
+    assert 'title="the repo whose board was replied on">shiftlead<' in html  # no record: the repo names it
 
 
 @pytest.mark.unit
@@ -1715,9 +1715,9 @@ def test_fyi_carries_its_own_quiet_number_which_is_never_added_to_the_first(monk
     """§4.10: *Inbox 1 · 5* — the second number is FYI's entries and is **never** added to the
     first, which is what needs a person. The section opens itself when its count is higher than
     this browser last saw, which is how a folded, uncounted FYI stops hiding mail."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     got = sections_of([entry("m-1", "ask"), entry("m-2", "note"), entry("m-3", "note")])
     assert got["count"] == 1 and got["fyi_n"] == 2
@@ -1778,8 +1778,8 @@ def test_a_steer_the_person_let_go_owes_an_outcome_exactly_as_a_question_does():
     close reason. The agent enforces the debt on `ASK_KINDS`, `steer` included (`MailEntry.owes`),
     so the page must read the same set: a narrower one left a `steer`'s debt in FYI, uncounted,
     while `ao progress none` was still refusing its sender (review of PR #287)."""
-    from agentorc.ui.app import OWING_KINDS
     from sessionorc.models import ASK_KINDS
+    from shiftlead.ui.app import OWING_KINDS
 
     assert set(OWING_KINDS) == set(ASK_KINDS)  # one rule, two readings of it
     gone = entry("m-1", "steer", default="off main", closed_reason="go_with_it",
@@ -1832,28 +1832,28 @@ def test_a_one_press_resume_carries_the_record_and_never_its_unattended_flag(tmp
     **Never `unattended`.** The session a press starts is attended, whatever the record was: an
     unattended session answers its own permission prompts, and a press with no form is no place to
     grant that. Nor `run_until`, `wrapup_prompt` or the old `prompt`."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import resume_create
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import resume_create
 
     rec = {
         "id": "ao-w1", "name": "tdgrind-ao-2", "dir": str(tmp_path), "adapter": "claude-code",
-        "profile": "grind", "role": "grinder", "team": "ao-grind", "project": "agentorc",
+        "profile": "grind", "role": "grinder", "team": "ao-grind", "project": "shiftlead",
         "lane": ["TD-073"], "controllers": ["ao-lead"], "adapter_id": "u-1", "state": "exited",
         "unattended": True, "run_until": "2026-09-20T06:00:00Z", "wrapup_prompt": "wrap up",
         "prompt": "the old brief", "capabilities": ["control"],
     }  # fmt: skip
     # a repo whose `grinder` preset grants nothing — so what the record carried cannot survive
-    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {lane: [TD-9]}}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {lane: [TD-9]}}\n")
     got = resume_create(rec)
     assert got["name"] == "tdgrind-ao-2" and got["resume"] == "u-1"
-    assert got["team"] == "ao-grind" and got["project"] == "agentorc" and got["controllers"] == ["ao-lead"]
+    assert got["team"] == "ao-grind" and got["project"] == "shiftlead" and got["controllers"] == ["ao-lead"]
     assert got["lane"] == ["TD-073"] and got["dir"] == str(tmp_path)
     assert got["unattended"] is False  # the whole point of the rule
     assert "run_until" not in got and "wrapup_prompt" not in got and "prompt" not in got
     # the grants come from the **role preset**, not off the old record: the record carried
     # `control` and this preset grants nothing, so a copy would show and an empty list is the proof
     assert got["capabilities"] == []
-    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {grants: [control], lane: [TD-9]}}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {grants: [control], lane: [TD-9]}}\n")
     assert resume_create(rec)["capabilities"] == ["control"]  # …and one it grants is granted
     # the record's own lane wins over the preset's; a record with none takes the preset's
     assert resume_create({**rec, "lane": []})["lane"] == ["TD-9"]
@@ -1862,7 +1862,7 @@ def test_a_one_press_resume_carries_the_record_and_never_its_unattended_flag(tmp
     assert "host" not in got  # this record is the local host's: a parameter never set is never sent
     assert resume_create({**rec, "host": "worker1"})["host"] == "worker1"
     # *Reopen and push* is the same create with a first prompt **the page wrote**
-    from agentorc.ui.app import REOPEN_AND_PUSH
+    from shiftlead.ui.app import REOPEN_AND_PUSH
 
     assert resume_create(rec, prompt=REOPEN_AND_PUSH)["prompt"] == REOPEN_AND_PUSH
     assert "push" in REOPEN_AND_PUSH.lower() and "--outcome" in REOPEN_AND_PUSH
@@ -1873,21 +1873,21 @@ def test_a_resume_of_a_worktree_record_checks_the_name_in_the_records_scope(tmp_
     """TD-145 (2026-09-24): a techlead in `<repo>/.claude/worktrees/techlead-ao-1` was resumed with
     `dir` alone, so the scope became the worktree's basename — `ao-techlead-ao-1-techlead-ao-1`,
     collapsed to `ao-techlead-ao-1`, an id nobody held — and a second record appeared beside
-    `ao-agentorc-techlead-ao-1` instead of replacing it. The create must carry the record's `repo`,
+    `ao-shiftlead-techlead-ao-1` instead of replacing it. The create must carry the record's `repo`,
     so the id the name check computes is the record's own; and *Resume with changes…* must land on
     the form the way the form's own Start would send it back: Where = new worktree, its name, and
     the repo in the directory field."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import resume_create, resume_form_url
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from sessionorc import naming
+    from shiftlead.ui.app import resume_create, resume_form_url
 
-    repo = tmp_path / "agentorc"
+    repo = tmp_path / "shiftlead"
     wt = repo / ".claude" / "worktrees" / "techlead-ao-1"
     wt.mkdir(parents=True)
     rec = {
-        "id": "ao-agentorc-techlead-ao-1", "name": "techlead-ao-1", "dir": str(wt), "repo": str(repo),
+        "id": "ao-shiftlead-techlead-ao-1", "name": "techlead-ao-1", "dir": str(wt), "repo": str(repo),
         "worktree": "techlead-ao-1", "adapter": "claude-code", "profile": "grind-fable", "role": "techlead",
-        "team": "ao-grind", "project": "agentorc", "lane": [], "controllers": ["ao-agentorc-manager-ao-1"],
+        "team": "ao-grind", "project": "shiftlead", "lane": [], "controllers": ["ao-shiftlead-manager-ao-1"],
         "adapter_id": "u-1", "state": "exited", "unattended": True,
     }  # fmt: skip
     got = resume_create(rec)
@@ -1907,7 +1907,7 @@ def test_a_resume_of_a_worktree_record_checks_the_name_in_the_records_scope(tmp_
     assert "repo" not in q  # the form has no repo field; it derives it from Where
     plain = resume_form_url({**rec, "repo": None, "dir": str(tmp_path)})
     assert "where=" not in plain and "worktree=" not in plain
-    # `ao new --repo` scopes a directory by a repo without agentorc's worktree flow (`worktree` unset):
+    # `ao new --repo` scopes a directory by a repo without shiftlead's worktree flow (`worktree` unset):
     # the form keeps that directory — keying on `dir != repo` would have moved it (review of #543)
     outside = {**rec, "worktree": None, "dir": str(tmp_path / "elsewhere")}
     q = {
@@ -1923,7 +1923,7 @@ def test_when_a_resume_cannot_be_silent_it_is_the_filled_in_form_and_not_a_guess
     """§4.5a: *when it cannot be silent it is not a guess*. What the record itself settles is
     answered before anything is created; everything else is the agent's own refusal, and either
     way the answer is the same — the filled-in form, with the reason on it."""
-    from agentorc.ui.app import resume_blocked, resume_form_url
+    from shiftlead.ui.app import resume_blocked, resume_form_url
 
     live = {"state": "working", "name": "w", "dir": "/tmp", "adapter_id": "u-1"}
     assert "still running" in resume_blocked(live)
@@ -1949,9 +1949,9 @@ def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_p
     """**Resume with changes…** is the same create as a form; a press that could not be silent
     lands on the same page with its reason, so a person is never left wondering which of the two
     controls they pressed or what stopped it."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     def page(prefill):
         return templates.get_template("new.html").render(
@@ -2051,9 +2051,9 @@ def test_the_suspended_mark_is_drawn_wherever_the_record_is_and_is_never_a_contr
 
     The two ways out are a person's **Resume** and **Forget**, which exist already — which is why
     there is no Unsuspend anywhere here, and why this is a mark rather than a control."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import suspended_note, templates, view
+    from shiftlead.ui.app import suspended_note, templates, view
 
     got = suspended_note({"at": "2026-09-20T22:00:00Z", "by": "person", "why": "claimed to be ao-y"})
     assert "suspended at 2026-09-20T22:00:00Z by person" in got and "claimed to be ao-y" in got
@@ -2291,7 +2291,7 @@ def test_answered_for_you_is_its_own_section_uncounted_newest_first_and_apart_fr
     """§4.9b / §4.5a: an entry carrying `answered` is under *Answered for you* — never in FYI with
     the notes, never in either number — newest first. A plain note stays FYI, and a snoozed one is
     snoozed like anything else."""
-    from agentorc.ui.app import INBOX_SECTIONS
+    from shiftlead.ui.app import INBOX_SECTIONS
 
     assert INBOX_SECTIONS.index("waiting") < INBOX_SECTIONS.index("answered") < INBOX_SECTIONS.index("fyi")
     old = answered_fyi("m-1", at="2026-09-19T09:00:00Z")
@@ -2526,7 +2526,7 @@ def test_the_team_header_carries_the_answered_mark_as_a_mark_and_the_pages_fill_
     """The header renders an empty, hidden `<span>` per team — never a button or a link — and the
     poll fills it; the Inbox page records *last opened* only while the group is open and in view,
     and the Org reads the poll at load so the mark does not wait a whole interval."""
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     head = templates.get_template("group_head.html")
     html = head.render(g={"team": "ao-grind", "label": "ao-grind", "members": [], "live": 1})
@@ -2616,8 +2616,8 @@ def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path
     box is a bare Deny, and the body then carries no `reason` at all. The box survives the redraws a
     pushed delta or a poll makes, so a half-typed reason is not taken from under the person. That
     the reason reaches the hook's decision is `test_ui.py`'s permission round trip."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     card = templates.get_template("card.html").render(s=view(rec("ao-p", "needs-you", pending=PERMISSION)))
     (row,) = state_rows_of([rec("ao-p", "needs-you", pending=PERMISSION)])
@@ -2660,7 +2660,7 @@ def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path
 
 def _rail_fixture():
     """Two teams' mail and states in every section — the case TD-135's *Done when* is written for."""
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     es = [
         entry("m-1", "ask", team="grind", text="merge #517?", from_name="jeffrey"),
@@ -2679,7 +2679,7 @@ def _rail_fixture():
 def test_every_row_kind_has_its_rail_kind():
     """§4.5 screen 6 *The rail*: *questions*, *steering*, *session states*, *board items*, *notes*,
     *trail* — one per row, from the row's own fields."""
-    from agentorc.ui.app import rail_kind
+    from shiftlead.ui.app import rail_kind
 
     assert rail_kind({"kind": "ask"}) == "questions"
     assert rail_kind({"kind": "note", "passed_up": "ao-t"}) == "questions"
@@ -2692,7 +2692,7 @@ def test_every_row_kind_has_its_rail_kind():
 
 @pytest.mark.unit
 def test_the_picks_come_from_the_url_and_unknown_lines_are_dropped():
-    from agentorc.ui.app import rail_picks
+    from shiftlead.ui.app import rail_picks
 
     got = rail_picks({"team": "grind,none", "sec": "needs,bogus", "kind": "questions", "find": "  jeff  "})
     assert got == {"team": ["grind", "none"], "sec": ["needs"], "kind": ["questions"], "find": "jeff"}
@@ -2705,7 +2705,7 @@ def test_the_rail_counts_rows_on_the_page_under_the_picks():
     line reads what it needs from the person; a second team adds its rows; *FYI* alone shows both
     teams' FYI; an unpicked team reads 0 of n; every count reads *n of all*; nothing picked is the
     whole, as a plain number."""
-    from agentorc.ui.app import rail_counts, rail_picks, rail_rows
+    from shiftlead.ui.app import rail_counts, rail_picks, rail_rows
 
     rows = rail_rows(_rail_fixture())
     whole = rail_counts(rows, rail_picks({}))
@@ -2732,7 +2732,7 @@ def test_the_find_matches_every_word_in_any_order_and_numbers_with_or_without_th
     """TD-135 *Done when* (4): two words from a body in the other order, `#517`, `517,`, and *jeff*
     finding *jeffrey*; a team pressed and a word typed shows only that team's matching rows, and
     the team counts change with the word."""
-    from agentorc.ui.app import rail_counts, rail_picks, rail_rows
+    from shiftlead.ui.app import rail_counts, rail_picks, rail_rows
 
     rows = rail_rows(_rail_fixture())
 
@@ -2752,8 +2752,8 @@ def test_the_page_draws_the_rail_pressed_from_the_url(monkeypatch, tmp_path):
     """§4.5 screen 6: the picks are the page's URL, so the first paint is the filtered page — its
     lines pressed, **Clear filters** drawn, the counts *n of all*, the find box holding the words —
     and the title row is *Inbox* alone."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import rail_counts, rail_picks, rail_rows, templates
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import rail_counts, rail_picks, rail_rows, templates
 
     sections = _rail_fixture()
     picks = rail_picks({"team": "grind", "find": "517"})
@@ -2772,8 +2772,8 @@ def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(m
     """TD-423 (§4.5 screen 6 *The rail*, Paul 2026-10-08): **Clear filters** is drawn at the rail's
     head whatever is picked, so the toggles under it never move; with nothing picked or typed it is
     disabled (`.btn:disabled`'s look), and the page's recount sets `disabled`, never `hidden`."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import rail_counts, rail_picks, rail_rows, templates
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import rail_counts, rail_picks, rail_rows, templates
 
     sections = _rail_fixture()
     for query, disabled in (({}, True), ({"find": "517"}, False), ({"kind": "questions"}, False)):
@@ -2786,7 +2786,7 @@ def test_clear_filters_holds_its_place_and_is_disabled_while_nothing_is_picked(m
         assert "hidden" not in button, query
         assert (" disabled" in button) is disabled, query
         assert html.index('id="railclear"') < html.index('id="ifilter"'), query  # the rail's head
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'railclear").classList.toggle("hidden"' not in js
 
 
@@ -2832,7 +2832,7 @@ def test_the_recount_disables_clear_filters_while_nothing_is_picked():
         pytest.skip("node is not installed: the recount is JavaScript, and nothing else runs it")
     probe = pathlib.Path(tempfile.mkdtemp()) / "recount_probe.js"
     probe.write_text(RECOUNT_PROBE)
-    app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js"
     out = subprocess.run([node, str(probe), str(app_js)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     assert [(c["q"], c["disabled"]) for c in json.loads(out.stdout)] == [
@@ -2848,7 +2848,7 @@ def test_the_find_count_holds_its_line_while_empty():
     """TD-427: `#findn`, the find box's *n of m*, keeps one line while it is empty, so the first
     word typed moves no toggle. Read as a declaration of the stylesheet's rules, comments
     stripped, so a rule commented out is no rule."""
-    css = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.css").read_text()
     css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     rules = re.findall(r"([^{}]+)\{([^{}]*)\}", css)
     decls = [
@@ -2893,7 +2893,7 @@ def test_the_script_counts_the_rail_as_the_server_does():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    from agentorc.ui.app import find_words, rail_counts, rail_picks, rail_rows
+    from shiftlead.ui.app import find_words, rail_counts, rail_picks, rail_rows
 
     # …with a board row coming up (TD-220): in *board items*, in no section's number, kept by a *Needs you* pick
     rows = rail_rows(_rail_fixture(), [{"row": "board", "id": "b9", "team": "grind", "find": "later on"}])
@@ -2928,8 +2928,8 @@ def test_below_720_the_rail_is_a_chip_row_and_a_sheet_holding_the_same_toggles(m
     chips after it — and a native `<dialog>` the rail itself moves into, so the chips and the sheet
     are the rail's toggles and never a second list; below 720 px the rail beside the column is not
     drawn, and a row's controls are 44 px high."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates
 
     html = templates.get_template("inbox.html").render(
         sections=_rail_fixture(), host="kmaster", active="Inbox", agent_down=False, volatile=False, usage={}
@@ -3000,8 +3000,8 @@ def test_idle_open_work_is_a_row_for_a_team_with_no_manager(tmp_path, monkeypatc
     """§4.5a **Inbox row: idle · open work** (§6 rule 3 `idle_open`, TD-259 slice 4): a supervised
     member carrying `idle_open` in a team whose records hold no manager is a counted row with Open
     and Snooze, its words the record's fields; a managed team's member draws none."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import inbox_sections
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import inbox_sections
 
     mark = {"at": "2026-10-01T10:40:00Z", "ref": "TD-070"}
     nudged = {"since": "2026-10-01T10:00:00Z", "nudged_at": "2026-10-01T10:20:00Z", "supervised": True}
@@ -3044,8 +3044,8 @@ def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tm
     TD-250 slice 2): drawn beside Resume on the row of a supervised record that is not a seat — the
     *fills exhausted* row keeps Open, Resume and Dismiss alone — and in the card's menu for a
     supervised idle, exited or closed record, confirming only when no restart mark stands."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     at = "2026-10-01T11:00:00Z"
     ceiling = {"at": at, "count": 3}
@@ -3079,12 +3079,12 @@ def test_the_host_pick_lists_this_host_and_its_nodes(tmp_path, monkeypatch):
     defines more than one — this host first, each node after it, a container marked so and one with
     no live link disabled with its reason — and plain text with one. A Resume with changes… of a
     node's record lands with that host picked."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text(
         "local:\n  name: kmaster\n  local: true\n"
         "nodes:\n  laptop: {}\n  box: {container: {devcontainer: /r/.devcontainer}}\n"
     )
-    from agentorc.ui.app import form_hosts, resume_form_url, templates
+    from shiftlead.ui.app import form_hosts, resume_form_url, templates
 
     got = form_hosts({"links": {"box": {"up": True}, "laptop": {"up": False, "why": "ssh refused"}}})
     assert [(h["name"], h["up"], h["note"]) for h in got] == [
@@ -3135,7 +3135,7 @@ def test_every_inbox_control_has_its_verb_under_way():
     """§4.5a **Inbox row: pending**: one table in the page's script, keyed by the control's wire name (a
     board row's by `board_<its action>`) — every `data-act` the Inbox draws has its verb, so no pending
     row shows a wire name; and every row carries the error line a refused press is drawn on."""
-    root = pathlib.Path(__file__).parents[1] / "src/agentorc/ui"
+    root = pathlib.Path(__file__).parents[1] / "src/shiftlead/ui"
     js = (root / "static/app.js").read_text()
     verbs = _js_table(js, "PRESS_VERBS")
     html = "".join(
@@ -3168,7 +3168,7 @@ def test_every_inbox_control_has_its_verb_under_way():
 def test_every_button_has_one_hover_one_press_and_one_ring():
     """§4.5a **a control's look**: `:hover`, `:active` and `:focus-visible` are set once, on `.btn`, and
     no variant sets its own hover (the ghost's and the card footers' rules are folded into the one)."""
-    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
     rules = [r.split("{")[0].strip() for r in css.split("}") if "{" in r]
     for state in (":hover", ":active", ":focus-visible"):
         mine = [s for s in rules if ".btn" in s and state in s]
@@ -3220,7 +3220,7 @@ def test_an_entry_closed_while_snoozed_is_listed_by_its_close_not_in_the_fold():
     """§4.10 *Snooze* (TD-373): a press that answers or closes a snoozed entry ends the snooze with
     it — the home closes the entry and leaves `snoozed_until` as it was, so the page lists a closed
     entry by its close, never in the **Snoozed (n)** fold."""
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     now = datetime(2026, 9, 19, 12, tzinfo=UTC)
     later = iso(now + timedelta(hours=3))

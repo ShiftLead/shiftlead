@@ -1,5 +1,5 @@
 """The home's definition files have a history (design §4.9 *What is left at the home has a history*,
-TD-210, TD-229 slice 5): at the home, `~/.agentorc` is a git work tree that tracks `org.yml`,
+TD-210, TD-229 slice 5): at the home, `~/.shiftlead` is a git work tree that tracks `org.yml`,
 `profiles.yml` and `settings.yml`, and the org's `flows/` and `roles/` directories (§4.9c, TD-313), and
 ignores the rest — sessions, runs and mail are state, and
 `hosts.yml` is this machine's own. The home's host agent is the one committer; it reads none of the
@@ -30,8 +30,8 @@ IGNORE = (
 # the committer's own name, and nothing of the person's git setup that could stop or sign a commit
 _GIT = (
     "git",
-    "-c", "user.name=agentorc",
-    "-c", "user.email=agentorc@localhost",
+    "-c", "user.name=shiftlead",
+    "-c", "user.email=shiftlead@localhost",
     "-c", "core.hooksPath=/dev/null",
     "-c", "commit.gpgsign=false",
 )  # fmt: skip

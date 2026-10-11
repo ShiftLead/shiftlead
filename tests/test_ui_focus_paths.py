@@ -17,10 +17,10 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from agentorc.ui import help as helpmod
-from agentorc.ui import uiconf
+from shiftlead.ui import help as helpmod
+from shiftlead.ui import uiconf
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 REACH = "vscode://vscode-remote/attached-container+7b22636f6e7461696e65724e616d65223a222f6e31227d/workspaces/r?windowId=_blank"
 
 
@@ -59,9 +59,9 @@ def test_the_file_form_is_the_buttons_template_with_path_unfilled(person):
 
 @pytest.mark.unit
 def test_focus_is_served_editor_file_only_beside_its_editor_button(tmp_path, monkeypatch, person):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import view
+    from shiftlead.ui.app import view
 
     rec = {"id": "ao-x-1", "name": "w", "kind": "agent", "dir": str(tmp_path), "state": "idle"}
     person("")
@@ -76,8 +76,8 @@ def test_focus_is_served_editor_file_only_beside_its_editor_button(tmp_path, mon
 
 @pytest.mark.unit
 def test_the_route_forwards_the_runs_to_the_paths_read(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui import app as ui
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui import app as ui
 
     asked: list[tuple[str, dict]] = []
 
@@ -142,13 +142,13 @@ const press = (event, file, resolved, line, col) => {
 const FILE = "vscode://file{path}", SSH = "vscode://vscode-remote/ssh-remote+km{path}";
 const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
 (async () => {
-  const rows = ["see src/agentorc/cli.py:364 and build/review.", "nothing here at all",
+  const rows = ["see src/shiftlead/cli.py:364 and build/review.", "nothing here at all",
     "Edit(scripts/x.py) then https://github.com/eyecantell/agentorc/pull/1"];
   const term = { buffer: { active: { getLine: (y) => rows[y] === undefined ? undefined
     : { translateToString: () => rows[y] } } } };
   const asked = [];
   let fail = false;
-  const answer = { "src/agentorc/cli.py": "/r/src/agentorc/cli.py", "build/review": null,
+  const answer = { "src/shiftlead/cli.py": "/r/src/shiftlead/cli.py", "build/review": null,
     "scripts/x.py": "/r/scripts/x.py" };
   const p = AO.pathProvider(term, "ao-x-1", { file: FILE }, (r) => { asked.push(r);
     const paths = Object.fromEntries(r.map((k) => [k, answer[k] ?? null]));
@@ -187,7 +187,7 @@ const BOX = "vscode://vscode-remote/attached-container+7b7d{path}";
   console.log(JSON.stringify({
     wideLinks, slowAsks: slowAsked.length,
     long: runs("x/" + "a".repeat(600) + " and src/ok.py"),
-    one: runs("see src/agentorc/cli.py:364 and build/review."),
+    one: runs("see src/shiftlead/cli.py:364 and build/review."),
     shapes: runs("(./a/b.py) ~/x/y.md, /etc/hosts; ../up/z.ts:3:7] word a/"),
     url: runs("https://github.com/a/b/pull/1 and http://x/y/z"),
     bare: runs("no paths, just words and a.b and ./ and /"),
@@ -235,8 +235,8 @@ def _probe() -> dict:
 @pytest.mark.unit
 def test_the_runs_a_row_yields():
     got = _probe()
-    assert got["one"] == [["src/agentorc/cli.py:364", "src/agentorc/cli.py", 364, None, 4, 27],
-                          ["build/review", "build/review", None, None, 32, 44]]  # fmt: skip
+    assert got["one"] == [["src/shiftlead/cli.py:364", "src/shiftlead/cli.py", 364, None, 4, 28],
+                          ["build/review", "build/review", None, None, 33, 45]]  # fmt: skip
     # relative, ./, ~/, ../ and absolute; the bracket or sentence stop at the tail is not the run's
     assert [r[0] for r in got["shapes"]] == ["./a/b.py", "~/x/y.md", "/etc/hosts", "../up/z.ts:3:7"]
     assert got["shapes"][3][2:4] == [3, 7]
@@ -257,14 +257,14 @@ def test_a_links_range_is_in_cells_and_an_answer_from_before_a_reattach_is_not_k
 @pytest.mark.unit
 def test_a_row_is_asked_once_and_only_what_the_host_resolved_is_a_link():
     got = _probe()
-    link = {"text": "src/agentorc/cli.py:364", "range": {"start": {"x": 5, "y": 1}, "end": {"x": 27, "y": 1}},
+    link = {"text": "src/shiftlead/cli.py:364", "range": {"start": {"x": 5, "y": 1}, "end": {"x": 28, "y": 1}},
             "decorations": {"underline": True, "pointerCursor": True}}  # fmt: skip
     # build/review in the same row is not a file: text
     assert got["first"] == [link] and got["again"] == [link]
     assert got["empty"] is None  # a row with no candidates asks nothing
     assert [k["text"] for k in got["third"]] == ["scripts/x.py"]  # the URL on the row is the addon's
     assert got["askedBefore"] == 2  # rows 1 and 3, once each; the second hover was answered from memory
-    assert got["asked"][0] == ["src/agentorc/cli.py", "build/review"]
+    assert got["asked"][0] == ["src/shiftlead/cli.py", "build/review"]
     # a failed ask is no link and remembered nowhere: the next hover asks again
     assert got["failed"] is None and got["after"] == [link]
 
@@ -273,7 +273,7 @@ def test_a_row_is_asked_once_and_only_what_the_host_resolved_is_a_link():
 def test_only_ctrl_or_cmd_opens_and_the_line_rides_on_every_vscode_form():
     got = _probe()
     assert got["plainClick"] is False and got["ctrlClick"] is True
-    assert got["opened"] == [["vscode://file/r/src/agentorc/cli.py:364", "the editor"]]
+    assert got["opened"] == [["vscode://file/r/src/shiftlead/cli.py:364", "the editor"]]
     # percent-encoded, `/` kept (§5, TD-011); the line and column after the path
     assert got["file"]["opened"] == [["vscode://file/r/my%20dir/a%23b.py:12:3", "the editor"]]
     # no line printed: `:1`, so a remote path opens as a file and not a folder (TD-524, TD-526)

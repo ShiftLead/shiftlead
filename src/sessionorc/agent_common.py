@@ -40,9 +40,9 @@ from sessionorc.models import (
     report_line,
 )
 
-log = logging.getLogger("agentorc.agent")
+log = logging.getLogger("shiftlead.agent")
 
-TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
+TICK_SECONDS = float(os.environ.get("SHIFTLEAD_TICK", "2"))
 PUSH_OPEN = b'{"event": "session", "session": '  # a pushed view's envelope, measured not guessed (TD-066)
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
@@ -243,7 +243,7 @@ def closer_of(caller: Any, closer: Any, at: str) -> dict[str, Any]:
 FILES_MAX = 16
 FILE_CAP = 256 * 1024
 # The home's nightly tarball of its store (§4.4a "When the home is lost", step 4b.3): what goes in,
-# relative to AGENTORC_HOME — the org's records and the files that say what the org is — and how
+# relative to SHIFTLEAD_HOME — the org's records and the files that say what the org is — and how
 # many days are kept. Nothing else: never a node's `env`, a token, a run log or a socket.
 BACKUP_KEEP = 7
 BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml", "settings.yml")
@@ -341,7 +341,7 @@ def _reply_line(req: dict[str, Any], reply: dict[str, Any]) -> bytes:
 
 
 def backup_store(day: str) -> Path | None:
-    """`backups/store-<day>.tar.gz` of `BACKUP_MEMBERS` under AGENTORC_HOME (design §4.4a "When
+    """`backups/store-<day>.tar.gz` of `BACKUP_MEMBERS` under SHIFTLEAD_HOME (design §4.4a "When
     the home is lost", TD-057 step 4b.3), mode `0600`, written under a temporary name and renamed
     so a half-written tarball never counts as one; the newest `BACKUP_KEEP` kept. Regular files
     only — a socket, a symlink or anything else found among them is not followed. None when

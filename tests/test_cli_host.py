@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from agentorc import cli, teamrun
 from sessionorc import containers
 from sessionorc.client import AgentUnavailable
+from shiftlead import cli, teamrun
 
 pytestmark = pytest.mark.unit
 

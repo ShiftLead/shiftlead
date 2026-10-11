@@ -202,7 +202,7 @@ async def test_resume_supersedes_the_exited_record(agent, hookstub, tmp_path):
 
 async def test_resume_of_a_live_conversation_is_refused(agent, hookstub, tmp_path, monkeypatch):
     """TD-012: two panes must never drive one conversation. A live record of ours, or a live session
-    outside agentorc with that tool id, refuses the resume; the anchor rule (directories) is separate."""
+    outside shiftlead with that tool id, refuses the resume; the anchor rule (directories) is separate."""
     from sessionorc import adapters
     from sessionorc.adapters import ExternalSession
 
@@ -219,7 +219,7 @@ async def test_resume_of_a_live_conversation_is_refused(agent, hookstub, tmp_pat
             "external_sessions",
             lambda: [ExternalSession("ext", str(tmp_path / "c"), "vscode-conv", "cc-ext", "idle")],
         )
-        with pytest.raises(AgentError, match="vscode-conv .*outside agentorc"):
+        with pytest.raises(AgentError, match="vscode-conv .*outside shiftlead"):
             await c.call("create", name="again", dir=str(tmp_path / "b"), adapter="hookstub", resume="cc-ext")
         await c.call("kill", id=live["id"])
         new = await c.call("create", name="again", dir=str(tmp_path / "b"), adapter="hookstub", resume="cc-live")
@@ -304,8 +304,8 @@ async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_pat
 async def test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks(agent, hookstub, tmp_path, monkeypatch):
     """TD-015: with no hook yet, the screen rule's verdict is applied as scraped (the trust dialog
     case); once a hook reports, the screen no longer outranks it; `explain` says which."""
-    from agentorc.adapters.claude_code import RULES_FILE
     from sessionorc.screen import Manifest
+    from shiftlead.adapters.claude_code import RULES_FILE
 
     monkeypatch.setattr(type(hookstub), "rules", Manifest.load(RULES_FILE))
     async with LocalClient() as c:
@@ -346,9 +346,9 @@ async def test_a_screen_rules_state_goes_back_when_its_screen_is_gone(agent, hoo
     verdict until the tool's next hook."""
     from datetime import timedelta
 
-    from agentorc.adapters.claude_code import RULES_FILE
     from sessionorc import agent_tick
     from sessionorc.screen import Manifest
+    from shiftlead.adapters.claude_code import RULES_FILE
 
     monkeypatch.setattr(type(hookstub), "rules", Manifest.load(RULES_FILE))
     fixture = Path(__file__).parent / "fixtures" / "screens" / "trust-dialog.txt"

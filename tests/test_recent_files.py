@@ -11,10 +11,10 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from agentorc.adapters.claude_code.hook import translate
 from sessionorc.client import LocalClient
 from sessionorc.gitinfo import changed_files
 from sessionorc.models import NODE_OWNED, RECENT_FILES, Session
+from shiftlead.adapters.claude_code.hook import translate
 
 
 def run(*args, cwd):

@@ -2,28 +2,28 @@ import json
 
 import pytest
 
-from agentorc import service
+from shiftlead import service
 
 pytestmark = pytest.mark.unit
 
 
 def test_unit_text_shapes():
-    a = service.unit_text("agentorc-agent", home="/x/home")
+    a = service.unit_text("shiftlead-agent", home="/x/home")
     assert "KillMode=process" in a  # restarting the agent must never take the tmux server down
-    assert "agentorc-agent serve" in a and "Environment=AGENTORC_HOME=/x/home" in a
+    assert "shiftlead-agent serve" in a and "Environment=SHIFTLEAD_HOME=/x/home" in a
     assert "Environment=PATH=" in a and "WantedBy=default.target" in a
-    u = service.unit_text("agentorc-ui", bind="127.0.0.1", port=8765)
-    assert "--bind 127.0.0.1 --port 8765" in u and "After=agentorc-agent.service" in u
+    u = service.unit_text("shiftlead-ui", bind="127.0.0.1", port=8765)
+    assert "--bind 127.0.0.1 --port 8765" in u and "After=shiftlead-agent.service" in u
     assert "KillMode" not in u
 
 
 def test_the_ui_address_has_one_source(monkeypatch):
-    """`ao ui`, `agentorc-ui` and `ao service install` default to the same bind and port, read from
+    """`ao ui`, `shiftlead-ui` and `ao service install` default to the same bind and port, read from
     one place (TD-149 (7)): three literals once had to be kept in step by hand."""
     import uvicorn
 
-    from agentorc import cli
-    from agentorc.ui import app
+    from shiftlead import cli
+    from shiftlead.ui import app
 
     p = cli.build_parser()
     for argv in (["ui"], ["service", "status"]):
@@ -33,7 +33,7 @@ def test_the_ui_address_has_one_source(monkeypatch):
     monkeypatch.setattr(uvicorn, "run", lambda *a, **k: seen.update(k))
     assert app.main([]) == 0
     assert (seen["host"], seen["port"]) == (service.DEFAULT_BIND, service.DEFAULT_PORT)
-    assert f"--bind {service.DEFAULT_BIND} --port {service.DEFAULT_PORT}" in service.unit_text("agentorc-ui")
+    assert f"--bind {service.DEFAULT_BIND} --port {service.DEFAULT_PORT}" in service.unit_text("shiftlead-ui")
 
 
 def test_install_writes_the_wheel_before_it_restarts_the_units(tmp_path, monkeypatch):
@@ -106,23 +106,23 @@ def test_the_watch_unit_texts():
         "Environment=LANG=C.UTF-8",
     ):
         assert f"{line}\n" in t
-    assert t.split("ExecStart=")[1].split("\n")[0].endswith("agentorc-watch")
+    assert t.split("ExecStart=")[1].split("\n")[0].endswith("shiftlead-watch")
     assert ":/home/paul/.local/bin:" in t, "doppler and the venv resolve as the agent unit's PATH does"
     assert "[Install]" not in t, "the timer is what is enabled, never the service"
     timer = service.watch_timer_text()
-    for line in ("OnBootSec=2min", "OnUnitActiveSec=5min", "Unit=agentorc-watch.service", "WantedBy=timers.target"):
+    for line in ("OnBootSec=2min", "OnUnitActiveSec=5min", "Unit=shiftlead-watch.service", "WantedBy=timers.target"):
         assert f"{line}\n" in timer
     assert list(service.system_units("paul", 1000)) == [
-        "agentorc-tmux.service",
-        "agentorc-watch.service",
-        "agentorc-watch.timer",
+        "shiftlead-tmux.service",
+        "shiftlead-watch.service",
+        "shiftlead-watch.timer",
     ]
 
 
 def test_install_stages_the_system_units_only_when_absent_or_differing(tmp_path, monkeypatch):
     import os
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(service, "SYSTEM_DIR", tmp_path / "etc")
     units = service.system_units("paul", os.getuid())
     staged = service.stage_system_units("paul")
@@ -131,12 +131,12 @@ def test_install_stages_the_system_units_only_when_absent_or_differing(tmp_path,
     (tmp_path / "etc").mkdir()
     for name, text in units.items():
         (tmp_path / "etc" / name).write_text(text)
-    (tmp_path / "etc" / "agentorc-tmux.service").write_text("[Service]\nExecStart=/old/tmux -D\n")
+    (tmp_path / "etc" / "shiftlead-tmux.service").write_text("[Service]\nExecStart=/old/tmux -D\n")
     assert service.stage_system_units("paul") == staged[:1], "an installed unit that differs is staged again"
-    (tmp_path / "etc" / "agentorc-tmux.service").write_text(units["agentorc-tmux.service"])
-    (tmp_path / "etc" / "agentorc-watch.timer").unlink()
+    (tmp_path / "etc" / "shiftlead-tmux.service").write_text(units["shiftlead-tmux.service"])
+    (tmp_path / "etc" / "shiftlead-watch.timer").unlink()
     assert service.stage_system_units("paul") == staged[2:], "the watch's timer absent beside a current tmux unit"
-    (tmp_path / "etc" / "agentorc-watch.timer").write_text(units["agentorc-watch.timer"])
+    (tmp_path / "etc" / "shiftlead-watch.timer").write_text(units["shiftlead-watch.timer"])
     assert service.stage_system_units("paul") == [], "every one current: no root line"
 
 
@@ -152,7 +152,7 @@ def test_install_system_writes_the_unit_made_again_as_root_and_starts_it(tmp_pat
     import pwd
 
     me = getpass.getuser()
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(service, "SYSTEM_DIR", tmp_path / "etc")
     (tmp_path / "etc").mkdir()
     monkeypatch.setattr(service.os, "geteuid", lambda: 0)
@@ -176,7 +176,7 @@ def test_install_system_writes_the_unit_made_again_as_root_and_starts_it(tmp_pat
         assert (tmp_path / "etc" / name).read_text() == text
     assert ran[1:] == [
         ["systemctl", "daemon-reload"],
-        ["systemctl", "enable", "--now", "agentorc-tmux.service", "agentorc-watch.timer"],
+        ["systemctl", "enable", "--now", "shiftlead-tmux.service", "shiftlead-watch.timer"],
     ]
     monkeypatch.setattr(service, "_server_answers", lambda uid: True)  # the old server, not the unit's
     with pytest.raises(RuntimeError, match="already answers on .* default socket"):
@@ -189,11 +189,11 @@ def test_status_says_where_the_tmux_server_runs(monkeypatch):
 
     monkeypatch.setattr(Tmux, "server_pid", lambda self: 4100)
     for cg, said in (
-        ("/system.slice/agentorc-tmux.service", "ok: tmux — server 4100, system unit agentorc-tmux.service"),
+        ("/system.slice/shiftlead-tmux.service", "ok: tmux — server 4100, system unit shiftlead-tmux.service"),
         (
-            "/user.slice/user-1000.slice/user@1000.service/app.slice/agentorc-agent.service",
+            "/user.slice/user-1000.slice/user@1000.service/app.slice/shiftlead-agent.service",
             "warning: tmux — server 4100 under the user manager (/user.slice/user-1000.slice/user@1000.service/"
-            "app.slice/agentorc-agent.service): a stop of `systemd --user` ends every session; "
+            "app.slice/shiftlead-agent.service): a stop of `systemd --user` ends every session; "
             "`ao service install` prints the system unit",
         ),
         ("/user.slice/user-1000.slice/session-3.scope", "tmux: server 4100, not under systemd"),
@@ -205,16 +205,16 @@ def test_status_says_where_the_tmux_server_runs(monkeypatch):
 
 
 def test_ao_service_install_prints_the_root_line_only_when_staged(tmp_path, monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     monkeypatch.setattr(service, "install", lambda **kw: ["u.service"])
-    monkeypatch.setattr(service, "status", lambda: "agentorc-agent: active")
+    monkeypatch.setattr(service, "status", lambda: "shiftlead-agent: active")
     monkeypatch.setattr(
-        service, "stage_system_units", lambda: [tmp_path / "agentorc-tmux.service", tmp_path / "agentorc-watch.timer"]
+        service, "stage_system_units", lambda: [tmp_path / "shiftlead-tmux.service", tmp_path / "shiftlead-watch.timer"]
     )
     assert cli.main(["service", "install"]) == 0
     out = capsys.readouterr().out
-    staged = f"{tmp_path / 'agentorc-tmux.service'}, {tmp_path / 'agentorc-watch.timer'}"
+    staged = f"{tmp_path / 'shiftlead-tmux.service'}, {tmp_path / 'shiftlead-watch.timer'}"
     assert f"staged {staged}; run once as root: sudo " in out
     assert out.rstrip().endswith("ao service install --system")
     monkeypatch.setattr(service, "stage_system_units", lambda: [])
@@ -226,10 +226,10 @@ def test_ao_service_install_prints_the_root_line_only_when_staged(tmp_path, monk
 
 
 def test_ao_service_install_says_a_failed_stage_and_still_succeeds(monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     monkeypatch.setattr(service, "install", lambda **kw: ["u.service"])
-    monkeypatch.setattr(service, "status", lambda: "agentorc-agent: active")
+    monkeypatch.setattr(service, "status", lambda: "shiftlead-agent: active")
 
     def unwritable():
         raise OSError("read-only home")
@@ -243,14 +243,14 @@ def test_ao_service_install_says_a_failed_stage_and_still_succeeds(monkeypatch, 
 
 
 def test_ao_service_install_system_names_what_it_wrote(monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
-    monkeypatch.setattr(service, "install_system", lambda: ["/etc/systemd/system/agentorc-tmux.service"])
+    monkeypatch.setattr(service, "install_system", lambda: ["/etc/systemd/system/shiftlead-tmux.service"])
     assert cli.main(["--json", "service", "install", "--system"]) == 0
-    assert json.loads(capsys.readouterr().out) == {"written": ["/etc/systemd/system/agentorc-tmux.service"]}
+    assert json.loads(capsys.readouterr().out) == {"written": ["/etc/systemd/system/shiftlead-tmux.service"]}
     assert cli.main(["service", "install", "--system"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("wrote /etc/systemd/system/agentorc-tmux.service; ")
+    assert out.startswith("wrote /etc/systemd/system/shiftlead-tmux.service; ")
     assert f"{service.TMUX_UNIT} and {service.WATCH_UNIT}.timer enabled and started" in out
 
 
@@ -276,6 +276,6 @@ def test_status_names_the_watch_timer(monkeypatch):
     monkeypatch.setattr(service, "tmux_placement", lambda: "tmux: no server")
     shown = "LoadState=loaded\nActiveState=active\nLastTriggerUSec=Fri 2026-10-09 14:35:02 BST\n"
     assert service.watch_reading() == {"loaded": True, "active": "active", "last": "Fri 2026-10-09 14:35:02 BST"}
-    assert service.status().endswith("tmux: no server\nagentorc-watch.timer: active")
+    assert service.status().endswith("tmux: no server\nshiftlead-watch.timer: active")
     shown = "LoadState=not-found\nActiveState=inactive\nLastTriggerUSec=n/a\n"
-    assert service.status().endswith("agentorc-watch.timer: not installed")
+    assert service.status().endswith("shiftlead-watch.timer: not installed")

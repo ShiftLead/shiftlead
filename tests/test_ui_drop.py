@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 @pytest.mark.unit
 def test_review_pr_is_the_panels_rule():
-    from agentorc.ui.app import review_pr
+    from shiftlead.ui.app import review_pr
 
     claimed = {"ref": "TD-127", "status": "claimed", "source": "declared"}
     assert review_pr([claimed], "TD-127") is None
@@ -22,8 +22,8 @@ def test_review_pr_is_the_panels_rule():
 
 @pytest.mark.unit
 def test_the_route_refuses_a_drop_in_review_and_lets_one_in_progress_go(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui import app as uiapp
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui import app as uiapp
 
     calls = []
     record = {"id": "ao-w", "progress": []}

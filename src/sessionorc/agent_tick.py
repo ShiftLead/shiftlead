@@ -102,7 +102,7 @@ def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) ->
     return out
 
 
-FILLED_FOR = "[agentorc] you are filled for: "
+FILLED_FOR = "[shiftlead] you are filled for: "
 # `restarts` entries that are not the tick's restarts, left out of rule 9's note (§4.9a, TD-468): a
 # person's Restart, and a team's start by a schedule or by rule 8
 NOT_RESTARTS = ("person", "start", "work")
@@ -110,7 +110,7 @@ NOT_RESTARTS = ("person", "start", "work")
 
 def filled_for(cause: dict[str, Any] | None) -> str | None:
     """The closing line of a manager on call's fill prompt (§6 rule 3 *A fill says why it came*,
-    TD-410), in fixed words from its `seat_due`: *[agentorc] you are filled for: <by> — <member>*, the
+    TD-410), in fixed words from its `seat_due`: *[shiftlead] you are filled for: <by> — <member>*, the
     question's id for `asks`. None for any other fill, which says nothing more."""
     if not cause or not cause.get("by"):
         return None
@@ -946,7 +946,7 @@ class TickMixin:
         the record carries `restart_blocked` and the Inbox lists it."""
         if not s.restart_blocked_sent_at and s.state == "idle" and s.host == self.host:
             line = (
-                f"[agentorc] your restart is held: {dirty} uncommitted and {unpushed} unpushed in your checkout "
+                f"[shiftlead] your restart is held: {dirty} uncommitted and {unpushed} unpushed in your checkout "
                 "— commit and push them, and the host agent restarts you"
             )
             if await self._policy_send(s, line):
@@ -1050,7 +1050,7 @@ class TickMixin:
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
-        line = f"[agentorc] {over.replace(' over the ', ', over your ', 1)} — take nothing new: push, ledger, then "
+        line = f"[shiftlead] {over.replace(' over the ', ', over your ', 1)} — take nothing new: push, ledger, then "
         line += '`ao progress restart --why "context bound"`'
         if await self._policy_send(s, line):
             s.context_sent_at = now_iso()
@@ -1916,7 +1916,7 @@ class TickMixin:
                 return None
             return first
         line = (
-            "[agentorc] your team is finished: every member has declared. Make your last acts — "
+            "[shiftlead] your team is finished: every member has declared. Make your last acts — "
             "`ao progress none`, the note to the person — then `ao close` yourself"
         )
         if manager.state == "idle" and await self._policy_send(manager, line):
@@ -2091,14 +2091,14 @@ class TickMixin:
             # the seat's own questions the person answered (TD-258): a handed entry is the part above
             owed = self._owed_part([e.id for e in s.outbox if e.owes_for(session_inbox=False)])
             parts += [owed] if owed else []
-            return "[agentorc] " + "; ".join(parts) if parts else None
+            return "[shiftlead] " + "; ".join(parts) if parts else None
         ref = self._open_ref(s)
         owed = self._owed_part(s.owed())
         minutes = int(IDLE_NUDGE.total_seconds() // 60)
         if ref is None:
-            return f"[agentorc] you have been idle {minutes} minutes: {owed}" if owed else None
+            return f"[shiftlead] you have been idle {minutes} minutes: {owed}" if owed else None
         return (
-            f"[agentorc] you have been idle {minutes} minutes with `{ref}` open "
+            f"[shiftlead] you have been idle {minutes} minutes with `{ref}` open "
             f"— end the run with one of `ao progress done {ref} --pr N`, `ao progress drop {ref} --why`, "
             "`ao progress none --why` or `ao progress restart --why`" + (f"; {owed}" if owed else "")
         )
@@ -3097,7 +3097,7 @@ class TickMixin:
         results = await asyncio.gather(
             *(
                 # the ledger path the client read from the repo's config at create (design §5
-                # `ledger:`), else the default — this package never reads `.agentorc.yml` itself
+                # `ledger:`), else the default — this package never reads `.shiftlead.yml` itself
                 asyncio.to_thread(
                     reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left, reviews
                 )
@@ -3698,7 +3698,7 @@ class TickMixin:
             # The end of a run this record no longer holds (TD-186): a restart closed the old run and
             # created this one under the same id, and the old run's SessionEnd landed after it. It is
             # not this run's exit, and its tool id is not this run's — applied, it marked a live run
-            # `exited` and made its own tool session read as *outside agentorc* to the anchor rule.
+            # `exited` and made its own tool session read as *outside shiftlead* to the anchor rule.
             log.info("%s: ignored the end of a previous run (%s; this run is %s)", sid, aid, s.adapter_id)
             return
         if s.state == "closed":

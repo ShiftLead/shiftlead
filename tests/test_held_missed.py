@@ -18,7 +18,7 @@ REVIEW = {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
 CREATED = "2026-09-29T12:00:00Z"
 MERGED = datetime(2026, 9, 29, 13, 0, tzinfo=UTC)
 LATER = MERGED + held.GRACE + timedelta(minutes=1)
-HELD, FREE = ["src/sessionorc/agent_tick.py", "docs/design.md"], ["src/agentorc/cli.py"]
+HELD, FREE = ["src/sessionorc/agent_tick.py", "docs/design.md"], ["src/shiftlead/cli.py"]
 
 
 def _rec(reader: str = "techlead") -> Session:
@@ -78,7 +78,7 @@ def test_the_fixed_words():
     c = held.crossing(845, ["src/sessionorc/agent_tick.py"], "t")
     assert c == {"pr": 845, "at": "t", "paths": ["src/sessionorc/agent_tick.py"]}
     assert held.line(c, "techlead") == (
-        "[agentorc] PR #845 touched held paths (`src/sessionorc/agent_tick.py`) and merged without the "
+        "[shiftlead] PR #845 touched held paths (`src/sessionorc/agent_tick.py`) and merged without the "
         'techlead\'s read — a held PR waits for `ao msg --kind ask --pr <n> <seat> "…"` and the reply before the merge'
     )
     many = held.crossing(9, [f"src/sessionorc/{n}.py" for n in "abcde"], "t")
@@ -94,30 +94,30 @@ def test_a_chain_holds_the_union_of_its_links_paths_and_is_said_as_its_readers()
     """TD-315 slice 1: a record carrying a flow's chain holds every link's paths, and its reader is
     any the PR's asks named — the older shape's words stay as they were."""
     links = [
-        {"stage": "ui-review", "reader": "ui", "held": ["src/agentorc/ui/**"]},
+        {"stage": "ui-review", "reader": "ui", "held": ["src/shiftlead/ui/**"]},
         {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]},
     ]
     chain = {"chain": links, "bound": "2h"}
-    files = ["src/agentorc/ui/app.py", "src/sessionorc/held.py", "docs/design.md"]
-    assert held.held_paths(files, chain) == ["src/agentorc/ui/app.py", "src/sessionorc/held.py"]
+    files = ["src/shiftlead/ui/app.py", "src/sessionorc/held.py", "docs/design.md"]
+    assert held.held_paths(files, chain) == ["src/shiftlead/ui/app.py", "src/sessionorc/held.py"]
     s = _rec()
     s.review = chain
     _ask(s, "ao-x-ui")
     _reply(s, "ao-x-ui")
     # link by link (§6 rule 11, TD-349): the ui reader's reply reads a PR only the ui link holds
-    assert held.read_by(s, 845, ["src/agentorc/ui/app.py"]) == "ao-x-ui"
+    assert held.read_by(s, 845, ["src/shiftlead/ui/app.py"]) == "ao-x-ui"
     assert held.read_by(s, 845, files) is None, "the techlead's link holds it too, and has no reply"
     assert "without its readers' read" in held.said({"pr": 845, "paths": ["src/sessionorc/held.py"]}, "")
 
 
 CHAIN = {
     "chain": [
-        {"stage": "ui-review", "reader": "ui-reader", "held": ["src/agentorc/ui/**"]},
+        {"stage": "ui-review", "reader": "ui-reader", "held": ["src/shiftlead/ui/**"]},
         {"stage": "review", "reader": "techlead", "held": ["src/**"]},
     ],
     "bound": "2h",
 }
-BOTH = ["src/agentorc/ui/app.py", "src/sessionorc/held.py"]
+BOTH = ["src/shiftlead/ui/app.py", "src/sessionorc/held.py"]
 
 
 def _chain() -> Session:
@@ -135,7 +135,7 @@ def test_a_chain_is_read_when_every_link_holding_the_pr_has_its_readers_reply():
     s = _chain()
     _reply(s, "ao-x-ui-reader", root="m-1", verdict="pass")
     assert held.read_by(s, 845, BOTH) is None, "the first reader's pass alone is not the chain's read"
-    assert held.read_by(s, 845, ["src/agentorc/ui/app.py", "src/x.py"]) is None, "both links hold src/**"
+    assert held.read_by(s, 845, ["src/shiftlead/ui/app.py", "src/x.py"]) is None, "both links hold src/**"
     _reply(s, "ao-x-ui-reader", root="m-2")  # the first reader on the second's thread: not that link's
     assert held.read_by(s, 845, BOTH) is None
     _reply(s, "ao-x-techlead", root="m-2", verdict="pass")
@@ -366,8 +366,8 @@ async def test_an_idle_member_is_typed_the_line_once(agent, composerstubs, tmp_p
 
 
 def test_the_field_is_the_homes_and_the_match_is_one():
-    from agentorc import review
     from sessionorc import models
+    from shiftlead import review
 
     assert "held_missed" in models.HOME_OWNED
     assert review.held_paths is held.held_paths and review.pr_files is held.pr_files and review.matches is held.matches

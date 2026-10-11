@@ -13,7 +13,7 @@ import pytest
 from design_doc import section
 
 ROOT = pathlib.Path(__file__).parents[1]
-UI = ROOT / "src" / "agentorc" / "ui"
+UI = ROOT / "src" / "shiftlead" / "ui"
 
 pytestmark = pytest.mark.unit
 
@@ -28,14 +28,14 @@ def design_help() -> list[tuple[str, str, str]]:
 
 
 def test_help_py_is_the_designs_list_word_for_word():
-    from agentorc.ui.help import HELP
+    from shiftlead.ui.help import HELP
 
     assert [(h.name, h.where, h.text) for h in HELP] == design_help()
     assert len({h.key for h in HELP}) == len(HELP)
 
 
 def test_every_mark_and_titled_control_names_a_key():
-    from agentorc.ui.help import BY_KEY, GROUPS, SCREENS
+    from shiftlead.ui.help import BY_KEY, GROUPS, SCREENS
 
     text = "".join(p.read_text(encoding="utf-8") for p in (UI / "templates").glob("*.html"))
     titled = set(re.findall(r"help_title\('([\w-]+)'\)", text))
@@ -62,7 +62,7 @@ def test_every_mark_and_titled_control_names_a_key():
 
 
 def test_a_title_is_its_paragraphs_first_sentence():
-    from agentorc.ui.help import BY_KEY, first_sentence
+    from shiftlead.ui.help import BY_KEY, first_sentence
 
     assert first_sentence("forget") == "Drops this session's record: the card, its report line and its mail."
     for h in BY_KEY.values():
@@ -73,8 +73,8 @@ def test_the_marks_draw_the_inbox_shape_and_the_panel_ends_in_help(monkeypatch, 
     """§4.5a the ***i*** mark: a `<button>` labelled *About these controls* with `aria-expanded`,
     `aria-controls` and `aria-describedby` on a panel always in the page and `hidden`, one paragraph
     per control of the group, then *every control → Help* to the group's screen."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates
 
     mod = templates.get_template("help_mark.html").module
     mark, panel = str(mod.mark("focus", "focus")), str(mod.panel("focus", "focus"))
@@ -87,8 +87,8 @@ def test_the_marks_draw_the_inbox_shape_and_the_panel_ends_in_help(monkeypatch, 
 def test_the_help_page_carries_every_paragraph_once(subprocess_agent):
     from fastapi.testclient import TestClient
 
-    from agentorc.ui.app import create_app
-    from agentorc.ui.help import HELP
+    from shiftlead.ui.app import create_app
+    from shiftlead.ui.help import HELP
 
     with TestClient(create_app()) as c:
         page = c.get("/help")

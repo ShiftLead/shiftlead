@@ -280,7 +280,7 @@ async def test_a_mark_is_saved_with_no_repo_and_a_repo_the_home_does_not_read_is
         # the client's reading takes it from there (TD-330 (3))
         home = await person.call("host")
         assert home["balance"] == {"grind": saved["grind"]["balance"], "other": saved["other"]["balance"]}
-        from agentorc import teamrun
+        from shiftlead import teamrun
 
         repos = await person.call("repos")
         assert set(teamrun.balance_marks(repos)) == {"other"}

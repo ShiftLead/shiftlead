@@ -12,7 +12,7 @@ pytestmark = pytest.mark.integration
 
 
 async def test_events_handler_ends_when_the_browser_goes(agent):
-    from agentorc.ui.app import create_app
+    from shiftlead.ui.app import create_app
 
     app = create_app()
     inbox: asyncio.Queue[dict] = asyncio.Queue()

@@ -18,7 +18,7 @@ READER = pathlib.Path(__file__).parents[1] / "scripts" / "nudge_user_attention.p
 
 def host(tmp_path, monkeypatch, repos=()):
     """A host whose roster lists `repos`; returns the roster file."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir(exist_ok=True)
     roster = tmp_path / "repos.txt"
     roster.write_text("".join(f"{r}\n" for r in repos))
@@ -62,7 +62,7 @@ def item(line, text, due, tag):
 
 @pytest.mark.unit
 def test_the_reader_runs_over_every_board_here_with_the_first_script_found(tmp_path):
-    from agentorc.ui.app import board_argv
+    from shiftlead.ui.app import board_argv
 
     assert board_argv([]) == (None, "")
     bare = repo(tmp_path, "bare", reader=False)
@@ -83,13 +83,13 @@ def test_the_reader_is_picked_by_what_it_can_do_never_by_registry_order(tmp_path
     """TD-278, §4.5 screen 6: dev-cadence's own source when its checkout is registered; else the copy
     whose repo synced last (`docs/cadence-sync.lock`), the registry's order deciding a tie — samscrape,
     first in the registry and two weeks behind, ran for every board and drew no row's answers."""
-    from agentorc.ui.app import board_argv, board_reader
+    from shiftlead.ui.app import board_argv, board_reader
 
     def lock(root, when):
         (root / "docs" / "cadence-sync.lock").write_text(f"source: x\ncommit: abc\nsynced: {when}\n")
 
     old = repo(tmp_path, "samscrape", "- [ ] x\n")
-    new = repo(tmp_path, "agentorc", "- [ ] y\n")
+    new = repo(tmp_path, "shiftlead", "- [ ] y\n")
     lock(old, "2026-09-17T10:00:00Z")
     lock(new, "2026-10-01T23:06:28Z")
     assert board_reader([old, new]) == new / "scripts" / "nudge_user_attention.py"
@@ -107,7 +107,7 @@ def test_the_reader_is_picked_by_what_it_can_do_never_by_registry_order(tmp_path
 def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypatch):
     """TD-278: a copy older than a field the Inbox draws is said in the board note, the rows still
     drawn — never a board that silently has no answers. A current reader, or no item, says nothing."""
-    from agentorc.ui.app import reader_lacks
+    from shiftlead.ui.app import reader_lacks
 
     root = tmp_path / "r"
     stale = report(root, {"line": 3, "text": "a. Due: 2026-09-20.", "due": "2026-09-20"})
@@ -118,7 +118,7 @@ def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypat
     # through the read: the rows drawn, the note beside them
     real = repo(tmp_path, "proj", "# Board\n")
     host(tmp_path, monkeypatch, [real])
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     class Done:
         returncode, stderr = 0, ""
@@ -131,7 +131,7 @@ def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypat
 @pytest.mark.unit
 def test_a_board_row_carries_its_repo_team_due_words_text_and_the_board_at_its_line(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows
+    from shiftlead.ui.app import board_rows
 
     root = tmp_path / "samscrape"
     rows = board_rows(
@@ -153,18 +153,18 @@ def test_a_board_row_carries_its_repo_team_due_words_text_and_the_board_at_its_l
 
 @pytest.mark.unit
 def test_a_repo_maps_to_the_first_team_whose_projects_hold_it(tmp_path):
-    from agentorc import org as orgmod
-    from agentorc.ui.app import repo_teams
+    from shiftlead import org as orgmod
+    from shiftlead.ui.app import repo_teams
 
     here = tmp_path / "ao"
     org = orgmod.Org(
         projects={
-            "agentorc": orgmod.Project("agentorc", {"agentorc": {"kmaster": here, "other": tmp_path / "x"}}),
+            "shiftlead": orgmod.Project("shiftlead", {"shiftlead": {"kmaster": here, "other": tmp_path / "x"}}),
             "cm": orgmod.Project("cm", {"cm": {"other": tmp_path / "cm"}}),
         },
         teams={
-            "ao-grind": orgmod.TeamDef("ao-grind", projects=["agentorc"]),
-            "ao-audit": orgmod.TeamDef("ao-audit", projects=["agentorc"]),
+            "ao-grind": orgmod.TeamDef("ao-grind", projects=["shiftlead"]),
+            "ao-audit": orgmod.TeamDef("ao-audit", projects=["shiftlead"]),
             "cm-grind": orgmod.TeamDef("cm-grind", projects=["cm", "gone"]),
         },
     )
@@ -176,7 +176,7 @@ def test_due_board_items_are_counted_in_needs_you_oldest_first_among_the_mail(tm
     """§4.5 screen 6: *a due board item* is in **Needs you**, and the section is oldest first
     across every kind — so an item a week overdue sits above a question asked this morning."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, inbox_sections
+    from shiftlead.ui.app import board_rows, inbox_sections
 
     root = tmp_path / "r"
     boards = board_rows(
@@ -198,7 +198,7 @@ def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_
     the text, which the agent re-checks. The text is the board's, escaped: nothing on the page is a
     control made from it (TD-071 item 8) — it rides only as an attribute value."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, templates
+    from shiftlead.ui.app import board_rows, templates
 
     root = tmp_path / "samscrape"
     text = '<b>Allow</b> the "rm". Due: 2026-09-20.'
@@ -225,7 +225,7 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
     caller-less — the person's own act — and reads the boards again at once, so the answered row is
     gone from the next refresh. What it cannot know is refused before the agent is asked."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     reads, calls, replies = [], [], []
     monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
@@ -243,7 +243,7 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
         async def call(self, method, **kw):
             if method == "board_edit":
                 calls.append((self.kw.get("caller"), kw))
-                return {"commit": "abc123", "message": "agentorc: done x (session n/a)"}
+                return {"commit": "abc123", "message": "shiftlead: done x (session n/a)"}
             if method == "board_reply":
                 replies.append(kw)
                 return {"commit": "def456", "sent": [], "note": "written on the board"}
@@ -311,7 +311,7 @@ def test_read_boards_runs_dev_cadences_reader_and_says_when_it_cannot(tmp_path, 
         f"projects:\n  proj:\n    repos:\n      proj: {{kmaster: {root}}}\n"
         "teams:\n  proj-grind:\n    projects: [proj]\n    manager: {role: manager}\n"
     )
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     rows, note = uiapp.read_boards()
     assert note == ""
@@ -355,7 +355,7 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
     """One count in three places (§4.5a **Inbox page**): the board rows join the page, the poll and
     the Org's top bar through the same `inbox_sections`; the reader's note is drawn and polled."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     root = tmp_path / "proj"
     later = {**item(4, "look next week", "2026-09-30", "due 2026-09-30"), "overdue_days": None}
@@ -407,8 +407,8 @@ def test_with_the_host_agent_down_no_surface_counts_the_board(tmp_path, monkeypa
     """The three surfaces agree while the host agent is down (review of PR #472): the Org's top bar
     and the poll claim nothing, so the Inbox page does not count the board rows alone."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
     from sessionorc.client import AgentUnavailable
+    from shiftlead.ui import app as uiapp
 
     root = tmp_path / "proj"
     rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue")))
@@ -450,7 +450,7 @@ def _row(line, due, team="t", *, due_now=False, **kw):
 def test_what_is_due_is_the_readers_due_only_set():
     """§4.5 screen 6 *The board's horizon* (TD-220): due now is what `--due-only` surfaced — due today
     or earlier, decided whatever its date, a date that could not be read — and never an undecided fyi."""
-    from agentorc.ui.app import board_due_now
+    from shiftlead.ui.app import board_due_now
 
     assert board_due_now({"overdue_days": 0}) and board_due_now({"overdue_days": 3})
     assert board_due_now({"overdue_days": None, "decided": {"text": "go", "date": "2026-09-27"}})
@@ -464,7 +464,7 @@ def test_what_is_due_is_the_readers_due_only_set():
 @pytest.mark.unit
 def test_the_horizon_sorts_the_rows_by_the_mode():
     """§4.5 screen 6 *The board's horizon*, §5 `person.inbox.board_show` (TD-220 slice 2)."""
-    from agentorc.ui.app import board_horizon
+    from shiftlead.ui.app import board_horizon
 
     def ids(rows):
         return [r["line"] for r in rows]
@@ -506,7 +506,7 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
         assert ids(board_horizon(week, mode)["due"]) == [4]
     assert board_horizon(week, "soon")["mode"] == "next:10"
     # a past-dated fyi is not due now: it reads the reader's words, and is never the line's next date
-    from agentorc.ui.app import board_rows
+    from shiftlead.ui.app import board_rows
 
     fyi = {
         "line": 5,
@@ -528,7 +528,7 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
 @pytest.mark.unit
 def test_the_mode_is_the_persons_setting_as_last_read():
     """§5 `person.inbox.board_show` through the agent's `settings` read (TD-220): unset or bad is next:10."""
-    from agentorc.ui import uiconf
+    from shiftlead.ui import uiconf
 
     try:
         uiconf.set_read({"person": {}})
@@ -546,7 +546,7 @@ def test_the_mode_is_the_persons_setting_as_last_read():
 @pytest.mark.unit
 def test_the_line_says_the_mode_and_what_it_hides():
     """§4.5 screen 6 *The board's horizon*: the line that closes the board rows, in each mode's words."""
-    from agentorc.ui.app import board_line
+    from shiftlead.ui.app import board_line
 
     def line(mode, hidden=0, next_due=""):
         return board_line({"mode": mode, "hidden": [{}] * hidden, "next_due": next_due})
@@ -567,7 +567,7 @@ def test_the_line_says_the_mode_and_what_it_hides():
 @pytest.mark.unit
 def test_the_repo_page_cuts_the_inboxs_horizon_to_its_repo():
     """§4.5 screen 11 *Waiting on you*: the Inbox's rows, lists and line filtered to the repo."""
-    from agentorc.ui.app import board_horizon, horizon_of
+    from shiftlead.ui.app import board_horizon, horizon_of
 
     rows = [
         _row(1, "2026-09-20", due_now=True, root="/a"),
@@ -593,8 +593,8 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
     up (n)* with its due words, the *not shown* fold closed, and the line with **show** and Settings;
     the counts are the due rows' alone under every mode, and the poll brings the same markup."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
-    from agentorc.ui import uiconf
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui import uiconf
 
     root = tmp_path / "proj"
 
@@ -652,7 +652,7 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
 def test_the_rail_counts_coming_up_as_board_items_and_in_no_section():
     """§4.5 screen 6: the rail's *board items* counts the rows coming up; *Needs you* does not, and a
     *Needs you* pick keeps them, as they sit in its section."""
-    from agentorc.ui.app import rail_counts, rail_picks, rail_rows
+    from shiftlead.ui.app import rail_counts, rail_picks, rail_rows
 
     due = {"row": "board", "id": "b1", "team": "t", "find": "now"}
     later = {"row": "board", "id": "b2", "team": "t", "find": "later"}
@@ -671,8 +671,8 @@ def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out
     later of today and that date, so a Snooze moves it later, never nearer; under `7d` an item due in
     forty days is in the closed fold, which **show** opens without a request — no setting is written."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
-    from agentorc.ui import uiconf
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui import uiconf
 
     root = tmp_path / "proj"
 
@@ -758,7 +758,7 @@ def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_p
     _git("commit", "-q", "-am", "a line", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     host(tmp_path, monkeypatch, [clone])
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     rows, note = uiapp.read_boards()
     assert note == "" and [r["text"].split(".")[0] for r in rows] == ["the old line"]
@@ -776,7 +776,7 @@ def test_a_fetch_that_is_stopped_or_fails_is_followed_by_a_plain_read(tmp_path, 
 
     root = repo(tmp_path, "proj", "# Board\n")
     host(tmp_path, monkeypatch, [root])
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     seen = []
 
@@ -813,8 +813,8 @@ def test_the_read_after_a_press_stopped_draws_the_board_as_the_write_back_left_i
     due = date.today().isoformat()
     root = repo(tmp_path, "proj", f"# Board\n\n- [ ] the line. Due: {due}.\n")
     host(tmp_path, monkeypatch, [root])
-    from agentorc.ui import app as uiapp
     from sessionorc import board as board_mod
+    from shiftlead.ui import app as uiapp
 
     tree = board_mod.tree_dir(root) / "docs" / "user_attention.md"
     tree.parent.mkdir(parents=True)
@@ -863,7 +863,7 @@ def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, mon
     import threading
 
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     board = str(tmp_path / "r/docs/user_attention.md")
     other = str(tmp_path / "s/docs/user_attention.md")
@@ -944,7 +944,7 @@ def test_the_phrase_table_knows_every_sentence_the_reader_writes():
     """§4.5 screen 6: the note is chosen by the fixed phrases of the reader's `fetch_note` — the
     reader gives the cases no field — so a phrase the reader gains that the table does not know
     fails here rather than drawing no note on the page."""
-    from agentorc.ui.inbox import ORIGIN_PHRASES
+    from shiftlead.ui.inbox import ORIGIN_PHRASES
 
     phrases = _reader_phrases()
     assert len(phrases) >= 9
@@ -957,7 +957,7 @@ def test_the_phrase_table_knows_every_sentence_the_reader_writes():
 def test_the_origin_note_says_each_case_in_the_designs_words():
     """§4.5a **origin note**: behind, local edits, two-sided (the warning colour), origin not
     reached with its reason; none when the board matches, origin has none, or the read was plain."""
-    from agentorc.ui.inbox import origin_note
+    from shiftlead.ui.inbox import origin_note
 
     def note(fetch_note, source=""):
         return origin_note({"source": source, "fetch_note": fetch_note})
@@ -983,10 +983,10 @@ def test_the_origin_note_says_each_case_in_the_designs_words():
 def test_the_behind_note_ends_with_the_pulls_standing(monkeypatch):
     """§4.5 screen 6, §6 *Pull* (TD-263): the *behind* note's tail is the home's last pull reading
     for the repo, from the fixed table; no tail before a pass has reached it, or once it is current."""
-    from agentorc.ui import inbox
+    from shiftlead.ui import inbox
 
     head = "read from origin/main: this checkout has not pulled it yet"
-    row = {"source": "origin/main", "fetch_note": "", "root": "/x/agentorc"}
+    row = {"source": "origin/main", "fetch_note": "", "root": "/x/shiftlead"}
     for reading, tail in (
         ({"outcome": "waiting", "occupant": "main"}, " — the host agent pulls it once main is idle"),
         ({"outcome": "waiting", "occupant": None, "why": "unreadable"}, " — the host agent pulls it once it is idle"),
@@ -996,9 +996,9 @@ def test_the_behind_note_ends_with_the_pulls_standing(monkeypatch):
         ({"outcome": "pulled", "commits": 2}, ""),
         (None, ""),
     ):
-        monkeypatch.setattr(inbox, "PULLS", {"agentorc": reading} if reading else {})
+        monkeypatch.setattr(inbox, "PULLS", {"shiftlead": reading} if reading else {})
         assert inbox.origin_note(row) == {"text": head + tail, "warn": False}
-    monkeypatch.setattr(inbox, "PULLS", {"agentorc": {"outcome": "off"}})
+    monkeypatch.setattr(inbox, "PULLS", {"shiftlead": {"outcome": "off"}})
     assert inbox.origin_note({**row, "root": "/x/other"})["text"] == head  # another repo's reading
 
 
@@ -1008,7 +1008,7 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_live(tmp_pa
     board whose `source` is origin, Snooze, Done and Reply are as live as any (TD-264: the write-back
     works on origin's line) and Open board stays; a two-sided board's note is in the warning colour."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, templates
+    from shiftlead.ui.app import board_rows, templates
 
     a, b, c = tmp_path / "behind", tmp_path / "same", tmp_path / "both"
     rep = report(a, item(3, "one. Due: 2026-09-20.", "2026-09-20", "2d overdue"), item(4, "two.", "2026-09-20", "x"))
@@ -1045,7 +1045,7 @@ def test_a_press_on_a_board_read_from_origin_goes_to_the_write_back(tmp_path, mo
     origin's line, so the press goes to `board_edit` or `board_reply` as any row's does — and the
     read after it is a fetching read of that one board."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     board = str(tmp_path / "r/docs/user_attention.md")
     row = {"row": "board", "id": f"board:{board}:3", "board": board, "text": "x", "due_now": True, "at": "2026-09-01"}
@@ -1121,8 +1121,8 @@ def test_after_a_pull_the_row_is_pressable_and_a_two_sided_board_warns(tmp_path,
     edit against a new line on origin shows the checkout's rows under the warning note."""
     clone, due = _behind_clone(tmp_path)
     host(tmp_path, monkeypatch, [clone])
-    from agentorc.ui import app as uiapp
-    from agentorc.ui.app import templates
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui.app import templates
 
     def page():
         rows, note = uiapp.read_boards(fetch=True)
@@ -1171,7 +1171,7 @@ def decide_item(line=9, *, decided=None, default="hold"):
 
 def rows_html(tmp_path, monkeypatch, it, **board):
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, templates
+    from shiftlead.ui.app import board_rows, templates
 
     rep = report(tmp_path / "samscrape", it)
     rep["boards"][0].update(board)
@@ -1263,7 +1263,7 @@ def test_a_live_looks_pair_is_drawn_by_its_words_works_and_not_right(tmp_path, m
 def test_only_a_look_or_watch_with_exactly_the_pair_is_a_live_look(tmp_path, monkeypatch):
     """Else they are ordinary answer buttons: another kind, a third answer, a complete *Not right:
     wrong repo*, or the words in another order."""
-    from agentorc.ui.inbox import board_head, live_look
+    from shiftlead.ui.inbox import board_head, live_look
 
     for it in (
         look_item(kind="decide"),
@@ -1279,7 +1279,7 @@ def test_only_a_look_or_watch_with_exactly_the_pair_is_a_live_look(tmp_path, mon
     assert live_look(look_item(kind="look"))  # the kind cadence names for it (TD-292), as a `watch` before it
     rows, html = rows_html(tmp_path, monkeypatch, look_item(kind="look"))
     assert rows[0]["pair"] and "board_notright" in html
-    from agentorc.ui.inbox import board_due_now
+    from shiftlead.ui.inbox import board_due_now
 
     assert board_due_now(look_item(kind="look"))  # with no default, a counted due row under Needs you
     assert board_head("no bold here, just a long line " * 4).endswith("…") and len(board_head("x " * 90)) == 60
@@ -1292,7 +1292,7 @@ def test_not_right_opens_the_composer_begun_decides_then_hands_an_entry_on():
     techlead, its words the item's head and the answer; a refusal there is toasted and returns."""
     import pathlib
 
-    js = (pathlib.Path(__file__).parent.parent / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     at = js.index('if (action === "board_notright") {')
     block = js[at : js.index('if (action === "board_add") {', at)]
     assert 'text: "Not right: "' in block and '$("#mailtext").value = o.text || "";' in js
@@ -1346,7 +1346,7 @@ def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_pat
     the boards read again at once so the row re-reads *decided*; a decide naming no answer or no
     list is refused before the agent is asked, and the other acts carry neither field."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     reads, calls = [], []
     monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
@@ -1390,8 +1390,8 @@ def test_the_page_draws_what_the_reader_reads_and_a_press_is_written_and_read_ba
     import sys
 
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, templates
     from sessionorc import board as board_mod
+    from shiftlead.ui.app import board_rows, templates
 
     today = date.today().isoformat()
     head = f"- [ ] decide {today} (session `w` on kmaster) — **Ship it?** Pick."
@@ -1440,9 +1440,9 @@ def test_a_board_row_draws_its_line_as_markdown_folded_after_its_head(tmp_path, 
     *details* with each **Part:** head opening a paragraph and the `Context:` last; the `Due:` goes
     and the reader's replies stand under the text, outside the fold."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, templates
+    from shiftlead.ui.app import board_rows, templates
 
-    root = tmp_path / "agentorc"
+    root = tmp_path / "shiftlead"
     filler = " ".join(["the card reads its line and its hover lists every window."] * 6)
     text = (
         "watch 2026-09-30 (session `grinder-ao-2` on kmaster) — **One walk of the Org.** The live copy is "
@@ -1475,7 +1475,7 @@ def test_a_short_board_line_draws_whole_and_a_reader_without_replies_keeps_them(
     """A line no longer than `FOLD_CHARS` has no *details* (§4.5a **Inbox board row: text**); a
     `Context:` alone is still under one. A reader that gives no `replies` leaves the tail in the text."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows
+    from shiftlead.ui.app import board_rows
 
     root = tmp_path / "samscrape"
     (row,) = board_rows(report(root, item(3, "act — **Rotate the key.** Soon. Due: 2026-09-20.", "2026-09-20", "x")))
@@ -1489,7 +1489,7 @@ def test_a_short_board_line_draws_whole_and_a_reader_without_replies_keeps_them(
 
 @pytest.mark.unit
 def test_fold_head_cuts_after_the_bold_head_and_its_sentence():
-    from agentorc.ui import render
+    from shiftlead.ui import render
 
     long = "x " * 200
     assert render.fold_head("short **head.** one.") == ("short **head.** one.", "")
@@ -1505,9 +1505,9 @@ def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
     and draws none twice; a `Context:` after the `Due:` still closes the fold; a bold or mid-sentence
     *Context:* is text."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows
+    from shiftlead.ui.app import board_rows
 
-    root = tmp_path / "agentorc"
+    root = tmp_path / "shiftlead"
     text = "act — Rotate it. Due: 2026-10-05. — Paul, 2026-10-02: hi — Paul, 2026-10-03: yo"
     it = item(3, text, "2026-10-05", "x") | {"replies": [{"by": "Paul", "date": "2026-10-02", "text": "hi"}]}
     (row,) = board_rows(report(root, it))
@@ -1523,7 +1523,7 @@ def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
 def test_put_on_the_board_takes_its_words_in_a_box_of_lines(tmp_path, monkeypatch):
     """TD-281 (2): *what's needed* is a textarea of four rows, not a one-line input."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     html = templates.get_template("board_add.html").render(board_choices=[{"board": "/b", "label": "b"}])
     assert '<textarea class="input" id="batext" rows="4"' in html and 'id="batext"' in html
@@ -1556,7 +1556,7 @@ def test_board_rows_stamp_whom_the_item_waits_on_and_when_it_comes_back(tmp_path
     """`answered` is `decided` from the reader's `waiting_on`, else `replied` from its `replies`;
     the date is the decided date or the last reply's; `stale` from `BOARD_WAIT_DAYS` (3) civil days
     to the reader's `today` (2026-09-22): decided Sep 19 is back, Sep 20 is not."""
-    from agentorc.ui.inbox import BOARD_WAIT_DAYS, board_rows
+    from shiftlead.ui.inbox import BOARD_WAIT_DAYS, board_rows
 
     assert BOARD_WAIT_DAYS == 3
     root = tmp_path / "r"
@@ -1595,7 +1595,7 @@ def test_an_answered_row_waits_on_them_in_no_count_and_a_stale_one_comes_back(tm
     """Decided and replied rows are under *Waiting on them* — out of `count`, `overdue_n` and the
     horizon — the undecided due one under *Needs you*; a decided row three days back is counted
     again; a replied one that is not due and stale goes back to the horizon, not to *Needs you*."""
-    from agentorc.ui.inbox import board_horizon, board_rows, inbox_sections
+    from shiftlead.ui.inbox import board_horizon, board_rows, inbox_sections
 
     root = tmp_path / "r"
     rows = board_rows(
@@ -1627,17 +1627,17 @@ def test_an_answered_row_waits_on_them_in_no_count_and_a_stale_one_comes_back(tm
 
 @pytest.mark.unit
 def test_the_waiting_words_say_the_lease_holder_the_named_session_or_the_next_reader():
-    from agentorc.ui.inbox import board_waiting_on
+    from shiftlead.ui.inbox import board_waiting_on
 
     now = datetime(2026, 9, 22, 12, tzinfo=UTC)
     lease = {"ref": "TD-122", "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
-    row = {"repo": "agentorc", "refs": ["TD-122"], "session": "grinder-ao-1"}
+    row = {"repo": "shiftlead", "refs": ["TD-122"], "session": "grinder-ao-1"}
     holder = {"id": "ao-x-2", "name": "grinder-ao-2", "state": "working", "progress": [lease]}
     named = {"id": "ao-x-1", "name": "grinder-ao-1", "state": "idle", "progress": []}
     assert board_waiting_on(row, [named, holder], now) == "waiting on grinder-ao-2 — holds TD-122"
     assert board_waiting_on(row, [named], now) == "waiting on grinder-ao-1"
     assert board_waiting_on(row, [{**named, "state": "exited"}], now) == (
-        "waiting on the next session to read agentorc's board"
+        "waiting on the next session to read shiftlead's board"
     )
     # an expired lease holds nothing; a session named by its uuid's first eight is found by adapter_id
     old = {**holder, "progress": [{**lease, "at": (now - timedelta(days=2)).isoformat()}]}
@@ -1648,7 +1648,7 @@ def test_the_waiting_words_say_the_lease_holder_the_named_session_or_the_next_re
 @pytest.mark.unit
 def test_the_waiting_row_offers_reply_done_and_open_board_and_no_answers_or_snooze(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, inbox_sections, templates
+    from shiftlead.ui.app import board_rows, inbox_sections, templates
 
     it = {**decide_item(decided="approve"), "waiting_on": "session"}
     rows = board_rows(report(tmp_path / "samscrape", it))
@@ -1714,11 +1714,11 @@ def test_the_standing_says_whom_a_reply_reaches_before_the_press():
     """design §4.5a *Inbox board row: standing* (TD-142): a live lease on one of the item's refs is
     *still on <ref> — <holder> holds it*; else a live record the item's session names is *moved on*;
     else *gone*; an item with no session and no refs draws nothing."""
-    from agentorc.ui.inbox import board_standing
+    from shiftlead.ui.inbox import board_standing
 
     now = datetime(2026, 9, 22, 12, tzinfo=UTC)
     lease = {"ref": "TD-122", "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
-    row = {"repo": "agentorc", "refs": ["TD-9", "TD-122"], "session": "grinder-ao-1"}
+    row = {"repo": "shiftlead", "refs": ["TD-9", "TD-122"], "session": "grinder-ao-1"}
     holder = {"id": "ao-x-2", "name": "grinder-ao-2", "state": "working", "progress": [lease]}
     named = {"id": "ao-x-1", "name": "grinder-ao-1", "state": "idle", "progress": []}
     got = board_standing(row, [named, holder], now)
@@ -1734,14 +1734,14 @@ def test_the_standing_says_whom_a_reply_reaches_before_the_press():
     old = {**holder, "progress": [{**lease, "at": (now - timedelta(days=2)).isoformat()}]}
     assert board_standing(row, [old], now)["text"] == "gone"
     assert board_standing(row, [{**holder, "state": "closed"}], now)["text"] == "gone"
-    assert board_standing({"repo": "agentorc", "refs": [], "session": ""}, [holder], now) is None
+    assert board_standing({"repo": "shiftlead", "refs": [], "session": ""}, [holder], now) is None
 
 
 @pytest.mark.unit
 def test_the_row_draws_its_standing_and_hands_its_refs_to_reply(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
-    from agentorc.ui.app import board_rows, inbox_sections, templates, with_standings
-    from agentorc.ui.inbox import board_horizon
+    from shiftlead.ui.app import board_rows, inbox_sections, templates, with_standings
+    from shiftlead.ui.inbox import board_horizon
 
     now = datetime(2026, 9, 22, 12, tzinfo=UTC)
     lease = {"ref": "TD-122", "status": "claimed", "at": (now - timedelta(hours=1)).isoformat()}
@@ -1750,7 +1750,7 @@ def test_the_row_draws_its_standing_and_hands_its_refs_to_reply(tmp_path, monkey
     due.update(session="grinder-ao-1", refs=["TD-122"])
     ahead = {**item(5, "**Later.** Due: 2026-09-25.", "2026-09-25", ""), "session": "grinder-ao-1", "refs": []}
     ahead["overdue_days"] = None
-    rows = board_rows(report(tmp_path / "agentorc", due, ahead))
+    rows = board_rows(report(tmp_path / "shiftlead", due, ahead))
     s = inbox_sections([], now=now, boards=rows, fleet=[holder])
     html = templates.get_template("inbox_rows.html").render(rows=s["needs"], section="needs")
     assert "grinder-ao-1 · still on TD-122 — grinder-ao-2 holds it" in html
@@ -1767,8 +1767,8 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     own reader — a lease on it is *holds board:<key>*; held by nobody and its session gone, it is
     *pickable by <team>* for each team whose `free-pick` lane takes it, with the team's wound-down
     state when none is live; a `fyi` line and a repo no team services keep the next reader."""
-    from agentorc.ui.inbox import board_waiting_on
     from sessionorc import workorders
+    from shiftlead.ui.inbox import board_waiting_on
 
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)
@@ -1809,7 +1809,7 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
 def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any_one(tmp_path):
     """TD-393 (`_order_teams`): a record resumed as another (`superseded_by`) names no team, and a
     team with one live and one ended record reads live whichever comes first — never *wound down*."""
-    from agentorc.ui.inbox import board_waiting_on
+    from shiftlead.ui.inbox import board_waiting_on
 
     root = tmp_path / "repo"
     (root / "scripts").mkdir(parents=True)

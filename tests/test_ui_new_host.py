@@ -14,22 +14,22 @@ REPO_YML = (
     "controllers: [lead-1]\nledger: docs/ledger.md\n"
 )
 NODE_FILES = {
-    ".agentorc.yml": REPO_YML,
+    ".shiftlead.yml": REPO_YML,
     "docs/scout.md": "Scout the node's own alpha.\n",
     # a role the node's checkout defines (§4.9c, TD-313): read there, never from this host's disk
-    ".agentorc/roles/warden/role.yml": "kind: worker\nicon: eye\n",
-    ".agentorc/roles/warden/template.md": "Ward {lane} on the node.\n",
+    ".shiftlead/roles/warden/role.yml": "kind: worker\nicon: eye\n",
+    ".shiftlead/roles/warden/template.md": "Ward {lane} on the node.\n",
 }
 
 
 @pytest.fixture
 def form(tmp_path, monkeypatch):
-    from agentorc.ui import app as uiapp
     from sessionorc.client import AgentError
+    from shiftlead.ui import app as uiapp
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     calls: list[tuple[str, dict]] = []
 
@@ -98,7 +98,7 @@ def test_the_roles_are_read_from_the_picked_hosts_repo(form):
     got = c.get("/api/roles", params={"dir": "/srv/node/alpha/.claude/worktrees/td-1", "host": "node1"}).json()
     hunter = next(r for r in got["roles"] if r["name"] == "hunter")
     assert hunter["source"] == "built-in + repo" and got["controllers"] == ["lead-1"]
-    assert got["file"] == "node1:/srv/node/alpha/.agentorc.yml"
+    assert got["file"] == "node1:/srv/node/alpha/.shiftlead.yml"
     outside = c.get("/api/roles", params={"dir": "/srv/node/gone", "host": "node1"}).json()
     assert next(r for r in outside["roles"] if r["name"] == "hunter")["source"] == "built-in"
     assert "error" not in outside
@@ -125,7 +125,7 @@ def test_a_host_that_does_not_answer_is_said_not_refused(form):
 def test_the_page_passes_the_picked_host_on_every_read():
     from pathlib import Path
 
-    js = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     for api in ("dir_check", "worktrees", "occupancy", "roles", "team_review"):
         line = next(ln for ln in js.splitlines() if f"/api/{api}?" in ln)
         assert "${hq()}" in line, api
@@ -141,10 +141,10 @@ def test_the_form_reads_its_own_directory_field():
     bound it with a bare `[name=dir]`, so a Repo pick never reached the field Start posts."""
     from pathlib import Path
 
-    js = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     body = js[js.index("AO.newSession = function") :]
     assert "const dir = $(\"form[action='/new'] [name=dir]\")" in body
-    base = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "templates" / "base.html").read_text()
+    base = (Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "templates" / "base.html").read_text()
     assert 'id="shellform"' in base and 'name="dir"' in base  # the reason the selector is scoped
 
 
@@ -202,5 +202,5 @@ def test_a_role_the_other_hosts_checkout_defines_is_listed_and_started(form):
     assert made["prompt"].startswith("Ward watch on the node.")
     assert (
         "host_files",
-        {"host": "node1", "dir": "/srv/node/alpha", "paths": [".agentorc/roles/warden/template.md"]},
+        {"host": "node1", "dir": "/srv/node/alpha", "paths": [".shiftlead/roles/warden/template.md"]},
     ) in calls

@@ -124,7 +124,7 @@ def test_backoff_doubles_to_a_ceiling_with_jitter():
 
 
 class Home:
-    """A home agent in its own process and its own AGENTORC_HOME — the test process is the node."""
+    """A home agent in its own process and its own SHIFTLEAD_HOME — the test process is the node."""
 
     def __init__(self, root, nodes):
         self.dir = root / "kmaster"
@@ -139,8 +139,8 @@ class Home:
     @property
     def env(self):
         ours = {
-            "AGENTORC_HOME": str(self.dir),
-            "AGENTORC_TICK": str(FAST_TICK),
+            "SHIFTLEAD_HOME": str(self.dir),
+            "SHIFTLEAD_TICK": str(FAST_TICK),
             "CLAUDE_CONFIG_DIR": str(self.dir / "c"),
             "AO_TEST_RESTART_SETTLE": "0",  # the crash-loop test runs three restarts inside its bound
         }
@@ -148,7 +148,7 @@ class Home:
 
     async def start(self):
         env = self.env
-        env.pop("AGENTORC_SESSION", None)
+        env.pop("SHIFTLEAD_SESSION", None)
         self.proc = subprocess.Popen([sys.executable, str(CHILD), self.sock_name], env=env, stderr=subprocess.DEVNULL)
         assert await wait_for(lambda: (self.dir / "agent.sock").exists(), timeout=10.0, step=0.05), "home never came up"
 
@@ -161,7 +161,7 @@ class Home:
                 self.proc.kill()
 
     def dial_command(self, host="laptop"):
-        return ["env", f"AGENTORC_HOME={self.dir}", sys.executable, "-m", "sessionorc.agent", "link", "--host", host]
+        return ["env", f"SHIFTLEAD_HOME={self.dir}", sys.executable, "-m", "sessionorc.agent", "link", "--host", host]
 
     async def host_rpc(self):
         async with LocalClient(sock=self.dir / "agent.sock") as c:
@@ -185,14 +185,14 @@ async def node_agent(tmp_path, monkeypatch, command=None, name="laptop", socket=
     d.mkdir(exist_ok=True)
     how = f"socket: {socket}" if socket is not None else f"command: {command!r}"
     (d / "hosts.yml").write_text(f"home: kmaster\nlocal:\n  name: {name}\nlink:\n  {how}\n")
-    monkeypatch.setenv("AGENTORC_HOME", str(d))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(d))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(d / "claude"))
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", FAST_TICK)
     monkeypatch.setattr(link, "BACKOFF_FIRST", 0.05)
     monkeypatch.setattr(link, "BACKOFF_MAX", 0.2)
     sock_name = private_socket_name()
-    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)
+    monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
@@ -209,7 +209,7 @@ async def node_agent(tmp_path, monkeypatch, command=None, name="laptop", socket=
 async def test_the_link_comes_up_drops_with_the_home_and_comes_back(home, tmp_path, monkeypatch):
     """The shape of *laptop closed for an hour*, from the link's side: up, down with a reason,
     and up again on its own, the backoff starting over."""
-    monkeypatch.setenv("AGENTORC_BUILD", "abc123def456")  # what a provisioned agent is started with
+    monkeypatch.setenv("SHIFTLEAD_BUILD", "abc123def456")  # what a provisioned agent is started with
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
         assert node.home_link["why"] == "linked to kmaster as laptop"
@@ -273,7 +273,7 @@ async def test_ssh_failed_and_agent_down_are_told_apart(tmp_path, monkeypatch):
         assert await wait_for(lambda: node.home_link["why"].startswith("ssh failed"), timeout=10.0, step=0.05)
     empty = tmp_path / "nobody-home"
     empty.mkdir()
-    cmd = ["env", f"AGENTORC_HOME={empty}", sys.executable, "-m", "sessionorc.agent", "link", "--host", "laptop"]
+    cmd = ["env", f"SHIFTLEAD_HOME={empty}", sys.executable, "-m", "sessionorc.agent", "link", "--host", "laptop"]
     async with node_agent(tmp_path, monkeypatch, cmd) as node:
         assert await wait_for(lambda: "agent down on the home" in node.home_link["why"], timeout=10.0, step=0.05)
 
@@ -1290,7 +1290,7 @@ async def test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_hom
 
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
-        launch = home.dir / "launch"  # the home's, whatever this process's AGENTORC_HOME now says
+        launch = home.dir / "launch"  # the home's, whatever this process's SHIFTLEAD_HOME now says
         seat = dict(name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True, host="laptop")
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             address = (await person.call("create", supervised=True, prompt="brief", **seat))["id"]
@@ -1300,7 +1300,7 @@ async def test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_hom
             assert rec["name"] == "w" and "worktree" not in rec  # as the node made it
             from sessionorc import paths
 
-            assert paths.launch_dir() != launch  # this process's AGENTORC_HOME is the node's now
+            assert paths.launch_dir() != launch  # this process's SHIFTLEAD_HOME is the node's now
             assert not (paths.launch_dir() / f"{address.removesuffix('@laptop')}.json").exists()  # the node wrote none
             assert (await at_home(home, address))["supervised"] is True
             await person.call("kill", id=address)
@@ -1530,14 +1530,14 @@ def test_a_checkouts_files_are_read_inside_it_and_nothing_else(tmp_path):
     (repo / "docs").mkdir(parents=True)
     (repo / ".git").mkdir()
     outside.write_text("the key")
-    (repo / ".agentorc.yml").write_text("roles: {}\n")
+    (repo / ".shiftlead.yml").write_text("roles: {}\n")
     (repo / "docs" / "brief.md").write_text("a brief")
     (repo / "docs" / "inside.md").symlink_to(repo / "docs" / "brief.md")
     (repo / "docs" / "out.md").symlink_to(outside)
     (repo / "big.md").write_text("x" * (FILE_CAP + 1))
-    got = read_checkout(str(repo), [".agentorc.yml", "docs/brief.md", "docs/inside.md", "missing.md"])
+    got = read_checkout(str(repo), [".shiftlead.yml", "docs/brief.md", "docs/inside.md", "missing.md"])
     assert got["files"] == {
-        ".agentorc.yml": "roles: {}\n", "docs/brief.md": "a brief", "docs/inside.md": "a brief", "missing.md": None,
+        ".shiftlead.yml": "roles: {}\n", "docs/brief.md": "a brief", "docs/inside.md": "a brief", "missing.md": None,
     }  # fmt: skip
     for bad, why in (
         ("../secret", "outside the checkout"),
@@ -1552,7 +1552,7 @@ def test_a_checkouts_files_are_read_inside_it_and_nothing_else(tmp_path):
     with pytest.raises(ValueError, match=f"at most {FILES_MAX}"):
         read_checkout(str(repo), ["a"] * (FILES_MAX + 1))
     with pytest.raises(ValueError, match="does not exist here"):
-        read_checkout(str(tmp_path / "nope"), [".agentorc.yml"])
+        read_checkout(str(tmp_path / "nope"), [".shiftlead.yml"])
     (tmp_path / ".ssh").mkdir()
     with pytest.raises(ValueError, match="is not a git checkout"):  # a directory that is not a repo is not read
         read_checkout(str(tmp_path / ".ssh"), ["id_ed25519"])
@@ -1609,10 +1609,10 @@ async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(a
             return {"dir": params["dir"], "files": {p: f"on laptop: {p}" for p in params["paths"]}}
 
     (tmp_path / "repo" / ".git").mkdir(parents=True)
-    (tmp_path / "repo" / ".agentorc.yml").write_text("x: 1\n")
+    (tmp_path / "repo" / ".shiftlead.yml").write_text("x: 1\n")
     async with LocalClient() as person:
-        here = await person.call("host_files", host=agent.host, dir=str(tmp_path / "repo"), paths=[".agentorc.yml"])
-        assert here["files"] == {".agentorc.yml": "x: 1\n"}
+        here = await person.call("host_files", host=agent.host, dir=str(tmp_path / "repo"), paths=[".shiftlead.yml"])
+        assert here["files"] == {".shiftlead.yml": "x: 1\n"}
         with pytest.raises(AgentError, match="outside the checkout"):
             await person.call("host_files", host=agent.host, dir=str(tmp_path / "repo"), paths=["../../etc/passwd"])
         agent._take_records("laptop", [record()], whole=True)  # a host the home has heard of
@@ -1620,8 +1620,8 @@ async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(a
             await person.call("host_files", host="laptop", dir="/w", paths=["a"])
         agent._link_muxes["laptop"] = mux = Files()
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
-        got = await person.call("host_files", host="laptop", dir="/w", paths=[".agentorc.yml"])
-        assert got["files"] == {".agentorc.yml": "on laptop: .agentorc.yml"} and mux.sent[0][0] == "files"
+        got = await person.call("host_files", host="laptop", dir="/w", paths=[".shiftlead.yml"])
+        assert got["files"] == {".shiftlead.yml": "on laptop: .shiftlead.yml"} and mux.sent[0][0] == "files"
         lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
     async with LocalClient(caller=lead["id"]) as as_lead:
         with pytest.raises(AgentError, match="needs the control grant"):
@@ -1645,14 +1645,14 @@ async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(a
 async def test_a_node_serves_files_from_its_own_checkout_across_the_link(home, tmp_path, monkeypatch):
     """End to end: the home's `host_files` for the node reads the checkout on the node."""
     (tmp_path / "cm" / ".git").mkdir(parents=True)
-    (tmp_path / "cm" / ".agentorc.yml").write_text("roles: {grinder: {brief: b.md}}\n")
+    (tmp_path / "cm" / ".shiftlead.yml").write_text("roles: {grinder: {brief: b.md}}\n")
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             got = await person.call(
-                "host_files", host="laptop", dir=str(tmp_path / "cm"), paths=[".agentorc.yml", "b.md"]
+                "host_files", host="laptop", dir=str(tmp_path / "cm"), paths=[".shiftlead.yml", "b.md"]
             )
-            assert got["files"] == {".agentorc.yml": "roles: {grinder: {brief: b.md}}\n", "b.md": None}
+            assert got["files"] == {".shiftlead.yml": "roles: {grinder: {brief: b.md}}\n", "b.md": None}
             with pytest.raises(AgentError, match="laptop: .*outside the checkout"):
                 await person.call("host_files", host="laptop", dir=str(tmp_path / "cm"), paths=["../kmaster/hosts.yml"])
         async with LocalClient() as at_node:  # a node reads no other host's files, and does not forward it
@@ -1731,14 +1731,14 @@ async def test_host_occupancy_and_worktrees_here_through_a_node_and_for_a_contai
                 if method == "occupancy":
                     return {
                         "dir": params["dir"],
-                        "occupants": ["ao-x-w (working)", "vs (claude-code, outside agentorc)"],
+                        "occupants": ["ao-x-w (working)", "vs (claude-code, outside shiftlead)"],
                     }
                 return {"worktrees": [{"name": "wt", "path": str(wt), "occupied": False}, "junk"]}
 
         agent._link_muxes["laptop"] = mux = Node()
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
         occ = await person.call("host_occupancy", host="laptop", dir="/w")
-        assert occ["occupants"] == ["ao-x-w@laptop (working)", "vs (claude-code, outside agentorc)"]
+        assert occ["occupants"] == ["ao-x-w@laptop (working)", "vs (claude-code, outside shiftlead)"]
         got = await person.call("host_worktrees", host="laptop", repo="/w")
         assert got["worktrees"] == [{"name": "wt", "path": str(wt), "occupied": False}]
         assert mux.sent == [("occupancy", {"dir": "/w"}), ("worktrees", {"repo": "/w"})]
@@ -1792,7 +1792,7 @@ def test_the_nightly_tarball_holds_the_store_and_the_orgs_files_and_nothing_else
     from sessionorc.agent import BACKUP_KEEP, backup_store
 
     home = tmp_path / "h"
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     for rel, text in {
         "sessions/ao-a.json": "{}", "remote/laptop/ao-b.json": "{}", "person_inbox.json": "[]",
         "org.yml": "teams: {}", "hosts.yml": "nodes: [laptop]", "profiles.yml": "profiles: {}",

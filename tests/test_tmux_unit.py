@@ -13,9 +13,9 @@ from test_identity import FakeProc, P
 from sessionorc import identity
 from sessionorc.client import LocalClient
 
-SYSTEM = "/system.slice/agentorc-tmux.service"
-USER = "/user.slice/user-1000.slice/user@1000.service/app.slice/agentorc-agent.service"
-RUNNER = "/system.slice/actions.runner.eyecantell-agentorc.service"
+SYSTEM = "/system.slice/shiftlead-tmux.service"
+USER = "/user.slice/user-1000.slice/user@1000.service/app.slice/shiftlead-agent.service"
+RUNNER = "/system.slice/actions.runner.eyecantell-shiftlead.service"
 SCOPE = "/user.slice/user-1000.slice/session-3.scope"
 
 

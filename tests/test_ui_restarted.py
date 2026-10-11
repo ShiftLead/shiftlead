@@ -9,8 +9,8 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from agentorc import cli
-from agentorc.ui.cards import restarted_view
+from shiftlead import cli
+from shiftlead.ui.cards import restarted_view
 
 NOW = datetime(2026, 10, 10, 12, 0, tzinfo=UTC)
 
@@ -89,8 +89,8 @@ def test_the_hover_lists_the_window_newest_first_and_counts_toward_the_ceiling()
 def test_the_card_and_the_focus_draw_the_chip_and_a_seat_never(tmp_path, monkeypatch):
     """The card's row 4 carries the short form beside the report line and the Focus header the whole
     words beside *brief changed*, each with the hover as its title; a seat draws neither."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     at = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
     base = {"id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
@@ -128,7 +128,7 @@ def test_the_card_and_the_focus_draw_the_chip_and_a_seat_never(tmp_path, monkeyp
 def test_the_focus_keeps_the_chip_current_from_the_delta():
     from pathlib import Path
 
-    js = (Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     body = js[js.index('const rs = $("#frestarted");') :]
     body = body[: body.index("\n      }\n")]
     assert 'rs.classList.toggle("hidden", !v.restarted);' in body
@@ -148,7 +148,7 @@ def test_the_page_hides_the_chip_when_its_window_passes(tmp_path):
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    app = Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js"
+    app = Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js"
     probe = tmp_path / "until_probe.js"
     probe.write_text("""
 const fs = require("fs"); const noop = () => {};

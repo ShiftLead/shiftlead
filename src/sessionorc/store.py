@@ -1,4 +1,4 @@
-"""On-disk session records and the hook event queue under `~/.agentorc/`.
+"""On-disk session records and the hook event queue under `~/.shiftlead/`.
 
 The host agent is the only writer of `sessions/*.json`. Hook scripts talk to the agent's socket;
 when the agent is down they append to `events/<session>.jsonl`, which the agent drains on its

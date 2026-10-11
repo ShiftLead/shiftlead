@@ -8,9 +8,9 @@ from dataclasses import asdict
 
 import pytest
 
-from agentorc import teamrun
 from sessionorc import work
 from sessionorc.models import Session
+from shiftlead import teamrun
 
 pytestmark = pytest.mark.unit
 

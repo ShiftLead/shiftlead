@@ -116,7 +116,7 @@ class DoctorMixin:
             "pid": pid,
             "started": _started(now[1]) if now else None,
             "cgroup": (cgroup := self.proc.cgroup(pid) if pid else None),
-            # where it runs (§4.1, TD-495): `system` (agentorc-tmux.service), `user` (a warning) or `none`
+            # where it runs (§4.1, TD-495): `system` (shiftlead-tmux.service), `user` (a warning) or `none`
             "runs": identity.server_placement(cgroup),
             "first": {"pid": first[0], "started": _started(first[1])} if first else None,
             "replaced": replaced,

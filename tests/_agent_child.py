@@ -1,10 +1,10 @@
 """Test-only launcher: a host agent on a private tmux socket, in its own process.
 
-`agentorc-agent serve` builds `Tmux()` with no socket name, i.e. the user's real tmux server, so
+`shiftlead-agent serve` builds `Tmux()` with no socket name, i.e. the user's real tmux server, so
 the test suite never spawns it. This script takes the socket name as its one argument and reads
-`AGENTORC_HOME` / `AGENTORC_TICK` from its environment like the real agent does.
+`SHIFTLEAD_HOME` / `SHIFTLEAD_TICK` from its environment like the real agent does.
 
-Stops the way `agentorc-agent serve` does (`serve_until_signal`, TD-024): SIGTERM cancels the
+Stops the way `shiftlead-agent serve` does (`serve_until_signal`, TD-024): SIGTERM cancels the
 serve task, `serve()`'s `finally` unlinks the socket file, and the process exits 0 with no
 pending-task traceback — `test_agent_restart.py` asserts exactly that on this child.
 """
@@ -26,7 +26,7 @@ from sessionorc.tmux import Tmux
 async def _run(socket_name: str) -> None:
     # never the person's dev-cadence roster: the home reads repo facts (`gh`, git) for every repo
     # on it (design §4.4 *Repo facts*), as conftest's `_no_real_repos_registry` says for this process
-    hosts.DEFAULT_REPOS_REGISTRY = os.path.join(os.environ["AGENTORC_HOME"], "no-roster", "repos.txt")
+    hosts.DEFAULT_REPOS_REGISTRY = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     if settle := os.environ.get("AO_TEST_RESTART_SETTLE"):

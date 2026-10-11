@@ -11,19 +11,19 @@ nodes:
     identity: enforce                            # optional: the node's identity mode (design §4.8a)
 ```
 
-Everything else is derived, under `~/.agentorc/nodes/<name>/.devcontainer/`. Two generated
+Everything else is derived, under `~/.shiftlead/nodes/<name>/.devcontainer/`. Two generated
 definitions from the repo's: **`base.json`** is the repo's image — `image` or `build` with its
 paths re-anchored, and the repo's `features` — with the person's `mounts`, `customizations` and
 `containerEnv` dropped (they carry the person's credentials), built once by `devcontainer build`
-and tagged `agentorc-node-<name>-base`; **`devcontainer.json`** is the node's container, built from
+and tagged `shiftlead-node-<name>-base`; **`devcontainer.json`** is the node's container, built from
 a one-stage **generated Dockerfile** on that base that installs tmux as root, with the repo's
 `remoteUser`, lifecycle commands and ports kept, each dropped mount stood in by an empty tmpfs at
 the same target, the checkout mounted at the **same absolute path** inside as outside, and
-agentorc's two mounts added. (A local devcontainer *feature* was the first shape; the CLI takes
+shiftlead's two mounts added. (A local devcontainer *feature* was the first shape; the CLI takes
 one only from the workspace's own `.devcontainer/`, which is the repo's — seen live 2026-09-17 —
-so the tmux layer is a stage of agentorc's own on the repo's image instead.) `~/.agentorc/nodes/<name>/` is
-`/agentorc` inside: `/agentorc/home` the node's `AGENTORC_HOME`, `/agentorc/venv` the agent at the
-home's version from the wheel the promote wrote (`~/.agentorc/wheels/`), `/agentorc/link` the
+so the tmux layer is a stage of shiftlead's own on the repo's image instead.) `~/.shiftlead/nodes/<name>/` is
+`/shiftlead` inside: `/shiftlead/home` the node's `SHIFTLEAD_HOME`, `/shiftlead/venv` the agent at the
+home's version from the wheel the promote wrote (`~/.shiftlead/wheels/`), `/shiftlead/link` the
 home's per-node link socket directory (step 3c.1).
 
 Every external call goes through one seam, `Runner.run`, so the suite drives `up` and the
@@ -51,14 +51,14 @@ import yaml
 from sessionorc import hosts, identity, paths
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
-INSIDE = "/agentorc"  # the node's volume, inside
+INSIDE = "/shiftlead"  # the node's volume, inside
 INSIDE_HOME = f"{INSIDE}/home"
 INSIDE_VENV = f"{INSIDE}/venv"
 INSIDE_LINK = f"{INSIDE}/link"
 INSIDE_WHEELS = f"{INSIDE}/wheels"
 INSIDE_PROFILES = f"{INSIDE}/profiles"
 INSIDE_ENV = f"{INSIDE}/env"
-ID_LABEL = "dev.agentorc.node"  # the id label `devcontainer up` keys the container on: ours, never VS Code's
+ID_LABEL = "dev.shiftlead.node"  # the id label `devcontainer up` keys the container on: ours, never VS Code's
 PIDFILE = f"{INSIDE_HOME}/agent.pid"
 AGENT_LOG = f"{INSIDE_HOME}/agent.log"
 MIN_PYTHON = (3, 12)
@@ -66,9 +66,9 @@ MIN_PYTHON = (3, 12)
 # replaced by an empty tmpfs at its target (a lifecycle script may assume the path).
 DROPPED = ("mounts", "customizations", "containerEnv")
 
-BASE_IMAGE = "agentorc-node-{name}-base"  # what `devcontainer build` tags the repo's image as
+BASE_IMAGE = "shiftlead-node-{name}-base"  # what `devcontainer build` tags the repo's image as
 INSTALL_TMUX = """#!/bin/sh
-# agentorc's layer on the repo's image: tmux with whatever package manager the image has. The
+# shiftlead's layer on the repo's image: tmux with whatever package manager the image has. The
 # agent is not installed here — the home installs its own wheel onto the node's volume.
 set -e
 if command -v tmux >/dev/null 2>&1; then exit 0; fi
@@ -81,7 +81,7 @@ elif command -v dnf >/dev/null 2>&1; then
 elif command -v microdnf >/dev/null 2>&1; then
   microdnf install -y tmux && microdnf clean all
 else
-  echo "agentorc: no package manager found to install tmux (tried apt-get, apk, dnf, microdnf)" >&2
+  echo "shiftlead: no package manager found to install tmux (tried apt-get, apk, dnf, microdnf)" >&2
   exit 1
 fi
 """
@@ -245,7 +245,7 @@ def generate_base(repo: dict[str, Any], *, name: str, repo_config_dir: Path) -> 
     container's definition from the repo's, and keeps the repo's mounts out of it"): what
     `devcontainer build` builds and tags as the base."""
     out: dict[str, Any] = {k: v for k, v in repo.items() if k in IMAGE_KEYS}
-    out["name"] = f"agentorc node {name} (base)"
+    out["name"] = f"shiftlead node {name} (base)"
     if "build" in out:
         out["build"] = _reanchor(out["build"], repo_config_dir)
     for key in ("dockerFile", "context"):  # the legacy top-level pair
@@ -259,9 +259,9 @@ def generate_node(
     repo: dict[str, Any], *, name: str, checkout: Path, config_dir: Path, node_dir: Path, link_dir: Path
 ) -> dict[str, Any]:
     """The node's container on the built base: the repo's definition with its image keys
-    replaced by the generated Dockerfile, the person's parts out, agentorc's in."""
+    replaced by the generated Dockerfile, the person's parts out, shiftlead's in."""
     out: dict[str, Any] = {k: v for k, v in repo.items() if k not in DROPPED and k not in IMAGE_KEYS}
-    out["name"] = f"agentorc node {name}"
+    out["name"] = f"shiftlead node {name}"
     out["build"] = {"dockerfile": str(config_dir / "Dockerfile"), "context": str(config_dir)}
     mounts: list[str] = []
     for m in repo.get("mounts") or []:
@@ -280,11 +280,11 @@ def generate_node(
 def dockerfile_text(base_image: str, image_user: str) -> str:
     """One stage on the base: tmux as root, then the image's own user back."""
     lines = [
-        "# generated by agentorc (`ao host up`): the repo's image plus what a host needs. Not the repo's.",
+        "# generated by shiftlead (`ao host up`): the repo's image plus what a host needs. Not the repo's.",
         f"FROM {base_image}",
         "USER root",
-        "COPY install-tmux.sh /tmp/agentorc-install-tmux.sh",
-        "RUN sh /tmp/agentorc-install-tmux.sh && rm -f /tmp/agentorc-install-tmux.sh",
+        "COPY install-tmux.sh /tmp/shiftlead-install-tmux.sh",
+        "RUN sh /tmp/shiftlead-install-tmux.sh && rm -f /tmp/shiftlead-install-tmux.sh",
     ]
     if image_user:
         lines.append(f"USER {image_user}")
@@ -477,7 +477,7 @@ def exec_cmd(
     cmd = ["docker", "exec"]
     if detach:
         cmd.append("-d")
-    cmd += ["-u", user, "-e", f"AGENTORC_HOME={INSIDE_HOME}"]
+    cmd += ["-u", user, "-e", f"SHIFTLEAD_HOME={INSIDE_HOME}"]
     for k, v in (env or {}).items():
         cmd += ["-e", f"{k}={v}"]
     if env_file is not None and env_file.is_file():
@@ -485,13 +485,13 @@ def exec_cmd(
     return [*cmd, cid, *args]
 
 
-BUILD_ENV = "AGENTORC_BUILD"  # what the agent inside was started on; it says so in its `hello`
+BUILD_ENV = "SHIFTLEAD_BUILD"  # what the agent inside was started on; it says so in its `hello`
 BUILDFILE = f"{INSIDE_HOME}/agent.build"  # the same, beside the pidfile: read from the home with no docker
 
 
 def build_id(wheel: Path) -> str:
     """A build's name: the first 12 hex of the wheel's sha256. Every promote writes
-    `agentorc-0.0.1-…whl` again, so neither the file name nor the version tells two builds apart."""
+    `shiftlead-0.0.1-…whl` again, so neither the file name nor the version tells two builds apart."""
     return hashlib.sha256(wheel.read_bytes()).hexdigest()[:12]
 
 
@@ -514,7 +514,7 @@ def home_build() -> str:
 
 
 def newest_wheel() -> Path:
-    wheels = sorted(paths.home().joinpath("wheels").glob("agentorc-*.whl"), key=lambda p: p.stat().st_mtime)
+    wheels = sorted(paths.home().joinpath("wheels").glob("shiftlead-*.whl"), key=lambda p: p.stat().st_mtime)
     if not wheels:
         raise ContainerError(
             f"no wheel under {paths.home() / 'wheels'}: the promote writes one (`ao service install`, TD-062) — "
@@ -550,7 +550,7 @@ def check_image(n: ContainerNode, r: Runner, cid: str, user: str) -> None:
     cp = r.run(exec_cmd(cid, user, "sh", "-c", "command -v tmux"), check=False)
     if cp.returncode != 0:
         raise ContainerError(
-            f"no tmux in {n.name} after the build: agentorc's feature did not install it (see the build log)"
+            f"no tmux in {n.name} after the build: shiftlead's feature did not install it (see the build log)"
         )
 
 
@@ -564,8 +564,8 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
         shutil.copy2(wheel, dest)
     r.log(f"installing {wheel.name} into {INSIDE_VENV} …")
     r.run(exec_cmd(cid, user, "sh", "-c", f"test -x {INSIDE_VENV}/bin/python || python3 -m venv {INSIDE_VENV}"))
-    # Two installs: the first brings the dependencies, the second replaces agentorc itself even at
-    # the same version — pip never reinstalls a same-version wheel on its own, and agentorc's
+    # Two installs: the first brings the dependencies, the second replaces shiftlead itself even at
+    # the same version — pip never reinstalls a same-version wheel on its own, and shiftlead's
     # version does not change per promote (Sonnet review, 2026-09-17: a re-promoted node kept its
     # old code).
     r.run(exec_cmd(cid, user, f"{INSIDE_VENV}/bin/pip", "install", "-q", "--upgrade", f"{INSIDE_WHEELS}/{wheel.name}"))
@@ -590,9 +590,9 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
 
 
 def write_node_config(n: ContainerNode) -> None:
-    """The node's `hosts.yml` and `profiles.yml` under `/agentorc/home`: it is a node of this home,
+    """The node's `hosts.yml` and `profiles.yml` under `/shiftlead/home`: it is a node of this home,
     dials the mounted link socket, and runs the home's profiles with each `config_dir` under
-    `/agentorc/profiles/<profile>/` — logged in once by hand inside, and kept."""
+    `/shiftlead/profiles/<profile>/` — logged in once by hand inside, and kept."""
     home_dir = n.node_dir / "home"
     home_dir.mkdir(parents=True, exist_ok=True)
     local = {"name": n.name, "vscode_host": n.name}
@@ -631,7 +631,7 @@ def write_node_config(n: ContainerNode) -> None:
 def agent_pid(r: Runner, cid: str, user: str) -> int | None:
     """The pid behind the node's pidfile, if it is alive in the container *and* is the agent — a
     pidfile on the volume outlives the container, and a fresh pid namespace reuses low numbers."""
-    script = f"p=$(cat {PIDFILE} 2>/dev/null) && kill -0 $p && grep -q agentorc-agent /proc/$p/cmdline && echo $p"
+    script = f"p=$(cat {PIDFILE} 2>/dev/null) && kill -0 $p && grep -q shiftlead-agent /proc/$p/cmdline && echo $p"
     cp = r.run(exec_cmd(cid, user, "sh", "-c", script), check=False)
     out = (cp.stdout or "").strip()
     return int(out) if out.isdigit() else None
@@ -646,14 +646,14 @@ def start_agent(n: ContainerNode, r: Runner, cid: str, user: str) -> None:
     build = node_build(n)
     script = (
         f"echo $$ > {PIDFILE}; echo {build} > {BUILDFILE}; "
-        f"exec {INSIDE_VENV}/bin/agentorc-agent serve >> {AGENT_LOG} 2>&1"
+        f"exec {INSIDE_VENV}/bin/shiftlead-agent serve >> {AGENT_LOG} 2>&1"
     )
     r.run(exec_cmd(cid, user, "sh", "-c", script, env_file=n.env_file, detach=True, env={BUILD_ENV: build}))
 
 
 def node_build(n: ContainerNode) -> str:
     """The build on the node's volume: what `provision` last installed there."""
-    wheels = sorted((n.node_dir / "wheels").glob("agentorc-*.whl"), key=lambda p: p.stat().st_mtime)
+    wheels = sorted((n.node_dir / "wheels").glob("shiftlead-*.whl"), key=lambda p: p.stat().st_mtime)
     return build_id(wheels[-1]) if wheels else ""
 
 
@@ -878,7 +878,7 @@ def write_wheel(
     runner: Callable[[list[str]], subprocess.CompletedProcess[str]] | None = None, *, keep: int = 3
 ) -> Path | None:
     """`ao service install` (the promote, TD-062) writes the wheel of what it installed to
-    `~/.agentorc/wheels/`, which is what a container node is provisioned from. From the source
+    `~/.shiftlead/wheels/`, which is what a container node is provisioned from. From the source
     directory the install came from (`direct_url.json`), else from the index at the same version.
     Never fatal to the promote: None, and a line, when it cannot."""
     from importlib import metadata
@@ -886,7 +886,7 @@ def write_wheel(
     wheels = paths.home() / "wheels"
     wheels.mkdir(parents=True, exist_ok=True)
     try:
-        dist = metadata.distribution("agentorc")
+        dist = metadata.distribution("shiftlead")
     except metadata.PackageNotFoundError:
         return None
     src: str | None = None
@@ -903,14 +903,14 @@ def write_wheel(
     cmd = (
         [*pip, "wheel", "--no-deps", "-q", "-w", str(wheels), src]
         if src
-        else [*pip, "download", "--no-deps", "-q", "-d", str(wheels), f"agentorc=={dist.version}"]
+        else [*pip, "download", "--no-deps", "-q", "-d", str(wheels), f"shiftlead=={dist.version}"]
     )
     cp = run(cmd)
     if cp.returncode != 0:
         why = (cp.stderr or "").strip().splitlines()[-1:] or [f"exit {cp.returncode}"]
-        print(f"[agentorc] no wheel written for container nodes: {why[0]}", file=sys.stderr)
+        print(f"[shiftlead] no wheel written for container nodes: {why[0]}", file=sys.stderr)
         return None
-    built = sorted(wheels.glob("agentorc-*.whl"), key=lambda p: p.stat().st_mtime)
+    built = sorted(wheels.glob("shiftlead-*.whl"), key=lambda p: p.stat().st_mtime)
     for old in built[:-keep]:
         old.unlink(missing_ok=True)
     return built[-1] if built else None

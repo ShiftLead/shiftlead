@@ -1,4 +1,4 @@
-"""`~/.agentorc/hosts.yml` — the hosts agentorc knows about (design §5). Phase 1 reads only the
+"""`~/.shiftlead/hosts.yml` — the hosts shiftlead knows about (design §5). Phase 1 reads only the
 `local` entry, on the machine the UI and the host agent share; the ssh transport entries arrive
 with phase 2 (TD-004). Both processes read it: the UI for the name and VS Code links, the host
 agent for run-log retention.
@@ -26,7 +26,7 @@ nodes:
 # on a node: how to dial — one `link:` key, of one of these shapes. Default: `ssh -T <home>`
 # with the home's name as the ssh alias.
 link: {ssh: kmaster}                        # or {command: [...]}, run as given (tests; any other transport)
-# link: {socket: /agentorc/link/link.sock}  # a container node on the home's own machine (step 3c):
+# link: {socket: /shiftlead/link/link.sock}  # a container node on the home's own machine (step 3c):
 #                                           # the home's per-node socket, its directory mounted in
 ```
 
@@ -159,7 +159,7 @@ SSH_OPTIONS = ("-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=15", "-o"
 
 def link_command() -> list[str]:
     """How this node dials its home (design §4.4a "Where to dial"): `link: {command: [...]}` as
-    given, else `ssh -T <target> agentorc-agent link` with `link: {ssh: <target>}` or the home's
+    given, else `ssh -T <target> shiftlead-agent link` with `link: {ssh: <target>}` or the home's
     name as the target. The remote command is decoration — the key's forced command replaces it."""
     raw = _top().get("link")
     cfg = raw if isinstance(raw, dict) else {}
@@ -168,7 +168,7 @@ def link_command() -> list[str]:
         return list(command)
     target = cfg.get("ssh")
     target = target.strip() if isinstance(target, str) and target.strip() else home_name()
-    return ["ssh", *SSH_OPTIONS, target, "agentorc-agent", "link"]
+    return ["ssh", *SSH_OPTIONS, target, "shiftlead-agent", "link"]
 
 
 def link_socket() -> Path | None:

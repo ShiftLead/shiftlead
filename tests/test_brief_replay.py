@@ -93,7 +93,7 @@ def test_a_brief_under_the_homes_work_tree_is_read_from_disk_whatever_its_remote
     into — with a remote named `origin` added there, a brief kept under it still reads (the techlead's
     read of #800)."""
     home = tmp_path / "home"
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     home.mkdir()
     _git(home, "init", "-q", "-b", "main")
     _git(home, "config", "user.email", "t@example.com")
@@ -436,9 +436,9 @@ async def test_what_the_brief_restart_leaves_alone(agent, tmp_path):
 
 
 async def test_every_reply_to_a_member_whose_brief_changed_carries_the_clause(agent, tmp_path, capsys):
-    from agentorc import cli
     from sessionorc import client as clientmod
     from sessionorc.agent import BRIEF_CLAUSE
+    from shiftlead import cli
 
     async with LocalClient() as person:
         params = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], "unattended": True}
@@ -452,7 +452,7 @@ async def test_every_reply_to_a_member_whose_brief_changed_carries_the_clause(ag
         import argparse
 
         cli.unread_line(argparse.Namespace(json=False))
-        assert capsys.readouterr().out == f"[agentorc] ({BRIEF_CLAUSE}) — finish the entry in hand, then declare\n"
+        assert capsys.readouterr().out == f"[shiftlead] ({BRIEF_CLAUSE}) — finish the entry in hand, then declare\n"
         # a restart it declares now is never early, and once declared the clause is not repeated
         await wc.call("progress", id=w, ref=None, status="restart", why="brief changed")
         assert agent.sessions[w].restart_wanted.get("early") is None

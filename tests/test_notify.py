@@ -100,13 +100,13 @@ async def test_set_settings_writes_notify_and_refuses_on_without_secrets(agent):
 
 def test_a_line_is_structured_fields_and_a_link_never_what_a_session_wrote():
     assert notify.state_line("grinder-ao-1", "ao-grind", "permission") == (
-        "agentorc · grinder-ao-1 (ao-grind) needs you: permission"
+        "shiftlead · grinder-ao-1 (ao-grind) needs you: permission"
     )
-    assert notify.state_line("w", "", "needs") == "agentorc · w needs you"
+    assert notify.state_line("w", "", "needs") == "shiftlead · w needs you"
     assert notify.ask_line("grinder-ao-1", "ao-grind", "TD-229") == (
-        "agentorc · grinder-ao-1 (ao-grind) asks you a question · TD-229"
+        "shiftlead · grinder-ao-1 (ao-grind) asks you a question · TD-229"
     )
-    assert notify.alarm_line("w", "t") == "agentorc · identity alarm on w (t)"
+    assert notify.alarm_line("w", "t") == "shiftlead · identity alarm on w (t)"
     assert notify.row_link("http://k:1", "ao-x-w|permission") == "http://k:1/inbox?row=ao-x-w%7Cpermission"
     assert notify.mail_link("http://k:1", "m-ab12") == "http://k:1/inbox/m-ab12"
     assert notify.row_link("", "k") == "" and notify.message("x", "") == "x"
@@ -136,11 +136,11 @@ def test_the_child_sends_one_request_and_never_prints_the_url(monkeypatch, capsy
     monkeypatch.setattr(notify.urllib.request, "urlopen", fake_urlopen)
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN[3:])
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "42")
-    monkeypatch.setattr(sys, "stdin", io.StringIO("agentorc · w needs you\nhttp://k/inbox\n"))
+    monkeypatch.setattr(sys, "stdin", io.StringIO("shiftlead · w needs you\nhttp://k/inbox\n"))
     assert notify.main() == 0
     assert calls[0][1] == {
         "chat_id": "42",
-        "text": "agentorc · w needs you\nhttp://k/inbox",
+        "text": "shiftlead · w needs you\nhttp://k/inbox",
         "disable_web_page_preview": True,
     }
 
@@ -180,7 +180,7 @@ async def test_a_row_is_told_once_after_the_hold_and_again_only_as_a_new_row(age
         assert sent == [
             (
                 "samscrape/prd",
-                "agentorc · grinder-x-1 (x-grind) needs you: permission\n"
+                "shiftlead · grinder-x-1 (x-grind) needs you: permission\n"
                 "http://kmaster:8765/inbox?row=ao-x-w%7Cpermission",
             )
         ]
@@ -195,7 +195,7 @@ async def test_a_row_is_told_once_after_the_hold_and_again_only_as_a_new_row(age
         t1 = t0 + timedelta(seconds=200)
         s.state, s.since, s.pending = "needs-you", _z(t1), Pending(kind="question", text="which?")
         await _pass(agent, t1 + timedelta(seconds=61))
-        assert [t.split("\n")[0] for _, t in sent][1] == "agentorc · grinder-x-1 (x-grind) needs you: question"
+        assert [t.split("\n")[0] for _, t in sent][1] == "shiftlead · grinder-x-1 (x-grind) needs you: question"
         assert (await agent.rpc_host())["notify"]["last_ok"]
     finally:
         agent.sessions.pop(s.id, None)
@@ -250,7 +250,7 @@ async def test_an_ask_and_an_alarm_are_told_and_a_steer_is_not(agent, sent, tmp_
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
         texts = sorted(t for _, t in sent)
-        assert "agentorc · grinder-x-1 (x-grind) asks you a question · TD-229" in texts
+        assert "shiftlead · grinder-x-1 (x-grind) asks you a question · TD-229" in texts
         assert "secret words" not in "".join(texts)
         assert len(texts) == 2 and any("identity alarm on grinder-x-1" in t for t in texts), texts
     finally:
@@ -349,10 +349,10 @@ async def test_a_blocked_outcome_a_restart_row_and_a_team_with_work_are_told(age
         await _pass(agent, t0 + timedelta(seconds=61))
         texts = sorted(t for _, t in sent)
         assert texts == [
-            "agentorc · cm-grind wound down and has work: 3 entries",
-            "agentorc · grinder-x-1 (x-grind) reports blocked · TD-142",
-            "agentorc · run-grind's grinder-run-1 finished and has work: 1 entry",
-            "agentorc · x-grind: grinder-x-1 was not restarted",
+            "shiftlead · cm-grind wound down and has work: 3 entries",
+            "shiftlead · grinder-x-1 (x-grind) reports blocked · TD-142",
+            "shiftlead · run-grind's grinder-run-1 finished and has work: 1 entry",
+            "shiftlead · x-grind: grinder-x-1 was not restarted",
         ], texts
         assert "the box is down" not in "".join(texts)
     finally:
@@ -385,7 +385,7 @@ async def test_a_team_with_no_on_work_key_is_told_as_start(agent, sent):
         teams[team] = {"work_waiting": {"at": _z(t0), "repo": "/r", "members": {"a": ["TD-1"]}}}
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
-        assert [t for _, t in sent] == ["agentorc · ask-grind wound down and has work: 1 entry"], sent
+        assert [t for _, t in sent] == ["shiftlead · ask-grind wound down and has work: 1 entry"], sent
     finally:
         for team in ("cm-grind", "ask-grind", "off-grind", "bare-grind"):
             teams.pop(team, None)
@@ -459,7 +459,7 @@ async def test_after_and_more_nothing_until_ten_minutes_pass(agent, sent, tmp_pa
         )
         ids.append("ao-x-c")
         await _pass(agent, t2 + timedelta(seconds=61))
-        assert sent[-1][1].startswith("agentorc · c (x-grind) needs you: question") and len(sent) == 8
+        assert sent[-1][1].startswith("shiftlead · c (x-grind) needs you: question") and len(sent) == 8
     finally:
         for sid in ids:
             agent.sessions.pop(sid, None)
@@ -474,7 +474,7 @@ async def test_send_a_test_is_the_persons_and_sends_whatever_on_says(agent, sent
         settings_mod.save({"notify": {"telegram": {"on": False, "secrets": "samscrape/prd", "link": "http://k:1"}}})
         got = await person.call("notify_test")
         assert got["sent"] is True and got["result"].startswith("sent at")
-        assert sent[-1][0] == "samscrape/prd" and sent[-1][1].startswith("agentorc · a test from ")
+        assert sent[-1][0] == "samscrape/prd" and sent[-1][1].startswith("shiftlead · a test from ")
         assert sent[-1][1].endswith("\nhttp://k:1/inbox")
         assert (await agent.rpc_host())["notify"]["last_ok"] == got["at"]
         sid = (
@@ -516,7 +516,7 @@ async def test_a_dismissed_restart_row_and_a_handed_entrys_blocked_outcome(agent
     h.inbox.append(e)
     try:
         await _pass(agent, t0 + timedelta(seconds=61))
-        assert [t for _, t in sent] == ["agentorc · seat-x (x-grind) reports blocked · TD-077"]
+        assert [t for _, t in sent] == ["shiftlead · seat-x (x-grind) reports blocked · TD-077"]
     finally:
         agent.attention_snoozed.clear()
         agent.sessions.pop(s.id, None)

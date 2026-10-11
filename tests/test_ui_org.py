@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from agentorc.ui.app import team_groups, templates
+from shiftlead.ui.app import team_groups, templates
 
 pytestmark = pytest.mark.unit
 
@@ -136,9 +136,9 @@ def test_the_teams_ready_mark_is_counted_by_the_grouping_and_kept_out_of_its_cou
 
 def test_two_teams_each_with_a_lead():
     views = [
-        sess("ao-orc", "orchestrator-ao-1", team="ao-grind", project="agentorc", caps=["control"]),
-        sess("ao-g1", "tdgrind-ao-1", team="ao-grind", project="agentorc", controllers=["ao-orc"], state="working"),
-        sess("ao-g2", "tdgrind-ao-2", team="ao-grind", project="agentorc", controllers=["ao-orc"], state="needs-you"),
+        sess("ao-orc", "orchestrator-ao-1", team="ao-grind", project="shiftlead", caps=["control"]),
+        sess("ao-g1", "tdgrind-ao-1", team="ao-grind", project="shiftlead", controllers=["ao-orc"], state="working"),
+        sess("ao-g2", "tdgrind-ao-2", team="ao-grind", project="shiftlead", controllers=["ao-orc"], state="needs-you"),
         sess("gu-orc", "orchestrator-gu", team="guardians", project="guardians", caps=["control"]),
         sess("gu-1", "api-grinder", team="guardians", project="guardians-api", controllers=["gu-orc"]),
     ]
@@ -146,7 +146,7 @@ def test_two_teams_each_with_a_lead():
     assert [g["team"] for g in groups] == ["ao-grind", "guardians"]
     ao, gu = groups
     assert ao["manager"]["name"] == "orchestrator-ao-1" and ao["ids"][0] == "ao-orc"  # the lead's card first
-    assert ao["projects"] == ["agentorc"]
+    assert ao["projects"] == ["shiftlead"]
     assert gu["projects"] == ["guardians", "guardians-api"]  # deduplicated across the members
     assert gu["manager"]["id"] == "gu-orc"
 
@@ -184,29 +184,29 @@ def test_members_sort_urgent_first_within_a_group():
 
 
 def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import templates, view
+    from shiftlead.ui.app import templates, view
 
     records = [
         {
             "id": "ao-orc",
             "name": "orchestrator-ao-1",
             "state": "idle",
-            "dir": "/tmp/agentorc",
+            "dir": "/tmp/shiftlead",
             "kind": "agent",
             "team": "ao-grind",
-            "project": "agentorc",
+            "project": "shiftlead",
             "capabilities": ["control"],
         },
         {
             "id": "ao-g1",
             "name": "tdgrind-ao-1",
             "state": "working",
-            "dir": "/tmp/agentorc/wt",
+            "dir": "/tmp/shiftlead/wt",
             "kind": "agent",
             "team": "ao-grind",
-            "project": "agentorc",
+            "project": "shiftlead",
             "controllers": ["ao-orc"],
             "tail": ["…"],
         },
@@ -254,9 +254,9 @@ def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(mo
     `/inbox` — the dialog it opened until then is retired — and its number, the **Needs you**
     section, shows at one and not at zero. Its hover text says what it counts and that it is not
     the Org's needs-you count."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     def render(n):
         return templates.get_template("org.html").render(
@@ -286,8 +286,8 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     """Design §4.2 (2026-09-17): a lead idle between rounds, log pushed, used to read *ready to
     close ✓* over working members. The item comes from `controllers`, not a role — and a session
     that controls nothing never sees it."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     clean = {"dirty": 0, "ahead": 0, "upstream": "origin/x", "branch": "x"}
     lead = {"id": "ao-orc", "name": "orc", "state": "idle", "dir": "/tmp/a", "kind": "agent", "git": clean, "tail": []}
@@ -331,9 +331,9 @@ def test_the_teams_line_says_the_identity_mode_unless_the_host_enforces_it(tmp_p
     """design §4.8a: the Org's teams line says *identity: observe* or *identity: off* — a host that
     is not enforcing is not yet protected — and says **nothing** under `enforce`, which is the host
     that is. A note that was always there would stop being read."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import identity_note, templates
+    from shiftlead.ui.app import identity_note, templates
 
     assert "observe" in identity_note({"mode": "observe"}) and "not enforcing" in identity_note({"mode": "observe"})
     assert identity_note({"mode": "off"}).startswith("identity: off")
@@ -355,9 +355,9 @@ def test_the_org_says_restart_pending_when_hosts_yml_moved_under_the_agent(tmp_p
     """design §5 (TD-149 (5)): `local.name`, `home:` and `local.identity` are the agent's from its
     start and the page's per request, so a hand edit since is named — each value that moved, what
     the agent runs as against what the file says — and nothing is said while they agree."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("home: hub\nlocal:\n  name: box\n  identity: enforce\n")
-    from agentorc.ui.app import restart_note, templates
+    from shiftlead.ui.app import restart_note, templates
 
     agrees = {"host": "box", "home": "hub"}
     assert restart_note(agrees, {"mode": "enforce"}) == ""
@@ -379,11 +379,11 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     """TD-073: the top bar's chip is one span per profile showing that profile's **worst** window —
     the label and number the adapter gave — with every window on hover. No field name of any one
     tool appears in the template, so a profile with one daily window renders the same way."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     from datetime import timedelta
 
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     now = datetime.now(UTC)  # the page draws against the clock, so the reading is a minute old
     usage = {
@@ -529,7 +529,7 @@ def test_a_refused_usage_poll_keeps_the_held_reading_and_its_age_says_how_old_it
     account's: *unknown since 16:00 (was 88%)*. The hover says when it was read, from where, and why
     the poll since failed. A refusal with nothing ever held is *no reading yet*; a tool that reports
     no quota has no chip."""
-    from agentorc.ui.app import usage_chip
+    from shiftlead.ui.app import usage_chip
 
     got = {k: usage_chip("grind", u, USAGE_NOW) for k, u in USAGE_CASES.items()}
     read = f"read at {_clock('2026-09-20T20:00:00Z')}, 3m ago, asked of the endpoint"
@@ -580,7 +580,7 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
     reserve, the days left and when the line next moves on hover. *Worst* is the smallest gap to a
     line — the tool's 100% where there is none, so an unreserved 97% outranks a reserved 40% of a
     70% line — and *near* is within ten points of a line, 80% without one."""
-    from agentorc.ui.app import usage_chip, with_lines
+    from shiftlead.ui.app import usage_chip, with_lines
 
     got = {k: usage_chip("grind", u, USAGE_NOW) for k, u in USAGE_CASES.items()}
     lined = got["lined"]
@@ -611,7 +611,7 @@ def test_the_usage_chip_shows_the_gates_projection():
     gate projects a window, the chip says so — *week 88% · 6h · projected 96% / 95%* — ranks and
     colours by the projection, and a reading past `USAGE_UNKNOWN` it projects is not *unknown*;
     a window with no rate to project by is the reading as ever."""
-    from agentorc.ui.app import usage_chip
+    from shiftlead.ui.app import usage_chip
 
     got = {k: usage_chip("grind", USAGE_CASES[k], USAGE_NOW) for k in ("projected", "projected_under", "no_rate")}
     assert got["projected"]["text"] == "grind · week 88% · 6h · projected 96% / 95%"
@@ -628,7 +628,7 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
     quota as *Claude, paul*. The readings are grouped by account: one chip, `<tool> · <account>`,
     the lowest line among the profiles sharing it, and each profile with its line and sessions on
     hover. A reading from an agent that names no account stays its profile's own chip."""
-    from agentorc.ui.app import usage_accounts, usage_chip
+    from shiftlead.ui.app import usage_accounts, usage_chip
 
     reading = {"windows": [{"label": "week", "pct": 24, "resets": "r"}], "fetched": "f", "reason": "ok",
                "account": "paul", "tool": "Claude"}  # fmt: skip
@@ -679,14 +679,14 @@ def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):
     import shutil
     import subprocess
 
-    from agentorc.ui.app import usage_chip
+    from shiftlead.ui.app import usage_chip
 
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript too, and nothing else runs it")
     probe = tmp_path / "usage_probe.js"
     probe.write_text(USAGE_PROBE)
-    app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js"
     out = subprocess.run([node, str(probe), str(app_js), json.dumps(USAGE_CASES), USAGE_NOW.isoformat()],
                          capture_output=True, text=True, timeout=30)  # fmt: skip
     assert out.returncode == 0, out.stderr
@@ -719,9 +719,9 @@ def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path,
     """design §4.5a **brief changed** (§6 rule 7, TD-217 slice 3): fixed words, the files by name and
     when on hover, drawn where *restart wanted* is; a mark, never pressable, and on Focus always in
     the page and hidden until true."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import card_slot, templates, view
+    from shiftlead.ui.app import card_slot, templates, view
 
     base = {"id": "ao-m1", "name": "m1", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
             "state": "idle", "since": "2026-09-21T01:00:00Z", "confidence": "hook", "pane": True,
@@ -750,7 +750,7 @@ def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path,
     assert card_slot(view({**base, "state": "working", "brief_changed": bc}))["text"] == "brief changed"
     # a malformed field costs the chip, never the grid
     assert view({**base, "brief_changed": "yes"})["brief_changed"] is None
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert '$("#fbc")' in js  # kept current from the pushed delta
 
 
@@ -765,9 +765,9 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     act on it** — a run that was over before it began did not run out of context. So an early one
     must not look like an ordinary one: a person reading the same chip would expect the same thing
     to happen next, and nothing will."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import templates, view
+    from shiftlead.ui.app import templates, view
 
     base = {"id": "ao-w1", "name": "w1", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
             "state": "idle", "since": "2026-09-21T01:00:00Z", "confidence": "hook", "pane": True,
@@ -799,7 +799,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
             assert 'class="badge rw early"' in html, where
         else:  # the slot says it wants a person, in words (design §4.5 *The card's anatomy*, TD-095)
             assert "restart wanted · early — for a person" in html
-    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
     assert ".badge.rw.early" in css  # …and it does not look the same
 
     # what made it early is the home's reading, on the mark (§4.9a, TD-249 slice 6): the hover ends
@@ -813,7 +813,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
         assert "restart wanted · repeats TD-229" in html and "· early" not in html, where
         assert f"{words}, so a controller does not act on it" in html, where
     assert "restart wanted · repeats TD-229 — for a person" in pages[0][1]
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "repeats ${r.repeat}" in js and "r.decided" in js  # the delta draws the same words
 
     # on Focus both report-line marks are **always in the page, hidden until true**, and the header's
@@ -823,7 +823,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     plain = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org")
     assert 'id="frw"' in plain and 'id="foow"' in plain
     assert "badge rw hidden" in plain and "badge oow hidden" in plain  # present, not shown
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert 'rw.classList.toggle("hidden", !r);' in js and 'rw.classList.toggle("early", early);' in js
     assert 'oow.classList.toggle("hidden", !o);' in js
 
@@ -859,8 +859,8 @@ def _card(**kw):
 
 
 def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
 
     perm = {"kind": "permission", "text": "Bash: rm -rf build", "tool_use_id": "tu", "deadline": "2026-09-21T03:00:00Z"}
     doing = {"text": "TD-095: the rows", "at": "2026-09-21T01:30:00Z"}
@@ -905,8 +905,8 @@ def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, 
 
 
 def test_ready_to_close_is_the_caption_and_the_next_act_is_the_foots_first_button(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     clean = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
     ready = view(_card(git=clean, doing={"text": "done with TD-1", "at": "2026-09-21T01:30:00Z"}))
@@ -936,8 +936,8 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     tmp_path, monkeypatch
 ):
     """§4.5 row 6 and §4.5a **Forget** / **Details** / **more ▾** (TD-266, built by TD-267)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     gone = ('data-act="wrapup"', 'data-act="kill"', 'data-act="close"', 'data-act="mode"',
             'data-act="shell-here"', 'data-act="popout"', "data-copy=")  # fmt: skip
@@ -969,7 +969,7 @@ def test_a_closed_card_leads_with_forget_its_menu_draws_what_applies_and_its_hov
     assert all(g in menu(kept) for g in gone) and 'data-act="remove"' not in menu(kept)
     assert acts(card.render(s=view(_card(state="exited", exit_code=0, pane=False)))) == ["message", "remove"]
     # the Details banner says the same beside its Forget, from the view's field
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'v.closed_keep ? ` <span class="meta">${esc(v.closed_keep)}</span>`' in js
 
 
@@ -977,8 +977,8 @@ def test_a_closed_card_says_who_closed_it_and_keeps_the_declaration_after_the_en
     """§4.5 row 5 (b) and §4.5a **doing** (TD-262, built by TD-265): the record's `closer` in the
     card's words — a person's, a session's by its name, the session's own, the tick's four — bare
     *closed* with none, and a closed or exited record that declared keeps the declaration after."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
 
     at = "2026-10-01T10:00:00Z"
     mgr = _card(id="ao-r-manager-dc-1", name="manager-dc-1", state="closed", pane=False)
@@ -1017,8 +1017,8 @@ def test_a_closed_card_says_who_closed_it_and_keeps_the_declaration_after_the_en
 
 def test_ready_to_close_on_focus_says_close_session_as_the_header_does(tmp_path, monkeypatch):
     """TD-272: the *Ready to close* card's button read **Close**, as if it closed the card."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = view(_card(state="idle", created="2026-09-21T00:00:00Z"))
     html = templates.get_template("focus.html").render(s={**s, "grants_all": [], "ready": []}, host="h", active="Org")
@@ -1027,8 +1027,8 @@ def test_ready_to_close_on_focus_says_close_session_as_the_header_does(tmp_path,
 
 
 def test_row_three_says_where_once_and_the_group_hides_what_it_already_says(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import _middle, templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import _middle, templates, view
 
     # the worktree named for the session is not repeated; one named otherwise is
     v = view(_card(git={"branch": "td095-rows"}))
@@ -1049,16 +1049,16 @@ def test_row_three_says_where_once_and_the_group_hides_what_it_already_says(tmp_
     assert view({**member, "controllers": ["ao-m", "ao-x"]}, [mgr, member])["under_is_manager"] is False
     html = templates.get_template("card.html").render(s=view(member, [mgr, member]))
     assert 'class="meta under ingroup"' in html and 'class="badge team ingroup"' in html
-    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
     assert '.tgroup:not([data-team=""]):not(.filtering) .sc .ingroup { display: none; }' in css
 
 
 def test_the_mode_is_a_word_on_the_card_and_its_toggle_is_in_more(tmp_path, monkeypatch):
     """Design §4.5a **unattended / interactive** (TD-095): a mark, never pressable, on the card;
     *interactive* — the person's own — carries the `person` mark; the toggle is an entry of *more*."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
-    from agentorc.ui.icons import ICON_PATHS
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
+    from shiftlead.ui.icons import ICON_PATHS
 
     card = templates.get_template("card.html")
     worker, mine = card.render(s=view(_card())), card.render(s=view(_card(unattended=False)))
@@ -1074,8 +1074,8 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
     rest are plain links, and the one filled button a card carries is Allow on a *needs you* card.
     *more ▾ → Close* is enabled only when Ready to close passes (§4.5) — dimmed means disabled, and
     its hover says what it waits on."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     card = templates.get_template("card.html")
 
@@ -1100,14 +1100,14 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     """Design §4.5 *The card's anatomy* (TD-095): the header carries the host / repo its sessions
     share — *mixed* where they do not — and the counts by state in the grid's order, *needs you*
     being its ringed mark instead; *No team* is headed by its count and nothing else."""
-    from agentorc.ui.app import group_place, state_counts, team_groups, templates
+    from shiftlead.ui.app import group_place, state_counts, team_groups, templates
 
     def v(sid, state, place, unseen=False, **kw):
         return {**sess(sid, sid, state=state, **kw), "place": place, "unseen": unseen}
 
-    same = [v("a", "working", "kmaster / agentorc", team="t"), v("b", "idle", "kmaster / agentorc", team="t")]
-    assert group_place(same) == "kmaster / agentorc" and group_place([]) == ""
-    assert group_place([*same, v("c", "idle", "vps / agentorc", team="t")]) == "mixed"
+    same = [v("a", "working", "kmaster / shiftlead", team="t"), v("b", "idle", "kmaster / shiftlead", team="t")]
+    assert group_place(same) == "kmaster / shiftlead" and group_place([]) == ""
+    assert group_place([*same, v("c", "idle", "vps / shiftlead", team="t")]) == "mixed"
     many = [*same, v("c", "needs-you", "x"), v("d", "idle", "x", unseen=True), v("e", "limited", "x")]
     assert state_counts(many) == ["1 limited", "1 working", "1 unseen", "1 idle"]  # urgency order
     groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
@@ -1115,7 +1115,7 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     head = templates.get_template("group_head.html").render(g=team)
     # a live team's header carries no state chips since TD-176: its compact cards say it — but
     # folded it does, so they are drawn for the fold alone and CSS shows them only then (TD-194)
-    assert "kmaster / agentorc" in head and "▾ 2 sessions" in head and " live<" not in head
+    assert "kmaster / shiftlead" in head and "▾ 2 sessions" in head and " live<" not in head
     assert head.count("1 working") == 1 and 'class="meta counts foldonly">· 1 working · 1 idle<' in head
     nohead = templates.get_template("group_head.html").render(g=none)
     assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
@@ -1126,8 +1126,8 @@ def test_within_one_urgency_the_persons_own_sort_first_and_the_card_says_it_is_m
     first, name) — a worker that needs a person still outranks the person's own idle session, and a
     manager's card is placed first before any of this. The filter's word `mine` (§4.5a, TD-428)
     shows only the interactive sessions; the card says which it is, the page's script does the rest."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import card_order, team_groups, templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import card_order, team_groups, templates, view
 
     a = _card(id="ao-a", name="a")  # unattended, idle
     z = _card(id="ao-z", name="z", unattended=False)  # interactive, idle
@@ -1140,7 +1140,7 @@ def test_within_one_urgency_the_persons_own_sort_first_and_the_card_says_it_is_m
     assert g["ids"] == ["ao-m", "ao-z", "ao-a"]  # the manager first, then the person's own
     card = templates.get_template("card.html")
     assert 'data-mine="1"' in card.render(s=vs[1]) and "data-mine" not in card.render(s=vs[0])
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "(!!b.dataset.mine - !!a.dataset.mine)" in js  # the page's re-sort keeps the same key
     html = templates.get_template("org.html").render(
         sessions=vs, groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
@@ -1155,10 +1155,10 @@ def test_a_seats_last_came_is_its_fill_and_a_compact_flag_keeps_its_count(tmp_pa
     """TD-200: (1) a seat that just left reads *last came* from its record's `created` (the fill),
     never from `since` (when it left: *last came · 0s ago*); (2) the compact card's flag is the
     count alone, never clipped — *47 unpushed* once read *⚠ 4* — with the full words on hover."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from datetime import UTC, datetime, timedelta
 
-    from agentorc.ui.app import templates, view
+    from shiftlead.ui.app import templates, view
 
     now = datetime.now(UTC)
     iso = lambda t: t.isoformat().replace("+00:00", "Z")  # noqa: E731
@@ -1170,7 +1170,7 @@ def test_a_seats_last_came_is_its_fill_and_a_compact_flag_keeps_its_count(tmp_pa
     assert c["flag"] == "dirty · 47 unpushed" and c["flag_short"] == "dirty · 47"
     html = templates.get_template("card.html").render(s={**c, "compact": True, "compact_line": "Manager"})
     assert '<span class="flag" title="dirty · 47 unpushed">⚠ dirty · 47</span>' in html
-    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
     assert ".sc .r2 .flag { flex-shrink: 0; }" in css  # the line of its own gives way, never the count
 
 
@@ -1180,8 +1180,8 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
     it is — the slot says what would make it come, the caption when it last came, and the foot's
     first button is Message…, never Forget or Close session. A seat that is filled is an ordinary
     card, and a record the definition does not name is the `exited` it always was."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import state_counts, templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import state_counts, templates, view
 
     clean = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
     for state in ("exited", "closed"):
@@ -1235,8 +1235,8 @@ def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):
     """Design §4.2 *Unseen idle*, TD-095 (f), Paul 2026-09-21: an unattended session that finished
     while nobody looked is plain `idle` — its manager read the result and its slot says how it
     ended; the person's own interactive session is *idle · unseen* and sorts above idle."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
 
     finished = {"since": "2026-09-21T03:00:00Z", "seen_at": "2026-09-21T02:00:00Z"}
     worker = view(_card(**finished))  # `_card` is unattended
@@ -1250,8 +1250,8 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
     composed by the page from the mark's own fields — never from what the session said. It is (a)
     in the slot, *what explains a stop*, and waits behind a permission, a question, a limit or a
     stall; the Focus header shows it regardless. A mark, not a state: the pill stays `idle`."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import gated_view, templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import gated_view, templates, view
 
     mark = {"profile": "grind", "label": "week", "pct": 75, "line": 70, "since": "2026-09-21T01:00:00Z",
             "next": "2026-09-21T14:00:00Z", "sent_at": None}  # fmt: skip
@@ -1299,22 +1299,22 @@ def test_members_is_on_an_org_defined_team_and_a_note_on_a_repo_defined_one():
     """§4.5a *team card: Members…* (TD-172): on the *i* panel's Definition line (TD-418) of a team
     `org.yml` defines; on a team a repo defines, drawn disabled with its reason and **Open file**
     (TD-229); never on *No team*. The exited banner's *one member back* line and the team skill's say the same thing."""
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     head = templates.get_template("group_head.html")
     base = {"team": "ao-grind", "label": "ao-grind", "defined": True, "stopped": True, "members": [], "live": 0}
     assert 'data-members="ao-grind"' in head.render(g={**base, "in_org": True})
-    repo = head.render(g={**base, "in_org": False, "source": "/r/.agentorc.yml", "source_repo": "r"})
+    repo = head.render(g={**base, "in_org": False, "source": "/r/.shiftlead.yml", "source_repo": "r"})
     # a repo's team (§4.5a *Members… on a repo-defined team*, TD-229 slice 4): disabled, its reason
-    # beside it, and **Open file** on its `.agentorc.yml` through the person's `open_in`
-    assert "data-members" not in repo and "defined in r&#39;s .agentorc.yml — changed by PR</span>" in repo
-    assert '<button class="btn sm ghost" disabled title="defined in r&#39;s .agentorc.yml' in repo
-    assert ">Open file</a>" in repo and "/r/.agentorc.yml" in repo
+    # beside it, and **Open file** on its `.shiftlead.yml` through the person's `open_in`
+    assert "data-members" not in repo and "defined in r&#39;s .shiftlead.yml — changed by PR</span>" in repo
+    assert '<button class="btn sm ghost" disabled title="defined in r&#39;s .shiftlead.yml' in repo
+    assert ">Open file</a>" in repo and "/r/.shiftlead.yml" in repo
     panel = repo[repo.index('class="note secinfo helppanel"') :]
     assert panel.index('<div class="defline"><b>Definition</b>') < panel.index(">Open file</a>")
     assert "Flow on Settings →" in panel and repo.index("helppanel") < repo.index("changed by PR")
     assert "data-members" not in head.render(g={"team": "", "label": "No team", "members": []})
-    ui_dir = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+    ui_dir = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
     js = (ui_dir / "static" / "app.js").read_text()
     # TD-250 slice 3: Restart is the way back into the team's run; Resume with changes… is for a
     # record with no launch record
@@ -1330,7 +1330,7 @@ def test_a_metered_accounts_chip_reads_spend_over_its_amount():
     """design §4.5a **usage** (TD-151 slice 5): *day $4.10 / $5*, the worst window the one nearest its
     amount, amber from eight tenths and red at it, tokens by kind on hover, *spend unknown* when the
     adapter could not read, and a window with no amount printing its spend alone."""
-    from agentorc.ui.app import usage_accounts, usage_chip
+    from shiftlead.ui.app import usage_accounts, usage_chip
 
     got = usage_chip("Claude · key", USAGE_CASES["metered"])
     assert got["text"] == "Claude · key · month 12.3M tok / 10M tok" and got["cls"] == "cap" and got["pct"] == 100
@@ -1380,8 +1380,8 @@ def test_a_card_says_what_it_waits_on_after_its_declaration_or_alone(tmp_path, m
     slot's ending — after the declaration's words, before its reason; alone on one that declared
     nothing; after the ending of a closed one — the sooner bound first, *and n more*, an `ask` with no
     time, the question's first paragraph on hover. Prose holds nothing, and a closed entry leaves."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import view, waits_of
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view, waits_of
 
     bound = datetime.now(UTC).replace(hour=9, minute=57, second=0, microsecond=0)
     clock = bound.astimezone().strftime("%H:%M")
@@ -1427,7 +1427,7 @@ def test_the_usage_chip_prints_a_whole_float_as_the_script_does():
     """TD-296 #1: the endpoint's `52.0` drew *week 52.0%* on the pages the server renders (Settings,
     Inbox, Help, New session) and *week 52%* where `AO.usageChip` redraws it (JS prints a whole
     float bare). The server now prints `:g`, as the script does; a fraction keeps its decimal."""
-    from agentorc.ui.app import usage_chip
+    from shiftlead.ui.app import usage_chip
 
     u = {"windows": [{"label": "week", "pct": 52.0, "resets": "r"}, {"label": "5h", "pct": 7.5, "resets": "r"}],
          "fetched": "2026-09-20T20:00:00Z", "reason": "ok"}  # fmt: skip
@@ -1440,9 +1440,9 @@ def test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none(monk
     """§4.5a *team card: + card* (TD-377, built by TD-379): the last card in every defined team's grid,
     live or not, whose press is the New session form on that team; none on *No team*, and none on a
     badge no definition carries (there is no team for the form to pick)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import view
+    from shiftlead.ui.app import view
 
     records = [
         {"id": "ao-g1", "name": "grinder-1", "state": "working", "dir": "/tmp/r", "kind": "agent", "team": "live"},
@@ -1482,7 +1482,7 @@ def test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none(monk
     assert sections["live"].index('id="card-ao-g1"') < sections["live"].index('class="card sc plus"')
     assert "plus" not in sections[""] and "plus" not in sections["badge-only"]
     # its hover is the help entry's first sentence, and the help entry says no definition changes
-    from agentorc.ui.help import BY_KEY, first_sentence
+    from shiftlead.ui.help import BY_KEY, first_sentence
 
     assert f'title="{first_sentence("plus")}"'.replace("'", "&#39;") in sections["live"]
     assert "Nothing is written to org.yml" in BY_KEY["plus"].text
@@ -1492,9 +1492,9 @@ def test_a_delta_carries_the_plus_card_for_a_defined_team_and_none_for_the_rest(
     """§4.5a *team card: + card* (TD-379; pinned by TD-389): `render_heads` is what a delta sends, and
     its `plus` is how the client puts the card back after a sort or a group swap — the card for a
     defined team, sessions or none, and nothing for *No team* or a badge no definition carries."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import render_heads, view
+    from shiftlead.ui.app import render_heads, view
 
     records = [
         {"id": "ao-g1", "name": "grinder-1", "state": "working", "dir": "/tmp/r", "kind": "agent", "team": "live"},
@@ -1519,8 +1519,8 @@ def test_a_delta_carries_the_plus_card_for_a_defined_team_and_none_for_the_rest(
 
 
 def test_the_anchor_seats_slot_says_what_brings_it_and_why_a_fill_waits():
-    from agentorc.org import ANCHOR_WHEN
-    from agentorc.ui.app import view
+    from shiftlead.org import ANCHOR_WHEN
+    from shiftlead.ui.app import view
 
     seats = {"ao-w": ANCHOR_WHEN}
     slot = view(_card(state="closed", pane=False), seats=seats)["slot"]
@@ -1544,7 +1544,7 @@ def test_the_anchor_seats_slot_says_what_brings_it_and_why_a_fill_waits():
 
 
 def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
-    from agentorc.ui.cards import seat_occupant
+    from shiftlead.ui.cards import seat_occupant
 
     now = datetime(2026, 10, 8, 7, 0, tzinfo=UTC)
     seat = {
@@ -1569,15 +1569,15 @@ def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
     assert seat_occupant(["ao-alpha-anchor-ao-1 (idle)"], [{**seat, "progress": []}], now) == (
         "anchor-ao-1 holds it (a seat, idle)"
     )
-    # not a seat, outside agentorc, or nothing: the plain *in use by* words stand
+    # not a seat, outside shiftlead, or nothing: the plain *in use by* words stand
     assert seat_occupant(["ao-alpha-paul (idle)"], fleet, now) == ""
-    assert seat_occupant(["claude-1 (claude-code, outside agentorc)"], fleet, now) == ""
+    assert seat_occupant(["claude-1 (claude-code, outside shiftlead)"], fleet, now) == ""
     assert seat_occupant([], fleet, now) == ""
     # a seat listed after another holder is still named (review of #1253)
-    assert seat_occupant(["claude-1 (claude-code, outside agentorc)", "ao-alpha-anchor-ao-1 (idle)"], fleet, now) == (
+    assert seat_occupant(["claude-1 (claude-code, outside shiftlead)", "ao-alpha-anchor-ao-1 (idle)"], fleet, now) == (
         "anchor-ao-1 holds it (a seat, idle · TD-299)"
     )
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "(o.seat || `in use by ${o.occupants.join" in js
 
 
@@ -1586,9 +1586,9 @@ def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypat
     claim whose PR the repo reading holds open, or an open `ask`/`steer` to the person whose `about`
     names a reference, draws the teal *waiting* pill — its own filter word and Agents pill, ranked after
     `working` — with the wait as the slot's ending; the payload's state stays `idle`."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import card_order, rollup, state_counts, view, waits_of
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from sessionorc.models import STATE_RANK
+    from shiftlead.ui.app import card_order, rollup, state_counts, view, waits_of
 
     repos = {
         "/r": {

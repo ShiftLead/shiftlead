@@ -126,9 +126,9 @@ async def test_the_context_file_goes_with_the_last_record_holding_the_conversati
 
 @pytest.mark.unit
 def test_claude_code_carries_it_as_the_system_prompts_tail(tmp_path, monkeypatch):
-    from agentorc.adapters.claude_code import AT_COMPOSER_ENV, ClaudeCodeAdapter
+    from shiftlead.adapters.claude_code import AT_COMPOSER_ENV, ClaudeCodeAdapter
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text("default: p\nprofiles:\n  p: {account: p}\n")
     ad = ClaudeCodeAdapter(binary="claude")

@@ -1,4 +1,4 @@
-"""`agentorc.org` — the `org.yml` reader (design §4.9, TD-040 step b): the defaults, the
+"""`shiftlead.org` — the `org.yml` reader (design §4.9, TD-040 step b): the defaults, the
 validation, a repo's own `teams:` folded in, and the per-host checkout lookup."""
 
 from __future__ import annotations
@@ -8,11 +8,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agentorc import org
+from shiftlead import org
 
 ORG = {
     "projects": {
-        "agentorc": {"repos": {"agentorc": {"kmaster": "~/agentorc"}}},
+        "shiftlead": {"repos": {"shiftlead": {"kmaster": "~/agentorc"}}},
         "guardians": {
             "repos": {
                 "guardians": {"devenv": "/workspaces/guardians"},
@@ -22,7 +22,7 @@ ORG = {
     },
     "teams": {
         "ao-grind": {
-            "projects": ["agentorc"],
+            "projects": ["shiftlead"],
             "manager": {"role": "manager", "name": "manager-ao-1"},
             "members": [
                 {"role": "grinder", "count": 2, "name": "tdgrind-ao", "lane": "free-pick"},
@@ -54,16 +54,16 @@ def write(tmp_path: Path, doc: object) -> Path:
 
 
 def test_missing_file_is_an_empty_org(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     o = org.load()
     assert o.projects == {} and o.teams == {} and o.roles == {}
     assert o.path == tmp_path / "org.yml"
-    assert o.checkout("agentorc", "agentorc", "kmaster") is None
+    assert o.checkout("shiftlead", "shiftlead", "kmaster") is None
 
 
 def test_projects_and_checkout_expand_home(tmp_path):
     o = org.load(write(tmp_path, ORG))
-    assert o.checkout("agentorc", "agentorc", "kmaster") == Path("~/agentorc").expanduser()
+    assert o.checkout("shiftlead", "shiftlead", "kmaster") == Path("~/agentorc").expanduser()
     assert o.checkout("guardians", "guardians-api", "devenv") == Path("/workspaces/guardians/api")
     assert o.checkout("guardians", "guardians-api", "kmaster") is None  # not on this host: phase 2
     assert o.checkout("guardians", "nope", "devenv") is None and o.checkout("nope", "x", "devenv") is None
@@ -74,11 +74,11 @@ def test_projects_and_checkout_expand_home(tmp_path):
 def test_every_default_of_section_4_9(tmp_path):
     o = org.load(write(tmp_path, ORG))
     grind = o.teams["ao-grind"]
-    assert grind.source == tmp_path / "org.yml" and grind.projects == ["agentorc"]
-    assert grind.manager == org.ManagerDef(role="manager", name="manager-ao-1", home="agentorc", profile=None)
+    assert grind.source == tmp_path / "org.yml" and grind.projects == ["shiftlead"]
+    assert grind.manager == org.ManagerDef(role="manager", name="manager-ao-1", home="shiftlead", profile=None)
     two, one = grind.members
     # count 1, name = the role, unattended true, grants/brief/profile = the role's, home = the only repo
-    assert one == org.MemberDef(role="hunter", name="hunter-ao", home="agentorc", lane=["ui"])
+    assert one == org.MemberDef(role="hunter", name="hunter-ao", home="shiftlead", lane=["ui"])
     assert one.count == 1 and one.unattended is True and one.grants is None and one.brief is None
     assert two.count == 2 and two.lane == ["free-pick"] and two.names() == ["tdgrind-ao-1", "tdgrind-ao-2"]
     assert one.names() == ["hunter-ao"]
@@ -211,7 +211,7 @@ def test_an_indirect_cycle_is_refused(tmp_path):
 
 
 def test_merge_repo_teams(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))  # no hosts.yml: the short hostname
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))  # no hosts.yml: the short hostname
     repo = tmp_path / "myrepo"
     repo.mkdir()
     base = org.load(write(tmp_path, ORG))
@@ -226,7 +226,7 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     assert merged.projects["myrepo"].repos == {"myrepo": {local_host().name: repo.resolve()}}
     assert merged.checkout("myrepo", "myrepo", local_host().name) == repo.resolve()
     g = merged.teams["grind"]
-    assert g.projects == ["myrepo"] and g.source == repo / ".agentorc.yml"
+    assert g.projects == ["myrepo"] and g.source == repo / ".shiftlead.yml"
     assert g.manager == org.ManagerDef(role="manager", name="orc", home="myrepo")
     assert g.members[0].names() == ["tdgrind-1", "tdgrind-2"] and g.members[0].home == "myrepo"
     assert merged.teams["ao-grind"] is base.teams["ao-grind"]  # org wins, source still org.yml
@@ -235,9 +235,9 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     # nothing to merge leaves the org as it was, and the repo is not made a project for nothing
     assert org.merge_repo_teams(base, repo, None).projects.keys() == base.projects.keys()
     # the repo's team the org file wins over is recorded, for `ao team list`'s *shadowed* (TD-229)
-    assert merged.shadowed == {"ao-grind": [repo / ".agentorc.yml"]} and base.shadowed == {}
+    assert merged.shadowed == {"ao-grind": [repo / ".shiftlead.yml"]} and base.shadowed == {}
     # nesting is the org file's (§4.9 *The org is an aggregate*), and the error names the repo's file
-    with pytest.raises(ValueError, match=r"\.agentorc\.yml: teams\.bad\.members\[0\]\.team: a nested team"):
+    with pytest.raises(ValueError, match=r"\.shiftlead\.yml: teams\.bad\.members\[0\]\.team: a nested team"):
         org.merge_repo_teams(base, repo, {"bad": {"members": [{"team": "ao-grind"}]}})
     # an org project of the repo's name is used as it stands
     doc = dict(ORG, projects={**ORG["projects"], "myrepo": {"repos": {"myrepo": {"elsewhere": "/x"}}}})
@@ -411,12 +411,12 @@ def test_the_org_roles_overlay_is_checked_key_by_key_as_a_repos_is(tmp_path):
 MEMBERS_YML = """\
 # the org, by hand
 projects:
-  agentorc: {repos: {agentorc: {kmaster: ~/agentorc}}}
+  shiftlead: {repos: {shiftlead: {kmaster: ~/agentorc}}}
 
 teams:
   # the grind team
   ao-grind:
-    projects: [agentorc]   # one repo
+    projects: [shiftlead]   # one repo
     manager: {role: manager, name: manager-ao-1}
     members:
       # two grinders, numbered
@@ -424,7 +424,7 @@ teams:
       - {role: hunter, name: hunter-ao, lane: [ui]}
     # after the members
   other:
-    projects: [agentorc]
+    projects: [shiftlead]
     manager: {role: manager}
     members:
       - role: grinder
@@ -559,7 +559,7 @@ def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path,
     <role>}` on a team, either key optional and read as `techlead` where unsaid; an unknown key, or a
     role nothing resolves, is an error naming it when the definition is read. A role resolves from the
     presets, the org's `roles:`, the team's own members and seats, or the repo's roles for its own teams."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     f = tmp_path / "org.yml"
     base = (
         "projects: {p: {repos: {r: {kmaster: /tmp/r}}}}\nroles: {designer: {profile: x}}\n"
@@ -597,7 +597,7 @@ def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path,
     merged = org.merge_repo_teams(org.merge_repo_teams(org.load(f), repo, teams, ["scribe"]), other, {"h": {}})
     assert merged.teams["g"].entry_role("feature") == "scribe" and "h" in merged.teams
     # `ao team list --json` (the rows) carries both types, said
-    from agentorc import teamrun
+    from shiftlead import teamrun
 
     f.write_text(base + "    entries: {feature: designer}\n")
     (row,) = teamrun.rows(org.load(f), [])
@@ -605,25 +605,25 @@ def test_entries_names_the_role_a_persons_entry_session_takes_per_type(tmp_path,
 
 
 def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monkeypatch):
-    """TD-229 slice 2: this repo's `.agentorc.yml` carries ao-grind, so removing the team from the
+    """TD-229 slice 2: this repo's `.shiftlead.yml` carries ao-grind, so removing the team from the
     org file starts the same team from the repo; while the org file still defines it, the repo's
     reads *shadowed* and nothing that runs changes. TD-310 (design §4.9c): the team is on flows —
     `[td, build-review]` with the top-level `held:` — and writes nothing its flow fills: no member
     lane, no `entries.feature`, no role `review:`, so `ao org check` warns of nothing redundant."""
-    from agentorc import repoconfig, teams
     from sessionorc import hosts
+    from shiftlead import repoconfig, teams
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     here = Path(__file__).resolve().parents[1]
-    repo = tmp_path / "agentorc"  # the checkout's directory name is the team's project
+    repo = tmp_path / "shiftlead"  # the checkout's directory name is the team's project
     repo.mkdir()
-    (repo / ".agentorc.yml").write_text((here / ".agentorc.yml").read_text())
+    (repo / ".shiftlead.yml").write_text((here / ".shiftlead.yml").read_text())
     overlay = {"roles": {"grinder": {"profile": "grind"}, "designer": {"profile": "grind-fable"}}}
 
     aggregate, notes = org.with_repos(org.load(write(tmp_path, overlay)), [repo])
     assert notes == []
     team = aggregate.teams["ao-grind"]
-    assert team.source == repo.resolve() / ".agentorc.yml" and team.projects == ["agentorc"] and not team.host
+    assert team.source == repo.resolve() / ".shiftlead.yml" and team.projects == ["shiftlead"] and not team.host
     assert (team.manager.name, team.manager.brief) == ("manager-ao-1", "docs/briefs/manager-ao-1.md")
     assert (team.techlead.name, team.techlead.context) == ("techlead-ao-1", "docs/briefs/techlead-context.md")
     got = [(m.role, m.names(), m.lane, m.brief, m.unattended) for m in team.members]
@@ -662,7 +662,7 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
     # while the org file defines ao-grind it wins, and the repo's is recorded as shadowed
     shadowing, _ = org.with_repos(org.load(write(tmp_path, ORG)), [repo])
     assert shadowing.teams["ao-grind"].source == tmp_path / "org.yml"
-    assert shadowing.shadowed == {"ao-grind": [repo.resolve() / ".agentorc.yml"]}
+    assert shadowing.shadowed == {"ao-grind": [repo.resolve() / ".shiftlead.yml"]}
 
 
 # ── `place:` and where a repo's team lands (design §4.9 *Where a repo's team lands*, TD-229 slice 3) ──
@@ -671,12 +671,12 @@ def test_this_repos_own_file_defines_ao_grind_as_the_org_file_did(tmp_path, monk
 def _repo(tmp_path: Path, name: str, team: str) -> Path:
     repo = tmp_path / name
     repo.mkdir(parents=True)
-    (repo / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {team: {"members": [{"role": "grinder"}]}}}))
+    (repo / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {team: {"members": [{"role": "grinder"}]}}}))
     return repo
 
 
 def _here(monkeypatch, tmp_path: Path) -> str:
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))  # no hosts.yml: the short hostname
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))  # no hosts.yml: the short hostname
     from sessionorc.hosts import local_host
 
     return local_host().name
@@ -731,7 +731,7 @@ def test_a_repos_team_lands_here_unless_place_names_it(tmp_path, monkeypatch):
 
 
 def test_a_placed_team_whose_checkout_there_cannot_be_told_is_listed_and_not_started(tmp_path, monkeypatch):
-    from agentorc import teams
+    from shiftlead import teams
 
     here = _here(monkeypatch, tmp_path)
     repo = _repo(tmp_path, "sam", "sam-grind")
@@ -767,7 +767,7 @@ def test_a_placed_team_whose_checkout_there_cannot_be_told_is_listed_and_not_sta
 
 
 def test_a_placed_team_starts_on_its_host_from_that_hosts_checkout(tmp_path, monkeypatch):
-    from agentorc import teams
+    from shiftlead import teams
 
     here = _here(monkeypatch, tmp_path)
     repo = _repo(tmp_path, "sam", "sam-grind")

@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agentorc import cli
 from sessionorc import defs
+from shiftlead import cli
 
 pytestmark = pytest.mark.unit
 
@@ -29,12 +29,12 @@ def git(root: Path, *args: str) -> None:
 
 
 def repo(root: Path, teams: dict | None = None) -> Path:
-    """A checkout on `main` with one commit, `origin/HEAD` naming `main`, and its `.agentorc.yml`."""
+    """A checkout on `main` with one commit, `origin/HEAD` naming `main`, and its `.shiftlead.yml`."""
     root.mkdir(parents=True)
     git(root, "init", "-q", "-b", "main")
     (root / ".gitignore").write_text(".worktrees/\n")
     if teams is not None:
-        (root / ".agentorc.yml").write_text(yaml.safe_dump({"teams": teams}))
+        (root / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": teams}))
     git(root, "add", "-A")
     git(root, "commit", "-q", "-m", "first")
     git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
@@ -49,7 +49,7 @@ def world(tmp_path, monkeypatch):
     answers nothing else — a check needs nothing else."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     registry = home / "repos.txt"
     registry.write_text(f"{tmp_path / 'alpha'}\n{tmp_path / 'beta'}\n")
     monkeypatch.setattr(
@@ -90,7 +90,7 @@ def test_ao_org_prints_each_team_its_file_its_repo_and_where_it_lands(world, cap
     rows = {r["name"]: r for r in got["teams"]}
     assert rows["alpha-grind"] == {
         "name": "alpha-grind",
-        "source": str(tmp_path / "alpha" / ".agentorc.yml"),
+        "source": str(tmp_path / "alpha" / ".shiftlead.yml"),
         "repos": ["alpha"],
         "host": HOST,
         "why": "registered here",
@@ -108,16 +108,16 @@ def test_ao_org_prints_each_team_its_file_its_repo_and_where_it_lands(world, cap
     }
     assert cli.main(["org"]) == 0
     out = capsys.readouterr().out
-    assert f"alpha-grind  repo: alpha  on {HOST} (registered here)  [{tmp_path / 'alpha' / '.agentorc.yml'}]" in out
+    assert f"alpha-grind  repo: alpha  on {HOST} (registered here)  [{tmp_path / 'alpha' / '.shiftlead.yml'}]" in out
     assert "no history yet" in out and "settings.yml  not there" in out
 
 
 def test_ao_org_says_a_placed_a_shadowed_and_a_twice_named_team_and_each_files_last_commit(world, capsys):
     tmp_path, home, org = world
-    (tmp_path / "alpha" / ".agentorc.yml").write_text(
+    (tmp_path / "alpha" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"teams": {"alpha-grind": TEAM, "twice": TEAM, "span": TEAM}})
     )
-    (tmp_path / "beta" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"twice": TEAM}}))
+    (tmp_path / "beta" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {"twice": TEAM}}))
     org["projects"]["alpha"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "devenv": "/work/alpha"}}}
     assert defs.init(home)
     (home / "org.yml").write_text(yaml.safe_dump({**org, "place": {"alpha-grind": "devenv"}}))
@@ -125,7 +125,7 @@ def test_ao_org_says_a_placed_a_shadowed_and_a_twice_named_team_and_each_files_l
     assert cli.main(["org"]) == 0
     out = capsys.readouterr().out
     assert "alpha-grind  repo: alpha  on devenv (place)" in out
-    assert f"span         shadowed by org.yml  [{tmp_path / 'alpha' / '.agentorc.yml'}]" in out
+    assert f"span         shadowed by org.yml  [{tmp_path / 'alpha' / '.shiftlead.yml'}]" in out
     assert "twice        refused: team 'twice' is defined twice" in out and out.count("defined twice") == 1
     # each file's last commit, the one never written said so
     assert "org: placed alpha-grind" in out and "no history yet" not in out
@@ -167,7 +167,7 @@ def test_a_profile_not_held_a_missing_brief_and_a_place_on_no_linked_host_are_ea
         "alpha-brief": {**TEAM, "members": [{"role": "hunter", "brief": "docs/briefs/absent.md"}]},
         "alpha-far": TEAM,
     }
-    (tmp_path / "alpha" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": teams_}))
+    (tmp_path / "alpha" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": teams_}))
     git(tmp_path / "alpha", "commit", "-qam", "teams")
     org["projects"]["alpha"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "mars": "/work/alpha"}}}
     (home / "org.yml").write_text(yaml.safe_dump({**org, "place": {"alpha-far": "mars"}}))
@@ -182,7 +182,7 @@ def test_a_profile_not_held_a_missing_brief_and_a_place_on_no_linked_host_are_ea
 
 def test_a_name_defined_twice_is_lacking_once(world, capsys):
     tmp_path, _, _ = world
-    (tmp_path / "beta" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"alpha-grind": TEAM}}))
+    (tmp_path / "beta" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {"alpha-grind": TEAM}}))
     git(tmp_path / "beta", "add", "-A")
     git(tmp_path / "beta", "commit", "-qm", "a team")
     code, got = check(capsys)
@@ -200,12 +200,12 @@ def test_a_team_naming_one_session_twice_is_lacking(world, capsys):
         "team span names hunter twice — take one of its lines out of org.yml (Members… → Remove keeps the session)"
     ]
     # a repo's team is changed by PR: no Members… hint
-    (tmp_path / "alpha" / ".agentorc.yml").write_text(
+    (tmp_path / "alpha" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"teams": {"alpha-grind": {**TEAM, "members": [{"role": "hunter"}, {"role": "hunter"}]}}})
     )
     git(tmp_path / "alpha", "commit", "-qam", "twice")
     _, got = check(capsys)
-    assert "team alpha-grind names hunter twice — take one of its lines out of .agentorc.yml" in got["lacks"]
+    assert "team alpha-grind names hunter twice — take one of its lines out of .shiftlead.yml" in got["lacks"]
 
 
 def test_a_checkout_off_its_default_branch_or_holding_changes_warns_and_does_not_fail(world, capsys):
@@ -279,7 +279,7 @@ def test_a_repo_held_only_on_a_node_is_listed_and_warned_of_and_an_unread_regist
         raise cli.AgentError(f"unknown method: {method}")
 
     monkeypatch.setattr(cli, "call_sync", agent)
-    line = f"sam — held only on devenv: its .agentorc.yml is not read; register a checkout at {HOST}"
+    line = f"sam — held only on devenv: its .shiftlead.yml is not read; register a checkout at {HOST}"
     code, got = check(capsys)
     assert (code, got["warnings"]) == (0, [line])  # alpha is held here too; sam is said once
     assert cli.main(["--json", "org"]) == 0

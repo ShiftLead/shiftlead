@@ -12,9 +12,9 @@ from datetime import UTC, datetime
 import pytest
 from conftest import FAST_TICK, wait_for
 
-from agentorc import cli
 from sessionorc import mail
 from sessionorc.client import LocalClient
+from shiftlead import cli
 
 pytestmark = pytest.mark.integration
 
@@ -247,6 +247,7 @@ async def test_three_rings_answered_with_nothing_read_hold_the_bell_until_a_read
             assert agent._unread_rings.get(w) is None and agent.sessions[w].doorbell_held is None
             for n in (1, 2, 3):
                 await _unread_ring(agent, ld, w, n)
+
             async def held() -> dict | None:
                 return (await c.call("get", id=w))["doorbell_held"]
 
@@ -294,4 +295,3 @@ async def test_a_persons_send_lifts_a_held_doorbell(agent, composerstubs, tmp_pa
         agent._unread_rings[w], agent._rang[w] = 2, {"count": 1, "turned": True}
         agent._scrub(w)
         assert w not in agent._unread_rings and w not in agent._rang
-

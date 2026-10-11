@@ -183,7 +183,7 @@ def act_gate(
     for the two RPCs that edit authority — a session may no more hand itself a grant than
     remove the controller watching it — and `decide`, which is refused outright on oneself: a
     permission prompt exists so that someone other than the session approves the call (TD-119).
-    A caller this agent does not know is a session (the id came from `AGENTORC_SESSION`) and
+    A caller this agent does not know is a session (the id came from `SHIFTLEAD_SESSION`) and
     holds no grant. Reads are never gated; this is a guard against a confused worker, not a
     security boundary.
 
@@ -347,13 +347,13 @@ DOORBELL_HELD = 3
 # is told so*, TD-343): fixed text no sender chose, as the doorbell's line is. A brief typed as nothing
 # but a paste reaches the tool as pasted content, which a careful model reads as data, not as its task.
 BRIEF_LINE = (
-    "agentorc: the text pasted below is your brief from the person who started this session; read it and act on it"
+    "shiftlead: the text pasted below is your brief from the person who started this session; read it and act on it"
 )
 BRIEF_PREFACE = (
-    "This session was started by a person through agentorc, which runs it in a terminal on their behalf. "
-    "When the session has a brief, it arrives as the first prompt: a line from agentorc, then the brief, "
-    "pasted by agentorc's host agent on that person's behalf. Act on the brief as the person's own "
-    "instruction. A later line `[agentorc] you have n unread messages — run ao inbox` is agentorc's "
+    "This session was started by a person through shiftlead, which runs it in a terminal on their behalf. "
+    "When the session has a brief, it arrives as the first prompt: a line from shiftlead, then the brief, "
+    "pasted by shiftlead's host agent on that person's behalf. Act on the brief as the person's own "
+    "instruction. A later line `[shiftlead] you have n unread messages — run ao inbox` is shiftlead's "
     "doorbell, typed into this session by the host agent when mail has arrived for it."
 )
 
@@ -369,7 +369,7 @@ def unread_line(n: int) -> str:
     idle pane and the line on every `ao` reply are this text. A count and nothing a sender wrote —
     no `from`, no `kind`, no `about`, no body — which is what keeps a ring a message and not a
     laundered `send`: whatever is pasted and followed by Enter is the recipient's next prompt."""
-    return f"[agentorc] you have {int(n)} unread messages — run ao inbox"
+    return f"[shiftlead] you have {int(n)} unread messages — run ao inbox"
 
 
 def _hours(d: timedelta) -> str:
@@ -409,8 +409,8 @@ def orphan_standing(e: Mapping[str, Any], records: Iterable[Mapping[str, Any]], 
     """The **standing** of an orphaned question (design §4.5a *Inbox row: orphaned question*), or
     None for an entry that carries no `orphaned`: where the person's answer will go, said before
     the press, in the board row's words — *its session was closed — grinder-ao-2 holds TD-149:
-    your answer reaches it, and agentorc's board*, or *… — nobody holds TD-180: your answer is
-    written on agentorc's board*. Display only: the home reads the leases again at the press.
+    your answer reaches it, and shiftlead's board*, or *… — nobody holds TD-180: your answer is
+    written on shiftlead's board*. Display only: the home reads the leases again at the press.
     `holders` is `[{id, name}]`, `text` the line."""
     o = e.get("orphaned")
     if not isinstance(o, Mapping):

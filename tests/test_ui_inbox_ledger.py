@@ -45,7 +45,7 @@ def test_the_fold_lists_each_repos_for_you_entries_in_the_repo_pages_order(tmp_p
     id; *yours* for `Owner: paul`, *your decision* otherwise; *held by* a live record's claim and not
     an ended one's; the team the definitions give the repo, else its live records', else none; each
     row the Repo page opened on its id; `n` every row."""
-    from agentorc.ui.app import ledger_for_you
+    from shiftlead.ui.app import ledger_for_you
 
     got = ledger_for_you(_repos(tmp_path), _fleet(tmp_path), {str(tmp_path / "samscrape"): "sam-defined"})
     assert got["n"] == 5
@@ -62,9 +62,9 @@ def test_the_fold_lists_each_repos_for_you_entries_in_the_repo_pages_order(tmp_p
 
 
 def _render(lf, tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import inbox_sections, templates
+    from shiftlead.ui.app import inbox_sections, templates
 
     sections = inbox_sections([])
     return templates.get_template("inbox.html").render(
@@ -78,14 +78,14 @@ def test_the_fold_sits_under_needs_you_closed_and_counted_nowhere(tmp_path, monk
     *entries that wait on you · not counted*; each row one link with the id, the title, the letter,
     why, *held by* and the team, carrying the team and the find for the rail's filter; no control;
     nothing at zero."""
-    from agentorc.ui.app import ledger_for_you
+    from shiftlead.ui.app import ledger_for_you
 
     html = _render(ledger_for_you(_repos(tmp_path), _fleet(tmp_path), {}), tmp_path, monkeypatch)
     needs = html[html.index('id="sec-needs"') : html.index('id="sec-steering"')]
     fold = needs[needs.index('id="ledgerforyou"') :]
     assert needs.index('id="boardhorizon"') < needs.index('id="ledgerforyou"')
     assert '<details class="fold ledgerfold" id="ledgerfold">' in fold  # no `open`: closed by default
-    assert "For you in the ledger</span> <span class=\"meta\">(5)</span>" in fold
+    assert 'For you in the ledger</span> <span class="meta">(5)</span>' in fold
     assert "entries that wait on you · not counted" in fold
     at = fold.index('href="/repo/agentorc#TD-319"')
     row = fold[fold.rindex("<a ", 0, at) :]
@@ -100,8 +100,8 @@ def test_the_fold_sits_under_needs_you_closed_and_counted_nowhere(tmp_path, monk
 def test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts(tmp_path, monkeypatch):
     """The route reads the home's `repos` and the fleet; the poll's `html.ledger` is the same box,
     so the page keeps it current."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    from agentorc.ui import app as ui
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
 
     repos, fleet = _repos(tmp_path), _fleet(tmp_path)
 
@@ -198,7 +198,7 @@ def test_the_folds_rows_follow_the_teams_picks_and_the_find_the_poll_and_the_rem
         pytest.skip("node is not installed: the rules are JavaScript, and nothing else runs them")
     probe = pathlib.Path(tempfile.mkdtemp()) / "ledger_probe.js"
     probe.write_text(LEDGER_PROBE)
-    app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js"
     out = subprocess.run([node, str(probe), str(app_js)], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout)

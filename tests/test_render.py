@@ -1,13 +1,13 @@
 """The closed markdown subset a message to the person is drawn in, and the fold (design §4.10 *How a
 message to a person is written*, §4.5a **Inbox row: details**; TD-138): one test per construct and
-one per refusal, because *no raw HTML reaches a page* is a property of `agentorc.ui.render`'s code
+one per refusal, because *no raw HTML reaches a page* is a property of `shiftlead.ui.render`'s code
 and these are what hold it there."""
 
 from __future__ import annotations
 
 import pytest
 
-from agentorc.ui.render import FOLD_CHARS, fold, inline, render
+from shiftlead.ui.render import FOLD_CHARS, fold, inline, render
 
 pytestmark = pytest.mark.unit
 ORIGIN = "http://kmaster:8765"

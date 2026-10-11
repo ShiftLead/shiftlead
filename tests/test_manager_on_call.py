@@ -227,19 +227,19 @@ async def test_a_fill_prompt_ends_with_the_cause_it_came_for_and_no_other_replay
             return agent._read_launch(mgr)["prompt"]
 
         agent.sessions[mgr].asks_ids = lambda **kw: ["m-1"]
-        assert await fill_for(now) == "the seat's brief\n\n[agentorc] you are filled for: asks — m-1"
+        assert await fill_for(now) == "the seat's brief\n\n[shiftlead] you are filled for: asks — m-1"
         assert agent.sessions[mgr].restarts[-1]["for"] == "seat_due"
         ra.state, ra.confidence, ra.pending = "needs-you", "hook", {"kind": "permission", "text": "Bash(rm)"}
-        assert await fill_for(now) == f"the seat's brief\n\n[agentorc] you are filled for: pending — {a}"
+        assert await fill_for(now) == f"the seat's brief\n\n[shiftlead] you are filled for: pending — {a}"
         ra.state, ra.pending = "stalled?", None
         assert (
             await fill_for(now + timedelta(minutes=1))
-            == f"the seat's brief\n\n[agentorc] you are filled for: stalled — {a}"
+            == f"the seat's brief\n\n[shiftlead] you are filled for: stalled — {a}"
         )
         ra.state, ra.idle_open = "idle", {"at": _iso(now), "ref": "TD-9"}
         assert (
             await fill_for(now + timedelta(minutes=2))
-            == f"the seat's brief\n\n[agentorc] you are filled for: open — {a}"
+            == f"the seat's brief\n\n[shiftlead] you are filled for: open — {a}"
         )
         # any other replay hands the brief alone, the last fill's line taken off
         _end(agent, mgr)

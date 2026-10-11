@@ -66,8 +66,8 @@ def fake(fleet, taken=(), created=None, handed=None):
 
 
 def client(monkeypatch, tmp_path, Fake):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    from agentorc.ui import app as ui
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
     monkeypatch.setattr(ui, "read_boards", lambda *a, **k: ([], ""))
@@ -117,7 +117,7 @@ def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatc
     (kw,) = created
     assert kw["role"] == "plain" and kw["team"] == "" and kw["controllers"] == [] and kw["unattended"] is False
     # with **What** empty the composer is empty, and the session is told the same
-    from agentorc import repoconfig
+    from shiftlead import repoconfig
 
     assert r.json()["text"] == ""
     assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "docs/technical_debt.md")
@@ -174,10 +174,10 @@ def test_a_live_seat_says_its_own_sentence(tmp_path, monkeypatch):
     """The sentence under the button is the seat's record's own when one is live (the agent's
     `refill`, an ask's sentence with no bound), not the one for a seat nobody fills."""
     world(tmp_path)
-    from agentorc import org as orgmod
-    from agentorc import teams
+    from shiftlead import org as orgmod
+    from shiftlead import teams
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     org = orgmod.load(tmp_path / "home" / "org.yml")
     t = org.teams["sam-grind"]
     sid = teams.seat_id(org, t, "kmaster", "kmaster")
@@ -205,7 +205,7 @@ def test_a_seat_with_no_checkout_is_not_read_as_no_seat():
     under the button says which, so the person knows whether to add a seat or a checkout."""
     from datetime import UTC, datetime
 
-    from agentorc.ui.repo import entry_hand
+    from shiftlead.ui.repo import entry_hand
 
     now = datetime(2026, 9, 29, tzinfo=UTC)
     none = entry_hand([{"team": "t", "seat": "", "name": "", "techlead": ""}], {}, now)
@@ -219,8 +219,8 @@ def test_focus_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_o
     """§4.5a Focus side panel **Told at start** (TD-283 part 2): a fold, closed, above Session, its
     heading the start context's length in lines, the text escaped with nothing in it a control — and
     no card at all on a record without one."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x-entry-1", "name": "entry-1", "kind": "interactive", "adapter": "claude-code",

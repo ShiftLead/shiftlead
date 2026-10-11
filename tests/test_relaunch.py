@@ -14,12 +14,12 @@ import pytest
 from conftest import park_ticks
 from test_brief_replay import _made_from, _merge, _repo
 
-from agentorc.ending import closer_words
 from sessionorc import paths, work
 from sessionorc.agent import RESTART_SETTLE
 from sessionorc.agent_common import FLOW_CLAUSE
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import WRAPUP_PROMPT
+from shiftlead.ending import closer_words
 
 SHELL = {"adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from agentorc.ui import cards
 from sessionorc.models import STATE_RANK
+from shiftlead.ui import cards
 
 
 def rec(host, state="unreachable"):
@@ -11,7 +11,7 @@ def rec(host, state="unreachable"):
 
 
 def test_an_unreachable_card_sorts_by_whether_its_host_is_volatile(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text(
         "local:\n  name: kmaster\nnodes:\n  laptop: {volatile: true}\n  vps: {}\n  box: {volatile: false}\n"
     )
@@ -22,7 +22,7 @@ def test_an_unreachable_card_sorts_by_whether_its_host_is_volatile(tmp_path, mon
 
 
 def test_this_hosts_own_local_entry_says_whether_it_is_volatile(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: laptop\n  volatile: true\n")
     assert cards.host_volatile("laptop")
     assert not cards.host_volatile("kmaster")

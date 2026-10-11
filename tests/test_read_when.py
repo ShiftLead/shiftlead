@@ -18,7 +18,7 @@ from sessionorc.client import LocalClient
 from sessionorc.models import Pending, Session
 
 NOW = datetime(2026, 9, 25, 12, 0, tzinfo=UTC)
-UI = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
 
 
 def rec(state="idle", **kw):
@@ -109,7 +109,7 @@ async def test_the_msg_reply_and_the_records_view_carry_the_sentence(agent, tmp_
 
 @pytest.mark.unit
 def test_ao_msg_ends_with_when_each_addressee_reads_it(monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     reply = {
         "entry": {"id": "m-1", "kind": "note", "text": "x"},
@@ -117,7 +117,7 @@ def test_ao_msg_ends_with_when_each_addressee_reads_it(monkeypatch, capsys):
         "read_when": {"ao-w": "read when this session is resumed, or started again under this name"},
     }
     monkeypatch.setattr(cli, "call_sync", lambda method, **_: reply)
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-me")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-me")
     assert cli.main(["msg", "ao-w", "x"]) == 0
     out = capsys.readouterr().out.strip().splitlines()
     assert out[-1] == "ao-w: read when this session is resumed, or started again under this name"
@@ -127,8 +127,8 @@ def test_ao_msg_ends_with_when_each_addressee_reads_it(monkeypatch, capsys):
 def test_the_card_and_focus_hand_the_pair_to_the_composer_and_a_seat_reads_as_one(tmp_path, monkeypatch):
     """The view's pair rides on the Message buttons; a seat the definition names takes the seat's
     sentences whatever the record says, and an older agent's record without a pair draws no line."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = {
         "id": "ao-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/w", "state": "exited",
@@ -193,7 +193,7 @@ def test_the_composers_line_swaps_with_the_kind_and_a_reply_reads_as_a_note():
 def test_every_reply_dialog_carries_its_addressees_line(tmp_path, monkeypatch):
     """§4.5a **Message**: *the Reply dialog shows the same line for its kind* — the Inbox page's and
     the Focus panel's Reply the sender's, **Overrule** the asker's (techlead, PR #583)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from test_ui_inbox import entry, rows
 
     answered = entry(
@@ -202,7 +202,7 @@ def test_every_reply_dialog_carries_its_addressees_line(tmp_path, monkeypatch):
     assert 'data-when-note="read when resumed"' in rows("answered", [answered])
     js = (UI / "static" / "app.js").read_text()
     assert 'data-when-note="${esc(e.reply_when || "")}">Reply</button>' in js  # the Focus panel's
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     class Fake:
         def __init__(self, *a, **k):

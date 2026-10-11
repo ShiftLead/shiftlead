@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from agentorc import cli, doctor
+from shiftlead import cli, doctor
 
 pytestmark = pytest.mark.unit
 
@@ -30,7 +30,7 @@ def reading(**over) -> dict:
         "tmux": {
             "pid": 41022,
             "started": "2026-10-06T07:02:00Z",
-            "cgroup": "/system.slice/agentorc-tmux.service",
+            "cgroup": "/system.slice/shiftlead-tmux.service",
             "runs": "system",
             "first": {"pid": 41022, "started": "2026-10-06T07:02:00Z"},
             "replaced": False,
@@ -40,7 +40,7 @@ def reading(**over) -> dict:
                 {
                     "profile": "grind",
                     "layers": [
-                        {"path": "/h/grind.json", "commands": [{"command": "/v/bin/agentorc-hook", "resolves": True}]}
+                        {"path": "/h/grind.json", "commands": [{"command": "/v/bin/shiftlead-hook", "resolves": True}]}
                     ],
                 }
             ],  # fmt: skip
@@ -86,7 +86,7 @@ def test_the_server_under_the_user_manager_is_a_warning_and_its_system_unit_ok()
     [(v, text)] = verdicts(doctor.tmux(t))
     assert v == "warning" and "a stop of `systemd --user` ends every session" in text
     [(v, text)] = verdicts(doctor.tmux(reading()["tmux"]))
-    assert v == "ok" and text.startswith("tmux — server 41022 since ") and text.endswith("agentorc-tmux.service")
+    assert v == "ok" and text.startswith("tmux — server 41022 since ") and text.endswith("shiftlead-tmux.service")
 
 
 def test_a_scraped_session_warns_and_a_stale_queue_and_a_dead_hook_command_lack():
@@ -318,7 +318,7 @@ def probed(agent, monkeypatch):
             return {}
         return agent[method]
 
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     monkeypatch.setattr(cli, "call_sync", fake)
     monkeypatch.setattr(cli.doctor, "PROBE_WAIT", 0.3)
     monkeypatch.setattr(cli, "_probe", lambda row, wait=0.3, every=0.01, f=cli._probe: f(row, wait, every))
@@ -351,7 +351,7 @@ def test_a_probe_is_refused_to_a_session_and_outside_hooks_and_for_an_unknown_pr
     assert cli.main(["doctor", "tmux", "--probe"]) == 1
     assert cli.main(["doctor", "hooks", "--probe", "nope"]) == 1
     assert "no profile 'nope'" in capsys.readouterr().err
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-me")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-me")
     assert cli.main(["doctor", "--probe"]) == 1
     assert "a person's own" in capsys.readouterr().err
     assert not [m for m, _ in calls if m == "create"]
@@ -397,7 +397,7 @@ def test_the_agent_line_says_whether_the_watch_stands(agent, capsys):
     """Design §4.7 **agent** (TD-497): the timer and its last run on the line, or a warning naming the press."""
     agent["watch"] = {"loaded": True, "active": "active", "last": "Fri 2026-10-09 14:35:02 BST"}
     assert cli.main(["doctor", "agent"]) == 0
-    assert capsys.readouterr().out.splitlines()[0].endswith(" · watch: agentorc-watch.timer, last run 14:35")
+    assert capsys.readouterr().out.splitlines()[0].endswith(" · watch: shiftlead-watch.timer, last run 14:35")
     agent["watch"] = {"loaded": False}
     assert cli.main(["doctor", "agent"]) == 0, "a warning, never a lack"
     out = capsys.readouterr().out.splitlines()

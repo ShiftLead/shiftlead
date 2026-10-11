@@ -25,9 +25,9 @@ def _load():
 
 def test_the_live_home_and_a_long_path_are_refused(tmp_path):
     lh = _load()
-    live = Path("~/.agentorc").expanduser()
-    assert "live agentorc home" in lh.refuse_live(live)
-    assert "live agentorc home" in lh.refuse_live(live / "look")
+    live = Path("~/.shiftlead").expanduser()
+    assert "live shiftlead home" in lh.refuse_live(live)
+    assert "live shiftlead home" in lh.refuse_live(live / "look")
     assert "too long" in lh.refuse_live(Path("/tmp") / ("x" * 120))
     assert lh.refuse_live(Path("/tmp/aolook-x")) is None
     # the command refuses before it makes anything
@@ -38,7 +38,7 @@ def test_the_live_home_and_a_long_path_are_refused(tmp_path):
 
 
 def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
-    env = {k: v for k, v in os.environ.items() if k != "AGENTORC_SESSION"}
+    env = {k: v for k, v in os.environ.items() if k != "SHIFTLEAD_SESSION"}
     err = (tmp_path / "stderr").open("w")  # what the script said, shown when it printed no URL
     proc = subprocess.Popen(
         [sys.executable, str(SCRIPT), "--sessions", "2"],
@@ -55,7 +55,7 @@ def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
             line = proc.stdout.readline()
             if line.startswith("look home:"):
                 break
-        m = re.match(r"look home: (http://127\.0\.0\.1:\d+/)\s+\(AGENTORC_HOME=(\S+), tmux -L (\S+)\)", line)
+        m = re.match(r"look home: (http://127\.0\.0\.1:\d+/)\s+\(SHIFTLEAD_HOME=(\S+), tmux -L (\S+)\)", line)
         assert m, f"no URL printed: {line!r}\n{(tmp_path / 'stderr').read_text()}"
         url, home, sock = m.group(1), Path(m.group(2)), m.group(3)
         assert home.is_relative_to("/tmp") and (home / "agent.sock").exists()

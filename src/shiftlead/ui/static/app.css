@@ -1,0 +1,744 @@
+/* The one monospace face (TD-038 (a)): bundled, so the terminal and every `.mono` label look the
+   same on a phone or a fresh laptop as on a machine that happens to have it installed. Latin
+   subset, 400 and 700; the licence is `vendor/fonts/OFL.txt`. */
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/static/vendor/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("/static/vendor/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); }
+/* No ligatures in the terminal: `=>` is two keystrokes in a pane you type into, not an arrow — VS
+   Code's terminal leaves them off by default too. JetBrains Mono draws its ligatures through `calt`. */
+.xterm .xterm-rows { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
+/* shiftlead — tokens seeded from docs/mockups/gen.py; dark mode is a token swap (design §2.12). */
+:root {
+  --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --line2: #eceef1;
+  --card: #fff; --input: #fff; --border: #cbd0d6; --hover: #eef0f3;
+  --link: #1f5fa8; --top: #1c2128; --topfg: #e6e9ee; --topdim: #aab3bf; --tab-on: #2b323b;
+  --term: #0f1419; --termfg: #d5dbe3; --tail: #aab3bf;
+  --needs: #f59e0b; --needs-bg: #fde68a; --needs-fg: #7c3d00;
+  /* design §4.5 *The card's anatomy* (TD-095): *working* is green — alive; *idle* is blue — alive,
+     at rest, may be spoken to; everything over or out of reach is one grey (`--ended`). On a card
+     green means working and nothing else. Blue is also the accent for what is new (`--new`). */
+  --working: #16a34a; --working-bg: #dcfce7; --working-fg: #166534;
+  --idle: #2563eb; --idle-bg: #dbeafe; --idle-fg: #1e40af;
+  /* *waiting* (§4.5 *The card's anatomy*, TD-418): teal — at rest on someone else's move, `idle` in every payload */
+  --waiting: #0d9488; --waiting-bg: #ccfbf1; --waiting-fg: #115e59;
+  --ended: #9ca3af; --ended-bg: #e5e7eb; --ended-fg: #4b5563;
+  --new: #2563eb; --new-bg: #dbeafe; --new-fg: #1e40af;
+  --stalled: #dc2626; --stalled-bg: #fecaca; --stalled-fg: #991b1b;
+  --limited: #7c3aed; --limited-bg: #ede9fe; --limited-fg: #5b21b6;
+  --done: #059669; --done-bg: #d1fae5; --done-fg: #065f46;
+  --warn-bg: #fff7ed; --warn-line: #fdba74; --warn-fg: #7c2d12; --scraped: #d9a441;
+  --alarm: #b45309; --alarm-bg: #fef3c7; --alarm-fg: #7c2d12;  /* design §4.8a: an identity alarm's mark */
+  --primary: #1c2128; --primary-fg: #fff;
+  /* design §4.5 *Type scale* (TD-130, built by TD-144): six sizes and two line heights, the same in
+     both themes, and **no rule below names a pixel size** (tests/test_css.py holds it). Body is
+     everything a person reads; small is lower-case small print, never smaller; cap is uppercase
+     tracked marks only; mono and mono-s the terminal and mono small print. If the page reads too
+     large or too small, `--t-body` is the one number to move. The card's heights follow the scale
+     so a card stays six rows of one height (§4.5 *The card's anatomy*). */
+  --t-body: 15px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px;
+  /* the team card's summary (design §4.5a *team card: summary*, TD-176): priority is one hue
+     darkened by rank; the kinds and the phases each their own; *opened* and *closed* blocks */
+  --p-high: #1e3a8a; --p-medium: #2563eb; --p-low: #93c5fd;
+  --k-pickable: #2563eb; --k-design: #4f46e5; --k-foryou: #d97706; --k-other: #e5e7eb; --k-other-fg: #374151;
+  --k-live: #0d9488; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #5b6b80;
+  --ph-add: #db2777; --ph-design: #4f46e5; --ph-grind: #2563eb; --ph-review: #d97706;
+  --blk-opened: #2563eb; --blk-closed: #059669; --seg-fg: #fff;
+  --lh: 1.5; --lh-mono: 1.55;
+  --row: 22px; --row1: 26px; --slot: 72px; --foot: 26px;
+}
+html[data-theme="dark"] {
+  --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --line2: #222831;
+  --card: #171b21; --input: #11151a; --border: #3a424d; --hover: #232a33;
+  --link: #7fb2f0; --top: #0b0e12; --topfg: #e6e9ee; --topdim: #8b95a3; --tab-on: #232a33;
+  --term: #0b0e12; --termfg: #d5dbe3; --tail: #8b95a3;
+  --needs-bg: #4a3608; --needs-fg: #fde68a; --working: #22c55e; --working-bg: #123d27; --working-fg: #bbf7d0;
+  --idle: #3b82f6; --idle-bg: #1a2c52; --idle-fg: #bfdbfe; --ended-bg: #2a313a; --ended-fg: #c9d1db;
+  --waiting: #14b8a6; --waiting-bg: #0f3b38; --waiting-fg: #99f6e4;
+  --new: #3b82f6; --new-bg: #1a2c52; --new-fg: #bfdbfe; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
+  --limited-bg: #2e1d5c; --limited-fg: #ddd6fe; --done-bg: #0d3d2c; --done-fg: #a7f3d0;
+  --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
+  --alarm: #d97706; --alarm-bg: #3f2a0c; --alarm-fg: #fcd34d;
+  --primary: #e6e9ee; --primary-fg: #0f1216;
+  --p-high: #93c5fd; --p-medium: #3b82f6; --p-low: #1e3a8a;
+  --k-pickable: #3b82f6; --k-design: #6366f1; --k-foryou: #d97706; --k-other: #2a313a; --k-other-fg: #c9d1db;
+  --k-live: #0f766e; --k-eval: #64748b; --k-blocked: #475569; --k-blocked-2: #3b4656;
+  --ph-add: #ec4899; --ph-design: #6366f1; --ph-grind: #3b82f6; --ph-review: #d97706;
+  --blk-opened: #1d4ed8; --blk-closed: #047857;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: var(--t-body)/var(--lh) "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+a { color: var(--link); text-decoration: none; } a:hover { text-decoration: underline; }
+.mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+.small { font-size: var(--t-small); } .muted, .dim { color: var(--muted); } .strong { color: var(--strong); }
+.grow { flex-grow: 1; } .hidden { display: none !important; } .inline { display: inline; margin: 0; }
+.row { display: flex; align-items: center; gap: 8px; min-width: 0; } .row.gap { gap: 10px; } .row.end { justify-content: flex-end; } .wrap { flex-wrap: wrap; }
+.col { display: flex; flex-direction: column; } .col.gap { gap: 16px; }
+.page { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; } .page.narrow { max-width: 760px; }
+.h1 { font-size: var(--t-title); font-weight: 600; } .h2 { font-weight: 600; }
+.note { font-size: var(--t-body); color: var(--muted); }
+.topbar { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px 14px; min-height: 48px; padding: 6px 20px; background: var(--top); color: var(--topfg); }
+/* the bar wraps rather than widening the page, and the usage chip keeps its width rather than being
+   squeezed to nothing, which made `fitUsage` hide every account behind a bare `+n` (TD-296 #9) */
+.wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: var(--t-title); color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
+.tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; }
+#hostchip { font-size: var(--t-small); color: var(--topdim); } #hostdot.down { color: var(--stalled); }
+/* The chips sit side by side and are measured against this width to decide what still fits
+   (TD-073): `max-width` plus `overflow: hidden` is what makes scrollWidth > clientWidth mean
+   "one too many", and inline-block is what gives a span a width to measure at all. */
+#usagechip { flex-shrink: 0; font-size: var(--t-small); color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
+#usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
+#usagechip .old { opacity: .6; }  /* a reading past USAGE_FRESH (TD-233) */
+#usagechip .unknown { opacity: .6; font-style: italic; }  /* no reading yet, or none the chip still offers (TD-233) */
+#buildchip { font-size: var(--t-small); color: var(--topdim); white-space: nowrap; vertical-align: middle; }  /* §4.5a build chip (TD-132 slice 5) */
+#buildchip.behind { color: var(--needs); font-weight: 600; } #buildchip.inflight { color: #9ec5ff; font-weight: 600; }
+#buildchip.held { color: var(--scraped); opacity: .8; } #buildchip.unknown { font-style: italic; }  /* TD-539: dim when live is main */
+#usagemore { cursor: default; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: var(--t-btn); font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
+.btn[hidden] { display: none; }  /* .btn sets display, which beats [hidden]: Settings' Cancel showed always (TD-296 #2) */
+.btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
+.btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
+.btn.sm { height: 26px; font-size: var(--t-small); padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
+.btn.on { background: var(--ended-bg); color: var(--fg); }
+/* §4.5a **a control's look** (§4.5 screen 6 *A control answers the press*, TD-340): one hover, one
+   press and one focus ring for every `.btn`, whatever its variant — the wash is a layer over the
+   variant's own colour, so a variant differs at rest and in nothing else; a filled one darkens instead
+   (`--btn-wash` transparent, `--btn-shade`), and a disabled one keeps its dimmed look and takes neither */
+.btn { --btn-wash: var(--hover); --btn-shade: brightness(1); }
+.btn.primary { --btn-wash: transparent; --btn-shade: brightness(.9); }
+.btn.light { --btn-wash: rgba(255, 255, 255, .12); }
+.btn:hover:not(:disabled) { background-image: linear-gradient(var(--btn-wash), var(--btn-wash)); filter: var(--btn-shade); }
+.btn:active:not(:disabled) { background-image: linear-gradient(var(--btn-wash), var(--btn-wash)); filter: var(--btn-shade) brightness(.94); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .28); }
+.btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.input { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); font-family: inherit; display: flex; align-items: center; }
+input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
+/* Put on the board's *what's needed* (TD-281): four rows that grow with the text, then scroll */
+#batext { display: block; height: auto; padding: 8px 10px; min-height: 6.5em; max-height: 40vh; field-sizing: content; overflow-y: auto; resize: vertical; font-family: inherit; line-height: var(--lh); }
+/* Deny's optional reason (§4.5a, TD-117): button-height, and it gives way before a button does */
+input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-family: inherit; flex: 0 1 11em; min-width: 5em; width: 11em; }
+.field { display: flex; flex-direction: column; gap: 5px; } .field[hidden], .promptchips[hidden], #dirfield[hidden], #wtchips[hidden], #whenfields[hidden] { display: none; }  /* a shell's Role and Lane (TD-284) */ .field > label { font-size: var(--t-cap); font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.grid2 > .span2 { grid-column: 1 / -1; }
+/* New session's **More ▸** (TD-277): Grants and the Resume id, folded */
+details#morefields > summary { list-style: none; }
+details#morefields > summary::-webkit-details-marker { display: none; }
+details#morefields[open] > summary { margin-bottom: 10px; }
+/* the Where choice an agent already holds (TD-277): greyed, with who holds it */
+.radio.taken { opacity: .6; } .radio[hidden] { display: none; }  /* .radio sets display: Where's worktree choice for a directory in no checkout (TD-296 #3) */ .pill.inuse { background: var(--line2); color: var(--muted); } .pill.inuse[hidden] { display: none; }  /* .pill sets display, which beats [hidden] */
+.radio { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
+.warn { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; color: var(--warn-fg); font-size: var(--t-body); }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: var(--t-cap); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.pill .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+/* design §4.5a **state icon**: a page of cards is read by shape before it is read by word */
+.pill::before { font-size: .9em; line-height: 1; }
+.pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 1.1em; } .pill.s-stalled::before { content: "?"; font-size: 1.1em; }
+/* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
+.pill.s-scheduled::before { content: "◷"; font-size: 1.1em; } .pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
+.pill.s-closed::before { content: "✓"; font-size: 1.1em; } .pill.s-unreachable::before { content: "⌀"; font-size: 1.1em; }
+.pill.s-oncall::before { content: "◇"; font-size: 1.1em; }  /* a seat with nobody in it (TD-097) */
+.pill.s-waiting::before { content: "⋯"; font-size: 1.1em; }  /* idle on someone else's move (TD-418) */
+.sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: .9em; letter-spacing: 0; }  /* not the idle glyph's tuning */
+.pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
+/* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
+   dashed, the same signal a scraped state carries */
+.meta.scraped { border-bottom: 1px dashed var(--scraped); }
+/* the context reading past its role's bound (design §4.5 row 4, §4.8, TD-190) */
+.context.over { color: var(--stalled); font-weight: 600; }
+.reports .rep { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
+.reports .rep.derived .ref { border-bottom: 1px dashed var(--scraped); }
+.reports .repgroup { margin-top: 6px; text-transform: none; font-weight: 600; } .reports .repgroup:first-child { margin-top: 0; }
+.reports .imark { margin-left: auto; }
+.reports .rep .st { font-size: var(--t-mono-s); color: var(--muted); }
+.reports .rep .st.done { color: var(--done); }
+.reports .rep .st.dropped { text-decoration: line-through; }
+/* the Focus Inbox panel, the card's unread chip and the mail composer (design §4.5a, §4.10) */
+.inbox .mail { padding: 6px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 3px; }
+.inbox .mail .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
+.inbox .mail.unread .ref { font-weight: 600; }
+.inbox .mail .st { font-size: var(--t-mono-s); color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
+.inbox .mail .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.inbox .mail .body.md { white-space: normal; }
+.badge.unread { color: var(--new-fg); background: var(--new-bg); border-color: var(--new); text-decoration: none; }
+/* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
+.badge.needs { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); text-decoration: none; }
+.maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
+.maildlg .row[hidden] { display: none; }
+/* the ? overlay (§4.5a, TD-124): the page's keys, filled from the handler's own table */
+.keydlg { width: min(520px, 92vw); color: var(--fg); } .keydlg::backdrop { background: rgba(0,0,0,.35); }
+.keydlg .note[hidden] { display: none; }
+.keys { border-collapse: collapse; font-size: var(--t-small); } .keys td { padding: 3px 12px 3px 0; vertical-align: top; } .keys td:first-child { white-space: nowrap; }
+kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--card); }
+#personinbox .badge { margin-left: 4px; }
+/* §4.10 *The Inbox is a queue*: FYI's own **quiet** number — *Inbox 1 · 5*. Never added to the
+   first, and deliberately plainer than it: the first is what needs a person. A mark, not a
+   control: the whole chip is the link, and this never had a border. */
+#personinbox .badge.fyin { border-color: transparent; background: transparent; color: var(--muted); font-weight: 500; margin-left: 2px; }
+/* the Inbox page (design §4.5 screen 6 *Layout*, §4.5a **Inbox page**; design round 2, TD-082).
+   **One centred column**, 1100 px at most: a queue reads top to bottom, and a message's text runs
+   the width of its row instead of wrapping at a measure of its own inside an empty box — the
+   `max-width: 110ch` that did that to `.body` is gone, the column is the measure now. **A section
+   is a heading, not a box** (no `.card`, no border). **A row is a card.** Every colour is a token —
+   a light theme is required later (TD-071 item 8). */
+.inboxpage { max-width: calc(1100px + 200px + 24px); width: 100%; margin: 0 auto; }
+/* design §4.5 screen 6 *The rail* (TD-129, built by TD-135): left of the column, sticky, 200 px,
+   starting under the title; the column keeps its 1100 px. Every line is a toggle — a real button
+   whose pressed state is the one thing that marks it, and a line at 0 stays, dimmed. */
+/* §4.5 screen 6 *The message page* (TD-136): the list's column without the rail; the entry's row as
+   the list draws it, then the thread's quiet cards; the row's *whole entry ›* is small print */
+.inboxpage.msgpage { max-width: 1100px; }
+.msgpage .msgthread .threadrow { background: transparent; }
+.inboxpage .pagelink { color: var(--link); }
+.inboxpage:not(.msgpage) .mailrow[data-page] > .body { cursor: pointer; }  /* the list only: on the page it is the page */
+.inboxwrap { display: grid; grid-template-columns: 200px minmax(0, 1100px); gap: 24px; align-items: start; }
+.inboxcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rail { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.rail .railclear { width: 100%; justify-content: center; }
+.rail .railfind { display: flex; flex-direction: column; gap: 3px; }
+.rail .railfind .input { width: 100%; height: 30px; }
+/* the find count keeps its line while empty, so the first word typed moves no toggle (TD-427) */
+.rail #findn { min-height: 1lh; }
+.rail .railgroup { display: flex; flex-direction: column; gap: 1px; }
+.rail .railh { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 0 6px 3px; }
+.rail .railline { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.rail .railline:hover { background: var(--hover); }
+.rail .railline[aria-pressed="true"] { background: var(--hover); border-color: var(--muted); font-weight: 600; }
+.rail .railline.dim { color: var(--muted); }
+.rail .raillabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inboxpage .railout { display: none !important; }  /* a section the rail does not pick is not drawn */
+/* §4.5 screen 6 *Narrow* (TD-137): the chip row and the sheet exist below 720 px only */
+.railchips, .railsheet:not([open]) { display: none; }
+.railchips .chip { border-radius: 999px; flex: none; gap: 6px; }
+.railchips .chip[aria-pressed="true"] { background: var(--hover); border-color: var(--muted); font-weight: 600; }
+.railchips .chip.dim { color: var(--muted); }
+.railsheet { color: var(--fg); background: var(--bg); border: 0; }
+.railsheet::backdrop { background: rgba(0,0,0,.35); }
+.railsheet .sheethead { align-items: center; margin-bottom: 12px; }
+.railsheet .rail { position: static; }
+.rail .railn { flex: none; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); }
+.inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
+.inboxpage .sechead { align-items: baseline; }
+/* FYI's fold **is** its heading: the disclosure's own ▾ before the name, and no second control */
+.inboxpage details.isec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; }
+.inboxpage details.isec > summary::-webkit-details-marker { display: none; }
+.inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: var(--t-cap); }
+.inboxpage details.isec[open] > summary::before { content: "▾"; }
+/* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
+   thing in a heading — everything bordered is a control, and this is one (§4.5a) */
+.inboxpage .imark, .reports .imark, .helpmark, .tipmark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
+.inboxpage .imark:hover, .reports .imark:hover, .helpmark:hover, .tipmark:hover { background: var(--hover); color: var(--fg); }
+.inboxpage .imark[aria-expanded="true"], .reports .imark[aria-expanded="true"], .helpmark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
+/* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
+   missing one), opened **in place** under the heading so it pushes the rows down, never covers one */
+.inboxpage .isec { position: relative; }
+.inboxpage .secinfo { margin: 0; max-width: 90ch; }
+.inboxpage .secinfo[hidden] { display: none; }
+/* design §4.5a the ***i*** mark's panel (TD-167): under its group, full width, pushing the rows down */
+.helppanel { flex-basis: 100%; margin: 4px 0 0; max-width: 90ch; } .helppanel[hidden] { display: none; }
+.ghead .overline { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* **over its line** (§4.5a, TD-239): amber, display only */
+.helppanel .defline { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 .5em; }  /* the team's **Definition** line (§4.5a ***i*** mark, TD-418) */
+.helppanel .notconcluded { margin: 0 0 .5em; white-space: normal; }  /* *not concluded:* under it */
+.ghead .stopsnote { flex-basis: 100%; }  /* **stops** (§4.5a, TD-337): the team's stop time, its own line */
+.ghead .flowcannot { flex-basis: 100%; white-space: normal; color: var(--needs-fg); }  /* *cannot be followed* (§4.5a, §4.9c): its own line */
+.ghead .flowchip { text-decoration: none; cursor: pointer; }  /* the **flow chip** (§4.5a, TD-418): its press the team's Settings card */
+.ghead .flowchanged { color: var(--needs-fg); }  /* *flow changed* beside its Apply (§4.5a, TD-309) */
+.helppanel ul.whofor { margin: 0 0 .5em; padding-left: 1.4em; }
+.helppanel p { margin: 0 0 .5em; } .helppanel p:last-child { margin-bottom: 0; }
+/* §4.5 screen 10 *Help*: one column, a heading per control, nothing pressable but the page's own links */
+.helppage { max-width: 760px; width: 100%; margin: 0 auto; }
+.helppage .helpscreen { display: flex; flex-direction: column; gap: 10px; }
+.helppage .helpscreen > .h2 { margin: 12px 0 0; }
+.helppage .helpname { margin: 0; font-size: var(--t-body); font-weight: 600; }
+.helppage .helpitem p { margin: 4px 0 0; }
+.helppage .helpwhere { font-weight: 400; color: var(--muted); font-size: var(--t-small); }
+/* the **keyboard** half of *a tooltip on hover and keyboard focus* (§4.5a): the same paragraph,
+   floated over the rows instead of pushing them down — a press is what pushes them. `!important`
+   because it has to beat the UA's `[hidden] { display: none }` on the very node it floats. */
+.inboxpage .secinfo.peek[hidden] { display: block !important; position: absolute; z-index: 5; left: 0;  /* no `top`: an auto offset keeps its static place, which is under the heading */ max-width: min(60ch, 100%); padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+/* **A row is a card**: its own surface, a hover state and a focus ring, and a tab stop of its own
+   (the template's `tabindex="0"`), so where one thing ends and the next begins is never in doubt */
+.inboxpage .mailrow { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); display: flex; flex-direction: column; gap: 5px; }
+.inboxpage .inboxrows { display: flex; flex-direction: column; gap: 8px; }
+.inboxpage .mailrow:hover { border-color: var(--border); }
+.inboxpage .mailrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* §4.10 *Told on Telegram* (TD-319 slice 3): the row a `?row=` link landed on, marked until the page is left */
+.inboxpage .mailrow.landed { border-color: var(--link); box-shadow: inset 3px 0 0 var(--link); }
+/* §4.5a **Inbox row: pending** (TD-340): the frame of a press — dimmed, its controls disabled, its age the verb */
+.mailrow.pending { opacity: .6; pointer-events: none; }  /* links and the Snooze menu, which take no `disabled` */
+/* §4.5 screen 6 *Layout* / §4.10: an FYI entry newer than this browser last saw is marked **new**
+   — the browser's own memory, as the fold is. A mark and never a control: no border, no cursor,
+   nothing to press; the row's own surface is what it sits on. */
+.inboxpage .mailrow.isnew { border-color: var(--new); }
+.inboxpage .mailrow.isnew .mhead::after { content: "new"; order: 99; font-size: var(--t-cap); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--new); }
+.inboxpage .mailrow[hidden] { display: none; }
+.inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); font-weight: 600; }
+.inboxpage .mailrow .st { font-size: var(--t-mono-s); color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
+/* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
+.inboxpage .mailrow .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* the board's horizon (§4.5 screen 6, TD-220): rows not yet due in the quiet colour, a sub-heading, the fold and the line */
+.inboxpage .mailrow[data-section="coming"] .body, .inboxpage .mailrow[data-section="unshown"] .body { color: var(--muted); }
+.boardsub { margin: 12px 0 6px; align-items: baseline; } .boardsubh { font-weight: 600; }
+details.boardfold { margin: 6px 0 2px; } details.boardfold > .inboxrows { margin-top: 6px; }
+.boardline { padding: 6px 2px 2px; }
+/* the Inbox's *For you in the ledger* fold (TD-368): a row is one link, drawn quieter than a mail row */
+details.ledgerfold, details.snoozedbox { margin: 12px 0 2px; }
+details.fold.ledgerfold > summary, details.fold.snoozedbox > summary { font-size: inherit; color: var(--fg); }
+details.fold.ledgerfold > summary .meta, details.fold.snoozedbox > summary .meta { color: var(--muted); }
+.ledgerrepo { padding: 8px 2px 2px; }
+a.ledgerrow { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 6px 10px; margin: 4px 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: inherit; text-decoration: none; }
+a.ledgerrow:hover { border-color: var(--border); } a.ledgerrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+a.ledgerrow .ledgertitle { flex: 1 1 18em; min-width: 0; } a.ledgerrow[hidden], .ledgergroup[hidden] { display: none; }
+.originnote { padding: 0 0 4px; } .originnote.warnish { color: var(--warn-fg); font-weight: 600; }
+/* §4.5 screen 6 *A board item the person answered waits on them* (TD-305): back after its wait */
+.boardrow .stale.warnish { color: var(--warn-fg); }
+/* design §4.5a **Inbox row: details** (§4.10, TD-138): a message's text is rendered from the closed
+   markdown subset, so its paragraphs are elements and `pre-wrap` would double every break. The fold
+   is a quiet, unbordered *details* line — a disclosure, not one of the row's bordered controls. A
+   link carries its host in small print after it (§4.10), so its text never passes for a control. */
+.body.md { white-space: normal; }
+.body.md > :first-child { margin-top: 0; } .body.md > :last-child { margin-bottom: 0; }
+.body.md p, .body.md ul, .body.md ol, .body.md pre { margin: 0 0 .5em; }
+.body.md ul, .body.md ol { padding-left: 1.4em; }
+.body.md code { font-family: "JetBrains Mono", monospace; font-size: .92em; background: var(--line2); border-radius: 3px; padding: 0 3px; }
+.body.md pre { white-space: pre-wrap; background: var(--line2); border-radius: 3px; padding: 6px 8px; }
+.body.md pre code { background: none; padding: 0; }
+.body.md .lhost { color: var(--muted); font-size: .85em; }
+details.fold > summary { cursor: pointer; font-size: var(--t-small); color: var(--muted); width: max-content; border: 0; padding: 1px 0; }
+details.fold > summary:hover { color: var(--fg); }
+details.fold[open] > summary { margin-bottom: 3px; }
+/* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
+.inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
+.inboxpage .promotelog { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 14em; overflow: auto; margin: 0; }
+/* §4.5 screen 6 *Layout* (Paul's rule, 2026-09-19): what says **what a row is** — the kind mark,
+   the role badge, the state pill (which never had a border) — is flat and unbordered; everything
+   bordered on a row is a control. The team badge keeps its border, because it is a button. */
+.inboxpage .mailrow .badge:not(.team) { border-color: transparent; }
+/* …and the other half of the same rule, which the live page showed was missing (the anchor, from
+   the 1920 shot of 2026-09-20): `.btn.ghost` is borderless site-wide, so on a row where every
+   control is a ghost button — Reply, Snooze, Open, Dismiss — *nothing* looked
+   pressable and the rule read only one way. On this page a control carries its border. */
+.inboxpage .mailrow .btn.ghost { border-color: var(--border); }
+.inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
+/* design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): the sender's words, drawn **apart
+   from the row's own controls** — its own row, indented behind a *suggested by …* label and set
+   off by a rule, so *Delete* or *Allow* proposed by a session never reads as one of the page's
+   controls. Its own row is also what keeps it from wrapping into the controls row. A label too
+   long for its button is cut with an ellipsis here and whole on `title` (the template). Colours
+   are tokens, as every colour on the page is (TD-071 item 8). */
+/* design §4.5a **Inbox row: answered for you** (§4.9b, TD-075 step 2): the asker's question is
+   set off by a rule as a quotation is, so the question and the answer given in the person's name
+   never read as one message. Tokens, as every colour here is. */
+.inboxpage .mailrow .body.quoted { padding-left: 10px; border-left: 2px solid var(--line); color: var(--strong); }
+.inboxpage .sugg { row-gap: 4px; padding: 4px 0 2px 10px; border-left: 2px solid var(--line); }
+.inboxpage .sugg .sugglabel { font-style: italic; }
+/* §4.5a **Inbox row: a look** (TD-292): the screenshots under the text, a press opens one in a tab */
+.inboxpage .shots { padding: 4px 0 2px; align-items: flex-start; }
+.inboxpage .shot { display: inline-flex; flex-direction: column; gap: 2px; max-width: 180px; text-decoration: none; }
+.inboxpage .shot img { max-width: 180px; max-height: 120px; object-fit: contain; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.inboxpage .shot .st { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inboxpage .btn.answer { max-width: 30ch; }
+.inboxpage .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inboxpage .btn.answer .adflt { text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+/* design §4.5a **Inbox row: state** (TD-069 step 2): a state row wears the card's own pill, which
+   is a span and never a control. The alarms list is text, one line per alarm. */
+.inboxpage .staterow .pill { cursor: default; }
+.inboxpage .alarms { margin: 0; padding-left: 18px; font-size: var(--t-body); color: var(--alarm-fg); }
+.inboxpage .alarms li { margin: 2px 0; }
+.inboxpage .staterow[data-row="alarm"], .inboxpage .staterow[data-row="alarm_host"] { border-left: 2px solid var(--alarm); padding-left: 8px; }
+/* design §4.8a: the card's identity mark — a warning, not the amber needs-you ring, and never
+   pressable: the Inbox row is where anything is done about it (TD-077 step 2). */
+.badge.alarmmark { cursor: default; color: var(--alarm-fg); background: var(--alarm-bg); border-color: var(--alarm); }
+/* design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat and never pressable, like
+   every mark. It is the suspension's only record on a page (a suspension ends no row, so it writes
+   no trail), so it is quiet but not faint: a person must be able to see that it is there. */
+/* design §4.5a **restart wanted** (§4.9a, TD-083): a mark like *out of work*, which carries no
+   style of its own — so neither does this, except for the one thing that must not look the same.
+   An **early** one is the one a controller does not act on, so it is marked as needing a person
+   rather than a restart; still flat, still nothing to press. */
+.badge.rw.early { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); }
+.badge.gated { color: var(--limited-fg); background: var(--limited-bg); border-color: var(--limited); } /* paused · usage (TD-100): the limit family, a mark */
+.badge.brief { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); } /* brief not sent (TD-339): amber, a mark */
+.badge.suspendedmark { cursor: default; color: var(--alarm-fg); background: transparent; border-color: var(--alarm); text-transform: uppercase; letter-spacing: .04em; font-size: var(--t-cap); }
+.grants .badge { margin-right: 4px; cursor: pointer; }
+.grants .badge.off { opacity: 0.55; }
+.s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
+.s-idle { background: var(--idle-bg); color: var(--idle-fg); } .s-waiting { background: var(--waiting-bg); color: var(--waiting-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
+/* the shared idle / exited / unreachable rule is split (TD-095): what is over is grey, idle is not */
+.s-exited, .s-closed, .s-oncall, .s-unreachable { background: var(--ended-bg); color: var(--ended-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
+.badge { display: inline-block; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; font-size: var(--t-cap); color: var(--muted); font-family: "JetBrains Mono", monospace; background: transparent; }
+.badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
+.badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; }
+.badge.toggle.on { color: var(--primary-fg); background: var(--primary); border-color: var(--primary); } .badge.toggle.on::before { background: currentColor; }
+.flag { display: inline-flex; align-items: center; gap: 4px; color: var(--stalled-fg); font-size: var(--t-small); font-weight: 500; white-space: nowrap; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; } .card.pad { padding: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+/* Org team groups (design §4.5a, §4.9): a header row per team over its own grid; the flat page is one headerless group */
+#groups { display: flex; flex-direction: column; gap: 22px; } .tgroup[hidden] { display: none; }
+/* A team is one card holding its sessions' cards (design §4.5a **team groups**, 2026-09-16); *No
+   team* and the flat grid (`data-team=""`) stay plain sections. */
+.tgroup:not([data-team=""]) { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 14px; background: var(--line2); }
+.ghead .btn[hidden] { display: none; }
+/* a folded team (design §4.5a *team card: fold*, TD-194): the card is its header alone — the summary
+   and the cards hidden, nothing unloaded — and a team with nothing live is also quieter (below) */
+.tgroup.folded:not(.filtering) .grid, .tgroup.folded:not(.filtering) .tsum { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+/* a team's header: the counts by state only while folded (TD-418) — the cards say them otherwise */
+.tgroup:not(.folded) .ghead .foldonly, .tgroup.filtering .ghead .foldonly { display: none; }
+/* the header is the fold's press, grown to the row: the pointer and a hover tint where it folds */
+.tgroup:has(> .ghead .fold) > .ghead { cursor: pointer; border-radius: 6px; } .tgroup:has(> .ghead .fold) > .ghead:hover { background: var(--hover); }
+.tgroup > .ghead:focus { outline: none; } .tgroup > .ghead:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }  /* the ring, as on a card */
+/* a member that needs the person rings the folded row amber, as it would its card; the row stays folded */
+.tgroup.folded:not(.filtering):has(> .ghead .pill.s-needs) > .ghead { box-shadow: 0 0 0 2px var(--needs); }
+.tgroup[data-live="0"]:not([data-team=""]) { background: transparent; border-style: dashed; }
+.tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
+/* one scale with the cards (TD-095 i): the header sits on the body's 13 px and its title is no
+   smaller than a card's name — it was 12 / 14 px from when it carried less */
+.ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; } .ghead .h2 { font-size: var(--t-title); }
+.ghead .name { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); font-weight: 600; color: var(--fg); text-decoration: none; }
+.badge.team { cursor: pointer; color: var(--fg); }
+/* the card's *under <controller>* chip and the Focus header's controllers chips (design §4.5a,
+   §4.8): one control drawn in two places, so both are `.badge` like every other chip on the page.
+   A controller whose session is gone is *shown dim, not dropped* (§4.5a), with the dashed scraped
+   outline `.pill.scraped` uses — `.scraped` is only ever a compound rule, so it needs this one. */
+.badge.controller { cursor: pointer; color: var(--fg); text-decoration: none; }
+.badge.controller.scraped { opacity: 0.6; outline: 1px dashed var(--scraped); outline-offset: 1px; }
+/* what is left of the Org Teams strip (design §4.5a): one line about the definitions themselves, when there is something to say */
+.strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.strip .warnish { color: var(--warn-fg); }
+.badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
+.sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
+.sc[hidden] { display: none; }  /* .sc sets display, which beats [hidden]: a filter left the cards it hid drawn beside a match (TD-379) */
+/* design §4.5 *The card's anatomy* (TD-095): six rows, the same on every card, **at one height** —
+   so every row is one line that never wraps, and what does not fit is clipped with the whole of it
+   on hover. The name, the pill and the clock never shrink; the long derived strings do. */
+.sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { display: flex; flex-direction: column; gap: 4px; } .sc-foot { display: flex; gap: 6px; align-items: center; height: var(--foot); }
+.sc-body > .row { height: var(--row); flex-wrap: nowrap; overflow: hidden; } .sc-body > .row.r1 { height: var(--row1); }
+.sc-body > .row > * { flex: 0 1 auto; min-width: 0; } .sc-body > .row > .grow { flex: 1 1 0; }
+.sc .r1 .name, .sc .r1 .pill, .sc .r2 .age, .sc .r3 .flag, .sc .r2 .flag { flex-shrink: 0; }
+.sc .badge { white-space: nowrap; }
+.sc .r2 .mode { font-size: var(--t-small); } .sc .r2 .mode.mine { color: var(--fg); font-weight: 600; } .sc .r2 .mode .ricon { vertical-align: -2px; margin-right: 3px; }
+.sc .r3 .under { flex-shrink: 0; }
+/* what a team's group already says (its badge, host / repo, *under* its manager) is not said again
+   on a card inside that group; a filter shows it, since a filtered grid reads card by card */
+.tgroup:not([data-team=""]):not(.filtering) .sc .ingroup { display: none; }
+/* the slot: two lines and a caption, whatever it holds — a longer text clamped, the whole on hover */
+.sc-slot { height: var(--slot); justify-content: space-between; }
+.sc-slot > .status { height: calc(2 * 1.55em); padding: 0 0 0 10px; line-height: 1.55; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sc-slot > .status.tail { white-space: pre-line; color: var(--muted); }
+.sc-slot > .caption { height: calc(var(--lh) * 1em); } .sc-slot > .caption.ready { color: var(--fg); }
+/* the foot (TD-095, second pass): the next act outlined at normal strength, the rest plain links at
+   normal strength — never the dimmed grey a disabled control wears — and Allow the one filled button */
+.sc-foot .btn.next { background-color: transparent; color: var(--fg); border-color: var(--muted); }
+.sc-foot .btn.link { background-color: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
+details.more .menu button:disabled { opacity: .45; cursor: default; } details.more .menu button:disabled:hover { background: none; }
+.sc .name { font-family: "JetBrains Mono", monospace; font-size: var(--t-title); font-weight: 600; color: var(--fg); }
+.sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
+.sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); } .sc.s-idle .sbar { background: var(--idle); }
+.sc.s-waiting .sbar { background: var(--waiting); }
+.sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); }
+.sc.s-needs { box-shadow: 0 0 0 2px var(--needs); }  /* ringed: what to press, seen from across the room */
+/* the keyboard's ring (§4.5a Org **keys**, TD-124): the browser's focus ring, blue and offset
+   outside the card, so it sits apart from the amber needs-you ring rather than replacing it */
+.sc:focus { outline: none; } .sc:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+.meta { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status.needs { border-color: var(--needs); color: var(--needs-fg); } .status.ok { border-color: var(--ended); color: var(--fg); } .status.bad { border-color: var(--stalled); } .status.lim { border-color: var(--limited); }
+/* design §4.5a **doing** line (§4.8, TD-074): what the session says it is doing. Prose rather than
+   pane output, so a long line wraps instead of being clipped mid-word; no colour of its own — the
+   state tile stays the one coloured thing on a card. */
+.status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: var(--strong); }
+/* design §4.5a **title** (§4.3 `title()`, TD-074): the tool's own name for the session, beside
+   shiftlead's. Secondary — shiftlead's name leads — and clipped on a card (`.meta` ellipsises), with
+   the whole of it on hover. */
+.tool-title { max-width: 16em; flex: 0 1 auto; }
+/* design §4.8 *Role presets*: the role badge's picture — `currentColor`, no fill, so it takes the
+   badge's muted ink and never reads as something to press. */
+.badge .ricon { vertical-align: -2px; margin-right: 3px; }
+.term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: var(--t-mono); line-height: var(--lh-mono); padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
+.term.tail { font-size: var(--t-small); line-height: var(--lh-mono); padding: 6px 9px; color: var(--tail); min-height: 54px; }
+details.more { position: relative; } details.more summary { list-style: none; } details.more summary::-webkit-details-marker { display: none; }
+/* fixed to the viewport, placed by `AO.placeMenu` when it opens (TD-121): an absolute menu was
+   clipped by the card's `overflow: hidden`, which the card's one height needs */
+details.more .menu { position: fixed; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 4px; display: flex; flex-direction: column; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+details.more .menu button { text-align: left; background: none; border: 0; padding: 6px 8px; color: var(--fg); font: inherit; cursor: pointer; border-radius: 3px; } details.more .menu button:hover { background: var(--hover); }
+/* the top bar's + New ▾ (§4.5a, TD-428): Session is a link, drawn as the menu's buttons are */
+details.more .menu a { text-align: left; padding: 6px 8px; color: var(--fg); text-decoration: none; border-radius: 3px; } details.more .menu a:hover { background: var(--hover); }
+details.more .menu .menutoggle { display: flex; align-items: center; gap: 6px; padding: 6px 8px; color: var(--fg); cursor: pointer; border-radius: 3px; } details.more .menu .menutoggle:hover { background: var(--hover); } details.more .menu .menutoggle.off { opacity: .45; cursor: default; }  /* copy on select (TD-174) */
+#toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
+.toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: var(--t-small); max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); } .toast.wait { border-left-color: var(--muted); }  /* a toast that waits: no clock until its answer (TD-340) */
+/* Focus */
+.page.focus { flex-direction: row; align-items: flex-start; gap: 14px; }
+.focus .main { flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; } .focus .side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+.focus .title { font-size: var(--t-title); font-weight: 500; }
+/* the panel put away (§4.5 *The panel put away*, TD-412): a 28px rail of glyphs, the terminal taking the width */
+.focus .sidetop { margin-bottom: -6px; } .focus .sidetop .btn { padding: 0 4px; color: var(--muted); background: transparent; border-color: transparent; }
+.focus .siderail { display: none; flex-direction: column; align-items: center; gap: 6px; }
+.focus .side.rail { width: 28px; } .focus .side.rail > :not(.siderail):not(script) { display: none; } .focus .side.rail > .siderail { display: flex; }
+.focus .railglyphs { display: contents; }
+.focus .railbtn { width: 24px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: 3px; background: var(--card); color: var(--fg); font-size: var(--t-small); line-height: 1; cursor: pointer; }
+.focus .railbtn:hover { background: var(--hover); } .focus #sideback { border-color: transparent; background: transparent; color: var(--muted); }
+.focus a.railbtn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }
+.focus .railbtn.g-needs { background: var(--needs-bg); color: var(--needs-fg); border-color: var(--needs); font-weight: 600; }
+/* a popped-out Focus (§4.5 *Pop out*, TD-046): no top bar, so the terminal takes the room it left */
+body.popped .page { padding: 10px 12px; } body.popped .termbox, body.popped .termwrap.cfold .termbox { height: calc(100vh - 150px); }
+/* design §4.5a **Focus header** (TD-085). The row had no wrap, and 2026-09-19 and -20 put three
+   more things in it — the tool's title, the **out of work** chip and the **doing** line, beside
+   the path, the state, the mode toggle, the stop badge, team, role, grants, controllers and, on a
+   `needs-you` session, Allow / Deny with the tool and its command. Without wrap a flex row shrinks
+   its shrinkable children rather than moving anything to a second line, and the session's path is
+   the most shrinkable thing there: at 1440 it broke over four lines, the title was squeezed to
+   nothing and the doing line never appeared.
+
+   **The name and its state must never be the things that shrink.** So the row wraps — which is
+   what the Focus artboard in `docs/mockups/gen.py` draws — and the two that say *which session
+   this is* are told not to shrink, while the two long derived strings are. Splitting the header
+   into an identity line and a control line is the other answer in TD-085 and is a §4.5a decision,
+   not this. */
+.focus #fhead { flex-wrap: wrap; row-gap: 6px; }
+.focus #fhead > .title, .focus #fhead > #fstate { flex: 0 0 auto; }
+/* the one long thing the row may take back instead: the tool's title, shown and never acted on,
+   the whole of it on hover (the doing line left the header for the Working card, TD-156) */
+.focus #fhead > .tool-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.side .told { margin-top: 8px; font-size: var(--t-small); line-height: 1.5; overflow-wrap: anywhere; color: var(--muted); } details.side .told p, details.side .told ul { margin: 0 0 6px; } details.side .told ul { padding-left: 16px; }
+#entryline { white-space: normal; }  /* the note under Open a session wraps: its second sentence says where the rest is read */
+details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1.55; overflow-wrap: anywhere; }
+/* design §4.5 *The Focus screen's anatomy* (TD-156): the header is two lines — the identity line
+   above, this acts line below it — with the card's foot rule: the next act outlined at normal
+   strength, the rest plain, more ▾ at the right. The buttons had been spread over the tail of the
+   wrapping identity row (Paul's screenshot, 2026-09-25: two lines of them, split). */
+.focus #facts { flex-wrap: wrap; row-gap: 6px; }
+.focus #facts .btn.next { background-color: transparent; color: var(--fg); border-color: var(--muted); }
+.focus #facts .btn.link { background-color: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
+.focus #facts details.more .menu { min-width: 210px; } .focus #facts .menu .key { float: right; margin-left: 12px; color: var(--muted); font-size: var(--t-cap); }
+.focus #facts .menu button.danger { color: var(--stalled-fg); }
+.badge.readymark { cursor: default; color: var(--done-fg); background: var(--done-bg); border-color: var(--done); }  /* the card's caption, in the card's words */
+/* the side panel's folds: the heading is the disclosure, a chevron before it, Session folded by default */
+details.side > summary { list-style: none; cursor: pointer; align-items: center; } details.side > summary::-webkit-details-marker { display: none; }
+details.side > summary .h2::before { content: "▾ "; color: var(--muted); font-weight: 400; } details.side:not([open]) > summary .h2::before { content: "▸ "; }
+details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side .kv dd .controllers { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
+.composer { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+/* §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): folded, the composer is one bar under the
+   terminal and opens as an overlay over the terminal's foot — the terminal's width, never past its top,
+   never resizing it — and the terminal is filled to the bar by `AO.termFill` (`--termh`), 360px its floor */
+.termwrap { position: relative; } .termwrap.cfold .termbox { height: var(--termh, 60vh); }
+/* open, it takes the bar's place (`--cbarh`, the bar and the gap above it) and grows up over the terminal's foot */
+.composer.overlay { position: absolute; left: 0; right: 0; bottom: calc(-1 * var(--cbarh, 0px)); max-height: calc(100% + var(--cbarh, 0px)); overflow: auto; z-index: 5; box-shadow: 0 -6px 18px rgba(0, 0, 0, .35); }
+.composerbar.under { visibility: hidden; }
+.composer.overlay.folded { display: none; } .composer.overlay textarea { height: auto; }
+.composerbar { padding: 6px 10px; align-items: center; }
+.composerbar .cbtext { min-width: 0; text-align: left; padding: 6px 4px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-body); cursor: text; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composerbar .cbtext:hover { color: var(--fg); } .composerbar .cbtext.draft { color: var(--fg); } .composerbar .cbtext.off { cursor: default; }
+.composer textarea { width: 100%; height: 72px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); line-height: var(--lh); font-family: inherit; resize: vertical; }
+.termro { margin: 0 0 4px; }
+.inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
+.kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.gitfiles { line-height: 1.7; margin-top: 6px; } .recentfiles { line-height: 1.7; overflow-wrap: anywhere; } .recentfiles .fmark { font-weight: 600; } .recentlinks { line-height: 1.7; min-width: 0; } .recentlinks div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
+@media (max-width: 720px) {
+  /* §4.5 screen 6 *Narrow* (TD-137): one column; the rail leaves the page for the sheet, a chip row
+     stands under the title, and a row's controls are 44 px high as the phone's Org cards' are */
+  .inboxwrap { grid-template-columns: minmax(0, 1fr); } .inboxwrap > .rail { display: none; }
+  /* the Focus composer's prompt chips (§4.5a, TD-170): one wrapping row above the text box */
+  .composer { display: flex; flex-direction: column; gap: 6px; } .composer > .row { display: contents; }
+  .composer .promptchips { order: -1; } .composer .promptchips .chip { min-height: 44px; }
+  /* the narrow mode keeps its composer open under the terminal, at the terminal's own height (TD-500) */
+  .composerbar, .cfoldhint { display: none !important; } .termwrap.cfold .termbox { height: 50vh; }
+  .composer.overlay, .composer.overlay.folded { position: static; display: flex; box-shadow: none; max-height: none; }
+  .railchips { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
+  .railchips .filterschip { position: sticky; left: 0; z-index: 1; background: var(--card); }
+  .railchips .chipteams { display: flex; gap: 6px; }
+  .railsheet[open] { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; padding: 16px; }
+  .railchips .chip, .railsheet .btn, .railsheet .railline, .railsheet .input { min-height: 44px; }
+  .inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }
+  /* a column whose items take its width: at flex-start the main column took its content's, and the
+     terminal's grid, once fit, held the page wider than the phone (TD-521) */
+  .page.focus { flex-direction: column; align-items: stretch; } .focus .side { width: 100%; }
+  /* put away on a phone, the rail is one row under the composer, 44px targets (TD-412) */
+  .focus .side.rail { width: 100%; } .focus .siderail { flex-direction: row; flex-wrap: wrap; } .focus .railbtn { width: 44px; height: 44px; } .termbox { height: 50vh; } .topbar { gap: 6px 8px; padding: 8px 10px; } #hostchip { display: none; }
+  /* a phone (TD-296 #9): the usage chip takes a row of its own under the buttons */
+  #usagechip { order: 1; flex-basis: 100%; max-width: 100%; } #usagechip:empty, #usagechip:not(:has([data-account])) { display: none; }
+  .grid { grid-template-columns: 1fr; }
+}
+
+/* ---- the team-first Org (design §4.5 screen 1, §4.5a *team card: summary*, TD-176 slice 3) ---- */
+.tsum { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); gap: 12px; margin-bottom: 12px; }
+@media (max-width: 1100px) { .tsum { grid-template-columns: minmax(0, 1fr); } }
+.facet { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* every facet's head one height, the window picker's, whether it holds one or not (§4.5a *Org: rollup*, TD-418);
+   a label never wraps: where the head runs out of room the selector drops to its own line, at the right */
+.facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
+.facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); white-space: nowrap; }
+.facet .fhead > .seg { margin-left: auto; }
+/* the rollup's ***i*** beside Agents: a tooltip and nothing to press (TD-418) */
+.tipmark { display: inline-flex; align-items: center; justify-content: center; cursor: help; }
+.facet .dim { opacity: .7; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); }
+.seg button:disabled { opacity: .45; cursor: default; }
+.bar, .blocks { display: flex; gap: 2px; height: 26px; }  /* one height, so the bars and the blocks line up (TD-418) */
+.bseg, .blk { display: flex; align-items: center; justify-content: center; min-width: 22px; padding: 0 4px; border-radius: 2px; color: var(--seg-fg); font-size: var(--t-small); font-weight: 600; text-decoration: none; white-space: nowrap; overflow: hidden; }
+.blk { font-weight: 500; gap: 4px; } .blk b { font-weight: 700; }
+/* a bar's segment too narrow for its words (TD-506): the word wraps out of sight, then the count; the hover keeps both.
+   The full-height ::before holds the first line, so what does not fit beside it falls to a second line the
+   segment clips; centring and the visible line are unchanged when it all fits. */
+.bar .bseg { flex-wrap: wrap; align-content: flex-start; }
+.bar .bseg::before { content: ""; height: 100%; }
+.bar .bseg .bw { white-space: pre; }
+.bseg.p-high { background: var(--p-high); } .bseg.p-medium { background: var(--p-medium); } .bseg.p-low { background: var(--p-low); color: var(--p-high); }
+.bseg.k-pickable, .legend .k-pickable { background: var(--k-pickable); } .bseg.k-design, .legend .k-design { background: var(--k-design); }
+.bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }
+/* the seven kinds (TD-418): *live check* its own teal, *blocked* hatched */
+.bseg.k-live-check, .legend .k-live-check { background: var(--k-live); } .bseg.k-evaluation, .legend .k-evaluation { background: var(--k-eval); }
+.bseg.k-blocked, .legend .k-blocked { background: repeating-linear-gradient(135deg, var(--k-blocked) 0 6px, var(--k-blocked-2) 6px 12px); }
+.rrow .flag { color: var(--needs-fg); }  /* an *other* row's flag on the Repo page (TD-418) */
+.blk.opened { background: var(--blk-opened); } .blk.closed { background: var(--blk-closed); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--t-small); color: var(--muted); }
+/* the lanes line under the legend (§4.5a *team card: Repo facet*, TD-361): its counts are links, a member out of work tinted */
+.laneline { font-size: var(--t-small); line-height: 1.5; white-space: normal; }
+.laneline a { color: inherit; font-weight: 600; }
+/* the lane's count inside a compact card's pill (§4.5a *card: compact*, TD-428): the kind bar's colour for
+   its lane, a soft tint; solid while the member said it is out of work and reads *idle* — the case to act on */
+.lanecount { margin-left: 5px; padding: 0 4px; border-radius: 3px; font-weight: 600; text-transform: none; letter-spacing: 0;
+  color: var(--lc); background: color-mix(in srgb, var(--lc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--lc) 45%, transparent); }
+.lanecount.k-pickable { --lc: var(--k-pickable); } .lanecount.k-design { --lc: var(--k-design); }
+.lanecount.solid { color: #fff; background: var(--lc); }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+/* TDs in motion in columns (§4.5a **Columns**, TD-252): one grid per row with the same tracks, so
+   each column starts at one x down the facet — the phase in the width of its longest word, the
+   priority's fixed slot (TD-232), then the reference, the holders and the PR in the server's widths
+   (`--ref-n`, `--who-n`, `--pr-n` characters; `--mch` is one character of their mono font, since a
+   track's `ch` would be the row's own face); the title alone flexes. Every cell is drawn, empty
+   where a row has none, so a row with no PR keeps its place */
+.mrow { --mch: .62em; display: grid; grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)) calc(var(--pr-n, 0) * var(--mch)); column-gap: 7px; align-items: baseline; min-width: 0; font-size: var(--t-small); }
+.mrow > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .mphase { overflow: visible; }
+.mrow .mtitle { color: var(--strong); }
+.mrow .mprio { min-height: 0; padding: 0; align-self: center; line-height: 16px; } /* one fixed slot, empty when unmarked (TD-232) */
+.mrow .mref, .mrow .mwho, .mrow .mpr { font-family: "JetBrains Mono", monospace; }
+.mrow .mwho .name { color: var(--fg); text-decoration: none; }
+/* a phone: the PR goes under the title before the holder is lost */
+@media (max-width: 720px) {
+  .mrow { grid-template-columns: 58px 18px calc(var(--ref-n, 6) * var(--mch)) minmax(0, 1fr) calc(var(--who-n, 12) * var(--mch)); }
+  .mrow .mpr { grid-column: 4 / -1; } .mrow .mpr:empty { display: none; }
+}
+.phase { flex: none; font-size: var(--t-cap); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 3px; color: var(--seg-fg); }
+.phase.ph-add { background: var(--ph-add); } .phase.ph-design { background: var(--ph-design); } .phase.ph-grind { background: var(--ph-grind); } .phase.ph-review { background: var(--ph-review); }
+.facet.fface.answering { background: var(--warn-bg); border-color: var(--warn-line); }
+.ablock { display: flex; flex-direction: column; gap: 5px; padding-bottom: 8px; border-bottom: 1px solid var(--line2); }
+.ablock:last-child { border-bottom: 0; }
+.ablock .atext { font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+/* the team's *asked you* line under the facet's head (§4.5a, TD-354): a link, untinted, never a block */
+.asked { font-size: var(--t-small); margin: -2px 0 6px; }
+.dfeed { display: flex; flex-direction: column; gap: 3px; max-height: 12em; overflow: auto; }
+/* the Doing list's three columns (§4.5a **Ages and columns**, TD-232): the age right-aligned in a width
+   that fits *59m* (TD-418), the doer in the server's width (`--doer-n` characters, at most 18), the words
+   the rest; each width is in its own mono font's `ch`, so the columns line up down the list */
+.drow { display: flex; gap: 8px; align-items: baseline; font-size: var(--t-small); min-width: 0; white-space: nowrap; }
+.drow .dage { flex: none; width: 4ch; text-align: right; }
+.drow .name { font-family: "JetBrains Mono", monospace; color: var(--fg); text-decoration: none; flex: none; width: calc(var(--doer-n, 12) * 1ch); overflow: hidden; text-overflow: ellipsis; }
+.drow .dtext { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.repopage .rrow.drow .dtext { white-space: normal; overflow-wrap: anywhere; } /* the Repo page's words wrap */
+@media (max-width: 720px) { .drow .dtext { white-space: normal; overflow-wrap: anywhere; } } /* the columns hold */
+/* the compact card (§4.5a *card: compact*): name and pill, one line, the foot — and no state glyph */
+.sc.compact { gap: 10px; padding: 12px 14px; }
+.pill.nog::before { content: none; }  /* no state glyph: a compact card, a count pill (§4.5a *state icon*) */
+.sc.compact .r1 .mine .ricon { vertical-align: -2px; margin-left: 4px; }
+.sc.compact .cline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the team's + card (§4.5a *team card: + card*, TD-379): a card's head, never a full card — a dashed
+   outline, no state bar, a large + over *your session in <team>*; the whole card is the link (mockup: gen.py `plus_card`) */
+.sc.plus { height: 64px; padding: 0; gap: 0; border: 1px dashed var(--border); background: transparent; }
+.sc.plus .plusgo { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--muted); text-decoration: none; }
+.sc.plus .plusmark { font-size: 2em; line-height: 1; font-weight: 300; color: var(--strong); }
+.sc.plus:hover { background: var(--hover); }
+.tsum .lv, .tsum .wv, .tsum .fv { display: flex; flex-direction: column; gap: 5px; }
+.tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden] { display: none; }
+/* the Org rollup (§4.5a *Org: rollup*, TD-176 slice 4) */
+.rollup { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr; gap: 12px; margin: 12px 0 18px; }
+@media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+@media (max-width: 640px) { .rollup { grid-template-columns: minmax(0, 1fr); } }
+.rollup.quiet { grid-template-columns: minmax(0, 22rem); } /* no team live: Needs you alone (TD-406) */
+.rollup.lone { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } /* one team live: Agents and Needs you (TD-418) */
+@media (max-width: 640px) { .rollup.lone { grid-template-columns: minmax(0, 1fr); } }
+.rollup button.pill { border: 0; cursor: pointer; font-family: inherit; }
+.rollup .fneeds.answering { background: var(--warn-bg); border-color: var(--warn-line); }
+.rollup .nrow { display: flex; gap: 8px; align-items: baseline; }
+.rollup .big { font-size: var(--t-title); color: var(--needs-fg); }
+.bseg.phase { border-radius: 2px; } .legend .ph-add { background: var(--ph-add); } .legend .ph-design { background: var(--ph-design); }
+.legend .ph-grind { background: var(--ph-grind); } .legend .ph-review { background: var(--ph-review); }
+/* the Repo page (design §4.5 screen 11, TD-176 slice 5) */
+.repopage .rhead { margin-bottom: 14px; align-items: baseline; }
+.repopage .rsec { margin-top: 22px; }
+.repopage .rsh { align-items: center; margin-bottom: 8px; }
+.repopage .rlist { background: var(--card); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; }
+.repopage .rrow { display: flex; gap: 12px; align-items: baseline; padding: 9px 14px; border-top: 1px solid var(--line2); min-width: 0; }
+.repopage .rrow:first-child { border-top: 0; }
+.repopage .rrow[hidden], .repopage .rrow.folded { display: none; }
+.repopage button.rrow { background: transparent; border: 0; border-top: 1px solid var(--line2); text-align: left; cursor: pointer; font: inherit; color: var(--muted); }
+.repopage .rtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repopage .rrow > .mono.strong, .repopage .rrow > .meta { flex: none; white-space: nowrap; }  /* the id and the tags keep their width; the title is what gives (TD-296 #16) */
+.repopage .rlh { padding: 8px 14px 4px; font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); border-top: 1px solid var(--line); }
+.repopage .rlh:first-child { border-top: 0; }
+.repopage .tag { font-size: var(--t-small); padding: 1px 7px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); white-space: nowrap; }
+.repopage .tag.wait { border-color: var(--needs); color: var(--needs-fg); background: var(--needs-bg); }
+.repopage .rrow .p-high { color: var(--stalled-fg); }
+.repopage .imark { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; }
+.repopage .secinfo { margin: -4px 0 8px; }
+.repopage .dchips { margin-bottom: 8px; }
+.repopage .dchips .chip { border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
+.repopage .dchips .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+@media (max-width: 720px) { .repopage .rrow:not(.drow) { flex-wrap: wrap; } }  /* a Doing row keeps its columns: its words wrap inside the last (TD-296 #16) */
+/* the Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148): the Inbox's one centred
+   column (TD-082) at a reading width — a section is a heading with its i mark, a row is a card; a
+   field is a label, its input and what it makes today, on one line that wraps on a phone */
+.inboxpage.setpage { max-width: 880px; display: flex; flex-direction: column; gap: 18px; }
+.setpage .setgroup { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-top: 4px; }
+.setpage .setcard { display: flex; flex-direction: column; gap: 10px; }
+.setpage .setrow { display: grid; grid-template-columns: 150px minmax(0, 220px) minmax(0, 1fr); gap: 10px; align-items: center; }
+.setpage .setpullcol { display: flex; flex-wrap: wrap; column-gap: 10px; row-gap: 2px; align-items: baseline; min-width: 0; }  /* the pull row's note and its reading, one column (TD-296 #17) */
+.setpage .setage { grid-column: 3; margin-top: -8px; }  /* the reading's age under its line (TD-233) */
+.setpage .setpicks { display: flex; flex-direction: column; gap: 4px; } .setpage .setpicks label { white-space: nowrap; } .setpage .setnum, .setpage .setin.setnum { width: 4.5em; display: inline-block; padding: 1px 4px; } /* board items shown (TD-220); `.setin`'s 100% below widened the page (TD-296 #9) */
+.setpage .setlabel { font-size: var(--t-small); font-weight: 600; color: var(--strong); }
+.setpage .setin { width: 100%; }
+.setpage .setover { color: var(--needs-fg); font-weight: 600; }  /* **balance**: the mark that stands (§6 *Balance*) */
+.setpage .settemplate { display: flex; flex-direction: column; gap: 10px; }
+.setpage .setline.warn, .setpage .setsaid.warn { color: var(--needs-fg); }
+.setpage .setvals { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 10px; margin: 0; }
+.setpage .setvals dt { font-size: var(--t-small); color: var(--muted); }
+.setpage .setvals dd { margin: 0; font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+.setpage .badge.defmark { cursor: default; color: var(--muted); border-color: transparent; font-family: inherit; }
+.setpage .setfoot { border-top: 1px solid var(--line); padding-top: 8px; align-items: center; }
+.setpage .setfoot .note { overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .setpage .setrow, .setpage .setvals { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .setpage .setage { grid-column: auto; margin-top: 0; }
+  .setpage .setvals dd { margin-bottom: 6px; }
+  .setpage .setpicks label { white-space: normal; }  /* board items shown wraps rather than widening the page (TD-296 #9) */
+}
+
+/* design §4.5 screen 9 **Transcript** (TD-166): the pane's reading of the conversation, folded — the
+   prompt on a tinted band with `>`, the assistant's text in full, each tool call one mono line with
+   its result folded under it. Everything is text; the folds are plain <details>. */
+.page.transcript { max-width: 1100px; width: 100%; margin: 0 auto; }
+.transcript .thead { align-items: center; flex-wrap: wrap; }
+.transcript .thead .title { font-size: var(--t-title); font-weight: 500; }
+.transcript .tcard { padding: 10px 12px; }
+.transcript .tcard .kv { margin: 0; }
+.transcript .tlog { padding: 6px 0; display: flex; flex-direction: column; gap: 2px; line-height: var(--lh); }
+.transcript .tturns { display: flex; flex-direction: column; gap: 2px; }
+.transcript .ttext { white-space: pre-wrap; overflow-wrap: anywhere; }
+.transcript .tprompt { display: flex; gap: 10px; padding: 10px 12px; margin-top: 8px; background: var(--hover); border-radius: 4px; }
+.transcript .tprompt .ttext { flex-grow: 1; min-width: 0; }
+.transcript .tprompt .meta { flex-shrink: 0; }
+.transcript .tmark { color: var(--muted); }
+.transcript .tsaid { padding: 4px 12px 4px 30px; }
+.transcript .ttool { padding: 3px 12px; display: flex; flex-direction: column; gap: 2px; }
+.transcript .tcall { font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+.transcript .targ { color: var(--strong); }
+.transcript .tfold { padding-left: 22px; }
+.transcript .tthought { padding: 3px 12px 3px 30px; }
+.transcript details.fold > summary { user-select: none; } /* a fold with no `data-fold`: remembered nowhere */
+.transcript .tbody { margin: 4px 0; padding: 6px 8px; font-size: var(--t-mono-s); background: var(--input); border: 1px solid var(--line2); border-radius: 4px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 30em; overflow: auto; }
+.transcript .tsidebody { border-left: 2px solid var(--line); margin: 4px 0 4px 4px; }
+.transcript .tcompact, .transcript .tearlier { text-align: center; padding: 8px; }
+/* the find's matched words (TD-280): a highlight that reads in both themes, the text's own colour */
+mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px; padding: 0 1px; }

@@ -9,7 +9,7 @@ import re
 
 import pytest
 
-CSS = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.css"
+CSS = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.css"
 TOKENS = ("--t-body", "--t-small", "--t-cap", "--t-title", "--t-mono", "--t-mono-s", "--t-btn", "--lh", "--lh-mono")
 
 pytestmark = pytest.mark.unit

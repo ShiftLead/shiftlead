@@ -287,7 +287,7 @@ async def test_a_metered_accounts_spend_is_summed_noted_and_gated(agent, hookstu
 
 
 def test_status_v_prints_a_metered_profiles_spend():
-    from agentorc.cli import spend_line
+    from shiftlead.cli import spend_line
 
     now = datetime(2026, 9, 27, 15, 0, tzinfo=UTC)
     rows = {TODAY.isoformat(): {"input": 1_200_000, "output": 0, "cache_read": 0, "cache_write": 0, "cost": 3.2}}
@@ -418,8 +418,8 @@ async def test_set_settings_and_gate_take_a_metered_profiles_amounts(agent, hook
     window of the home's three, set before its first session; a percent is refused by naming the
     billing, as are money on a profile with no prices and an amount on a subscription profile; `gate`
     answers the amounts as written with the spend beside them."""
-    from agentorc.cli import _gate_line, _reserve
     from sessionorc.client import AgentError
+    from shiftlead.cli import _gate_line, _reserve
 
     await park_ticks(agent)
     hookstub.billing = {

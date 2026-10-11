@@ -15,7 +15,7 @@ import pytest
 
 from sessionorc import settings as settings_mod
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 BASE = {
     "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": "/tmp",
@@ -25,8 +25,8 @@ BASE = {
 
 
 def _focus(monkeypatch, tmp_path, composer=None, **rec):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     v = view({**BASE, "dir": str(tmp_path), **rec})
     ctx = {"s": {**v, "grants_all": [], "ready": []}, "host": "h", "active": "Org", "popped": False}

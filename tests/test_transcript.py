@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from agentorc.adapters.claude_code import ClaudeCodeAdapter, munge
-from agentorc.adapters.claude_code import transcript as tr
-from agentorc.cli import transcript_text
 from sessionorc import adapters
 from sessionorc.adapters import Transcript, TranscriptEntry
 from sessionorc.client import AgentError, LocalClient
+from shiftlead.adapters.claude_code import ClaudeCodeAdapter, munge
+from shiftlead.adapters.claude_code import transcript as tr
+from shiftlead.cli import transcript_text
 
 
 def _at(n: int) -> str:
@@ -146,7 +146,7 @@ def test_an_inline_sidechain_folds_under_the_agent_call_before_it(tmp_path):
 
 @pytest.mark.unit
 def test_the_adapter_locates_the_file_from_the_record(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
         f"default: t\nprofiles:\n  t: {{account: t, config_dir: {tmp_path / 'cc'}}}\n"

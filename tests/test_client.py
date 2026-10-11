@@ -1,5 +1,5 @@
 """The two clients of the host agent: `call_sync` (one connection per call) and the stdio bridge
-that `ssh host agentorc-agent rpc` carries (design §4.6)."""
+that `ssh host shiftlead-agent rpc` carries (design §4.6)."""
 
 import contextlib
 import json
@@ -22,13 +22,13 @@ def test_call_sync_roundtrip(subprocess_agent, tmp_path):
 
 
 def test_call_sync_agent_down(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "nohome"))
     with pytest.raises(AgentUnavailable, match="not reachable"):
         call_sync("ping")
 
 
 def rpc_bridge(lines: list[dict], env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
-    """One bridge process, JSON lines on stdin, JSON lines back. The child reads `AGENTORC_HOME`
+    """One bridge process, JSON lines on stdin, JSON lines back. The child reads `SHIFTLEAD_HOME`
     from its own environment: with `env=None` it inherits the test process's (the fixture's)."""
     return subprocess.run(
         [sys.executable, "-m", "sessionorc.agent", "rpc"],
@@ -56,7 +56,7 @@ def test_rpc_bridge_pumps_lines(subprocess_agent, tmp_path):
 
 
 def test_rpc_bridge_agent_down(tmp_path):
-    env = {**os.environ, "AGENTORC_HOME": str(tmp_path / "nohome")}
+    env = {**os.environ, "SHIFTLEAD_HOME": str(tmp_path / "nohome")}
     cp = rpc_bridge([{"id": 1, "method": "ping", "params": {}}], env=env)
     assert cp.returncode == 1
     assert json.loads(cp.stdout.strip())["error"].startswith("agent down")

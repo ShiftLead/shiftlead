@@ -28,7 +28,7 @@ pytestmark = pytest.mark.integration
 
 @pytest.fixture
 def client(subprocess_agent):
-    from agentorc.ui.app import create_app
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         yield c
@@ -65,19 +65,19 @@ def test_pages_and_shell_flow(client, tmp_path):
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
     assert 'name="role"' in r.text and 'title="built-in · grants control">manager · unattended</option>' in r.text
-    (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
-    (tmp_path / ".agentorc" / "roles" / "reviewer").mkdir(parents=True)  # a role directory (§4.9c)
-    (tmp_path / ".agentorc" / "roles" / "reviewer" / "role.yml").write_text("")
-    (tmp_path / ".agentorc" / "roles" / "reviewer" / "template.md").write_text("review {lane}\n")
+    (tmp_path / ".shiftlead.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
+    (tmp_path / ".shiftlead" / "roles" / "reviewer").mkdir(parents=True)  # a role directory (§4.9c)
+    (tmp_path / ".shiftlead" / "roles" / "reviewer" / "role.yml").write_text("")
+    (tmp_path / ".shiftlead" / "roles" / "reviewer" / "template.md").write_text("review {lane}\n")
     r = client.get(f"/new?dir={tmp_path}")
     assert 'title="repo role + repo">reviewer · unattended</option>' in r.text and 'data-default="orc"' in r.text
     roles = client.get(f"/api/roles?dir={tmp_path}").json()
     assert roles["controllers"] == ["orc"] and [x["name"] for x in roles["roles"]][-1] == "reviewer"
-    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert "unknown grant 'fly'" in client.get(f"/api/roles?dir={tmp_path}").json()["error"]
     r = client.post("/new", data={"name": "x", "dir": str(tmp_path), "role": "grinder"}, follow_redirects=False)
     assert r.status_code == 400 and "unknown grant" in r.text  # a malformed file: Start says so, nothing starts
-    (tmp_path / ".agentorc.yml").unlink()
+    (tmp_path / ".shiftlead.yml").unlink()
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "sh1"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith("/focus/ao-")
     sid = r.headers["location"].rsplit("/", 1)[-1]
@@ -130,7 +130,7 @@ def test_events_stream_and_permission_buttons(client, tmp_path):
     wait_state(client, sid, "working")
     with client.websocket_connect("/events") as ws:
         # a hook-side permission request flips the card; the pushed html carries Allow/Deny
-        env = {**os.environ, "AGENTORC_SESSION": sid, "AGENTORC_PERMISSION_WAIT": "10"}
+        env = {**os.environ, "SHIFTLEAD_SESSION": sid, "SHIFTLEAD_PERMISSION_WAIT": "10"}
         payload = {
             "hook_event_name": "PermissionRequest",
             "tool_name": "Bash",
@@ -138,7 +138,7 @@ def test_events_stream_and_permission_buttons(client, tmp_path):
             "tool_use_id": "tu-ui",
         }
         proc = subprocess.Popen(
-            [sys.executable, "-m", "agentorc.adapters.claude_code.hook"],
+            [sys.executable, "-m", "shiftlead.adapters.claude_code.hook"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,
@@ -197,7 +197,7 @@ def test_the_term_socket_sends_the_clients_frame_for_the_real_window(client, sub
     before the attach's resize is followed by the one after it."""
     import functools
 
-    from agentorc.ui import app as ui_app
+    from shiftlead.ui import app as ui_app
 
     monkeypatch.setattr(ui_app, "watch_clients", functools.partial(ui_app.watch_clients, every=0.2))
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "clients"}, follow_redirects=False)
@@ -221,7 +221,7 @@ def test_the_term_socket_sends_the_clients_frame_for_the_real_window(client, sub
 
 
 def test_bridge_argv_shapes():
-    from agentorc.ui.pty_bridge import attach_argv, scroll_argv
+    from shiftlead.ui.pty_bridge import attach_argv, scroll_argv
 
     a = attach_argv("ao-x", socket_name="s")
     # the mouse is the browser's (§4.6, TD-174): the attach sets no option on the session
@@ -315,8 +315,8 @@ def test_term_unknown_session(client):
 
 def test_org_renders_with_agent_down(tmp_path, monkeypatch):
     """No bare 503: the Org shows the down banner and Retry when the agent socket is absent."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
-    from agentorc.ui.app import create_app
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "nohome"))
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         r = c.get("/")
@@ -337,8 +337,8 @@ def test_the_inbox_poll_says_the_agent_is_down_instead_of_a_bare_503(tmp_path, m
     answered a down host agent with a banner; its **poll** answered a bare 503, which a client can
     only drop — leaving the rows on screen looking current. The poll now answers in a shape the
     page can say, and claims no count: `needs: null` is *not known*, which is not *nothing*."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
-    from agentorc.ui.app import create_app
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "nohome"))
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         r = c.get("/api/person/inbox")
@@ -349,7 +349,7 @@ def test_the_inbox_poll_says_the_agent_is_down_instead_of_a_bare_503(tmp_path, m
         # the page carries the banner at all times, hidden until it is true, so the poll can show it
         page = c.get("/inbox").text
         assert 'id="agentdown"' in page and 'id="agentdownwhy"' in page
-        import agentorc.ui as ui
+        import shiftlead.ui as ui
 
         js = (pathlib.Path(ui.__file__).parent / "static" / "app.js").read_text()
         assert "agentdown" in js and "got.needs !== null" in js
@@ -364,9 +364,9 @@ def test_the_inbox_poll_says_the_agent_is_down_instead_of_a_bare_503(tmp_path, m
 
 
 def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  vscode_host: kmaster\n")
-    from agentorc.ui.app import vscode_url
+    from shiftlead.ui.app import vscode_url
 
     assert vscode_url("/tmp/ao-test") == "vscode://vscode-remote/ssh-remote+kmaster/tmp/ao-test?windowId=_blank"
     # a space or `?` in the directory is percent-encoded, the separators are not (TD-011)
@@ -444,7 +444,7 @@ def test_the_terminal_palette_is_complete_and_dark(tmp_path):
     present, every value a hex colour, and the background a literal rather than a theme token —
     the pane is dark whatever the page is, which is the whole of goal 12.
     """
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     block = js[js.index("AO.TERM_THEME = {") : js.index("};", js.index("AO.TERM_THEME = {"))]
     colours = dict(re.findall(r'(\w+): "(#[0-9a-fA-F]{6})"', block))
     base = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
@@ -462,7 +462,7 @@ def test_the_terminal_font_and_renderer_are_bundled_and_served(client):
     an `@font-face` for every file, the WebGL addon loads after xterm.js on the Focus page with the
     DOM renderer as its fallback, and every vendored file is named with its version in the vendor
     README — the files carry none, which is what held (c) up. Served, the font is `font/woff2`."""
-    static = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static"
+    static = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static"
     css = (static / "app.css").read_text()
     faces = re.findall(r'@font-face \{[^}]*url\("/static/vendor/(fonts/[^"]+)"\)', css)
     assert faces and all((static / "vendor" / f).is_file() for f in faces)
@@ -486,7 +486,7 @@ def test_the_page_links_its_stylesheet_and_script_by_their_content(client):
     serves the file it names."""
     import hashlib
 
-    static = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static"
+    static = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static"
     html = client.get("/").text
     for name in ("app.css", "app.js"):
         digest = hashlib.sha256((static / name).read_bytes()).hexdigest()[:12]
@@ -499,8 +499,8 @@ def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch)
     """design §4.5a **stops** note (§6, TD-026): a session with a stop time says so on its card and
     in its Focus header, in the host's local clock; every session without one says nothing, which is
     most of them."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x-2", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
@@ -533,10 +533,10 @@ def test_the_new_session_form_refuses_a_stop_time_on_an_interactive_session(tmp_
     """The form's half of `--until`'s rule (design §6): a stop time is a policy, policies leave
     interactive sessions alone (§4.2), and storing one nothing acts on is TD-026's failure
     inverted."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from fastapi import HTTPException
 
-    from agentorc.ui.app import stop_fields
+    from shiftlead.ui.app import stop_fields
 
     assert stop_fields("", False) == {} and stop_fields("   ", True) == {}
     with pytest.raises(HTTPException) as bad:
@@ -553,8 +553,8 @@ def test_a_stalled_card_says_why_when_a_screen_rule_explained_it(tmp_path, monke
     """TD-032: a worker that stood down under a Remote Control takeover is `stalled?` with a note
     from the screen rule. Design §4.2 promises "a `stalled?` that can say why", so the note goes on
     the card above the tail; a `stalled?` with no explanation still shows the tail alone."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = {
         "id": "ao-x-1", "name": "w1", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
@@ -606,11 +606,11 @@ def test_the_shell_button_twice_gives_two_shells(client, tmp_path):
 def test_the_profile_line_says_which_model_is_in_use(tmp_path, monkeypatch):
     """TD-031, design §4.2a: tool · account · model, where the third part is the model actually
     observed. The profile's declared model is an intent, so a line falling back to it says so."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "profiles.yml").write_text(
         "default: paul\nprofiles:\n  paul: {account: paul, model: fable-5-1}\n  bare: {account: b}\n"
     )
-    from agentorc.ui.app import view
+    from shiftlead.ui.app import view
 
     s = {
         "id": "ao-r-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
@@ -627,8 +627,8 @@ def test_the_profile_line_says_which_model_is_in_use(tmp_path, monkeypatch):
 def test_the_card_draws_the_context_reading_after_the_model(tmp_path, monkeypatch):
     """TD-190, design §4.5 *The card's anatomy* row 4: *· 231k* after tool · account · model, the
     window on hover and in Focus; nothing where the adapter cannot tell."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = {
         "id": "ao-r-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
@@ -718,7 +718,7 @@ def test_hand_back_clears_a_stop_time_that_passed_while_the_person_held_it(clien
     """TD-096, design §4.5a **Hand back**: a stop time that fell due while the session was
     interactive is not a deadline any more — nothing acted on it, and handing back must not have the
     next tick kill it — so it is cleared; one still ahead stays."""
-    from agentorc.ui.app import view
+    from shiftlead.ui.app import view
 
     assert view({"id": "a", "state": "idle", "unattended": False, "team": "t"})["mode_act"] == "Hand back"
     assert view({"id": "a", "state": "idle", "unattended": False, "controllers": ["m"]})["mode_act"] == "Hand back"
@@ -752,7 +752,7 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     dashed for what the agent derived), the Focus **Reports** panel with **Drop**, and the header
     **grants** chip. The panel and the chip are rendered by the client from the pushed record, so
     the page is asserted to carry their containers and the grant list the chip offers."""
-    from agentorc.ui.app import templates, view
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
@@ -800,7 +800,7 @@ def test_every_class_the_controllers_chips_name_is_one_the_stylesheet_draws(tmp_
     the Focus header (a `<button>`). The two halves are one §4.5a row and the page rewrites the
     second of them itself, so all three places are checked: both templates and the `app.js` line
     that rebuilds the chips on a live delta."""
-    import agentorc.ui as ui
+    import shiftlead.ui as ui
 
     root = pathlib.Path(ui.__file__).parent
     css = (root / "static" / "app.css").read_text()
@@ -819,7 +819,7 @@ def test_the_membership_controls(client, tmp_path):
     chip, the lead's **Members** list, and the New session **Controllers** picker. Both
     directions are derived from the fleet on render, never stored, so the assertions go through
     the real pages rather than a hand-built view."""
-    from agentorc.ui.app import templates, view
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-w", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
@@ -903,7 +903,7 @@ def test_the_membership_controls(client, tmp_path):
     assert next(x for x in client.get("/api/sessions").json() if x["id"] == unpicked)["controllers"] == []
 
     # the Members list carries the lane the §4.5a row promises
-    from agentorc.ui.app import view as _view
+    from shiftlead.ui.app import view as _view
 
     laned = {**base, "id": "ao-m", "lane": ["TD-027", "TD-019"], "controllers": ["ao-orc"]}
     assert _view(orc, [orc, laned])["members"][0]["lane"] == "TD-027, TD-019"
@@ -924,8 +924,8 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
     the one power in the system a person should never acquire without seeing it — and the reverse
     matters as much: a tick the person removed has to be honoured, not overridden by the preset.
     """
-    from agentorc.ui.app import GRANT_NOTES
     from sessionorc.models import GRANTS
+    from shiftlead.ui.app import GRANT_NOTES
 
     r = client.get("/new")
     assert r.status_code == 200
@@ -981,8 +981,8 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
 
 def test_every_grant_has_the_one_line_warning_the_control_table_promises():
     """A grant added to `GRANTS` without a note would ship an unexplained checkbox."""
-    from agentorc.ui.app import GRANT_NOTES
     from sessionorc.models import GRANTS
+    from shiftlead.ui.app import GRANT_NOTES
 
     assert set(GRANT_NOTES) == set(GRANTS)
     assert all(GRANT_NOTES[g].strip() for g in GRANTS)
@@ -997,7 +997,7 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     words, and the composer has to say the same thing the prose does without the reader having to
     decode the state pill.
     """
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert '"→ Steer" : "→ Send"' in js
     assert "steers the turn in flight" in js and "starts a new turn" in js
 
@@ -1082,7 +1082,7 @@ def test_the_stop_control_round_trips_and_can_actually_be_hidden():
     And `.badge` is `display: inline-block`, which beats the `hidden` attribute — exactly the trap
     the stylesheet already documents for `.btn`.
     """
-    root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+    root = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
     js = (root / "static" / "app.js").read_text()
     css = (root / "static" / "app.css").read_text()
     assert "b.dataset.until" in js and "el.dataset.until = v.run_until" in js
@@ -1090,9 +1090,9 @@ def test_the_stop_control_round_trips_and_can_actually_be_hidden():
     assert ".badge[hidden]" in css
 
     # the two formats that would have come back refused
-    from agentorc.cli import stop_time
     from sessionorc.client import AgentError
     from sessionorc.models import stop_note
+    from shiftlead.cli import stop_time
 
     note = stop_note({"run_until": "2030-01-07T06:00:00Z", "wrapup_sent_at": "2030-01-07T05:50:00Z"})
     assert note.startswith("stops ") and "wrap-up sent" in note
@@ -1107,8 +1107,8 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     inbox and closing the `ask`, and delete removing this session's copy only."""
     import asyncio
 
-    from agentorc.ui.app import templates, view
     from sessionorc.client import LocalClient
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
@@ -1176,7 +1176,7 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     assert [x["id"] for x in client.get(f"/api/sessions/{lead}/inbox").json()["entries"]] == [back["id"]]
     # the panel refetches bodies through `inbox` when the record's counts or marks change — never
     # from the pushed record, which carries none (§4.10 "A bounded body")
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert "JSON.stringify([v.unread || 0, v.mail || {}])" in js and "/inbox`" in js
     for sid in (lead, worker):
         client.post(f"/api/sessions/{sid}/kill")
@@ -1263,7 +1263,7 @@ def test_the_person_inbox_feed_carries_a_steer_and_its_delete_declines(client, t
     assert got[steer["id"]]["paused_at"] is None and got[steer["id"]]["snoozed_until"] is None
     assert got[ask]["bound"] is None and got[ask]["closed_reason"] is None
 
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'e.kind === "steer"' in js and "e.default" in js  # the default and the lapse line
     assert 'e.closed_reason === "lapsed"' in js and 'e.from === "system"' in js  # no Reply on a system note
 
@@ -1281,8 +1281,8 @@ def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp
     nothing left says so where a person looks, with the reason on hover. It is not a state — the
     record still reads `idle` — and it is drawn for any session that declared, since a hand-started
     worker may run out too. A card with neither report channel still draws the row for it."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x-2", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
@@ -1357,8 +1357,8 @@ def test_the_card_shows_what_the_session_says_it_is_doing_before_the_tail(tmp_pa
     then the `doing` line with its age, then the tail. A session that has said nothing keeps exactly
     the tail it showed before 2026-09-19, which is what a `shell` — whose tail *is* the work — always
     does. The text is a model's: escaped, shown, and never a control."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x-3", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
@@ -1400,8 +1400,8 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     carried the manager's name, state and line, and the manager's card said them again directly
     beneath it. The line is on the card, the first in the group; the header says where the team's
     sessions are and how many are in each state."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import team_groups, templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import team_groups, templates, view
 
     at = (datetime.now(UTC) - timedelta(minutes=11)).isoformat().replace("+00:00", "Z")
     records = [
@@ -1428,13 +1428,13 @@ def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show
     and the key stays on hover, since it is what `--role` and `--json` read. A repo's own label wins;
     one this host cannot read falls back to the default, the name raised, never to nothing. It is a
     person's text and is drawn escaped."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     import asyncio
 
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     roles = "roles:\n  manager: {label: Shift <lead>}\n  grinder: {label: TD grinder}\n"
-    (tmp_path / ".agentorc.yml").write_text(roles)
+    (tmp_path / ".shiftlead.yml").write_text(roles)
     base = {"kind": "agent", "adapter": "claude-code", "dir": str(tmp_path), "repo": str(tmp_path),
             "state": "idle", "since": "2026-09-20T16:00:00Z", "team": "ao-grind"}  # fmt: skip
     records = [
@@ -1465,8 +1465,8 @@ def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_d
     """§4.4a "Permission prompts follow the same line" (TD-057 step 4b.1): with the host's link down
     the waiter is out of reach, so the card offers no Allow / Deny — whose `decide` would be refused —
     and says where the prompt can still be answered."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = {
         "id": "ao-x-w@laptop", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/x",
@@ -1491,7 +1491,7 @@ async def test_a_nodes_org_page_says_its_link_and_where_the_org_is(agent):
     (paths.home() / "hosts.yml").write_text("home: elsewhere\n")
     agent.mode, agent.home = "node", "elsewhere"
     try:
-        from agentorc.ui.app import create_app
+        from shiftlead.ui.app import create_app
 
         def browse():
             with TestClient(create_app()) as c:
@@ -1508,7 +1508,7 @@ async def test_a_nodes_org_page_says_its_link_and_where_the_org_is(agent):
 
 
 def test_the_node_banner_reads_the_host_rpc():
-    from agentorc.ui.app import node_banner
+    from shiftlead.ui.app import node_banner
 
     assert node_banner({"mode": "home"}) == "" and node_banner(None) == ""
     up = node_banner({"mode": "node", "home": "kmaster", "home_reachable": True, "link": {"up": True}})
@@ -1523,8 +1523,8 @@ def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, mo
     which is *unmerged*: a launch branch tracking `origin/main` and pushed to its own ref is ahead
     and not unpushed, and the card must not call that stranded work. Three places, as ever: the
     card's flag, the Focus template's git line, and the `app.js` line that redraws it live."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
@@ -1555,11 +1555,11 @@ def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, mo
 
 def test_the_card_and_focus_show_the_tools_own_title_beside_the_name(tmp_path, monkeypatch):
     """TD-074 step 3, design §4.5a **title**: the session's name as its tool holds it, shown beside
-    agentorc's own name on the card and in the Focus header — always when there is one, since it is
+    shiftlead's own name on the card and in the Focus header — always when there is one, since it is
     a name and not a status. Display only: no control sets it, and the text is escaped. The Org
     filter matches a card's text, so it matches this too."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {
         "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
@@ -1574,7 +1574,7 @@ def test_the_card_and_focus_show_the_tools_own_title_beside_the_name(tmp_path, m
     assert titled["title"] == "Error Checker"
     html = card.render(s=titled)
     assert "Error Checker" in html and "tool-title" in html
-    assert 'data-act="title' not in html and 'data-act="rename' not in html  # agentorc has no rename
+    assert 'data-act="title' not in html and 'data-act="rename' not in html  # shiftlead has no rename
     # the whole of it is on hover, so the card may clip it; the Focus header carries it too
     assert "title=\"the session's name as its tool holds it" in html
     assert "Error Checker" in focus.render(s={**titled, "grants_all": [], "ready": []}, host="h", active="Org")
@@ -1590,10 +1590,10 @@ def test_the_filter_matches_the_tools_own_title(tmp_path, monkeypatch):
     """TD-074 step 3, design §4.5a **title**: *the filter box matches it*. The Org filter matches a
     card's own text (`applyFilter`), so the title is matched by being rendered in it — this pins
     both halves: the filter still reads the card's text, and the title is part of that text."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "text: c.textContent" in js  # each text word is matched in it: test_ui_org_chrome.py
     html = templates.get_template("card.html").render(
         s=view(
@@ -1618,12 +1618,12 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     It is resolved from the role's *name* at render time, through `repoconfig` (nothing in the core
     keys on a role, §9 invariant 9); a role with no icon, or a name this build does not know, draws
     nothing rather than an error."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     import asyncio
 
-    from agentorc.repoconfig import ICONS, RESERVED_ICONS
-    from agentorc.ui import app as uiapp
-    from agentorc.ui.icons import ICON_PATHS, role_svg
+    from shiftlead.repoconfig import ICONS, RESERVED_ICONS
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui.icons import ICON_PATHS, role_svg
 
     # every name the config accepts has a picture, and so does the one it reserves (TD-095)
     assert sorted(ICON_PATHS) == sorted([*ICONS, *RESERVED_ICONS])
@@ -1632,7 +1632,7 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     assert 'fill="none"' in role_svg("flag")  # stroked, never filled: it is not something to press
     assert role_svg(None) == "" and role_svg("rocket") == ""  # never an error on the page
 
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {icon: terminal}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {icon: terminal}\n")
 
     def rec(sid, role=None, repo=None):
         r = {"id": sid, "name": sid, "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
@@ -1677,8 +1677,8 @@ def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_pat
     """Review of PR #251: the Allow / Deny route 409s without a `tool_use_id`, and the Inbox's row
     already read such a permission as something to answer in the terminal — the card now agrees,
     instead of offering two buttons that cannot work."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = {
         "id": "ao-x-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/x",
@@ -1706,10 +1706,10 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     TD-156 (2026-09-25) split the header in two — the identity line (`#fhead`) and the acts line
     (`#facts`) — and moved the grants and controllers chips to the Session card; the pieces are
     pinned where they now live."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
-    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
 
     def rule(prefix):
         """The CSS rule beginning `prefix`, as an assertion rather than a `StopIteration` — a
@@ -1766,7 +1766,7 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     """§4.5a **report line** (TD-095): an entry whose reference is its PR reads `#359`, never
     `#359 → #359` — on the Focus Reports panel as on the card. The panel is drawn inside `AO.focus`'s
     closure, which the node probe cannot reach, so the rule is pinned where it is written."""
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js
 
 
@@ -1806,12 +1806,12 @@ def test_a_roles_message_line_is_on_the_view_the_titles_and_the_team_header(tmp_
     label is; the Message controls carry it as their `title`'s head and as `data-line` for the
     composer; the team header's line names, in the definition's order, the session holding each
     role — *(on call)* for an empty seat — and a role several sessions hold by its label."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     import asyncio
 
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {message: its own card}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {message: its own card}\n")
     base = {"kind": "agent", "adapter": "claude-code", "dir": str(tmp_path), "repo": str(tmp_path),
             "state": "idle", "since": "2026-09-20T16:00:00Z", "team": "ao-grind"}  # fmt: skip
     records = [
@@ -1857,8 +1857,8 @@ def test_a_roles_message_line_is_on_the_view_the_titles_and_the_team_header(tmp_
 def test_the_definition_names_its_roles_in_order_with_their_holders():
     """`teamrun.role_holders` (TD-171): the manager, the techlead seat, the seats, then the members,
     each role once with the names holding it; a person leading the team is not a role."""
-    from agentorc import org as orgmod
-    from agentorc import teamrun
+    from shiftlead import org as orgmod
+    from shiftlead import teamrun
 
     t = orgmod.TeamDef(
         name="ao-grind",
@@ -1880,10 +1880,10 @@ def test_a_roles_saved_prompts_are_chips_on_focus_and_new_session(tmp_path, monk
     TD-170): the role's `prompts:` in the file's order, each a chip whose `title` and `data-text` are
     its text — the definition's words, escaped; none for a record whose role has none; `/api/roles`
     and New session's options carry them for the Role pick."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    from agentorc.ui import app as uiapp
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as uiapp
 
-    (tmp_path / ".agentorc.yml").write_text(
+    (tmp_path / ".shiftlead.yml").write_text(
         "roles:\n  plain:\n    prompts:\n      - {label: review PR, text: 'Review PR <9> now.'}\n"
         "      - {label: sweep, text: /stranded-work}\n"
     )
@@ -1914,9 +1914,9 @@ def test_the_page_reads_person_through_the_agents_settings_read(client, tmp_path
     """design §5 (TD-146): the editor button comes from `person.open_in` in the home's settings.yml,
     read through the agent's `settings` read before a page is drawn — never from the file, and never
     from a retired ui.yml, which the Org names as *migrate*."""
-    from agentorc.ui import uiconf
     from sessionorc import paths
     from sessionorc.client import call_sync
+    from shiftlead.ui import uiconf
 
     try:
         call_sync("set_settings", person={"open_in": "none"})
@@ -1935,8 +1935,8 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
     TD-174): the toggle in Focus's *more ▾* is drawn checked until the person turns it off; a press
     writes `settings.yml` through `set_settings`, the next page draws it off, and only a boolean is
     taken."""
-    from agentorc.ui import uiconf
     from sessionorc.client import call_sync
+    from shiftlead.ui import uiconf
 
     uiconf.set_read({"person": {}, "migrate": []})
     assert uiconf.copy_on_select() is True  # nothing written: on
@@ -1962,7 +1962,7 @@ def test_copy_on_select_is_the_persons_and_on_by_default(client, tmp_path):
 def test_a_copy_on_release_says_so_with_copys_own_toast():
     """TD-273: a drag-and-release in the Focus terminal copied and said nothing, and a refused copy
     was silent too. It goes through Copy's own path, which toasts *copied* or *clipboard blocked*."""
-    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     release = js.split('document.addEventListener("mouseup", () => {')[1].split("});")[0]
     assert "copySel()" in release and "writeText" not in release
     copy = js.split("const copySel = () => {")[1].split("};")[0]
@@ -2003,7 +2003,7 @@ def test_profile_is_the_one_tool_pick(client, tmp_path):
     """§4.5a New session **the reworked form** (TD-284 slice 2): no Adapter field — every profile
     names its adapter and the two could disagree — the Profile list ending with *shell (no agent)*,
     and each of Host, Project and Profile naming its file; a shell picked there starts a shell."""
-    from agentorc.ui.app import SHELL_PICK
+    from shiftlead.ui.app import SHELL_PICK
 
     page = client.get("/new").text
     assert "<label>Adapter</label>" not in page and 'name="adapter"' not in page
@@ -2026,9 +2026,9 @@ def test_profile_is_the_one_tool_pick(client, tmp_path):
 
 def test_the_adapter_a_profile_pick_starts(tmp_path, monkeypatch):
     """The form sends no adapter (TD-284 slice 2): the picked profile's, else the default's."""
-    from agentorc.ui.app import profile_adapter
+    from shiftlead.ui.app import profile_adapter
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     assert profile_adapter("") == "claude-code"  # no profiles.yml: the default profile, Claude Code's
     (tmp_path / "profiles.yml").write_text(
         "default: paul\nprofiles:\n  paul: {adapter: claude-code, account: paul}\n"
@@ -2041,8 +2041,8 @@ def test_the_adapter_a_profile_pick_starts(tmp_path, monkeypatch):
 
 def test_a_tool_with_no_profile_lands_on_a_profile_of_that_tool():
     """A Resume with changes… of a record that names a tool and no profile (review of #948)."""
-    from agentorc.profiles import Profile
-    from agentorc.ui.app import tool_profile
+    from shiftlead.profiles import Profile
+    from shiftlead.ui.app import tool_profile
 
     profs = {"paul": Profile(name="paul"), "o": Profile(name="o", adapter="codex")}
     assert tool_profile(profs, "paul", "codex") == "o"
@@ -2055,7 +2055,7 @@ def test_the_repo_pick_and_another_directory(client, tmp_path):
     """§4.5a New session **the reworked form** (TD-284 slice 4): Repo lists the registered checkouts
     on this host and ends with *another directory…*, whose typed path is checked as it is typed; a
     prefilled directory that is no registered checkout lands on *another directory…* with it typed."""
-    from agentorc.ui.app import form_repos, repo_of
+    from shiftlead.ui.app import form_repos, repo_of
 
     a, b = tmp_path / "a", tmp_path / "b"
     a.mkdir(), b.mkdir()
@@ -2075,7 +2075,7 @@ def test_the_repo_pick_and_another_directory(client, tmp_path):
     subprocess.run(["git", "init", "-q", str(b)], check=True)
     assert client.get("/api/dir_check", params={"dir": str(b)}).json()["git"] is True
     assert gone["git"] is None
-    ui = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+    ui = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
     js, css = (ui / "static" / "app.js").read_text(), (ui / "static" / "app.css").read_text()
     assert "offerWorktree(o.git !== false);" in js and ".radio[hidden] { display: none; }" in css
     # the field's heading is upper-case, never the labels of its choices (Where, Controllers)
@@ -2118,7 +2118,7 @@ def test_the_worktree_line_slugs_a_name_as_the_server_does():
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
-    js = (pathlib.Path(__file__).resolve().parent.parent / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     line = next(x for x in js.splitlines() if "const slugOf = " in x).strip()
     names = ["TD-302", "My Feature", "  --x--  ", "Spike_2.feat", "a" * 40 + "-b", "!!!", "td-290"]
     out = subprocess.run(

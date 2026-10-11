@@ -8,8 +8,8 @@ import unittest.mock as um
 
 import pytest
 
-from agentorc import profiles
-from agentorc.adapters.claude_code import ClaudeCodeAdapter
+from shiftlead import profiles
+from shiftlead.adapters.claude_code import ClaudeCodeAdapter
 
 pytestmark = pytest.mark.unit
 
@@ -69,7 +69,7 @@ def test_a_metered_profile_needs_a_config_dir_of_its_own(tmp_path):
 
 
 def test_a_metered_profile_is_never_polled_for_a_quota(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "profiles.yml").write_text(
         "profiles:\n  api: {account: key, billing: metered, config_dir: /c/api}\n  paul: {account: paul}\n"
     )
@@ -99,7 +99,7 @@ def _entry(uid: str, mid: str, *, inp=10, out=5, cr=1000, cw=0, kind="assistant"
 def metered(tmp_path, monkeypatch):
     home, cfg = tmp_path / "home", tmp_path / "claude-api"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "profiles.yml").write_text(f"profiles:\n  api: {{account: key, billing: metered, config_dir: {cfg}}}\n")
     proj = cfg / "projects" / "-w-repo"
     proj.mkdir(parents=True)
@@ -139,7 +139,7 @@ def test_a_cursor_past_the_end_is_a_rewrite_read_from_the_top(metered):
 
 
 def test_spend_says_why_when_it_cannot_read(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "profiles.yml").write_text(f"profiles:\n  api: {{billing: metered, config_dir: {tmp_path / 'none'}}}\n")
     ad = ClaudeCodeAdapter()
     assert ad.spend("nope", {"x": 3}) == {"turns": [], "cursors": {"x": 3}, "reason": "no_profile"}

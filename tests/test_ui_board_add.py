@@ -37,7 +37,7 @@ def test_the_choices_are_the_registered_repos_that_carry_a_board(tmp_path, monke
     as `board_edit` resolves them; a repo with no board is not offered."""
     a, b = repo(tmp_path, "alpha", "# Board\n"), repo(tmp_path, "beta")
     host(tmp_path, monkeypatch, repos=[a, b])
-    from agentorc.ui.app import board_choices
+    from shiftlead.ui.app import board_choices
 
     got = board_choices()
     assert got == [{"label": "alpha", "root": str(a.resolve()), "board": str(a.resolve() / "docs/user_attention.md")}]
@@ -80,7 +80,7 @@ def test_the_form_defaults_to_the_senders_repos_board_and_the_page_carries_it(tm
     every choice; the poll's rows carry the default the button opens it with."""
     a = repo(tmp_path, "alpha", "# Board\n")
     host(tmp_path, monkeypatch, repos=[a])
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([], ""))
     board = str(a.resolve() / "docs/user_attention.md")
@@ -111,7 +111,7 @@ def test_the_form_defaults_to_the_senders_repos_board_and_the_page_carries_it(tm
 @pytest.mark.unit
 def test_a_host_with_no_board_says_so_in_the_form(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([], ""))
     Fake.fleet, Fake.inbox = [], {"entries": [], "trail": []}
@@ -127,7 +127,7 @@ def test_put_it_on_goes_to_the_write_backs_one_add_and_the_boards_are_read_again
     `action: add`, caller-less — the person's own act — and reads the boards again at once, so the
     new item is a row the moment it is due. What the form must name is refused before the agent."""
     host(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     reads = []
     monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
@@ -153,7 +153,7 @@ def test_the_script_opens_the_form_and_draws_a_refusal_in_it():
     board route's `add`, and a refusal is written into the form (`#baerr`) — the form stays open."""
     import pathlib
 
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     fn = js[js.index("AO.boardAdd = function") : js.index('document.addEventListener("click", async (ev)')]
     assert '$("#boardadd")' in fn and 'act("person", "board", body)' in fn and 'action: "add"' in fn
     assert "err.textContent = `not put on the board: ${e.message}`" in fn

@@ -20,7 +20,7 @@ def git(cwd, *args):
 def checkout(tmp_path, monkeypatch, name="proj", shots=("a.png",)):
     """A registered checkout `name` whose origin's `main` holds `shots` under docs/mockups/reviews/,
     with a working-tree file that origin does not hold (`local.png`)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir(exist_ok=True)
     origin, root = tmp_path / "origin.git", tmp_path / name
     git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
@@ -39,7 +39,7 @@ def checkout(tmp_path, monkeypatch, name="proj", shots=("a.png",)):
     (tmp_path / "home" / "hosts.yml").write_text(
         f"local:\n  name: kmaster\n  local: true\n  repos_registry: {roster}\n"
     )
-    from agentorc.ui import inbox
+    from shiftlead.ui import inbox
 
     inbox._shot_seen.clear()
     inbox._shot_host_down.clear()
@@ -86,7 +86,7 @@ def test_a_steer_look_keeps_its_kinds_row_and_a_pair_without_shots_is_ordinary()
 
 @pytest.mark.unit
 def test_look_pair_is_the_exact_pair_on_an_ask_with_shots():
-    from agentorc.ui.inbox import look_pair
+    from shiftlead.ui.inbox import look_pair
 
     s = ["docs/mockups/reviews/a.png"]
     assert look_pair({"kind": "ask", "shots": s, "answers": ["Works", "Not right: <what>"]})
@@ -100,7 +100,7 @@ def test_look_pair_is_the_exact_pair_on_an_ask_with_shots():
 @pytest.mark.integration
 def test_look_shots_address_only_what_origin_holds_in_the_one_directory(tmp_path, monkeypatch):
     checkout(tmp_path, monkeypatch, shots=("a.png", "b.png"))
-    from agentorc.ui.inbox import look_shots
+    from shiftlead.ui.inbox import look_shots
 
     got = look_shots(
         [
@@ -128,7 +128,7 @@ def test_an_image_past_the_bound_draws_its_name_alone(tmp_path, monkeypatch):
 
     monkeypatch.setattr(shots, "SHOT_BYTES_MAX", len(PNG) + len("a.png"))
     root = checkout(tmp_path, monkeypatch, shots=("a.png", "big.png.png"))
-    from agentorc.ui.inbox import look_shots
+    from shiftlead.ui.inbox import look_shots
 
     assert shots.exists(root.resolve(), "a.png") and shots.read(root.resolve(), "a.png")
     assert not shots.exists(root.resolve(), "big.png.png") and shots.read(root.resolve(), "big.png.png") is None
@@ -139,8 +139,8 @@ def test_an_image_past_the_bound_draws_its_name_alone(tmp_path, monkeypatch):
 @pytest.mark.integration
 def test_the_shot_route_serves_origins_png_and_nothing_else(tmp_path, monkeypatch):
     checkout(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
     from sessionorc.client import AgentUnavailable
+    from shiftlead.ui import app as uiapp
 
     class Down:
         def __init__(self, *a, **k):
@@ -169,8 +169,8 @@ def test_a_look_from_a_sender_on_another_host_is_addressed_and_served_through_th
     import base64
 
     checkout(tmp_path, monkeypatch)
-    from agentorc.ui import app as uiapp
-    from agentorc.ui import inbox
+    from shiftlead.ui import app as uiapp
+    from shiftlead.ui import inbox
 
     asked: list[tuple[str, str, str, bool]] = []
 
@@ -227,7 +227,7 @@ def test_a_look_from_a_sender_on_another_host_is_addressed_and_served_through_th
 
 @pytest.mark.unit
 def test_look_review_draws_the_button_only_on_an_open_ask_look_with_a_seat():
-    from agentorc.ui.inbox import look_review
+    from shiftlead.ui.inbox import look_review
 
     e = look(team="ao-grind")
     look_review(e, "ao-proj-techlead-ao-1", "techlead-ao-1", {})
@@ -252,7 +252,7 @@ def test_look_review_draws_the_button_only_on_an_open_ask_look_with_a_seat():
 def test_a_look_with_a_reviewer_is_listed_with_the_snoozed_as_with_the_seat_since():
     """`snoozed_for` sets it aside until the handed `ask` closes — in no count — and the row names
     the seat holding it, from the person's read's `handed` list, and when it went."""
-    from agentorc.ui.inbox import inbox_sections, look_review
+    from shiftlead.ui.inbox import inbox_sections, look_review
 
     e = look(team="ao-grind", snoozed_for="m-9")
     handed = {
@@ -290,7 +290,7 @@ def test_the_seats_reading_is_drawn_above_the_answers_and_its_handed_ask_reads_a
     assert html.index("read it: matches") < html.index('class="row gap wrap sugg"')
     from datetime import UTC, datetime
 
-    from agentorc.ui.inbox import handed_rows
+    from shiftlead.ui.inbox import handed_rows
 
     copy = {**look(), "id": "m-9", "from": "person", "look": "m-1", "holder": "ao-t", "holder_name": "techlead-ao-1"}
     h = handed_rows([{**copy, "owes": True}], {}, datetime.now(UTC))
@@ -305,11 +305,11 @@ def test_send_to_reviewer_passes_the_senders_teams_techlead_seat(tmp_path, monke
     team has none, so the agent's refusal is the toast."""
     from types import SimpleNamespace
 
-    from agentorc.ui import app as uiapp
+    from shiftlead.ui import app as uiapp
 
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     org = SimpleNamespace(
         teams={"ao-grind": SimpleNamespace(host=None, techlead=SimpleNamespace(name="techlead-ao-1"))}

@@ -2,14 +2,14 @@
 
 A repo's live copy is made from `main` by a person's press or the home's policy, never by a
 session. This module is the part that runs in a thread and returns plain data: the repo's
-`promote:` block (the one key of `.agentorc.yml` the host agent reads, by key alone), the three
+`promote:` block (the one key of `.shiftlead.yml` the host agent reads, by key alone), the three
 readings — **live** from `check`, **main** after the home's own `git fetch origin main`, **checks**
 from `gh` — the three preconditions as one function, and the run itself, detached, with its intent
 file written before it starts. The agent's `PromoteMixin` decides when; nothing here keeps state
-beyond the files under `~/.agentorc/promotes/<repo>/`.
+beyond the files under `~/.shiftlead/promotes/<repo>/`.
 
 A rollback (§6 *A rollback*, TD-226) is the same run started in a detached worktree of the checkout at
-an older commit of main, `~/.agentorc/promotes/<repo>/tree`, so the person's checkout is never moved;
+an older commit of main, `~/.shiftlead/promotes/<repo>/tree`, so the person's checkout is never moved;
 one that concludes writes `held.json`, and the policy starts nothing for the repo while it stands.
 """
 
@@ -49,10 +49,10 @@ FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failu
 
 
 def block(root: str | Path) -> dict[str, str] | None:
-    """The checkout's `promote: {run, check}`, or None when its `.agentorc.yml` has no such key.
+    """The checkout's `promote: {run, check}`, or None when its `.shiftlead.yml` has no such key.
     Raises ValueError, saying why, when the file or the block cannot be used — the caller logs it
     and skips the repo; it is never fatal to the tick. The rest of the file is the clients'."""
-    f = Path(root) / ".agentorc.yml"
+    f = paths.repo_file(root)
     try:
         doc = yaml.safe_load(f.read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -251,7 +251,7 @@ def resolve(root: str | Path, commit: str) -> tuple[str | None, str]:
     return sha, ""
 
 
-# -- the intent files (§6: `~/.agentorc/promotes/<repo>/`) ---------------------------------------
+# -- the intent files (§6: `~/.shiftlead/promotes/<repo>/`) ---------------------------------------
 
 
 def repo_dir(repo: str) -> Path:
@@ -333,7 +333,7 @@ def start(
     """Start `run` detached from the agent's process group (for this repo the run restarts the agent
     that started it), output to `<sha>.log`: in the checkout for a promote, in a detached worktree
     at `sha` for a `rollback` (§6 *How it reaches `run`*), a tree an earlier run left removed first
-    either way. `run` is handed `AGENTORC_PROMOTE_SHA`, `_FROM` (`frm`, what is live; empty when
+    either way. `run` is handed `SHIFTLEAD_PROMOTE_SHA`, `_FROM` (`frm`, what is live; empty when
     unread) and `_ROOT` (the checkout). The intent file is written **before** the start and gains
     the pid after, so an agent that dies in between still finds it; `n` is how many commits it
     makes live, for the note. Returns the intent. Raises ValueError when the worktree cannot be made."""
@@ -345,8 +345,8 @@ def start(
     intent: dict[str, Any] = {"sha": sha, "at": datetime.now(UTC).isoformat(), "pid": None, "log": str(log_path)}
     intent |= {"by": by, "ahead": n, "kind": kind, "from": frm, "tree": str(tree) if tree else None}
     _write(d / "inflight.json", intent)
-    env = {**os.environ, "AGENTORC_PROMOTE_SHA": sha, "AGENTORC_PROMOTE_FROM": frm or ""}
-    env["AGENTORC_PROMOTE_ROOT"] = str(root)
+    env = {**os.environ, "SHIFTLEAD_PROMOTE_SHA": sha, "SHIFTLEAD_PROMOTE_FROM": frm or ""}
+    env["SHIFTLEAD_PROMOTE_ROOT"] = str(root)
     with open(log_path, "ab") as out:
         p = subprocess.Popen(
             run, shell=True, cwd=str(tree or root), stdout=out, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
@@ -499,7 +499,7 @@ def survey(
     now: datetime,
     fetched: dict[str, str] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], list[str], dict[str, str]]:
-    """One pass, in a thread: every registered checkout whose `.agentorc.yml` carries `promote:`,
+    """One pass, in a thread: every registered checkout whose `.shiftlead.yml` carries `promote:`,
     keyed by the repo's name — `(readings, notes, bad)`. `full` takes all three readings (the
     reports' cadence); otherwise only `check`, and only for a repo with a run in flight. A run in
     flight is concluded, and under `auto: true` one is started when live ≠ main, the three

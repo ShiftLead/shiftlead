@@ -13,7 +13,7 @@ import tempfile
 
 import pytest
 
-JS = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js"
+JS = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js"
 
 PROBE = """
 const fs = require("fs");

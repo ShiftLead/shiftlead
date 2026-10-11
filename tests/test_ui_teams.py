@@ -1,7 +1,7 @@
 """The Org page's **Teams** strip and New session's **Project** picker (design §4.5a, §4.9), with
 the RPC mocked the way `test_cli_teams.py` mocks it — no agent, no tmux, no session ever created.
 
-The strip's Start and Stop are `agentorc.teamrun`'s, the very sequence `ao team start|stop` runs;
+The strip's Start and Stop are `shiftlead.teamrun`'s, the very sequence `ao team start|stop` runs;
 what is tested here is that the routes call it, that a pre-flight refusal creates nothing and comes
 back as the agent's own message, and that the page renders what §4.5a's row describes.
 """
@@ -16,8 +16,8 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from agentorc import teamrun
-from agentorc.ui import app as uiapp
+from shiftlead import teamrun
+from shiftlead.ui import app as uiapp
 
 pytestmark = pytest.mark.unit
 
@@ -96,10 +96,10 @@ class Fleet:
 def org_doc(root: Path) -> dict:
     return {
         "projects": {
-            "ao": {"repos": {"agentorc": {HOST: str(root / "agentorc")}}},
+            "ao": {"repos": {"shiftlead": {HOST: str(root / "shiftlead")}}},
             "wide": {
                 "repos": {
-                    "agentorc": {HOST: str(root / "agentorc")},
+                    "shiftlead": {HOST: str(root / "shiftlead")},
                     "ao-api": {HOST: str(root / "ao-api"), "devenv": "/workspaces/api"},
                 }
             },
@@ -116,15 +116,15 @@ def org_doc(root: Path) -> dict:
 
 @pytest.fixture
 def world(tmp_path, monkeypatch):
-    """A temp AGENTORC_HOME with `hosts.yml`, `org.yml`, two checkouts and a registry naming them,
+    """A temp SHIFTLEAD_HOME with `hosts.yml`, `org.yml`, two checkouts and a registry naming them,
     plus a fleet standing in for the agent on both the async and the blocking path."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     registry = home / "repos.txt"
-    for repo in ("agentorc", "ao-api"):
+    for repo in ("shiftlead", "ao-api"):
         (tmp_path / repo / ".git").mkdir(parents=True)
-    registry.write_text(f"{tmp_path / 'agentorc'}\n{tmp_path / 'ao-api'}\n")
+    registry.write_text(f"{tmp_path / 'shiftlead'}\n{tmp_path / 'ao-api'}\n")
     (home / "hosts.yml").write_text(
         yaml.safe_dump({"local": {"name": HOST, "local": True, "repos_registry": str(registry)}})
     )
@@ -216,7 +216,7 @@ def test_a_team_whose_sessions_all_declared_reads_wound_down_not_stopped(world):
 
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     tmp_path, fleet = world
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(
         yaml.safe_dump(
             {
                 "teams": {
@@ -229,7 +229,7 @@ def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     rows = {r["name"]: r for r in uiapp.teams_view([])["teams"]}
     assert rows["ao-grind"]["manager"] == "orc-ao"  # not `shadow`
     assert rows["repo-grind"]["manager"] == "person" and rows["repo-grind"]["members"] == 1
-    assert rows["repo-grind"]["source"].endswith("agentorc/.agentorc.yml")
+    assert rows["repo-grind"]["source"].endswith("shiftlead/.shiftlead.yml")
 
 
 def test_no_definitions_anywhere_is_an_empty_strip_that_still_names_the_file(world):
@@ -246,7 +246,7 @@ def test_a_malformed_definition_is_a_note_not_a_500(world):
     assert v["teams"] == [] and "not a defined project" in v["notes"][0]
     # and one broken repo file does not empty the strip of the definitions that do parse
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(org_doc(tmp_path)))
-    (tmp_path / "ao-api" / ".agentorc.yml").write_text("teams: {x: {members: [{nope: 1}]}}\n")
+    (tmp_path / "ao-api" / ".shiftlead.yml").write_text("teams: {x: {members: [{nope: 1}]}}\n")
     v = uiapp.teams_view([])
     assert [r["name"] for r in v["teams"]] == ["ao-grind"] and "ao-api" in v["notes"][0]
 
@@ -267,7 +267,7 @@ def test_a_wound_down_note_says_who_closed_it_how_soon_and_why(world, client):
     """design §4.5a team card *wound down* note (TD-262, built by TD-265): who closed the members from
     their records' closer — the manager's name when it closed any — *after 40 s* for a run under ten
     minutes, and the manager's own reason; `ao team list` says the same from the same row."""
-    from agentorc import teamrun
+    from shiftlead import teamrun
 
     _tmp, fleet = world
     t0, t1 = "2026-10-01T10:00:00Z", "2026-10-01T10:00:40Z"
@@ -429,7 +429,7 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
     place of starting, a concluded team's closes as its second line, and a start that reaches the
     page without **Start anyway** is refused before anything is created."""
     tmp_path, fleet = world
-    checkout = str(tmp_path / "agentorc")
+    checkout = str(tmp_path / "shiftlead")
     some = [{"id": "TD-1", "pickable": "yes", "kind": "build", "owner": ""}]
     fleet.repos = {checkout: {"ledger": {"entries": some}}}
     got = client.get("/api/teams/ao-grind/lanes").json()
@@ -462,7 +462,7 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
         help_title=lambda k: k,
     )
     assert 'data-closes="a, b"' in head
-    js = (Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    js = (Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'if (b && b.dataset.teamAct === "start") return startPress(b);' in js
     assert "Nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts." in js
     assert "if (picks && picks.empty)" in js and "It first closes ${b.dataset.closes}." in js
@@ -502,7 +502,7 @@ def test_a_pre_flight_failure_reports_the_agents_message_and_creates_nothing(wor
 def test_a_missing_checkout_stops_the_start_before_any_name_check(world, client):
     tmp_path, fleet = world
     doc = org_doc(tmp_path)
-    doc["projects"]["ao"]["repos"]["agentorc"][HOST] = str(tmp_path / "gone")
+    doc["projects"]["ao"]["repos"]["shiftlead"][HOST] = str(tmp_path / "gone")
     write_org(tmp_path, doc)
     r = client.post("/api/teams/ao-grind/start")
     assert r.status_code == 400 and "does not exist on kmaster" in r.json()["detail"]
@@ -557,17 +557,17 @@ def test_the_picker_offers_each_project_with_its_repos_checkouts_on_this_host(wo
     tmp_path, fleet = world
     html = client.get("/new").text
     assert 'name="project"' in html and ">No project<" in html
-    assert f'"path": "{tmp_path / "agentorc"}"' in html  # the narrowing data rides with the option
+    assert f'"path": "{tmp_path / "shiftlead"}"' in html  # the narrowing data rides with the option
     assert '"repo": "ao-api"' in html and '"hosts": ["devenv", "kmaster"]' in html
     projects = {p["name"]: p for p in uiapp.projects_view()}
-    assert [r["repo"] for r in projects["wide"]["repos"]] == ["agentorc", "ao-api"]
-    assert projects["ao"]["repos"][0]["path"] == str(tmp_path / "agentorc")
+    assert [r["repo"] for r in projects["wide"]["repos"]] == ["ao-api", "shiftlead"]
+    assert projects["ao"]["repos"][0]["path"] == str(tmp_path / "shiftlead")
 
 
 def test_no_project_is_the_default_and_changes_nothing(world, client):
     tmp_path, fleet = world
     r = client.post(
-        "/new", data={"name": "x", "dir": str(tmp_path / "agentorc"), "prompt": "go"}, follow_redirects=False
+        "/new", data={"name": "x", "dir": str(tmp_path / "shiftlead"), "prompt": "go"}, follow_redirects=False
     )
     assert r.status_code == 303
     (made,) = fleet.creates()
@@ -578,14 +578,14 @@ def test_choosing_a_project_badges_the_session_and_puts_the_project_block_in_fro
     tmp_path, fleet = world
     r = client.post(
         "/new",
-        data={"name": "x", "dir": str(tmp_path / "agentorc"), "prompt": "go", "project": "wide"},
+        data={"name": "x", "dir": str(tmp_path / "shiftlead"), "prompt": "go", "project": "wide"},
         follow_redirects=False,
     )
     assert r.status_code == 303
     (made,) = fleet.creates()
     assert made["project"] == "wide"
     assert made["prompt"].startswith("## Project: wide")
-    assert f"- agentorc: {tmp_path / 'agentorc'}  — your home" in made["prompt"]
+    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your home" in made["prompt"]
     assert "ao-api: not checked out on kmaster" not in made["prompt"]  # it is checked out here
     assert made["prompt"].endswith("go")
 
@@ -595,7 +595,7 @@ def test_a_one_repo_project_badges_without_a_block_and_an_undefined_name_still_b
     for project in ("ao", "nosuch"):
         client.post(
             "/new",
-            data={"name": project, "dir": str(tmp_path / "agentorc"), "prompt": "go", "project": project},
+            data={"name": project, "dir": str(tmp_path / "shiftlead"), "prompt": "go", "project": project},
             follow_redirects=False,
         )
     assert [p["project"] for p in fleet.creates()] == ["ao", "nosuch"]
@@ -757,15 +757,15 @@ def test_wind_down_and_stop_now_name_a_persons_session_in_their_confirm(world, c
 def test_the_new_session_form_offers_the_teams_and_says_their_reader(world, client):
     tmp_path, fleet = world
     _reader_org(tmp_path)
-    fleet.sessions.append({**badged("orc-ao", "ao-grind"), "id": "ao-agentorc-orc-ao"})
+    fleet.sessions.append({**badged("orc-ao", "ao-grind"), "id": "ao-shiftlead-orc-ao"})
     html = client.get("/new").text
     assert '<select class="input" name="team" id="team">' in html
-    assert 'value="ao-grind"' in html and 'data-manager="ao-agentorc-orc-ao"' in html
-    assert f"data-dirs='[\"{tmp_path / 'agentorc'}\"]'" in html and 'data-roles="grinder"' in html
-    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "agentorc")}).json()
-    assert got["line"] == "held PRs read by ao-agentorc-tl-ao on src/sessionorc/**"
+    assert 'value="ao-grind"' in html and 'data-manager="ao-shiftlead-orc-ao"' in html
+    assert f"data-dirs='[\"{tmp_path / 'shiftlead'}\"]'" in html and 'data-roles="grinder"' in html
+    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "shiftlead")}).json()
+    assert got["line"] == "held PRs read by ao-shiftlead-tl-ao on src/sessionorc/**"
     write_org(tmp_path, org_doc(tmp_path))  # no seat
-    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "agentorc")}).json()
+    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "shiftlead")}).json()
     assert got == {"review": None, "line": "no reader: this team has no techlead seat"}
 
 
@@ -776,24 +776,24 @@ def test_a_seat_on_call_is_a_controller_on_the_form_and_the_team_pick_ticks_it(w
     _reader_org(tmp_path)
     html = client.get("/new").text
     assert "No session holds the <code>control</code> grant and no seat is on call" in html
-    seat = {**badged("orc-ao", "ao-grind", state="closed"), "id": "ao-agentorc-orc-ao", "seat": {"trigger": "team"},
+    seat = {**badged("orc-ao", "ao-grind", state="closed"), "id": "ao-shiftlead-orc-ao", "seat": {"trigger": "team"},
             "capabilities": ["control"]}  # fmt: skip
     fleet.sessions.append(seat)
     html = client.get("/new").text
-    assert 'data-manager="ao-agentorc-orc-ao"' in html  # the Team pick ticks it
-    box = html.split('value="ao-agentorc-orc-ao"')[1].split("</label>")[0]
+    assert 'data-manager="ao-shiftlead-orc-ao"' in html  # the Team pick ticks it
+    box = html.split('value="ao-shiftlead-orc-ao"')[1].split("</label>")[0]
     assert "orc-ao" in box and 'class="pill s-oncall"' in box and ">on call</span>" in box
     assert "A seat on call holds it for whoever fills it." in html
     # a closed record that is no seat is no controller, and neither is it the Team pick's manager
     fleet.sessions[-1] = {**seat, "seat": None}
     html = client.get("/new").text
-    assert 'data-manager=""' in html and 'value="ao-agentorc-orc-ao"' not in html
+    assert 'data-manager=""' in html and 'value="ao-shiftlead-orc-ao"' not in html
 
 
 def test_start_with_a_team_badges_the_session_and_fills_the_teams_reader(world, client):
     tmp_path, fleet = world
     _reader_org(tmp_path)
-    data = {"name": "me", "dir": str(tmp_path / "agentorc"), "team": "ao-grind"}
+    data = {"name": "me", "dir": str(tmp_path / "shiftlead"), "team": "ao-grind"}
     r = client.post("/new", data=data, follow_redirects=False)
     assert r.status_code == 303
     (made,) = fleet.creates()
@@ -808,12 +808,12 @@ def test_under_a_flow_the_form_gives_a_persons_session_the_flows_reader(world, c
     tmp_path, fleet = world
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"].update(techlead={"name": "tl-ao"}, flows=["build-review"])
-    doc["roles"] = {"grinder": {"review": {"reader": "techlead", "held": ["src/agentorc/**"]}}}
+    doc["roles"] = {"grinder": {"review": {"reader": "techlead", "held": ["src/shiftlead/**"]}}}
     write_org(tmp_path, doc)
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
-    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "agentorc")}).json()
-    assert got["line"] == "held PRs read by ao-agentorc-tl-ao on docs/briefs/**, src/sessionorc/**"
-    data = {"name": "me", "dir": str(tmp_path / "agentorc"), "team": "ao-grind"}
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
+    got = client.get("/api/team_review", params={"team": "ao-grind", "dir": str(tmp_path / "shiftlead")}).json()
+    assert got["line"] == "held PRs read by ao-shiftlead-tl-ao on docs/briefs/**, src/sessionorc/**"
+    data = {"name": "me", "dir": str(tmp_path / "shiftlead"), "team": "ao-grind"}
     assert client.post("/new", data=data, follow_redirects=False).status_code == 303
     (made,) = fleet.creates()
     assert made["review"] == {"reader": "techlead", "held": ["docs/briefs/**", "src/sessionorc/**"], "bound": "2h"}
@@ -824,12 +824,14 @@ def test_start_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_br
     `prompt_from`; with no team each reads `none`."""
     tmp_path, fleet = world
     _reader_org(tmp_path)
-    data = {"name": "grind-9", "dir": str(tmp_path / "agentorc"), "role": "grinder", "team": "ao-grind"}
+    data = {"name": "grind-9", "dir": str(tmp_path / "shiftlead"), "role": "grinder", "team": "ao-grind"}
     assert client.post("/new", data=data, follow_redirects=False).status_code == 303
     (made,) = fleet.creates()
     slots = made["prompt_from"]["slots"]
-    assert slots["{techlead}"] == {"text": "ao-agentorc-tl-ao"} and slots["{manager}"] == {"text": "ao-agentorc-orc-ao"}
-    assert "Your team's techlead is `ao-agentorc-tl-ao`" in made["prompt"]
+    assert slots["{techlead}"] == {"text": "ao-shiftlead-tl-ao"} and slots["{manager}"] == {
+        "text": "ao-shiftlead-orc-ao"
+    }
+    assert "Your team's techlead is `ao-shiftlead-tl-ao`" in made["prompt"]
     fleet.calls.clear()
     assert client.post("/new", data={**data, "team": ""}, follow_redirects=False).status_code == 303
     slots = fleet.creates()[0]["prompt_from"]["slots"]
@@ -844,13 +846,13 @@ def test_start_with_a_team_that_lists_flows_composes_under_its_current_flow(worl
     doc["teams"]["ao-grind"]["techlead"] = {"name": "tl-ao"}
     doc["teams"]["ao-grind"]["flows"] = ["build-review"]
     write_org(tmp_path, doc)
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
-    data = {"name": "grind-9", "dir": str(tmp_path / "agentorc"), "role": "grinder", "team": "ao-grind"}
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
+    data = {"name": "grind-9", "dir": str(tmp_path / "shiftlead"), "role": "grinder", "team": "ao-grind"}
     assert client.post("/new", data=data, follow_redirects=False).status_code == 303
     (made,) = fleet.creates()
     slots = made["prompt_from"]["slots"]
     assert slots["{stage}"]["file"].endswith("flows/build-review/build.md")
-    assert slots["{flow}"]["text"].startswith("build-review: **build** (grinder) → review (ao-agentorc-tl-ao")
+    assert slots["{flow}"]["text"].startswith("build-review: **build** (grinder) → review (ao-shiftlead-tl-ao")
     assert "**This team's flow:** build-review: **build**" in made["prompt"]
 
 
@@ -858,7 +860,7 @@ def test_start_with_a_role_hands_create_what_its_brief_was_made_from(world, clie
     """TD-217 slice 1 (design §6 rule 7): the form's preset brief goes with `prompt_from`, which filled
     again gives the prompt; a prompt the person typed fills nothing and sends none."""
     tmp_path, fleet = world
-    data = {"name": "h", "dir": str(tmp_path / "agentorc"), "role": "hunter", "lane": "TD-9"}
+    data = {"name": "h", "dir": str(tmp_path / "shiftlead"), "role": "hunter", "lane": "TD-9"}
     assert client.post("/new", data=data, follow_redirects=False).status_code == 303
     (made,) = fleet.creates()
     base = pathlib.Path(made["prompt_from"]["base"]).read_text(encoding="utf-8")
@@ -877,7 +879,7 @@ def test_a_placed_teams_host_registry_is_asked_once_per_ttl_and_a_refusal_is_unk
     refusal is `OSError` (the landing's *unknown*), kept as long as an answer."""
     import asyncio
 
-    from agentorc.ui import common
+    from shiftlead.ui import common
 
     calls: list[tuple[str, dict]] = []
 
@@ -939,7 +941,7 @@ def _flow_org(tmp_path, flows):
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"].update(techlead={"name": "tl-ao"}, flows=flows)
     write_org(tmp_path, doc)
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
 
 
 def _head(html, team="ao-grind"):
@@ -954,7 +956,7 @@ def test_a_teams_header_reads_its_flow_and_strip_and_why_it_cannot_follow_it(wor
     # the **flow chip** (TD-418): the strip its tooltip, its press the team's Settings card
     assert (
         '<a class="badge flowchip" href="/settings#team-ao-grind" '
-        'title="build → review → you, through ao-agentorc-tl-ao' in head
+        'title="build → review → you, through ao-shiftlead-tl-ao' in head
     )
     assert ">flow: build-review</a>" in head
     assert "flowcannot" not in head and "data-flow-apply" not in head  # stopped: nothing to compare
@@ -979,7 +981,7 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
     tmp_path, fleet = world
     _flow_org(tmp_path, ["build-review"])
     fleet.sessions = [
-        {**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []},
+        {**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []},
     ]
     head = _head(client.get("/").text)
     # the one live member is relaunched, and the ones the flow needs and nobody runs are started
@@ -989,7 +991,12 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
     got = client.post("/api/teams/ao-grind/flow/apply").json()
     assert got["ok"] and {d["name"]: d["act"] for d in got["applied"]}["grind-1"] == "relaunch"
     (sent,) = [p for m, p in fleet.calls if m == "relaunch"]
-    assert sent["id"] == "ao-agentorc-grind-1" and sorted(sent["launch"]) == ["lane", "prompt", "prompt_from", "review"]
+    assert sent["id"] == "ao-shiftlead-grind-1" and sorted(sent["launch"]) == [
+        "lane",
+        "prompt",
+        "prompt_from",
+        "review",
+    ]
     assert client.post("/api/teams/nobody/flow/apply").status_code == 400
 
 
@@ -997,12 +1004,12 @@ def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(wor
     """§4.9c, §4.5a (TD-399, built by TD-400): a live team that runs no flow is compared on its seats
     alone — the anchor it lacks reads *definition changed* and **Apply** names the start; so does the
     manager on call it has no record of (§6 rule 3, TD-410, built by TD-413)."""
-    from agentorc import org as orgmod
+    from shiftlead import org as orgmod
 
     monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", True)
     tmp_path, fleet = world
     write_org(tmp_path, org_doc(tmp_path))
-    fleet.sessions = [{**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    fleet.sessions = [{**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     head = _head(client.get("/").text)
     lines = "orc-ao: starts&#10;ao-grind-anchor: starts"
     assert f'<span class="meta flowchanged" title="{lines}">definition changed</span>' in head
@@ -1029,7 +1036,7 @@ def test_the_header_is_one_row_and_the_definition_is_on_its_i_panel(world, clien
 
     for live in (False, True):
         fleet.sessions = [
-            {**badged("ao-agentorc-grind-1", "ao-grind", state="working" if live else "exited"), "name": "grind-1"}
+            {**badged("ao-shiftlead-grind-1", "ao-grind", state="working" if live else "exited"), "name": "grind-1"}
             | {"tail": [], "unread": 3}
         ]
         row, panel = row_and_panel()
@@ -1056,11 +1063,11 @@ def test_the_header_is_one_row_and_the_definition_is_on_its_i_panel(world, clien
 def test_the_settings_pages_flow_is_written_and_nothing_more_on_save(world, client):
     """§4.5a *Settings page: Teams* **flow**: a pick of the team's flows, written on Save and nothing
     more (TD-356; the card's Flow pick moved here, TD-418); a flow it cannot follow is refused in place, naming why."""
-    from agentorc.ui import settings_page as setmod
+    from shiftlead.ui import settings_page as setmod
 
     tmp_path, fleet = world
     _flow_org(tmp_path, ["build-review", "td"])
-    fleet.sessions = [{**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    fleet.sessions = [{**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     rows = [{"name": "build-review", "current": True, "strip": "build → review → you", "cannot": ""}]
     rows.append({"name": "td", "current": False, "strip": "", "cannot": "td cannot be followed by ao-grind"})
     (card,) = setmod.team_cards(uiapp.org_here()[0].teams, {}, flows={"ao-grind": rows})
@@ -1079,7 +1086,7 @@ def test_a_members_flow_mark_says_what_a_switch_did_or_left_on_it(monkeypatch):
     """§4.5a *flow changed — Apply*'s member marks (§4.9c *Switching*, TD-309): *sits out under
     <flow>* winding down or closed for it, *— close it yourself* on a person's session, *flow changed*
     on a node member Apply skipped, and the node's own words on an idle one relaunched."""
-    from agentorc.ui import cards
+    from shiftlead.ui import cards
 
     monkeypatch.setattr(cards, "FLOWS", {"t": "build"})
     monkeypatch.setattr(cards, "FLOW_ACTS", {"p": "left", "n@devenv": "relaunch"})
@@ -1107,9 +1114,9 @@ def test_a_members_flow_mark_says_what_a_switch_did_or_left_on_it(monkeypatch):
 def test_a_member_closed_for_a_sit_out_keeps_its_card_saying_so(world, client):
     tmp_path, fleet = world
     _flow_org(tmp_path, ["build-review"])
-    rec = {**badged("ao-agentorc-designer", "ao-grind", state="closed"), "name": "designer", "tail": []}
+    rec = {**badged("ao-shiftlead-designer", "ao-grind", state="closed"), "name": "designer", "tail": []}
     rec.update(closed_for={"why": "sit_out"}, closer={"by": "tick", "why": "sit_out"})
-    fleet.sessions = [rec, {**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    fleet.sessions = [rec, {**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     html = client.get("/").text
     assert "sits out under build-review" in html and "its card stays until Forget · closed by the tick" in html
     # …and a person's session the flow sits out, live: on its compact line, since nothing winds it down
@@ -1118,6 +1125,6 @@ def test_a_member_closed_for_a_sit_out_keeps_its_card_saying_so(world, client):
     doc["teams"]["ao-grind"].update(techlead={"name": "tl-ao"}, flows=["build-review", "td"])
     doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "des"})
     write_org(tmp_path, doc)
-    me = {**badged("ao-agentorc-des", "ao-grind", state="idle", unattended=False), "name": "des", "tail": []}
-    fleet.sessions = [me, {**badged("ao-agentorc-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
+    me = {**badged("ao-shiftlead-des", "ao-grind", state="idle", unattended=False), "name": "des", "tail": []}
+    fleet.sessions = [me, {**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     assert "interactive · sits out under build-review — close it yourself" in client.get("/").text

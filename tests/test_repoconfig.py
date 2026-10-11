@@ -1,9 +1,9 @@
-"""`.agentorc.yml` (design §5) and the role presets over it (§4.8): defaults, the per-key merge,
+"""`.shiftlead.yml` (design §5) and the role presets over it (§4.8): defaults, the per-key merge,
 a malformed file, the brief templates."""
 
 import pytest
 
-from agentorc import repoconfig
+from shiftlead import repoconfig
 
 pytestmark = pytest.mark.unit
 
@@ -39,14 +39,14 @@ def test_missing_file_gives_the_defaults(tmp_path):
 @pytest.mark.parametrize("key", ["adapter", "worktrees", "anchor"])
 def test_a_retired_key_is_refused_naming_where_it_lives(tmp_path, key):
     # TD-149 (1): read by nothing, so a repo writing one is told where it is decided instead
-    (tmp_path / ".agentorc.yml").write_text(f"{key}: x\n")
-    with pytest.raises(ValueError, match=f"`{key}` is not a `.agentorc.yml` key any more") as e:
+    (tmp_path / ".shiftlead.yml").write_text(f"{key}: x\n")
+    with pytest.raises(ValueError, match=f"`{key}` is not a `.shiftlead.yml` key any more") as e:
         repoconfig.load(tmp_path)
     assert repoconfig.RETIRED[key] in str(e.value)
 
 
 def test_the_section_5_example_loads(tmp_path):
-    (tmp_path / ".agentorc.yml").write_text(
+    (tmp_path / ".shiftlead.yml").write_text(
         """
 unattended:
   workers: 3
@@ -65,9 +65,9 @@ commands:
   - {name: test, run: pdm run test}
 """
     )
-    define(tmp_path / ".agentorc" / "roles", "reviewer")  # a `roles:` key names a definition (§4.9c)
+    define(tmp_path / ".shiftlead" / "roles", "reviewer")  # a `roles:` key names a definition (§4.9c)
     cfg = repoconfig.load(tmp_path)
-    assert cfg.path == tmp_path / ".agentorc.yml"
+    assert cfg.path == tmp_path / ".shiftlead.yml"
     assert cfg.unattended == {"workers": 3, "window": {"weekday": "20:00-06:00", "weekend": "all"}}
     assert cfg.controllers == ["orchestrator-ao-1"] and cfg.ledger == "docs/debt.md"
     assert cfg.teams["grind"]["manager"] == {"role": "manager", "name": "orc"}
@@ -100,8 +100,8 @@ commands:
 
 
 def test_the_org_overlay_sits_between_built_in_and_repo(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))  # its org role directory is this test's
-    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {lane: [TD-001]}}\n")
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))  # its org role directory is this test's
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {lane: [TD-001]}}\n")
     cfg = repoconfig.load(tmp_path)
     overlay = {"grinder": {"profile": "grind", "lane": ["free-pick"]}, "scout": {"grants": ["control"]}}
     g = repoconfig.resolve_role(cfg, "grinder", roles_overlay=overlay)
@@ -127,18 +127,18 @@ def test_the_org_overlay_sits_between_built_in_and_repo(tmp_path, monkeypatch):
         ("roles: {grinder: 3}\n", "`roles`.grinder must be a mapping"),
         ("commands: [{name: t}]\n", r"`commands`\[0\] needs `name` and `run`"),
         ("unattended: 3\n", "`unattended` must be a mapping"),
-        ("windows: 3\n", "`windows` is not a `.agentorc.yml` key"),
+        ("windows: 3\n", "`windows` is not a `.shiftlead.yml` key"),
         ("roles: {a: {brief: x}\n", "not valid YAML"),
     ],
 )
 def test_a_malformed_file_names_the_key(tmp_path, text, names):
-    (tmp_path / ".agentorc.yml").write_text(text)
+    (tmp_path / ".shiftlead.yml").write_text(text)
     if names is None:
         assert repoconfig.load(tmp_path).controllers == ["orc"]
         return
     with pytest.raises(ValueError, match=names) as e:
         repoconfig.load(tmp_path)
-    assert str(tmp_path / ".agentorc.yml") in str(e.value)
+    assert str(tmp_path / ".shiftlead.yml") in str(e.value)
 
 
 def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
@@ -150,14 +150,14 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     orc = repoconfig.resolve_role(cfg, "manager").brief_text()
     assert "## Members: (none given)" in orc and "control" in orc
     # design §4.9a *A wind-down is announced* (TD-053 step 5): the note to the person comes before the close (TD-125)
-    assert orc.index("ran out of work at <t>. Merged this run") < orc.index("ao close $AGENTORC_SESSION")
+    assert orc.index("ran out of work at <t>. Merged this run") < orc.index("ao close $SHIFTLEAD_SESSION")
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
     for name in ("grinder", "hunter", "manager"):  # one screen each, *The path* section included (§4.9c)
         assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 45
 
 
 def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
-    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {brief: briefs/g.md}, hunter: {brief: briefs/h.md}}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {brief: briefs/g.md}, hunter: {brief: briefs/h.md}}\n")
     (tmp_path / "briefs").mkdir()
     (tmp_path / "briefs" / "g.md").write_text("grind {lane} now\n")
     cfg = repoconfig.load(tmp_path)
@@ -171,7 +171,7 @@ def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
 def test_discover_walks_up_to_the_file_or_the_git_root(tmp_path):
     repo = tmp_path / "repo"
     (repo / ".git").mkdir(parents=True)
-    (repo / ".agentorc.yml").write_text("ledger: docs/l.md\n")
+    (repo / ".shiftlead.yml").write_text("ledger: docs/l.md\n")
     wt = repo / ".claude" / "worktrees" / "x" / "src"
     wt.mkdir(parents=True)
     assert repoconfig.discover(wt).ledger == "docs/l.md"  # the checked-in file, found from a subdirectory
@@ -191,10 +191,10 @@ def test_old_role_names_are_unknown_roles(tmp_path):
     for old in ("orchestrator", "lead"):
         with pytest.raises(KeyError, match=f"unknown role '{old}'"):
             repoconfig.resolve_role(repoconfig.RepoConfig(), old)
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {profile: repo-prof}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  lead: {profile: repo-prof}\n")
     with pytest.raises(ValueError, match="`roles`.lead: unknown role 'lead'"):  # a key alone defines nothing
         repoconfig.load(tmp_path)
-    define(tmp_path / ".agentorc" / "roles", "lead")
+    define(tmp_path / ".shiftlead" / "roles", "lead")
     role = repoconfig.resolve_role(repoconfig.load(tmp_path), "lead")
     assert (role.name, role.profile, role.grants) == ("lead", "repo-prof", [])
 
@@ -205,14 +205,14 @@ def test_techlead_is_a_preset(tmp_path):
     tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
     assert (tl.brief, tl.lane, tl.grants, tl.icon, tl.display) == ("techlead.md", [], [], "book", "Tech Lead")
     assert "**techlead**" in tl.brief_text()
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  techlead: {profile: strong}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  techlead: {profile: strong}\n")
     assert repoconfig.resolve_role(repoconfig.load(tmp_path), "techlead").profile == "strong"
 
 
 def test_techlead_placeholder_names_the_seat_or_says_none():
     """Design §4.9b `{techlead}`: a member's and a manager's brief take it, filled with the seat's
     id at a team start and `none` for a session started by hand, so no brief ever shows the
-    placeholder itself. (The seat's own brief reads its id from `$AGENTORC_SESSION`.)"""
+    placeholder itself. (The seat's own brief reads its id from `$SHIFTLEAD_SESSION`.)"""
     cfg = repoconfig.RepoConfig()
     for name in ("grinder", "hunter", "manager"):
         role = repoconfig.resolve_role(cfg, name)
@@ -225,8 +225,8 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     entry needs, with `{repo}`, `{type}` and `{ledger}` slots. The session way fills them from the form;
     the techlead's brief takes the same text through `{entry}`, the slots said in words since the repo
     and type ride on the handed message — and no other preset carries it."""
-    filled = repoconfig.entry_text("agentorc", "feature", "docs/technical_debt.md")
-    assert "ledger of agentorc: docs/technical_debt.md, with Type feature" in filled
+    filled = repoconfig.entry_text("shiftlead", "feature", "docs/technical_debt.md")
+    assert "ledger of shiftlead: docs/technical_debt.md, with Type feature" in filled
     assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" in filled
     assert not any(slot in filled for slot in repoconfig.ENTRY_SLOTS)
     tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
@@ -242,7 +242,7 @@ def test_entry_rules_are_written_once_and_read_both_ways():
 
 def test_grants_orchestrate_in_a_role_is_an_unknown_grant(tmp_path):
     """TD-107: `grants: [orchestrate]` in a `roles:` block is refused like any unknown grant."""
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  reviewer: {grants: [orchestrate, control]}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  reviewer: {grants: [orchestrate, control]}\n")
     with pytest.raises(ValueError, match="unknown grant 'orchestrate'"):
         repoconfig.load(tmp_path)
 
@@ -268,8 +268,8 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
     assert repoconfig.default_label("orchestrator") == "Orchestrator"
     assert repoconfig.default_label("reviewer") == "Reviewer" and repoconfig.default_label("") == ""
     # a layer's label wins per key, as every other key does, and to_dict says what the page shows
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  reviewer: {icon: eye}\n")
-    define(tmp_path / ".agentorc" / "roles", "reviewer")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  reviewer: {icon: eye}\n")
+    define(tmp_path / ".shiftlead" / "roles", "reviewer")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.display == "TD grinder" and grinder.icon == "wrench" and grinder.to_dict()["label"] == "TD grinder"
@@ -278,7 +278,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
     # a label is one short line of text, checked when the file is read
     for bad, why in (("label: ''", "one line"), ("label: 7", "one line"), ("label: [a]", "one line"),
                      ("label: \"a\\nb\"", "one line"), ("label: " + "x" * 41, "longer than 40")):  # fmt: skip
-        (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
+        (tmp_path / ".shiftlead.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
         with pytest.raises(ValueError, match=why):
             repoconfig.load(tmp_path)
 
@@ -302,9 +302,9 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     assert "icon" in repoconfig.ROLE_KEYS
     assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
     # the repo's own file overrides it, and its other keys are untouched
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {icon: terminal}\n  reviewer: {icon: eye}\n")
-    define(tmp_path / ".agentorc" / "roles", "reviewer")
-    define(tmp_path / ".agentorc" / "roles", "lead")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder: {icon: terminal}\n  reviewer: {icon: eye}\n")
+    define(tmp_path / ".shiftlead" / "roles", "reviewer")
+    define(tmp_path / ".shiftlead" / "roles", "lead")
     cfg = repoconfig.load(tmp_path)
     grinder = repoconfig.resolve_role(cfg, "grinder")
     assert grinder.icon == "terminal" and grinder.brief == "grinder.md" and grinder.lane == ["free-pick"]
@@ -315,17 +315,17 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     assert repoconfig.resolve_role(cfg, "hunter", overlay).icon == "book"
     assert repoconfig.resolve_role(cfg, "grinder", overlay).icon == "terminal"  # the repo still wins
     # an explicit null is "no icon", and the layer that says so is the one that counts
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: null}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  lead: {icon: null}\n")
     assert repoconfig.resolve_role(repoconfig.load(tmp_path), "lead").icon is None
     # an unknown name is refused when the file is read, naming the key and what is known
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: rocket}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  lead: {icon: rocket}\n")
     with pytest.raises(ValueError, match=r"icon: unknown icon 'rocket'"):
         repoconfig.load(tmp_path)
     # `person` is the card's interactive mark (TD-095): reserved, and the refusal says so
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: person}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  lead: {icon: person}\n")
     with pytest.raises(ValueError, match=r"icon: 'person' is reserved for the card's mark of an interactive"):
         repoconfig.load(tmp_path)
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: 7}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  lead: {icon: 7}\n")
     with pytest.raises(ValueError, match="icon must be a string"):
         repoconfig.load(tmp_path)
 
@@ -374,7 +374,7 @@ def test_a_role_says_when_to_message_it(tmp_path):
         assert repoconfig.resolve_role(cfg, name).message == line
     assert repoconfig.resolve_role(cfg, "techlead").message.endswith("— an ask fills the seat")
     assert repoconfig.resolve_role(cfg, "plain").message is None
-    (tmp_path / ".agentorc.yml").write_text(
+    (tmp_path / ".shiftlead.yml").write_text(
         "roles:\n  grinder: {message: the ledger entry it claimed}\n  designer: {message: a design-first entry}\n"
         "  hunter: {message: null}\n"
     )
@@ -387,7 +387,7 @@ def test_a_role_says_when_to_message_it(tmp_path):
         ('message: "a\\nb"', "one line"),
         ("message: " + "x" * 121, "longer than 120"),
     ):
-        (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
+        (tmp_path / ".shiftlead.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
         with pytest.raises(ValueError, match=why):
             repoconfig.load(tmp_path)
 
@@ -398,7 +398,7 @@ def test_a_role_has_saved_prompts_replaced_whole_per_layer(tmp_path):
     checked when the file is read, naming the role and the entry; the key replaced whole at each
     layer, never merged; the built-ins carry none."""
     assert repoconfig.resolve_role(repoconfig.RepoConfig(), "grinder").prompts == []
-    (tmp_path / ".agentorc.yml").write_text(
+    (tmp_path / ".shiftlead.yml").write_text(
         "roles:\n  plain:\n    prompts:\n      - {label: review PR, text: 'Review PR $n as the cadence says.'}\n"
         "      - {label: sweep, text: /stranded-work}\n"
     )
@@ -416,6 +416,6 @@ def test_a_role_has_saved_prompts_replaced_whole_per_layer(tmp_path):
         ("prompts: [{label: " + "x" * 25 + ", text: y}]", r"grinder\.prompts\[0\]\.label is longer than 24"),
         ("prompts: [{label: a, text: b, run: c}]", "mapping of label and text"),
     ):
-        (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
+        (tmp_path / ".shiftlead.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
         with pytest.raises(ValueError, match=why):  # the error names the role and the entry
             repoconfig.load(tmp_path)

@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 
-from agentorc.ui import app as uiapp
-from agentorc.ui import inbox as inboxmod
-from agentorc.ui.app import inbox_sections, state_rows, templates, view
 from sessionorc import cadence, held
+from shiftlead.ui import app as uiapp
+from shiftlead.ui import inbox as inboxmod
+from shiftlead.ui.app import inbox_sections, state_rows, templates, view
 
 pytestmark = pytest.mark.unit
 
@@ -123,7 +123,7 @@ def test_a_malformed_mark_never_breaks_the_page():
 def test_dismiss_is_clear_mark_with_the_session_the_mark_and_the_pr(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     calls: list[tuple[str, dict]] = []
 
     class FakeClient:

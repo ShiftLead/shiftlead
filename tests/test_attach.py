@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from sessionorc import paths
 from sessionorc.client import AgentError, LocalClient
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 
 def _b64(raw: bytes) -> str:
@@ -166,8 +166,8 @@ def test_attachment_names_need_no_quoting_in_a_prompt():
 
 
 def _client(monkeypatch, tmp_path, calls):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    from agentorc.ui import app as ui
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
 
     class Fake:
         def __init__(self, *a, **k):
@@ -220,7 +220,7 @@ def test_the_route_carries_a_pieces_upload_offset_total_and_cancel(tmp_path, mon
         calls.append((method, kw))
         return next(answers) if method == "attach" and not kw.get("cancel") else {"cancelled": True}
 
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui.LocalClient, "call", lambda self, method, **kw: fake(method, **kw))
     r = c.post("/api/sessions/ao-x-1/attach", data={"total": "5"}, files={"file": ("deck.pptx", b"abc")})
@@ -245,8 +245,8 @@ def test_the_route_carries_a_pieces_upload_offset_total_and_cancel(tmp_path, mon
 def test_the_composer_draws_attach_beside_send(tmp_path, monkeypatch):
     """§4.5a *Focus composer*: **Attach** in the composer's row, with the picker it opens; the
     composer, and so Attach, is closed on an unattended session."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {"id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
             "state": "idle", "since": "2026-10-07T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
@@ -543,8 +543,8 @@ def test_the_composer_shows_an_uploads_percent_and_its_cancel(tmp_path):
 def test_the_focus_page_serves_the_piece_size_and_the_cancel(tmp_path, monkeypatch):
     """TD-478: the Attach button carries the host agent's `paths.ATTACH_PIECE_BYTES`, so the page
     slices by the constant the host agent reads, and the ✕ is drawn hidden beside it."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     base = {"id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
             "state": "idle", "since": "2026-10-07T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],

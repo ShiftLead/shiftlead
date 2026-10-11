@@ -1,5 +1,5 @@
 """Design §4.9 *What is left at the home has a history* (TD-210, TD-229 slice 5): at the home
-`~/.agentorc` is a git work tree tracking `org.yml`, `profiles.yml` and `settings.yml`, and the home's
+`~/.shiftlead` is a git work tree tracking `org.yml`, `profiles.yml` and `settings.yml`, and the home's
 host agent is its one committer — after `set_settings`, on `commit_defs`, and for a hand edit."""
 
 from __future__ import annotations
@@ -13,9 +13,9 @@ from pathlib import Path
 import pytest
 from conftest import park_ticks
 
-from agentorc import service
 from sessionorc import defs, hosts, modes, paths
 from sessionorc.client import AgentError, LocalClient
+from shiftlead import service
 
 
 def _log(home: Path, *paths_: str) -> list[str]:

@@ -82,7 +82,7 @@ def test_a_fully_detached_process_is_outside_unless_the_cgroup_check_is_on():
     """Double fork and `setsid`: no chain, a session id of its own, no terminal. Read as *outside*
     it would be the person with no `caller` — so where the agent's service cgroup holds every pane,
     it is *unknown*."""
-    svc = "/user.slice/user-1000.slice/user@1000.service/app.slice/agentorc-agent.service"
+    svc = "/user.slice/user-1000.slice/user@1000.service/app.slice/shiftlead-agent.service"
     cg = {400: svc, 50: svc, 7: svc, 300: "/user.slice/session-3.scope"}
     fp = FakeProc([*BASE, P(7, 1, 7), P(400, 1, 400, 0)], cgroups=cg)  # 7 is the agent, started by systemd
     assert identity.classify(400, PANES, fp) == identity.OUTSIDE
@@ -99,7 +99,7 @@ def test_an_orphan_in_a_panes_own_scope_is_that_session():
     is setsid'd with no tty, orphaned once that shell exits — never sat in the server's cgroup, and the
     *unknown* clause never fired: it read as *outside*, the person. It is matched by the pane's scope."""
     app = "/user.slice/user-1000.slice/user@1000.service/app.slice"
-    svc, sx, sy = f"{app}/agentorc-agent.service", f"{app}/tmux-spawn-x.scope", f"{app}/tmux-spawn-y.scope"
+    svc, sx, sy = f"{app}/shiftlead-agent.service", f"{app}/tmux-spawn-x.scope", f"{app}/tmux-spawn-y.scope"
     cg = {7: svc, 50: svc, 100: sx, 200: sy, 400: sx, 401: f"{app}/tmux-spawn-other.scope", 300: "/user.slice/s.scope"}
     fp = FakeProc([*BASE, P(7, 1, 7), P(400, 1, 400), P(401, 1, 401), P(300, 1, 300, 0x8810)], cgroups=cg)
     panes = [Pane("ao-x", 100, 0x8801, sx), Pane("ao-y", 200, 0x8802, sy)]
@@ -124,7 +124,7 @@ async def test_the_scopes_of_our_panes_no_record_holds_are_ours(agent, monkeypat
     import os
 
     sx, sz, sg = "/app.slice/tmux-spawn-x.scope", "/app.slice/tmux-spawn-z.scope", "/app.slice/tmux-spawn-g.scope"
-    svc = "/app.slice/agentorc-agent.service"
+    svc = "/app.slice/shiftlead-agent.service"
     fp = FakeProc(
         [*BASE, P(300, 50, 300), P(500, 50, 500)],
         {50: svc, os.getpid(): svc, 100: sx, 200: sg, 300: sz, 500: "/app.slice/tmux-spawn-w.scope"},
@@ -151,7 +151,7 @@ async def test_the_scopes_of_our_panes_no_record_holds_are_ours(agent, monkeypat
 
 
 def test_the_detached_check_is_off_when_the_tmux_server_is_not_in_the_agents_own_service():
-    svc = "/system.slice/agentorc-agent.service"
+    svc = "/system.slice/shiftlead-agent.service"
     scope = "/user.slice/user-1000.slice/session-3.scope"
     assert identity.detached_check(FakeProc([], {7: svc, 50: scope}), agent_pid=7, tmux_pid=50) is None  # an old server
     assert identity.detached_check(FakeProc([], {7: scope, 50: scope}), agent_pid=7, tmux_pid=50) is None  # a dev run
@@ -391,7 +391,7 @@ async def test_the_detached_check_follows_the_tmux_server_it_is_about(agent, mon
 
     def check(_reader, *, agent_pid, tmux_pid):
         checks.append(tmux_pid)
-        return "/system.slice/agentorc-agent.service" if tmux_pid == 50 else None
+        return "/system.slice/shiftlead-agent.service" if tmux_pid == 50 else None
 
     monkeypatch.setattr(agent_mod.identity, "detached_check", check)
     monkeypatch.setattr(agent.tmux, "server_pid", lambda: pid)
@@ -563,7 +563,7 @@ def test_a_gone_pane_in_a_scope_of_its_own_is_matched_by_that_scope():
     tool has died keeps neither the pane's session id nor its pty. tmux under systemd starts each pane
     in a `tmux-spawn-<uuid>.scope`, which the orphan keeps: the third signal, asked only when the scope
     is the pane's own."""
-    scope, server = "/app.slice/tmux-spawn-1.scope", "/app.slice/agentorc-agent.service"
+    scope, server = "/app.slice/tmux-spawn-1.scope", "/app.slice/shiftlead-agent.service"
     fp = FakeProc([*BASE, P(140, 1, 139), P(141, 1, 141)], {100: scope, 50: server, 140: scope, 141: server})
     x = Pane("ao-x", 100, 0x8801, scope)
     assert identity.classify_gone(140, x, fp) == Channel("session", "ao-x", "scope")
@@ -587,7 +587,7 @@ async def test_the_old_runs_last_hook_is_its_sessions_by_the_panes_scope(agent, 
     agent.identity_mode = "enforce"
     agent._id_detached = ""
     old, new, other = "/app.slice/tmux-spawn-old.scope", "/app.slice/tmux-spawn-new.scope", "/app.slice/x.scope"
-    server, mine = "/app.slice/agentorc-agent.service", "/app.slice/agentorc-agent.service"
+    server, mine = "/app.slice/shiftlead-agent.service", "/app.slice/shiftlead-agent.service"
     fp = FakeProc(
         [*BASE, P(140, 1, 139), P(141, 1, 141), P(300, 50, 300, 0x8803)],
         {50: server, os.getpid(): mine, 100: old, 200: other, 140: old, 141: other, 300: new},

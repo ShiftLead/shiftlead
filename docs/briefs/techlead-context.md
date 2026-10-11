@@ -1,4 +1,4 @@
-# The techlead's primer for agentorc
+# The techlead's primer for ShiftLead
 
 **What this is.** You are a techlead (design §4.9b): you start cold, for one batch of questions, and
 this page is meant to be your first read after your brief, once your brief names it — the project
@@ -12,13 +12,13 @@ disagree, the document is right, this page is stale, and you say so in your summ
 (`tests/test_primer.py`) holds every section and path named here to ones that exist; it cannot
 hold the prose to the truth, so check before you lean on it.
 
-## 1. What agentorc is
+## 1. What ShiftLead is
 
 A self-hosted dashboard that orchestrates **interactive AI coding-agent sessions** (Claude Code
 first) and plain shells, each in its own tmux session, across hosts (§1, §2). A person watches
 and steers many sessions from one page; teams of unattended sessions work a repo's ledger
 through PRs. The project is to be renamed `shiftlead` (TD-060); the code and docs still say
-agentorc.
+ShiftLead.
 
 The design is the source of truth: one file per section under `docs/design/`, and `docs/design.md`
 its index. **A change in behaviour is a change to the design first**, and **a control that is not
@@ -30,9 +30,9 @@ person is `docs/user_attention.md`.
 ## 2. The parts
 
 - **Two import packages, one distribution.** `sessionorc` (`src/sessionorc/`): tmux, hosts, the
-  link between hosts, the host agent, mail, identity, the record model. `agentorc`
-  (`src/agentorc/`): adapters, profiles, roles and briefs, teams, the CLI, the UI.
-  **`sessionorc` never imports `agentorc`**, and the core never names a tool outside its adapter
+  link between hosts, the host agent, mail, identity, the record model. `shiftlead`
+  (`src/shiftlead/`): adapters, profiles, roles and briefs, teams, the CLI, the UI.
+  **`sessionorc` never imports `shiftlead`**, and the core never names a tool outside its adapter
   (§4.3).
 - **The host agent** (§4.4, `src/sessionorc/agent.py`): one per host, the only thing that
   creates, kills or types into an `ao-*` tmux session (§9 invariant 1). It serves RPCs on a unix
@@ -50,11 +50,11 @@ person is `docs/user_attention.md`.
   `src/sessionorc/modes.py`; a new RPC that writes a home-owned thing and is missing from those
   tables is a bug that has been made twice (`suspend`, `identity_log`; both are named in that file).
 - **State** (§4.2): hooks first, screen-scraping as a labelled fallback; a state shown as `hook`
-  came from a hook (§9 invariant 4). Adapters (`src/agentorc/adapters/`) hold everything that
+  came from a hook (§9 invariant 4). Adapters (`src/shiftlead/adapters/`) hold everything that
   knows a tool: its hooks, its composer, its usage endpoint, its transcript.
 - **Profiles** (§4.2a): tool · account · model. One account has one usage window; a capped
   account caps every session on it.
-- **The UI** (§4.5, `src/agentorc/ui/`): Org, Focus, the Inbox (a queue — *Needs you*,
+- **The UI** (§4.5, `src/shiftlead/ui/`): Org, Focus, the Inbox (a queue — *Needs you*,
   *Steering*, *Waiting on them*, FYI; §4.10 *The Inbox is a queue*; its filters are the rail and
   one entry opens as a page, §4.5 screen 6 *The rail* and *The message page*, TD-129; a message to
   the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message
@@ -66,9 +66,9 @@ person is `docs/user_attention.md`.
   session wrote** — text a session wrote is only ever text; a control comes from a structured
   field. The ledger records the person's constraint in these words: *nothing on a page is a
   control that parses what an agent printed* (TD-071).
-- **The CLI** (§4.7, `src/agentorc/cli.py`): `ao`. What a session may run is in `ao --skill`
-  (`src/agentorc/skill.md`); standing a team up is `ao team --skill`
-  (`src/agentorc/team_skill.md`).
+- **The CLI** (§4.7, `src/shiftlead/cli.py`): `ao`. What a session may run is in `ao --skill`
+  (`src/shiftlead/skill.md`); standing a team up is `ao team --skill`
+  (`src/shiftlead/team_skill.md`).
 
 ## 3. Who may do what
 
@@ -93,10 +93,10 @@ person is `docs/user_attention.md`.
 
 ## 4. Teams, and how a run ends
 
-- **Org, team, project** (§4.9): `~/.agentorc/org.yml` defines projects (where checkouts are) and
+- **Org, team, project** (§4.9): `~/.shiftlead/org.yml` defines projects (where checkouts are) and
   teams (a `manager:` — or `manager: {role: person}`, the bare string being refused — plus
   members, each a role with a lane and a brief). `ao team start` launches them; briefs are read
-  from the checkout at that moment (`docs/briefs/` here; presets under `src/agentorc/briefs/`).
+  from the checkout at that moment (`docs/briefs/` here; presets under `src/shiftlead/briefs/`).
 - **One agent per directory** (§9 invariant 2): every unattended session works in its own
   worktree under `.claude/worktrees/<name>`; the first session in the checkout is the **anchor**
   and only the anchor promotes the live install.
@@ -134,7 +134,7 @@ the repo; a change to it is Paul's. A ledger entry's Status changes in the PR th
 thing; a PR number is written only after the PR exists; bare dates are the machine's local date.
 Files under `scripts/`, `docs/cadence.md` and `.claude/skills/` that open with a SYNCED FILE
 header belong to dev-cadence and are never edited here. The live system is **promoted, not
-edited** (CLAUDE.md): nothing a worker does touches `~/.agentorc`, the live venv, systemd, or a
+edited** (CLAUDE.md): nothing a worker does touches `~/.shiftlead`, the live venv, systemd, or a
 session it does not control. Tests run on private tmux sockets and a temporary home
 (`pdm run test`, `pdm run lint`).
 

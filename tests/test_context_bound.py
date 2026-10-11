@@ -10,10 +10,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks, wait_for
 
-from agentorc import repoconfig, teams
 from sessionorc.agent import CONTEXT_AGAIN
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import ProgressEntry, context_over, normalize_context
+from shiftlead import repoconfig, teams
 
 
 def test_a_context_setting_is_checked_and_read_as_tokens():
@@ -42,11 +42,11 @@ def test_the_worker_presets_carry_300k_and_a_layer_can_change_or_remove_it(tmp_p
     # 300k is the worker presets' own, and the default of every role that sets none (TD-249)
     assert {r.context_bound for r in got.values()} == {300_000}
     assert {n for n, r in got.items() if r.context_default} == {"manager", "techlead", "designer", "plain"}
-    (tmp_path / ".agentorc.yml").write_text(
+    (tmp_path / ".shiftlead.yml").write_text(
         "roles:\n  grinder:\n    context: {bound: 400k}\n  hunter:\n    context: none\n"
         "  manager:\n    context: none\n  scribe:\n    brief: docs/scribe.md\n"
     )
-    scribe_dir = tmp_path / ".agentorc" / "roles" / "scribe"  # a role directory (§4.9c)
+    scribe_dir = tmp_path / ".shiftlead" / "roles" / "scribe"  # a role directory (§4.9c)
     scribe_dir.mkdir(parents=True)
     (scribe_dir / "role.yml").write_text("")
     (scribe_dir / "template.md").write_text("scribe {lane}\n")
@@ -60,11 +60,11 @@ def test_the_worker_presets_carry_300k_and_a_layer_can_change_or_remove_it(tmp_p
     scribe = repoconfig.resolve_role(cfg, "scribe")  # a role a repo defines, with no `context:`
     assert scribe.context_bound == 300_000 and scribe.context_default
     assert grinder.to_dict()["context_bound"] == 400_000 and scribe.to_dict()["context_default"] is True
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    context: {bound: lots}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder:\n    context: {bound: lots}\n")
     with pytest.raises(ValueError, match=r"grinder\.context: bound is a token count"):
         repoconfig.load(tmp_path)
     # `org.yml`'s layer reaches `resolve_role` unchecked by the loader: the same check applies there
-    (tmp_path / ".agentorc.yml").write_text("")
+    (tmp_path / ".shiftlead.yml").write_text("")
     cfg = repoconfig.load(tmp_path)
     with pytest.raises(ValueError, match=r"org roles\.manager\.context"):
         repoconfig.resolve_role(cfg, "manager", {"manager": {"context": {"bound": "x"}}})
@@ -81,7 +81,7 @@ def test_a_team_launch_sends_the_bound_and_a_bare_one_sends_nothing(tmp_path):
 
 
 async def test_the_bound_rides_the_record_and_status_v_says_it(agent, tmp_path, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     async with LocalClient() as person:
 
@@ -104,8 +104,8 @@ async def test_the_bound_rides_the_record_and_status_v_says_it(agent, tmp_path, 
 
 
 def test_the_card_draws_the_reading_red_past_the_bound(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     s = {
         "id": "ao-r-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
@@ -233,15 +233,15 @@ async def test_every_reply_to_a_member_over_its_bound_carries_the_clause(agent, 
 def test_the_clause_rides_the_unread_line_or_stands_alone(capsys):
     import argparse
 
-    from agentorc import cli
     from sessionorc import client as clientmod
+    from shiftlead import cli
 
     args = argparse.Namespace(json=False)
     over = "context 231k over the 200k bound"
     clientmod.last_mail = {"unread": 0, "wake_budget_spent": False, "context": over}
     cli.unread_line(args)
-    assert capsys.readouterr().out == f"[agentorc] ({over}) — finish the entry in hand, then declare\n"
+    assert capsys.readouterr().out == f"[shiftlead] ({over}) — finish the entry in hand, then declare\n"
     clientmod.last_mail = {"unread": 2, "wake_budget_spent": False, "context": over}
     cli.unread_line(args)
-    assert capsys.readouterr().out == f"[agentorc] you have 2 unread messages — run ao inbox ({over})\n"
+    assert capsys.readouterr().out == f"[shiftlead] you have 2 unread messages — run ao inbox ({over})\n"
     clientmod.last_mail = None

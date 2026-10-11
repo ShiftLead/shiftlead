@@ -268,7 +268,7 @@ def attention_kind(s: Session) -> str:
     """Which **state row** this record is, or `""` for one that needs nobody (design §4.5a *Inbox
     row: state*, §4.10 *The Inbox is a queue*). The home needs this to know when a row **ends**,
     so that what became of it leaves a trail; the page has its own form of the same predicate over
-    the view it renders (`agentorc.ui.app.state_kind`) — **a parity pair**: a kind added to one is
+    the view it renders (`shiftlead.ui.app.state_kind`) — **a parity pair**: a kind added to one is
     added to the other, and `tests/test_attention.py` holds them to the same answers.
 
     `unpushed` is the one the two read differently and deliberately: the page adds *what Ready to
@@ -521,9 +521,9 @@ REVIEW_READERS = ("techlead", "person")
 VERDICTS = ("pass", "merged", "findings")
 REVIEW_BOUND = "2h"  # §4.9b *The reader*: a read of a diff, unless the preset says otherwise
 # The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`, §4.9c a sit-out): the card, the CLI
-# (`agentorc.teams` re-exports it) and the home's sit-out send the same words.
+# (`shiftlead.teams` re-exports it) and the home's sit-out send the same words.
 WRAPUP_PROMPT = (
-    "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
+    "shiftlead: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
     "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
     "idle), then stop."
 )
@@ -891,7 +891,7 @@ def report_line(session: dict[str, Any], prs: Mapping[int, str] | None = None) -
 
 @dataclass
 class Session:
-    id: str  # agentorc's own id; also the tmux session name
+    id: str  # shiftlead's own id; also the tmux session name
     name: str  # what the person called it
     kind: Kind
     adapter: str  # claude-code | shell | ...
@@ -910,7 +910,7 @@ class Session:
     # The session's name as its tool holds it (design §4.5a **title**, §4.3 `title()`, TD-074):
     # observed from the pane on the host where the pane lives, exactly as `tail` is — the tool
     # writes its terminal title, tmux holds it as `#{pane_title}`, and the session's adapter says
-    # what of it is a name. Display only: agentorc has no rename of its own, so nothing here ever
+    # what of it is a name. Display only: shiftlead has no rename of its own, so nothing here ever
     # writes it. None when the adapter has no opinion or there is no name to show; it changes
     # rarely and no wake fires on it (it is out of `wake_digest`).
     title: str | None = None
@@ -1051,7 +1051,7 @@ class Session:
     # (§9 invariant 9). Empty for a session started without one.
     role: str = ""
     # Where a `TD-NNN` reference resolves in this session's repo, relative to its checkout — the
-    # client reads it from the repo's `.agentorc.yml` (`ledger:`, design §5) at create and hands it
+    # client reads it from the repo's `.shiftlead.yml` (`ledger:`, design §5) at create and hands it
     # over, so the derived-report tick (`sessionorc.reports`) reads the right file without this
     # package knowing the config format. None: the ledger's default path.
     ledger: str | None = None

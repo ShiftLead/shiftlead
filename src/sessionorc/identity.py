@@ -166,12 +166,12 @@ class Channel:
 OUTSIDE = Channel("outside")
 
 
-TMUX_UNIT = "agentorc-tmux.service"  # the installed home's tmux server, a system unit (design §4.1, TD-488)
+TMUX_UNIT = "shiftlead-tmux.service"  # the installed home's tmux server, a system unit (design §4.1, TD-488)
 
 
 def server_placement(cgroup: str | None) -> str | None:
     """Where the tmux server runs (design §4.1, TD-495): `system` in its own system unit
-    (`…/agentorc-tmux.service`), `user` anywhere under the user manager (`user@<uid>.service`, where
+    (`…/shiftlead-tmux.service`), `user` anywhere under the user manager (`user@<uid>.service`, where
     one stop of `systemd --user` ends every session — a warning), `none` elsewhere (a dev run, a
     container, a scratch home's server started from a shell); None with no server or no reading."""
     if not cgroup:
@@ -228,10 +228,10 @@ def detached_check(reader: ProcReader, *, agent_pid: int, tmux_pid: int | None) 
     """The cgroup a detached process would still be in — or None when the check is **off**.
 
     On only when the tmux server's cgroup is a systemd `.service` whose own process is either **the
-    server itself** — the system unit, `agentorc-tmux.service`, the server's parent systemd (§4.1,
+    server itself** — the system unit, `shiftlead-tmux.service`, the server's parent systemd (§4.1,
     TD-495) — or **the agent**: the server's cgroup is the agent's own and the agent was started by
     systemd itself (the user units: `KillMode=process` keeps the tmux server, and every pane, inside
-    `agentorc-agent.service`). The unit's name is asked as well as the parent, because a server that
+    `shiftlead-agent.service`). The unit's name is asked as well as the parent, because a server that
     daemonised inside a test runner's `.service` is reparented to init too.
     The agent's parent condition is what CI taught on the first push of this module: a test runner is often
     inside *some* `.service` together with the person standing in it, and so is any agent a worker

@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from test_transcript import write_fixture
 
-from agentorc.adapters.claude_code import transcript as tr
+from shiftlead.adapters.claude_code import transcript as tr
 
 REC = {
     "id": "ao-x-designer",
@@ -34,8 +34,8 @@ REC = {
 
 @pytest.fixture
 def page(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    from agentorc.ui import app as ui
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
 
     t = tr.read(write_fixture(tmp_path), subagents=tmp_path / "s1" / "subagents").to_dict()
     calls: list[tuple[str, dict]] = []
@@ -57,7 +57,7 @@ def page(tmp_path, monkeypatch):
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
     monkeypatch.setattr(ui, "host_name", lambda: "kmaster")
-    monkeypatch.setattr("agentorc.ui.cards.host_name", lambda: "kmaster")
+    monkeypatch.setattr("shiftlead.ui.cards.host_name", lambda: "kmaster")
     with TestClient(ui.create_app()) as c:
         yield c, calls, replies, t
 
@@ -77,7 +77,7 @@ def test_the_page_draws_the_turns_folded_as_the_pane_does(page):
         r'<div class="tprompt"><span class="tmark mono">&gt;</span><div class="ttext">fix the tests</div>', html
     )
     assert '<div class="tsaid ttext">Looking.</div>' in html
-    assert '<summary>thought · 3 lines</summary>' in html
+    assert "<summary>thought · 3 lines</summary>" in html
     assert '⏺</span> Bash(<span class="targ">pdm run test</span>)' in html
     assert '<summary>result · 2 lines</summary><pre class="tbody mono">3 failed\nmore</pre>' in html
     # the subagent's turns are folded under the Agent call that started them, with their count
@@ -124,7 +124,7 @@ def test_the_editor_button_opens_the_file_and_none_draws_none(page, monkeypatch)
     c, _, _, t = page
     html = c.get("/transcript/ao-x-designer").text
     assert re.search(r'<a class="btn sm link editor" href="vscode://[^"]*' + re.escape(t["path"]), html)
-    from agentorc.ui import uiconf
+    from shiftlead.ui import uiconf
 
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
     assert 'class="btn sm link editor"' not in c.get("/transcript/ao-x-designer").text
@@ -149,8 +149,8 @@ def test_a_refused_read_is_said_on_the_page(page):
 
 @pytest.mark.unit
 def test_the_focus_header_offers_transcript_only_with_a_tool_session_id(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     def focus(**rec):
         v = view({**REC, "state": "idle", **rec})
@@ -168,7 +168,7 @@ def test_the_focus_header_offers_transcript_only_with_a_tool_session_id(tmp_path
 def test_the_page_script_keeps_the_button_and_the_banner_s_words_in_step():
     """The header's button follows `adapter_id` on the delta, and the exited banner gains *or read
     its transcript* where the button is drawn (TD-166 fix 3)."""
-    js = (pathlib.Path(__file__).resolve().parent.parent / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     assert 'tr.classList.toggle("hidden", !v.adapter_id)' in js
     assert "read its transcript</a>" in js and "const read = v.adapter_id ?" in js
     assert "AO.transcript = function" in js and "?part=1&before=" in js

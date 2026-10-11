@@ -14,7 +14,7 @@ import tempfile
 
 import pytest
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 PROBE = r"""
 const fs = require("fs");

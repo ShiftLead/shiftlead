@@ -1,5 +1,5 @@
 """The status line's report (design §4.4 *A report*, *The person's own status line still shows*;
-§4.3 `usage_report`; TD-233 slice 2, the adapter's half): `agentorc-hook --statusline` reads the
+§4.3 `usage_report`; TD-233 slice 2, the adapter's half): `shiftlead-hook --statusline` reads the
 limits Claude Code hands its status line, reports them as `usage_report` when a number moved or a
 minute passed, and runs the status line the launch's layer displaced."""
 
@@ -13,15 +13,15 @@ from pathlib import Path
 
 import pytest
 
-from agentorc import profiles
-from agentorc.adapters.claude_code import (
+from shiftlead import profiles
+from shiftlead.adapters.claude_code import (
     context_file,
     displaced_status_line,
     hooks_settings,
     usage_report,
     write_hooks_file,
 )
-from agentorc.adapters.claude_code import hook as hook_mod
+from shiftlead.adapters.claude_code import hook as hook_mod
 
 R5 = 1790000000  # 2026-09-21T14:13:20Z
 RW = 1790500000
@@ -59,10 +59,10 @@ def test_usage_report_reads_the_two_windows_by_the_endpoints_labels():
 
 
 def test_the_layer_names_the_status_line_with_a_minutes_refresh(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     prof = profiles.Profile(name="p", config_dir=tmp_path / "cfg")
-    sl = hooks_settings(prof, "/x y/agentorc-hook")["statusLine"]
-    assert sl == {"type": "command", "command": "'/x y/agentorc-hook' --statusline", "refreshInterval": 60}
+    sl = hooks_settings(prof, "/x y/shiftlead-hook")["statusLine"]
+    assert sl == {"type": "command", "command": "'/x y/shiftlead-hook' --statusline", "refreshInterval": 60}
     assert hooks_settings(prof, padding=2)["statusLine"]["padding"] == 2
     # the displaced line's padding is carried into the layer, in a file of its own
     proj = tmp_path / "proj"
@@ -93,7 +93,7 @@ def test_the_displaced_status_line_is_the_directorys_before_the_profiles(tmp_pat
     _line(proj / ".claude", "settings.local.json", "local-line")
     assert displaced_status_line(proj, cfg)["command"] == "local-line"
     # ours is never the displaced one — it would run itself — and an unreadable file names none
-    _line(proj / ".claude", "settings.local.json", "/bin/agentorc-hook --statusline")
+    _line(proj / ".claude", "settings.local.json", "/bin/shiftlead-hook --statusline")
     (proj / ".claude" / "settings.json").write_text("{not json")
     assert displaced_status_line(proj, cfg)["command"] == "profile-line"
 
@@ -148,8 +148,8 @@ class FakeAgent:
 def home(tmp_path, monkeypatch):
     h = Path("/tmp") / f"aosl-{tmp_path.name[-12:]}"  # a unix socket path must stay short
     h.mkdir(exist_ok=True)
-    monkeypatch.setenv("AGENTORC_HOME", str(h))
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-x-w1")
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(h))
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-w1")
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "cfg"))
     yield h
     for f in sorted(h.rglob("*"), reverse=True):
@@ -159,7 +159,7 @@ def home(tmp_path, monkeypatch):
 
 def run_statusline(monkeypatch, capsys, p: dict | str, now: float) -> str:
     monkeypatch.setattr(hook_mod.sys, "stdin", io.StringIO(p if isinstance(p, str) else json.dumps(p)))
-    monkeypatch.setattr(hook_mod.sys, "argv", ["agentorc-hook", "--statusline"])
+    monkeypatch.setattr(hook_mod.sys, "argv", ["shiftlead-hook", "--statusline"])
     monkeypatch.setattr(hook_mod.time, "time", lambda: now)
     assert hook_mod.main() == 0
     return capsys.readouterr().out

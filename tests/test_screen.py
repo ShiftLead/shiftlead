@@ -8,8 +8,8 @@ import pytest
 from design_doc import files as design_files
 from design_doc import whole
 
-from agentorc.adapters.claude_code import RULES_FILE, ClaudeCodeAdapter
 from sessionorc.screen import Manifest, Rule
+from shiftlead.adapters.claude_code import RULES_FILE, ClaudeCodeAdapter
 
 pytestmark = pytest.mark.unit
 

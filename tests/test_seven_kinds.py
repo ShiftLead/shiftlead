@@ -11,8 +11,8 @@ from pathlib import Path
 from test_ui_repo_page import client, fake
 from test_ui_team_summary import NOW, member
 
-from agentorc.ui import app as ui
 from sessionorc import ledger
+from shiftlead.ui import app as ui
 
 LEDGER = """# Technical debt
 
@@ -172,7 +172,7 @@ def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monke
     """§4.7: pickable rows are *pickable* plus a live check nothing blocks whose build is live; design
     rows *design*; the live-check line a live check nothing blocks whose build is not live; a live
     check blocked by a decision alone is counted and listed nowhere; the *other* flag under the line."""
-    from agentorc import cli
+    from shiftlead import cli
 
     repo = tmp_path / "r"
     repo.mkdir()

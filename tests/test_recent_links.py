@@ -14,14 +14,14 @@ import tempfile
 
 import pytest
 
-from agentorc.adapters.claude_code import ClaudeCodeAdapter, munge
-from agentorc.adapters.claude_code import transcript as transcript_mod
 from sessionorc import adapters
 from sessionorc.adapters import Link
 from sessionorc.client import LocalClient
 from sessionorc.models import NODE_OWNED, RECENT_LINKS, Session
+from shiftlead.adapters.claude_code import ClaudeCodeAdapter, munge
+from shiftlead.adapters.claude_code import transcript as transcript_mod
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 
 def _text(at: str, *texts: str) -> dict:
@@ -131,7 +131,7 @@ def test_the_cursor_advances_past_whole_lines_and_starts_again_past_the_files_en
 
 @pytest.mark.unit
 def test_the_adapter_reads_by_profile_and_answers_none_without_a_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
         f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"

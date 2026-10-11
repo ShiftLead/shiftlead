@@ -12,8 +12,10 @@ from pathlib import Path
 import pytest
 from conftest import run_hook, wait_for
 
-from agentorc import profiles
-from agentorc.adapters.claude_code import (
+from sessionorc.adapters import short_model
+from sessionorc.client import LocalClient
+from shiftlead import profiles
+from shiftlead.adapters.claude_code import (
     AT_COMPOSER_ENV,
     CADENCE_HOOK_LINE,
     HOOK_EVENTS,
@@ -29,9 +31,7 @@ from agentorc.adapters.claude_code import (
     repo_wires_cadence,
     write_hooks_file,
 )
-from agentorc.adapters.claude_code.hook import translate
-from sessionorc.adapters import short_model
-from sessionorc.client import LocalClient
+from shiftlead.adapters.claude_code.hook import translate
 
 pytestmark = pytest.mark.integration  # the hook-script tests spawn processes; split later if wanted
 
@@ -129,15 +129,15 @@ def test_translate_permission_and_questions():
 
 def test_hooks_settings_shape():
     prof = profiles.Profile(name="p", permission_wait=120)
-    h = hooks_settings(prof, "/x/agentorc-hook")["hooks"]
+    h = hooks_settings(prof, "/x/shiftlead-hook")["hooks"]
     assert set(h) >= {"PermissionRequest", "Stop", "Notification", "SessionEnd", "SubagentStop"}
     pr = h["PermissionRequest"][0]["hooks"][0]
-    assert pr["command"] == "/x/agentorc-hook" and pr["timeout"] == 135
+    assert pr["command"] == "/x/shiftlead-hook" and pr["timeout"] == 135
     assert h["Stop"][0]["hooks"][0]["timeout"] == 10
     assert len(h["SessionStart"][0]["hooks"]) == 1  # no cadence line unless asked
-    hc = hooks_settings(prof, "/x/agentorc-hook", cadence_line=True)["hooks"]
+    hc = hooks_settings(prof, "/x/shiftlead-hook", cadence_line=True)["hooks"]
     ss = hc["SessionStart"][0]["hooks"]
-    assert [x["command"] for x in ss] == ["/x/agentorc-hook", CADENCE_HOOK_LINE] and ss[1]["timeout"] >= 130
+    assert [x["command"] for x in ss] == ["/x/shiftlead-hook", CADENCE_HOOK_LINE] and ss[1]["timeout"] >= 130
     # The line runs the main checkout's runner (dev-cadence TD-055 (b), 2026-09-25): the first entry of
     # `git worktree list --porcelain`, falling back to the directory's own copy outside a git repo.
     assert CADENCE_HOOK_LINE.startswith('r=$(git -C "${CLAUDE_PROJECT_DIR:-.}" worktree list --porcelain')
@@ -152,7 +152,7 @@ def _settings(d: Path, commands: list[str]) -> None:
 
 
 def test_repo_wires_cadence_and_layer_choice(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     prof = profiles.Profile(name="p")
     bare = tmp_path / "bare"  # no settings at all: a plain directory, or a repo that is no consumer
     bare.mkdir()
@@ -195,7 +195,7 @@ def test_an_unattended_layer_refuses_the_tools_peer_messages(tmp_path, monkeypat
     from a session in another permission-mode class behind a deliver-or-deny panel no hook reports,
     so an unattended launch refuses them in its layer; an interactive one keeps the tool's default,
     and the two are separate files so concurrent launches never overwrite each other's."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     prof = profiles.Profile(name="p")
     assert "crossSessionInbound" not in hooks_settings(prof)
     assert hooks_settings(prof, unattended=True)["crossSessionInbound"] == "refuse"
@@ -213,14 +213,14 @@ def test_an_unattended_layer_refuses_the_tools_peer_messages(tmp_path, monkeypat
 
 def test_the_hook_command_falls_back_to_the_one_beside_the_interpreter(tmp_path, monkeypatch):
     """TD-301: a container node's host agent runs from its venv with that venv off PATH, so the layer
-    names the `agentorc-hook` beside `sys.executable` rather than a bare name no session resolves."""
-    from agentorc.adapters import claude_code as cc
+    names the `shiftlead-hook` beside `sys.executable` rather than a bare name no session resolves."""
+    from shiftlead.adapters import claude_code as cc
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     venv = tmp_path / "venv" / "bin"
     venv.mkdir(parents=True)
     (venv / "python").write_text("")
-    hook = venv / "agentorc-hook"
+    hook = venv / "shiftlead-hook"
     hook.write_text("#!/bin/sh\n")
     hook.chmod(0o755)
     monkeypatch.setenv("PATH", str(tmp_path / "empty"))
@@ -236,7 +236,7 @@ def test_a_metered_profiles_launch_pins_the_prompt_cache_to_an_hour(tmp_path, mo
     """§4.2a *A metered profile's prompt cache lives an hour* (TD-470): `1h` on a metered profile's
     launch, nothing on a subscription's, and the host agent's own key passed for either billing; the
     subagents' key is left to the tool."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.delenv("CLAUDE_CODE_PROMPT_CACHE_TTL", raising=False)
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
@@ -257,7 +257,7 @@ def test_a_metered_profiles_launch_pins_the_prompt_cache_to_an_hour(tmp_path, mo
 
 
 def test_launch_argv_and_env(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
         "default: paul\nprofiles:\n  paul: {account: paul, model: opus, config_dir: ~/.claude}\n"
@@ -270,8 +270,8 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert spec.first_prompt == "do it" and "--model" in spec.argv and "--name" in spec.argv
     assert not any("do it" in a for a in spec.argv)  # typed at the composer, never passed (TD-339)
     assert "CLAUDE_CONFIG_DIR" not in spec.env or spec.env["CLAUDE_CONFIG_DIR"].endswith(".claude")
-    assert spec.env["AGENTORC_PERMISSION_WAIT"] == "600"
-    assert "AGENTORC_PROFILE" not in spec.env  # read by nothing (TD-149 (8)); the record carries the profile
+    assert spec.env["SHIFTLEAD_PERMISSION_WAIT"] == "600"
+    assert "SHIFTLEAD_PROFILE" not in spec.env  # read by nothing (TD-149 (8)); the record carries the profile
     assert spec.env[AT_COMPOSER_ENV] == "1"  # every launch lands at the composer, its brief typed there (TD-339)
     bare = ad.launch(profile="", resume=None, prompt=None, unattended=False, cwd=tmp_path)
     assert bare.env[AT_COMPOSER_ENV] == "1"
@@ -281,7 +281,7 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     g = ad.launch(profile="grind", resume="abc-123", prompt=None, unattended=True, cwd=tmp_path)
     assert g.adapter_id == "abc-123" and "--resume" in g.argv and "--session-id" not in g.argv
     assert "--dangerously-skip-permissions" in g.argv
-    assert g.env["CLAUDE_CONFIG_DIR"] == "/tmp/cc-grind" and g.env["AGENTORC_PERMISSION_WAIT"] == "30"
+    assert g.env["CLAUDE_CONFIG_DIR"] == "/tmp/cc-grind" and g.env["SHIFTLEAD_PERMISSION_WAIT"] == "30"
     assert AT_COMPOSER_ENV not in g.env  # a resume's own `source: resume` says it
     # the unattended launch carries the refusing layer, the interactive one does not (TD-064 (a))
     g_layer = json.loads(Path(g.argv[g.argv.index("--settings") + 1]).read_text())
@@ -358,7 +358,7 @@ def test_translate_carries_the_model_when_the_payload_has_one():
 def test_model_in_use_reads_the_last_top_level_assistant_turn(tmp_path, monkeypatch):
     """TD-031: the transcript entry's own `message.model`, never a grep, and never a sidechain
     entry — a subagent's model is not the session's."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
         f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
@@ -391,7 +391,7 @@ def test_context_reads_the_last_top_level_turns_usage(tmp_path, monkeypatch):
     """TD-190, design §4.3 `context`: the prompt the last top-level turn sent — input plus both
     cache counts — stamped with that turn's time, and the model's window where the table knows it.
     A sidechain turn is a subagent's, and a cut first line is skipped."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
         f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
@@ -429,7 +429,7 @@ def test_context_prefers_the_window_the_status_line_reported(tmp_path, monkeypat
     """TD-295, design §4.3 `context`: a window the session's status line reported beats the table's —
     a reported 200k on a model the table gives 1M — and its tokens win only when they are later
     than the transcript's last turn; with no turn yet, the report alone is the reading."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(
         f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
@@ -556,9 +556,9 @@ async def test_hook_script_end_to_end(agent, hookstub, tmp_path):
 
 
 def test_hook_script_without_session_is_noop():
-    env = {k: v for k, v in os.environ.items() if k != "AGENTORC_SESSION"}
+    env = {k: v for k, v in os.environ.items() if k != "SHIFTLEAD_SESSION"}
     cp = subprocess.run(
-        [sys.executable, "-m", "agentorc.adapters.claude_code.hook"],
+        [sys.executable, "-m", "shiftlead.adapters.claude_code.hook"],
         input='{"hook_event_name": "Stop"}',
         capture_output=True,
         text=True,
@@ -569,7 +569,7 @@ def test_hook_script_without_session_is_noop():
 
 
 def test_hook_script_queues_when_agent_down(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     cp = run_hook("ao-x-y", {"hook_event_name": "Stop", "session_id": "u"})
     assert cp.returncode == 0
     q = (tmp_path / "home" / "events" / "ao-x-y.jsonl").read_text().strip()
@@ -608,7 +608,7 @@ def test_pid_alive_corroborates_procstart():
 
 
 def test_external_sessions_filters_dead_entries(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
     (tmp_path / "home" / "profiles.yml").write_text(f"profiles:\n  t: {{config_dir: {tmp_path}}}\n")
     (tmp_path / "sessions").mkdir()
@@ -634,7 +634,7 @@ def test_external_sessions_reads_every_profiles_registry(tmp_path, monkeypatch):
     home, a, b = tmp_path / "home", tmp_path / "claude-a", tmp_path / "claude-b"
     for d in (home, a / "sessions", b / "sessions", tmp_path / "other" / "sessions"):
         d.mkdir(parents=True)
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "profiles.yml").write_text(
         f"default: a\nprofiles:\n  a: {{config_dir: {a}}}\n  a2: {{config_dir: {a}, model: sonnet}}\n"
         f"  b: {{config_dir: {b}}}\n  x: {{adapter: other-tool, config_dir: {tmp_path / 'other'}}}\n"
@@ -653,9 +653,9 @@ def test_usage_for_by_profile_name_and_why_when_there_is_no_reading(tmp_path, mo
     and the poll asked again a minute later against an endpoint answering 429."""
     import unittest.mock as um
 
-    from agentorc.adapters.claude_code import Usage, UsageRefused, Window
+    from shiftlead.adapters.claude_code import Usage, UsageRefused, Window
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))  # no profiles.yml: only `default` exists
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))  # no profiles.yml: only `default` exists
     ad = ClaudeCodeAdapter()
     assert ad.usage_for("no-such-profile") == {"reason": "no_profile"}
     u = Usage(
@@ -690,9 +690,9 @@ def test_a_429_is_read_as_rate_limited_with_its_retry_after(tmp_path, monkeypatc
     import unittest.mock as um
     import urllib.error
 
-    from agentorc.adapters.claude_code import UsageRefused
+    from shiftlead.adapters.claude_code import UsageRefused
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     ad = ClaudeCodeAdapter()
     prof = profiles.get(None)
     with um.patch.object(ClaudeCodeAdapter, "_creds", return_value={"accessToken": "t"}):
@@ -736,7 +736,7 @@ def test_title_is_the_tools_own_name_for_the_session_or_nothing():
     """TD-074 step 3, design §4.3 `title()` / §4.5a **title**: the terminal title the tool set, with
     its own decoration off. What is left is a name — often the person's own, given with the tool's
     rename — unless there is nothing left, it is the tool's default, or it is a shell's
-    `user@host: dir` on a pane the tool never titled. Display only: agentorc never sets it."""
+    `user@host: dir` on a pane the tool never titled. Display only: shiftlead never sets it."""
     ad = ClaudeCodeAdapter()
     assert ad.title("✳ Error Checker") == "Error Checker"  # seen on a live pane 2026-09-19
     assert ad.title("  ✻  TD-074 steps 3 and 4  ") == "TD-074 steps 3 and 4"

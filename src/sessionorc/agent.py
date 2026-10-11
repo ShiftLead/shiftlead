@@ -1099,7 +1099,7 @@ class HostAgent(
             base = naming.base_id(directory, repo, name)
             for _attempt in range(5):
                 sid = naming.session_id(directory, repo, name, taken)
-                # Ours win, whatever an adapter sets. AGENTORC_HOME is explicit because the tmux
+                # Ours win, whatever an adapter sets. SHIFTLEAD_HOME is explicit because the tmux
                 # server may predate this agent and carry a different environment; a hook script
                 # inside the session must find *this* agent's socket (found the hard way, 2026-09-06).
                 # AGENT_NAME is the name the Org shows, for whatever in the session signs its work —
@@ -1111,8 +1111,8 @@ class HostAgent(
                 shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
                 env = {
                     **spec.env,
-                    "AGENTORC_SESSION": sid,
-                    "AGENTORC_HOME": str(paths.home()),
+                    "SHIFTLEAD_SESSION": sid,
+                    "SHIFTLEAD_HOME": str(paths.home()),
                     "AGENT_NAME": shown,
                     "CADENCE_ATTENTION_SCOPE": "own" if unattended else "machine",
                 }
@@ -1326,7 +1326,7 @@ class HostAgent(
                     "verdict": "live",
                     "holder": base,
                     "holder_state": "unrecorded",
-                    "message": f"{name} is running outside agentorc — its card appears within a tick",
+                    "message": f"{name} is running outside shiftlead — its card appears within a tick",
                     "hint": f"switch to it with: ao focus {base}",
                 }
                 return out, None
@@ -1535,8 +1535,8 @@ class HostAgent(
         return entries
 
     def occupants(self, directory: Path) -> list[str]:
-        """Who holds the agent slot for `directory` (design §9 invariant 2): agentorc's own live
-        agent sessions, plus live sessions the adapters can see that agentorc did not start
+        """Who holds the agent slot for `directory` (design §9 invariant 2): shiftlead's own live
+        agent sessions, plus live sessions the adapters can see that shiftlead did not start
         (a VS Code terminal running `claude` in the checkout, say). Shells never count."""
         directory = Path(directory).resolve()
         # Runs in a thread while the loop goes on writing these maps in place: iterate copies, taken
@@ -1569,7 +1569,7 @@ class HostAgent(
             if ext.tool_id and ext.tool_id in ours:
                 continue  # that is one of ours, seen through the tool's registry
             if Path(ext.cwd).resolve() == directory:
-                out.append(f"{ext.name} ({ext.adapter}, outside agentorc{', ' + ext.status if ext.status else ''})")
+                out.append(f"{ext.name} ({ext.adapter}, outside shiftlead{', ' + ext.status if ext.status else ''})")
         return out
 
     def pull_occupant(self, directory: Path) -> str | None:
@@ -1578,7 +1578,7 @@ class HostAgent(
         one's state cannot be read, which the pull takes as mid-turn. Unlike `occupants` it counts
         shells (a foreground command may be `git` itself) and reads each record's state: `idle`,
         `exited` and `closed` are at rest, everything else may be a turn under way or about to
-        resume. A session outside agentorc is at rest only when its tool's registry says `idle`."""
+        resume. A session outside shiftlead is at rest only when its tool's registry says `idle`."""
         directory = Path(directory).resolve()
         rest = ("idle", "exited", "closed")
         mine = list(self.sessions.values())  # a copy taken in one step: this runs in a thread
@@ -1602,7 +1602,7 @@ class HostAgent(
 
     def conversation_holders(self, adapter_id: str) -> list[str]:
         """Who is driving the tool conversation `adapter_id` right now (TD-012): a live record of
-        ours, or a live session outside agentorc whose tool id matches. Two panes on one
+        ours, or a live session outside shiftlead whose tool id matches. Two panes on one
         conversation is the failure `resume` must not create; an exited record is superseded
         instead (`_supersede`)."""
         out = [
@@ -1613,7 +1613,7 @@ class HostAgent(
         ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
         for ext in adapters.external_sessions():
             if ext.tool_id == adapter_id and ext.tool_id not in ours:
-                out.append(f"{ext.name} ({ext.adapter}, outside agentorc{', ' + ext.status if ext.status else ''})")
+                out.append(f"{ext.name} ({ext.adapter}, outside shiftlead{', ' + ext.status if ext.status else ''})")
         return out
 
     async def rpc_occupancy(self, dir: str) -> dict[str, Any]:
@@ -2866,7 +2866,7 @@ async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="agentorc-agent", description=__doc__)
+    ap = argparse.ArgumentParser(prog="shiftlead-agent", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("serve", help="run the host agent (foreground)")
     sub.add_parser("rpc", help="stdin/stdout JSON-lines bridge to the local socket (used over ssh)")
@@ -2878,9 +2878,9 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if args.cmd == "serve":
-        # `AGENTORC_TMUX_SOCKET` names a private tmux server (TD-298), as the tests and `scripts/look_home.py`
+        # `SHIFTLEAD_TMUX_SOCKET` names a private tmux server (TD-298), as the tests and `scripts/look_home.py`
         # use: a scratch home's agent never lists or drives the default server's sessions.
-        tmux = Tmux(socket_name=os.environ.get("AGENTORC_TMUX_SOCKET") or None)
+        tmux = Tmux(socket_name=os.environ.get("SHIFTLEAD_TMUX_SOCKET") or None)
         asyncio.run(serve_until_signal(HostAgent(tmux=tmux)))
         return 0
     if args.cmd == "rpc":

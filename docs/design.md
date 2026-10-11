@@ -1,6 +1,6 @@
 # ShiftLead — design
 
-*ShiftLead is the project's name (shiftlead.dev). This document says `agentorc` wherever it names the
+*ShiftLead is the project's name (shiftlead.dev). This document says `shiftlead` wherever it names the
 packages, the state directory, the units, the config file or the command's home, because those are
 still their names: the machine-side rename is TD-060's second step, at a release boundary. The command
 is `ao`.*
@@ -19,7 +19,7 @@ The design is the files under [`design/`](design/), one per section and one per 
 grep the directory, read a section by its file.
 
 - **§1** [Problem](design/1-problem.md) — the person running many agent sessions across hosts, and what that costs them today.
-- **§2** [Goals](design/2-goals.md) — what agentorc must do, and what it does not try to.
+- **§2** [Goals](design/2-goals.md) — what shiftlead must do, and what it does not try to.
 - **§3** [Prior art](design/3-prior-art.md) — the tools surveyed, what was taken from each, and why none is the substrate.
 - **§4** [Architecture](design/4-architecture.md) — the picture: browser, UI, host agents, tmux, and the home that joins them.
 - **§4.1** [Session substrate: tmux, one session per conversation](design/4.1-session-substrate.md) — one tmux session per conversation; names, the anchor rule, worktrees, plain shells.
@@ -34,14 +34,14 @@ grep the directory, read a section by its file.
 - **§4.5c** [Product direction](design/4.5c-product-direction.md) — the two products this architecture serves, and who owns the host in each.
 - **§4.6** [Transport and terminal mechanics](design/4.6-transport.md) — the links between UI, host agents and panes; reconnects, backoff, `unreachable`.
 - **§4.7** [CLI](design/4.7-cli.md) — the `ao` command: its verbs, its JSON, what each one mutates.
-- **§4.8** [Capabilities, report channels, and role presets](design/4.8-capabilities-roles.md) — what a session may do to agentorc: grants, controllers, report channels, role presets, briefs.
+- **§4.8** [Capabilities, report channels, and role presets](design/4.8-capabilities-roles.md) — what a session may do to shiftlead: grants, controllers, report channels, role presets, briefs.
 - **§4.8a** [Who is calling: identity on one host (TD-077)](design/4.8a-identity.md) — how the host agent knows which session is calling, and what its gates are and are not.
 - **§4.9** [Org, Team, Project: the definitions above a session](design/4.9-org-team-project.md) — the org, its teams and projects; how a team is defined, started and stopped.
 - **§4.9a** [Winding down: a team that runs out of work](design/4.9a-winding-down.md) — how a team that runs out of work winds down, and a run's three words.
 - **§4.9b** [The techlead: a go-between for what would reach the person (TD-075)](design/4.9b-techlead.md) — the techlead seat: what it reads, what it answers, and what still reaches the person.
 - **§4.9c** [Flows: the path an entry takes through a team](design/4.9c-flows.md) — the path an entry takes through a team: flows, stages, `held:` and the review.
 - **§4.10** [Messages between sessions](design/4.10-messages.md) — mail between sessions and to the person: kinds, bounds, outcomes, threads, looks.
-- **§5** [Configuration](design/5-configuration.md) — the settings file, the repo's `.agentorc.yml`, and where each setting lives.
+- **§5** [Configuration](design/5-configuration.md) — the settings file, the repo's `.shiftlead.yml`, and where each setting lives.
 - **§6** [Policies (the tdgrind supervisor, generalized)](design/6-policies.md) — the tick's policies: usage gates, run windows, restarts, promote, balance.
 - **§7** [Phases](design/7-phases.md) — the phase plan, re-baselined against what runs, and what each phase still lacks.
 - **§8** [Lessons carried in (dev-cadence + tdgrind)](design/8-lessons.md) — lessons carried in from dev-cadence and tdgrind.

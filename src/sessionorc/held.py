@@ -121,7 +121,7 @@ def addressed(addr: str, readers: list[str]) -> str | None:
     """Which of a chain's `readers` — each the seat's name as the definition gives it (§4.9c) — a
     mail address names: the session id `ao-<scope>-<name>`, on this host or `@<host>`, or the name
     itself. The longest name that fits wins, so `ui-reader` is never taken for `reader`. None: none.
-    Here since rule 11 reads a chain at the home (TD-349); `agentorc.review` re-exports it."""
+    Here since rule 11 reads a chain at the home (TD-349); `shiftlead.review` re-exports it."""
     base = str(addr).split("@", 1)[0]
     fits = [r for r in readers if base == r or base.endswith(f"-{r}")]
     return max(fits, key=len) if fits else None
@@ -166,9 +166,7 @@ def read_by(s: Session, pr: int, files: Iterable[str] | None = None) -> str | No
         return None
     links = review_links(review)
     readers = [str(x.get("reader") or "") for x in links]
-    holding = [
-        x for x in links if files is None or any(matches(f, g) for f in files for g in x.get("held") or [])
-    ]
+    holding = [x for x in links if files is None or any(matches(f, g) for f in files for g in x.get("held") or [])]
     threads: dict[str, set[str]] = {}  # an ask's thread → the readers it was addressed to
     for e in s.outbox:
         if e.kind == "ask" and e.pr == pr:
@@ -239,7 +237,7 @@ def line(c: dict[str, Any], reader: str) -> str:
     """The fixed line typed into an idle member's composer."""
     to = "person" if reader == "person" else "<seat>"
     return (
-        f"[agentorc] {said(c, reader)} — a held PR waits for "
+        f"[shiftlead] {said(c, reader)} — a held PR waits for "
         f'`ao msg --kind ask --pr <n> {to} "…"` and the reply before the merge'
     )
 
