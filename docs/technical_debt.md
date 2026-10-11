@@ -41,7 +41,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-549 | "Every page" draws the build chip, but only `/` and `/inbox` are tested: `Focus`'s line can be removed with the suite green | Low | Open |
 
 ---
 
@@ -590,19 +589,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
-
-## TD-549: "Every page" draws the build chip, but only `/` and `/inbox` are tested: `Focus`'s line can be removed with the suite green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/agentorc/ui/app.py` (`chip_build(call)` in `focus`, `transcript`, `repo_page`, and the other page contexts #1500 touched); `tests/test_ui_promote.py::test_every_page_and_the_inbox_poll_draw_the_build_chip`
-
-**Why:** the test's name and docstring say *"on every page, always drawn"*, and the design (§4.5a) says the chip is on every page. The loop is `for path in ("/", "/inbox")`. #1500 added `build_chip` to the Focus, Transcript and Repo contexts (and more further down `app.py`), and `base.html` draws the chip only when the context holds one, so a page that forgets the key shows no chip. Probe: delete `"build_chip": await chip_build(call),` from the `focus` handler's context (`app.py` ~1322) and run all of `tests/` with `-x` — passes.
-
-**Fix:** extend that loop to one URL per template that extends `base.html` (a Focus, a Transcript, a Repo page, Settings, the Hosts and Teams pages the fixture can reach), or walk the routes' template names against `base.html`'s chip once; expect `id="buildchip"` in each.
-
-**Related:** TD-539 (the build), TD-548.
