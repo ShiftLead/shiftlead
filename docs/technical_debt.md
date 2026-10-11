@@ -44,43 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-552 | The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc` | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 
-## TD-552: The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-11 (the anchor, split from TD-060 (b) on Paul's word)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/mockups/gen.py` (46 hits; the mockup HTML it writes follows from a regeneration), `docs/design/` (26 hits in seven sections: 4.1, 4.4a, 4.7, 4.9, 4.9c, 5, 10), `docs/glossary.md`, `README.md`, `CLAUDE.md`'s documentation map, `docs/claude-memory/` (the live pointers — `~/agentorc`, `agentorc-venv`, `~/.agentorc`, `AGENTORC_*` — in `MEMORY.md` and six memories: `agentorc-td-grind-mechanics`, `check-in-flight-before-a-td-step`, `headless-screenshots-on-kmaster`, `live-system-restart-authorized`, `reviewer-prompts-keep-out-of-the-anchor`, `scratchpad-too-long-for-unix-sockets`; the word elsewhere in the memories is mostly a dated incident), `scripts/split_design.py`. (`agentorc.code-workspace` is untracked and ignored — `*.code-workspace` — so it is a local rename in the checkout, not this PR's.)
-
-**Why:** the rename (TD-060) moved the machine names and the live briefs; the rest of the text still says `agentorc` where it means what is true now, so a reader follows a path, a variable or a unit that no longer exists.
-
-**Fix:** replace a name that says what is true now (`agentorc` the product → ShiftLead, `src/agentorc/` → `src/shiftlead/`, `~/.agentorc` → `~/.shiftlead`, `AGENTORC_*` → `SHIFTLEAD_*`, `agentorc-venv` → `shiftlead-venv`, `~/agentorc` → `~/shiftlead`), and **leave dated records as written**: `docs/design-history.md`, `docs/decisions/`, `docs/briefs/archive/`, the ledger archive, `docs/user_attention_archive.md`, an ADR title, a memory's dated incident, a closed session's `ao-agentorc-…` id, and the README's *was `agentorc`* line. The `.agentorc.yml` fallback's sentences in the design stay until TD-553 removes the fallback. Mockups: edit `gen.py` and regenerate (`docs/mockups/README.md`), never the HTML by hand. `docs/cadence*.md` and `scripts/cadence_hooks.sh`, `check_cadence.py`, `ledger.py` are SYNCED FILES: they are dev-cadence's TD-091 and arrive by its sync, not here. A memory edit lands by this PR, never uncommitted in the main checkout (it blocks auto promote). §4.5a's help list is bound to `help.py`; leave its wording to a build entry if a name is in it.
-
-**Done when** `git grep -i agentorc` outside the dated records above, the synced files and the fallback's code and sentences returns nothing, and the mockups regenerate unchanged from `gen.py`.
-
-**Related:** TD-060, TD-553, dev-cadence TD-091.
-
-## TD-553: Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-11 (the anchor, split from TD-060 (c) on Paul's word)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — until each of the three repos' `main` carries `.shiftlead.yml` and no `.agentorc.yml` (samscrape's by the anchor's PR, samscrape #1077, 2026-10-11; the other two are the entries below); read each with `git -C ~/<repo> ls-tree origin/main --name-only` before the pick.
-**Blocked by:** contractmatch#TD-055, dev-cadence#TD-091
-**Location:** `src/sessionorc/paths.py` (`LEGACY_REPO_FILE`, `repo_file`), `src/shiftlead/org.py:1044`, `src/shiftlead/repoconfig.py` (536, 576), `src/shiftlead/migrate.py`'s docstring (21, 36), `tests/test_migrate.py:92`, and the design's sentences on the fallback (`docs/design/4.7-cli.md:373`, `5-configuration.md:124`).
-
-**Why:** the rename read a repo's `.agentorc.yml` as a fallback (TD-060 step 2) so the other repos could rename theirs by their own PRs. Once they have, the fallback is code that reads a file nobody writes.
-
-**Fix:** delete `LEGACY_REPO_FILE` and every use of it; `repo_file` returns `<root>/.shiftlead.yml`; a repo that still has only `.agentorc.yml` then has no repo file — `ao doctor` names the file to rename (one line, `org`'s check). The design's fallback sentences go in the same PR, the dated fact to `docs/design-history.md`. It is grinder-ao-1's (its lane is `src/sessionorc/**`), and its claim names the `repoconfig.py` and `org.py` lines it touches in grinder-ao-2's lane.
-
-**Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
-
-**Related:** TD-060, TD-552.
-
 ---
 
 <!-- Entry template:
@@ -628,3 +591,40 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the cadence check's `ledger` row, fail a PR whose diff removes a `## TD-NNN:` heading from `docs/technical_debt_archive.md`, naming the ids (a rebase's conflict resolution that drops one shows the same way). Being a SYNCED FILE, it is made in dev-cadence and synced here. **Done when** a PR deleting an archived entry's heading fails the `ledger` row.
 
 **Related:** TD-461 (#1421).
+
+## TD-552: The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (the anchor, split from TD-060 (b) on Paul's word)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/mockups/gen.py` (46 hits; the mockup HTML it writes follows from a regeneration), `docs/design/` (26 hits in seven sections: 4.1, 4.4a, 4.7, 4.9, 4.9c, 5, 10), `docs/glossary.md`, `README.md`, `CLAUDE.md`'s documentation map, `docs/claude-memory/` (the live pointers — `~/agentorc`, `agentorc-venv`, `~/.agentorc`, `AGENTORC_*` — in `MEMORY.md` and six memories: `agentorc-td-grind-mechanics`, `check-in-flight-before-a-td-step`, `headless-screenshots-on-kmaster`, `live-system-restart-authorized`, `reviewer-prompts-keep-out-of-the-anchor`, `scratchpad-too-long-for-unix-sockets`; the word elsewhere in the memories is mostly a dated incident), `scripts/split_design.py`. (`agentorc.code-workspace` is untracked and ignored — `*.code-workspace` — so it is a local rename in the checkout, not this PR's.)
+
+**Why:** the rename (TD-060) moved the machine names and the live briefs; the rest of the text still says `agentorc` where it means what is true now, so a reader follows a path, a variable or a unit that no longer exists.
+
+**Fix:** replace a name that says what is true now (`agentorc` the product → ShiftLead, `src/agentorc/` → `src/shiftlead/`, `~/.agentorc` → `~/.shiftlead`, `AGENTORC_*` → `SHIFTLEAD_*`, `agentorc-venv` → `shiftlead-venv`, `~/agentorc` → `~/shiftlead`), and **leave dated records as written**: `docs/design-history.md`, `docs/decisions/`, `docs/briefs/archive/`, the ledger archive, `docs/user_attention_archive.md`, an ADR title, a memory's dated incident, a closed session's `ao-agentorc-…` id, and the README's *was `agentorc`* line. The `.agentorc.yml` fallback's sentences in the design stay until TD-553 removes the fallback. Mockups: edit `gen.py` and regenerate (`docs/mockups/README.md`), never the HTML by hand. `docs/cadence*.md` and `scripts/cadence_hooks.sh`, `check_cadence.py`, `ledger.py` are SYNCED FILES: they are dev-cadence's TD-091 and arrive by its sync, not here. A memory edit lands by this PR, never uncommitted in the main checkout (it blocks auto promote). §4.5a's help list is bound to `help.py`; leave its wording to a build entry if a name is in it.
+
+**Done when** `git grep -i agentorc` outside the dated records above, the synced files and the fallback's code and sentences returns nothing, and the mockups regenerate unchanged from `gen.py`.
+
+**Related:** TD-060, TD-553, dev-cadence TD-091.
+
+## TD-553: Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (the anchor, split from TD-060 (c) on Paul's word)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — until each of the three repos' `main` carries `.shiftlead.yml` and no `.agentorc.yml` (samscrape's by the anchor's PR, samscrape #1077, 2026-10-11; the other two are the entries below); read each with `git -C ~/<repo> ls-tree origin/main --name-only` before the pick.
+**Blocked by:** contractmatch#TD-055, dev-cadence#TD-091
+**Location:** `src/sessionorc/paths.py` (`LEGACY_REPO_FILE`, `repo_file`), `src/shiftlead/org.py:1044`, `src/shiftlead/repoconfig.py` (536, 576), `src/shiftlead/migrate.py`'s docstring (21, 36), `tests/test_migrate.py:92`, and the design's sentences on the fallback (`docs/design/4.7-cli.md:373`, `5-configuration.md:124`).
+
+**Why:** the rename read a repo's `.agentorc.yml` as a fallback (TD-060 step 2) so the other repos could rename theirs by their own PRs. Once they have, the fallback is code that reads a file nobody writes.
+
+**Fix:** delete `LEGACY_REPO_FILE` and every use of it; `repo_file` returns `<root>/.shiftlead.yml`; a repo that still has only `.agentorc.yml` then has no repo file — `ao doctor` names the file to rename (one line, `org`'s check). The design's fallback sentences go in the same PR, the dated fact to `docs/design-history.md`. It is grinder-ao-1's (its lane is `src/sessionorc/**`), and its claim names the `repoconfig.py` and `org.py` lines it touches in grinder-ao-2's lane.
+
+**Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
+
+**Related:** TD-060, TD-552.
