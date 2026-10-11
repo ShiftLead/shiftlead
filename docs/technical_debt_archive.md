@@ -9687,4 +9687,4 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 
 **Related:** TD-552, TD-060.
 
-**Resolved:** 2026-10-11 (PR #N) — every `src/agentorc/` in the open entries now reads `src/shiftlead/` (each path checked to exist there, except `adapters/<tool>/`, a pattern, and TD-055's `briefs/orchestrator.md`, a file removed long before the rename); TD-299's Location names `~/.shiftlead/` and TD-460's `.shiftlead.yml`. `git grep "src/agentorc/" docs/technical_debt.md` finds nothing.
+**Resolved:** 2026-10-11 (PR #1523) — every `src/agentorc/` in the open entries now reads `src/shiftlead/` (each path checked to exist there, except `adapters/<tool>/`, a pattern, and TD-055's `briefs/orchestrator.md`, a file removed long before the rename); TD-299's Location names `~/.shiftlead/` and TD-460's `.shiftlead.yml`. `git grep "src/agentorc/" docs/technical_debt.md` finds nothing.
