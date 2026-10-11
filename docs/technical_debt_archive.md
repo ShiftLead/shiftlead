@@ -9590,3 +9590,21 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-539 (the build), TD-547.
 
 **Resolved:** 2026-10-11 (PR #1509) — `tests/test_build.py::test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row` hands `build_chip` linked nodes (up and stale, stale but down, up and fresh, not a dict) and expects only the first named `, stale`; with `build.info` monkeypatched to another commit it expects `this page: …`, and to the same commit none. Dropping the comprehension's condition, its `up`, or the `page` line each fails it.
+
+## TD-549: "Every page" draws the build chip, but only `/` and `/inbox` are tested: `Focus`'s line can be removed with the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/app.py` (`chip_build(call)` in `focus`, `transcript`, `repo_page`, and the other page contexts #1500 touched); `tests/test_ui_promote.py::test_every_page_and_the_inbox_poll_draw_the_build_chip`
+
+**Why:** the test's name and docstring say *"on every page, always drawn"*, and the design (§4.5a) says the chip is on every page. The loop is `for path in ("/", "/inbox")`. #1500 added `build_chip` to the Focus, Transcript and Repo contexts (and more further down `app.py`), and `base.html` draws the chip only when the context holds one, so a page that forgets the key shows no chip. Probe: delete `"build_chip": await chip_build(call),` from the `focus` handler's context (`app.py` ~1322) and run all of `tests/` with `-x` — passes.
+
+**Fix:** extend that loop to one URL per template that extends `base.html` (a Focus, a Transcript, a Repo page, Settings, the Hosts and Teams pages the fixture can reach), or walk the routes' template names against `base.html`'s chip once; expect `id="buildchip"` in each.
+
+**Related:** TD-539 (the build), TD-548.
+
+**Resolved:** 2026-10-11 (PR #1510) — `tests/test_ui_build_chip_pages.py` reads a chip only `chip_build`'s monkeypatch writes on every page that extends `base.html` (Org, Inbox, the message page, Focus, Transcript, New, Help, Settings on the host agent; Repo through a fake client), and walks the templates so a new page that extends `base.html` must be added. Each of the nine handlers' `build_chip` lines, removed in turn, fails it.
