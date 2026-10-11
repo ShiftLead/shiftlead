@@ -195,6 +195,7 @@ def test_install_system_removes_the_old_units_only_when_their_server_holds_no_se
     monkeypatch.setattr(service, "SYSTEM_DIR", etc)
     monkeypatch.setattr(service.os, "geteuid", lambda: 0)
     monkeypatch.setattr(service, "_server_answers", lambda uid: False)
+    assert service.LEGACY_SYSTEM_UNITS == ("agentorc-tmux.service", "agentorc-watch.timer", "agentorc-watch.service")
     present = ["agentorc-tmux.service", "agentorc-watch.timer"]  # agentorc-watch.service is absent
     for u in present:
         (etc / u).write_text("[Service]\n")
