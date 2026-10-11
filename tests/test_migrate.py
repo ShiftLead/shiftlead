@@ -98,3 +98,118 @@ def test_a_repo_that_has_not_renamed_its_file_is_read_from_the_legacy_name(tmp_p
     (tmp_path / ".shiftlead.yml").write_text("ledger: docs/new.md\n")
     assert paths.repo_file(tmp_path) == tmp_path / ".shiftlead.yml"
     assert repoconfig.load(tmp_path).ledger == "docs/new.md"
+
+
+def test_migrate_rewrites_the_venv_and_scripts_reloads_after_the_units_go_and_leaves_symlinks(tmp_path):
+    old = _old_home(tmp_path)
+    (old / "launch" / "ao-y.json").write_text(json.dumps({"cmd": "/h/agentorc-venv/bin/agentorc-hook agentorc-ui"}))
+    (old / "nodes" / "cm" / "home" / "profiles.yml").write_text("hook: /h/agentorc-venv/bin/agentorc-watch\n")
+    outside = tmp_path / "outside"
+    (outside / "venv").mkdir(parents=True)
+    (outside / "linked.yml").write_text("venv: /h/agentorc-venv\n")
+    (old / "linked.yml").symlink_to(outside / "linked.yml")
+    (old / "nodes" / "dm").mkdir()
+    (old / "nodes" / "dm" / "venv").symlink_to(outside / "venv")
+    new = tmp_path / ".shiftlead"
+    units = tmp_path / "units"
+    units.mkdir()
+    for u in migrate.OLD_UNITS:
+        (units / f"{u}.service").write_text("[Unit]\n")
+    seen: list[tuple[str, ...]] = []
+    left_at_reload: list[list[Path]] = []
+
+    def systemctl(*args: str) -> subprocess.CompletedProcess[str]:
+        seen.append(args)
+        if args == ("daemon-reload",):
+            left_at_reload.append(list(units.iterdir()))
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    migrate.run(old=old, new=new, unit_dir=units, sessions=lambda: [], systemctl=systemctl)
+    assert json.loads((new / "launch" / "ao-y.json").read_text()) == {
+        "cmd": "/h/shiftlead-venv/bin/shiftlead-hook shiftlead-ui"
+    }
+    assert (
+        new / "nodes" / "cm" / "home" / "profiles.yml"
+    ).read_text() == "hook: /h/shiftlead-venv/bin/shiftlead-watch\n"
+    # the reload comes after the disable, once the unit files are gone
+    assert seen == [("disable", "--now", "agentorc-agent.service", "agentorc-ui.service"), ("daemon-reload",)]
+    assert left_at_reload == [[]]
+    # a symlink is followed by neither the rewrite nor the venv removal
+    assert (outside / "linked.yml").read_text() == "venv: /h/agentorc-venv\n"
+    assert (new / "nodes" / "dm" / "venv").is_symlink() and (outside / "venv").is_dir()
+
+
+@pytest.mark.parametrize(
+    ("returncode", "stdout", "stderr", "want"),
+    [
+        (0, "ao-a\nao-b\n", "", ["ao-a", "ao-b"]),
+        (1, "", "no server running on /tmp/tmux-1000/default\n", []),
+        (1, "", "error connecting to /tmp/tmux-1000/default (No such file or directory)\n", []),
+        (1, "", "no sessions\n", []),
+        (1, "", "lost server\n", ["(tmux: lost server)"]),
+        (1, "", "", ["(tmux: unreadable)"]),
+    ],
+)
+def test_live_sessions_reads_a_server_that_errors_as_a_session(monkeypatch, returncode, stdout, stderr, want):
+    def run(argv, **kw):
+        assert argv[:2] == ["tmux", "list-sessions"]
+        return subprocess.CompletedProcess(argv, returncode, stdout, stderr)
+
+    monkeypatch.setattr(migrate.subprocess, "run", run)
+    assert migrate.live_sessions() == want
+
+
+def test_live_sessions_without_tmux_is_empty(monkeypatch):
+    def run(argv, **kw):
+        raise FileNotFoundError("tmux")
+
+    monkeypatch.setattr(migrate.subprocess, "run", run)
+    assert migrate.live_sessions() == []
+
+
+def test_environment_warning_names_the_old_variables(monkeypatch):
+    for k in [k for k in migrate.os.environ if k.startswith("AGENTORC_")]:
+        monkeypatch.delenv(k)
+    assert migrate.environment_warning() is None
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    monkeypatch.setenv("AGENTORC_HOME", "/h")
+    assert migrate.environment_warning() == "this shell still carries AGENTORC_HOME, AGENTORC_SESSION: open a new one"
+
+
+def test_next_steps_put_root_first_then_the_user_units():
+    from shiftlead import service
+
+    steps = migrate.next_steps()
+    assert steps[0] == service.system_line()
+    assert steps[1].endswith("ao service install")
+
+
+def test_cmd_migrate_prints_what_was_done_and_the_steps_and_exits_1_when_refused(monkeypatch, capsys):
+    from shiftlead import cli
+
+    monkeypatch.setattr(migrate, "run", lambda: ["moved /h/.agentorc to /h/.shiftlead"])
+    monkeypatch.setattr(migrate, "next_steps", lambda: ["sudo root-line", "ao service install"])
+    monkeypatch.setattr(
+        migrate, "environment_warning", lambda: "this shell still carries AGENTORC_HOME: open a new one"
+    )
+    assert cli.main(["migrate"]) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "moved /h/.agentorc to /h/.shiftlead",
+        "then:",
+        "  sudo root-line",
+        "  ao service install",
+        "this shell still carries AGENTORC_HOME: open a new one",
+    ]
+    assert cli.main(["--json", "migrate"]) == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "done": ["moved /h/.agentorc to /h/.shiftlead"],
+        "next": ["sudo root-line", "ao service install"],
+        "warning": "this shell still carries AGENTORC_HOME: open a new one",
+    }
+
+    def refused():
+        raise RuntimeError("1 session(s) still run (ao-x): close them first, then migrate")
+
+    monkeypatch.setattr(migrate, "run", refused)
+    assert cli.main(["migrate"]) == 1
+    assert "1 session(s) still run (ao-x)" in capsys.readouterr().err
