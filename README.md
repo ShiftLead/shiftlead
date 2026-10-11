@@ -2,7 +2,7 @@
 
 *The project is **ShiftLead** ([shiftlead.dev](https://shiftlead.dev)), decided 2026-09-21; the command is `ao`.
 The packages, the state directory, the units and the config file carry the name since 2026-10-10 (TD-060;
-`ao migrate` moves a machine from the old names once), and the repo is `eyecantell/shiftlead` since 2026-10-11.
+`ao migrate` moves a machine from the old names once), and the repo is `ShiftLead/shiftlead` since 2026-10-11.
 Was `sessionherd` for the first day of design, and `agentorc` from 2026-09-04 to 2026-10-10, to sit beside [cmdorc](https://github.com/eyecantell/textual-cmdorc).*
 
 A self-hosted web dashboard that orchestrates interactive AI coding-agent sessions (Claude Code first;
