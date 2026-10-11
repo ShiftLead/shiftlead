@@ -9608,3 +9608,23 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-539 (the build), TD-548.
 
 **Resolved:** 2026-10-11 (PR #1510) — `tests/test_ui_build_chip_pages.py` reads a chip only `chip_build`'s monkeypatch writes on every page that extends `base.html` (Org, Inbox, the message page, Focus, Transcript, New, Help, Settings on the host agent; Repo through a fake client), and walks the templates so a new page that extends `base.html` must be added. Each of the nine handlers' `build_chip` lines, removed in turn, fails it.
+
+## TD-552: The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (the anchor, split from TD-060 (b) on Paul's word)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/mockups/gen.py` (46 hits; the mockup HTML it writes follows from a regeneration), `docs/design/` (26 hits in seven sections: 4.1, 4.4a, 4.7, 4.9, 4.9c, 5, 10), `docs/glossary.md`, `README.md`, `CLAUDE.md`'s documentation map, `docs/claude-memory/` (the live pointers — `~/agentorc`, `agentorc-venv`, `~/.agentorc`, `AGENTORC_*` — in `MEMORY.md` and six memories: `agentorc-td-grind-mechanics`, `check-in-flight-before-a-td-step`, `headless-screenshots-on-kmaster`, `live-system-restart-authorized`, `reviewer-prompts-keep-out-of-the-anchor`, `scratchpad-too-long-for-unix-sockets`; the word elsewhere in the memories is mostly a dated incident), `scripts/split_design.py`. (`agentorc.code-workspace` is untracked and ignored — `*.code-workspace` — so it is a local rename in the checkout, not this PR's.)
+
+**Why:** the rename (TD-060) moved the machine names and the live briefs; the rest of the text still says `agentorc` where it means what is true now, so a reader follows a path, a variable or a unit that no longer exists.
+
+**Fix:** replace a name that says what is true now (`agentorc` the product → ShiftLead, `src/agentorc/` → `src/shiftlead/`, `~/.agentorc` → `~/.shiftlead`, `AGENTORC_*` → `SHIFTLEAD_*`, `agentorc-venv` → `shiftlead-venv`, `~/agentorc` → `~/shiftlead`), and **leave dated records as written**: `docs/design-history.md`, `docs/decisions/`, `docs/briefs/archive/`, the ledger archive, `docs/user_attention_archive.md`, an ADR title, a memory's dated incident, a closed session's `ao-agentorc-…` id, and the README's *was `agentorc`* line. The `.agentorc.yml` fallback's sentences in the design stay until TD-553 removes the fallback. Mockups: edit `gen.py` and regenerate (`docs/mockups/README.md`), never the HTML by hand. `docs/cadence*.md` and `scripts/cadence_hooks.sh`, `check_cadence.py`, `ledger.py` are SYNCED FILES: they are dev-cadence's TD-091 and arrive by its sync, not here. A memory edit lands by this PR, never uncommitted in the main checkout (it blocks auto promote). §4.5a's help list is bound to `help.py`; leave its wording to a build entry if a name is in it.
+
+**Done when** `git grep -i agentorc` outside the dated records above, the synced files and the fallback's code and sentences returns nothing, and the mockups regenerate unchanged from `gen.py`.
+
+**Related:** TD-060, TD-553, dev-cadence TD-091.
+
+**Resolved:** 2026-10-11 (PR #1520) — `gen.py` and its regeneration (every artboard equal to main's with the one word changed), the design's §10, §4.1, §4.4a, §4.7, §4.9 and §4.9c, the glossary, the mockups' README and `shot.sh`, `split_design.py`'s blurbs, the memories' live pointers (two slugs renamed with their links) and the board's live commands (lines 11, 12, 15, 16) name ShiftLead's names. `git grep -i agentorc` outside the dated records, the synced files, the fallback (TD-553), `src/`, `tests/` and the ledger now finds only dated text: §10's 2026-09-04 *Name* line, the canvas brief, `docs/mockups/reviews/`, CLAUDE.md's ADR title, the README's *was* line, memories' dated incidents, board lines 19–20.
