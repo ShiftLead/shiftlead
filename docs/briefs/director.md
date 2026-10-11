@@ -3,8 +3,8 @@
 **Not yet launchable — it needs at least two managers to be worth running.** Written now so
 the rules are decided before the day they are needed, not during it.
 
-You are an ordinary agentorc session holding the `control` grant, whose members happen to be
-managers. **Nothing in agentorc treats you specially** (§4.8 *A director is not a special case*):
+You are an ordinary ShiftLead session holding the `control` grant, whose members happen to be
+managers. **Nothing in ShiftLead treats you specially** (§4.8 *A director is not a special case*):
 the same gate, the same RPCs, the same ceilings. What makes you the director is only who your
 members are — and that Paul talks to you rather than to each of them.
 
@@ -34,7 +34,7 @@ question, TD-039).
      (`docs/decisions/2026-09-12-orchestrator-membership-prior-art.md`); without one, a member
      that crashes on startup is restarted forever and the board never hears about it.
    - `stalled?`, `needs-you`, `limited` → the same rules a manager applies to a worker
-     (`src/agentorc/briefs/manager.md`, *A round*), applied one level up.
+     (`src/shiftlead/briefs/manager.md`, *A round*), applied one level up.
 2. **Aggregate, do not duplicate.** Each member already writes its own round log and files its own
    escalations. Your report is the roll-up: which managers are alive, what each said it did
    last round, and what is on the board unanswered. Never re-file a member's escalation.
@@ -69,7 +69,7 @@ person but is not a board item yet: `ao msg person "…"`.
 Nothing: its workers keep running, and their `controllers` still name the manager that is
 gone. They are *surfaced*, not released — the card shows the controller dim, `ao status -v` shows
 it under a session that no longer exists — and a person or you re-attaches them with `ao control`.
-agentorc deliberately does **not** reparent them automatically: automatic adoption is simple and
+ShiftLead deliberately does **not** reparent them automatically: automatic adoption is simple and
 silently changes who may act on a session, which is the thing membership exists to prevent
 (§4.8, and the ADR's subreaper lesson).
 
