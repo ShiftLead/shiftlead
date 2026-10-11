@@ -41,6 +41,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
+| TD-547 | The build chip's browser half (`drawBuildChip`, `buildStamp`, the Inbox poll's redraw) has no test: delete it and the suite stays green | Low | Open |
+| TD-548 | `common.build_chip`'s stale-node list and the page's own build are untested: the two lines can go and `test_build.py` and `test_ui_promote.py` stay green | Low | Open |
+| TD-549 | "Every page" draws the build chip, but only `/` and `/inbox` are tested: `Focus`'s line can be removed with the suite green | Low | Open |
+| TD-550 | The tick keeps a record's `files` when a read fails and saves when only the list moved: neither is tested, and the failing form empties the list | Low | Open |
+| TD-551 | The links read's `state == "closed"` skip is untested: a closed record's transcript is read every minute with the suite green | Low | Open |
 
 ---
 
@@ -590,3 +595,82 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
+## TD-547: The build chip's browser half (`drawBuildChip`, `buildStamp`, the Inbox poll's redraw) has no test: delete it and the suite stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`buildStamp`, `drawBuildChip`, the `if (got.build_chip) drawBuildChip(...)` line in the Inbox poll); `tests/test_ui_promote.py::test_every_page_and_the_inbox_poll_draw_the_build_chip`
+
+**Why:** the comment #1500 wrote says the chip is *"Drawn at load and again from each Inbox poll's `build_chip`, so a merge shows without a reload"* and reprints *live <MM-DD HH:MM>* "in the browser's zone — the year in front only when it is not this one". Every test of it is server-side: `test_ui_promote.py` greps the HTML for `data-at`/`data-rest` and the poll's JSON for `build_chip`, and `grep -rn 'drawBuildChip\|buildStamp' tests/` finds nothing. Probes, each run over all of `tests/` in a scratch worktree: delete `drawBuildChip(null);` (the load draw), delete `if (got.build_chip) drawBuildChip(got.build_chip);` (the poll redraw), and replace the year rule with `return false ? md` — each `pytest -x` run passes. So the page can show the server's sentence in the server's zone, never refresh after a merge, or print the wrong year, and nothing fails.
+
+**Fix:** a node probe in the style of `tests/test_recent_links.py::PROBE`: load `app.js`, call `drawBuildChip({at, rest, ...})` on a stub element and expect `live <MM-DD HH:MM><rest>` (with TZ set), the year in front for an `at` of another year, `text` kept when there is no `at`, and a call with `null` re-stamping from `dataset`. A second line: the poll function handed `{build_chip: {...}}` reaches `drawBuildChip`.
+
+**Related:** TD-539 (the build), TD-546 (the probe pattern).
+
+## TD-548: `common.build_chip`'s stale-node list and the page's own build are untested: the two lines can go and `test_build.py` and `test_ui_promote.py` stay green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/common.py` (`build_chip`: `more["nodes"] = [... s.get("up") and s.get("stale")]`, `more["page"] = build.info()`); `tests/test_build.py::test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row`
+
+**Why:** #1500's docstring says the chip names *"The page's own `build.info()` ... where it differs, and each linked node marked stale"*. `test_the_chip_says_promoting_held_the_page_and_a_stale_node` calls `build.chip(..., page=…, nodes=[…])` directly, so the formatting is held, but the code that builds `nodes` from `info["links"]` and passes `build.info()` as `page` is exercised by no test: no fixture there carries `links`, and the page's build equals the host's in a test run. Probes over all of `tests/`: replace the `nodes` comprehension's condition with `False`, and delete `more["page"] = build.info()` — both `pytest -x` runs pass.
+
+**Fix:** in `test_build.py`'s `build_chip` test: an `info` with `links: {box: {up: True, stale: True, build: <sha>}, down: {up: False, stale: True}, fresh: {up: True}}` expects the title to end with `box: <sha7>, stale` and name neither of the others; and with `build.info` monkeypatched to another commit, `this page: …` is in the title.
+
+**Related:** TD-539 (the build), TD-547.
+
+## TD-549: "Every page" draws the build chip, but only `/` and `/inbox` are tested: `Focus`'s line can be removed with the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`chip_build(call)` in `focus`, `transcript`, `repo_page`, and the other page contexts #1500 touched); `tests/test_ui_promote.py::test_every_page_and_the_inbox_poll_draw_the_build_chip`
+
+**Why:** the test's name and docstring say *"on every page, always drawn"*, and the design (§4.5a) says the chip is on every page. The loop is `for path in ("/", "/inbox")`. #1500 added `build_chip` to the Focus, Transcript and Repo contexts (and more further down `app.py`), and `base.html` draws the chip only when the context holds one, so a page that forgets the key shows no chip. Probe: delete `"build_chip": await chip_build(call),` from the `focus` handler's context (`app.py` ~1322) and run all of `tests/` with `-x` — passes.
+
+**Fix:** extend that loop to one URL per template that extends `base.html` (a Focus, a Transcript, a Repo page, Settings, the Hosts and Teams pages the fixture can reach), or walk the routes' template names against `base.html`'s chip once; expect `id="buildchip"` in each.
+
+**Related:** TD-539 (the build), TD-548.
+
+## TD-550: The tick keeps a record's `files` when a read fails and saves when only the list moved: neither is tested, and the failing form empties the list
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1497, TD-538)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_refresh_git`: `files = {... if isinstance(r, list)}` and `changed = changed or files[s.id] != live.files`); `tests/test_recent_files.py::test_the_tick_reads_the_list_when_the_status_moves_and_a_shell_session_shows_it`
+
+**Why:** the comment #1497 wrote says *"a read that failed keeps the list it had, and is taken again next time"*, and `changed_files`'s docstring says *"None when a read fails, so the record keeps what it had"*. The unit test holds the None at `changed_files`; the tick test never makes a read fail. Probes on `tests/test_recent_files.py` and `tests/test_ui_focus_recent_files.py`: replace `if isinstance(r, list)}` with `if not isinstance(r, BaseException)}` — a failing read would then set `live.files = None`, and it is marked read, so it is not taken again — passes; replace `changed = changed or files[s.id] != live.files` with `pass` (the list moving with no change in `git`, as a commit after a fetch does) — passes, and the test reads through `get`, never the store.
+
+**Fix:** in the tick test, monkeypatch `_recent_files` to return None once: expect the list unchanged and `_files_read` not advanced, then a next tick that reads it; and a read whose list differs while `git` is equal expects `store.save` (read the record back from the store, not `get`).
+
+**Related:** TD-538 (the build).
+
+## TD-551: The links read's `state == "closed"` skip is untested: a closed record's transcript is read every minute with the suite green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1501, TD-544)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_refresh_links`: `if not (s.adapter_id and s.dir) or s.state == "closed":`); `tests/test_recent_links.py::test_the_tick_merges_newest_first_a_url_once_and_keeps_twenty`
+
+**Why:** `_refresh_links`'s docstring reads each *live* record. The test asserts the no-`adapter_id` skip, the cadence, the cursor and the merge, but never a closed record. Probe: drop `or s.state == "closed"` and run `tests/test_recent_links.py` — passes. A closed record reads its transcript (a file, off the loop in a thread) every `LINKS_EVERY` for as long as the record is kept.
+
+**Fix:** after the merge assertions, `kill` and `close` the session (without `remove`), reset `_links_checked`, tick, and expect `asked` to gain nothing.
+
+**Related:** TD-544 (the build), TD-543 (the design).
