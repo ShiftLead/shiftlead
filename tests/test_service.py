@@ -183,6 +183,40 @@ def test_install_system_writes_the_unit_made_again_as_root_and_starts_it(tmp_pat
         service.install_system()
 
 
+def test_install_system_removes_the_old_units_only_when_their_server_holds_no_session(tmp_path, monkeypatch):
+    """TD-060's old units go first, as root, and never while their server holds a session: stopping
+    `agentorc-tmux` ends every session in it, and a server that cannot be asked counts as holding one."""
+    import getpass
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SUDO_USER", getpass.getuser())
+    etc = tmp_path / "etc"
+    etc.mkdir()
+    monkeypatch.setattr(service, "SYSTEM_DIR", etc)
+    monkeypatch.setattr(service.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(service, "_server_answers", lambda uid: False)
+    assert service.LEGACY_SYSTEM_UNITS == ("agentorc-tmux.service", "agentorc-watch.timer", "agentorc-watch.service")
+    present = ["agentorc-tmux.service", "agentorc-watch.timer"]  # agentorc-watch.service is absent
+    for u in present:
+        (etc / u).write_text("[Service]\n")
+    ran = []
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    monkeypatch.setattr(service.subprocess, "run", lambda argv, **kw: ran.append(argv) or Done())
+    for answer, named in ((["ao-x"], "ao-x"), (None, "unreadable")):
+        monkeypatch.setattr(service, "_server_sessions", lambda uid, a=answer: a)
+        with pytest.raises(RuntimeError, match=rf"agentorc-tmux\.service, agentorc-watch\.timer.*\({named}\)"):
+            service.install_system()
+        assert all((etc / u).exists() for u in present)
+        assert ran == []
+    monkeypatch.setattr(service, "_server_sessions", lambda uid: [])
+    service.install_system()
+    assert not any((etc / u).exists() for u in service.LEGACY_SYSTEM_UNITS)
+    assert ran[:2] == [["systemctl", "disable", "--now", *present], ["systemctl", "daemon-reload"]]
+
+
 def test_status_says_where_the_tmux_server_runs(monkeypatch):
     from sessionorc import identity
     from sessionorc.tmux import Tmux
