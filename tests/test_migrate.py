@@ -17,7 +17,9 @@ def _old_home(root: Path) -> Path:
     (old / "claude-hooks").mkdir(parents=True)
     (old / "claude-hooks" / "grind.json").write_text('{"command": "/v/agentorc-venv/bin/agentorc-hook"}')
     (old / "launch").mkdir()
-    (old / "launch" / "ao-x.json").write_text(json.dumps({"env": {"AGENTORC_SESSION": "ao-x"}}))
+    (old / "launch" / "ao-x.json").write_text(
+        json.dumps({"env": {"AGENTORC_SESSION": "ao-agentorc-agent-1"}, "cmd": "/h/.agentorc/x /r/.agentorc.yml"})
+    )
     (old / "nodes" / "cm" / "home").mkdir(parents=True)
     (old / "nodes" / "cm" / "home" / "hosts.yml").write_text("home: /h/.agentorc/x\n")
     (old / "nodes" / "cm" / "venv" / "bin").mkdir(parents=True)
@@ -50,7 +52,11 @@ def test_migrate_moves_the_home_rewrites_its_files_and_removes_the_old_units(tmp
     assert not old.exists() and new.is_dir()
     assert not list(units.iterdir())
     assert ("disable", "--now", "agentorc-agent.service", "agentorc-ui.service") in seen
-    assert json.loads((new / "launch" / "ao-x.json").read_text()) == {"env": {"SHIFTLEAD_SESSION": "ao-x"}}
+    # the home's directory and the variables change; a repo's file and a session id do not
+    assert json.loads((new / "launch" / "ao-x.json").read_text()) == {
+        "env": {"SHIFTLEAD_SESSION": "ao-agentorc-agent-1"},
+        "cmd": "/h/.shiftlead/x /r/.agentorc.yml",
+    }
     assert (new / "nodes" / "cm" / "home" / "hosts.yml").read_text() == "home: /h/.shiftlead/x\n"
     # the project and the repo keep their names; only the machine names change
     assert "agentorc: {repos: {agentorc: {k: ~/agentorc}}}" in (new / "org.yml").read_text()

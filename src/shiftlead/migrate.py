@@ -15,14 +15,16 @@ live session breaks its hooks. In order:
 5. each container node's venv removed: its scripts name `/agentorc/venv`, and the node's volume is
    mounted at `/shiftlead` now; `ao host up` installs it again, and the node's logins are kept.
 
-What is left is printed, not done: `ao service install` from the new venv (the user units), and
-the root line that swaps the two system units (`install --system` removes the old ones). A repo's
+What is left is printed, not done: the root line that swaps the system units first (`install
+--system` removes the old ones and starts the new tmux server), then `ao service install` from the
+new venv (the user units, whose agent then finds that server). A repo's
 `.agentorc.yml` is read as a fallback until that repo renames it (`sessionorc.paths.repo_file`).
 """
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -30,25 +32,29 @@ from pathlib import Path
 
 OLD_HOME = Path("~/.agentorc")
 OLD_UNITS = ("agentorc-agent", "agentorc-ui")
-# The old names as they appear inside the home's own files: paths into it, the venv, the hook and
-# the agent's console scripts, and the environment variables.
+# The old names as they appear inside the home's own files: paths into it (the directory, never a
+# repo's `.agentorc.yml`, which keeps its name until the repo renames it), the venv, the console
+# scripts as whole words (never inside an `ao-agentorc-…` session id), and the environment variables.
 REWRITES = (
-    ("/.agentorc", "/.shiftlead"),
-    ("agentorc-venv", "shiftlead-venv"),
-    ("agentorc-hook", "shiftlead-hook"),
-    ("agentorc-agent", "shiftlead-agent"),
-    ("AGENTORC_", "SHIFTLEAD_"),
+    (re.compile(r"/\.agentorc(?![\w.-])"), "/.shiftlead"),
+    (re.compile(r"agentorc-venv"), "shiftlead-venv"),
+    (re.compile(r"(?<![\w-])agentorc-(hook|agent|ui|watch)(?![\w-])"), r"shiftlead-\1"),
+    (re.compile(r"\bAGENTORC_"), "SHIFTLEAD_"),
 )
 TEXT_GLOBS = ("*.yml", "*.yaml", "*.json", "launch/*.json", "nodes/*/home/*.yml")
 
 
 def live_sessions() -> list[str]:
-    """The sessions the person's default tmux server holds now; none when no server answers."""
+    """The sessions the person's default tmux server holds now; none when no server answers. A server
+    that answers with an error reads as one session, so the move is refused rather than risked."""
     try:
         cp = subprocess.run(["tmux", "list-sessions", "-F", "#{session_name}"], capture_output=True, text=True)
     except FileNotFoundError:
         return []
-    return [s for s in cp.stdout.split() if s] if cp.returncode == 0 else []
+    if cp.returncode == 0:
+        return [s for s in cp.stdout.split() if s]
+    quiet = ("no server running", "error connecting to", "no sessions")
+    return [] if any(q in cp.stderr for q in quiet) else [f"(tmux: {cp.stderr.strip() or 'unreadable'})"]
 
 
 def _systemctl(*args: str) -> subprocess.CompletedProcess[str]:
@@ -78,16 +84,19 @@ def run(
     if new.exists():
         raise RuntimeError(f"{new} already exists: move it aside or remove it, then migrate")
     done = []
-    files = [unit_dir / f"{u}.service" for u in OLD_UNITS]
-    if any(f.exists() for f in files):
-        systemctl("disable", "--now", *[f.name for f in files if f.exists()])
-        for f in files:
-            f.unlink(missing_ok=True)
-        systemctl("daemon-reload")
-        done.append(f"stopped and removed {', '.join(OLD_UNITS)}")
+    # stopped before the move (a running agent writes into the home), removed only after it: a move
+    # that fails leaves the units in place to start again
+    files = [f for f in (unit_dir / f"{u}.service" for u in OLD_UNITS) if f.exists()]
+    if files:
+        systemctl("disable", "--now", *[f.name for f in files])
     new.parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(old), str(new))
     done.append(f"moved {old} to {new}")
+    if files:
+        for f in files:
+            f.unlink(missing_ok=True)
+        systemctl("daemon-reload")
+        done.append(f"stopped and removed {', '.join(f.stem for f in files)}")
     rewritten = []
     for pattern in TEXT_GLOBS:
         for f in sorted(new.glob(pattern)):
@@ -98,8 +107,8 @@ def run(
             except (OSError, UnicodeDecodeError):
                 continue
             out = text
-            for a, b in REWRITES:
-                out = out.replace(a, b)
+            for pattern, repl in REWRITES:
+                out = pattern.sub(repl, out)
             if out != text:
                 f.write_text(out, encoding="utf-8")
                 rewritten.append(str(f.relative_to(new)))
@@ -126,9 +135,11 @@ def next_steps() -> list[str]:
     """What the person runs after the move, in order."""
     from shiftlead import service
 
+    # root's first: it removes the old tmux unit and starts the new one, so the agent the user units
+    # start next finds its server rather than starting one of its own on the socket
     return [
-        f"{service._bin('ao')} service install",
         service.system_line(),
+        f"{service._bin('ao')} service install",
     ]
 
 
