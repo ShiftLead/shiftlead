@@ -9648,3 +9648,23 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-060 (#1505), TD-556.
 
 **Resolved:** 2026-10-11 (PR #1521) — `test_install_system_removes_the_old_units_only_when_their_server_holds_no_session` holds the refusal for a server with a session and for one that cannot be read (files kept, no `systemctl`), and with an empty server the `disable --now` of exactly the present units, their removal and the `daemon-reload`. Both probes in **Why** fail it, as do `if live:` and dropping the `unlink`.
+
+## TD-556: `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1505)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/migrate.py` (`REWRITES`, `live_sessions`, `run`'s `daemon-reload` and symlink guards, `next_steps`, `environment_warning`), `cmd_migrate` in `src/shiftlead/cli.py`; `tests/test_migrate.py::test_migrate_moves_the_home_rewrites_its_files_and_removes_the_old_units`
+
+**Why:** the comment above `REWRITES` lists what is rewritten (*"the venv, the console scripts as whole words (never inside an `ao-agentorc-…` session id)"*), and `live_sessions`' docstring says *"a server that answers with an error reads as one session, so the move is refused rather than risked"*. The one test injects `sessions=lambda: []` and `systemctl`, and its fixture puts `agentorc-venv` and `agentorc-hook` only into `claude-hooks/grind.json`, a file the same run deletes. Probes, each over `tests/test_migrate.py` alone: delete the `agentorc-venv` rule — passes; delete the `agentorc-(hook|agent|ui|watch)` rule — passes (the session id `ao-agentorc-agent-1` is only asserted to *stay*, so the guard half is held and the rewrite half is not); delete `systemctl("daemon-reload")` — passes (the test asserts only the `disable` call); drop `or f.is_symlink()` and `and not d.is_symlink()` — pass; replace `live_sessions`' error branch with `return []` — passes, so a tmux that answers with an error no longer refuses the move. `migrate.live_sessions`, `next_steps`, `environment_warning` and `cmd_migrate` are named by no test (`grep -rn` over `tests/`; the one `live_sessions` hit is a test name in `test_cli_host.py`).
+
+**Fix:** extend `test_migrate.py`: a launch record or `nodes/*/home/hosts.yml` carrying `/h/agentorc-venv/bin/agentorc-hook` and `agentorc-ui` expects `shiftlead-venv`, `shiftlead-hook`, `shiftlead-ui`; `daemon-reload` is among the `systemctl` calls, after the unit files are gone; a symlinked file and node venv are left; `live_sessions` with `subprocess.run` monkeypatched answers `[]` for *no server running*, the names for a list, and one `(tmux: …)` entry for any other error, and `FileNotFoundError` gives `[]`; `cmd_migrate` prints the lines and the steps and exits 1 on a `RuntimeError`.
+
+**Done when:** each probe in **Why** fails `tests/test_migrate.py`.
+
+**Related:** TD-060 (#1505), TD-555.
+
+**Resolved:** 2026-10-11 (PR #1522) — `tests/test_migrate.py` holds the venv and console-script rewrites, `daemon-reload` after the unit files are gone, both symlink guards, `live_sessions` (a list, the quiet errors, any other error as one session, no tmux), `environment_warning`, `next_steps` and `cmd_migrate` (prose, `--json`, exit 1). Every probe in **Why** fails it.

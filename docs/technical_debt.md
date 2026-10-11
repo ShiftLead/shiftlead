@@ -43,7 +43,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-554 | TD-060's summary row and header still say *undecided*, *two systemd units* and **Owner:** paul after the rename was built and split | Low | Open |
-| TD-556 | `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green | Low | Open |
 | TD-557 | Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists | Low | Open |
 
 ---
@@ -630,24 +629,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** TD-060's row title and `**Owner:**` agree with its Status.
 
 **Related:** TD-060, TD-552, TD-553.
-
-## TD-556: `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-11 (test-audit-ao-1, auditing #1505)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/migrate.py` (`REWRITES`, `live_sessions`, `run`'s `daemon-reload` and symlink guards, `next_steps`, `environment_warning`), `cmd_migrate` in `src/shiftlead/cli.py`; `tests/test_migrate.py::test_migrate_moves_the_home_rewrites_its_files_and_removes_the_old_units`
-
-**Why:** the comment above `REWRITES` lists what is rewritten (*"the venv, the console scripts as whole words (never inside an `ao-agentorc-…` session id)"*), and `live_sessions`' docstring says *"a server that answers with an error reads as one session, so the move is refused rather than risked"*. The one test injects `sessions=lambda: []` and `systemctl`, and its fixture puts `agentorc-venv` and `agentorc-hook` only into `claude-hooks/grind.json`, a file the same run deletes. Probes, each over `tests/test_migrate.py` alone: delete the `agentorc-venv` rule — passes; delete the `agentorc-(hook|agent|ui|watch)` rule — passes (the session id `ao-agentorc-agent-1` is only asserted to *stay*, so the guard half is held and the rewrite half is not); delete `systemctl("daemon-reload")` — passes (the test asserts only the `disable` call); drop `or f.is_symlink()` and `and not d.is_symlink()` — pass; replace `live_sessions`' error branch with `return []` — passes, so a tmux that answers with an error no longer refuses the move. `migrate.live_sessions`, `next_steps`, `environment_warning` and `cmd_migrate` are named by no test (`grep -rn` over `tests/`; the one `live_sessions` hit is a test name in `test_cli_host.py`).
-
-**Fix:** extend `test_migrate.py`: a launch record or `nodes/*/home/hosts.yml` carrying `/h/agentorc-venv/bin/agentorc-hook` and `agentorc-ui` expects `shiftlead-venv`, `shiftlead-hook`, `shiftlead-ui`; `daemon-reload` is among the `systemctl` calls, after the unit files are gone; a symlinked file and node venv are left; `live_sessions` with `subprocess.run` monkeypatched answers `[]` for *no server running*, the names for a list, and one `(tmux: …)` entry for any other error, and `FileNotFoundError` gives `[]`; `cmd_migrate` prints the lines and the steps and exits 1 on a `RuntimeError`.
-
-**Done when:** each probe in **Why** fails `tests/test_migrate.py`.
-
-**Related:** TD-060 (#1505), TD-555.
 
 ## TD-557: Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists
 
