@@ -1,4 +1,4 @@
-# Briefs for unattended agentorc sessions
+# Briefs for unattended ShiftLead sessions
 
 > **Standing a team up is not here — run `ao team --skill`** (TD-067). That recipe covers the
 > project and team definition, the roles, and `ao team list / start / status / stop`, which is how
@@ -10,7 +10,7 @@ A brief is the opening prompt of an unattended worker. Launch one from the main 
 session gets its own worktree and branch, per design §4.5a, New session "Where: new worktree"):
 
 ```
-pdm run ao new -d ~/agentorc -w grinder-ao-1 --unattended --prompt "$(cat docs/briefs/grinder-ao-1.md)" grinder-ao-1
+pdm run ao new -d ~/shiftlead -w grinder-ao-1 --unattended --prompt "$(cat docs/briefs/grinder-ao-1.md)" grinder-ao-1
 ```
 
 Since 2026-09-22 a repo's brief is a **supplement** (design §4.8, TD-114): `ao team start` and `ao new --role` fill it into the package template's *This repo's rules* section, so a file here says only what this repo does differently — its first reads, where it works, the gate and who merges, the lane's exclusions, its standing rules — and where it disagrees with the template it wins, except that it may add to the template's never-list and never take from it. The `--prompt` launches below hand the file over whole, with no template around it. A brief names no run, no date and no stop time (TD-042): the same file starts the session every
@@ -27,7 +27,7 @@ Membership below, which is the part that is easy to forget and looks like a brok
 is. (`ao team start` does both for you, in the right order, and is the ordinary way in.)
 
 ```
-pdm run ao new -d ~/agentorc -w manager-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/manager-ao-1.md)" manager-ao-1
+pdm run ao new -d ~/shiftlead -w manager-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/manager-ao-1.md)" manager-ao-1
 ```
 
 **Membership (design §4.8, TD-036).** The grant lets a lead act on other sessions; it
