@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Emit the agentorc mockup artboards (.dc.html) + canvas.json from one shared style."""
+"""Emit the ShiftLead mockup artboards (.dc.html) + canvas.json from one shared style."""
 import json, pathlib, re
 
 OUT = pathlib.Path(__file__).parent
@@ -58,7 +58,7 @@ CSS = """
   .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
-  /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
+  /* the role badge's picture, sized to sit on the badge's baseline (src/shiftlead/ui/static/app.css) */
   .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -172,7 +172,7 @@ ICON = {
 }
 
 # design §4.8 *Role presets* (TD-074): the role badge's picture. The `d` of each path is copied
-# from `src/agentorc/ui/icons.py`, which is where the page's eight live — a mockup that drew its
+# from `src/shiftlead/ui/icons.py`, which is where the page's eight live — a mockup that drew its
 # own would be showing something the page does not. Monochrome and unfilled, so the state pill
 # stays the one coloured thing on a card.
 ROLE_ICON = {
@@ -310,7 +310,7 @@ def due_strip(compact=False):
 # and reporting nothing — which is every session a person starts for themselves.
 # `doing` is what the session **says** it is doing (§4.8, TD-074) with the age the card prints
 # beside it, and `title` is the name its **tool** holds — Claude Code's own, often the person's
-# (*Error Checker*), shown beside agentorc's name and never a control. Both are display only.
+# (*Error Checker*), shown beside ShiftLead's name and never a control. Both are display only.
 EXTRA = {
     "orc-1":     {"team": "samscrape-grind", "role": "manager", "report": "round 41 · 2 wrapped up", "grants": "control",
                   "doing": ("round 41: reading four members, two claims to re-check", "2m")},
@@ -336,20 +336,20 @@ EXTRA = {
     "errors-alerts": {"title": "Error Checker", "unseen": True},
 }
 
-# §4.9 team definitions: every team in ~/.agentorc/org.yml and in the repos' .agentorc.yml, its
+# §4.9 team definitions: every team in ~/.shiftlead/org.yml and in the repos' .shiftlead.yml, its
 # source, its manager, and how many of its members are live right now. A team with nothing live
 # keeps its card (§4.5a **team groups**, 2026-09-18 — the Teams strip that listed them is retired):
 # below the live teams and *No team*, its dead cards folded, Start on its header.
 TEAMS = [
     ("samscrape-grind", "org.yml", "orc-1", 4, "samscrape"),
-    ("ao-grind", "org.yml", "manager-ao-1", 0, "agentorc"),
-    ("cadence-sweep", "dev-cadence/.agentorc.yml", "sweeper", 0, "dev-cadence"),
+    ("ao-grind", "org.yml", "manager-ao-1", 0, "shiftlead"),
+    ("cadence-sweep", "dev-cadence/.shiftlead.yml", "sweeper", 0, "dev-cadence"),
 ]
 # what a stopped team's header says: its folded sessions and *wound down <t> ago* when every one of
 # them declared out of work (§4.9a), else *stopped*; a definition no session carries is the same
 # card, empty, headed by what the definition says
 STOPPED = {
-    "ao-grind": {"folded": 4, "wound": "6h", "place": "kmaster / agentorc"},
+    "ao-grind": {"folded": 4, "wound": "6h", "place": "kmaster / shiftlead"},
     "cadence-sweep": {"def": "Manager sweeper · 1 member · dev-cadence"},
 }
 
@@ -776,14 +776,14 @@ def focus():
   <span style="text-decoration: underline; cursor: pointer;" title="Ctrl+click to open (Cmd+click on a Mac) — a URL in the pane is a link (design §4.6, TD-421); a plain click or a drag selects as before">https://github.com/ContractMatch/samscrape/pull/811</span>
 
 <span class="d">⏺</span> Bash(git push -u origin td301-fix)
-<span class="q">  ⏳ waiting for permission (agentorc hook · answer above, or the terminal dialog appears in 9m 12s)</span>
+<span class="q">  ⏳ waiting for permission (shiftlead hook · answer above, or the terminal dialog appears in 9m 12s)</span>
 <span class="d">▌</span>'''
     return head("Focus") + f'''<div style="width: 1440px; min-height: 1280px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     {focus_head("tdgrind-1", pill("needs"),
-                f'''<span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
+                f'''<span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in shiftlead">DIU fetcher</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="input" style="height: 26px; width: 150px; font-size: 12px; color: #9ca3af;">why? (optional)</span><span class="meta">Bash · git push -u origin td301-fix · 9m 12s</span>
       <span class="badge">stops 06:00</span>''',
                 next_act='<span class="btn sm next">Take over</span>', member=True)}
@@ -825,7 +825,7 @@ def focus_ready():
     the outlined next act on the acts line, Kill one menu away; the side panel in reading order,
     Ready to close open because the close is the person's, Session folded to one line. An
     unattended team member shows none of this: its team closes it, and its checklist is folded."""
-    term = '''<span class="d">● designer-ao-1 · claude-code · /home/kmaster/agentorc/.claude/worktrees/designer-ao-1</span>
+    term = '''<span class="d">● designer-ao-1 · claude-code · /home/kmaster/shiftlead/.claude/worktrees/designer-ao-1</span>
 
 <span class="p">&gt;</span> Wrap up: finish what you hold, push, report, and say what is left.
 
@@ -874,7 +874,7 @@ Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
       </div>
       <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
     </div>
-    {focus_session_card("claude-code · paul · fable-5-1", "111132eb…c01c3", "ao-agentorc-designer-ao-1", "2026-09-25 18:27 MDT · 3h 02m", "6 m ago", "interactive", "—", "ao-agentorc-designer-ao-1-20260925.log", "none", "under manager-ao-1 ×")}
+    {focus_session_card("claude-code · paul · fable-5-1", "111132eb…c01c3", "ao-shiftlead-designer-ao-1", "2026-09-25 18:27 MDT · 3h 02m", "6 m ago", "interactive", "—", "ao-shiftlead-designer-ao-1-20260925.log", "none", "under manager-ao-1 ×")}
   </div>
 </div>
 </div>
@@ -931,7 +931,7 @@ def focus_orchestrator():
 ''' + TAIL
 
 def new_session():
-    """The shipped form (`src/agentorc/ui/templates/new.html`), field for field: TD-277's design
+    """The shipped form (`src/shiftlead/ui/templates/new.html`), field for field: TD-277's design
     (2026-10-02), built by TD-284. The form read as one thing, in the order a person starts a
     session — who (Name, Host, Role, Profile), where (Team, Project, Repo, the worktree-first
     Where), the job (Lane, Until and At under an unattended role, the prompt), who may act on it.
@@ -945,14 +945,14 @@ def new_session():
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free in agentorc — it names the session and its worktree</span></div>
+    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free in shiftlead — it names the session and its worktree</span></div>
     <div class="field"><label>Host</label><span class="input">kmaster<span class="muted">▾</span></span><span class="note">kmaster · contractmatch-dev (container) — from <span class="mono">hosts.yml</span> · <span {lk}>Open file</span>; one host: plain text</span></div>
     <div class="field"><label>Role</label><span class="input">grinder · unattended<span class="muted">▾</span></span><span class="note">first choice: <b>Interactive</b> (no role, yours). A role fills the brief, lane and grants and <b>runs unattended</b> — <span {lk}>run it under me instead</span></span></div>
     <div class="field"><label>Profile</label><span class="input">the role's: claude-code · paul (max) · opus<span class="muted">▾</span></span><span class="note">tool · account · model the session starts with — from <span class="mono">profiles.yml</span> · <span {lk}>Open file</span>; the list ends with <i>shell (no agent)</i></span></div>
     <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: brings its repo and host, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b></span></div>
     <div class="field"><label>Project</label><span class="input" style="color: #9ca3af;">none<span class="muted">▾</span></span><span class="note">optional: narrows Repo to its repos — from <span class="mono">org.yml</span> <span class="mono">projects:</span> · <span {lk}>Open file</span></span></div>
   </div>
-  <div class="field"><label>Repo</label><span class="input">agentorc <span class="mono muted" style="margin-left: 8px;">/home/kmaster/agentorc</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">a registered checkout on kmaster. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo</span></div>
+  <div class="field"><label>Repo</label><span class="input">shiftlead <span class="mono muted" style="margin-left: 8px;">/home/kmaster/shiftlead</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">a registered checkout on kmaster. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo</span></div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div class="radio on"><span class="rb"></span><div><div>Worktree <span class="mono">td-302</span> · new</div><div class="note"><span class="mono">.claude/worktrees/td-302</span> on branch <span class="mono">td-302</span>, from origin's default branch</div>
@@ -968,7 +968,7 @@ def new_session():
   <div class="field"><label>Opening prompt (optional)</label><div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;"><span class="btn sm ghost">review PR</span><span class="btn sm ghost">sweep</span><span class="btn sm ghost">waiting on me</span></div><span class="input" style="height: 60px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Empty: the role's brief is sent, filled from its template.</span></div>
   <div class="field"><label>Controllers</label>
     <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>manager-ao-1 <span class="pill plain s-ended">◇ on call</span></div><div class="note mono">ao-agentorc-manager-ao-1</div></div></div>
+      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>manager-ao-1 <span class="pill plain s-ended">◇ on call</span></div><div class="note mono">ao-shiftlead-manager-ao-1</div></div></div>
     </div>
     <span class="note">Who may act on this one (send, wrap up, kill, close). Ticked by the Team pick; none ticked: nobody may.</span>
   </div>
@@ -1088,7 +1088,7 @@ def message_dialogs():
         dlg("Message grinder-ao-2", "ask", "<b>Working.</b> Read when its turn ends: it is rung on the tick after its Stop.", attaching="deck.pptx · 37%"),
         dlg("Message designer-ao-1", "note", "<b>Exited.</b> Read when this session is resumed, or started again under this name — the mail moves with the name."),
         dlg("Message main", "ask", "<b>Yours.</b> Lands in its inbox and wakes nothing: a person's session is never rung; the card's unread chip shows it."),
-        dlg("Message grinder-ao-1", "ask", "<b>Idle.</b> Rung within a tick: the doorbell types <span class=\"mono\">[agentorc] you have 1 unread message</span> into its pane."),
+        dlg("Message grinder-ao-1", "ask", "<b>Idle.</b> Rung within a tick: the doorbell types <span class=\"mono\">[shiftlead] you have 1 unread message</span> into its pane."),
     ]
     grid = "".join(f'<div>{b}</div>' for b in boards)
     return head("Message") + f'''<div style="width: 1440px; min-height: 1060px; background: #f4f5f7; display: flex; flex-direction: column;">
@@ -1119,7 +1119,7 @@ def transcript():
     turns = "".join([
         '<div style="text-align: center; padding: 10px;"><span class="btn sm">earlier turns · 20 more above</span></div>',
         '<div style="text-align: center;"><span class="meta">— compacted 14:02 —</span></div>',
-        prompt("[agentorc] you have 1 unread message — run ao inbox", "14:06:12"),
+        prompt("[shiftlead] you have 1 unread message — run ao inbox", "14:06:12"),
         thought(4),
         tool("Bash", "ao inbox --unread --json", "result · 21 lines"),
         said("Paul answered the steer on TD-128 with <i>go with it</i>. Merging #547 once the cadence check passes."),
@@ -1145,7 +1145,7 @@ def transcript():
 <div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 1100px; align-self: center; width: 100%;">
   <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
     <a href="#" class="muted">&larr; Focus</a>
-    <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / agentorc / designer-ao-1</span>
+    <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / shiftlead / designer-ao-1</span>
     {pill("ended", "exited 2h")}
     <span class="badge">ao-grind</span><span class="badge">{role_icon("grinder")}designer</span>
     <span class="meta">claude-code · paul (max) · fable-5-1</span>
@@ -1154,7 +1154,7 @@ def transcript():
   </div>
   <div class="card" style="padding: 10px 12px;">
     <dl class="kv" style="margin: 0;">
-      <dt>file</dt><dd class="mono" style="font-size: 12px;">~/.claude/projects/-home-kmaster-agentorc--claude-worktrees-designer-ao-1/9f2c…41b0.jsonl · 812 KB · on kmaster</dd>
+      <dt>file</dt><dd class="mono" style="font-size: 12px;">~/.claude/projects/-home-kmaster-shiftlead--claude-worktrees-designer-ao-1/9f2c…41b0.jsonl · 812 KB · on kmaster</dd>
       <dt>turns</dt><dd>63 · 2026-09-25 13:48 &rarr; 16:12 MDT · compacted once</dd>
       <dt>showing</dt><dd>the last 20 turns · <span class="muted">a snapshot at 18:31; reload to read what came after</span></dd>
     </dl>
@@ -1204,7 +1204,7 @@ def add_entry():
 {topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
   <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
-    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">agentorc · docs/technical_debt.md</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">shiftlead · docs/technical_debt.md</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
     <div class="note">Write what you have: a title, or a page. The number, the header lines and the file locations are found for you, and you are asked only what cannot be found.</div>
     <div class="field"><label>What</label><span class="input" style="height: 132px; align-items: flex-start; padding: 8px 10px;">{words}</span></div>
     <div class="field"><label>Type</label><div style="display: flex; gap: 10px;">
@@ -1233,7 +1233,7 @@ def add_entry():
     <div style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">
       {side_card("Told at start", '<span class="meta" style="font-size: 12px;">7 lines</span>', "", open_=False)}
       {side_card("Told at start", '<span class="meta" style="font-size: 12px;">7 lines</span>', """<div style="font-size: 12px; line-height: 1.5; margin-top: 8px; color: #4b5563; display: flex; flex-direction: column; gap: 6px;" title="the session's start context (design §4.3, TD-283): display only">
-        <div>The person asked for a new entry in the ledger of agentorc: docs/technical_debt.md, with Type debt. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
+        <div>The person asked for a new entry in the ledger of shiftlead: docs/technical_debt.md, with Type debt. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
         <div><b>Read before you write</b>: the ledger's preamble and template, and its three newest entries …</div>
         <div><b>The number</b> is the first free one over the ledger, its archive and every open PR …</div>
         <div class="muted">… four more lines</div></div>""")}
@@ -1260,16 +1260,16 @@ def members_dialog():
   <span class="mono muted" style="font-size: 12px;">{holder}</span>{st}{rm}
 </div>'''
     rows = "".join([
-        row("manager", "manager-ao-1", "—", 0, "ao-agentorc-manager-ao-1", "working", False, "the manager: a different definition, by hand"),
+        row("manager", "manager-ao-1", "—", 0, "ao-shiftlead-manager-ao-1", "working", False, "the manager: a different definition, by hand"),
         row("techlead", "techlead-ao-1", "—", 0, "seat", "oncall", False, "the seat: by hand"),
         row("grinder", "grinder-ao", "free-pick", 2, "grinder-ao-1 · grinder-ao-2", "working"),
-        row("designer", "designer-ao-1", "design-first", 0, "ao-agentorc-designer-ao-1", "idle"),
+        row("designer", "designer-ao-1", "design-first", 0, "ao-shiftlead-designer-ao-1", "idle"),
     ])
     return head("Members") + f'''<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
   <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.agentorc/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
+    <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.shiftlead/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
     <div class="note">The definition as the file holds it, with the session holding each entry. <b>Add</b> edits one line of the file (a <span class="mono">count:</span> bumped, or one member line added) and, while the team runs, creates the member under the manager at once; <b>Remove</b> edits the line the same way and winds that one session down — never a kill — and its card stays until Forget. Comments in the file are kept: the edit is one line, never a rewrite.</div>
     {rows}
     <div style="border-top: 1px solid #eceef1; padding-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -1282,7 +1282,7 @@ def members_dialog():
     </div>
     <div class="note" style="color: #7c3d00;">{ICON["warn"]}Remove grinder-ao-2? Edits org.yml (count: 2 → 1) and winds down grinder-ao-2 — it finishes what it holds and exits; its card stays until Forget.</div>
   </div>
-  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.agentorc.yml</span> shows no Members…: that file is a PR's.</div>
+  <div class="note" style="width: 760px;">Design notes, not page text. The first control that edits a definition from the page (ADR 2026-09-25 §5): the team card's, not the Settings page's, and it edits <span class="mono">org.yml</span> as text in place. A team defined in a repo's <span class="mono">.shiftlead.yml</span> shows no Members…: that file is a PR's.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1369,12 +1369,12 @@ def commands():
     for host, repo, path, cmds in COMMANDS:
         cards = "".join(cmd(repo, c) for c in cmds)
         groups += f'''<div style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="grp" style="padding: 0;"><span>{host} / {repo}</span><span class="path mono" style="font-size: 12px;">{path}/.agentorc.yml</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">edit yml</span></div>
+    <div class="grp" style="padding: 0;"><span>{host} / {repo}</span><span class="path mono" style="font-size: 12px;">{path}/.shiftlead.yml</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">edit yml</span></div>
     <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start;">{cards}</div>
   </div>'''
     groups += f'''<div style="display: flex; flex-direction: column; gap: 8px;">
     <div class="grp" style="padding: 0;"><span>kmaster / contractmatch</span><span class="path mono" style="font-size: 12px;">/home/kmaster/contractmatch</span></div>
-    <div class="note" style="padding: 10px 12px; border: 1px dashed #cbd0d6; border-radius: 6px;">No <span class="mono">.agentorc.yml</span> in this repo. Add a <span class="mono">commands:</span> list to get buttons here; each press starts a <span class="mono">ao-contractmatch-cmd-&lt;name&gt;</span> session.</div>
+    <div class="note" style="padding: 10px 12px; border: 1px dashed #cbd0d6; border-radius: 6px;">No <span class="mono">.shiftlead.yml</span> in this repo. Add a <span class="mono">commands:</span> list to get buttons here; each press starts a <span class="mono">ao-contractmatch-cmd-&lt;name&gt;</span> session.</div>
   </div>'''
     runs = [
         ("ao-samscrape-cmd-cluster", "kmaster", "working", "8s", "kubectl get pods -n samscrape\nNAME                         READY   STATUS    AGE\ncurate-input-28471            1/1     Running   3h\n▌"),
@@ -1405,7 +1405,7 @@ def commands():
     <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Org unless "show command runs" is on</span></div>
     <div class="card"><table><tbody>{rows}</tbody></table></div>
   </div>
-  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Org and out of the urgency sort. The attention report's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
+  <div class="note">Buttons come from each repo's checked-in <span class="mono">.shiftlead.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Org and out of the urgency sort. The attention report's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1461,7 +1461,7 @@ def inbox_rows():
         mcard(BAR["exited"], "", "push", "", "exited 2h ago",
               '<div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>',
               b(ICON["resume"] + "Reopen and push", "primary") + b("Resume") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), state=("exited", "exited")),
-        mcard(BAR["needs"], "promote", "agentorc", "", "main moved 12m ago",
+        mcard(BAR["needs"], "promote", "shiftlead", "", "main moved 12m ago",
               '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
               b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
         # TD-290: a look nobody could settle is an `ask` that names screenshots — counted here; Send to reviewer hands it to the techlead seat
@@ -1493,8 +1493,8 @@ def inbox_rows():
               b("Reply") + b("Go with it", "primary") + b("Pause") + gap + b(ICON["focus"] + "Open", "ghost")),
         # TD-213: an orphaned steer — its asker was closed by the wind-down, the question stands
         mcard(BAR["exited"], "steer", "grinder-ao-1", "ao-grind", "7h ago · about TD-149 · <b>5h left, then its default stands and ao-grind is asked to start</b>",
-              '<div class="txt"><span class="muted">its session was closed · <b style="color: #374151;">nobody holds TD-149 — your answer is written on agentorc’s board</b></span></div>'
-              '<div class="txt">Six keys of <span class="mono">.agentorc.yml</span> are read by nothing. <b>Remove them and refuse them at load, or keep reading them with a warning?</b></div>'
+              '<div class="txt"><span class="muted">its session was closed · <b style="color: #374151;">nobody holds TD-149 — your answer is written on shiftlead’s board</b></span></div>'
+              '<div class="txt">Six keys of <span class="mono">.shiftlead.yml</span> are read by nothing. <b>Remove them and refuse them at load, or keep reading them with a warning?</b></div>'
               '<div class="meta">its asker would have gone with: <b style="color: #374151;">Remove and refuse</b></div>'
               '<div class="sugg"><span class="lbl">suggested by grinder-ao-1</span>' + b("“Remove and refuse” · default") + b("“Keep, with a warning”") + '</div>',
               b("Reply") + b("Go with it", "primary") + gap + b("Delete", "ghost danger")),
@@ -1553,10 +1553,10 @@ def inbox(picks=False):
                                                                       f'<div class="txt" style="color: #4b5563;">{title}</div>',
                                                                       f'<a href="#" class="muted" style="font-size: 12px;">{tid} on the {repo} Repo page →</a>')
         ledger = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>For you in the ledger</span><span class="n" style="background: transparent; color: #6b7280;">3</span><span class="muted" style="font-size: 12px; font-weight: 400;">entries that wait on you · not counted</span></div>'
-            + '<div class="muted mono" style="padding: 2px 2px 4px; font-size: 12px;">agentorc</div>'
-            + lrow("TD-156", "M", "UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel", "yours", "agentorc", "ao-grind")
-            + lrow("TD-133", "L", "Build the team start at the reset — schedules: in settings.yml, the tick's replay, ao schedule, the card's starts note", "your decision", "agentorc", "ao-grind")
-            + lrow("TD-319", "L", "Build the Telegram channel — the home tells the person what newly stops a session or a team", "your decision", "agentorc", "ao-grind", "held by grinder-ao-1"))
+            + '<div class="muted mono" style="padding: 2px 2px 4px; font-size: 12px;">shiftlead</div>'
+            + lrow("TD-156", "M", "UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel", "yours", "shiftlead", "ao-grind")
+            + lrow("TD-133", "L", "Build the team start at the reset — schedules: in settings.yml, the tick's replay, ao schedule, the card's starts note", "your decision", "shiftlead", "ao-grind")
+            + lrow("TD-319", "L", "Build the Telegram channel — the home tells the person what newly stops a session or a team", "your decision", "shiftlead", "ao-grind", "held by grinder-ao-1"))
         body = (isec("Needs you", 7, opened=True) + "".join(needs) + later + ledger + isec("Steering", 3) + "".join(steering)
                 + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · <span style="font-size: 10px;">▸</span> Snoozed (1) · back on their dates · not counted</div>')
@@ -1631,11 +1631,11 @@ def inbox_press():
              + ladder("Stop now", "danger", HOVER, DOWN) + ladder("Works <span style=\"font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280;\">default</span>", "answer", HOVER, DOWN) + "</table>")
     b = lambda label, c="", st="": f'<span class="btn sm {c}" style="{st}">{label}</span>'
     gap = '<span style="flex-grow: 1;"></span>'
-    text = '<div class="txt">Give the contractmatch container node what a worker needs, so cm-grind can run inside it (TD-299 step 3).</div><div class="meta">due today · agentorc · <a href="#">docs/user_attention.md:11</a></div>'
+    text = '<div class="txt">Give the contractmatch container node what a worker needs, so cm-grind can run inside it (TD-299 step 3).</div><div class="meta">due today · shiftlead · <a href="#">docs/user_attention.md:11</a></div>'
     ctl = lambda st="": b("Reply", "", st) + b("Snooze ▾", "", st) + b("Done", "", st) + gap + b("Open board", "ghost", st)
-    rest = mcard("#cbd0d6", "board", "agentorc", "ao-grind", "due today · Oct 3", text, ctl())
-    pending = mcard("#cbd0d6", "board", "agentorc", "ao-grind", '<i style="color: #b45309;">checking off…</i>', text, ctl(OFF), cls="pending").replace('<div class="mcard pending">', '<div class="mcard pending" style="opacity: .6;" aria-busy="true">')
-    back = mcard("#cbd0d6", "board", "agentorc", "ao-grind", "due today · Oct 3",
+    rest = mcard("#cbd0d6", "board", "shiftlead", "ao-grind", "due today · Oct 3", text, ctl())
+    pending = mcard("#cbd0d6", "board", "shiftlead", "ao-grind", '<i style="color: #b45309;">checking off…</i>', text, ctl(OFF), cls="pending").replace('<div class="mcard pending">', '<div class="mcard pending" style="opacity: .6;" aria-busy="true">')
+    back = mcard("#cbd0d6", "board", "shiftlead", "ao-grind", "due today · Oct 3",
                  text + '<div style="font-size: 12px; color: #991b1b; margin-top: 2px;">not checked off: the push was refused — origin moved under the commit; press again</div>', ctl())
     toast = lambda words, color, note: (f'<div style="display: flex; align-items: center; gap: 12px;"><div style="background: #fff; border: 1px solid #cbd0d6; border-left: 3px solid {color}; padding: 8px 12px; border-radius: 4px; font-size: 12px; max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15);">{words}</div><span class="muted" style="font-size: 12px;">{note}</span></div>')
     step = lambda n, title, blurb: f'<div style="margin: 18px 0 8px;"><span style="font-weight: 600; font-size: 14px;">{n}. {title}</span> <span class="muted" style="font-size: 12px;">{blurb}</span></div>'
@@ -1794,7 +1794,7 @@ def repo_facet_board():
         return (f'<div style="width: 456px; display: flex; flex-direction: column; gap: 8px;">'
                 f'<div class="meta" style="font-size: 12px; white-space: normal; line-height: 1.5;">{caption}</div>'
                 f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;">'
-                f'<div style="display: flex; align-items: center; gap: 8px;"><span class="kind">Repo</span> <a href="#" style="font-weight: 600;">agentorc</a>'
+                f'<div style="display: flex; align-items: center; gap: 8px;"><span class="kind">Repo</span> <a href="#" style="font-weight: 600;">shiftlead</a>'
                 f'<span style="flex-grow: 1;"></span><span class="meta">open →</span></div>'
                 f'<div style="display: flex; align-items: center; gap: 8px;"><span class="kind">Technical debt ({open_n} open)</span><span class="btn sm ghost">Add entry…</span>'
                 f'<span style="flex-grow: 1;"></span><span class="meta mono" style="font-size: 12px;"><b>open</b> · day · week · month</span></div>'
@@ -1866,10 +1866,10 @@ def settings_page():
         '<div class="txt">' + field("stop time", "06:00", "Fri 06:00 · every member and seat") + field("reserve priority", "10", "+10 on grind’s reserve → line 60% for this team", 60) + '</div>'
         '<div class="txt muted" style="opacity: .6;">' + field("schedule", "at the reset of grind’s week", "not built — TD-133", 220) + '</div>',
         b("Save", "primary") + b("Clear stop time") + gap + '<span class="muted" style="font-size: 12px;">defined in org.yml — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
-    repos = card("agentorc", "repo · /home/kmaster/agentorc",
+    repos = card("shiftlead", "repo · /home/kmaster/shiftlead",
         '<div class="txt">' + field("promote auto", "off", "the Inbox row offers the press; on: the home promotes 10 min after main moves", 60) + field("pull", "on", "the home fast-forwards this checkout when git allows and the anchor is idle · last pulled 4m ago · 3 commits", 60) + '</div>'
         + ro("ledger", "docs/technical_debt.md") + ro("roles", "grinder, techlead, manager, designer · review: techlead reads src/sessionorc/**, docs/briefs/**") + ro("promote.run", "pip install --upgrade … && ao service install") + ro("promote.check", "sessionorc.build.info()[\"commit\"]"),
-        b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">.agentorc.yml · read per call · by PR — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
+        b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">.shiftlead.yml · read per call · by PR — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     you = card("yours everywhere", "",
         '<div class="txt">' + field("editor", "vscode", "the card’s and Focus’s button; none removes it") + '</div>'
         '<div class="txt">' + field("file link", "☑ opens the folder first", "so the file lands in the worktree’s window", 190) + field("wait", "1", "s before the file, 0–4 · your browser may ask twice until you tell it to always allow this site", 50) + '</div>'
@@ -1880,7 +1880,7 @@ def settings_page():
         '<div class="txt">' + field("secrets", "samscrape/prd", "a Doppler project/config — a name; the token is never shown or stored here", 150) + field("link", "http://kmaster:8765", "how your phone reaches this page", 190) + '</div>'
         '<div class="meta">told: a session waiting on you · a question · a blocked outcome · an identity alarm · a member not restarted · a team with work</div>'
         '<div class="meta">after a minute, once, and never while a page is visible · no text a session wrote is sent</div>'
-        '<div class="meta">last sent 14:02 · <span class="mono">agentorc · grinder-ao-1 (ao-grind) needs you: permission</span></div>',
+        '<div class="meta">last sent 14:02 · <span class="mono">shiftlead · grinder-ao-1 (ao-grind) needs you: permission</span></div>',
         b("Save", "primary") + b("Cancel") + b("Send a test") + gap + '<span class="muted" style="font-size: 12px;">settings.yml · notify · sent by the home</span>')
     browser = card("this browser", "",
         ro("theme", "dark · the ◐ toggle in the top bar") + ro("mine", "off") + ro("Inbox folds", "FYI open · Answered open") + ro("shell directory", "~"),
@@ -1891,7 +1891,7 @@ def settings_page():
     profiles = card("grind", "default",
         ro("adapter", "claude-code", dflt=True) + ro("account", "paul") + ro("model", "fable-5-1") + ro("config_dir", "~/.claude-grind") + ro("permission_wait", "600", dflt=True),
         gap + '<span class="muted" style="font-size: 12px;">profiles.yml · read per call · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
-    org = card("ao-grind", "team · projects: agentorc",
+    org = card("ao-grind", "team · projects: shiftlead",
         ro("manager", "manager-ao-1 · unattended · control") + ro("techlead", "techlead-ao-1") + ro("members", "grinder ×2 · designer ×1") + ro("host", "kmaster", dflt=True),
         gap + '<span class="muted" style="font-size: 12px;">org.yml · read per call by the clients, never the agent · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     return head("Settings") + f'''<div style="width: 1440px; min-height: 2320px; background: #f4f5f7; display: flex; flex-direction: column;">

@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-26T18:54:49.508Z
 ---
 
-Running `.venv/bin/python -m pytest` from a scratch worktree (a rebase of someone's PR under the scratchpad) imports `agentorc`/`sessionorc` from the **main checkout's** `src/`, not the worktree's: the venv is an editable install of `/home/kmaster/agentorc`. A test that reads a field the branch added (2026-09-22: `KeyError: 'supervised'`) is not a branch failure — it is the main checkout being behind.
+Running `.venv/bin/python -m pytest` from a scratch worktree (a rebase of someone's PR under the scratchpad) imports `shiftlead`/`sessionorc` from the **main checkout's** `src/`, not the worktree's: the venv is an editable install of `/home/kmaster/shiftlead`. A test that reads a field the branch added (2026-09-22: `KeyError: 'supervised'`) is not a branch failure — it is the main checkout being behind.
 
 **Why:** two hours of merges had moved main while the checkout sat at an older commit; the branch's tests were right and the import path was stale.
 

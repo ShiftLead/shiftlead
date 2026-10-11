@@ -73,7 +73,7 @@ not mix:
   the config file until TD-060's machine-side step. — **decided** 2026-09-21 (Paul).
 - **designer** — a team's design member: an `unattended` session whose lane is the ledger's `design-first` entries, and any entry blocked by `decision (designer)` (TD-367). It writes the design and the entries the grinders pick, merges nothing on a held path, and shows the person only what needs them — an obvious design is merged and noted, a defensible default is a bounded `steer`, taste is an `ask` with answers (design §4.8 *Role names*, TD-120; decided 2026-09-24, an interactive seat from 2026-09-23 until then).
 - **director** — the session that coordinates managers: its members are managers, not workers.
-  Agentorc does not treat it specially (design §4.8); the word names a position in the graph, not
+  ShiftLead does not treat it specially (design §4.8); the word names a position in the graph, not
   a kind of session. Director > manager > worker. *Not:* conductor (decided and replaced the same
   day), orc-of-orcs, orchestrator of orchestrators, top orc. — **decided** 2026-09-16 (Paul).
 - **member** — the graph relation, not a position: B is A's member when B's `controllers` name

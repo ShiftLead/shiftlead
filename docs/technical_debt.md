@@ -41,11 +41,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
-| TD-552 | The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc` | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-554 | TD-060's summary row and header still say *undecided*, *two systemd units* and **Owner:** paul after the rename was built and split | Low | Open |
 | TD-555 | `service._remove_legacy_system_units` — the root step that stops `agentorc-tmux` and ends every session in it unless the server is empty — has no test: gut the function and `tests/test_service.py` stays green | Medium | Open |
 | TD-556 | `ao migrate`'s venv and console-script rewrites, its tmux guard, its `daemon-reload` and `cmd_migrate` are untested: each can go and `test_migrate.py` stays green | Low | Open |
+| TD-557 | Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists | Low | Open |
 
 ---
 
@@ -595,24 +595,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-461 (#1421).
 
-## TD-552: The rename's text sweep: the mockups' generator, the design sections, the glossary, the cadence notes and the memories' live pointers still say `agentorc`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-11 (the anchor, split from TD-060 (b) on Paul's word)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/mockups/gen.py` (46 hits; the mockup HTML it writes follows from a regeneration), `docs/design/` (26 hits in seven sections: 4.1, 4.4a, 4.7, 4.9, 4.9c, 5, 10), `docs/glossary.md`, `README.md`, `CLAUDE.md`'s documentation map, `docs/claude-memory/` (the live pointers — `~/agentorc`, `agentorc-venv`, `~/.agentorc`, `AGENTORC_*` — in `MEMORY.md` and six memories: `agentorc-td-grind-mechanics`, `check-in-flight-before-a-td-step`, `headless-screenshots-on-kmaster`, `live-system-restart-authorized`, `reviewer-prompts-keep-out-of-the-anchor`, `scratchpad-too-long-for-unix-sockets`; the word elsewhere in the memories is mostly a dated incident), `scripts/split_design.py`. (`agentorc.code-workspace` is untracked and ignored — `*.code-workspace` — so it is a local rename in the checkout, not this PR's.)
-
-**Why:** the rename (TD-060) moved the machine names and the live briefs; the rest of the text still says `agentorc` where it means what is true now, so a reader follows a path, a variable or a unit that no longer exists.
-
-**Fix:** replace a name that says what is true now (`agentorc` the product → ShiftLead, `src/agentorc/` → `src/shiftlead/`, `~/.agentorc` → `~/.shiftlead`, `AGENTORC_*` → `SHIFTLEAD_*`, `agentorc-venv` → `shiftlead-venv`, `~/agentorc` → `~/shiftlead`), and **leave dated records as written**: `docs/design-history.md`, `docs/decisions/`, `docs/briefs/archive/`, the ledger archive, `docs/user_attention_archive.md`, an ADR title, a memory's dated incident, a closed session's `ao-agentorc-…` id, and the README's *was `agentorc`* line. The `.agentorc.yml` fallback's sentences in the design stay until TD-553 removes the fallback. Mockups: edit `gen.py` and regenerate (`docs/mockups/README.md`), never the HTML by hand. `docs/cadence*.md` and `scripts/cadence_hooks.sh`, `check_cadence.py`, `ledger.py` are SYNCED FILES: they are dev-cadence's TD-091 and arrive by its sync, not here. A memory edit lands by this PR, never uncommitted in the main checkout (it blocks auto promote). §4.5a's help list is bound to `help.py`; leave its wording to a build entry if a name is in it.
-
-**Done when** `git grep -i agentorc` outside the dated records above, the synced files and the fallback's code and sentences returns nothing, and the mockups regenerate unchanged from `gen.py`.
-
-**Related:** TD-060, TD-553, dev-cadence TD-091.
-
 ## TD-553: Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs
 
 **Priority:** Low
@@ -685,3 +667,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when:** each probe in **Why** fails `tests/test_migrate.py`.
 
 **Related:** TD-060 (#1505), TD-555.
+
+## TD-557: Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (grinder-ao-2, met on TD-552; its independent review counted them)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md` — nineteen `src/agentorc/` paths in open entries' **Location:**, **Why** and **Fix** lines (`git grep -n "src/agentorc/" docs/technical_debt.md`).
+
+**Why:** the package moved to `src/shiftlead/` on 2026-10-10 (TD-060), and TD-552 left the ledger out of its sweep. A grinder that follows a Location to a file finds nothing, and `ao repo` / the Inbox's ledger fold show the dead path.
+
+**Fix:** in the open entries only, `src/agentorc/` → `src/shiftlead/` where the file exists at the new path (check each); a quoted dated sentence (a probe's output, a commit message) stays as written. Leave `docs/technical_debt_archive.md` alone.
+
+**Done when:** `git grep -n "src/agentorc/" docs/technical_debt.md` finds only quoted dated text.
+
+**Related:** TD-552, TD-060.

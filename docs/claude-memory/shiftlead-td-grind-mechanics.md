@@ -1,6 +1,6 @@
 ---
-name: agentorc-td-grind-mechanics
-description: "Gotchas for scripted ledger edits, PR comments and merging in agentorc (template headed TD-001, never guess a PR number, the cadence verdict goes on the comment's first line, archive-tail conflicts, the **Resolved:** label)"
+name: shiftlead-td-grind-mechanics
+description: "Gotchas for scripted ledger edits, PR comments and merging in ShiftLead (template headed TD-001, never guess a PR number, the cadence verdict goes on the comment's first line, archive-tail conflicts, the **Resolved:** label)"
 metadata: 
   node_type: memory
   type: project
@@ -28,7 +28,7 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
   is never edited: a malformed one is superseded by a new one.
 - `pkill -f <pattern>` kills the wrapping shell when the pattern appears in the command line
   itself; kill by pid. (Run 2 hit it again: exit 144 on the whole Bash tool call.)
-- A probe script that starts a child agent must put `AGENTORC_HOME` under a *short* path: the
+- A probe script that starts a child agent must put `SHIFTLEAD_HOME` under a *short* path: the
   session scratchpad path is too long for `agent.sock` (`OSError: AF_UNIX path too long`) and
   the child waits forever for a socket that never appears.
 - Sonnet reviewers should be told to read the PR via `gh pr diff N` and
@@ -79,4 +79,4 @@ Added 2026-09-22 (grinder-ao-1):
 **Why:** these cost real time and one wrong PR state on the first run.
 **How to apply:** when scripting ledger moves or chaining merges in this repo, reuse these rules;
 a helper that skips the template block lives only in a session scratchpad, so rewrite it.
-Related: [[unattended-workers-run-inside-agentorc]].
+Related: [[unattended-workers-run-inside-shiftlead]].

@@ -13,7 +13,7 @@ each — never by keeping both sides as the archive-tail and history-tail confli
 current row each; Sonnet's fact-check caught it, and a merged copy would have said two things.
 
 **How to apply:** after `git rebase`, `grep -c '^| TD-NNN '` for each id in the hunk; pick the
-row whose status matches the entry body. Related: [[agentorc-td-grind-mechanics]].
+row whose status matches the entry body. Related: [[shiftlead-td-grind-mechanics]].
 
 Also: `ao --json msg person "…"` — the global `--json` sits before the subcommand; after the text
 it is read as part of the message and the call errors with *unrecognized arguments*.

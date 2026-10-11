@@ -18,4 +18,4 @@ own conditional, so the shell construct is the whole rule.
 
 **How to apply:** read the `[PASS]`/`[FAIL]` line *and* branch on the script's exit code. When a
 title names a `TD-NNN`, the PR must touch `docs/technical_debt.md` (a board-only edit fails
-`ledger`). Related: [[agentorc-td-grind-mechanics]], [[read-inbox-before-merging]].
+`ledger`). Related: [[shiftlead-td-grind-mechanics]], [[read-inbox-before-merging]].

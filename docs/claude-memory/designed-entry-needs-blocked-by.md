@@ -18,4 +18,4 @@ ledger edit; standing flags on untouched entries are not yours.
 
 **How to apply:** every design PR's TD entry gets the Blocked by line naming its build entries, and
 no Pickable line; a build entry blocked on a board decision writes
-`**Blocked by:** decision (Paul) — docs/user_attention.md, <date> item`. See [[agentorc-td-grind-mechanics]].
+`**Blocked by:** decision (Paul) — docs/user_attention.md, <date> item`. See [[shiftlead-td-grind-mechanics]].

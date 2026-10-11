@@ -21,4 +21,4 @@ at someone else's PR is worse than none.
 number it returned and push that as its own small commit — or, better, hold the ledger line back
 and write it once with the real number. Same rule for `ao progress done <ref> --pr N`.
 
-Related: [[agentorc-td-grind-mechanics]].
+Related: [[shiftlead-td-grind-mechanics]].

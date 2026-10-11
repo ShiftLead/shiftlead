@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-25T19:15:25.180Z
 ---
 
-Three things the designer run (and one from a techlead seat) of 2026-09-25 learned (see [[agentorc-td-grind-mechanics]], [[reviewer-prompts-keep-out-of-the-anchor]]):
+Three things the designer run (and one from a techlead seat) of 2026-09-25 learned (see [[shiftlead-td-grind-mechanics]], [[reviewer-prompts-keep-out-of-the-anchor]]):
 
 1. **`ao msg --kind steer person` is refused as full** once the person inbox holds 20 entries unread or unanswered from the caller: *the person is away — write the line on user_attention.md with a Due: date*. The board line is then the channel (one line listing every open steer, its default and the alternative, `Due:` the bound's day), merged as its own small PR so it is on `main` at once; the design PR's Status names that board line instead of a steer id.
 2. **A fact-check agent started in this worktree reads the branch that is checked out at the moment it looks** — and the designer switches branches every few minutes. Give it explicit refs (`git diff origin/main...<branch>`, `git show <branch>:<path>`) and tell it to skip `gen.py` unless `rev-parse --abbrev-ref HEAD` is the PR's branch. Two checks went wrong before this was in the prompt.
