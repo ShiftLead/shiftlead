@@ -9668,3 +9668,23 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-060 (#1505), TD-555.
 
 **Resolved:** 2026-10-11 (PR #1522) — `tests/test_migrate.py` holds the venv and console-script rewrites, `daemon-reload` after the unit files are gone, both symlink guards, `live_sessions` (a list, the quiet errors, any other error as one session, no tmux), `environment_warning`, `next_steps` and `cmd_migrate` (prose, `--json`, exit 1). Every probe in **Why** fails it.
+
+## TD-557: Open entries' **Location:** lines still name `src/agentorc/…`, a path that no longer exists
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (grinder-ao-2, met on TD-552; its independent review counted them)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/technical_debt.md` — nineteen `src/agentorc/` paths in open entries' **Location:**, **Why** and **Fix** lines (`git grep -n "src/agentorc/" docs/technical_debt.md`).
+
+**Why:** the package moved to `src/shiftlead/` on 2026-10-10 (TD-060), and TD-552 left the ledger out of its sweep. A grinder that follows a Location to a file finds nothing, and `ao repo` / the Inbox's ledger fold show the dead path.
+
+**Fix:** in the open entries only, `src/agentorc/` → `src/shiftlead/` where the file exists at the new path (check each); a quoted dated sentence (a probe's output, a commit message) stays as written. Leave `docs/technical_debt_archive.md` alone.
+
+**Done when:** `git grep -n "src/agentorc/" docs/technical_debt.md` finds only quoted dated text.
+
+**Related:** TD-552, TD-060.
+
+**Resolved:** 2026-10-11 (PR #1523) — every `src/agentorc/` in the open entries now reads `src/shiftlead/` (each path checked to exist there, except `adapters/<tool>/`, a pattern, and TD-055's `briefs/orchestrator.md`, a file removed long before the rename); TD-299's Location names `~/.shiftlead/` and TD-460's `.shiftlead.yml`. `git grep "src/agentorc/" docs/technical_debt.md` finds nothing.
