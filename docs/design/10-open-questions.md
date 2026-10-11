@@ -26,7 +26,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       `ssh -tt host tmux attach -t <name>`, bridged to xterm.js with `asyncio` + `os.openpty`;
       resize is `TIOCSWINSZ` on the local pty. The host agent stays the only per-host process.
       ttyd remains the fallback if the bridge proves flaky on slow links (§4.5b).
-- [x] `.shiftlead.yml` vs. a section in dev-cadence's per-repo config (2026-09-04): its own
+- [x] `.agentorc.yml` vs. a section in dev-cadence's per-repo config (2026-09-04): its own
       file; dev-cadence stays the cadence system, ShiftLead reads its registry and, via the host
       agent only, edits and commits board items (§4.7).
 - [x] Repo layout (2026-09-04): **one repo, two packages**, `sessionorc` below the adapter
@@ -78,7 +78,7 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       acting RPC passes only with the grant *and* membership in the target's list; empty means
       nobody may act; several controllers allowed; create adds the creator with the child's
       grants ⊆ the creator's; `set_controllers` is gated on the target; defaults from
-      `.shiftlead.yml` (§4.8, §4.5a, invariant 11). Rejected: per repo — the boundary is the one
+      `.agentorc.yml` (§4.8, §4.5a, invariant 11). Rejected: per repo — the boundary is the one
       the person set, not one inferred from a path. From prior art
       ([ADR](../decisions/2026-09-12-orchestrator-membership-prior-art.md)): a restart ceiling,
       `one_for_one` restart scope, an exited orchestrator neither kills nor loses its workers
