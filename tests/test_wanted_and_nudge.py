@@ -175,7 +175,7 @@ async def test_a_seat_owing_an_outcome_is_nudged_with_no_question_waiting(agent,
         rec.outbox = [_answered("m-5", _iso(now))]
         await _idle_for(agent, sid, now, IDLE_NUDGE + timedelta(minutes=1))
         assert agent._nudge_line(rec) == (
-            '[agentorc] you owe 1 outcome on m-5 — `ao msg person --outcome done|blocked|dropped "…" --for m-5`'
+            '[shiftlead] you owe 1 outcome on m-5 — `ao msg person --outcome done|blocked|dropped "…" --for m-5`'
         )
         rec.outbox = []
         assert agent._nudge_line(rec) is None

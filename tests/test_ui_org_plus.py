@@ -13,7 +13,7 @@ import subprocess
 
 import pytest
 
-APP = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js"
+APP = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js"
 
 # The fake DOM: elements with ids, classes, dataset, attributes, children and parent; selectors of
 # compound parts (`tag`, `#id`, `.class`, `:not(.class)`, `[attr]`) joined by descendant spaces —

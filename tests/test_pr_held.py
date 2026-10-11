@@ -8,15 +8,15 @@ import subprocess
 
 import pytest
 
-from agentorc import cli
-from agentorc import review as reviewmod
+from shiftlead import cli
+from shiftlead import review as reviewmod
 
 
 def test_held_globs_read_as_written():
     assert reviewmod.matches("src/sessionorc/agent.py", "**")
     assert reviewmod.matches("src/sessionorc/agent.py", "src/**")
     assert reviewmod.matches("src/sessionorc/agent.py", "src/sessionorc/**")
-    assert not reviewmod.matches("src/agentorc/cli.py", "src/sessionorc/**")
+    assert not reviewmod.matches("src/shiftlead/cli.py", "src/sessionorc/**")
     assert reviewmod.matches("org.yml", "org.yml") and not reviewmod.matches("docs/org.yml", "org.yml")
     assert reviewmod.matches("docs/briefs/a.md", "docs/briefs/*.md")
     assert not reviewmod.matches("docs/briefs/archive/a.md", "docs/briefs/*.md")  # `*` stays in one directory
@@ -59,7 +59,7 @@ def test_a_failed_read_is_said_never_taken_for_not_held(monkeypatch):
 
 
 def _world(monkeypatch, review, files):
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-r-w")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-r-w")
     monkeypatch.setattr(cli, "call_sync", lambda method, **kw: {"id": kw["id"], "dir": "/r", "review": review})
     body = json.dumps({"files": [{"path": f} for f in files]})
     monkeypatch.setattr(reviewmod.subprocess, "run", lambda argv, **kw: subprocess.CompletedProcess(argv, 0, body, ""))
@@ -88,18 +88,18 @@ def test_ao_pr_held_reads_a_flows_chain(monkeypatch, capsys):
     # the PR, in the flow's order; whose turn it is, is slice 4's
     chain = {
         "chain": [
-            {"stage": "ui-review", "reader": "ui-reader-ao", "held": ["src/agentorc/ui/**"]},
+            {"stage": "ui-review", "reader": "ui-reader-ao", "held": ["src/shiftlead/ui/**"]},
             {"stage": "review", "reader": "techlead-ao", "held": ["src/sessionorc/**"]},
         ],
         "bound": "2h",
     }
     got = reviewmod.setting(chain)
-    assert got["held"] == ["src/agentorc/ui/**", "src/sessionorc/**"] and got["chain"] == chain["chain"]
-    _world(monkeypatch, chain, ["src/agentorc/ui/app.py", "src/sessionorc/agent.py"])
+    assert got["held"] == ["src/shiftlead/ui/**", "src/sessionorc/**"] and got["chain"] == chain["chain"]
+    _world(monkeypatch, chain, ["src/shiftlead/ui/app.py", "src/sessionorc/agent.py"])
     assert cli.main(["pr", "held", "12"]) == 0
     out = capsys.readouterr().out
     assert "is held by 2 readers, in order (bound 2h)" in out
-    assert "  ui-review · ui-reader-ao · src/agentorc/ui/app.py · your turn to ask" in out
+    assert "  ui-review · ui-reader-ao · src/shiftlead/ui/app.py · your turn to ask" in out
     assert "  review · techlead-ao · src/sessionorc/agent.py · later — it merges" in out
     _world(monkeypatch, chain, ["src/sessionorc/agent.py"])
     assert cli.main(["pr", "held", "12"]) == 0
@@ -111,7 +111,7 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
     # §4.9c *Whose turn it is* (TD-315 slice 4): each link's state from the author's asks, the
     # first not passed its turn, the last its merger; a reader asks with `--id <the asker>`
     links = [
-        {"stage": "ui-review", "reader": "ui-reader-ao", "paths": ["src/agentorc/ui/app.py"]},
+        {"stage": "ui-review", "reader": "ui-reader-ao", "paths": ["src/shiftlead/ui/app.py"]},
         {"stage": "review", "reader": "techlead-ao", "paths": ["src/sessionorc/agent.py"]},
     ]
 
@@ -145,7 +145,7 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
     assert reviewmod.walk(links, None)["turn"] is None
     # the command, with the home's reads
     chain = {"chain": [{"stage": x["stage"], "reader": x["reader"], "held": x["paths"]} for x in links], "bound": "2h"}
-    _world(monkeypatch, chain, ["src/agentorc/ui/app.py", "src/sessionorc/agent.py"])
+    _world(monkeypatch, chain, ["src/shiftlead/ui/app.py", "src/sessionorc/agent.py"])
     base = cli.call_sync
     monkeypatch.setattr(cli, "call_sync", lambda m, **kw: {"asks": [passed]} if m == "pr_reads" else base(m, **kw))
     assert cli.main(["--json", "pr", "held", "12"]) == 0
@@ -154,7 +154,7 @@ def test_the_walk_says_whose_turn_it_is(monkeypatch, capsys):
     assert [r["state"] for r in got["chain"]] == ["passed", "next"]
     assert cli.main(["pr", "held", "12"]) == 0
     out = capsys.readouterr().out
-    assert "ui-reader-ao · src/agentorc/ui/app.py · passed 14:02 UTC" in out and "your turn to ask — it merges" in out
+    assert "ui-reader-ao · src/shiftlead/ui/app.py · passed 14:02 UTC" in out and "your turn to ask — it merges" in out
 
 
 # -- the page half (design §4.5a *PRs waiting*, TD-093 slice 3) --------------------------------------
@@ -223,7 +223,7 @@ def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeyp
 def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
     from datetime import UTC, datetime
 
-    from agentorc.ui.app import prs_waiting, team_groups, templates
+    from shiftlead.ui.app import prs_waiting, team_groups, templates
 
     now = datetime(2026, 9, 23, 12, tzinfo=UTC)
     seat = {"role": "techlead", "prs_waiting": {"n": 2, "oldest": "2026-09-23T10:30:00Z"}}
@@ -256,8 +256,8 @@ def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
 
 def test_the_inbox_mark_of_a_chain_names_its_readers():
     # review of TD-315 slice 3: a chain has no top-level `reader`, so the mark says *its readers'*
-    from agentorc.ui.inbox import held_mark
     from sessionorc import held
+    from shiftlead.ui.inbox import held_mark
 
     v = {"id": "w", "dir": "/nowhere", "held_missed": [held.crossing(n, ["src/a.py"], "t") for n in (845, 846)]}
     texts = {}

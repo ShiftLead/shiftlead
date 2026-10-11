@@ -14,9 +14,9 @@ import tempfile
 
 import pytest
 
-from agentorc.ui import help as helpmod
+from shiftlead.ui import help as helpmod
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 PROBE = """
 const fs = require("fs");

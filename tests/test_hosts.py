@@ -6,7 +6,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_local_host_from_file(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     h = hosts.local_host()
     # hostname fallback and every default
     assert h.name and h.vscode_host == h.name and h.local is False and h.volatile is False
@@ -43,7 +43,7 @@ def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
     monkeypatch.setattr(hosts, "DEFAULT_REPOS_REGISTRY", str(roster))
     scratch = tmp_path / "scratch"
     scratch.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(scratch))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(scratch))
     h = hosts.local_host()
     assert h.repos_registry == scratch / "repos.txt" and h.repos() == []
     assert hosts.Host(name="x", vscode_host="x").repos() == []  # the dataclass's default reads the home too
@@ -51,18 +51,18 @@ def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
     assert hosts.local_host().repos() == ["/home/p/mine"]
     # the default home (however it is spelled) keeps the machine roster
     monkeypatch.setenv("HOME", str(tmp_path))
-    monkeypatch.setenv("AGENTORC_HOME", "~/.agentorc")
+    monkeypatch.setenv("SHIFTLEAD_HOME", "~/.shiftlead")
     assert hosts.local_host().repos() == ["/home/p/real"]
-    (tmp_path / ".agentorc").mkdir()
-    (tmp_path / "link").symlink_to(tmp_path / ".agentorc")
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "link"))
+    (tmp_path / ".shiftlead").mkdir()
+    (tmp_path / "link").symlink_to(tmp_path / ".shiftlead")
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "link"))
     assert hosts.default_repos_registry() == roster  # a symlink to the default home is the default home
-    monkeypatch.delenv("AGENTORC_HOME")
+    monkeypatch.delenv("SHIFTLEAD_HOME")
     assert hosts.default_repos_registry() == roster
 
 
 def test_serve_takes_the_tmux_socket_from_the_env(tmp_path, monkeypatch):
-    """TD-298: `agentorc-agent serve` honours `AGENTORC_TMUX_SOCKET`, as the tests and `look_home.py`
+    """TD-298: `shiftlead-agent serve` honours `SHIFTLEAD_TMUX_SOCKET`, as the tests and `look_home.py`
     do, so a scratch home's agent never lists or drives the default server's sessions."""
     from sessionorc import agent
 
@@ -72,19 +72,19 @@ def test_serve_takes_the_tmux_socket_from_the_env(tmp_path, monkeypatch):
         seen.append(a.tmux.socket_name)
 
     monkeypatch.setattr(agent, "serve_until_signal", fake_serve)
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", "ao-scratch-td298")
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", "ao-scratch-td298")
     assert agent.main(["serve"]) == 0
-    monkeypatch.delenv("AGENTORC_TMUX_SOCKET")
+    monkeypatch.delenv("SHIFTLEAD_TMUX_SOCKET")
     assert agent.main(["serve"]) == 0
     assert seen == ["ao-scratch-td298", None]
 
 
 def test_env_overrides_are_gone(tmp_path, monkeypatch):
     """TD-004: the file is the only source; the phase-1 env overrides no longer apply."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: fromfile\n")
-    monkeypatch.setenv("AGENTORC_HOST_NAME", "fromenv")
-    monkeypatch.setenv("AGENTORC_LOCAL_HOST", "1")
+    monkeypatch.setenv("SHIFTLEAD_HOST_NAME", "fromenv")
+    monkeypatch.setenv("SHIFTLEAD_LOCAL_HOST", "1")
     h = hosts.local_host()
     assert h.name == "fromfile" and h.local is False

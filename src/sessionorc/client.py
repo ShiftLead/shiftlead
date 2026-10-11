@@ -122,7 +122,7 @@ class LocalClient:
         except TimeoutError:
             raise AgentStuck(
                 f"the host agent did not answer {method!r} within {_timeout:g}s — it is stuck, not gone; "
-                f"look at its journal (journalctl --user -u agentorc-agent) before retrying"
+                f"look at its journal (journalctl --user -u shiftlead-agent) before retrying"
             ) from None
         if not line:
             raise AgentUnavailable("host agent closed the connection")
@@ -145,7 +145,7 @@ class LocalClient:
 
 
 # How long a `wait` keeps trying to reconnect after the socket goes under it (design §4.8
-# *Waking a manager*, TD-086). A promote restarts `agentorc-agent` and the unit is back in seconds
+# *Waking a manager*, TD-086). A promote restarts `shiftlead-agent` and the unit is back in seconds
 # (TD-062); eight promotes in one evening cost a manager its wake channel three times. Long enough
 # for a restart under load, short enough that a real outage is still an error a person sees.
 RECONNECT_GRACE = 30.0
@@ -238,7 +238,7 @@ def call_sync(method: str, *, caller: str | None = None, _timeout: float | None 
 
 
 async def bridge_stdio() -> int:
-    """Pump stdin → socket → stdout, line for line. `ssh host agentorc-agent rpc` is this."""
+    """Pump stdin → socket → stdout, line for line. `ssh host shiftlead-agent rpc` is this."""
     try:
         reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()), limit=LINE_LIMIT)
     except (ConnectionError, FileNotFoundError, OSError) as e:

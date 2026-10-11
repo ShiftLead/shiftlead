@@ -11,9 +11,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from agentorc.ui import app as uiapp
-from agentorc.ui.app import inbox_sections
-from agentorc.ui.inbox import work_held, work_note, work_rows, work_started
+from shiftlead.ui import app as uiapp
+from shiftlead.ui.app import inbox_sections
+from shiftlead.ui.inbox import work_held, work_note, work_rows, work_started
 
 pytestmark = pytest.mark.unit
 
@@ -194,7 +194,7 @@ def _session(name: str, **kw) -> dict:
 def page(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     (home / "org.yml").write_text(
         f"projects:\n  p:\n    repos:\n      r: {{kmaster: {tmp_path}}}\n"

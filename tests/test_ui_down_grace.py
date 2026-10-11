@@ -12,7 +12,7 @@ import subprocess
 
 import pytest
 
-APP = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui" / "static" / "app.js"
+APP = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui" / "static" / "app.js"
 
 PROBE = """
 const fs = require("fs");
@@ -88,7 +88,9 @@ def test_a_close_the_page_caused_by_leaving_and_one_failed_inbox_poll_draw_nothi
     assert "if (!isDown || shown || inboxDownLong) {" in js
 
 
-POLL_PROBE = PROBE.split("const AO = window.AO;")[0] + """
+POLL_PROBE = (
+    PROBE.split("const AO = window.AO;")[0]
+    + """
 const AO = window.AO;
 const why = { textContent: "" };
 const base = document.querySelector;
@@ -116,6 +118,7 @@ async function run() {
 }
 run().catch((e) => { console.error(e); process.exit(1); });
 """
+)
 
 
 @pytest.mark.unit

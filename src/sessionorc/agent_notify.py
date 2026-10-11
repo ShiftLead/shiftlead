@@ -193,7 +193,7 @@ class NotifyMixin:
 
     async def rpc_notify_test(self, caller: Any = None) -> dict[str, Any]:
         """**Send a test** (§4.5a **You**: **Telegram**, §4.10): one message now with the saved
-        secrets and link, whatever `on` says — *agentorc · a test from <home>* and the Inbox's
+        secrets and link, whatever `on` says — *shiftlead · a test from <home>* and the Inbox's
         address — answering the send's result in words. A person's own (`mail.PERSON_ONLY`), at the
         home alone (`modes.HOME_EDITS` forwards it from a node)."""
         agent_common.person_only(caller, "send a Telegram test", "§4.10")

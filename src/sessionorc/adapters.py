@@ -1,7 +1,7 @@
 """The adapter contract as the host agent sees it, plus the `shell` adapter and the registry.
 
 `sessionorc` knows nothing about any particular tool. Hook-fed adapters (Claude Code, …) live in
-`agentorc.adapters.*` and register through the `agentorc.adapters` entry-point group.
+`shiftlead.adapters.*` and register through the `shiftlead.adapters` entry-point group.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from typing import Protocol, runtime_checkable
 from sessionorc.models import Confidence, State
 from sessionorc.tmux import PaneInfo
 
-log = logging.getLogger("agentorc.adapters")
+log = logging.getLogger("shiftlead.adapters")
 
 SHELLS = {"bash", "zsh", "sh", "fish", "dash", "ksh"}
 
@@ -57,7 +57,7 @@ class Adapter(Protocol):
     #                                                      carried on `PaneInfo.title`) with the tool's own
     #                                                      decoration removed; None when what is there is not a
     #                                                      name — the tool's default, a shell's `user@host: path`.
-    #                                                      Display only: agentorc has no rename of its own
+    #                                                      Display only: shiftlead has no rename of its own
     #                                                      (design §4.3, §4.5a **title**, TD-074). An adapter
     #                                                      without it gives no title, which is the `shell` case
     #   external_sessions() -> list[ExternalSession]      live sessions of the tool started elsewhere
@@ -225,7 +225,7 @@ def short_model(adapter: str, model: str | None) -> str:
 
 @dataclass
 class ExternalSession:
-    """A live session of the tool that agentorc did not start (a VS Code terminal, a plain
+    """A live session of the tool that shiftlead did not start (a VS Code terminal, a plain
     `claude` in a shell): enough to enforce the anchor rule against it (design §9 invariant 2)."""
 
     adapter: str
@@ -236,7 +236,7 @@ class ExternalSession:
 
 
 def external_sessions() -> list[ExternalSession]:
-    """Every registered adapter's view of live sessions outside agentorc. Optional per adapter."""
+    """Every registered adapter's view of live sessions outside shiftlead. Optional per adapter."""
     if not _REGISTRY:
         load_all()
     out: list[ExternalSession] = []
@@ -306,7 +306,7 @@ def names() -> list[str]:
 def load_all() -> None:
     register(ShellAdapter())
     register(CommandAdapter())
-    for ep in entry_points(group="agentorc.adapters"):
+    for ep in entry_points(group="shiftlead.adapters"):
         try:
             obj = ep.load()
             register(obj() if isinstance(obj, type) else obj)

@@ -14,7 +14,7 @@ import tempfile
 import pytest
 from test_ui import client  # noqa: F401 — the fixture, by name
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 PROBE = """
 const fs = require("fs");
@@ -44,8 +44,8 @@ console.log(JSON.stringify(out));
 
 # what each card says of itself: its `data-*` and its text (`data-mine` is "1" or absent)
 CARDS = {
-    "me": {"kind": "agent", "team": "ao-grind", "pill": "idle", "mine": "1", "text": "me agentorc main"},
-    "worker": {"kind": "agent", "team": "ao-grind", "pill": "working", "text": "worker agentorc td428"},
+    "me": {"kind": "agent", "team": "ao-grind", "pill": "idle", "mine": "1", "text": "me shiftlead main"},
+    "worker": {"kind": "agent", "team": "ao-grind", "pill": "working", "text": "worker shiftlead td428"},
     "mine-waiting": {"kind": "agent", "team": "sam", "pill": "waiting", "mine": "1", "text": "mine-waiting samscrape"},
     "run": {"kind": "command", "team": "ao-grind", "pill": "working", "text": "run pdm test"},
     "my-run": {"kind": "command", "team": "", "pill": "idle", "mine": "1", "text": "my-run ls"},
@@ -110,10 +110,10 @@ def test_mine_and_kind_command_compose_with_team_and_state():
 
 @pytest.mark.unit
 def test_text_words_each_must_match_beside_the_others():
-    got = _passes("agentorc", "agentorc td428", "mine agentorc", "scratch kind:command")
-    assert got["agentorc"] == {"me", "worker"}
-    assert got["agentorc td428"] == {"worker"}
-    assert got["mine agentorc"] == {"me"}
+    got = _passes("shiftlead", "shiftlead td428", "mine shiftlead", "scratch kind:command")
+    assert got["shiftlead"] == {"me", "worker"}
+    assert got["shiftlead td428"] == {"worker"}
+    assert got["mine shiftlead"] == {"me"}
     assert got["scratch kind:command"] == {"loose"}
 
 
@@ -131,7 +131,7 @@ def test_a_badge_or_a_pill_presses_its_own_word_and_keeps_the_rest():
             ["mine state:idle", "state:working"],
             ["team:sam mine", "team:ao-grind"],
             ["Team:AO-grind mine", "team:ao-grind"],
-            ["team:ao-grind agentorc", "state:idle"],
+            ["team:ao-grind shiftlead", "state:idle"],
         ],
     )["toggles"]
     assert got == [
@@ -142,7 +142,7 @@ def test_a_badge_or_a_pill_presses_its_own_word_and_keeps_the_rest():
         "mine state:working",
         "mine team:ao-grind",
         "mine",
-        "team:ao-grind agentorc state:idle",
+        "team:ao-grind shiftlead state:idle",
     ]
 
 
@@ -158,7 +158,7 @@ def test_the_top_bar_draws_one_new_button_whose_menu_is_session_and_shell(client
 
 
 def test_no_template_carries_the_toggle_or_the_box_and_settings_forgets_mine():
-    from agentorc.ui import settings_page
+    from shiftlead.ui import settings_page
 
     for t in (UI / "templates").glob("*.html"):
         body = t.read_text()

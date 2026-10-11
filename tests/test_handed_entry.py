@@ -27,7 +27,7 @@ def _seat(state: str = "exited") -> Session:
 
 def _handed(mid: str = "m-entry", to: str = "ao-tl") -> MailEntry:
     e = MailEntry(id=mid, from_=PERSON, to=[to], at="2026-09-29T11:00:00Z", kind="ask", text="the parser drops …")
-    e.handed, e.entry = True, {"repo": "agentorc", "type": "debt"}
+    e.handed, e.entry = True, {"repo": "shiftlead", "type": "debt"}
     return e
 
 
@@ -171,8 +171,15 @@ def _registry(tmp_path, *repos):
 async def _seat_session(person, tmp_path) -> str:
     return (
         await person.call(
-            "create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
-            unattended=True, supervised=True, prompt="the seat's brief", seat={"trigger": "asks"},
+            "create",
+            name="tl",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc", "--noprofile"],
+            unattended=True,
+            supervised=True,
+            prompt="the seat's brief",
+            seat={"trigger": "asks"},
         )  # fmt: skip
     )["id"]
 
@@ -188,7 +195,7 @@ def test_entry_add_is_the_homes_edit():
 
 @pytest.mark.integration
 async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_path):
-    repo = tmp_path / "agentorc"
+    repo = tmp_path / "shiftlead"
     repo.mkdir()
     _registry(tmp_path, repo)
     await park_ticks(agent)
@@ -196,36 +203,36 @@ async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_pa
         sid = await _seat_session(person, tmp_path)
         teams = [{"team": "ao-grind", "seat": sid}, {"team": "other", "seat": "ao-x"}]
         got = await person.call(
-            "entry_add", repo="agentorc", type="Debt", text="  the parser drops a trailing line  ", teams=teams
+            "entry_add", repo="shiftlead", type="Debt", text="  the parser drops a trailing line  ", teams=teams
         )
-        assert (got["to"], got["team"], got["repo"], got["type"]) == (sid, "ao-grind", "agentorc", "debt")
+        assert (got["to"], got["team"], got["repo"], got["type"]) == (sid, "ao-grind", "shiftlead", "debt")
         assert "default bound" not in got["read_when"], "a handed entry never lapses, so the sentence names none"
         rec = agent.sessions[sid]
         e = next(e for e in rec.inbox if e.id == got["id"])
         assert e.kind == "ask" and e.from_ == PERSON and e.text == "the parser drops a trailing line"
-        assert e.handed and e.entry == {"repo": "agentorc", "type": "debt"} and e.bound is None
+        assert e.handed and e.entry == {"repo": "shiftlead", "type": "debt"} and e.bound is None
         assert e.handed_entry and rec.asks_waiting() == 1
         # three days on, past any `ask`'s default bound, the sweep leaves it standing
         await agent._sweep_mail(datetime.now(UTC) + timedelta(days=3))
         assert e.open and e.expired_at is None
         # by path as well as by name — `ao td add` hands the checkout it runs in
         again = await person.call("entry_add", repo=str(repo), type="feature", text="a second", teams=teams)
-        assert again["repo"] == "agentorc" and again["type"] == "feature"
+        assert again["repo"] == "shiftlead" and again["type"] == "feature"
         # a seat on call — its record exited — reads *fills this seat*, with no bound after it
         rec.state, rec.pane, rec.exit_code = "exited", True, 0
         agent.store.save(rec)
-        third = await person.call("entry_add", repo="agentorc", type="debt", text="a third", teams=teams)
+        third = await person.call("entry_add", repo="shiftlead", type="debt", text="a third", teams=teams)
         assert third["read_when"] == "fills this seat: a session starts on the next tick and reads it first"
         await person.call("kill", id=sid)
 
 
 @pytest.mark.integration
 async def test_entry_add_is_refused_in_words(agent, tmp_path):
-    repo = tmp_path / "agentorc"
+    repo = tmp_path / "shiftlead"
     repo.mkdir()
     _registry(tmp_path, repo)
     teams = [{"team": "ao-grind", "seat": "ao-agentorc-techlead-ao-1"}]
-    ok = {"repo": "agentorc", "type": "debt", "text": "x", "teams": teams}
+    ok = {"repo": "shiftlead", "type": "debt", "text": "x", "teams": teams}
     async with LocalClient(caller="ao-some-worker") as worker:
         with pytest.raises(AgentError, match="a person's own act"):
             await worker.call("entry_add", **ok)
@@ -236,7 +243,7 @@ async def test_entry_add_is_refused_in_words(agent, tmp_path):
             await person.call("entry_add", **{**ok, "type": "chore"})
         with pytest.raises(AgentError, match="has no words"):
             await person.call("entry_add", **{**ok, "text": "   "})
-        with pytest.raises(AgentError, match="no team services agentorc"):
+        with pytest.raises(AgentError, match="no team services shiftlead"):
             await person.call("entry_add", **{**ok, "teams": []})
         with pytest.raises(AgentError, match="ao-grind has no techlead seat"):
             await person.call("entry_add", **{**ok, "teams": [{"team": "ao-grind", "seat": ""}]})
@@ -248,8 +255,15 @@ async def test_entry_add_is_refused_in_words(agent, tmp_path):
 async def _seat_with_entry(person, agent, tmp_path) -> str:
     sid = (
         await person.call(
-            "create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
-            unattended=True, supervised=True, prompt="the seat's brief", seat={"trigger": "asks"},
+            "create",
+            name="tl",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc", "--noprofile"],
+            unattended=True,
+            supervised=True,
+            prompt="the seat's brief",
+            seat={"trigger": "asks"},
         )  # fmt: skip
     )["id"]
     agent.sessions[sid].inbox.append(_handed(to=sid))
@@ -316,7 +330,7 @@ def test_the_seats_nudge_names_a_handed_entry_by_its_outcome(agent):
     assert "questions waiting" not in line and "1 entry the person handed you owes its outcome" in line
     q = MailEntry(id="m-q", from_="ao-mgr", to=[s.id], at="2026-09-29T11:00:00Z", kind="ask", text="?")
     s.inbox.append(q)
-    assert agent._nudge_line(s).startswith("[agentorc] you have 1 questions waiting — run `ao inbox`; 1 entry")
+    assert agent._nudge_line(s).startswith("[shiftlead] you have 1 questions waiting — run `ao inbox`; 1 entry")
 
 
 # -- TD-292 slice 4: Send to reviewer — a look handed to the techlead seat --------------------------
@@ -327,16 +341,16 @@ SHOT = "docs/mockups/reviews/2026-10-03-td292-row.png"
 
 async def _look(person, tmp_path, *, kind: str = "ask") -> tuple[str, str, str]:
     async def mk(n: str, **kw) -> str:
-        return (
-            await person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw)
-        )["id"]
+        return (await person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw))[
+            "id"
+        ]
 
     builder, seat = await mk("builder", unattended=True), await mk("tl", unattended=True, seat={"trigger": "asks"})
     extra = {"default": "Works"} if kind == "steer" else {"answers": ["Works", "Not right: x"]}
     async with LocalClient(caller=builder) as c:
-        look = (
-            await c.call("msg", to="person", kind=kind, text="the row?", about="TD-292", shots=[SHOT], **extra)
-        )["entry"]["id"]
+        look = (await c.call("msg", to="person", kind=kind, text="the row?", about="TD-292", shots=[SHOT], **extra))[
+            "entry"
+        ]["id"]
     return builder, seat, look
 
 
@@ -399,9 +413,9 @@ async def test_send_to_reviewer_is_refused_in_words(agent, tmp_path):
     async with LocalClient() as person:
         builder, seat, look = await _look(person, tmp_path)
         async with LocalClient(caller=builder) as c:
-            steer = (
-                await c.call("msg", to="person", kind="steer", default="Works", text="the row?", shots=[SHOT])
-            )["entry"]["id"]
+            steer = (await c.call("msg", to="person", kind="steer", default="Works", text="the row?", shots=[SHOT]))[
+                "entry"
+            ]["id"]
             plain = (await c.call("msg", to="person", kind="ask", text="merge?"))["entry"]["id"]
         async with LocalClient(caller=seat) as tl:
             with pytest.raises(AgentError, match="a person's own act"):

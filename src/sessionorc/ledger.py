@@ -1,6 +1,6 @@
 """The ledger's entry headers, read (design §4.4 *Repo facts*, TD-176 slice 1).
 
-A repo's ledger (`.agentorc.yml`'s `ledger:`, default `docs/technical_debt.md`) is a file of
+A repo's ledger (`.shiftlead.yml`'s `ledger:`, default `docs/technical_debt.md`) is a file of
 entries, each `## TD-NNN: title` followed by header fields — `**Priority:**`, `**Owner:**`,
 `**Kind:**`, `**Type:**`, `**Blocked by:**`. This module is the one reader of those fields: the
 Org's Repo facet and the Repo page count what it returns, and `tests/test_ledger.py` holds the
@@ -27,12 +27,12 @@ from typing import Any
 
 import yaml
 
+from sessionorc import paths
 from sessionorc.models import owner_word
 
 # origin's default branch as last fetched; the two usual names when `origin/HEAD` was never set
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
-DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `agentorc.repoconfig` has it
-REPO_FILE = ".agentorc.yml"
+DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `shiftlead.repoconfig` has it
 
 HEADING = re.compile(r"^## (TD-\d+):[ \t]*(.*)$", re.M)
 SECTION = re.compile(r"^## ", re.M)  # a body ends at the next `## ` heading of any kind, as the script reads it
@@ -290,7 +290,7 @@ def in_lanes(
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
     rest.sort(key=lambda r: (-r["n"], r["owner"]))
-    # live = not ended: the UI's `cards.DEAD`, written out since sessionorc never imports agentorc
+    # live = not ended: the UI's `cards.DEAD`, written out since sessionorc never imports shiftlead
     alive = [frozenset(r["lane"]) for r in records if r.get("lane") and r.get("state") not in ("exited", "closed")]
     members = []
     for r in records:
@@ -473,10 +473,10 @@ class Registry:
 
 
 def ledger_path(root: Path | str) -> str:
-    """The checkout's ledger file, relative to it: `.agentorc.yml`'s `ledger:` when it names one,
-    else the default. An unreadable file is the default, as it is for `agentorc.repoconfig`."""
+    """The checkout's ledger file, relative to it: `.shiftlead.yml`'s `ledger:` when it names one,
+    else the default. An unreadable file is the default, as it is for `shiftlead.repoconfig`."""
     try:
-        doc = yaml.safe_load((Path(root) / REPO_FILE).read_text(encoding="utf-8"))
+        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return DEFAULT
     got = doc.get("ledger") if isinstance(doc, dict) else None

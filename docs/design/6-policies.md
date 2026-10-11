@@ -306,7 +306,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the held create moves the mail as a fill does), a member `needs-you` from the first minute —
      by this rule and no Start-time case: the Start itself is never a cause.
      **A fill says why it came**: the prompt a fill hands `create` is the brief, filled again as
-     rule 7 has it, with **one closing line** in fixed words — *[agentorc] you are filled for: <by>
+     rule 7 has it, with **one closing line** in fixed words — *[shiftlead] you are filled for: <by>
      — <member or the question's id>* — the cause as `seat_due` carries it, so the seat's first
      act is the reading and not `ao status`; `seat_due` on the record stays the truth it reads
      back, and a replay for any other `why` adds no such line. Its `control` grant and its place
@@ -327,7 +327,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped`, or, for a seat,
      `seat_due` set (a question waiting on an idle techlead) — and no declaration, no pending, not
      gated, its composer empty (§4.2 `send`'s rules; the doorbell's *one typist per pane* holds), is
-     sent **one fixed line** through `send`'s path: *[agentorc] you have been idle 20 minutes with
+     sent **one fixed line** through `send`'s path: *[shiftlead] you have been idle 20 minutes with
      `<ref>` open — end the run with one of `ao progress done <ref> --pr N`, `ao progress drop
      <ref> --why`, `ao progress none --why` or `ao progress restart --why`*, naming the first open
      reference — for a seat, the number waiting: *you have N questions waiting — run `ao inbox`*,
@@ -380,7 +380,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   (`manager_on_call.md`, 1,400 words) reads `ao --skill` and its own log, and each of the four
   causes says what to read for it (a tail, a transcript, the member's record), never a section of
   the design whole; a repo's supplement to it names reads for a reading, never for a round, and
-  agentorc's own (`docs/briefs/manager-ao-1.md`) keeps its *first reads* — §4.2, §9's invariants,
+  shiftlead's own (`docs/briefs/manager-ao-1.md`) keeps its *first reads* — §4.2, §9's invariants,
   the cadence skill — under the readings that need them. The standing manager's brief
   (`manager.md`, 4,200 words, reading §4.8 and §6 whole and cadence §1–§4) is `on_call: false`'s
   alone. The wind-down is rule 9's whichever shape the manager has: a manager on call that is
@@ -399,10 +399,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      record as `context: {tokens, at, window}` — the window kept beside the tokens, since the
      model may change mid-run) is over its role's **bound** (§4.8 `context: {bound}`; 300k for
      every built-in worker preset — grinder, hunter, auditor — and for every role that sets none,
-     a seat excepted, and a repo's own number under its `.agentorc.yml`, §4.8 *The bound has two
+     a seat excepted, and a repo's own number under its `.shiftlead.yml`, §4.8 *The bound has two
      layers*) is told so **once it is hook-confirmed `idle` and holds no claim in progress** —
      between entries, never mid-turn — by **one fixed line** through `send`'s path, as rule 4's
-     is: *[agentorc] context 231k, over your 200k bound — take nothing new: push, ledger, then
+     is: *[shiftlead] context 231k, over your 200k bound — take nothing new: push, ledger, then
      `ao progress restart --why "context bound"`*; `context_sent_at` marks it, and it is sent
      again after twenty minutes if the member is still idle and over. A member that is `working`
      past the bound is not interrupted: every `ao` reply it makes ends with *(context 231k over
@@ -736,7 +736,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      members' half is `ao team stop --close`'s (§4.9a) — each finished member is closed under the
      wrap-up's own safety check, one with uncommitted or unpushed work left open and the Inbox row
      it is after any wrap-up — and the manager's half is this rule's own. The manager, if live and
-     on the home, gets **one** send of fixed text, *[agentorc] your team is finished: every member
+     on the home, gets **one** send of fixed text, *[shiftlead] your team is finished: every member
      has declared. Make your last acts — `ao progress none`, the note to the person — then `ao
      close` yourself*, typed only into an idle composer as rule 4's line is, and
      `finished_sent_at` on its record says it landed (§4.3's list of the home's fields). From that
@@ -803,7 +803,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      and nothing else. **`fail`** the first time for that PR — `told` empty — is one fixed line to
      the member, rule 5's two ways: typed into the idle composer of an unattended member on the
      home's own host (never into an attended session, invariant 5: it is told by the clause),
-     *[agentorc] PR #842 failed the cadence check: review, ledger — fix it, then report `ao
+     *[shiftlead] PR #842 failed the cadence check: review, ledger — fix it, then report `ao
      progress done TD-257 --pr 842` again*, the row names from the script's `rule` field and never
      its `detail`, and on a working member the clause at the end of every `ao` reply, *(PR #842
      fails the cadence check: review, ledger)*, read at the home as rule 5's is; `told` marks it.
@@ -847,7 +847,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      person, replied by the person alone. So a chain's PR merged after its first reader's `pass`
      and before its last reader's reply is a crossing, as a one-reader PR merged before its reply
      is. `held.read_by(s, pr, files)` walks `review_links` against the PR's files, `addressed` (in
-     `sessionorc.held`, re-exported by `agentorc.review`) matching each reply's sender and each
+     `sessionorc.held`, re-exported by `shiftlead.review`) matching each reply's sender and each
      ask's addressee to a link's reader; the older `{reader, held}` reads as before. The mail read
      is the record's own — its `ask` in its outbox, the reply in its inbox — and, since mail is
      pruned, the `read_by` rule 10 kept on the PR's `checks` entry — one sender, so for a chain
@@ -857,7 +857,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the record as **`held_missed: [{pr, at, paths, told, dismissed}]`** (home-owned): the member
      gets one fixed line, rule 5's two ways — typed into the idle composer of an unattended member
      on the home's host, else the clause on its next `ao` reply, said once, `told` marking either
-     — *[agentorc] PR #845 touched held paths (`src/sessionorc/agent_tick.py`) and merged without
+     — *[shiftlead] PR #845 touched held paths (`src/sessionorc/agent_tick.py`) and merged without
      the techlead's read — a held PR waits for `ao msg --kind ask --pr <n> <seat> "…"` and the
      reply before the merge* — and the person gets one `system` note, FYI and uncounted, naming
      the PR, the paths and the member, since a gate was passed and the person should know each
@@ -898,7 +898,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   for samscrape — is made from `main` by **a person's press or this policy, never by a session**
   (CLAUDE.md: a worker never promotes; the `promote` RPC is refused to a session as `set_settings`
   is, §4.7). It runs **at the home** (§4.4a), for each checkout in the home's registry (`hosts.yml`
-  `repos_registry`) whose `.agentorc.yml` carries `promote:` (§5); a repo whose checkout is on a
+  `repos_registry`) whose `.shiftlead.yml` carries `promote:` (§5); a repo whose checkout is on a
   node only has no promote. On the reports' cadence (five minutes, one read per repo, each detached
   from the tick as the `gh` reads are) the home takes **three readings** and keeps them on `host`
   under `promotes`: **live**, `check`'s commit, a failed read keeping the last good one with its
@@ -927,8 +927,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   on (1) or (3); on (2) a person may press through `pending`, `failed` or `unknown` — a rollback
   (`--sha`) or a merged hotfix past a flaky check is the person's word — with the row saying what
   the checks said. **The run is detached** from the agent's own process group, its output to
-  `~/.agentorc/promotes/<repo>/<sha>.log` (pruned with the run logs, `runs_keep_days`), and an
-  intent file `~/.agentorc/promotes/<repo>/inflight.json` — `{sha, at, pid, log, by}`, `by` being
+  `~/.shiftlead/promotes/<repo>/<sha>.log` (pruned with the run logs, `runs_keep_days`), and an
+  intent file `~/.shiftlead/promotes/<repo>/inflight.json` — `{sha, at, pid, log, by}`, `by` being
   `auto` or the person, and for a rollback `from`, `kind` and `tree` too (below) — is written
   **before** the start, because for this repo the run restarts the host agent that started it: **the
   outcome is read from `check` on later ticks, never from the run's exit code** (`check` read every
@@ -958,12 +958,12 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     when it names no commit or more than one, when it is **not an ancestor of `origin/main`** (a
     branch is never promoted, CLAUDE.md; a hotfix is a merge and then a press), and when it is live
     already. Main's head is the plain press, by the path above. `--back` is `from` in
-    `~/.agentorc/promotes/<repo>/last.json` — `{sha, from, at, by}`, written when a promote
+    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by}`, written when a promote
     concludes, `from` being what `check` read before the run — and is refused when there is no such
     record or its `from` was never read, and **while a hold stands**: the last promote was then the
     rollback, and its `from` is the commit the person went back from.
   - **How it reaches `run`.** The checkout stays where the person left it. The home adds a detached
-    worktree of the checkout at the commit, `~/.agentorc/promotes/<repo>/tree` (`git worktree add
+    worktree of the checkout at the commit, `~/.shiftlead/promotes/<repo>/tree` (`git worktree add
     --detach`; one left by an earlier run is removed first), and starts `run` **there**, which is
     why §5 says `run` makes live *the tree it is started in*. It is the one write the promote makes
     to a repo: an entry in the repo's worktree list, touching no branch, no index and no file of the
@@ -978,8 +978,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     (2) is the person's word, as on any press, and the reply says what the checks read on *that*
     commit. Of (3), a run in flight refuses it and **a failure standing does not**: a rollback that
     concludes clears the failure.
-  - **What the repo may refuse.** `run` is started with `AGENTORC_PROMOTE_SHA` (the commit),
-    `AGENTORC_PROMOTE_FROM` (what is live, empty when unread) and `AGENTORC_PROMOTE_ROOT` (the
+  - **What the repo may refuse.** `run` is started with `SHIFTLEAD_PROMOTE_SHA` (the commit),
+    `SHIFTLEAD_PROMOTE_FROM` (what is live, empty when unread) and `SHIFTLEAD_PROMOTE_ROOT` (the
     checkout, for what a run needs that no commit holds), on every promote. The home knows no repo's
     schema, so a commit that cannot be gone back to (one older than a migration) is the repo's `run`
     to refuse, by exiting before it changes anything: live reads as it did, and the row is a failure
@@ -988,7 +988,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the note reads *rolled back `<repo>` to `<sha7>` from `<sha7>` — main is n commits ahead*. The
     wheel and the nodes follow as after any promote: the run writes the wheel of what it installed,
     and that is the newest.
-  - **The hold.** A rollback that concludes writes `~/.agentorc/promotes/<repo>/held.json` — `{sha,
+  - **The hold.** A rollback that concludes writes `~/.shiftlead/promotes/<repo>/held.json` — `{sha,
     from, main, at}` — and the reading carries it as `held`. **While it stands the policy starts
     nothing for that repo**, whatever `auto` says and however far main moves: the commit the person
     went back from is still on main, and a later merge that is not its cure would put it live again.
@@ -1024,7 +1024,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   container node's record over the same path while its link is up, is at rest — `idle`, `exited` or
   `closed`; `working`, `needs-you`, `stalled?`, `limited` and `unreachable` are not rest, since a
   turn may be under way or about to resume — and every live session the adapters see there outside
-  agentorc (a plain `claude` in a terminal, `external_sessions`, §4.3) reports `idle` from the
+  shiftlead (a plain `claude` in a terminal, `external_sessions`, §4.3) reports `idle` from the
   tool's own registry (`status`: busy | idle | shell). One the home cannot read the state of is
   taken as mid-turn, and the pass waits (no pull, and the note stays). No session at all is idle. A `shell` record running a
   foreground command is `working` and counts: it may be `git` itself. So tracked files move under

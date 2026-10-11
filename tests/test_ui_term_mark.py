@@ -14,9 +14,9 @@ import uuid
 
 import pytest
 
-from agentorc.ui.pty_bridge import clients_argv, clients_frame, watch_clients
+from shiftlead.ui.pty_bridge import clients_argv, clients_frame, watch_clients
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 APP = UI / "static" / "app.js"
 
 PROBE = """
@@ -102,7 +102,7 @@ def test_the_focus_wires_the_mark_to_the_socket_and_the_feed():
     """The wiring around `AO.termMark`: the bridge's `{clients, window}` frame is read beside the
     `read_only` one, before the backoff reset (the attach's own word, not pane output); a pane byte
     clears a pending reconnect and restarts the silence; a retry stamps `retryAt` once; the feed's
-    state reaches the mark; each event goes to the console as `[agentorc] terminal …`; the page
+    state reaches the mark; each event goes to the console as `[shiftlead] terminal …`; the page
     carries the slot, hidden."""
     js = APP.read_text()
     body = js[js.index("ws.onmessage = (m) => {\n") :]
@@ -114,7 +114,7 @@ def test_the_focus_wires_the_mark_to_the_socket_and_the_feed():
     assert "mk.state = ev.session.state; drawMark();" in js
     # a session that turns working counts its silence from then, not from the quiet idle before it
     assert 'if (ev.session.state === "working" && mk.lastByte != null) mk.lastByte = Date.now();' in js
-    assert 'console.info("[agentorc] terminal", ...a, new Date().toISOString())' in js
+    assert 'console.info("[shiftlead] terminal", ...a, new Date().toISOString())' in js
     for event in ('tlog("open")', 'tlog("closed", e.code, e.reason || "")', 'tlog("clients"', "tlog(`output after"):
         assert event in js, event
     html = (UI / "templates" / "focus.html").read_text()

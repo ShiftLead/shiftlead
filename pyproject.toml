@@ -1,5 +1,5 @@
 [project]
-name = "agentorc"
+name = "shiftlead"
 version = "0.0.1"
 description = "Orchestrate interactive AI coding-agent sessions and shells running in tmux across hosts."
 readme = "README.md"
@@ -20,15 +20,15 @@ ui = [
 ]
 
 [project.scripts]
-agentorc = "agentorc.cli:main"
-ao = "agentorc.cli:main"
-agentorc-agent = "sessionorc.agent:main"
-agentorc-hook = "agentorc.adapters.claude_code.hook:main"
-agentorc-ui = "agentorc.ui.app:main"
-agentorc-watch = "agentorc.watch:main"
+shiftlead = "shiftlead.cli:main"
+ao = "shiftlead.cli:main"
+shiftlead-agent = "sessionorc.agent:main"
+shiftlead-hook = "shiftlead.adapters.claude_code.hook:main"
+shiftlead-ui = "shiftlead.ui.app:main"
+shiftlead-watch = "shiftlead.watch:main"
 
-[project.entry-points."agentorc.adapters"]
-claude-code = "agentorc.adapters.claude_code:ClaudeCodeAdapter"
+[project.entry-points."shiftlead.adapters"]
+claude-code = "shiftlead.adapters.claude_code:ClaudeCodeAdapter"
 
 [build-system]
 requires = ["pdm-backend"]
@@ -39,7 +39,7 @@ distribution = true
 
 [tool.pdm.build]
 package-dir = "src"
-includes = ["src/sessionorc", "src/agentorc"]
+includes = ["src/sessionorc", "src/shiftlead"]
 source-includes = []
 
 [dependency-groups]

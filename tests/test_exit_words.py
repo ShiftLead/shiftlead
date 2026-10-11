@@ -9,8 +9,8 @@ import re
 
 import pytest
 
-from agentorc import cli
-from agentorc.ending import clock, ending_hover, exit_words
+from shiftlead import cli
+from shiftlead.ending import clock, ending_hover, exit_words
 
 UTC = datetime.UTC
 NOW = datetime.datetime(2026, 10, 9, 18, 0, tzinfo=UTC)
@@ -88,7 +88,7 @@ def test_the_hover_is_the_words_and_the_time():
 
 
 def _view(rec, fleet=None, **kw):
-    from agentorc.ui.app import view
+    from shiftlead.ui.app import view
 
     base = {"kind": "agent", "adapter": "claude-code", "dir": "/tmp/x", "since": _at(minutes=30), "pane": False,
             "tail": [], "created": _at(hours=2), "confidence": "tick"}  # fmt: skip
@@ -101,7 +101,7 @@ def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
     ending on an exited record (never *guessed*: it is the tick's own reading), *guessed from the
     screen* on a scraped state, *reported by the tool* on a hook one, and a `stalled?` the tick
     observed said as observed."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     kill = {**_exited(how="kill", by="ao-r-manager-1"), "id": "ao-r-w-1"}
     v = _view(kill, [{"id": "ao-r-manager-1", "name": "manager-1"}])
     assert v["pill_title"].startswith("killed by manager-1 · ") and v["exit_text"] == "killed by manager-1"
@@ -121,7 +121,7 @@ def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
     stalled = _view({**idle, "state": "stalled?", "confidence": "tick"})
     assert stalled["pill_title"] == "observed by the host agent, not reported by the tool"
     # a *waiting* pill says its reason, and a seat on call is read from its record — before the ending
-    from agentorc.ui.cards import pill_title
+    from shiftlead.ui.cards import pill_title
 
     waiting = {"state_class": "waiting", "wait_reason": "waiting · review #1302", "confidence": "hook"}
     assert pill_title(waiting) == "waiting · review #1302 — idle in every payload, on someone else’s move"
@@ -151,9 +151,9 @@ def test_an_ending_before_today_says_its_day():
 def test_the_card_and_the_inbox_row_draw_the_one_text(tmp_path, monkeypatch):
     """The card's pill (compact and full) and the Inbox row's carry `pill_title`, so all three say
     the same; the Focus header draws it from the same view in the script (`v.pill_title`)."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates
-    from agentorc.ui.inbox import state_rows
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates
+    from shiftlead.ui.inbox import state_rows
 
     v = _view({**_exited(how="kill", by="person"), "id": "ao-r-w-1"})
     title = v["pill_title"]

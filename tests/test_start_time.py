@@ -243,7 +243,7 @@ def test_the_starts_note_is_the_stops_formatter_on_a_scheduled_record_only():
 
 
 async def test_ao_new_at_and_ao_at_drive_the_start(agent, tmp_path, capsys, monkeypatch):
-    from agentorc import cli
+    from shiftlead import cli
 
     await park_ticks(agent)
     monkeypatch.chdir(tmp_path)

@@ -87,9 +87,9 @@ def test_the_repos_own_ledger_parses_every_entry_the_heading_regex_finds():
 
 def test_ledger_path_reads_the_repo_file_and_defaults(tmp_path):
     assert ledger.ledger_path(tmp_path) == "docs/technical_debt.md"
-    (tmp_path / ".agentorc.yml").write_text("ledger: notes/debt.md\n")
+    (tmp_path / ".shiftlead.yml").write_text("ledger: notes/debt.md\n")
     assert ledger.ledger_path(tmp_path) == "notes/debt.md"
-    (tmp_path / ".agentorc.yml").write_text(": not yaml [\n")
+    (tmp_path / ".shiftlead.yml").write_text(": not yaml [\n")
     assert ledger.ledger_path(tmp_path) == "docs/technical_debt.md"
 
 
@@ -330,7 +330,7 @@ def test_a_node_refuses_the_repo_facts_while_its_home_is_unreachable():
 
 
 def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     now = datetime.now(UTC)
     reading = {
@@ -453,7 +453,7 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
     marked *live check* with its build's PR, in the pick order; one whose build is not live is a
     `live-check` line saying it waits; one the person judges (*for you*) is on neither, nor one blocked
     by a decision alone, which is counted under *live check* and listed nowhere (§4.7, TD-418)."""
-    from agentorc import cli
+    from shiftlead import cli
 
     def e(i, page, prio, live, built, owner="grinder", blocked=()):
         return {"id": i, "title": f"check {i}", "for_page": page, "priority": prio, "owner": owner,
@@ -487,7 +487,7 @@ def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypat
 def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monkeypatch, capsys):
     """TD-368 slice 2 (design §4.7, TD-367): a build on `decision (designer)` is on the design list
     and says *decision* after its owner; a `Kind: design-first` row does not."""
-    from agentorc import cli
+    from shiftlead import cli
 
     entries = [
         {"id": "TD-151", "title": "metered", "for_page": "design", "priority": "low", "owner": "grinder",
@@ -620,7 +620,7 @@ def test_the_grinder_template_says_the_pick_order_and_names_the_tool():
     and the priority in the claim's first `ao doing` line."""
     from importlib import resources
 
-    text = resources.files("agentorc").joinpath("briefs", "grinder.md").read_text(encoding="utf-8")
+    text = resources.files("shiftlead").joinpath("briefs", "grinder.md").read_text(encoding="utf-8")
     assert "High, then Medium, then Low" in text and "`ao repo` lists" in text
     assert "put the priority there" in text and "Choosing in a free-pick lane" in text
 
@@ -698,7 +698,7 @@ def test_repo_lanes_reads_the_repos_own_records_and_a_claim_only_while_its_holde
     """§4.4 *In a team's lanes* (TD-361, TD-363): a record of another repo is no team of this one,
     lane or not, and a claim held by an ended record holds nothing — the entry is unheld and the
     member out of work with it in its lane is warned; held by a live record, it is not."""
-    from agentorc import teamrun
+    from shiftlead import teamrun
 
     other = tmp_path / "other"
     other.mkdir()
@@ -725,7 +725,7 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
     """§4.7 `ao repo` (TD-361): the first line's parentheses, one per servicing team; a member out of
     work with unheld work in its lane on a line of its own; `--json` carries `lanes` by team;
     `--all` reads no members and prints the counts alone."""
-    from agentorc import cli
+    from shiftlead import cli
 
     entries, records = _oct6()
     entries.append(
@@ -809,7 +809,7 @@ def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch,
     """§4.7 `ao repo` (TD-428): the *is out of work with n* line reads the per-member count — an
     out-of-work anchor seat with an unheld evaluation, which the pickable and design-first kinds alone
     never named, and a member that declared and is waiting on you, whatever its pill reads."""
-    from agentorc import cli
+    from shiftlead import cli
 
     entries, records = _own_counts()
     records[1]["out_of_work"] = {"at": "2026-10-09T09:00:00Z", "why": "x"}

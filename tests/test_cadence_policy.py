@@ -62,7 +62,7 @@ def test_a_read_leaves_the_entry_and_its_marks():
 def test_the_fixed_words():
     c = {"pr": 842, "verdict": "fail", "failed": ["review", "ledger"]}
     assert cadence.line(c, "TD-257") == (
-        "[agentorc] PR #842 failed the cadence check: review, ledger — fix it, then report "
+        "[shiftlead] PR #842 failed the cadence check: review, ledger — fix it, then report "
         "`ao progress done TD-257 --pr 842` again"
     )
     assert cadence.clause([c, {"pr": 9, "verdict": "pass", "failed": []}]) == (
@@ -384,21 +384,21 @@ async def test_every_reply_to_a_member_with_a_failing_pr_carries_the_clause(agen
 def test_the_cadence_clause_rides_the_unread_line_or_stands_alone(capsys):
     import argparse
 
-    from agentorc import cli
     from sessionorc import client as clientmod
+    from shiftlead import cli
 
     args = argparse.Namespace(json=False)
     fails = "PR #842 fails the cadence check: review, ledger"
     clientmod.last_mail = {"unread": 0, "wake_budget_spent": False, "cadence": fails}
     cli.unread_line(args)
-    assert capsys.readouterr().out == f"[agentorc] ({fails})\n"
+    assert capsys.readouterr().out == f"[shiftlead] ({fails})\n"
     clientmod.last_mail = {"unread": 2, "wake_budget_spent": False, "cadence": fails}
     cli.unread_line(args)
-    assert capsys.readouterr().out == f"[agentorc] you have 2 unread messages — run ao inbox ({fails})\n"
+    assert capsys.readouterr().out == f"[shiftlead] you have 2 unread messages — run ao inbox ({fails})\n"
     over = "context 231k over the 200k bound"
     clientmod.last_mail = {"unread": 0, "wake_budget_spent": False, "context": over, "cadence": fails}
     cli.unread_line(args)
-    assert capsys.readouterr().out == f"[agentorc] ({over}; {fails}) — finish the entry in hand, then declare\n"
+    assert capsys.readouterr().out == f"[shiftlead] ({over}; {fails}) — finish the entry in hand, then declare\n"
     clientmod.last_mail = None
 
 

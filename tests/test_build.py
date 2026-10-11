@@ -128,7 +128,7 @@ async def test_host_reports_the_build_and_when_the_agent_started(agent):
 
 
 async def test_status_v_prints_the_running_build(agent, repo, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     built = _git(repo, "rev-parse", "HEAD")
     _commit(repo, "2\n")
@@ -193,7 +193,7 @@ def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(
     """The techlead's read of TD-132 slice 5: where the home's `promotes` reading holds the checkout
     the build came from, at the same live commit, the chip takes main's distance from it — the
     Inbox's Promote row's number — rather than this checkout's last fetch; otherwise it measures here."""
-    from agentorc.ui.common import build_chip
+    from shiftlead.ui.common import build_chip
 
     built = _git(repo, "rev-parse", "HEAD")
     _commit(repo, "2\n")

@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from agentorc.ui import app as uiapp
+from shiftlead.ui import app as uiapp
 
 pytestmark = pytest.mark.unit
 
@@ -27,7 +27,7 @@ def rec(**kw):
 def page(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     calls: list[tuple[str, dict]] = []
 

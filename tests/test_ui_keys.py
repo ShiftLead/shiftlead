@@ -14,7 +14,7 @@ import tempfile
 
 import pytest
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 PROBE = """
 const fs = require("fs");
@@ -109,9 +109,9 @@ def _needle(sel: str) -> str:
 
 
 def _org_html(monkeypatch, tmp_path) -> str:
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import team_groups, templates, view
+    from shiftlead.ui.app import team_groups, templates, view
 
     records = [
         {

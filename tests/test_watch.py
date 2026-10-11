@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from agentorc import watch
+from shiftlead import watch
 
 T0 = datetime(2026, 10, 9, 11, 31, tzinfo=UTC)
 EVERY = watch.WATCH_EVERY
@@ -45,12 +45,12 @@ def hhmm(minutes):
 def test_silence_is_told_at_ten_minutes_and_its_recovery_once(home):
     sent = drive(home, [(0, True, False), (5, False, False), (10, False, False), (15, False, False)])
     assert sent[:3] == [[], [], []], "five minutes silent is not yet an outage"
-    assert sent[3] == [f"agentorc · the host agent on kmaster has not answered since {hhmm(5)}"]
+    assert sent[3] == [f"shiftlead · the host agent on kmaster has not answered since {hhmm(5)}"]
     state = json.loads((home / "watch.json").read_text())
     assert state["told"] == ["silent"] and state["silent_since"] == (T0 + timedelta(minutes=5)).isoformat()
     later = drive(home, [(20, False, False), (265, False, False), (270, True, False), (275, True, False)])
     assert later[:2] == [[], []], "one message an outage"
-    assert later[2] == ["agentorc · the host agent on kmaster answers again (silent 4h25m)"]
+    assert later[2] == ["shiftlead · the host agent on kmaster answers again (silent 4h25m)"]
     assert later[3] == [], "one message a recovery"
     assert json.loads((home / "watch.json").read_text())["told"] == []
 
@@ -58,9 +58,9 @@ def test_silence_is_told_at_ten_minutes_and_its_recovery_once(home):
 def test_a_stopped_manager_is_started_told_and_its_recovery_told(home):
     sent = drive(home, [(0, False, True), (5, True, False)])
     assert sent[0] == [
-        f"agentorc · kmaster's user manager was stopped; started again at {hhmm(0)}, sessions kept running"
+        f"shiftlead · kmaster's user manager was stopped; started again at {hhmm(0)}, sessions kept running"
     ]
-    assert sent[1] == ["agentorc · the host agent on kmaster answers again (silent 5 min)"]
+    assert sent[1] == ["shiftlead · the host agent on kmaster answers again (silent 5 min)"]
     state = json.loads((home / "watch.json").read_text())
     assert state == {"silent_since": None, "manager_started_at": None, "told": [], "last_run": state["last_run"]}
 
@@ -98,7 +98,7 @@ def test_a_failed_send_is_logged_and_not_retried(home, monkeypatch):
         "-m",
         "sessionorc.notify",
     ]
-    assert line.startswith("agentorc · the host agent on kmaster has not answered")
+    assert line.startswith("shiftlead · the host agent on kmaster has not answered")
     assert (home / "watch.log").read_text().endswith("send failed: Doppler Error: you must be logged in\n")
 
 
@@ -122,8 +122,8 @@ def test_a_sent_line_is_logged_and_a_child_that_cannot_run_is_a_log_line(monkeyp
 
     logged: list[str] = []
     monkeypatch.setattr(watch.subprocess, "run", lambda argv, **kw: Sent())
-    watch.tell("agentorc · a line", "a/b", logged.append)
-    assert logged == ["told: agentorc · a line"]
+    watch.tell("shiftlead · a line", "a/b", logged.append)
+    assert logged == ["told: shiftlead · a line"]
     for err in (FileNotFoundError("doppler"), subprocess.TimeoutExpired("doppler", 10)):
 
         def fail(argv, err=err, **kw):
@@ -131,7 +131,7 @@ def test_a_sent_line_is_logged_and_a_child_that_cannot_run_is_a_log_line(monkeyp
 
         monkeypatch.setattr(watch.subprocess, "run", fail)
         logged.clear()
-        watch.tell("agentorc · a line", "a/b", logged.append)
+        watch.tell("shiftlead · a line", "a/b", logged.append)
         assert logged == [f"send failed: {type(err).__name__}"]
 
 
@@ -140,7 +140,7 @@ def test_main_wires_the_switch_the_host_and_the_home(monkeypatch, tmp_path):
     switch's secrets, in the host's name, and the state kept under the home."""
     from sessionorc import hosts, settings
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "ao"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "ao"))
     monkeypatch.setattr(watch, "manager_started", lambda: True)
     monkeypatch.setattr(watch, "ask", lambda: False)
     monkeypatch.setattr(settings, "telegram", lambda doc: {"secrets": "a/b", "link": ""})
@@ -155,7 +155,7 @@ def test_main_wires_the_switch_the_host_and_the_home(monkeypatch, tmp_path):
     assert len(sent) == 1
     argv, line = sent[0]
     assert argv[:6] == ["doppler", "run", "--project", "a", "--config", "b"]
-    assert line.startswith("agentorc · kmaster's user manager was stopped; started again at ")
+    assert line.startswith("shiftlead · kmaster's user manager was stopped; started again at ")
     state = json.loads((tmp_path / "ao" / "watch.json").read_text())
     assert state["told"] == ["manager"] and state["manager_started_at"]
     assert (tmp_path / "ao" / "watch.log").read_text().endswith(f"told: {line}\n")
@@ -207,5 +207,5 @@ def test_a_switch_turned_on_mid_outage_tells_the_outage_before_its_recovery(home
     drive(home, [(0, False, False), (10, False, False)], secrets=None)
     assert drive(home, [(15, False, False), (20, True, False)]) == [
         [watch.silent_line("kmaster", T0)],
-        ["agentorc · the host agent on kmaster answers again (silent 20 min)"],
+        ["shiftlead · the host agent on kmaster answers again (silent 20 min)"],
     ]

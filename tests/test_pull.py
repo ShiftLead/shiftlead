@@ -38,7 +38,7 @@ def _commit(root: Path, name: str, text: str | None = None) -> str:
 def repo(tmp_path, monkeypatch):
     """A bare origin, the home's checkout of it on main (no `promote:` block — the pull does not need
     one), and `other`, a second clone whose pushes leave the checkout behind."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     origin = tmp_path / "origin.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
     root = tmp_path / "repo"

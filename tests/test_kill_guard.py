@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 from conftest import run_hook
 
-import agentorc
-from agentorc.adapters.claude_code.guard import REASON, refuse
-from agentorc.adapters.claude_code.hook import refused_command, translate
+import shiftlead
+from shiftlead.adapters.claude_code.guard import REASON, refuse
+from shiftlead.adapters.claude_code.hook import refused_command, translate
 
 # the 2026-10-09 loop that killed `systemd --user`, as it was run
 THE_LOOP = (
@@ -103,7 +103,7 @@ def bash(command: str) -> dict:
 
 def test_the_hook_prints_the_deny_and_still_reports_the_event(tmp_path, monkeypatch):
     """No host agent: the hook still refuses on its own, and the event is queued as any `PreToolUse`."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     cp = run_hook("ao-x-y", bash("pkill -f sleep"))
     assert cp.returncode == 0
     assert json.loads(cp.stdout) == {
@@ -118,7 +118,7 @@ def test_the_hook_prints_the_deny_and_still_reports_the_event(tmp_path, monkeypa
 
 
 def test_an_allowed_command_prints_nothing(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     cp = run_hook("ao-x-y", bash("kill 12345"))
     assert cp.returncode == 0 and cp.stdout == ""
     assert (tmp_path / "home" / "events" / "ao-x-y.jsonl").exists()
@@ -126,7 +126,7 @@ def test_an_allowed_command_prints_nothing(tmp_path, monkeypatch):
 
 def test_a_subagents_kill_is_refused_too(tmp_path, monkeypatch):
     """A subagent's tool says nothing about the state (TD-201), but its kill is no less a kill."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     cp = run_hook("ao-x-y", {**bash("killall sleep"), "agent_id": "a1"})
     assert json.loads(cp.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
@@ -135,7 +135,7 @@ def test_another_tools_command_is_not_read(tmp_path, monkeypatch):
     """Only `Bash` runs a command: a `command` on any other tool's input is never the guard's."""
     other = {**bash("pkill -f sleep"), "tool_name": "Read"}
     assert refused_command(other) is None
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     cp = run_hook("ao-x-y", other)
     assert cp.returncode == 0 and cp.stdout == ""
     assert translate(other)["event"] == "PreToolUse:Read"
@@ -143,7 +143,7 @@ def test_another_tools_command_is_not_read(tmp_path, monkeypatch):
 
 # The rule's words (design §4.8): the skill and every template brief that carries a never-list.
 RULE = "**Signal only a pid you started and still hold**"
-PACKAGE = Path(agentorc.__file__).parent
+PACKAGE = Path(shiftlead.__file__).parent
 # the supplements and the entry template carry no never-list of their own
 NO_NEVER_LIST = {"entry.md", "grinder.stage.md", "techlead.stage.md"}
 

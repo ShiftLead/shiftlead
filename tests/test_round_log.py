@@ -78,11 +78,11 @@ async def test_the_prune_keeps_a_live_names_round_log_and_drops_an_old_one(agent
 
 
 def test_ao_log_writes_and_reads_its_own(subprocess_agent, tmp_path, capsys, monkeypatch):
-    from agentorc import cli
+    from shiftlead import cli
 
     assert cli.main(["--json", "shell", "m", "-d", str(tmp_path)]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["log", "--tail"]) == 0
     assert capsys.readouterr().out.strip() == f"{sid}: no round log"
     assert cli.main(["log", "20:10  w1:", "idle → ok"]) == 0
@@ -93,22 +93,22 @@ def test_ao_log_writes_and_reads_its_own(subprocess_agent, tmp_path, capsys, mon
     assert "--id goes with --tail" in capsys.readouterr().err
     assert cli.main(["log"]) == 2
     assert "needs a line" in capsys.readouterr().err
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["log", "--tail", "1", "--id", sid]) == 0  # a person reads it by id
     assert capsys.readouterr().out.endswith("20:10  w1: idle → ok\n")
     cli.main(["kill", sid])
 
 
 def test_the_manager_template_logs_and_commits_nothing():
-    text = resources.files("agentorc").joinpath("briefs", "manager.md").read_text(encoding="utf-8")
+    text = resources.files("shiftlead").joinpath("briefs", "manager.md").read_text(encoding="utf-8")
     assert '`ao log "HH:MM' in text and "Nothing is committed" in text
     assert "push your log" not in text and "on your launch branch:" not in text
     assert "`ao log --tail 20`" in text
 
 
 def test_the_focus_rounds_line(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import rounds_lines
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import rounds_lines
 
     s = {"created": "2026-09-27T20:00:30Z"}
     assert rounds_lines(s, None) is None  # the host agent could not say: no line at all

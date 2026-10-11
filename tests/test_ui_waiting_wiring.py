@@ -47,7 +47,7 @@ def member(sid: str, root: str, **kw) -> dict:
 def client(monkeypatch, tmp_path):
     """A host agent stub: an idle member holding TD-301, whose PR #811 the repo reading holds open; one
     idle with an open ask to the person; a working one; `subscribe` yields the first one's delta once."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     root = str(tmp_path / "samscrape")
     waiting = member(
         "g1",
@@ -89,7 +89,7 @@ def client(monkeypatch, tmp_path):
         async def subscribe(self):
             yield {"event": "session", "session": waiting}
 
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
     monkeypatch.setattr(ui, "read_boards", lambda *a, **k: ([], ""))
@@ -122,7 +122,7 @@ def test_the_inbox_state_rows_read_waiting(tmp_path, monkeypatch):
 def test_the_repo_page_builds_its_views_with_the_reading_and_the_waits(tmp_path, monkeypatch):
     """The Repo page draws no member pill today, so what it would show is not visible in its HTML; what
     is pinned is that its views are built as the Org's are, with the repo reading and the waits."""
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     c = client(monkeypatch, tmp_path)
     seen: list[dict] = []

@@ -13,7 +13,7 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
 BASE = {
     "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": "/tmp",
@@ -23,8 +23,8 @@ BASE = {
 
 
 def _focus(monkeypatch, tmp_path, popped, **rec):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     v = view({**BASE, "dir": str(tmp_path), **rec})
     return templates.get_template("focus.html").render(
@@ -68,8 +68,8 @@ def test_every_focus_is_titled_by_its_name_and_state(tmp_path, monkeypatch):
 def test_the_card_offers_pop_out_in_more_and_marks_its_focus_link(tmp_path, monkeypatch):
     """§4.5a **Pop out** sits in the card's *more ▾*; **Focus** stays a plain link — a modifier is
     the browser's — carrying the id the page relabels to *Focus window* while it is popped out."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
 
     html = templates.get_template("card.html").render(s=view({**BASE, "dir": str(tmp_path)}))
     menu = html[html.index('class="menu"') :]
@@ -165,7 +165,7 @@ def test_the_pop_out_rules_run_as_themselves():
 
 @pytest.fixture
 def client(subprocess_agent):
-    from agentorc.ui.app import create_app
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         yield c

@@ -67,7 +67,7 @@ def test_the_standing_names_the_holder_or_says_nobody_holds_it():
 
 @pytest.mark.unit
 def test_an_orphaned_steer_is_steering_while_its_clock_runs_and_counted_once_it_is_cleared():
-    from agentorc.ui.app import inbox_sections
+    from shiftlead.ui.app import inbox_sections
 
     running = orphan("m-1", "steer", default="drop it", bound=iso(NOW + timedelta(minutes=21)))
     cleared = orphan("m-2", "steer", default="drop it", bound=None)
@@ -110,7 +110,7 @@ def test_only_a_failed_write_is_drawn_as_not_written():
     """TD-234: *not written* is the refused board line (§4.5a), so only Reply, a suggested answer and
     Go with it draw it on the row; a failed Snooze or Delete wrote nothing and keeps only its toast.
     Read from the source: the row's error is gated by the three presses that write."""
-    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     catch = js[js.index("const named = { identity_log:") : js.index("not written: ${e.message}")]
     assert 'const writes = ["reply", "answer", "gowithit"].includes(action);' in catch
     assert "const rowerr = writes && " in catch
@@ -131,9 +131,9 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
     entry, so the route does not look for one — and `ao inbox` prints the standing beside it."""
     from fastapi.testclient import TestClient
 
-    from agentorc import cli
-    from agentorc.ui.app import create_app
     from sessionorc.client import call_sync
+    from shiftlead import cli
+    from shiftlead.ui.app import create_app
 
     repo = tmp_path / "agentorc"
     (repo / "docs").mkdir(parents=True)
@@ -146,7 +146,7 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "init")
     with_origin(repo)  # the write-back lands on origin's head (§4.4, TD-264); the child has the fake gh
-    home = pathlib.Path(os.environ["AGENTORC_HOME"])
+    home = pathlib.Path(os.environ["SHIFTLEAD_HOME"])
     (home / "repos.txt").write_text(f"{repo}\n")
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
 

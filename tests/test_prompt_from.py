@@ -12,9 +12,9 @@ import pytest
 from conftest import park_ticks
 from test_cli_teams import creates, org_doc, world, write_org  # noqa: F401 — `world` is a fixture
 
-from agentorc import cli, repoconfig
 from sessionorc import paths
 from sessionorc.client import LocalClient
+from shiftlead import cli, repoconfig
 
 
 def fill(made_from: dict) -> str:
@@ -32,8 +32,8 @@ def test_compose_says_what_the_brief_was_made_from_and_filling_it_gives_the_text
     (tmp_path / "briefs").mkdir()
     sup = tmp_path / "briefs" / "g.md"
     sup.write_text("grind {lane}, ask {techlead}\n")
-    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {brief: briefs/g.md}, solo: {brief: briefs/g.md}}\n")
-    solo = tmp_path / ".agentorc" / "roles" / "solo"  # a role directory (§4.9c, TD-313)
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {brief: briefs/g.md}, solo: {brief: briefs/g.md}}\n")
+    solo = tmp_path / ".shiftlead" / "roles" / "solo"  # a role directory (§4.9c, TD-313)
     solo.mkdir(parents=True)
     (solo / "role.yml").write_text("")
     (solo / "template.md").write_text("solo {lane}: {repo}\n")
@@ -63,7 +63,7 @@ def test_compose_says_what_the_brief_was_made_from_and_filling_it_gives_the_text
 @pytest.mark.unit
 def test_a_team_start_hands_each_member_its_prompt_from(world):  # noqa: F811
     tmp_path, state = world
-    docs = tmp_path / "agentorc" / "docs"
+    docs = tmp_path / "shiftlead" / "docs"
     docs.mkdir()
     (docs / "b.md").write_text("mine: {lane}, ask {techlead}\n")
     doc = org_doc(tmp_path, two_repos=True)  # a reach to describe: the Project block goes in front

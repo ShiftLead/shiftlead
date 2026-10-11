@@ -10,8 +10,8 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from agentorc.ui import app as uiapp
-from agentorc.ui.app import inbox_sections, promote_rows
+from shiftlead.ui import app as uiapp
+from shiftlead.ui.app import inbox_sections, promote_rows
 
 pytestmark = pytest.mark.unit
 
@@ -31,25 +31,25 @@ def reading(**kw):
 
 
 def test_by_hand_main_ahead_is_a_counted_row_and_live_at_main_is_none():
-    (r,) = promote_rows({"agentorc": reading()})
-    assert r["row"] == "promote" and r["sid"] == "promote:agentorc" and not r["fyi"]
-    assert r["text"] == "agentorc · live 4444444 · main 9999999, 3 commits ahead · checks green"
+    (r,) = promote_rows({"shiftlead": reading()})
+    assert r["row"] == "promote" and r["sid"] == "promote:shiftlead" and not r["fyi"]
+    assert r["text"] == "shiftlead · live 4444444 · main 9999999, 3 commits ahead · checks green"
     assert r["at"] == "2026-09-27T10:00:00+00:00"  # aged from when main moved
-    assert promote_rows({"agentorc": reading(live=MAIN, ahead=0)}) == []
-    s = inbox_sections([], states=promote_rows({"agentorc": reading()}))
+    assert promote_rows({"shiftlead": reading(live=MAIN, ahead=0)}) == []
+    s = inbox_sections([], states=promote_rows({"shiftlead": reading()}))
     assert s["count"] == 1 and s["needs"][0]["row"] == "promote"
 
 
 def test_in_flight_is_fyi_and_uncounted():
     flight = {"sha": MAIN, "at": "2026-09-27T10:05:00+00:00", "by": "person", "log": "/l"}
-    (r,) = promote_rows({"agentorc": reading(inflight=flight)})
+    (r,) = promote_rows({"shiftlead": reading(inflight=flight)})
     assert r["fyi"] and r["at"] == flight["at"]
     s = inbox_sections([], states=[r])
     assert s["count"] == 0 and [e["row"] for e in s["fyi"]] == ["promote"]
 
 
 def test_under_auto_nothing_but_a_failure_and_a_failure_whatever_auto_says():
-    assert promote_rows({"agentorc": reading(auto=True)}) == []
+    assert promote_rows({"shiftlead": reading(auto=True)}) == []
     failed = {
         "sha": MAIN,
         "at": "2026-09-27T10:30:00+00:00",
@@ -59,7 +59,7 @@ def test_under_auto_nothing_but_a_failure_and_a_failure_whatever_auto_says():
         "tail": ["boom"],
     }
     for auto in (True, False):
-        (r,) = promote_rows({"agentorc": reading(auto=auto, failed=failed)})
+        (r,) = promote_rows({"shiftlead": reading(auto=auto, failed=failed)})
         assert not r["fyi"] and r["failed"]["why"] == "it broke"
         assert inbox_sections([], states=[r])["count"] == 1
 
@@ -68,36 +68,36 @@ def test_a_held_row_is_counted_whatever_auto_says_and_reads_rolled_back():
     """§4.5a *After a rollback* (§6 *The hold*, TD-226 slice 3): drawn while the home's `held` stands,
     under auto too and with live behind main, under *Needs you*, reading *rolled back from*, never
     *behind*; Dismiss is drawn on it, each control titled by its help paragraph."""
-    from agentorc.ui.app import templates
-    from agentorc.ui.help import first_sentence
+    from shiftlead.ui.app import templates
+    from shiftlead.ui.help import first_sentence
 
     now = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
     held = {"sha": LIVE, "from": "7" * 40, "main": MAIN, "at": "2026-09-29T09:00:00+00:00"}
     for auto in (True, False):
-        (r,) = promote_rows({"agentorc": reading(auto=auto, held=held)}, now)
+        (r,) = promote_rows({"shiftlead": reading(auto=auto, held=held)}, now)
         assert r["text"] == (
-            "agentorc · live 4444444, rolled back from 7777777 3h 0m ago · main 9999999, 3 commits ahead"
+            "shiftlead · live 4444444, rolled back from 7777777 3h 0m ago · main 9999999, 3 commits ahead"
             f" · checks green · auto {'on' if auto else 'off'} · held"
         )
         assert not r["fyi"] and r["held"] == held and inbox_sections([], states=[r])["count"] == 1
     # held with live at main's head (main has not moved since): still drawn, the hold is the person's
-    (r,) = promote_rows({"agentorc": reading(auto=True, live=MAIN, ahead=0, held=held)}, now)
+    (r,) = promote_rows({"shiftlead": reading(auto=True, live=MAIN, ahead=0, held=held)}, now)
     assert "rolled back from 7777777" in r["text"]
     html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
     assert 'data-act="clear_promote"' in html and 'data-act="promote"' in html
     for key in ("promote", "promote-snooze", "promote-dismiss"):
         assert f'title="{first_sentence(key)}"'.replace("'", "&#39;") in html, key
     # neither failed nor held: no Dismiss
-    (r,) = promote_rows({"agentorc": reading()}, now)
+    (r,) = promote_rows({"shiftlead": reading()}, now)
     html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
     assert 'data-act="clear_promote"' not in html
 
 
 def test_a_snoozed_row_is_in_no_count_and_merges_do_not_wake_it():
     until = (datetime.now(UTC) + timedelta(days=1)).isoformat()
-    snoozed = {"promote:agentorc|promote": until}
+    snoozed = {"promote:shiftlead|promote": until}
     for n in (3, 5):  # a later merge moves main and the count; the row stays aside
-        s = inbox_sections([], states=promote_rows({"agentorc": reading(ahead=n)}), attention_snoozed=snoozed)
+        s = inbox_sections([], states=promote_rows({"shiftlead": reading(ahead=n)}), attention_snoozed=snoozed)
         assert s["count"] == 0 and [e["row"] for e in s["snoozed"]] == ["promote"]
 
 
@@ -105,10 +105,10 @@ def test_a_snoozed_row_is_in_no_count_and_merges_do_not_wake_it():
 def page(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     calls: list[tuple[str, dict]] = []
-    promotes = {"agentorc": reading()}
+    promotes = {"shiftlead": reading()}
     answers = {
         "list": [],
         "inbox": {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0},
@@ -130,14 +130,14 @@ def page(tmp_path, monkeypatch):
             "promotes": promotes,
         },
         "promote": {
-            "repo": "agentorc",
+            "repo": "shiftlead",
             "sha": MAIN,
             "started": "t",
             "log": "/l",
             "checks": "green",
             "checks_why": None,
         },
-        "clear_promote": {"repo": "agentorc", "cleared": True},
+        "clear_promote": {"repo": "shiftlead", "cleared": True},
     }
 
     class FakeClient:
@@ -159,11 +159,11 @@ def page(tmp_path, monkeypatch):
 def test_the_inbox_draws_the_row_with_promote_and_snooze_and_counts_it(page):
     c, calls, promotes = page
     html = c.get("/inbox").text
-    assert "agentorc · live 4444444 · main 9999999, 3 commits ahead · checks green" in html
-    assert 'data-act="promote" data-id="person" data-repo="agentorc"' in html
+    assert "shiftlead · live 4444444 · main 9999999, 3 commits ahead · checks green" in html
+    assert 'data-act="promote" data-id="person" data-repo="shiftlead"' in html
     assert 'data-row="promote" data-when="1w"' in html and 'data-act="clear_promote"' not in html
     assert c.get("/api/person/inbox").json()["needs"] == 1
-    promotes["agentorc"] = reading(
+    promotes["shiftlead"] = reading(
         failed={"sha": MAIN, "at": "t", "why": "it broke", "log": "/l", "exit": 3, "tail": ["boom"]}
     )
     html = c.get("/inbox").text
@@ -172,10 +172,10 @@ def test_the_inbox_draws_the_row_with_promote_and_snooze_and_counts_it(page):
 
 def test_promote_and_dismiss_go_to_the_rpcs_with_the_repo(page):
     c, calls, _ = page
-    assert c.post("/api/person/promote", json={"repo": "agentorc"}).json()["sha"] == MAIN
-    assert c.post("/api/person/clear_promote", json={"repo": "agentorc"}).json()["cleared"] is True
+    assert c.post("/api/person/promote", json={"repo": "shiftlead"}).json()["sha"] == MAIN
+    assert c.post("/api/person/clear_promote", json={"repo": "shiftlead"}).json()["cleared"] is True
     assert [(m, p) for m, p in calls if m in ("promote", "clear_promote")] == [
-        ("promote", {"repo": "agentorc"}), ("clear_promote", {"repo": "agentorc"}),
+        ("promote", {"repo": "shiftlead"}), ("clear_promote", {"repo": "shiftlead"}),
     ]  # fmt: skip
     assert c.post("/api/person/promote", json={}).status_code == 400
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from agentorc import repoconfig, teams
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import normalize_review, review_links
+from shiftlead import repoconfig, teams
 
 
 def test_a_review_setting_is_checked_and_filled_in():
@@ -30,12 +30,12 @@ def test_a_review_setting_is_checked_and_filled_in():
 def test_a_chain_of_review_stages_is_checked_and_reads_as_links():
     """§4.9c *A review stage any seat may hold* (TD-315 slice 1): the record carries `{chain: [{stage,
     reader, held}], bound}`; the older shape is a chain of one."""
-    chain = {"chain": [{"stage": "ui-review", "reader": "ui-reader", "held": "src/agentorc/ui/**"},
+    chain = {"chain": [{"stage": "ui-review", "reader": "ui-reader", "held": "src/shiftlead/ui/**"},
                        {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]}]}  # fmt: skip
     got = normalize_review(chain)
     assert got == {
         "chain": [
-            {"stage": "ui-review", "reader": "ui-reader", "held": ["src/agentorc/ui/**"]},
+            {"stage": "ui-review", "reader": "ui-reader", "held": ["src/shiftlead/ui/**"]},
             {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]},
         ],
         "bound": "2h",
@@ -65,22 +65,22 @@ def test_a_chain_of_review_stages_is_checked_and_reads_as_links():
 
 
 def test_a_role_preset_carries_review_to_the_create(tmp_path):
-    (tmp_path / ".agentorc.yml").write_text(
+    (tmp_path / ".shiftlead.yml").write_text(
         "roles:\n  grinder:\n    review: {reader: techlead, held: [src/sessionorc/**]}\n"
     )
     cfg = repoconfig.load(tmp_path)
     role = repoconfig.resolve_role(cfg, "grinder")
     assert role.review == {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": "2h"}
     assert repoconfig.resolve_role(cfg, "hunter").review is None  # a role that says nothing holds nothing
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {reader: nobody}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder:\n    review: {reader: nobody}\n")
     with pytest.raises(ValueError, match=r"grinder\.review: reader is one of"):
         repoconfig.load(tmp_path)
     # a chain is a flow's compile's, never a file's (TD-315, review of #1120)
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {chain: [{stage: r, reader: x}]}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  grinder:\n    review: {chain: [{stage: r, reader: x}]}\n")
     with pytest.raises(ValueError, match=r"grinder\.review: a role's review takes reader"):
         repoconfig.load(tmp_path)
     # `org.yml`'s layer reaches `resolve_role` unchecked by the loader: the same check applies there
-    (tmp_path / ".agentorc.yml").write_text("")
+    (tmp_path / ".shiftlead.yml").write_text("")
     org_chain = {"grinder": {"review": {"chain": [{"stage": "r", "reader": "x"}]}}}
     with pytest.raises(ValueError, match=r"org roles\.grinder\.review: a role's review takes reader"):
         repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder", org_chain)

@@ -1,9 +1,9 @@
 ## 5. Configuration
 
-- Hosts: `~/.agentorc/hosts.yml` on every host — the UI host's copy lists the hosts; each host
+- Hosts: `~/.shiftlead/hosts.yml` on every host — the UI host's copy lists the hosts; each host
   agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a). The `local` entry's
   fields: `name`, `vscode_host`, `local: true|false` (`vscode://file` links, for a UI on the machine
-  you sit at), `volatile: true|false`, `repos_registry` path (unset: dev-cadence's `~/.config/dev-cadence/repos.txt` on the default home `~/.agentorc`, `repos.txt` under any other home), `runs_keep_days`, `identity` (§4.8a)
+  you sit at), `volatile: true|false`, `repos_registry` path (unset: dev-cadence's `~/.config/dev-cadence/repos.txt` on the default home `~/.shiftlead`, `repos.txt` under any other home), `runs_keep_days`, `identity` (§4.8a)
   and `person` (§4.4a); the top-level keys are `home:`, `nodes:` and `link:` (§4.4a). There are
   no per-host `transport:` or `ssh` target entries: the hub-and-spoke ssh transport they were for
   was replaced by the home and node split (§4.4a, §7 phase 2), where a node dials the home with its
@@ -21,7 +21,7 @@
   and mail; an agent whose file names no `home:`, or names itself, is the home. On Paul's machines
   it is `home: kmaster`.
 - **The settings a person moves** (the ADR [settings
-  audit](../decisions/2026-09-25-settings-audit.md)): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
+  audit](../decisions/2026-09-25-settings-audit.md)): **`settings.yml`**, beside `hosts.yml` in the shiftlead home **of the home** — home-
   owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
   written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
   is; `ao gate`, `ao schedule`, `ao team until` (§4.7) and the Settings page (§4.5 screen 8) all
@@ -45,7 +45,7 @@ teams:                                        # per team, by the name org.yml or
     flow: build-review                        # §4.9c: which of the team's flows it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
 repos:                                        # per registered checkout, by its directory name
-  agentorc: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .agentorc.yml); §6 *Pull*: the checkout follows origin, on when absent
+  agentorc: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
@@ -117,10 +117,11 @@ notify:                                       # §4.10 *Told on Telegram when no
   text the person wrote, escaped. Nothing under `person:` reaches a policy: the gate and the tick
   read the file by key and never this one.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
-  duplicated; a home other than `~/.agentorc` reads its own `repos.txt` unless `repos_registry` names one. A repo without dev-cadence can still be listed there. Directories that are not
+  duplicated; a home other than `~/.shiftlead` reads its own `repos.txt` unless `repos_registry` names one. A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
-  ones per host in `~/.agentorc/recent_dirs`.
-- Per repo: `.agentorc.yml` (checked in):
+  ones per host in `~/.shiftlead/recent_dirs`.
+- Per repo: `.shiftlead.yml` (checked in). A repo that has not renamed its file since the project was
+  `agentorc` is read from `.agentorc.yml` while no `.shiftlead.yml` is beside it (`sessionorc.paths.repo_file`, TD-060):
 
 ```yaml
 unattended:                           # read by nothing yet (below)
@@ -142,7 +143,7 @@ controllers: [manager-ao-1]           # §4.8: who may act on a session started 
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
-                                      # this repo's own flows and roles are directories in .agentorc/, not keys (§4.9c)
+                                      # this repo's own flows and roles are directories in .shiftlead/, not keys (§4.9c)
 teams:                                # §4.9: the repo's own teams, aggregated into the org; org.yml wins a name
   grind: {flows: [build], manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]   # read by nothing yet
@@ -166,7 +167,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   invariant 2, not a per-repo choice.
 
   **`promote:`** (`run` and `check`, both required; `auto` refused as `settings.yml`'s) is the repo's own
-  answer to *how does `main` become what is running*, and nothing in agentorc names pip, a venv,
+  answer to *how does `main` become what is running*, and nothing in shiftlead names pip, a venv,
   systemd, skaffold or wrangler: this repo's `run` is the pip pair of CLAUDE.md and its `check`
   prints the installed build's commit (`sessionorc.build.info()`); samscrape's would be its
   skaffold run and the deployed image's tag; contractmatch's a wrangler deploy and the deployment's
@@ -174,7 +175,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   *Promote* says when), `check` in the checkout and `run` in the tree it is to make live: the
   checkout, on main's head, for a promote, and a detached worktree at the commit for a rollback
   (§6 *A rollback*). So **`run` makes live the tree it is started in**, names no path to
-  the checkout, and finds the checkout in `AGENTORC_PROMOTE_ROOT` when it needs what no commit
+  the checkout, and finds the checkout in `SHIFTLEAD_PROMOTE_ROOT` when it needs what no commit
   holds. It is judged by what `check` says
   afterwards, never by its exit code; `check` prints one full commit on stdout and exits 0, or
   exits non-zero with the reason on stderr (*not deployed*, *no cluster*), which the row shows as
@@ -185,12 +186,12 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   policy that acts needs its declaration where the policy runs; `ledger:` travels on the record
   instead because it is a session's.
 
-- Org (§4.9): the teams each registered repo defines in its own `.agentorc.yml`, aggregated with
+- Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
   the org file, which holds what no one repo can: projects and teams that span repos, `place:`
   and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` are tracked
-  by a git work tree in `~/.agentorc/` at the home (§4.9 *The org is an aggregate*, *What is
+  by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
   left at the home has a history*).
-  The org file: `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
+  The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
   exactly as a repo's `roles:` is. Read by the clients on every use, never by the host agent:
 
@@ -217,7 +218,7 @@ person's and live in `settings.yml`. A `roles:` preset never carries a schedule,
 grant never carries one either. A directory session (no repo) reduces to `ready_when:
 [no_subagents]`.
 
-- **Test knobs, not settings**: `AGENTORC_TICK` — the host agent's tick in seconds (default 2),
+- **Test knobs, not settings**: `SHIFTLEAD_TICK` — the host agent's tick in seconds (default 2),
   read once at its start — exists for the test suite, which runs agents on a faster clock; nothing a
   person sets, and no page shows it.
 

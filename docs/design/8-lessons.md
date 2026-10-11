@@ -9,15 +9,15 @@
 - **Verify a real completion, not a catalog** — `credentials_ok()` and `usage()` are live
   calls, and the UI shows when they last succeeded.
 
-**Which side a thing lives on** (TD-159, [ADR 2026-10-08](../decisions/2026-10-08-agentorc-dev-cadence-split.md)).
-dev-cadence owns what a repo needs with no agentorc on the machine: the ledger and board formats,
-the cadence check, the git hooks, and the skills and scripts that read a checkout. agentorc owns
+**Which side a thing lives on** (TD-159, [ADR 2026-10-08](../decisions/2026-10-08-shiftlead-dev-cadence-split.md)).
+dev-cadence owns what a repo needs with no shiftlead on the machine: the ledger and board formats,
+the cadence check, the git hooks, and the skills and scripts that read a checkout. shiftlead owns
 what needs a host agent, a session record or a second session.
-- A file needed both ways stays dev-cadence's. agentorc reads it as a client, and a second reader
-  inside agentorc (`sessionorc/ledger.py`, `sessionorc/board.py`) is held equal to the script by a
+- A file needed both ways stays dev-cadence's. shiftlead reads it as a client, and a second reader
+  inside shiftlead (`sessionorc/ledger.py`, `sessionorc/board.py`) is held equal to the script by a
   test and named in cadence §7's parity table.
-- A synced file never calls `ao`. Where it must behave differently in an agentorc session, it
-  reads an environment variable that agentorc's launch sets. `CADENCE_ATTENTION_SCOPE` is the
+- A synced file never calls `ao`. Where it must behave differently in an shiftlead session, it
+  reads an environment variable that shiftlead's launch sets. `CADENCE_ATTENTION_SCOPE` is the
   first: the hook reads it, and every launch sets it, `own` unattended and `machine` interactive
   (§4.3, TD-425). The hook's `ao status` branch is the one known exception until dev-cadence
   drops it, which waits on TD-425's live check telling it the variable reaches the hook.

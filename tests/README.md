@@ -5,8 +5,8 @@
 
 ## Rules
 
-1. **Never the user's tmux server or `~/.agentorc`.** Every fixture that touches tmux uses a
-   private server (`-L ao-test-<uuid>`) and a temp `AGENTORC_HOME`. `agentorc-agent serve` is
+1. **Never the user's tmux server or `~/.shiftlead`.** Every fixture that touches tmux uses a
+   private server (`-L ao-test-<uuid>`) and a temp `SHIFTLEAD_HOME`. `shiftlead-agent serve` is
    never spawned by a test: it builds `Tmux()` with no socket name, which is the real server.
    The subprocess agent is `tests/_agent_child.py`.
    **Two pytest runs at once must not touch each other** (TD-025): the stale-server sweep kills
@@ -29,10 +29,10 @@
    or `subprocess_agent` (separate process, plain `def` tests). Anything that calls
    `call_sync`, `cli.main`, or the sync FastAPI `TestClient` uses `asyncio.run` and hangs
    against the in-process fixture, because a sync test body never pumps that fixture's loop.
-5. **`subprocess_agent` is module-scoped.** It sets `AGENTORC_HOME` and `AGENTORC_TMUX_SOCKET`
+5. **`subprocess_agent` is module-scoped.** It sets `SHIFTLEAD_HOME` and `SHIFTLEAD_TMUX_SOCKET`
    in the test process as well as the child, because the UI under `TestClient` runs in the test
    process and reads them from `os.environ` at call time. A child process that must reach the
-   same agent (`agentorc-hook`, `agentorc-agent rpc`) inherits the environment; do not pass a
+   same agent (`shiftlead-hook`, `shiftlead-agent rpc`) inherits the environment; do not pass a
    curated `env=` without those two variables.
 6. **Never wipe the adapter registry.** Add a stub with
    `monkeypatch.setitem(adapters._REGISTRY, ...)` after `adapters.load_all()` (the `hookstub`
@@ -44,7 +44,7 @@
 ## Real-environment dependencies
 
 - The anchor rule (design §9 invariant 2) reads the default Claude Code profile's session
-  registry under `~/.claude` to see sessions started outside agentorc. Tests create sessions in
+  registry under `~/.claude` to see sessions started outside shiftlead. Tests create sessions in
   temp directories, which no real session occupies, so this is harmless but not isolated.
 - `test_gitinfo` sets its own git identity per repo; no global git config is needed.
 - `TestClient` keeps a portal thread alive, so `ptyprocess`'s `forkpty()` in the `/term` tests

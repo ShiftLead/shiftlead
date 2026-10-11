@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agentorc import org as orgmod
-from agentorc import orgcheck, teamrun, teams
+from shiftlead import org as orgmod
+from shiftlead import orgcheck, teamrun, teams
 
 pytestmark = pytest.mark.unit
 
@@ -28,7 +28,7 @@ def _anchor_on(monkeypatch):
 def _org(tmp_path: Path, monkeypatch, teams_doc: dict, *, repos=("alpha",)) -> orgmod.Org:
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     for r in repos:
         (tmp_path / r / ".git").mkdir(parents=True, exist_ok=True)
     doc = {"projects": {"p": {"repos": {r: {HOST: str(tmp_path / r)} for r in repos}}}, "teams": teams_doc}
@@ -155,7 +155,7 @@ def test_a_start_creates_the_seat_after_the_techlead_under_the_manager(tmp_path,
 def test_a_held_checkout_starts_the_team_and_writes_the_seat_alone_saying_who_holds_it(tmp_path, monkeypatch):
     """TD-386: the seat's record is written `held` — closed, no pane — for rule 3 to fill once free."""
     org = _org(tmp_path, monkeypatch, {"t": _team()})
-    held = {"by": "claude-1", "why": "held by claude-1 (claude-code, outside agentorc)"}
+    held = {"by": "claude-1", "why": "held by claude-1 (claude-code, outside shiftlead)"}
     call, calls = _fake(held)
     _, out = teamrun.start(call, org, "t", HOST)
     made = [p for m, p in calls if m == "create"]
@@ -165,7 +165,7 @@ def test_a_held_checkout_starts_the_team_and_writes_the_seat_alone_saying_who_ho
     # the manager on call is written held too, with nothing holding it (§6 rule 3, TD-410)
     assert made[0].get("held") is True and "held_reason" not in made[0]
     (said,) = [n for n in out["notes"] if n.startswith("t-anchor")]
-    assert "held by claude-1 (claude-code, outside agentorc)" in said and "filled once the checkout is free" in said
+    assert "held by claude-1 (claude-code, outside shiftlead)" in said and "filled once the checkout is free" in said
 
 
 @pytest.mark.parametrize("why", ["1 file uncommitted", "branch td-x", "branch td-x, 2 files uncommitted"])
@@ -241,7 +241,7 @@ def test_the_mark_reads_definition_changed_where_seats_are_all_that_differ_or_no
     member = {"name": "g", "act": "relaunch", "seat": False, "line": "g: relaunched — lane a → b"}
     assert teamrun.definition_changed([seat], "td") and teamrun.definition_changed([member], None)
     assert not teamrun.definition_changed([seat, member], "td") and not teamrun.definition_changed([], None)
-    from agentorc.ui.repo import flow_head
+    from shiftlead.ui.repo import flow_head
 
     assert flow_head({"flow": None, "differences": [seat]}, live=True)["definition_changed"] is True
     assert flow_head({"flow": None, "differences": [seat]}, live=False)["flow_changed"] == []
@@ -313,7 +313,7 @@ def test_a_start_writes_the_manager_on_call_held_and_its_members_name_it(tmp_pat
     teamrun.start(call, watched, "w", HOST)
     (eye,) = [p for m, p in calls if m == "create" and p["name"] == "eye"]
     assert eye["unattended"] is False and "held" not in eye
-    from agentorc import cli
+    from shiftlead import cli
 
     org = _org(tmp_path, monkeypatch, {"t": _team()})
     p = teams.plan(org, "t", HOST)
@@ -356,7 +356,7 @@ def test_ao_team_list_and_flow_say_definition_changed_and_apply_says_the_definit
     """TD-402 (§4.5a *flow changed — Apply*, §4.7): a live team with no flow that lacks its anchor reads
     *definition changed — Apply* with the seat's line in `ao team list` and `ao team flow <team>`, and
     `--apply` says *applied the definition:*, never a flow's name it does not have."""
-    from agentorc import cli
+    from shiftlead import cli
 
     org, call, calls = _applying(tmp_path, monkeypatch, None)
     monkeypatch.setattr(cli.hosts, "local_host", lambda: cli.hosts.Host(name=HOST, vscode_host=HOST, local=True))
@@ -384,9 +384,9 @@ def test_members_and_ao_team_list_name_the_seat(tmp_path, monkeypatch, capsys):
     assert v["anchor"] == {"name": "t-anchor", "id": "ao-alpha-t-anchor", "state": "closed"}
     assert "t-anchor" not in [e.get("name") for e in v["members"]]
     assert teamrun.members_view(org, "off", [])["anchor"] is None
-    js = (Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert '<span class="meta">anchor seat</span> ${who(v.anchor)}' in js
-    from agentorc import cli
+    from shiftlead import cli
 
     def call(method, **params):
         if method == "list":
@@ -407,7 +407,7 @@ def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_al
     and held there, the team starts and the seat is the `held` create."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     doc = {"projects": {"p": {"repos": {"alpha": {"nodeb": "/srv/alpha"}}}}, "teams": {"t": _team(host="nodeb")}}
     (home / "org.yml").write_text(yaml.safe_dump(doc))
     org = orgmod.load()

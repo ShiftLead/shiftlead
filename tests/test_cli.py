@@ -17,9 +17,9 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from conftest import pane_line, run_hook, wait_for_sync, wait_screen
 
-from agentorc import cli
 from sessionorc.client import AgentError, call_sync
 from sessionorc.models import CITES_ON_AN_ASK
+from shiftlead import cli
 
 pytestmark = pytest.mark.integration
 
@@ -153,10 +153,10 @@ def test_errors_map_to_exit_codes(subprocess_agent, tmp_path, monkeypatch, capsy
     assert cli.main(["new", "x", "-d", str(tmp_path / "missing")]) == 1
     assert "not a directory" in capsys.readouterr().err
     # no agent behind this home: exit 3 with the hint
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "empty-home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "empty-home"))
     assert cli.main(["status"]) == 3
     err = capsys.readouterr().err
-    assert "not reachable" in err and "agentorc-agent serve" in err
+    assert "not reachable" in err and "shiftlead-agent serve" in err
 
 
 def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatch):
@@ -211,14 +211,14 @@ def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatc
     assert cli.main(["--json", "kill", "ao-nope"]) == 1
     assert out() == {"error": "no session ao-nope"}
     assert capsys.readouterr().err == ""
-    monkeypatch.setattr("agentorc.service.status", lambda: "agentorc-agent: active")
+    monkeypatch.setattr("shiftlead.service.status", lambda: "shiftlead-agent: active")
     assert cli.main(["--json", "service", "status"]) == 0
     got = out()  # and the running build (design §4.4, TD-062 (c)); this test's agent runs the checkout
-    assert got["status"] == "agentorc-agent: active" and got["build"]["line"].startswith("host agent: build")
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "empty-home"))
+    assert got["status"] == "shiftlead-agent: active" and got["build"]["line"].startswith("host agent: build")
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "empty-home"))
     assert cli.main(["--json", "status"]) == 3
     e = out()
-    assert "not reachable" in e["error"] and "agentorc-agent serve" in e["hint"]
+    assert "not reachable" in e["error"] and "shiftlead-agent serve" in e["hint"]
 
 
 def test_send_wait(subprocess_agent, tmp_path, capsys):
@@ -271,14 +271,14 @@ def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp
     assert "no session ao-nope" in capsys.readouterr().err
     # a real focus runs tmux attach as a child: patch it (no tty here) and check the argv
     seen = {}
-    monkeypatch.setattr("agentorc.cli.subprocess.call", lambda argv: seen.update(argv=argv) or 0)
+    monkeypatch.setattr("shiftlead.cli.subprocess.call", lambda argv: seen.update(argv=argv) or 0)
     assert cli.main(["focus", sid]) == 0
     assert seen["argv"][0] == "tmux" and seen["argv"][3:6] == ["attach", "-t", f"={sid}:"]
-    # killed: `exited` like a natural exit, but the record says the pane is gone (TD-023) — agentorc's
+    # killed: `exited` like a natural exit, but the record says the pane is gone (TD-023) — shiftlead's
     # own line, exit 1, and tmux is never run
     assert call_sync("kill", id=sid)["pane"] is False
     wait_state(sid, "exited")
-    monkeypatch.setattr("agentorc.cli.subprocess.call", lambda argv: pytest.fail(f"tmux was run: {argv}"))
+    monkeypatch.setattr("shiftlead.cli.subprocess.call", lambda argv: pytest.fail(f"tmux was run: {argv}"))
     assert cli.main(["focus", sid]) == 1
     assert "pane is gone" in capsys.readouterr().err
     monkeypatch.undo()
@@ -328,7 +328,7 @@ def test_skill_prints_the_rules(capsys):
     out = capsys.readouterr().out
     assert out.startswith("---\nname: ao\n")
     for must in (
-        "AGENTORC_SESSION",
+        "SHIFTLEAD_SESSION",
         "ao status --json",
         "prompt-stuck",
         "invariant 1",
@@ -356,7 +356,7 @@ def test_skill_prints_the_rules(capsys):
 
 
 def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeypatch):
-    """TD-028 step 1: `ao` sends AGENTORC_SESSION as the caller; `ao grant` / `ao revoke` edit
+    """TD-028 step 1: `ao` sends SHIFTLEAD_SESSION as the caller; `ao grant` / `ao revoke` edit
     `capabilities`, shown by `ao status -v` and `--json`; `ao new --grant` sets it at create.
     TD-036: the grant is now only half the gate — the caller must also be in the target's
     `controllers`."""
@@ -371,7 +371,7 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     wait_state(a, "idle")
     wait_state(b, "idle")
     call_sync("set_mode", id=b, unattended=True)  # a worker; an interactive b is §9 invariant 5's case
-    monkeypatch.setenv("AGENTORC_SESSION", a)  # now `ao` runs inside session a
+    monkeypatch.setenv("SHIFTLEAD_SESSION", a)  # now `ao` runs inside session a
     assert cli.main(["kill", b]) == 1
     assert "needs the control grant" in capsys.readouterr().err
     assert cli.main(["--json", "grant", a, "control"]) == 1  # no self-grant
@@ -379,12 +379,12 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     assert cli.main(["--json", "status"]) == 0  # reads pass
     assert {s["id"] for s in out()} >= {a, b}
     assert cli.main(["send", a, "echo", "self-ok"]) == 0  # self passes
-    monkeypatch.delenv("AGENTORC_SESSION")  # a person at a terminal
+    monkeypatch.delenv("SHIFTLEAD_SESSION")  # a person at a terminal
     assert cli.main(["grant", a, "control"]) == 0
     assert capsys.readouterr().out.strip() == f"{a}: grants control"
     assert cli.main(["status", "-v"]) == 0
     assert "grants: control" in capsys.readouterr().out
-    monkeypatch.setenv("AGENTORC_SESSION", a)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", a)
     # The grant alone is no longer enough (TD-036): a is not in b's controllers, and an empty list
     # means nobody may act. `ao control` lands in step 2; here the RPC stands in for it.
     assert cli.main(["--json", "kill", b]) == 1
@@ -392,7 +392,7 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     call_sync("set_controllers", id=b, add=[a])
     assert cli.main(["--json", "kill", b]) == 0
     assert out()["state"] == "exited"
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["--json", "revoke", a, "control"]) == 0
     assert out()["capabilities"] == []
     assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "control"]) == 0
@@ -430,17 +430,17 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     # …so the lead can now act on it — once it is a worker. Interactive, it is a person's
     # session and out of reach whatever the list says (§9 invariant 5, TD-041); `ao mode` is how
     # a person hands it over, and the CLI shows the refusal as it came
-    monkeypatch.setenv("AGENTORC_SESSION", orc)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", orc)
     assert cli.main(["send", w1, "echo", "ok"]) == 1
     assert "invariant 5" in capsys.readouterr().err
     assert cli.main(["control", "orc", "add", "w1"]) == 1  # nor may a session add itself to one
     assert "invariant 5" in capsys.readouterr().err
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["mode", w1, "unattended"]) == 0
     assert capsys.readouterr().out.strip() == f"{w1}: unattended"
-    monkeypatch.setenv("AGENTORC_SESSION", orc)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", orc)
     assert cli.main(["send", w1, "echo", "ok"]) == 0
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
 
     # both directions in `status -v`
     assert cli.main(["status", "-v"]) == 0
@@ -480,7 +480,7 @@ def test_until_parses_the_shapes_a_person_types_and_refuses_the_rest():
     """`ao new --until` / `ao until` (design §6, TD-026). The friendly parsing is the client's,
     because "the next 06:00" is a question about the caller's clock — the agent only ever stores the
     instant."""
-    from agentorc.cli import stop_time
+    from shiftlead.cli import stop_time
 
     now = datetime.datetime.now().astimezone()
     plus = datetime.datetime.fromisoformat(stop_time("+90m"))
@@ -501,8 +501,8 @@ def test_new_until_needs_unattended_and_carries_the_wrap_up_words(tmp_path, monk
     without `--unattended` is refused rather than stored where nothing will act on it. The wrap-up
     wording travels with the record — `sessionorc` must not know what a brief is — and it is the one
     `ao team stop` sends, so both ways of ending a worker say the same thing."""
-    from agentorc import teams
-    from agentorc.cli import _stop
+    from shiftlead import teams
+    from shiftlead.cli import _stop
 
     args = argparse.Namespace(until="+2h", unattended=False)
     with pytest.raises(AgentError, match="unattended"):
@@ -513,7 +513,7 @@ def test_new_until_needs_unattended_and_carries_the_wrap_up_words(tmp_path, monk
 
 
 def test_stop_note_reads_in_the_local_clock(monkeypatch):
-    from agentorc.cli import stop_note
+    from shiftlead.cli import stop_note
 
     assert stop_note({}) == ""
     when = datetime.datetime.now().astimezone() + datetime.timedelta(hours=2)
@@ -534,10 +534,10 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
     sid = out()["id"]
     wait_state(sid, "idle")
     # a person at a terminal with no session of their own is told, not guessed at
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     assert cli.main(["progress", "claim", "TD-027"]) == 2
-    assert "run this inside an agentorc session" in capsys.readouterr().err
-    monkeypatch.setenv("AGENTORC_SESSION", sid)  # now `ao` runs inside the grinder
+    assert "run this inside an shiftlead session" in capsys.readouterr().err
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)  # now `ao` runs inside the grinder
     assert cli.main(["progress", "claim", "td-27"]) == 0
     assert capsys.readouterr().out.strip() == f"{sid}: TD-027 · 0/2 done"
     assert cli.main(["--json", "progress", "done", "TD-027", "--pr", "60"]) == 0
@@ -562,7 +562,7 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
     assert "report: TD-027 → #60 · 1/2 done" in shown and "filed:  TD-029 (low)" in shown
     # `shell` has no opinion on how a model name shortens, so it prints as observed (TD-031)
     assert "model:  claude-opus-5" in shown
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or a lead, for a worker
     assert [f["ref"] for f in out()["findings"]] == ["TD-029", "#67"]
     call_sync("kill", id=sid)
@@ -627,19 +627,19 @@ def test_every_subcommand_takes_a_bare_name(subprocess_agent, tmp_path, capsys, 
 def test_ao_new_team_and_project_badges(subprocess_agent, tmp_path, capsys):
     """TD-040 step (b), design §4.9: `ao new --team --project` pass two plain strings through to
     the record; `status --json` carries them and `status -v` prints one line each when set."""
-    argv = ["--json", "new", "g", "-a", "shell", "-d", str(tmp_path), "--team", "ao-grind", "--project", "agentorc"]
+    argv = ["--json", "new", "g", "-a", "shell", "-d", str(tmp_path), "--team", "ao-grind", "--project", "shiftlead"]
     assert cli.main(argv) == 0
     s = json.loads(capsys.readouterr().out)
-    assert (s["team"], s["project"]) == ("ao-grind", "agentorc")
+    assert (s["team"], s["project"]) == ("ao-grind", "shiftlead")
     assert cli.main(["--json", "shell", "-d", str(tmp_path)]) == 0  # `ao shell` has no flags: empty badges
     sh = json.loads(capsys.readouterr().out)
     assert (sh["team"], sh["project"]) == ("", "")
     assert cli.main(["--json", "status"]) == 0
     by_id = {r["id"]: r for r in json.loads(capsys.readouterr().out)}
-    assert (by_id[s["id"]]["team"], by_id[s["id"]]["project"]) == ("ao-grind", "agentorc")
+    assert (by_id[s["id"]]["team"], by_id[s["id"]]["project"]) == ("ao-grind", "shiftlead")
     assert cli.main(["status", "-v"]) == 0
     shown = capsys.readouterr().out
-    assert "team:   ao-grind" in shown and "project: agentorc" in shown
+    assert "team:   ao-grind" in shown and "project: shiftlead" in shown
     assert shown.count("team:") == 1  # the shell session shows neither line
     for sid in (s["id"], sh["id"]):
         call_sync("kill", id=sid)
@@ -749,7 +749,7 @@ def test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn(subprocess_ag
     sid = call_sync("create", name="poller", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
     assert cli.main(["inbox", "--unread"]) == 0  # the person inbox: no line
     assert cli.END_THE_TURN not in capsys.readouterr().out
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["inbox", "--unread"]) == 0
     assert cli.END_THE_TURN in capsys.readouterr().out
     assert cli.main(["--json", "inbox", "--unread"]) == 0
@@ -784,14 +784,14 @@ def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_ag
     assert cli.main(["--json", "shell", "-d", str(tmp_path), "w1"]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
     assert cli.main(["control", lead, "add", sid]) == 0
-    env = {**os.environ, "AGENTORC_SESSION": lead}
+    env = {**os.environ, "SHIFTLEAD_SESSION": lead}
 
     def wait_once(timeout: str) -> subprocess.Popen:
         return subprocess.Popen(
             [
                 sys.executable,
                 "-c",
-                "from agentorc.cli import main; raise SystemExit(main())",
+                "from shiftlead.cli import main; raise SystemExit(main())",
                 "--json",
                 "wait",
                 "--timeout",
@@ -863,7 +863,7 @@ def test_a_cursor_that_cannot_be_read_wakes_on_everything_rather_than_on_nothing
     """
     from sessionorc.waits import read_cursor, wake_changes, write_cursor
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     rec = [{"id": "m1", "state": "working", "controllers": ["lead"]}]
 
     assert read_cursor("lead") == {}  # never waited
@@ -891,7 +891,7 @@ def test_two_callers_whose_ids_differ_only_past_the_slug_do_not_share_a_cursor(t
     """`naming.slug` truncates, so a digest keeps the filename unique (review of PR #145)."""
     from sessionorc.waits import cursor_file as _cursor_file
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     a = "ao-agentorc-a-very-long-orchestrator-session-name-one"
     b = "ao-agentorc-a-very-long-orchestrator-session-name-two"
     assert _cursor_file(a) != _cursor_file(b)
@@ -900,7 +900,7 @@ def test_two_callers_whose_ids_differ_only_past_the_slug_do_not_share_a_cursor(t
 def test_the_skill_tells_a_session_that_ao_wait_exists():
     """A command no session knows about is half-shipped: `ao --skill` is where a supervising
     session learns what it can do, and `ao wait` changes how such a session is written."""
-    skill = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "skill.md").read_text()
+    skill = (pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "skill.md").read_text()
     assert "ao wait" in skill
     assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
 
@@ -908,7 +908,7 @@ def test_the_skill_tells_a_session_that_ao_wait_exists():
 def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction(capsys):
     """TD-134, TD-471 (design §4.10 *A disagreement, worked*): an `ask` to both and its citations are named, the worker
     never picks one, and the unanswered case goes to the person — never a stalled worker."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
     line = next(ln for ln in text.splitlines() if "--kind ask --cites" in ln)
     example = re.search(r"`(ao msg [^`]*)`", line).group(1)
     # the example parses as written: a worker that types it puts the ask to both, not a usage error
@@ -926,9 +926,9 @@ def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
     """TD-153 (design §4.10): the doorbell rings only a hook-confirmed idle, so a session that
     polls for mail in a loop is never rung. Where a session reads how to wait, it reads that."""
     root = pathlib.Path(__file__).parents[1]
-    skill = (root / "src" / "agentorc" / "skill.md").read_text()
+    skill = (root / "src" / "shiftlead" / "skill.md").read_text()
     assert "Waiting on mail is ending the turn" in skill and "never a loop" in skill
-    briefs = sorted((root / "src" / "agentorc" / "briefs").glob("*.md")) + [root / "docs/briefs/designer-ao-1.md"]
+    briefs = sorted((root / "src" / "shiftlead" / "briefs").glob("*.md")) + [root / "docs/briefs/designer-ao-1.md"]
     for p in briefs:
         text = p.read_text()
         assert "never wait for input" not in text, p.name  # read as *never be idle*
@@ -939,14 +939,14 @@ def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
 def test_the_grinder_preset_says_a_board_line_is_named_with_its_due_date():
     """TD-220 slice 5 (design §4.5 screen 6 *The board's horizon*): the Inbox draws a line not yet due
     only as far as the person's mode reaches, so a worker that names one says when it is due."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
     assert "*on the board, due <date>*" in text and "is dated today" in text
 
 
 def test_the_grinder_preset_reads_the_inbox_before_a_claim_and_before_the_declaration():
     """TD-141 (design §4.9a): the briefs say it twice — before a claim and before the declaration —
     and the refusal is what holds when they are not read."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
     claim, declare = text.index("Read your inbox before claiming"), text.index("read your inbox once more")
     assert claim < declare < text.index('ao progress none --why "<what you searched')
     assert "refused while mail is unread" in text
@@ -959,7 +959,7 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
     command that settles it. The manager's says it chases its members' debts and never
     reports one for them; and all of them say that a `note` is not a way to ask."""
     root = pathlib.Path(__file__).parents[1]
-    from agentorc import repoconfig
+    from shiftlead import repoconfig
 
     cfg = repoconfig.load(root)
 
@@ -971,13 +971,13 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
             return repoconfig.resolve_role(cfg, role).brief_text(supplement=rel) or ""
         return (root / rel).read_text()
 
-    workers = ["src/agentorc/briefs/grinder.md", "src/agentorc/briefs/hunter.md", "docs/briefs/grinder-ao-1.md"]
-    for rel in [*workers, "src/agentorc/skill.md"]:
+    workers = ["src/shiftlead/briefs/grinder.md", "src/shiftlead/briefs/hunter.md", "docs/briefs/grinder-ao-1.md"]
+    for rel in [*workers, "src/shiftlead/skill.md"]:
         text = started_from(rel)
         assert "--outcome done|blocked|dropped" in text, rel
         assert "--for" in text and "--thread" in text, rel
         assert "tell me if you want less" in text, rel  # the kind, in the words the mistake was made in
-    for rel in ("src/agentorc/briefs/manager.md", "docs/briefs/manager-ao-1.md"):
+    for rel in ("src/shiftlead/briefs/manager.md", "docs/briefs/manager-ao-1.md"):
         text = started_from(rel)
         assert "owed:" in text, rel  # where a manager reads a member's debt
         assert "report an outcome for a" in text, rel  # and never in its place
@@ -997,7 +997,7 @@ SHAPE = (
 def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
     in the same words in every preset whose session writes to the person, and in the designer's."""
-    root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
+    root = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "briefs"
     for name in ("techlead.md", "manager.md", "grinder.md", "designer.md"):  # the designer a preset since TD-309
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
     # since TD-310 the repo's designer brief is the template's `{repo}` supplement, so it says it no
@@ -1031,7 +1031,7 @@ def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_
     (tmp_path / "o").mkdir()
     other = call_sync("create", name="other", dir=str(tmp_path / "o"), adapter="shell", argv=["bash", "--norc"])["id"]
     call_sync("set_controllers", id=other, add=[sid])
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     long = " ".join(["word"] * 90)
     assert cli.main(["msg", "person", long, "--kind", "note"]) == 0
     got = capsys.readouterr()
@@ -1048,7 +1048,7 @@ def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_t
     """TD-103 slice (5), design §6 *Keeping a team running* rules 2–4: the tick fills and closes
     the techlead seat, carries out a wanted restart and sends the idle nudge, so the preset does
     none of them by hand (each would race the tick); it reads the marks the tick leaves."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/manager.md").read_text()
     assert "ao new --keep-mail" not in text and "ao new --supervised" not in text
     assert "**The host agent keeps the seat**" in text and "`seat_due`" in text and "why: fill" in text
     assert "restart_blocked" in text and "**the host agent sends it one fixed line**" in text
@@ -1061,7 +1061,7 @@ def test_the_manager_brief_announces_a_wind_down_as_a_note_and_boards_only_what_
     inbox, two lines — what the run merged, and each member's search — and the board carries only
     what waits on the person. The 23:47Z line was two hundred counted words whose one act was a PR
     waiting on its reader, which is never on the board and never in the note."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/manager.md").read_text()
     assert "ran out of work at <t>. Merged this run: #a, #b (or: nothing)." in text
     assert "<member>: <what it looked for and did not find, from the `why` on its record>; <member>: …" in text
     assert "a `note`, two lines, nothing else in it" in text
@@ -1079,12 +1079,12 @@ def test_the_manager_brief_reads_the_records_each_round_and_takes_finished_from_
     `ao team status --json`, and the tick's line means the members are closed and the last acts are due."""
     root = pathlib.Path(__file__).parents[1]
     halves = (
-        "[agentorc] your team is finished: every member has declared. Make your last acts — ",
+        "[shiftlead] your team is finished: every member has declared. Make your last acts — ",
         "`ao progress none`, the note to the person — then `ao close` yourself",
     )
     tick = (root / "src/sessionorc/agent_tick.py").read_text()
     assert all(f'"{h}"' in tick for h in halves)  # the line as the tick types it
-    text = (root / "src/agentorc/briefs/manager.md").read_text()
+    text = (root / "src/shiftlead/briefs/manager.md").read_text()
     assert "`ao team status <your team> --json` (or `ao status --json`)" in text
     assert "every round, and never carried from an earlier round" in text
     assert "its record says `unattended: false` **now**" in text
@@ -1104,7 +1104,7 @@ def test_the_manager_brief_names_none_of_the_four_jobs_the_tick_took():
     tick's, so the preset and this repo's supplement tell a manager to do none of them — a member
     told by both hears each thing twice — and to read the marks the policies leave instead."""
     root = pathlib.Path(__file__).parents[1]
-    text = (root / "src/agentorc/briefs/manager.md").read_text()
+    text = (root / "src/shiftlead/briefs/manager.md").read_text()
     supplement = (root / "docs/briefs/manager-ao-1.md").read_text()
     for gone in (
         "check_cadence.py",
@@ -1131,7 +1131,7 @@ def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
     declaration is restarted by the host agent's tick, so the preset must not send its manager down
     a hand `ao new` for it (which would race the tick and ship `{lane}` unfilled); a member past
     `restart_ceiling` reaches the person's Inbox by itself (TD-118 cut the board line)."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/manager.md").read_text()
     assert "**the host agent restarts it**" in text and "restart_ceiling" in text
     assert "restart it once with `ao new`" not in text
 
@@ -1149,18 +1149,18 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     call_sync("set_controllers", id=worker, add=[lead])
     call_sync("send", id=worker, text="echo typed by a person")
     call_sync("msg", to=worker, text="from the person")
-    monkeypatch.setenv("AGENTORC_SESSION", lead)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", lead)
     assert cli.main(["msg", worker, "rebase first", "--kind", "ask", "--about", "TD-001"]) == 0
     out = capsys.readouterr().out
     assert f"ask → {worker}" in out and "bound" in out
     # a refusal prints as the RPC words it, naming its rule
     assert cli.main(["msg", peer, "hi"]) == 1
     assert "design §4.10" in capsys.readouterr().err
-    monkeypatch.setenv("AGENTORC_SESSION", peer)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", peer)
     assert cli.main(["--json", "msg", "person", "a question for Paul", "--kind", "ask"]) == 0
     to_person = json.loads(capsys.readouterr().out)
     assert to_person["delivered"] == ["person"]
-    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert out.startswith(cli.INBOX_HEADER)
@@ -1177,7 +1177,7 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert cli.main(["msg", "--reply-to", ask_id, "rebased"]) == 0
     assert f"reply → {lead}" in (out := capsys.readouterr().out) and f"closed {ask_id}" in out
     # a person at a terminal reads the person inbox, and replies from it to the sender
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert out.startswith(cli.INBOX_HEADER) and "person inbox:" in out and f"[other] {peer}" in out
@@ -1192,10 +1192,10 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
     person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
     refused in the host agent's words; `--unread` does not combine with it."""
     worker = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["--json", "msg", "person", "rebase or merge?", "--kind", "ask"]) == 0
     asked = json.loads(capsys.readouterr().out)["entry"]["id"]
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["msg", "--reply-to", asked, "merge it"]) == 0
     capsys.readouterr()
     assert cli.main(["inbox", "--thread", asked]) == 0
@@ -1205,7 +1205,7 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
     assert cli.main(["--json", "inbox", "--thread", asked]) == 0
     assert [e["from"] for e in json.loads(capsys.readouterr().out)["entries"]] == [worker, "person"]
     assert cli.main(["inbox", "--thread", asked, "--unread"]) == 2
-    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["inbox", "--thread", asked]) == 1
     assert "cannot read a thread" in capsys.readouterr().err
     call_sync("kill", id=worker)
@@ -1216,10 +1216,10 @@ def test_msg_verdict_rides_a_readers_reply_to_a_prs_ask(subprocess_agent, tmp_pa
     refuses the reply without it, and argparse a word that is none of the three."""
     w = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="t")["id"]
     tl = call_sync("create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="t")["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", w)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", w)
     assert cli.main(["--json", "msg", "--kind", "ask", "--pr", "12", tl, "#12 is green"]) == 0
     asked = json.loads(capsys.readouterr().out)["entry"]["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", tl)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", tl)
     assert cli.main(["msg", "--reply-to", asked, "merged #12"]) == 1
     assert "--verdict" in capsys.readouterr().err
     with pytest.raises(SystemExit):
@@ -1227,7 +1227,7 @@ def test_msg_verdict_rides_a_readers_reply_to_a_prs_ask(subprocess_agent, tmp_pa
     capsys.readouterr()
     assert cli.main(["--json", "msg", "--reply-to", asked, "--verdict", "merged", "merged #12"]) == 0
     assert json.loads(capsys.readouterr().out)["entry"]["verdict"] == "merged"
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     for sid in (w, tl):
         call_sync("kill", id=sid)
 
@@ -1238,7 +1238,7 @@ def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, 
     refusal names `steer`; `ao inbox` prints a steer's default and how long is left, `[system]`
     beside a note from the home, and `lapsed` once the bound has passed."""
     sid = call_sync("create", name="steerer", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["msg", "person", "which branch?", "--kind", "steer", "--default", "off main"]) == 0
     out = capsys.readouterr().out
     assert "steer → person" in out and "bound" in out and "unless told otherwise: off main" in out
@@ -1251,7 +1251,7 @@ def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, 
     # …and the unbounded ask says so where it is read
     assert cli.main(["msg", "person", "merge?", "--kind", "ask"]) == 0
     capsys.readouterr()
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert "steer" in out and "default: off main" in out and "left" in out
@@ -1266,7 +1266,7 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     one a reply picked; `ao msg --reply-to <id> --pick <n>` takes that same number, sends that
     answer's own text, and says clearly what is not one."""
     sid = call_sync("create", name="asker", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     ask_argv = ["--json", "msg", "person", "merge PR 9?", "--kind", "ask"]
     assert cli.main([*ask_argv, "--answer", "merge it", "--answer", "hold it"]) == 0
     ask = json.loads(capsys.readouterr().out)["entry"]
@@ -1278,7 +1278,7 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     assert cli.main(["msg", "person", "fyi", "--answer", "sure"]) == 1
     assert "only a question carries answers" in capsys.readouterr().err
     # the person reads them numbered from 1, with the steer's default marked and nothing else
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert "  1. merge it" in out and "  2. hold it" in out
@@ -1309,7 +1309,7 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     assert 'answered 2: "hold it"' in out and 'answered 2: "merge PR 9?"' not in out
     assert 'answered 2: "off develop"' in out
     # the sender reads which answer it was, so it branches on the number and not on the text
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert 'answered 2: "hold it"' in out
@@ -1323,10 +1323,10 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     )
     sent = {}
     for name, extra in (("blank", ["   "]), ("bare", ["rebase it first"]), ("addressed", [sid, "rebase it first"])):
-        monkeypatch.setenv("AGENTORC_SESSION", sid)
+        monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
         assert cli.main([*ask_argv, "--answer", "merge it", "--answer", "hold it"]) == 0
         q = json.loads(capsys.readouterr().out)["entry"]
-        monkeypatch.delenv("AGENTORC_SESSION")
+        monkeypatch.delenv("SHIFTLEAD_SESSION")
         assert cli.main(["--json", "msg", "--reply-to", q["id"], "--pick", "2", *extra]) == 0, name
         got = json.loads(capsys.readouterr().out)
         assert got["closed"] == q["id"], name
@@ -1343,15 +1343,15 @@ def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subp
     caller parsing stdout never meets it."""
     assert cli.main(["--json", "shell", "-d", str(tmp_path), "mailed"]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
-    line = "[agentorc] you have 1 unread messages — run ao inbox"
-    os.environ["AGENTORC_SESSION"] = sid
+    line = "[shiftlead] you have 1 unread messages — run ao inbox"
+    os.environ["SHIFTLEAD_SESSION"] = sid
     try:
         assert cli.main(["status"]) == 0
         assert line not in capsys.readouterr().out
-        del os.environ["AGENTORC_SESSION"]
+        del os.environ["SHIFTLEAD_SESSION"]
         assert cli.main(["msg", sid, "a note for you"]) == 0  # a person's message
         capsys.readouterr()
-        os.environ["AGENTORC_SESSION"] = sid
+        os.environ["SHIFTLEAD_SESSION"] = sid
         assert cli.main(["status"]) == 0
         out = capsys.readouterr().out
         assert out.rstrip().endswith(line)
@@ -1362,9 +1362,9 @@ def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subp
         assert cli.main(["kill", "ao-no-such-session"]) == 1  # a refusal carries it too
         assert line in capsys.readouterr().out
         assert cli.main(["inbox"]) == 0  # reading it clears the line from this very reply
-        assert "[agentorc]" not in capsys.readouterr().out
+        assert "[shiftlead]" not in capsys.readouterr().out
     finally:
-        os.environ.pop("AGENTORC_SESSION", None)
+        os.environ.pop("SHIFTLEAD_SESSION", None)
         cli.main(["kill", sid])
 
 
@@ -1377,7 +1377,7 @@ def test_the_unread_line_says_when_the_wake_budget_is_spent(capsys):
     args = argparse.Namespace(json=False)
     clientmod.last_mail = {"unread": 3, "wake_budget_spent": True}
     cli.unread_line(args)
-    assert capsys.readouterr().out == "[agentorc] you have 3 unread messages — run ao inbox (wake budget spent)\n"
+    assert capsys.readouterr().out == "[shiftlead] you have 3 unread messages — run ao inbox (wake budget spent)\n"
     clientmod.last_mail = None
     cli.unread_line(args)
     assert capsys.readouterr().out == ""
@@ -1394,11 +1394,11 @@ def test_the_same_line_says_what_outcomes_are_owed(capsys):
     args = argparse.Namespace(json=False)
     clientmod.last_mail = {"unread": 0, "wake_budget_spent": False, "owed": ["m-1", "m-2"]}
     cli.unread_line(args)
-    assert capsys.readouterr().out == "[agentorc] you owe 2 outcomes: m-1, m-2\n"
+    assert capsys.readouterr().out == "[shiftlead] you owe 2 outcomes: m-1, m-2\n"
     clientmod.last_mail = {"unread": 1, "wake_budget_spent": False, "owed": ["m-1"]}
     cli.unread_line(args)
     out = capsys.readouterr().out.splitlines()
-    assert out == ["[agentorc] you have 1 unread messages — run ao inbox", "[agentorc] you owe 1 outcome: m-1"]
+    assert out == ["[shiftlead] you have 1 unread messages — run ao inbox", "[shiftlead] you owe 1 outcome: m-1"]
     clientmod.last_mail = None
 
 
@@ -1431,7 +1431,7 @@ def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, 
     and shows in `ao status -v` and `--json`."""
     assert cli.main(["--json", "shell", "oow", "-d", str(tmp_path)]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["progress", "none", "TD-001", "--why", "x"]) == 2
     assert "takes no reference" in capsys.readouterr().err
     assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0  # TD-056: --force reaches the RPC
@@ -1442,7 +1442,7 @@ def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, 
     assert "needs --why" in capsys.readouterr().err
     assert cli.main(["progress", "none", "--why", "no open entry I may pick"]) == 0
     assert capsys.readouterr().out.strip() == f"{sid}: out of work — no open entry I may pick"
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["status", "-v"]) == 0
     assert re.search(r"out of work \S+: no open entry I may pick", capsys.readouterr().out)
     assert cli.main(["--json", "status"]) == 0
@@ -1456,7 +1456,7 @@ def test_doing_says_one_line_and_status_shows_it_with_its_age(subprocess_agent, 
     its age. A person with no session of their own is told, not guessed at."""
     assert cli.main(["--json", "shell", "doer", "-d", str(tmp_path)]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["doing"]) == 2
     assert "needs a line" in capsys.readouterr().err
     assert cli.main(["doing", "--clear", "reading the ledger"]) == 2
@@ -1472,7 +1472,7 @@ def test_doing_says_one_line_and_status_shows_it_with_its_age(subprocess_agent, 
     assert cli.main(["doing", "--clear"]) == 0
     assert capsys.readouterr().out.strip() == f"{sid}: doing cleared"
     assert call_sync("get", id=sid)["doing"] is None
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["doing", "nothing of mine to say"]) == 2
     assert "no session" in capsys.readouterr().err
     call_sync("kill", id=sid)
@@ -1491,7 +1491,7 @@ def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
         return {"id": "ao-x", "progress": [], "lane": []}
 
     monkeypatch.setattr(cli, "call_sync", fake)
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
     assert cli.main(["progress", "claim", "TD-900"]) == 0
     assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0
     assert sent[0]["force"] is None and sent[1]["force"] is True
@@ -1505,7 +1505,7 @@ def test_progress_done_slice_keeps_the_claim(subprocess_agent, tmp_path, capsys,
     assert cli.main(["--json", "new", "slicer", "-a", "shell", "-d", str(tmp_path)]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
     wait_state(sid, "idle")
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     assert cli.main(["progress", "done", "TD-325", "--slice"]) == 2  # no --pr
     assert cli.main(["progress", "claim", "TD-325", "--pr", "9", "--slice"]) == 2  # not done
     assert "--slice goes with ao progress done TD-325 --pr <n>" in capsys.readouterr().err
@@ -1534,7 +1534,7 @@ def test_progress_sends_slice_only_when_asked(monkeypatch, capsys):
         return {"id": "ao-x", "progress": [], "lane": []}
 
     monkeypatch.setattr(cli, "call_sync", fake)
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
     assert cli.main(["progress", "done", "TD-900", "--pr", "5"]) == 0
     assert cli.main(["progress", "done", "TD-900", "--pr", "5", "--slice"]) == 0
     assert sent[0]["slice"] is None and sent[1]["slice"] is True
@@ -1618,7 +1618,7 @@ def test_a_nodes_status_line_says_unreachable_only_when_it_is(monkeypatch, capsy
     while the home's journal showed the link **up**, and sent a reader looking for an outage that
     was not there. Three answers now, one per state the agent can be in — and a failed read is the
     third, not the bad one: not knowing is not the same as knowing it is down."""
-    from agentorc import cli as climod
+    from shiftlead import cli as climod
 
     monkeypatch.setattr(climod.hosts, "is_node", lambda: True)
     monkeypatch.setattr(climod.hosts, "home_name", lambda: "kmaster")
@@ -1662,7 +1662,7 @@ def test_a_nodes_status_line_says_unreachable_only_when_it_is(monkeypatch, capsy
 def test_the_host_line_is_drawn_only_on_a_node(monkeypatch, capsys):
     """The home says nothing: its listing is the whole org's, and a line about *this host only*
     would be false there (design §4.4a)."""
-    from agentorc import cli as climod
+    from shiftlead import cli as climod
 
     monkeypatch.setattr(climod.hosts, "is_node", lambda: False)
     monkeypatch.setattr(climod, "call_sync", lambda method, **kw: [])
@@ -1675,14 +1675,14 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
     """TD-086 item 2, `ao --skill`'s Never list. One line said two different things: the socket
     could not be opened, *and* a call's reply never came because the connection closed under it —
     which a promote causes (TD-062), three times on the evening of 2026-09-20 to a lead blocked in
-    `ao wait`. Both printed *start it with: agentorc-agent serve*: wrong in fact, because the agent
+    `ao wait`. Both printed *start it with: shiftlead-agent serve*: wrong in fact, because the agent
     was `active` again at once, and wrong for a session, which its skill forbids to start one.
 
     So the CLI asks again rather than reading the exception's words, and the hint is never printed
     to a session whichever answer it gets. The exit code stays 3 in all three: what the caller
     could not do, it could not do."""
-    from agentorc import cli as climod
     from sessionorc.client import AgentUnavailable
+    from shiftlead import cli as climod
 
     def boom(args):
         raise AgentUnavailable("host agent closed the connection")
@@ -1691,34 +1691,34 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
 
     # (a) an agent answers now: it was restarting, and *run it again* is the whole of the advice
     monkeypatch.setattr(climod, "_agent_answers", lambda: True)
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     assert climod._run(args) == 3
     err = capsys.readouterr().err
-    assert "restarted under this command — run it again" in err and "agentorc-agent serve" not in err
+    assert "restarted under this command — run it again" in err and "shiftlead-agent serve" not in err
 
     # …and a session gets the same sentence: it is the true one, and it names nothing to start
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-x-1")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-1")
     assert climod._run(args) == 3
-    assert "agentorc-agent serve" not in capsys.readouterr().err
+    assert "shiftlead-agent serve" not in capsys.readouterr().err
 
     # (b) nothing answers, and the caller is a session: told to stop, in its skill's own words
     monkeypatch.setattr(climod, "_agent_answers", lambda: False)
     assert climod._run(args) == 3
     err = capsys.readouterr().err
-    assert "stop here; a session never starts one" in err and "agentorc-agent serve" not in err
+    assert "stop here; a session never starts one" in err and "shiftlead-agent serve" not in err
 
     # (c) nothing answers, and the caller is a person: the hint is theirs, and only theirs — with the
-    # ancestry probe stubbed, since this suite may itself be running inside an agentorc pane
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    # ancestry probe stubbed, since this suite may itself be running inside an shiftlead pane
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     monkeypatch.setattr(climod, "_session_by_ancestry", lambda: None)
     assert climod._run(args) == 3
-    assert "start it with: agentorc-agent serve" in capsys.readouterr().err
+    assert "start it with: shiftlead-agent serve" in capsys.readouterr().err
 
     # (d) TD-089: the variable is gone but a process above this one was started in a session's pane
     monkeypatch.setattr(climod, "_session_by_ancestry", lambda: "ao-x-1")
     assert climod._run(args) == 3
     err = capsys.readouterr().err
-    assert "stop here; a session never starts one" in err and "agentorc-agent serve" not in err
+    assert "stop here; a session never starts one" in err and "shiftlead-agent serve" not in err
 
     # --json says which it was without prose, for a caller that parses (TD-030)
     monkeypatch.setattr(climod, "_agent_answers", lambda: True)
@@ -1728,12 +1728,12 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
 
 
 def test_a_session_is_found_by_its_ancestors_environment_when_its_own_is_gone(tmp_path):
-    """TD-089, design §4.8a *With no host agent to ask*: the launch sets `AGENTORC_SESSION` on the
+    """TD-089, design §4.8a *With no host agent to ask*: the launch sets `SHIFTLEAD_SESSION` on the
     pane's first process, so a process that lost it still has an ancestor started with it. The walk
     reads `/proc/<pid>/stat` for the parent (a `comm` with spaces and parentheses included) and
     `/proc/<pid>/environ` for the variable; it stops at init, at a process it may not read, at a
     broken chain and at the hop bound, and every failure is *no session*."""
-    from agentorc import cli as climod
+    from shiftlead import cli as climod
 
     def proc(pid, ppid, env=None, comm="sh"):
         d = tmp_path / str(pid)
@@ -1744,7 +1744,7 @@ def test_a_session_is_found_by_its_ancestors_environment_when_its_own_is_gone(tm
 
     proc(40, 30, {"PATH": "/bin"}, comm="ao (a) b")  # ourselves: our own environ is os.environ's, not read
     proc(30, 20, {"PATH": "/bin"})  # a hook's shell that scrubbed the variable
-    proc(20, 10, {"AGENTORC_SESSION": "ao-agentorc-w-1", "PATH": "/bin"}, comm="claude")
+    proc(20, 10, {"SHIFTLEAD_SESSION": "ao-agentorc-w-1", "PATH": "/bin"}, comm="claude")
     proc(10, 1, {"PATH": "/bin"}, comm="tmux: server")
     assert climod._session_by_ancestry(tmp_path, pid=40) == "ao-agentorc-w-1"
     assert climod._session_by_ancestry(tmp_path, pid=10) is None  # the chain reaches init: a person's
@@ -1753,8 +1753,8 @@ def test_a_session_is_found_by_its_ancestors_environment_when_its_own_is_gone(tm
     assert climod._session_by_ancestry(tmp_path, pid=50) is None
     proc(70, 99, {})  # the parent exited under the walk
     assert climod._session_by_ancestry(tmp_path, pid=70) is None
-    proc(80, 81, {"AGENTORC_SESSION": ""})
-    proc(81, 80, {"AGENTORC_SESSION": ""})  # an empty value is not a session, and a loop is bounded
+    proc(80, 81, {"SHIFTLEAD_SESSION": ""})
+    proc(81, 80, {"SHIFTLEAD_SESSION": ""})  # an empty value is not a session, and a loop is bounded
     assert climod._session_by_ancestry(tmp_path, pid=80) is None
 
 
@@ -1773,7 +1773,7 @@ def test_the_probe_is_one_ping_it_never_raises_and_it_cannot_hang(monkeypatch, t
     import socket
     import time
 
-    from agentorc import cli as climod
+    from shiftlead import cli as climod
 
     # nothing is listening: immediate, and a `no`
     monkeypatch.setattr(climod.clientmod.paths, "socket_path", lambda: tmp_path / "nothing.sock")
@@ -1823,7 +1823,7 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     and `none` refuse each other. A later declared claim takes it back."""
     assert cli.main(["--json", "shell", "again", "-d", str(tmp_path)]) == 0
     sid = json.loads(capsys.readouterr().out)["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
 
     assert cli.main(["progress", "restart"]) == 1
     assert "needs --why" in capsys.readouterr().err
@@ -1851,7 +1851,7 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     assert call_sync("get", id=sid)["restart_wanted"] is None
 
     # nobody else may declare it
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     try:
         call_sync("progress", id=sid, status="restart", why="not mine to say", caller="ao-someone")
         raise AssertionError("another session declared a restart")
@@ -1867,7 +1867,7 @@ def test_inbox_sent_and_the_asks_waiting_line(subprocess_agent, tmp_path, capsys
     (tmp_path / "b").mkdir()
     asker = call_sync("create", name="aw-asker", dir=str(tmp_path / "a"), adapter="shell", team="aw-t")["id"]
     seat = call_sync("create", name="aw-seat", dir=str(tmp_path / "b"), adapter="shell", team="aw-t")["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["msg", seat, "squash or rebase?", "--kind", "ask"]) == 0
     capsys.readouterr()
     assert cli.main(["inbox", "--sent"]) == 0
@@ -1888,10 +1888,10 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
     (tmp_path / "b").mkdir()
     asker = call_sync("create", name="up-asker", dir=str(tmp_path / "a"), adapter="shell", team="up-t")["id"]
     passer = call_sync("create", name="up-passer", dir=str(tmp_path / "b"), adapter="shell", team="up-t")["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["--json", "msg", passer, "delete the old branch?", "--kind", "ask"]) == 0
     q = json.loads(capsys.readouterr().out)["entry"]
-    monkeypatch.setenv("AGENTORC_SESSION", passer)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", passer)
     assert cli.main(["msg", "--pass-up", q["id"], "some text"]) == 2
     assert "leave the text out" in capsys.readouterr().err
     assert cli.main(["msg", "--pass-up", q["id"]]) == 2
@@ -1899,7 +1899,7 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
     assert cli.main(["msg", "--pass-up", q["id"], "--recommend", "keep it", "--answer", "delete it"]) == 0
     out = capsys.readouterr().out
     assert f"{q['id']} passed up → person, recommending: keep it" in out and "  2. delete it" in out
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert "delete the old branch?" in out and f"passed up by {passer}, who recommends: keep it" in out
@@ -1916,17 +1916,17 @@ def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, c
     (tmp_path / "b").mkdir()
     asker = call_sync("create", name="src-asker", dir=str(tmp_path / "a"), adapter="shell", team="src-t")["id"]
     answerer = call_sync("create", name="src-answerer", dir=str(tmp_path / "b"), adapter="shell", team="src-t")["id"]
-    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["--json", "msg", answerer, "is the seat counted in a wind-down?", "--kind", "ask"]) == 0
     q = json.loads(capsys.readouterr().out)["entry"]
-    monkeypatch.setenv("AGENTORC_SESSION", answerer)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", answerer)
     assert cli.main(["msg", "--reply-to", q["id"], "no, never", "--source", "design §4.9b, the seat"]) == 0
     out = capsys.readouterr().out
     assert "source: design §4.9b, the seat" in out and "the person is told: answered for you" in out
-    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["inbox"]) == 0
     assert "  source: design §4.9b, the seat" in capsys.readouterr().out
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["inbox"]) == 0
     out = capsys.readouterr().out
     assert f"answered for you — {asker} asked: is the seat counted in a wind-down?" in out
@@ -1942,7 +1942,7 @@ def _iso(t: datetime.datetime) -> str:
 def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
     """`ao gate` (design §4.7, TD-100 slice 2): `30` flat, `10/day` per day, empty clears; the line
     names the reserve, the line and, for a per-day reserve, when it moves."""
-    from agentorc.cli import _gate_line, _reserve
+    from shiftlead.cli import _gate_line, _reserve
 
     assert (_reserve("30"), _reserve("10/day"), _reserve("")) == (30, {"per_day": 10}, None)
     for bad in ("30%", "ten", "-5", "1.5/day"):
@@ -1973,7 +1973,7 @@ def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
 def test_ao_gate_says_how_old_each_reading_is():
     """design §4.7 `ao gate` (TD-230, TD-233 slice 1): each window read from a reading ends with its
     age and source, *· read 6h ago (asked)*; a reading with no time on it, or none, says nothing."""
-    from agentorc.cli import _gate_line, _gate_read
+    from shiftlead.cli import _gate_line, _gate_read
 
     six = _iso(datetime.datetime.now(datetime.UTC) - datetime.timedelta(hours=6, minutes=1))
     assert _gate_read({"fetched": six}) == " · read 6h ago (asked)"
@@ -1989,7 +1989,7 @@ def test_ao_gate_says_how_old_each_reading_is():
 def test_ao_gate_prints_a_projection_and_a_window_with_no_rate():
     """design §4.7 `ao gate` (TD-233 slice 4): a window past `usage.max_age` prints the reading it
     held, then *· projected 96%*; one with no rate to project by says so, and pauses nothing."""
-    from agentorc.cli import _gate_line, _max_age_said
+    from shiftlead.cli import _gate_line, _max_age_said
 
     pr = {"label": "week", "reserve": 5, "line": 95, "pct": 96.0, "next": None,
           "projected": {"from": 88, "rate": 1.33, "age": 21600}}  # fmt: skip
@@ -2008,7 +2008,7 @@ def test_ao_gate_max_age_sets_the_setting(subprocess_agent, capsys, monkeypatch)
     host agent's refusal, and a session is refused as for the reserves."""
     from sessionorc import settings as settings_mod
 
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     try:
         assert cli.main(["gate", "--max-age", "90m"]) == 0
         assert capsys.readouterr().out.startswith("max_age 90m: ")
@@ -2027,11 +2027,11 @@ def test_ao_gate_max_age_sets_the_setting(subprocess_agent, capsys, monkeypatch)
         assert cli.main(["gate", "--max-age", "2h", "grind", "5h=30"]) == 0
         out = capsys.readouterr().out
         assert out.startswith("max_age 2h: ") and "grind · 5h 30" in out
-        monkeypatch.setenv("AGENTORC_SESSION", "s-nobody")
+        monkeypatch.setenv("SHIFTLEAD_SESSION", "s-nobody")
         assert cli.main(["gate", "--max-age", "off"]) != 0
         assert settings_mod.load()["usage"] == {"max_age": "2h"}
     finally:
-        monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+        monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
         assert cli.main(["gate", "--max-age", "default", "grind", "5h="]) == 0  # the agent is shared: leave it bare
     assert "usage" not in settings_mod.load() and not settings_mod.load().get("usage_gate")
 
@@ -2040,9 +2040,9 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys,
     """`ao gate` end to end: the reserves land in settings.yml through `set_settings`, `ao gate`
     shows them, a session's `ao gate` is refused by the host agent, and `ao new --unattended`
     carries the pause and resume texts onto the record."""
-    from agentorc import teams
+    from shiftlead import teams
 
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     assert cli.main(["gate"]) == 0
     assert "no usage gate" in capsys.readouterr().out
     assert cli.main(["gate", "grind", "5h=30", "week=10/day"]) == 0
@@ -2057,10 +2057,10 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys,
     assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
     rec = json.loads(capsys.readouterr().out)
     assert (rec["pause_prompt"], rec["resume_prompt"]) == (teams.PAUSE_PROMPT, teams.RESUME_PROMPT)
-    monkeypatch.setenv("AGENTORC_SESSION", rec["id"])
+    monkeypatch.setenv("SHIFTLEAD_SESSION", rec["id"])
     assert cli.main(["gate", "grind", "5h=30"]) != 0
     assert "a person's own" in capsys.readouterr().err
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["kill", rec["id"]]) == 0
 
 
@@ -2070,7 +2070,7 @@ def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, c
     defined ones, `ao settings` prints each key with what it makes, and `--where` names the files."""
     from sessionorc import paths
 
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     monkeypatch.chdir(tmp_path)
     (paths.home() / "org.yml").write_text(
         f"projects:\n  ao: {{repos: {{ao: {{kmaster: {tmp_path}}}}}}}\n"
@@ -2140,7 +2140,7 @@ def test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses(tmp_path, 
     TD-193): the home's repo readings are read once per call, and a PR they hold as merged carries
     the word; the read refused (a node offline), the line is printed unmarked. `--json` is the
     records as they are."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
     rec = {
         "id": "ao-x-g",
@@ -2180,7 +2180,7 @@ def test_status_v_marks_a_pr_that_is_no_longer_open_and_never_guesses(tmp_path, 
 def test_status_v_says_a_brief_changed_with_its_files(tmp_path, monkeypatch, capsys):
     """Design §4.5a **brief changed**, §6 rule 7 (TD-217 slice 3): `ao status -v` prints
     `brief: changed <when> (<files>)`, and `--json` carries the field as it is."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
     rec = {
         "id": "ao-x-m",
@@ -2239,14 +2239,14 @@ def test_ao_restart_prints_the_new_records_line_and_a_refusal_in_the_agents_word
     assert json.loads(capsys.readouterr().out)["restarts"][0]["why"] == "person"
     assert cli.main(["restart", "ao-x-dirty"]) == 1
     assert "w has work left: 2 uncommitted" in capsys.readouterr().err
-    manager = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    manager = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/manager.md").read_text()
     assert "on the board once — the person's press is the Inbox row's Restart, or `ao restart <id>`." in manager
 
 
 def test_the_presets_say_what_over_its_line_means():
     """TD-239 slice 5 (design §6 *Balance*): a worker refused *over its line* takes nothing new, ends
     its turn and never declares `none`; the manager logs one line and treats nobody as crashed."""
-    briefs = pathlib.Path(__file__).parents[1] / "src/agentorc/briefs"
+    briefs = pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs"
     grinder = (briefs / "grinder.md").read_text()
     assert "**Over its line** (design §6 *Balance*)" in grinder and "`--force` does not pass it" in grinder
     assert "a branch cut for a new entry is no way round it" in grinder and "Never declare `none` on it" in grinder
@@ -2326,7 +2326,7 @@ def test_a_malformed_restarts_field_reads_as_words_and_never_raises():
     """`restart_words` leaves a malformed field out and `restarts_line` skips what is not an entry
     (TD-486): a record from a node older than the field, or a hand-repaired one, never crashes
     `ao status -v`."""
-    from agentorc.ending import restart_words
+    from shiftlead.ending import restart_words
 
     for idle in (True, float("nan"), float("inf"), "5", None):
         assert restart_words({"why": "cache", "idle": idle}) == "cache lapsed", idle
@@ -2382,7 +2382,7 @@ def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outco
     """TD-384 slice 3 (design §4.9a *What a session does with a decided line*): the work order is
     claimed as `board:<key>` before any entry, ends one of four ways in a PR that closes the line, and
     an unclaimed one keeps the lane from out of work."""
-    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    text = (pathlib.Path(__file__).parents[1] / "src/shiftlead/briefs/grinder.md").read_text()
     assert "A decided board line comes first" in text and "Take it before any entry" in text
     assert "`ao progress claim board:<key>`" in text and "`ao progress done board:<key> --pr <n>`" in text
     for outcome in (

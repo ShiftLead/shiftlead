@@ -329,7 +329,7 @@ class RemoteMixin:
             raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
 
     def _occupant_from(self, who: str, host: str) -> str:
-        """A node's occupant line (`<id> (<state>)`, or an agent outside agentorc) in the home's
+        """A node's occupant line (`<id> (<state>)`, or an agent outside shiftlead) in the home's
         form: a record of that node's is `<id>@<host>`, as the home's own reading names it."""
         sid, sep, rest = who.partition(" ")
         return f"{sid}@{host}{sep}{rest}" if sid in self.remote.get(host, {}) else who
@@ -911,7 +911,7 @@ class RemoteMixin:
         if self.mode != "home":
             return f"{self.host} is a node of {self.home}, not a home: there is one home, and a node takes no links"
         if not host:
-            return "the link named no host (`agentorc-agent link --host <name>` in authorized_keys)"
+            return "the link named no host (`shiftlead-agent link --host <name>` in authorized_keys)"
         if host == self.host:
             return f"{host} is this home's own name: a node's key must be bound to the node's name"
         if host not in hosts.nodes():

@@ -37,7 +37,7 @@ async def stop(task: asyncio.Task) -> None:
 
 
 async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", 0.3)
     # Long enough that no tick can judge the paneless record below `exited` before the migration
     # is asserted, however loaded the machine is; the second half of the test shortens it on
@@ -99,7 +99,7 @@ async def test_orchestrate_is_not_a_grant(tmp_path, monkeypatch):
     from sessionorc.agent import RpcError
     from sessionorc.models import has_control
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     paths.ensure_layout()
     store = SessionStore()
     old = Session(id="ao-old-lead", name="old-lead", kind="interactive", adapter="shell", dir=str(tmp_path))
@@ -123,7 +123,7 @@ def test_restart_seeds_hook_freshness(tmp_path, monkeypatch):
     so a screen rule cannot outrank it until the stall window passes; a scraped record is cold."""
     from datetime import UTC, datetime
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     paths.ensure_layout()
     store = SessionStore()
     hooked = Session(id="ao-h", name="h", kind="interactive", adapter="hookstub", dir=str(tmp_path), confidence="hook")
@@ -144,7 +144,7 @@ def test_restart_seeds_hook_freshness(tmp_path, monkeypatch):
 def test_sigterm_stops_serve_cleanly(tmp_path, monkeypatch):
     """TD-024: SIGTERM cancels the serve task (`serve_until_signal`), so `serve()`'s `finally`
     unlinks the socket and the process exits 0 without asyncio's pending-task traceback. Runs the
-    test child, which stops exactly the way `agentorc-agent serve` does."""
+    test child, which stops exactly the way `shiftlead-agent serve` does."""
     import os
     import signal
     import subprocess
@@ -154,8 +154,8 @@ def test_sigterm_stops_serve_cleanly(tmp_path, monkeypatch):
 
     home = tmp_path / "home"
     sock_name = private_socket_name()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
-    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
     proc = subprocess.Popen(
         [sys.executable, str(CHILD), sock_name],
         env=dict(os.environ),
@@ -182,7 +182,7 @@ async def test_stop_closes_a_subscriber_and_a_blocked_wait(tmp_path, monkeypatch
     """TD-058: leaving `async with server` awaits `wait_closed()`, which waits for every open client
     connection — the UI's subscription and a lead blocked in `wait` never end on their own, so a
     stop hung until systemd's SIGKILL. The serve task must finish within a second of its cancel."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     tmux = Tmux(socket_name=private_socket_name())
     try:
         _, task = await start(tmux)
@@ -212,7 +212,7 @@ def test_prune_runs_keeps_live_logs(tmp_path, monkeypatch):
     import os
     from datetime import UTC, datetime
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     paths.ensure_layout()
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
     old_t = (datetime.now(UTC) - timedelta(days=8)).timestamp()
@@ -249,7 +249,7 @@ def test_prune_runs_keeps_live_logs(tmp_path, monkeypatch):
 
 
 async def test_a_wait_rides_out_a_restart_and_returns_the_change(tmp_path, monkeypatch):
-    """TD-086 item 1: a promote restarts `agentorc-agent` under every blocked `ao wait`, and the
+    """TD-086 item 1: a promote restarts `shiftlead-agent` under every blocked `ao wait`, and the
     wait died with the socket — a lead lost its wake channel by a routine act of the anchor's,
     three times in one evening. `client.wait_rpc` remakes the connection instead, with the time
     that is left, so the wait keeps its promise: it returns on the first thing in scope.
@@ -258,7 +258,7 @@ async def test_a_wait_rides_out_a_restart_and_returns_the_change(tmp_path, monke
     `rpc_wait` holding only what that wait compared and found **unchanged** — so a change that
     lands while nobody is connected is still ahead of it, and the remade wait returns it at once.
     Here the change lands **while the agent is down**, which is the case that matters."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", 0.3)
     tmux = Tmux(socket_name=private_socket_name())
     try:
@@ -292,7 +292,7 @@ async def test_a_wait_against_no_agent_at_all_is_still_an_error(tmp_path, monkey
     """The other half of TD-086 item 1: a connection that closes **mid-call** is told apart from
     an agent that cannot be reached at all. Nothing answers here, so nothing is retried — the
     caller is told at once, as before, rather than waiting out a grace for an agent that is down."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     with pytest.raises(AgentUnavailable, match="not reachable"):
         await client.wait_rpc(caller="ao-nobody", timeout=30.0)
 
@@ -302,7 +302,7 @@ async def test_the_last_usage_reading_survives_a_restart(tmp_path, monkeypatch):
     one day — and the agent polled at once against an endpoint that answers 429, while the chip
     vanished rather than going stale. The last good reading is now on disk with its `fetched`
     time, so a restarted agent has something to show and nothing to ask for."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     tmux = Tmux(socket_name=private_socket_name())
     reading = {"windows": [{"label": "5h", "pct": 61, "resets": None}], "fetched": "t1", "reason": "ok"}
     a = HostAgent(tmux=tmux)
@@ -326,7 +326,7 @@ async def test_a_restart_keeps_the_polls_allowance_too(tmp_path, monkeypatch):
     passed, never sooner; a reading with no readable time is polled at once, as before."""
     from sessionorc.agent import USAGE_FRESH
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     tmux = Tmux(socket_name=private_socket_name())
 
     def iso(dt):

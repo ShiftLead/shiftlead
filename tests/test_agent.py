@@ -1,4 +1,4 @@
-"""End-to-end: an in-process host agent on a private tmux server and a temp AGENTORC_HOME."""
+"""End-to-end: an in-process host agent on a private tmux server and a temp SHIFTLEAD_HOME."""
 
 import asyncio
 import json
@@ -27,7 +27,7 @@ async def test_shell_lifecycle(agent, tmp_path):
         env = await c.call("tail", id=sid, lines=1)  # warm-up; the real check is below
         assert env is not None
         # and the name the Org shows, for dev-cadence's co-author hook (TD-185)
-        await c.call("send", id=sid, text='echo HOME=$AGENTORC_HOME SESSION=$AGENTORC_SESSION NAME="$AGENT_NAME".')
+        await c.call("send", id=sid, text='echo HOME=$SHIFTLEAD_HOME SESSION=$SHIFTLEAD_SESSION NAME="$AGENT_NAME".')
         for _ in range(30):
             tail = await c.call("tail", id=sid, lines=6)
             if any(f"HOME={paths.home()} SESSION={sid} NAME=my shell." in line for line in tail):
@@ -269,14 +269,14 @@ async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeyp
     (tmp_path / "free").mkdir()
     async with LocalClient() as c:
         occ = await c.call("occupancy", dir=str(tmp_path / "vscode"))
-        assert occ["occupants"] == ["editor-session (ext-tool, outside agentorc, busy)"]
+        assert occ["occupants"] == ["editor-session (ext-tool, outside shiftlead, busy)"]
         assert (await c.call("occupancy", dir=str(tmp_path / "free")))["occupants"] == []
-        with pytest.raises(AgentError, match="outside agentorc"):
+        with pytest.raises(AgentError, match="outside shiftlead"):
             await c.call("create", name="x", dir=str(tmp_path / "vscode"), adapter="ext-tool")
         # shells are exempt, and a shell in that directory does not occupy it either
         sh = await c.call("create", name="sh", dir=str(tmp_path / "vscode"), adapter="shell", argv=["bash", "--norc"])
         assert (await c.call("occupancy", dir=str(tmp_path / "vscode")))["occupants"] == [
-            "editor-session (ext-tool, outside agentorc, busy)"
+            "editor-session (ext-tool, outside shiftlead, busy)"
         ]
         # our own live agent session occupies its directory
         own = await c.call("create", name="own", dir=str(tmp_path / "free"), adapter="ext-tool")
@@ -608,9 +608,9 @@ async def test_send_to_an_exited_record_is_refused_in_words(agent, hookstub, tmp
         assert (await c.call("get", id=s["id"]))["sends"] == []
 
 
-async def test_a_session_started_outside_agentorc_gets_no_card(agent, hookstub, tmp_path):
-    """Design §4.1 (2026-09-17): a live session the adapter sees outside agentorc is not shown —
-    the Org is what agentorc started or adopted, and a person's own session is theirs. The registry
+async def test_a_session_started_outside_shiftlead_gets_no_card(agent, hookstub, tmp_path):
+    """Design §4.1 (2026-09-17): a live session the adapter sees outside shiftlead is not shown —
+    the Org is what shiftlead started or adopted, and a person's own session is theirs. The registry
     is still read where the anchor rule needs it (`occupancy`, tested above)."""
     from sessionorc.adapters import ExternalSession
 
@@ -857,7 +857,7 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
             with pytest.raises(AgentError, match="not in its controllers"):
                 await orc_client.call("kill", id=vid)
             # a registry-only id and a missing id are refused by the method, not by the gate
-            with pytest.raises(AgentError, match="started outside agentorc|no session"):
+            with pytest.raises(AgentError, match="started outside shiftlead|no session"):
                 await orc_client.call("kill", id="ao-not-a-record")
             with pytest.raises(AgentError, match="bad params"):
                 await orc_client.call("kill")
@@ -1368,7 +1368,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._derived_at  # no key outlives the record
-        # a record created with the repo's `ledger:` (read by the client from `.agentorc.yml`) hands
+        # a record created with the repo's `ledger:` (read by the client from `.shiftlead.yml`) hands
         # that path to the derivation — the agent itself never reads the file
         other = (await person.call("create", name="l", dir=str(repo), adapter="shell", argv=["bash", "--norc"],
                                    role="grinder", ledger="docs/debt.md"))  # fmt: skip
@@ -1557,13 +1557,13 @@ async def test_team_and_project_are_plain_badges_on_the_record(agent, tmp_path):
             adapter="shell",
             argv=["bash", "--norc"],
             team="ao-grind",
-            project="agentorc",
+            project="shiftlead",
         )
-        assert (s["team"], s["project"]) == ("ao-grind", "agentorc")
+        assert (s["team"], s["project"]) == ("ao-grind", "shiftlead")
         got = await c.call("get", id=s["id"])
-        assert (got["team"], got["project"]) == ("ao-grind", "agentorc")
+        assert (got["team"], got["project"]) == ("ao-grind", "shiftlead")
         saved = agent.store.load(s["id"])
-        assert (saved.team, saved.project) == ("ao-grind", "agentorc")
+        assert (saved.team, saved.project) == ("ao-grind", "shiftlead")
         # a team nobody defined is stored all the same: the clients validate, the agent stores
         plain = await c.call("create", name="p", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         assert (plain["team"], plain["project"]) == ("", "")
@@ -1706,7 +1706,7 @@ async def test_a_prompt_no_process_can_take_is_refused_before_anything_is_create
     """TD-068: a brief rides in the tool's argv, and on 2026-09-18 one of 16 KB failed at tmux —
     *after* `create` had made the worktree, which stayed with no record pointing at it. The launch
     script (`Tmux._fit`) carries a 32 KB brief now; what no path can deliver is one argument past
-    the kernel's limit, and that is refused here, in agentorc's own words, before the worktree."""
+    the kernel's limit, and that is refused here, in shiftlead's own words, before the worktree."""
     from sessionorc.tmux import ARG_LIMIT
 
     repo = tmp_path / "repo"
@@ -1763,7 +1763,7 @@ async def test_a_reply_past_the_line_limit_is_refused_in_words_not_written(agent
         s = await c.call("create", name="wide", dir=str(tmp_path), adapter="shell")
         await c.call("progress", id=s["id"], ref="TD-1", status="claimed", why="x" * 4_000)
         monkeypatch.setattr(link, "FRAME_LIMIT", 2_048)
-        with caplog.at_level("ERROR", logger="agentorc.agent"), pytest.raises(AgentError, match="line limit"):
+        with caplog.at_level("ERROR", logger="shiftlead.agent"), pytest.raises(AgentError, match="line limit"):
             await c.call("list")
         assert "reply to list" in caplog.text
         # the same connection still serves what fits: one refusal, not a broken client
@@ -2071,7 +2071,7 @@ async def test_a_tool_event_that_wakes_an_idle_session_is_logged(agent, tmp_path
     `event`; the agent logs the one that wakes a hook-confirmed idle session, and only that one."""
     async with LocalClient() as c:
         s = await c.call("create", name="woken", dir=str(tmp_path), adapter="shell")
-        with caplog.at_level("INFO", logger="agentorc.agent"):
+        with caplog.at_level("INFO", logger="shiftlead.agent"):
             await c.call("hook", session=s["id"], state="idle")
             await c.call("hook", session=s["id"], state="working")  # a prompt's own start: unnamed
             await c.call("hook", session=s["id"], state="working", event="PreToolUse:Bash")  # already working

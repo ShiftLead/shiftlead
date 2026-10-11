@@ -1,9 +1,10 @@
 # ShiftLead
 
 *The project is **ShiftLead** ([shiftlead.dev](https://shiftlead.dev)), decided 2026-09-21; the command is `ao`.
-The packages, the state directory, the units and the config file are still named `agentorc` until the
-machine-side rename lands at a release boundary (TD-060). Was `sessionherd` for the first day of design,
-and `agentorc` from 2026-09-04 to sit beside [cmdorc](https://github.com/eyecantell/textual-cmdorc).*
+The packages, the state directory, the units and the config file carry the name since 2026-10-10 (TD-060;
+`ao migrate` moves a machine from the old names once); the repo is still `eyecantell/agentorc` until it is
+renamed. Was `sessionherd` for the first day of design, and `agentorc` from 2026-09-04 to 2026-10-10, to sit
+beside [cmdorc](https://github.com/eyecantell/textual-cmdorc).*
 
 A self-hosted web dashboard that orchestrates interactive AI coding-agent sessions (Claude Code first;
 Gemini CLI, Codex CLI, and on-prem harnesses via adapters) — and plain shells — running in tmux across one or more
@@ -40,7 +41,7 @@ and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, i
    state, TD-002 attachments, TD-003 phone, TD-004 `hosts.yml`, TD-010 adopting hand-started
    sessions), then **phase 2** of [`docs/design.md`](docs/design.md) §7: second host, ssh
    transport, agent install script.
-4. Known gap in the phase 1 success test: only sessions agentorc launched (or hand-started
+4. Known gap in the phase 1 success test: only sessions ShiftLead launched (or hand-started
    `ao-*` tmux sessions) appear in the Org. A Claude Code session opened in a VS Code terminal
    is not a tmux session and is invisible until Adopt (TD-010) exists.
 
@@ -51,10 +52,10 @@ swap of the light one, which is how the real dark mode should work too.
 
 ## Layout
 
-One repo, one distribution (`agentorc`, with an `[ui]` extra for the host that serves the web
+One repo, one distribution (`shiftlead`, with an `[ui]` extra for the host that serves the web
 UI), two import packages: `sessionorc` (tmux, hosts, ssh, the pty terminal bridge, run logs, the
-shell adapter) and `agentorc` (hook adapters, profiles, policies, Ready to close, the board) on
-top of it. `sessionorc` never imports `agentorc`; it becomes its own repo only when a second
+shell adapter) and `shiftlead` (hook adapters, profiles, policies, Ready to close, the board) on
+top of it. `sessionorc` never imports `shiftlead`; it becomes its own repo only when a second
 consumer appears (docs/design.md §10).
 
 ## Requirements
@@ -66,23 +67,23 @@ tmux server survive logout and reboot.
 ## Run it (phase 1, one host)
 
 ```bash
-pdm install -G ui                      # or: pipx install 'agentorc[ui]' once published
-pdm run agentorc-agent serve           # the host agent: tmux, sessions, hooks, run logs
+pdm install -G ui                      # or: pipx install 'shiftlead[ui]' once published
+pdm run shiftlead-agent serve           # the host agent: tmux, sessions, hooks, run logs
 pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (localhost by default; see below)
 pdm run ao new td-302 -d ~/samscrape   # or the New session form; `ao shell` for a plain shell
 pdm run ao service install             # instead of the two `serve`/`ui` terminals: systemd user units
                                        # (survive logout and reboot with linger; `ao service status`)
 ```
 
-To work on agentorc *with* agentorc, keep the running copy separate from the checkout: install
+To work on ShiftLead *with* ShiftLead, keep the running copy separate from the checkout: install
 a stable, non-editable copy and point the units at it, then promote a merge deliberately.
 
 ```bash
-python3 -m virtualenv ~/.local/share/agentorc-venv          # (pipx works the same way, if you have it)
-~/.local/share/agentorc-venv/bin/pip install '/path/to/agentorc[ui]'
-~/.local/share/agentorc-venv/bin/ao service install          # units now run the stable copy; restarts them
+python3 -m virtualenv ~/.local/share/shiftlead-venv          # (pipx works the same way, if you have it)
+~/.local/share/shiftlead-venv/bin/pip install '/path/to/agentorc[ui]'
+~/.local/share/shiftlead-venv/bin/ao service install          # units now run the stable copy; restarts them
 # after a merge you want live:
-~/.local/share/agentorc-venv/bin/pip install --upgrade '/path/to/agentorc[ui]' && ~/.local/share/agentorc-venv/bin/ao service install
+~/.local/share/shiftlead-venv/bin/pip install --upgrade '/path/to/agentorc[ui]' && ~/.local/share/shiftlead-venv/bin/ao service install
 ```
 
 Reaching the UI from elsewhere: never a bare public port (design §4.5). Use a private network
@@ -96,9 +97,9 @@ up served by VS Code's forwarder instead of your `ssh -L`, and the terminal webs
 arrive (pages still load, which makes it hard to spot; found 2026-09-06). Start both from a plain
 ssh session, or set `remote.autoForwardPorts` to false for that remote.
 
-State lives under `~/.agentorc/` (`AGENTORC_HOME` overrides it — every session the agent creates
-carries it, so hooks inside find the right agent). Profiles: `~/.agentorc/profiles.yml`
-(design §4.2a). Host identity: `~/.agentorc/hosts.yml`, e.g. `local: {name: kmaster, vscode_host: kmaster}` —
+State lives under `~/.shiftlead/` (`SHIFTLEAD_HOME` overrides it — every session the agent creates
+carries it, so hooks inside find the right agent). Profiles: `~/.shiftlead/profiles.yml`
+(design §4.2a). Host identity: `~/.shiftlead/hosts.yml`, e.g. `local: {name: kmaster, vscode_host: kmaster}` —
 `vscode_host` is the ssh alias VS Code links use and must be in your own `~/.ssh/config`; add
 `local: true` when the UI runs on the machine you sit at (`vscode://file/…` links). Without the
 file the machine's hostname is used, which is rarely what VS Code can resolve. The same entry
@@ -113,22 +114,22 @@ forwarded over it yet, so a node still serves only its own host's sessions):
 
 ```bash
 # on the node (say `laptop`): a key used for nothing else
-ssh-keygen -t ed25519 -N '' -f ~/.ssh/agentorc-link
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/shiftlead-link
 # on the home (kmaster), one line in ~/.ssh/authorized_keys — the name after --host is the node's
 # name as far as the home is concerned, and it is set HERE, never by the node:
-command="agentorc-agent link --host laptop",restrict ssh-ed25519 AAAA… laptop-link
-# on the home, ~/.agentorc/hosts.yml:      nodes: [laptop]
-# on the node, ~/.agentorc/hosts.yml:      home: kmaster
+command="shiftlead-agent link --host laptop",restrict ssh-ed25519 AAAA… laptop-link
+# on the home, ~/.shiftlead/hosts.yml:      nodes: [laptop]
+# on the node, ~/.shiftlead/hosts.yml:      home: kmaster
 #                                          local: {name: laptop}
 #                                          link: {ssh: kmaster-link}   # an alias in ~/.ssh/config using that key
 ```
 
-`ao`'s `host` RPC (`agentorc-agent rpc` → `{"method": "host"}`) shows the link's state at both ends,
+`ao`'s `host` RPC (`shiftlead-agent rpc` → `{"method": "host"}`) shows the link's state at both ends,
 with the reason when it is down: *ssh failed*, *agent down on the home*, or *refused: …*.
 
 ## CLI
 
-The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `ao tail`,
+The package installs `shiftlead` and an `ao` alias. Reading: `ao status [-v]`, `ao tail`,
 `ao explain`. Acting on a session: `ao new`, `ao shell`, `ao send`, `ao keys`, `ao allow` /
 `ao deny`, `ao mode`, `ao kill`, `ao close`, `ao forget`. Capabilities and reports (design §4.8):
 `ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`, `ao doing "<one line>"` (what
@@ -158,7 +159,7 @@ ao team --skill
 ```
 
 It prints the recipe — the node (if the team runs on one), the project and the team definition in
-`~/.agentorc/org.yml` or a repo's own `.agentorc.yml`, the roles and their briefs, and
+`~/.shiftlead/org.yml` or a repo's own `.shiftlead.yml`, the roles and their briefs, and
 `ao team list / start / status / stop` — each step a command and what it does. It needs no host
 agent and no checkout of this repo, so it works inside a container node too. That is the source;
 this section is the pointer (TD-067). `ao --skill` is the other document and answers the other

@@ -1,6 +1,6 @@
 # Glossary
 
-The words agentorc uses, one meaning each. [`design.md`](design.md) is the source of truth for
+The words shiftlead uses, one meaning each. [`design.md`](design.md) is the source of truth for
 **behaviour**; this file is the source of truth for **words**. When the two disagree on a word,
 this file wins and the design is corrected to match.
 
@@ -25,7 +25,7 @@ not mix:
   because the person sees those tools' own words in the same terminal.
 - **No third genre.** No music, nautical, animal, household or driving words, with one named
   exception: **doorbell**, kept as the proper name of one fixed line. *orc* survives only in
-  product, package and command names (`agentorc`, `sessionorc`, `cmdorc`, `ao`), never for a
+  product, package and command names (`shiftlead`, `sessionorc`, `cmdorc`, `ao`), never for a
   session or a position.
 - **Record fields, state names and `ao` verbs do not change** for a word's sake; the one
   exception is the `orchestrate` grant, renamed `control` (TD-055; no alias since TD-107).
@@ -39,7 +39,7 @@ not mix:
   *proposed* (already the design's word).
 - **agent** — an AI coding session: an interactive session running a tool such as Claude Code.
   Bare *agent* never means the daemon. *Not:* bot, instance. — **decided** 2026-09-16 (Paul).
-- **session** — the record agentorc keeps for one tmux session: an agent, a shell or a command
+- **session** — the record shiftlead keeps for one tmux session: an agent, a shell or a command
   run. Every agent is a session; not every session is an agent. The record's field names keep
   *session*. — *proposed* (design §4.1, ADR 2026-09-13).
 - **worker** — an agent on a team that coordinates nobody: its record names a manager in its
@@ -69,7 +69,7 @@ not mix:
   means the manager.
 - **ShiftLead** — the project's name (shiftlead.dev): the thing that runs a shift of agents and
   tells the person what needs them. Spelled as one word with two capitals in prose; the command
-  is `ao`, and `agentorc` remains the name of the packages, the state directory, the units and
+  is `ao`, and `shiftlead` remains the name of the packages, the state directory, the units and
   the config file until TD-060's machine-side step. — **decided** 2026-09-21 (Paul).
 - **designer** — a team's design member: an `unattended` session whose lane is the ledger's `design-first` entries, and any entry blocked by `decision (designer)` (TD-367). It writes the design and the entries the grinders pick, merges nothing on a held path, and shows the person only what needs them — an obvious design is merged and noted, a defensible default is a bounded `steer`, taste is an `ask` with answers (design §4.8 *Role names*, TD-120; decided 2026-09-24, an interactive seat from 2026-09-23 until then).
 - **director** — the session that coordinates managers: its members are managers, not workers.
@@ -85,9 +85,9 @@ not mix:
 
 ## How work is organised
 
-- **org** — everything one person runs through agentorc, across hosts; also the name of the home
+- **org** — everything one person runs through shiftlead, across hosts; also the name of the home
   page. One per install. *Not:* fleet, herd. — *proposed* (ADR 2026-09-13); retiring *fleet* in
-  prose and UI is **decided** 2026-09-16 (Paul) — code variable names keep it. Since TD-210 (2026-09-28, designed) the org is an **aggregate**: the teams each registered repo defines in its own `.agentorc.yml`, with the org file holding only what spans repos or belongs to one install (design §4.9 *The org is an aggregate*).
+  prose and UI is **decided** 2026-09-16 (Paul) — code variable names keep it. Since TD-210 (2026-09-28, designed) the org is an **aggregate**: the teams each registered repo defines in its own `.shiftlead.yml`, with the org file holding only what spans repos or belongs to one install (design §4.9 *The org is an aggregate*).
 - **team** — a manager (or the person) plus its workers, defined once and started many times.
   A team may contain teams. — *proposed* (ADR 2026-09-13).
 - **project** — a named set of one or more repos that belong together. — *proposed* (ADR
@@ -102,7 +102,7 @@ not mix:
   that tells them the path from that step's side; a team that lists a flow staffs every stage of it.
   A stage is not a phase (*design · grind · review*, derived from claims) and not a state. —
   *proposed* 2026-10-04 (design §4.9c).
-- **path set** — a named list of a repo's held paths (`.agentorc.yml` `held: {<name>: […]}`), which a review stage names as the paths it reads (design §4.9c *A review stage any seat may hold*, TD-314). — *proposed* 2026-10-04.
+- **path set** — a named list of a repo's held paths (`.shiftlead.yml` `held: {<name>: […]}`), which a review stage names as the paths it reads (design §4.9c *A review stage any seat may hold*, TD-314). — *proposed* 2026-10-04.
 - **verdict** — the word on a reader's answer to a held PR's `ask`: `pass`, `merged` or `findings`, a field of the reply and never read from its text (design §4.9c, TD-314). — *proposed* 2026-10-04.
 - **sits out** — what a member is while its team's current flow has no stage for its role but another
   of the team's flows does: not started, or wound down at a switch, its card saying so until a flow
@@ -115,10 +115,10 @@ not mix:
   merged change to a page, for the one thing its checks and the techlead could not settle. A
   `steer` with the default *Works* where the techlead leaned (under *Steering*; it lapses to
   *Works*), an `ask` with *Works* / *Not right* where nobody did (under *Needs you*). On a
-  board, a line of kind `look`, only where there is no agentorc mail. Not a `watch`, which is a
+  board, a line of kind `look`, only where there is no shiftlead mail. Not a `watch`, which is a
   check a session makes again before acting. — *decided* 2026-10-03, Paul (design §4.9b *A UI
   change is verified by its builder*, §4.10 *A look*, TD-290).
-- **scratch home** — a host agent and a UI run from a worktree on an `AGENTORC_HOME`, a tmux
+- **scratch home** — a host agent and a UI run from a worktree on an `SHIFTLEAD_HOME`, a tmux
   server and a port of their own, where a builder looks at its own UI change and a press is
   safe; never the live home. — *proposed* 2026-10-03 (TD-290; `scripts/look_home.py`, TD-291).
 - **seat** — a place in a team definition that one session fills at a time, named by what it
@@ -141,7 +141,7 @@ not mix:
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
-- **brief** — the job description a session is started with, written from its role's template. The template holds agentorc's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.
+- **brief** — the job description a session is started with, written from its role's template. The template holds shiftlead's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.
   Describes the job, not the run (TD-042). — *proposed*.
 - **start context** — text a session holds from its start that is not a prompt: no turn runs for it, nothing is typed, and the composer does not hold it (design §4.3 `start_context`, TD-283 part 2, built 2026-10-04). Carried by the adapter, kept on the record and the launch record, read on Focus under **Told at start**. *Not:* a brief, which is sent as the opening prompt of an unattended run; nor the person's words, which stay in the composer.
 - **lane** — the list of references a worker was handed, or `free-pick`. — *proposed*. A lane word matches a ledger entry by its header (design §6 rule 6); an `owner:<word>` in the lane narrows it to entries whose `Owner:` is that word or absent (TD-214). A `design-first` lane also takes an entry of any kind blocked by `decision (designer)`, the decision's holder standing as its owner (TD-367).
@@ -168,18 +168,18 @@ not mix:
 ## Machinery
 
 - **host** — a machine sessions run on. — *proposed*.
-- **host agent** — the per-host daemon (`agentorc-agent`, `sessionorc/agent.py`): the only
+- **host agent** — the per-host daemon (`shiftlead-agent`, `sessionorc/agent.py`): the only
   process that creates, kills or types into `ao-*` tmux sessions (invariant 1). Always written in
   full; never shortened to *agent*. Command and module names are unchanged. — **decided**
   2026-09-16 (Paul).
-- **UI host** — the machine running `agentorc[ui]`. — *proposed*.
+- **UI host** — the machine running `shiftlead[ui]`. — *proposed*.
 - **home** (host agent) — the one host agent that holds the org's session graph and mail; kmaster
   on Paul's machines. *Not:* hub, master, server. — **decided** 2026-09-16 (Paul, design §4.4a).
   (The *home* of an agent — its checkout — is a different, older sense; say *home host agent* when
   the context could mean either.)
 - **node** — any other host agent: keeps its host's tmux, pty and hooks, and dials the home. —
   **decided** 2026-09-16 (Paul, design §4.4a).
-- **link** — a node's one long-lived connection to the home (`agentorc-agent link`, over ssh). —
+- **link** — a node's one long-lived connection to the home (`shiftlead-agent link`, over ssh). —
   **decided** 2026-09-16 (Paul, design §4.4a).
 - **address** — `<id>@<host>`, a session's org-wide name; a bare id means the record's own host. —
   **decided** 2026-09-16 (Paul, design §4.4a).
@@ -284,7 +284,7 @@ not mix:
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
 - **run window** — the hours unattended sessions may work (design §6). — *proposed*.
 - **setting** — a value the person turns without redefining anything: a reserve, a team's stop time or priority, a schedule, the promote's `auto`, the person's own editor and terminal. Every setting lives in the home's `settings.yml` (design §5), written only through `set_settings`, and the Settings page (§4.5 screen 8) is where it is turned. *Not:* definition, option, config. — *proposed* 2026-09-25 (Paul's line).
-- **definition** — what a team, a repo, a host or a profile *is*: `org.yml`, `.agentorc.yml`, `hosts.yml`, `profiles.yml`, edited by hand or by PR and shown read-only on the Settings page with where each comes from. *Not:* setting. — *proposed* 2026-09-25.
+- **definition** — what a team, a repo, a host or a profile *is*: `org.yml`, `.shiftlead.yml`, `hosts.yml`, `profiles.yml`, edited by hand or by PR and shown read-only on the Settings page with where each comes from. *Not:* setting. — *proposed* 2026-09-25.
 - **start time** — the instant a `scheduled` record becomes a session (design §6 *Start time*, TD-026): set at `ao new --at` or on the New session form, moved by `ao at`; the stop time's twin. *Not:* schedule (a team's standing rule), start_at (the field). — *proposed* 2026-09-25.
 - **schedule** — a person's standing press to start a team, kept in `settings.yml` under `teams.<team>.schedule` (design §6 *Schedule*, TD-026): today one shape, *at the reset* of a profile's window, carried out as a replay of the team's last start. *Not:* cron, timer, run window (the hours a schedule keeps a team inside). — *proposed* 2026-09-24.
 - **promote** — make a repo's `main` the live copy: for this repo, install the checkout into the live venv and restart the units (CLAUDE.md); for any repo, its `promote.run` (design §5 `promote:`, §6 *Promote*, TD-120). A person's press (`ao promote`, the Inbox row) or the home's policy under `auto: true`; never a session's. *Not:* deploy (a repo's own word for its `run`), release, upgrade. — *proposed* 2026-09-24.
@@ -306,13 +306,13 @@ not mix:
 
 ## Collisions with the tools' own words
 
-- **agent / subagent** — a *subagent* is always Claude Code's, inside one agentorc session; an
-  agentorc session is never called a subagent. The daemon is always *host agent*.
+- **agent / subagent** — a *subagent* is always Claude Code's, inside one shiftlead session; an
+  shiftlead session is never called a subagent. The daemon is always *host agent*.
 - **team / teammate** — Claude Code has its own agent teams and *teammates*. Write "Claude Code
-  team" if that feature is meant; never call an agentorc member a *teammate*.
-- **session** — bare *session* is the agentorc record. Say *tmux session* and *the tool's session
+  team" if that feature is meant; never call an shiftlead member a *teammate*.
+- **session** — bare *session* is the shiftlead record. Say *tmux session* and *the tool's session
   id* in full when those are meant.
-- **window** — tmux's word. agentorc's *run window* is a time range and is always the compound;
+- **window** — tmux's word. shiftlead's *run window* is a time range and is always the compound;
   never say *window* bare for one.
 - **turn, hook, worktree, branch** — deliberately aligned with Claude Code and git.
 

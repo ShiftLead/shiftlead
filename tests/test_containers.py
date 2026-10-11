@@ -47,9 +47,9 @@ CONTRACTMATCH = """{
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    h = tmp_path / "agentorc-home"
+    h = tmp_path / "shiftlead-home"
     h.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(h))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(h))
     checkout = tmp_path / "contractmatch"
     (checkout / ".devcontainer").mkdir(parents=True)
     (checkout / ".devcontainer" / "devcontainer.json").write_text(CONTRACTMATCH)
@@ -67,7 +67,7 @@ def home(tmp_path, monkeypatch):
         "  grind: {adapter: claude-code, account: paul, model: opus, config_dir: ~/.claude-grind}\n"
     )
     (h / "wheels").mkdir()
-    (h / "wheels" / "agentorc-0.0.1-py3-none-any.whl").write_bytes(b"wheel")
+    (h / "wheels" / "shiftlead-0.0.1-py3-none-any.whl").write_bytes(b"wheel")
     return h
 
 
@@ -81,14 +81,14 @@ def test_the_base_is_the_repos_image_and_nothing_of_the_persons(home, tmp_path):
     # the image, with its build paths re-anchored — the generated file no longer sits beside them
     assert base["build"]["dockerfile"] == str(checkout / ".devcontainer" / "Dockerfile")
     assert base["build"]["context"] == str(checkout) and base["build"]["target"] == "development"
-    assert base["name"] == "agentorc node contractmatch (base)"
+    assert base["name"] == "shiftlead node contractmatch (base)"
     # nothing else: not the mounts (credentials), not the customizations, not the env, not the ports
     assert set(base) == {"build", "name"}
     assert containers.read_definition(n.base_config) == base
-    assert n.base_image == "agentorc-node-contractmatch-base"
+    assert n.base_image == "shiftlead-node-contractmatch-base"
 
 
-def test_the_node_is_the_repos_with_the_persons_parts_out_and_agentorcs_in(home, tmp_path):
+def test_the_node_is_the_repos_with_the_persons_parts_out_and_shiftleads_in(home, tmp_path):
     n = containers.node("contractmatch")
     out = containers.write_node(n, "developer")
     checkout = tmp_path / "contractmatch"
@@ -104,17 +104,17 @@ def test_the_node_is_the_repos_with_the_persons_parts_out_and_agentorcs_in(home,
     # each dropped mount stood in by an empty tmpfs at its target, so postCreate's mkdir under it lives
     assert "type=tmpfs,target=/mounted/dev" in out["mounts"]
     assert "type=tmpfs,target=/mounted/stuff_for_containers_home" in out["mounts"]
-    # agentorc's two mounts, the checkout at the same path both sides, init, the name
-    assert f"source={n.node_dir},target=/agentorc,type=bind" in out["mounts"]
-    assert f"source={n.link_dir},target=/agentorc/link,type=bind" in out["mounts"]
+    # shiftlead's two mounts, the checkout at the same path both sides, init, the name
+    assert f"source={n.node_dir},target=/shiftlead,type=bind" in out["mounts"]
+    assert f"source={n.link_dir},target=/shiftlead/link,type=bind" in out["mounts"]
     assert out["workspaceMount"] == f"source={checkout},target={checkout},type=bind"
     assert out["workspaceFolder"] == str(checkout)
-    assert out["init"] is True and out["name"] == "agentorc node contractmatch"
+    assert out["init"] is True and out["name"] == "shiftlead node contractmatch"
     # the Dockerfile: one stage on the base, tmux as root, the image's own user restored
     df = (n.config_dir / "Dockerfile").read_text()
-    assert df.splitlines()[1] == "FROM agentorc-node-contractmatch-base"
+    assert df.splitlines()[1] == "FROM shiftlead-node-contractmatch-base"
     assert "USER root" in df and df.rstrip().endswith("USER developer")
-    assert "COPY install-tmux.sh" in df and "RUN sh /tmp/agentorc-install-tmux.sh" in df
+    assert "COPY install-tmux.sh" in df and "RUN sh /tmp/shiftlead-install-tmux.sh" in df
     install = n.config_dir / "install-tmux.sh"
     text = install.read_text()
     assert install.stat().st_mode & 0o111 and "apt-get" in text and "apk" in text and "dnf" in text
@@ -133,7 +133,7 @@ def test_the_repos_features_and_image_go_to_the_base_and_a_string_mount_is_under
     assert base == {
         "image": "python:3.12",
         "features": {"ghcr.io/devcontainers/features/node:1": {}},
-        "name": "agentorc node n (base)",
+        "name": "shiftlead node n (base)",
     }
     out = containers.generate_node(
         repo,
@@ -195,11 +195,11 @@ class Fake(Runner):
             "tmux": "/usr/bin/tmux\n",
             "pid": "",
             "up": json.dumps({"outcome": "success", "containerId": "abc123def456", "remoteUser": "developer"}) + "\n",
-            "build": json.dumps({"outcome": "success", "imageName": ["agentorc-node-contractmatch-base"]}) + "\n",
+            "build": json.dumps({"outcome": "success", "imageName": ["shiftlead-node-contractmatch-base"]}) + "\n",
             "user": "developer\n",
             "ps": "abc123def456\n",
             "inspect": "running\n",
-            "name": "/agentorc-node-cm\n",
+            "name": "/shiftlead-node-cm\n",
             **answers,
         }
         self.cli = "/fake/devcontainer"
@@ -250,7 +250,7 @@ def test_host_up_brings_it_up_provisions_it_and_starts_the_agent(home, tmp_path)
         "node": "contractmatch",
         "container": "abc123def456",
         "user": "developer",
-        "wheel": "agentorc-0.0.1-py3-none-any.whl",
+        "wheel": "shiftlead-0.0.1-py3-none-any.whl",
         "started": True,
         "restarted": False,
         "build": containers.home_build(),
@@ -261,36 +261,36 @@ def test_host_up_brings_it_up_provisions_it_and_starts_the_agent(home, tmp_path)
     build = r.calls[0]
     assert build[:2] == ["/fake/devcontainer", "build"] and "--no-cache" not in build
     assert build[build.index("--config") + 1] == str(n.base_config)
-    assert build[build.index("--image-name") + 1] == "agentorc-node-contractmatch-base"
-    assert ["docker", "inspect", "-f", "{{.Config.User}}", "agentorc-node-contractmatch-base"] in r.calls
+    assert build[build.index("--image-name") + 1] == "shiftlead-node-contractmatch-base"
+    assert ["docker", "inspect", "-f", "{{.Config.User}}", "shiftlead-node-contractmatch-base"] in r.calls
     assert (n.config_dir / "Dockerfile").read_text().rstrip().endswith("USER developer")
     up = r.calls[2]
     assert up[:2] == ["/fake/devcontainer", "up"] and "--remove-existing-container" not in up
     assert (
         up[up.index("--config") + 1] == str(n.config)
-        and up[up.index("--id-label") + 1] == "dev.agentorc.node=contractmatch"
+        and up[up.index("--id-label") + 1] == "dev.shiftlead.node=contractmatch"
     )
     assert up[up.index("--workspace-folder") + 1] == str(tmp_path / "contractmatch")
     assert n.link_dir.is_dir() and (n.node_dir / "home").is_dir()
     # the wheel copied onto the volume, the venv made, the wheel installed — as the remote user
-    assert (n.node_dir / "wheels" / "agentorc-0.0.1-py3-none-any.whl").read_bytes() == b"wheel"
-    venv = r.execs("python3 -m venv /agentorc/venv")
+    assert (n.node_dir / "wheels" / "shiftlead-0.0.1-py3-none-any.whl").read_bytes() == b"wheel"
+    venv = r.execs("python3 -m venv /shiftlead/venv")
     assert venv and venv[0][venv[0].index("-u") + 1] == "developer"
-    assert r.execs("/agentorc/venv/bin/pip install -q --upgrade /agentorc/wheels/agentorc-0.0.1-py3-none-any.whl")
-    # and agentorc itself replaced even at the same version: pip would otherwise keep the old code
-    assert r.execs("pip install -q --force-reinstall --no-deps /agentorc/wheels/agentorc-0.0.1-py3-none-any.whl")
+    assert r.execs("/shiftlead/venv/bin/pip install -q --upgrade /shiftlead/wheels/shiftlead-0.0.1-py3-none-any.whl")
+    # and shiftlead itself replaced even at the same version: pip would otherwise keep the old code
+    assert r.execs("pip install -q --force-reinstall --no-deps /shiftlead/wheels/shiftlead-0.0.1-py3-none-any.whl")
     # the node's own configuration: a node of this home, dialing the mounted socket, the profiles rewritten
     hosts_yml = (n.node_dir / "home" / "hosts.yml").read_text()
     assert "home: kmaster" in hosts_yml and "name: contractmatch" in hosts_yml
-    assert "socket: /agentorc/link/link.sock" in hosts_yml
+    assert "socket: /shiftlead/link/link.sock" in hosts_yml
     profiles = (n.node_dir / "home" / "profiles.yml").read_text()
-    assert "config_dir: /agentorc/profiles/grind" in profiles and "config_dir: /agentorc/profiles/default" in profiles
+    assert "config_dir: /shiftlead/profiles/grind" in profiles and "config_dir: /shiftlead/profiles/default" in profiles
     assert "~/.claude-grind" not in profiles and "default: default" in profiles
     assert (n.node_dir / "profiles").is_dir()
-    # the agent started detached, with a pidfile and its log under the node's home, AGENTORC_HOME set
-    start = r.execs("agentorc-agent serve")
-    assert len(start) == 1 and "-d" in start[0] and "AGENTORC_HOME=/agentorc/home" in start[0]
-    assert "echo $$ > /agentorc/home/agent.pid" in start[0][-1] and ">> /agentorc/home/agent.log" in start[0][-1]
+    # the agent started detached, with a pidfile and its log under the node's home, SHIFTLEAD_HOME set
+    start = r.execs("shiftlead-agent serve")
+    assert len(start) == 1 and "-d" in start[0] and "SHIFTLEAD_HOME=/shiftlead/home" in start[0]
+    assert "echo $$ > /shiftlead/home/agent.pid" in start[0][-1] and ">> /shiftlead/home/agent.log" in start[0][-1]
     assert "--env-file" not in start[0]  # no env file written: nothing to read in
 
 
@@ -304,8 +304,8 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     r = Fake(pid="4242\n")
     out = containers.host_up("contractmatch", r)
     assert out["started"] is False and out["restarted"] is False and out["pid"] == 4242 and out["build"] == ours
-    assert "grep -q agentorc-agent /proc/$p/cmdline" in r.execs("agent.pid")[0][-1]  # alive *and* the agent
-    assert not r.execs("agentorc-agent serve")  # a live pid behind the pidfile, on this build: not started twice
+    assert "grep -q shiftlead-agent /proc/$p/cmdline" in r.execs("agent.pid")[0][-1]  # alive *and* the agent
+    assert not r.execs("shiftlead-agent serve")  # a live pid behind the pidfile, on this build: not started twice
     assert r.execs("command -v gh")[0][r.execs("command -v gh")[0].index("--env-file") + 1] == str(n.env_file)
     (n.node_dir / "home").mkdir(parents=True, exist_ok=True)
     (n.node_dir / "home" / "agent.pid").write_text("4242\n")
@@ -315,7 +315,7 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     assert "--no-cache" in r2.calls[0]
     up = r2.calls[2]
     assert "--remove-existing-container" in up and "--build-no-cache" in up
-    start = r2.execs("agentorc-agent serve")
+    start = r2.execs("shiftlead-agent serve")
     assert start and "--env-file" in start[0]
 
 
@@ -347,7 +347,7 @@ def test_no_wheel_and_no_cli_are_refused_before_anything_runs(home, monkeypatch)
     r = Fake()
     with pytest.raises(ContainerError, match="no wheel under .*promote first"):
         containers.host_up("contractmatch", r)
-    assert not r.execs("agentorc-agent serve")
+    assert not r.execs("shiftlead-agent serve")
     plain = Runner(log=lambda line: None)
     monkeypatch.setattr("shutil.which", lambda *a, **k: None)
     with pytest.raises(ContainerError, match="devcontainer CLI is not on the home"):
@@ -362,13 +362,13 @@ def test_status_and_reach_are_derived_from_the_entry(home):
     assert out["container"] == "abc123def456" and out["state"] == "running" and out["pid"] == 7
     assert out["reach"]["terminal"] == "docker exec -u developer -it abc123def456 tmux attach"
     assert out["reach"]["container"] == "abc123def456" and out["reach"]["user"] == "developer"
-    assert out["reach"]["name"] == "agentorc-node-cm"
+    assert out["reach"]["name"] == "shiftlead-node-cm"
     # VS Code attaches to *this* container by docker's name — the `dev-container+` form would open
     # the person's own container from the repo's definition (3c.5)
     link = out["reach"]["vscode"].removeprefix("vscode://vscode-remote/attached-container+")
     head, _, path = link.removesuffix("?windowId=_blank").partition("/")
     assert (
-        json.loads(bytes.fromhex(head)) == {"containerName": "/agentorc-node-cm"} and "/" + path == out["devcontainer"]
+        json.loads(bytes.fromhex(head)) == {"containerName": "/shiftlead-node-cm"} and "/" + path == out["devcontainer"]
     )
     gone = containers.host_status("contractmatch", Fake(ps=""))
     assert gone["container"] is None and gone["state"] is None and "reach" not in gone
@@ -459,24 +459,24 @@ def test_the_promote_writes_the_wheel_of_what_it_installed_and_keeps_the_newest(
 
     def fake_pip(cmd):
         calls.append(cmd)
-        Path(cmd[cmd.index("-w") + 1], "agentorc-9.9.9-py3-none-any.whl").write_bytes(b"new")
+        Path(cmd[cmd.index("-w") + 1], "shiftlead-9.9.9-py3-none-any.whl").write_bytes(b"new")
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     for i in range(3):
-        p = wheels / f"agentorc-0.0.{i}-py3-none-any.whl"
+        p = wheels / f"shiftlead-0.0.{i}-py3-none-any.whl"
         p.write_bytes(b"old")
         os.utime(p, (1_000_000 + i, 1_000_000 + i))
     built = containers.write_wheel(fake_pip, keep=2)
-    assert built is not None and built.name == "agentorc-9.9.9-py3-none-any.whl"
+    assert built is not None and built.name == "shiftlead-9.9.9-py3-none-any.whl"
     assert calls[0][:5] == [calls[0][0], "-m", "pip", "wheel", "--no-deps"] and calls[0][-1].startswith("/")
     assert sorted(p.name for p in wheels.iterdir()) == [
-        "agentorc-0.0.2-py3-none-any.whl",
-        "agentorc-9.9.9-py3-none-any.whl",
+        "shiftlead-0.0.2-py3-none-any.whl",
+        "shiftlead-9.9.9-py3-none-any.whl",
     ]
-    assert containers.newest_wheel().name == "agentorc-9.9.9-py3-none-any.whl"
+    assert containers.newest_wheel().name == "shiftlead-9.9.9-py3-none-any.whl"
     failing = lambda cmd: subprocess.CompletedProcess(cmd, 1, "", "no network")  # noqa: E731
     assert containers.write_wheel(failing) is None  # never fatal to the promote: None and a line
-    assert containers.newest_wheel().name == "agentorc-9.9.9-py3-none-any.whl"  # the last one stands
+    assert containers.newest_wheel().name == "shiftlead-9.9.9-py3-none-any.whl"  # the last one stands
 
 
 # -- the supervisor (design §4.4a "The home supervises it", step 3c.3) ---------------------------------
@@ -531,10 +531,10 @@ def test_observe_and_act_through_the_seam(home):
     assert containers.observe(n, Fake(pid="9\n")) == ("running", True, "developer")
     r = Fake(pid="")
     containers.act(n, r, "start", "developer")
-    assert len(r.execs("agentorc-agent serve")) == 1 and not [c for c in r.calls if c[0] == r.cli]
+    assert len(r.execs("shiftlead-agent serve")) == 1 and not [c for c in r.calls if c[0] == r.cli]
     r = Fake(pid="9\n")
     containers.act(n, r, "provision", "developer")
-    assert r.execs("pip install") and r.execs("kill $p") and r.execs("agentorc-agent serve")
+    assert r.execs("pip install") and r.execs("kill $p") and r.execs("shiftlead-agent serve")
     r = Fake(ps="")
     with pytest.raises(ContainerError, match="went away"):
         containers.act(n, r, "start", "developer")
@@ -549,7 +549,7 @@ def test_observe_and_act_through_the_seam(home):
 @pytest.fixture
 def container_home(tmp_path, monkeypatch):
     """A home whose hosts.yml names a container node `cm`; set up before the `agent` fixture reads
-    the same AGENTORC_HOME."""
+    the same SHIFTLEAD_HOME."""
     h = tmp_path / "home"
     h.mkdir()
     checkout = tmp_path / "cm"
@@ -559,7 +559,7 @@ def container_home(tmp_path, monkeypatch):
         f"local:\n  name: kmaster\nnodes:\n  cm:\n    container: {{devcontainer: {checkout}}}\n"
     )
     (h / "wheels").mkdir()
-    (h / "wheels" / "agentorc-0.0.1-py3-none-any.whl").write_bytes(b"wheel")
+    (h / "wheels" / "shiftlead-0.0.1-py3-none-any.whl").write_bytes(b"wheel")
     monkeypatch.setattr(containers, "SUPERVISE_FIRST", 0.05)
     monkeypatch.setattr(containers, "SUPERVISE_MAX", 0.2)
     monkeypatch.setattr(containers, "SUPERVISE_GRACE", 0.15)
@@ -587,7 +587,7 @@ async def test_the_home_brings_a_gone_container_back_and_says_so_on_the_card(con
     sup = agent.supervision["cm"]
     assert sup["doing"] == "container gone — bringing it up: done, waiting for it to dial in" and sup["attempts"] == 0
     assert [c for c in fakes[0].calls if c[0] == fakes[0].cli][1][1] == "up"  # the whole idempotent host_up
-    assert fakes[0].execs("agentorc-agent serve")
+    assert fakes[0].execs("shiftlead-agent serve")
     v = agent._view(agent.remote["cm"]["ao-cm-w"])
     assert v["state"] == "unreachable" and v["host_link"]["supervisor"]["doing"] == sup["doing"]
     # the link comes up: the supervisor stands down and the overlay is plain again
@@ -750,7 +750,7 @@ def test_the_nodes_identity_mode_is_said_at_the_home_and_a_change_restarts_the_a
     r = Fake(pid="4242\n")
     out = containers.host_up("contractmatch", r)
     assert yaml.safe_load(node_hosts.read_text())["local"]["identity"] == "enforce"
-    assert out["restarted"] is True and r.execs("kill $p") and len(r.execs("agentorc-agent serve")) == 1
+    assert out["restarted"] is True and r.execs("kill $p") and len(r.execs("shiftlead-agent serve")) == 1
     r = Fake(pid="4242\n")
     assert containers.host_up("contractmatch", r)["restarted"] is False and not r.execs("kill $p")  # said once
 
@@ -761,12 +761,12 @@ def test_the_nodes_identity_mode_is_said_at_the_home_and_a_change_restarts_the_a
 
 
 def test_a_build_is_the_wheels_content_and_an_agent_on_an_older_one_is_restarted(home):
-    """Every promote writes `agentorc-0.0.1-…whl` again, so a build is named by content. `host_up`
+    """Every promote writes `shiftlead-0.0.1-…whl` again, so a build is named by content. `host_up`
     on a node whose agent is alive used to install the new wheel and leave the old process
     running the code it had loaded; the agent is now started with its build in its environment
     and beside its pidfile, and one that is behind is restarted."""
     n = containers.node("contractmatch")
-    wheel = paths.home() / "wheels" / "agentorc-0.0.1-py3-none-any.whl"
+    wheel = paths.home() / "wheels" / "shiftlead-0.0.1-py3-none-any.whl"
     ours = containers.home_build()
     assert ours == containers.build_id(wheel) and len(ours) == 12
     (n.node_dir / "wheels").mkdir(parents=True)
@@ -774,12 +774,12 @@ def test_a_build_is_the_wheels_content_and_an_agent_on_an_older_one_is_restarted
     r = Fake(pid="4242\n")  # alive, and started before builds were recorded
     out = containers.host_up("contractmatch", r)
     assert out["restarted"] is True and containers.node_build(n) == ours
-    assert r.execs("kill $p") and len(r.execs("agentorc-agent serve")) == 1
+    assert r.execs("kill $p") and len(r.execs("shiftlead-agent serve")) == 1
     stop = r.execs("kill $p")[0][-1]  # waits for the old agent to go, then takes it down hard: never two
     assert "kill -0 $p" in stop and "kill -9 $p" in stop
-    assert r.calls.index(r.execs("kill $p")[0]) < r.calls.index(r.execs("agentorc-agent serve")[0])
-    start = r.execs("agentorc-agent serve")[0]
-    assert f"AGENTORC_BUILD={ours}" in start and f"echo {ours} > /agentorc/home/agent.build" in start[-1]
+    assert r.calls.index(r.execs("kill $p")[0]) < r.calls.index(r.execs("shiftlead-agent serve")[0])
+    start = r.execs("shiftlead-agent serve")[0]
+    assert f"SHIFTLEAD_BUILD={ours}" in start and f"echo {ours} > /shiftlead/home/agent.build" in start[-1]
     # and the supervisor's decision: linked and behind is `provision`, as a protocol refusal is
     assert containers.decide("running", True, "linked", stale=True)[0] == "provision"
     assert containers.decide("running", True, "linked", stale=False) == ("wait", containers.WAITING)
@@ -817,7 +817,7 @@ async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_lev
     # a link that outlives a new wheel at the home: asked again on the tick, with no new hello
     agent.links["cm"] = {"up": True, "since": "now", "why": "linked", "build": ours}
     assert await wait_for(lambda: "cm" not in agent.supervision, timeout=5.0, step=0.05)  # level: stood down
-    wheel = paths.home() / "wheels" / "agentorc-0.0.1-py3-none-any.whl"
+    wheel = paths.home() / "wheels" / "shiftlead-0.0.1-py3-none-any.whl"
     wheel.write_bytes(b"a newer promote")
     assert await wait_for(lambda: "stale" in agent.links["cm"], timeout=5.0, step=0.05)
     assert containers.home_build() in agent.links["cm"]["stale"] and containers.home_build() != ours

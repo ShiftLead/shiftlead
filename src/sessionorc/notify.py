@@ -32,7 +32,7 @@ BURST = 6  # NOTIFY_BURST: messages in BURST_WINDOW; the next reads MORE, and th
 BURST_WINDOW = timedelta(minutes=10)
 WATCHED = timedelta(minutes=2)  # NOTIFY_WATCHED: a hold ending this soon after a visible page's read is not told
 CHILD_SECONDS = 30.0  # the child's whole life, doppler's start included
-PREFIX = "agentorc"
+PREFIX = "shiftlead"
 MORE = f"{PREFIX} · and more need you — open the Inbox"
 STATE_KINDS = ("permission", "question", "needs")  # the state rows told (§4.10 *What is told*)
 API = "https://api.telegram.org/bot{token}/sendMessage"
@@ -44,28 +44,28 @@ def _who(name: str, team: str) -> str:
 
 
 def state_line(name: str, team: str, kind: str) -> str:
-    """A session in `needs-you`: *agentorc · grinder-ao-1 (ao-grind) needs you: permission*."""
+    """A session in `needs-you`: *shiftlead · grinder-ao-1 (ao-grind) needs you: permission*."""
     what = "needs you" if kind == "needs" else f"needs you: {kind}"
     return f"{PREFIX} · {_who(name, team)} {what}"
 
 
 def ask_line(name: str, team: str, ref: str) -> str:
-    """An open `ask` in the person inbox: *agentorc · grinder-ao-1 (ao-grind) asks you a question · TD-229*."""
+    """An open `ask` in the person inbox: *shiftlead · grinder-ao-1 (ao-grind) asks you a question · TD-229*."""
     return f"{PREFIX} · {_who(name, team)} asks you a question" + (f" · {ref}" if ref else "")
 
 
 def blocked_line(name: str, team: str, ref: str) -> str:
-    """An outcome reported `blocked`: *agentorc · grinder-ao-1 (ao-grind) reports blocked · TD-142*."""
+    """An outcome reported `blocked`: *shiftlead · grinder-ao-1 (ao-grind) reports blocked · TD-142*."""
     return f"{PREFIX} · {_who(name, team)} reports blocked" + (f" · {ref}" if ref else "")
 
 
 def restart_line(name: str, team: str) -> str:
-    """A record the tick could not restart: *agentorc · ao-grind: grinder-ao-2 was not restarted*."""
+    """A record the tick could not restart: *shiftlead · ao-grind: grinder-ao-2 was not restarted*."""
     return f"{PREFIX} · {team + ': ' if team else ''}{name} was not restarted"
 
 
 def work_line(team: str, n: int, finished: list[str] | None = None) -> str:
-    """A wound-down team whose lanes gained work: *agentorc · cm-grind wound down and has work: 3 entries*;
+    """A wound-down team whose lanes gained work: *shiftlead · cm-grind wound down and has work: 3 entries*;
     for a team that runs on, its finished members (§6 rule 8, TD-466): *… ao-grind's grinder-ao-1 finished
     and has work: 1 entry*."""
     who = f"'s {', '.join(finished)} finished" if finished else " wound down"
@@ -73,12 +73,12 @@ def work_line(team: str, n: int, finished: list[str] | None = None) -> str:
 
 
 def test_line(home: str) -> str:
-    """**Send a test**: *agentorc · a test from kmaster*."""
+    """**Send a test**: *shiftlead · a test from kmaster*."""
     return f"{PREFIX} · a test from {home}"
 
 
 def alarm_line(name: str, team: str) -> str:
-    """An identity alarm on a record (§4.8a): *agentorc · identity alarm on grinder-ao-1 (ao-grind)*."""
+    """An identity alarm on a record (§4.8a): *shiftlead · identity alarm on grinder-ao-1 (ao-grind)*."""
     return f"{PREFIX} · identity alarm on {_who(name, team)}"
 
 

@@ -68,9 +68,9 @@ def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
 
 def test_the_message_names_the_item_and_the_session_that_raised_it():
     assert board.message(ITEM, "snooze", "2026-10-01") == (
-        "agentorc: snooze Merged, live check pending: the doorbell. to 2026-10-01 (session grinder-ao-1)"
+        "shiftlead: snooze Merged, live check pending: the doorbell. to 2026-10-01 (session grinder-ao-1)"
     )
-    assert board.message("n/a — undated.", "done") == "agentorc: done n/a — undated. (session n/a)"
+    assert board.message("n/a — undated.", "done") == "shiftlead: done n/a — undated. (session n/a)"
 
 
 def test_write_back_lands_the_one_line_on_origin_and_leaves_the_checkout_alone(repo):
@@ -243,7 +243,7 @@ async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, 
         with pytest.raises(AgentError, match="no longer holds this item"):
             await me.call("board_edit", board=path, line=7, text="something else", action="done")
         got = await me.call("board_edit", board=path, line=7, text=ITEM, action="snooze", due="2026-10-01")
-    assert got["action"] == "snooze" and got["message"].startswith("agentorc: snooze Merged")
+    assert got["action"] == "snooze" and got["message"].startswith("shiftlead: snooze Merged")
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
 
 
@@ -260,7 +260,7 @@ def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it
     )
     text = origin_board(repo)
     assert text == BOARD_TEXT.replace(f"- [ ] {ITEM}", line.rstrip("\n") + f"\n- [ ] {ITEM}")
-    assert got["line"] == 7 and got["message"] == "agentorc: board Check the fetcher Friday (from m-abc)"
+    assert got["line"] == 7 and got["message"] == "shiftlead: board Check the fetcher Friday (from m-abc)"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
     assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout catches up by the pull
     # no sender, no about: `n/a` and `none`
@@ -389,7 +389,7 @@ def test_a_reply_is_appended_to_the_items_own_line_signed_and_committed(repo):
     today = __import__("datetime").date.today().isoformat()
     line = origin_board(repo).splitlines()[6]
     assert line == f"- [ ] {ITEM} — Paul, {today}: rebase it, then merge"
-    assert got["message"] == "agentorc: reply on Merged, live check pending: the doorbell. (session grinder-ao-1)"
+    assert got["message"] == "shiftlead: reply on Merged, live check pending: the doorbell. (session grinder-ao-1)"
     assert (
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
@@ -440,7 +440,7 @@ async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agen
     assert got["action"] == "reply" and got["sent"] == [] and got["note"] == "written on the board"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})" and got[
         "message"
-    ].startswith("agentorc: reply on")
+    ].startswith("shiftlead: reply on")
     assert origin_board(repo).splitlines()[6].endswith(": rebase it")
     async with LocalClient() as me:  # no holder: no mail, and the trail line is still owed (§4.5a)
         trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
@@ -524,7 +524,7 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         # the closed asker's own record keeps the handed note for the name's next create (TD-271)
         left = [e for e in (await me.call("inbox", id=got["asker"]))["entries"] if e["from"] == "person"]
         assert len(left) == 1 and left[0]["handed"] and left[0]["text"].startswith("the DIU one")
-        assert got["message"].startswith("agentorc: answer Which fetcher first?") and got["message"].endswith(
+        assert got["message"].startswith("shiftlead: answer Which fetcher first?") and got["message"].endswith(
             f"(from {q})"
         )
         line = origin_board(repo).splitlines()[got["line"] - 1]
@@ -667,7 +667,7 @@ def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
         "- [ ] n/a — undated. Decided: Yes (2026-10-01)."
     )
     assert board.message(ASKED, "decide", answer="Lift it") == (
-        "agentorc: decide Which window?: Lift it (session grinder-ao-1)"
+        "shiftlead: decide Which window?: Lift it (session grinder-ao-1)"
     )
     long = board.message(ASKED, "decide", answer="Not right: " + "the ring is amber " * 9)  # a sentence is clipped
     assert long.endswith("… (session grinder-ao-1)") and len(long) < 140
@@ -734,7 +734,7 @@ def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
     git(repo, "commit", "-qam", "asked")
     git(repo, "push", "-q", "origin", "main")
     got = board.write_back(repo, 9, ASKED, "decide", answer="Keep it")
-    assert got["message"] == "agentorc: decide Which window?: Keep it (session grinder-ao-1)"
+    assert got["message"] == "shiftlead: decide Which window?: Keep it (session grinder-ao-1)"
     assert (
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
@@ -773,7 +773,7 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
                 await me.call("board_edit", board=path, line=10, text=LOOK, action="decide", answer=bad, answers=pair)
         got = await me.call("board_edit", board=path, line=9, text=ASKED, action="decide", answer="Keep it",
                             answers=["Keep  it", "Lift it"])  # fmt: skip
-        assert got["answer"] == "Keep it" and got["message"].startswith("agentorc: decide Which window?: Keep it")
+        assert got["answer"] == "Keep it" and got["message"].startswith("shiftlead: decide Which window?: Keep it")
         got = await me.call("board_edit", board=path, line=10, text=LOOK, action="decide",
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip
         assert got["answer"] == "Not right: the ring is amber"

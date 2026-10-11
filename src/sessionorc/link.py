@@ -32,7 +32,7 @@ from typing import Any
 from sessionorc import paths
 from sessionorc.client import LINE_LIMIT
 
-log = logging.getLogger("agentorc.link")
+log = logging.getLogger("shiftlead.link")
 
 PROTOCOL = 1
 LINK_PING = 15.0  # seconds between a node's pings
@@ -202,7 +202,7 @@ class Mux:
 
 
 async def bridge(host: str) -> int:
-    """`agentorc-agent link --host <name>`: tell the home agent which host this connection is bound
+    """`shiftlead-agent link --host <name>`: tell the home agent which host this connection is bound
     to — the name comes from `authorized_keys`, never from the node — then copy lines both ways.
     Exit 1 with one error frame when the agent's socket cannot be reached, which is how the node
     tells *agent down* from *ssh failed*."""
@@ -418,7 +418,7 @@ async def _converse(
                 timeout=silence or LINK_SILENCE,
                 protocol=PROTOCOL,
                 host=host,
-                build=os.environ.get("AGENTORC_BUILD", ""),
+                build=os.environ.get("SHIFTLEAD_BUILD", ""),
             )
         except LinkError as e:
             return False, f"refused: {e}"

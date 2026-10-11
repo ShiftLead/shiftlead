@@ -1,6 +1,6 @@
 """The host agent's settings a person moves (design §5 `settings.yml`, §6 *Usage gate*, TD-100).
 
-`settings.yml` sits beside `hosts.yml` in the agentorc home of each session host. The host agent
+`settings.yml` sits beside `hosts.yml` in the shiftlead home of each session host. The host agent
 reads it on every tick and writes it only through its `set_settings` RPC — a person's own — so a
 change takes effect on the next tick with no restart; a hand edit is read the same way. Its first
 key is the usage gate's reserves, per profile, per window label as the adapter names them (§4.3):
@@ -476,7 +476,7 @@ REPO_KEYS = ("promote", "pull")
 
 def parse_repo(value: Any, drop: bool = False) -> dict[str, Any]:
     """One repo's settings: `promote: {auto: bool}` (§6 *Promote*; `run` and `check` stay in the
-    repo's `.agentorc.yml`) and `pull: bool` (§6 *Pull*; absent is true)."""
+    repo's `.shiftlead.yml`) and `pull: bool` (§6 *Pull*; absent is true)."""
 
     def promote(v: Any) -> dict[str, bool]:
         _fields(v, ("auto",), "promote")

@@ -7,7 +7,7 @@ import pathlib
 import re
 from datetime import UTC, datetime, timedelta
 
-from agentorc.ui import app as ui
+from shiftlead.ui import app as ui
 
 NOW = datetime(2026, 9, 26, 12, 0, tzinfo=UTC)
 
@@ -239,7 +239,7 @@ def test_the_doing_list_reads_a_short_age_in_columns_and_the_script_spells_it_th
     unit, *0m* under a minute and ahead of the clock (TD-418; *just now* until then), nothing for an
     unreadable instant; the doer's width is the server's, the longest name up to eighteen; a longer
     name is cut and whole in its tooltip; the script ages the cell once a minute in the same words."""
-    from agentorc.ui.common import _short_age
+    from shiftlead.ui.common import _short_age
 
     def ago(**kw):
         return _iso(NOW - timedelta(**kw))
@@ -487,7 +487,7 @@ def test_a_stopped_team_draws_only_the_facets_that_hold_something():
 def test_an_answer_or_an_ask_alone_draws_the_face_facet():
     """TD-476 (TD-418, §4.5a *team card: summary*): on a team with nothing live the face facet holds
     something with a Doing row, an answer needed or an open ask to the person — each alone draws it."""
-    from agentorc.ui.org import drawn_facets
+    from shiftlead.ui.org import drawn_facets
 
     assert drawn_facets({"answers": [{"id": "a"}]}) == ["face"]
     assert drawn_facets({"asked": {"n": 1}}) == ["face"]
@@ -609,8 +609,8 @@ def test_a_live_teams_stop_time_is_on_its_header_once(monkeypatch):
     settings read, on a live team's header by the card's formatter; a member's compact line says
     *stops <t>* only where its own time differs, and *wrapping up* once asked; nothing on a team with
     nothing live, and nothing once the time is cleared or has passed."""
-    from agentorc.ui import uiconf
     from sessionorc.models import stop_note
+    from shiftlead.ui import uiconf
 
     later = (datetime.now(UTC) + timedelta(hours=2)).replace(second=30, microsecond=0)
     team_at, own_at = _iso(later), _iso(later + timedelta(hours=1))
@@ -735,7 +735,7 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     the line (TD-418, built by TD-428), on the Repo page the line whole, each count a link; the two
     segments' hovers say the same; a member out of work with unheld work in its lane named, untinted, its
     ids on hover, its name a Focus link; a team with no lane on any record draws the bars alone."""
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     def e(i, page, owner, kind="build"):
         return {"id": i, "title": i, "for_page": page, "owner": owner, "kind": kind, "pickable": "yes"}
@@ -857,7 +857,7 @@ def test_each_member_card_draws_its_own_lane_count_in_its_pill():
     otherwise, soft, and solid while the record carries `out_of_work` and its pill reads *idle*; a
     member out of work that waits on you stays soft; nothing at 0, with no lane, or once ended. The
     team's grouping draws it, and so does a single card's delta (`compact_in` with the repo facts)."""
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     def e(i, owner, kind="build"):
         return {"id": i, "title": i, "for_page": "pickable", "owner": owner, "kind": kind, "pickable": "yes"}

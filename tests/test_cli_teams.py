@@ -15,8 +15,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agentorc import cli, teamrun, teams
-from agentorc import org as orgmod
+from shiftlead import cli, teamrun, teams
+from shiftlead import org as orgmod
 
 pytestmark = pytest.mark.unit
 
@@ -24,7 +24,7 @@ HOST = "kmaster"
 
 
 def org_doc(root: Path, *, two_repos: bool = False) -> dict:
-    repos = {"agentorc": {HOST: str(root / "agentorc")}}
+    repos = {"shiftlead": {HOST: str(root / "shiftlead")}}
     if two_repos:
         repos["ao-api"] = {HOST: str(root / "ao-api"), "devenv": "/workspaces/api"}
     return {
@@ -32,10 +32,10 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "manager": {"role": "manager", "name": "orc-ao", "home": "agentorc"},
+                "manager": {"role": "manager", "name": "orc-ao", "home": "shiftlead"},
                 "members": [
-                    {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "agentorc"},
-                    {"role": "hunter", "name": "hunt", "lane": "ui", "home": "agentorc"},
+                    {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "shiftlead"},
+                    {"role": "hunter", "name": "hunt", "lane": "ui", "home": "shiftlead"},
                 ],
             }
         },
@@ -45,19 +45,19 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
 
 @pytest.fixture
 def world(tmp_path, monkeypatch):
-    """A temp AGENTORC_HOME with `org.yml`, `profiles.yml` and two checkouts, plus a mocked RPC."""
+    """A temp SHIFTLEAD_HOME with `org.yml`, `profiles.yml` and two checkouts, plus a mocked RPC."""
     home = tmp_path / "home"
     home.mkdir()
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     # both checkouts registered: `ao team` reads every registered checkout's `teams:` (§4.9, TD-229)
     registry = home / "repos.txt"
-    registry.write_text("".join(f"{tmp_path / r}\n" for r in ("agentorc", "ao-api")))
+    registry.write_text("".join(f"{tmp_path / r}\n" for r in ("shiftlead", "ao-api")))
     monkeypatch.setattr(
         cli.hosts,
         "local_host",
         lambda: cli.hosts.Host(name=HOST, vscode_host=HOST, local=True, repos_registry=registry),
     )
-    for repo in ("agentorc", "ao-api"):
+    for repo in ("shiftlead", "ao-api"):
         (tmp_path / repo / ".git").mkdir(parents=True)
     (home / "profiles.yml").write_text(
         yaml.safe_dump(
@@ -125,7 +125,7 @@ def world(tmp_path, monkeypatch):
         raise AssertionError(method)
 
     monkeypatch.setattr(cli, "call_sync", fake_call)
-    monkeypatch.chdir(tmp_path / "agentorc")
+    monkeypatch.chdir(tmp_path / "shiftlead")
     return tmp_path, state
 
 
@@ -135,7 +135,7 @@ def creates(state):
 
 def write_repo_roles(tmp_path, profile):
     doc = {"roles": {"grinder": {"profile": profile}}}
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(yaml.safe_dump(doc))
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(yaml.safe_dump(doc))
 
 
 def write_org(tmp_path, doc):
@@ -149,14 +149,14 @@ def test_a_live_name_holder_aborts_the_whole_start_and_names_it(world, capsys):
     tmp_path, state = world
     state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     state["verdicts"]["hunt"] = {
-        "name": "hunt", "verdict": "live", "holder": "ao-agentorc-hunt", "holder_state": "working",
+        "name": "hunt", "verdict": "live", "holder": "ao-shiftlead-hunt", "holder_state": "working",
     }  # fmt: skip
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not creates(state)  # never half a team (§4.9): the lead was not created either
     err = capsys.readouterr().err
-    assert "was not started" in err and "hunt is working as ao-agentorc-hunt" in err
+    assert "was not started" in err and "hunt is working as ao-shiftlead-hunt" in err
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 1
-    assert json.loads(capsys.readouterr().out)["holders"][0]["holder"] == "ao-agentorc-hunt"
+    assert json.loads(capsys.readouterr().out)["holders"][0]["holder"] == "ao-shiftlead-hunt"
 
 
 def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
@@ -168,13 +168,13 @@ def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
     tmp_path, state = world
     state["host"] = {"host": "local"}  # a Start on a concluded team reads `waiting` from it, refusing without (TD-274)
     state["verdicts"]["hunt"] = {
-        "name": "hunt", "verdict": "suspended", "holder": "ao-agentorc-hunt", "holder_state": "exited",
+        "name": "hunt", "verdict": "suspended", "holder": "ao-shiftlead-hunt", "holder_state": "exited",
         "message": "hunt was suspended by a person at 2026-09-20T23:00:00Z over an identity alarm",
     }  # fmt: skip
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not creates(state)  # not even the lead
     err = capsys.readouterr().err
-    assert "was not started" in err and "hunt is suspended as ao-agentorc-hunt — a person lifts it" in err
+    assert "was not started" in err and "hunt is suspended as ao-shiftlead-hunt — a person lifts it" in err
 
 
 def test_an_exited_holder_is_superseded_and_the_start_goes_ahead(world):
@@ -204,23 +204,23 @@ def test_a_sessions_start_asks_keep_mail_only_for_a_closed_record_it_controls(wo
     asks `keep_mail` where it controls the holder and nowhere else — every create still goes through,
     the start stays all or nothing, and a note names the member that starts empty and why."""
     tmp_path, state = world
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-lead")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-lead")
     state["sessions"][:] = [
-        {"id": "ao-agentorc-grind-1", "name": "grind-1", "state": "closed", "controllers": ["ao-agentorc-lead"]},
-        {"id": "ao-agentorc-grind-2", "name": "grind-2", "state": "closed", "controllers": []},
+        {"id": "ao-shiftlead-grind-1", "name": "grind-1", "state": "closed", "controllers": ["ao-shiftlead-lead"]},
+        {"id": "ao-shiftlead-grind-2", "name": "grind-2", "state": "closed", "controllers": []},
     ]
     for n in ("grind-1", "grind-2"):
         state["verdicts"][n] = {
             "name": n,
             "verdict": "supersede",
-            "holder": f"ao-agentorc-{n}",
+            "holder": f"ao-shiftlead-{n}",
             "holder_state": "closed",
         }
     assert cli.main(["team", "start", "ao-grind"]) == 0
     keeps = {p["name"]: p.get("keep_mail") for p in creates(state)}
     assert keeps == {"orc-ao": None, "grind-1": True, "grind-2": None, "hunt": None}
     out = capsys.readouterr().err  # a start's notes go to stderr, beside its warnings
-    assert "grind-2 starts with an empty mailbox: ao-agentorc-lead is not a controller of ao-agentorc-grind-2" in out
+    assert "grind-2 starts with an empty mailbox: ao-shiftlead-lead is not a controller of ao-shiftlead-grind-2" in out
     assert "grind-1 starts with an empty mailbox" not in out
 
 
@@ -239,7 +239,7 @@ def test_a_start_ends_with_the_build_line_once_and_never_refuses_on_it(world, ca
 def test_a_missing_checkout_aborts_naming_it(world, capsys):
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["projects"]["ao"]["repos"]["agentorc"][HOST] = str(tmp_path / "gone")
+    doc["projects"]["ao"]["repos"]["shiftlead"][HOST] = str(tmp_path / "gone")
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1
     err = capsys.readouterr().err
@@ -336,10 +336,10 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert [p["name"] for p in made] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     lead, grind1, hunt = made[0], made[1], made[3]
     assert lead["controllers"] == [] and lead["capabilities"] == ["control"] and lead["role"] == "manager"
-    lead_id = "ao-agentorc-orc-ao"
+    lead_id = "ao-shiftlead-orc-ao"
     assert all(p["controllers"] == [lead_id] for p in made[1:])
     # a worktree per session in its home repo (§4.9 "Home and reach"), and both badges
-    assert grind1["worktree"] == "grind-1" and grind1["dir"] == grind1["repo"] == str(tmp_path / "agentorc")
+    assert grind1["worktree"] == "grind-1" and grind1["dir"] == grind1["repo"] == str(tmp_path / "shiftlead")
     assert grind1["team"] == "ao-grind" and grind1["project"] == "ao" and grind1["unattended"] is True
     assert grind1["lane"] == ["free-pick"] and hunt["lane"] == ["ui"]
     assert "## Lane: free-pick" in grind1["prompt"] and "## Area: ui" in hunt["prompt"]
@@ -347,7 +347,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     out = capsys.readouterr().out
     # the first line says what the lanes hold (§4.7, TD-265): no `repos` reading here, so unknown, never empty
     assert out.splitlines()[0] == "grinder: ledger unreadable · hunter: ledger unreadable"
-    assert out.splitlines()[1].startswith("ao-agentorc-orc-ao  manager manager")
+    assert out.splitlines()[1].startswith("ao-shiftlead-orc-ao  manager manager")
     assert "member grinder" in out
 
 
@@ -375,7 +375,7 @@ def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(
     assert cli.main(["team", "start", "ao-grind"]) == 0
     made = creates(state)
     hunt = next(p for p in made if p["name"] == "hunt")
-    assert hunt["unattended"] is False and hunt["controllers"] == ["ao-agentorc-orc-ao"]  # recorded, inert
+    assert hunt["unattended"] is False and hunt["controllers"] == ["ao-shiftlead-orc-ao"]  # recorded, inert
     err = capsys.readouterr().err
     assert "hunt is interactive, so orc-ao cannot act on it" in err and "invariant 5" in err
     assert "grind-1" not in err  # the unattended members say nothing
@@ -402,10 +402,10 @@ def test_the_project_block_names_every_repo_on_this_host_and_which_is_home(world
     block = made["grind-1"]["prompt"]
     assert block.startswith("## Project: ao")
     assert f"- ao-api: {tmp_path / 'ao-api'}  — your home" in block
-    assert f"- agentorc: {tmp_path / 'agentorc'}\n" in block
+    assert f"- shiftlead: {tmp_path / 'shiftlead'}\n" in block
     assert "no credential and no permission" in block and "## Lane: free-pick" in block
     assert made["grind-1"]["dir"] == str(tmp_path / "ao-api")  # its home is where it runs
-    assert f"- agentorc: {tmp_path / 'agentorc'}  — your home" in made["hunt"]["prompt"]
+    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your home" in made["hunt"]["prompt"]
 
 
 def test_a_repo_on_another_host_is_a_note_not_a_failure(world):
@@ -425,10 +425,10 @@ def on_devenv(tmp_path):
     """The team's `host:` is `devenv`, and the repo is checked out there at the same path it has
     here — a container node's shape, where the roles and briefs are read."""
     doc = org_doc(tmp_path)
-    doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = str(tmp_path / "agentorc")
+    doc["projects"]["ao"]["repos"]["shiftlead"]["devenv"] = str(tmp_path / "shiftlead")
     doc["teams"]["ao-grind"]["host"] = "devenv"
     write_org(tmp_path, doc)
-    return str(tmp_path / "agentorc")
+    return str(tmp_path / "shiftlead")
 
 
 def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
@@ -457,21 +457,21 @@ def test_a_team_whose_host_is_unreachable_is_refused_whole(world, capsys):
 
 def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     """TD-057 step 4b.3: a checkout that is not a directory here — a machine node's — has its
-    `.agentorc.yml` and its briefs read on that node (`host_files`), by the same loader; the start
+    `.shiftlead.yml` and its briefs read on that node (`host_files`), by the same loader; the start
     stays all-or-nothing when that read fails, and a brief outside the checkout is never asked for."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = "/workspaces/agentorc"  # a laptop's path, not here
+    doc["projects"]["ao"]["repos"]["shiftlead"]["devenv"] = "/workspaces/agentorc"  # a laptop's path, not here
     doc["teams"]["ao-grind"]["host"] = "devenv"
     write_org(tmp_path, doc)
     there = "/workspaces/agentorc"
     state["elsewhere"] = {there}
     repo_cfg = yaml.safe_dump({"roles": {"grinder": {"brief": "docs/grind.md", "profile": "repo-grind"}}})
-    state["files"] = {there: {".agentorc.yml": repo_cfg, "docs/grind.md": "grind on the node: {lane}"}}
+    state["files"] = {there: {".shiftlead.yml": repo_cfg, "docs/grind.md": "grind on the node: {lane}"}}
     assert cli.main(["team", "start", "ao-grind"]) == 0
     asked = [p for m, p in state["calls"] if m == "host_files"]
     assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
-    assert {x for p in asked for x in p["paths"]} == {".agentorc.yml", "docs/grind.md"}
+    assert {x for p in asked for x in p["paths"]} == {".shiftlead.yml", "docs/grind.md"}
     made = {p["name"]: p for p in creates(state)}
     assert "grind on the node: free-pick" in made["grind-1"]["prompt"] and made["grind-1"]["profile"] == "repo-grind"
     assert all(p["host"] == "devenv" and p["dir"] == there for p in made.values())
@@ -481,11 +481,11 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert "devenv: runs on devenv: unreachable" in capsys.readouterr().err and not creates(state)
     # a brief the repo keeps outside its checkout is refused here, never asked of the node
-    state["files"] = {there: {".agentorc.yml": yaml.safe_dump({"roles": {"grinder": {"brief": "/etc/passwd"}}})}}
+    state["files"] = {there: {".shiftlead.yml": yaml.safe_dump({"roles": {"grinder": {"brief": "/etc/passwd"}}})}}
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert "outside the checkout" in capsys.readouterr().err and not creates(state)
     assert "/etc/passwd" not in str([p for m, p in state["calls"] if m == "host_files"])
-    del doc["projects"]["ao"]["repos"]["agentorc"]["devenv"]  # declared nowhere on that host
+    del doc["projects"]["ao"]["repos"]["shiftlead"]["devenv"]  # declared nowhere on that host
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert "has no checkout on devenv (declared on kmaster)" in capsys.readouterr().err
@@ -496,13 +496,13 @@ def test_stop_degrades_per_member_when_one_is_refused(world, capsys):
     are still wrapped up — the stop never aborts on the first refusal."""
     tmp_path, state = world
     started(state)
-    state["refuse"] = {"ao-agentorc-grind-2": "runs on devenv: unreachable since t — ssh failed; refused, not queued"}
+    state["refuse"] = {"ao-shiftlead-grind-2": "runs on devenv: unreachable since t — ssh failed; refused, not queued"}
     capsys.readouterr()
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
     sent = [p["id"] for m, p in state["calls"] if m == "send"]  # every member was tried, the lead last
-    assert sent == ["ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt", "ao-agentorc-orc-ao"]
+    assert sent == ["ao-shiftlead-grind-1", "ao-shiftlead-grind-2", "ao-shiftlead-hunt", "ao-shiftlead-orc-ao"]
     out = capsys.readouterr().out
-    assert "ao-agentorc-grind-2  member: refused: runs on devenv: unreachable" in out
+    assert "ao-shiftlead-grind-2  member: refused: runs on devenv: unreachable" in out
     assert out.count("wrap-up sent") == 3 and "still working" not in out  # the refused one is not waited on
 
 
@@ -513,11 +513,11 @@ def test_a_members_brief_is_a_supplement_in_the_templates_repo_slot(world, capsy
     `roles.<name>.brief`, never beside it. A supplement that repeats a template heading — a whole
     brief not yet cut — is said by the start, which goes ahead."""
     tmp_path, state = world
-    docs = tmp_path / "agentorc" / "docs"
+    docs = tmp_path / "shiftlead" / "docs"
     docs.mkdir()
     (docs / "b.md").write_text("mine: {lane}, ask {techlead}\n")
     (docs / "role.md").write_text("the role's own supplement\n")
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"roles": {"grinder": {"brief": "docs/role.md"}}})
     )
     doc = org_doc(tmp_path)
@@ -545,13 +545,13 @@ def test_a_members_brief_is_a_supplement_in_the_templates_repo_slot(world, capsy
 def test_a_template_with_no_supplement_reads_none_and_a_role_without_one_takes_the_brief_whole(tmp_path):
     """The slot reads `none` when the repo gives nothing (design §4.8); a role defined in a directory
     takes its own `template.md`, the repo's slots filled as a preset's are (§4.9c, TD-313)."""
-    from agentorc import repoconfig
+    from shiftlead import repoconfig
 
     cfg = repoconfig.RepoConfig(root=tmp_path)
     text = repoconfig.resolve_role(cfg, "grinder").brief_text()
     assert "## This repo's rules" in text and "\n\nnone\n\n" in text and "{repo}" not in text
     (tmp_path / "r.md").write_text("reviewer: {lane}\n")
-    d = tmp_path / ".agentorc" / "roles" / "reviewer"
+    d = tmp_path / ".shiftlead" / "roles" / "reviewer"
     d.mkdir(parents=True)
     (d / "role.yml").write_text("")
     (d / "template.md").write_text("reviewer: {lane}\n{repo}\n")
@@ -570,13 +570,13 @@ def test_a_template_with_no_supplement_reads_none_and_a_role_without_one_takes_t
 
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     tmp_path, state = world
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"teams": {"repo-team": {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}}})
     )
     assert cli.main(["team", "start", "repo-team"]) == 0
     made = creates(state)
     assert [p["name"] for p in made] == ["hunter"] and made[0]["team"] == "repo-team"
-    assert made[0]["project"] == "agentorc"  # the repo's own project, named for the checkout
+    assert made[0]["project"] == "shiftlead"  # the repo's own project, named for the checkout
 
 
 def test_the_org_is_one_aggregate_of_the_registered_checkouts(world, capsys, monkeypatch):
@@ -587,37 +587,37 @@ def test_the_org_is_one_aggregate_of_the_registered_checkouts(world, capsys, mon
     tmp_path, state = world
     monkeypatch.chdir(tmp_path / "home")  # not in either repo: the registry is what is read
     team = {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"twice": team, "ao-grind": team}}))
-    (tmp_path / "ao-api" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"twice": team, "api": team}}))
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {"twice": team, "ao-grind": team}}))
+    (tmp_path / "ao-api" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {"twice": team, "api": team}}))
     assert cli.main(["--json", "team", "list"]) == 0
     got = json.loads(capsys.readouterr().out)
     assert sorted(r["name"] for r in got["teams"]) == ["ao-grind", "api"]
     why = got["refused"]["twice"]
-    assert str(tmp_path / "agentorc" / ".agentorc.yml") in why and str(tmp_path / "ao-api" / ".agentorc.yml") in why
-    assert got["shadowed"] == {"ao-grind": [str(tmp_path / "agentorc" / ".agentorc.yml")]}
+    assert str(tmp_path / "shiftlead" / ".shiftlead.yml") in why and str(tmp_path / "ao-api" / ".shiftlead.yml") in why
+    assert got["shadowed"] == {"ao-grind": [str(tmp_path / "shiftlead" / ".shiftlead.yml")]}
     assert cli.main(["team", "list"]) == 0
     out = capsys.readouterr().out
     assert "ao-grind  shadowed by org.yml" in out and "twice     refused: team 'twice' is defined twice" in out
     assert cli.main(["team", "start", "twice"]) == 1
     assert "defined twice" in capsys.readouterr().err and creates(state) == []
     # the pages read the same function: the refusal is a note beside the strip
-    from agentorc import org as orgmod
+    from shiftlead import org as orgmod
 
     org, notes = orgmod.with_repos(orgmod.load(), cli.hosts.local_host().repos())
     assert "twice" not in org.teams and any("defined twice" in n for n in notes)
     # one checkout written twice in the registry is one repo, not a name defined twice against itself
     reg = tmp_path / "home" / "repos.txt"
-    reg.write_text(f"{tmp_path / 'agentorc'}\n{tmp_path / 'agentorc'}/\n")
+    reg.write_text(f"{tmp_path / 'shiftlead'}\n{tmp_path / 'shiftlead'}/\n")
     org, notes = orgmod.with_repos(orgmod.load(), cli.hosts.local_host().repos())
     assert "twice" in org.teams and not org.refused and notes == []
-    reg.write_text("".join(f"{tmp_path / r}\n" for r in ("agentorc", "ao-api")))
+    reg.write_text("".join(f"{tmp_path / r}\n" for r in ("shiftlead", "ao-api")))
     # spanning, placing and nesting are the org file's: the repo is skipped and named
     for bad, key in (
         ({"projects": ["ao"]}, "projects"),
         ({"host": "devenv"}, "host"),
         ({"members": [{"team": "ao-grind"}]}, "members[0].team"),
     ):
-        (tmp_path / "ao-api" / ".agentorc.yml").write_text(yaml.safe_dump({"teams": {"api": {**team, **bad}}}))
+        (tmp_path / "ao-api" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {"api": {**team, **bad}}}))
         assert cli.main(["--json", "team", "list"]) == 0
         captured = capsys.readouterr()
         assert "api" not in {r["name"] for r in json.loads(captured.out)["teams"]}
@@ -640,7 +640,7 @@ def test_stop_wraps_the_members_up_before_the_lead_and_now_kills(world, capsys):
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
     sent = [p for m, p in state["calls"] if m == "send"]
     assert [p["id"] for p in sent] == [
-        "ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt", "ao-agentorc-orc-ao",
+        "ao-shiftlead-grind-1", "ao-shiftlead-grind-2", "ao-shiftlead-hunt", "ao-shiftlead-orc-ao",
     ]  # fmt: skip
     assert all(p["text"] == teams.WRAPUP_PROMPT and p["wrapup"] is True for p in sent)  # holds the doorbell off
     assert "wrap-up sent" in capsys.readouterr().out
@@ -649,7 +649,7 @@ def test_stop_wraps_the_members_up_before_the_lead_and_now_kills(world, capsys):
         s["state"] = "working"
     assert cli.main(["team", "stop", "ao-grind", "--now"]) == 0
     killed = [p["id"] for m, p in state["calls"] if m == "kill"]
-    assert killed[-1] == "ao-agentorc-orc-ao" and len(killed) == 4
+    assert killed[-1] == "ao-shiftlead-orc-ao" and len(killed) == 4
     assert not [m for m, _ in state["calls"] if m == "send"]
 
 
@@ -660,29 +660,29 @@ def test_a_lead_stopping_its_own_team_is_the_wind_down_and_is_never_typed_at(wor
     tmp_path, state = world
     started(state)
     capsys.readouterr()
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-orc-ao")
     by_id = {s["id"]: s for s in state["sessions"]}
     # `unpushed` is the one measure the host agent computes (design §4.2, TD-080); `ahead` is kept
     # on the record beside it and is no longer what *pushed* is read from
     pushed = {"dirty": 0, "ahead": 0, "upstream": "origin/x", "unpushed": 0, "pushed_against": "origin/x"}
-    by_id["ao-agentorc-grind-1"]["git"] = pushed
-    by_id["ao-agentorc-hunt"]["git"] = pushed
-    by_id["ao-agentorc-grind-2"]["git"] = {**pushed, "ahead": 2, "unpushed": 2}
+    by_id["ao-shiftlead-grind-1"]["git"] = pushed
+    by_id["ao-shiftlead-hunt"]["git"] = pushed
+    by_id["ao-shiftlead-grind-2"]["git"] = {**pushed, "ahead": 2, "unpushed": 2}
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
     assert [p["id"] for m, p in state["calls"] if m == "send"] == [
-        "ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt",
+        "ao-shiftlead-grind-1", "ao-shiftlead-grind-2", "ao-shiftlead-hunt",
     ]  # fmt: skip
-    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1", "ao-agentorc-hunt"]
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-shiftlead-grind-1", "ao-shiftlead-hunt"]
     out = capsys.readouterr().out
-    assert "manager: is you" in out and "ao close ao-agentorc-orc-ao" in out
+    assert "manager: is you" in out and "ao close ao-shiftlead-orc-ao" in out
     assert "left open: 2 unpushed (vs origin/x)" in out
     assert "still working" not in out  # the lead's own line is not a member that missed the window
-    assert by_id["ao-agentorc-orc-ao"]["state"] == "working"  # untouched by its own command
+    assert by_id["ao-shiftlead-orc-ao"]["state"] == "working"  # untouched by its own command
     # `--now` from the lead kills the members and still spares the caller
     state["calls"].clear()
-    by_id["ao-agentorc-grind-2"]["state"] = "working"
+    by_id["ao-shiftlead-grind-2"]["state"] = "working"
     assert cli.main(["team", "stop", "ao-grind", "--now"]) == 0
-    assert [p["id"] for m, p in state["calls"] if m == "kill"] == ["ao-agentorc-grind-2"]
+    assert [p["id"] for m, p in state["calls"] if m == "kill"] == ["ao-shiftlead-grind-2"]
 
 
 def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, monkeypatch):
@@ -690,16 +690,16 @@ def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, m
     tmp_path, state = world
     started(state)
     by_id = {s["id"]: s for s in state["sessions"]}
-    by_id["ao-agentorc-grind-1"].update(
+    by_id["ao-shiftlead-grind-1"].update(
         state="idle",
         out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"},
         git={"dirty": 0, "ahead": 0, "upstream": "origin/x", "unpushed": 0},
     )
-    by_id["ao-agentorc-grind-2"]["out_of_work"] = {"at": "2026-09-17T06:00:00Z", "why": "x"}  # declared, still working
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
+    by_id["ao-shiftlead-grind-2"]["out_of_work"] = {"at": "2026-09-17T06:00:00Z", "why": "x"}  # declared, still working
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-orc-ao")
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
-    assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-agentorc-grind-2", "ao-agentorc-hunt"]
-    assert "ao-agentorc-grind-1" in [p["id"] for m, p in state["calls"] if m == "close"]
+    assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-shiftlead-grind-2", "ao-shiftlead-hunt"]
+    assert "ao-shiftlead-grind-1" in [p["id"] for m, p in state["calls"] if m == "close"]
     assert "finished (out of work), nothing sent, closed" in capsys.readouterr().out
 
 
@@ -713,17 +713,17 @@ def test_close_needs_proof_of_pushed_not_an_absent_count(world, capsys):
     started(state)
     by_id = {s["id"]: s for s in state["sessions"]}
     # a merged worker sitting on a detached `origin/main`: nothing is only on this machine
-    by_id["ao-agentorc-grind-1"]["git"] = {
+    by_id["ao-shiftlead-grind-1"]["git"] = {
         "dirty": 0, "ahead": 0, "upstream": None, "unpushed": 0, "pushed_against": "remote branches",
     }  # fmt: skip
-    by_id["ao-agentorc-hunt"].pop("git", None)  # unknown
+    by_id["ao-shiftlead-hunt"].pop("git", None)  # unknown
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
-    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1"]
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-shiftlead-grind-1"]
     out = capsys.readouterr().out
     assert out.count("left open: git state unknown") == 2  # grind-2 and hunt
     # the same checkout with a commit origin has never seen: left open, and told against what
-    by_id["ao-agentorc-grind-1"]["git"].update(unpushed=1)
-    by_id["ao-agentorc-grind-1"]["state"] = "idle"
+    by_id["ao-shiftlead-grind-1"]["git"].update(unpushed=1)
+    by_id["ao-shiftlead-grind-1"]["state"] = "idle"
     state["calls"].clear()
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
     assert not [m for m, _ in state["calls"] if m == "close"]
@@ -752,7 +752,7 @@ def test_status_lists_the_members_with_state_lane_and_report_line(world, capsys)
     state["sessions"] = [s for s in state["sessions"] if s["name"] != "hunt"]  # never started
     assert cli.main(["team", "status", "ao-grind"]) == 0
     out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith("ao-agentorc-orc-ao") and "working" in out[0]  # the lead first
+    assert out[0].startswith("ao-shiftlead-orc-ao") and "working" in out[0]  # the lead first
     assert "lane: free-pick" in out[1] and "report: TD-027 · 1/1 done" in out[1]
     assert out[-1].startswith("hunt") and "not started" in out[-1]
     assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
@@ -798,13 +798,13 @@ def test_status_json_carries_what_the_homes_reading_reads_and_the_reading(world,
 
 def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, capsys):
     tmp_path, state = world
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"teams": {"repo-team": {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}}})
     )
     assert cli.main(["team", "list"]) == 0
     out = capsys.readouterr().out
     assert "ao-grind" in out and "stopped" in out and str(tmp_path / "home" / "org.yml") in out
-    assert "repo-team" in out and "manager: person" in out and str(tmp_path / "agentorc" / ".agentorc.yml") in out
+    assert "repo-team" in out and "manager: person" in out and str(tmp_path / "shiftlead" / ".shiftlead.yml") in out
     started(state)
     capsys.readouterr()
     assert cli.main(["--json", "team", "list"]) == 0
@@ -896,15 +896,15 @@ def test_a_member_waiting_on_the_person_keeps_its_team_from_concluded(world, cap
     out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
     names = ["orc-ao", "grind-1"]
     state["sessions"][:] = [
-        {"id": f"ao-agentorc-{n}", "name": n, "team": "ao-grind", "state": "idle", "out_of_work": out,
+        {"id": f"ao-shiftlead-{n}", "name": n, "team": "ao-grind", "state": "idle", "out_of_work": out,
          "git": {"dirty": 0, "unpushed": 0}}
         for n in names
     ]  # fmt: skip
     state["verdicts"].update(
-        {n: {"name": n, "verdict": "live", "holder": f"ao-agentorc-{n}", "holder_state": "idle"} for n in names}
+        {n: {"name": n, "verdict": "live", "holder": f"ao-shiftlead-{n}", "holder_state": "idle"} for n in names}
     )
     q = {"id": "m-1", "ref": "TD-222", "bound": None}
-    state["host"] = {"host": "local", "waiting": {"ao-agentorc-grind-1": [q]}}
+    state["host"] = {"host": "local", "waiting": {"ao-shiftlead-grind-1": [q]}}
     org = cli._org_here()
     asked = teamrun.waiting_of_home(cli.call_sync)
     assert teamrun.concluded(state["sessions"], (), asked) is None
@@ -915,7 +915,7 @@ def test_a_member_waiting_on_the_person_keeps_its_team_from_concluded(world, cap
     state["calls"].clear()
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not [p for m, p in state["calls"] if m in ("close", "create")]
-    assert "grind-1 is idle as ao-agentorc-grind-1" in capsys.readouterr().err
+    assert "grind-1 is idle as ao-shiftlead-grind-1" in capsys.readouterr().err
     assert cli.main(["--json", "team", "status", "ao-grind"]) == 0
     got = json.loads(capsys.readouterr().out)
     assert got["waiting"] == {"grind-1": [q]} and got["finished"]["why"] == ["grind-1 waiting on the person: TD-222"]
@@ -947,13 +947,13 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
 
     def concluded_team(**extra):
         state["sessions"][:] = [
-            {"id": f"ao-agentorc-{n}", "name": n, "team": "ao-grind", "state": "idle", "git": dict(clean),
+            {"id": f"ao-shiftlead-{n}", "name": n, "team": "ao-grind", "state": "idle", "git": dict(clean),
              **({} if n == "techlead-ao" else {"out_of_work": out}), **extra.get(n, {})}
             for n in names
         ]  # fmt: skip
         state["verdicts"].clear()
         state["verdicts"].update(
-            {n: {"name": n, "verdict": "live", "holder": f"ao-agentorc-{n}", "holder_state": "idle"} for n in names}
+            {n: {"name": n, "verdict": "live", "holder": f"ao-shiftlead-{n}", "holder_state": "idle"} for n in names}
         )
         state["calls"].clear()
 
@@ -970,13 +970,13 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     concluded_team(**{"hunt": {"out_of_work": None}})
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not closes() and not creates(state)
-    assert "hunt is idle as ao-agentorc-hunt" in capsys.readouterr().err
+    assert "hunt is idle as ao-shiftlead-hunt" in capsys.readouterr().err
     # a suspended holder is refused as on any start (§4.8a), even when the team is concluded
     concluded_team()
-    state["verdicts"]["hunt"] = {"name": "hunt", "verdict": "suspended", "holder": "ao-agentorc-hunt"}
+    state["verdicts"]["hunt"] = {"name": "hunt", "verdict": "suspended", "holder": "ao-shiftlead-hunt"}
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not closes() and not creates(state)
-    assert "hunt is suspended as ao-agentorc-hunt" in capsys.readouterr().err
+    assert "hunt is suspended as ao-shiftlead-hunt" in capsys.readouterr().err
     # a holder that is not one of the team's sessions is refused, even when the team is concluded
     concluded_team()
     state["verdicts"]["hunt"]["holder"] = "ao-elsewhere-hunt"
@@ -986,7 +986,7 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     # concluded and clean: every one closed — before the first create — and the team started
     concluded_team()
     assert cli.main(["team", "start", "ao-grind"]) == 0
-    assert sorted(closes()) == sorted(f"ao-agentorc-{n}" for n in names)
+    assert sorted(closes()) == sorted(f"ao-shiftlead-{n}" for n in names)
     first_create = next(i for i, (m, _) in enumerate(state["calls"]) if m == "create")
     assert all(m != "close" for m, _ in state["calls"][first_create:])
     assert [p["name"] for p in creates(state)] == names
@@ -998,10 +998,10 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     # a person's idle session beside it (§4.9 *A person in the team*, TD-173): it neither stops the
     # team being concluded nor is closed by the start
     concluded_team()
-    me = {"id": "ao-agentorc-me", "name": "me", "team": "ao-grind", "state": "idle", "unattended": False}
+    me = {"id": "ao-shiftlead-me", "name": "me", "team": "ao-grind", "state": "idle", "unattended": False}
     state["sessions"].append(me)
     assert cli.main(["team", "start", "ao-grind"]) == 0
-    assert "ao-agentorc-me" not in closes() and sorted(closes()) == sorted(f"ao-agentorc-{n}" for n in names)
+    assert "ao-shiftlead-me" not in closes() and sorted(closes()) == sorted(f"ao-shiftlead-{n}" for n in names)
 
 
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────
@@ -1055,7 +1055,7 @@ def test_ao_new_project_adds_the_reach_block_and_the_badge(world, capsys):
     assert cli.main(["new", "solo", "--project", "ao", "--role", "hunter"]) == 0
     p = creates(state)[0]
     assert p["project"] == "ao" and p["prompt"].startswith("## Project: ao")
-    assert f"- agentorc: {tmp_path / 'agentorc'}  — your home" in p["prompt"]  # started in that checkout
+    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your home" in p["prompt"]  # started in that checkout
     assert "## Area: free" in p["prompt"]
     state["calls"].clear()
     # an undefined project is still a badge (step b landed it as a plain string): one line, no block
@@ -1071,7 +1071,7 @@ def test_ao_new_project_adds_the_reach_block_and_the_badge(world, capsys):
 
 # ── TD-042: a brief describes the job, not the run ────────────────────────────────────────────
 
-BRIEFS = Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
+BRIEFS = Path(__file__).parents[1] / "src" / "shiftlead" / "briefs"
 REPO_BRIEFS = Path(__file__).parents[1] / "docs" / "briefs"
 
 
@@ -1110,8 +1110,8 @@ def test_a_dated_adr_link_is_not_a_run_and_a_fenced_example_is_not_a_clock():
 def test_a_team_start_says_when_a_brief_names_one_run_and_starts_it_anyway(world, capsys):
     """A warning, never a refusal: the team starts, and the finding names the session and the line."""
     tmp_path, state = world
-    (tmp_path / "agentorc" / "docs").mkdir()
-    (tmp_path / "agentorc" / "docs" / "b.md").write_text("You are a worker.\n\nStop at 05:30 on 2026-09-12 (run 5).\n")
+    (tmp_path / "shiftlead" / "docs").mkdir()
+    (tmp_path / "shiftlead" / "docs" / "b.md").write_text("You are a worker.\n\nStop at 05:30 on 2026-09-12 (run 5).\n")
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["members"][0]["brief"] = "docs/b.md"
     write_org(tmp_path, doc)
@@ -1141,8 +1141,8 @@ def test_a_shell_redirect_is_not_a_run_number():
 def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monkeypatch):
     """The sessions that *did* start are running on that brief, so the warning matters here most."""
     tmp_path, state = world
-    (tmp_path / "agentorc" / "docs").mkdir()
-    (tmp_path / "agentorc" / "docs" / "b.md").write_text("Stop at 05:30 on 2026-09-12 (run 5).\n")
+    (tmp_path / "shiftlead" / "docs").mkdir()
+    (tmp_path / "shiftlead" / "docs" / "b.md").write_text("Stop at 05:30 on 2026-09-12 (run 5).\n")
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["members"][0]["brief"] = "docs/b.md"
     write_org(tmp_path, doc)
@@ -1229,7 +1229,7 @@ def test_ao_team_skill_prints_the_recipe_without_an_agent_and_exits(capsys):
     the recipe and exits **during parsing** — so it needs no host agent, and no `action`, even
     though `team`'s subcommand is `required=True`. That last part is the whole reason it is an
     `argparse.Action` rather than a subcommand of its own."""
-    from agentorc import cli as climod
+    from shiftlead import cli as climod
 
     with pytest.raises(SystemExit) as e:
         climod.main(["team", "--skill"])
@@ -1246,7 +1246,7 @@ def test_ao_team_skill_prints_the_recipe_without_an_agent_and_exits(capsys):
         "ao host up",
         "ao status -v",
         "org.yml",
-        ".agentorc.yml",
+        ".shiftlead.yml",
         "projects:",
         "members:",
         "manager: {role: person}",  # the form the loader accepts — the bare string is refused
@@ -1260,16 +1260,16 @@ def test_ao_team_skill_prints_the_recipe_without_an_agent_and_exits(capsys):
 @pytest.mark.unit
 def test_the_recipe_ships_in_the_package_so_it_prints_where_there_is_no_checkout():
     """It has to print inside a container node, which has no checkout of this repo — so it lives
-    beside `skill.md` in the package (`includes` in pyproject covers `src/agentorc`), and there is
+    beside `skill.md` in the package (`includes` in pyproject covers `src/shiftlead`), and there is
     **no copy under docs/** to drift from it. The README points at it instead."""
     import pathlib
 
-    from agentorc.cli import team_skill_text
+    from shiftlead.cli import team_skill_text
 
     root = pathlib.Path(__file__).parents[1]
-    assert (root / "src/agentorc/team_skill.md").is_file()
+    assert (root / "src/shiftlead/team_skill.md").is_file()
     assert not list((root / "docs").rglob("stand-up-a-team.md"))
-    assert team_skill_text() == (root / "src/agentorc/team_skill.md").read_text(encoding="utf-8")
+    assert team_skill_text() == (root / "src/shiftlead/team_skill.md").read_text(encoding="utf-8")
     readme = (root / "README.md").read_text(encoding="utf-8")
     assert "ao team --skill" in readme and "## Stand up a team" in readme
     # and the older document says which one case it still owns
@@ -1280,15 +1280,15 @@ def test_the_recipe_ships_in_the_package_so_it_prints_where_there_is_no_checkout
 @pytest.mark.unit
 def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path, monkeypatch):
     """The failure a guide dies of is a key that was never real. The recipe's `org.yml` block is
-    fed to the loader it names, and its `.agentorc.yml` block to `repoconfig`, so a key either
+    fed to the loader it names, and its `.shiftlead.yml` block to `repoconfig`, so a key either
     round-trips or this test says which one did not."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     import importlib
 
     import yaml
 
-    from agentorc import org as orgmod
-    from agentorc import repoconfig
+    from shiftlead import org as orgmod
+    from shiftlead import repoconfig
 
     importlib.reload(orgmod)
     org_yml = {
@@ -1311,7 +1311,7 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
 
     repo = tmp_path / "repo"
     repo.mkdir()
-    (repo / ".agentorc.yml").write_text(
+    (repo / ".shiftlead.yml").write_text(
         "roles:\n"
         "  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}\n"
         "  manager: {brief: docs/briefs/manager.md, grants: [control]}\n"
@@ -1337,14 +1337,14 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
 
     So the recipe is held to the planner as well as to the loader: it may not present a shape as
     working unless `plan()` accepts it, and where it names one that does not work it must say so."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     import importlib
 
     import yaml
 
-    from agentorc import org as orgmod
-    from agentorc import teams
-    from agentorc.cli import team_skill_text
+    from shiftlead import org as orgmod
+    from shiftlead import teams
+    from shiftlead.cli import team_skill_text
 
     importlib.reload(orgmod)
     monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", False)  # the reload took conftest's off back (anchor: tests' own)
@@ -1373,27 +1373,27 @@ def test_the_recipe_and_every_template_agree_on_the_supplement_slot():
     every built-in template must carry that section and its `{repo}` slot, or the recipe lies."""
     from importlib import resources
 
-    from agentorc import repoconfig
-    from agentorc.cli import team_skill_text
+    from shiftlead import repoconfig
+    from shiftlead.cli import team_skill_text
 
     assert "*This repo's rules*" in team_skill_text() and "### A repo's brief" in team_skill_text()
     for preset in repoconfig.PRESETS.values():
         if preset["brief"]:
-            text = resources.files("agentorc").joinpath("briefs", preset["brief"]).read_text(encoding="utf-8")
+            text = resources.files("shiftlead").joinpath("briefs", preset["brief"]).read_text(encoding="utf-8")
             assert "## This repo's rules" in text and "{repo}" in text, preset["brief"]
 
 
 def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
-    """TD-113 (b): the recipe lists the keys `.agentorc.yml` takes, so a second repo does not learn
+    """TD-113 (b): the recipe lists the keys `.shiftlead.yml` takes, so a second repo does not learn
     them from samscrape's files. Each it names is accepted by `repoconfig._apply`, `projects` —
     which it says is never one — is refused, and the list is the whole of what the loader takes."""
     import re
 
-    from agentorc import repoconfig
-    from agentorc.cli import team_skill_text
+    from shiftlead import repoconfig
+    from shiftlead.cli import team_skill_text
 
     text = team_skill_text()
-    para = text[text.index("`.agentorc.yml` takes these keys") :].split("\n\n")[0]
+    para = text[text.index("`.shiftlead.yml` takes these keys") :].split("\n\n")[0]
     named = set(re.findall(r"`(\w+)`", para)) - {"projects"}
     accepted = {
         "ledger": "docs/technical_debt.md",
@@ -1408,10 +1408,10 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
     }
     assert named == set(accepted)
     for key, value in accepted.items():
-        repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, value, tmp_path / ".agentorc.yml")
+        repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, value, tmp_path / ".shiftlead.yml")
     for key in ("projects", *repoconfig.RETIRED):  # TD-149 (1): the retired keys are refused too
-        with pytest.raises(ValueError, match="is not a `.agentorc.yml` key"):
-            repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, {}, tmp_path / ".agentorc.yml")
+        with pytest.raises(ValueError, match="is not a `.shiftlead.yml` key"):
+            repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, {}, tmp_path / ".shiftlead.yml")
     src = Path(repoconfig.__file__).read_text(encoding="utf-8")
     body = src[src.index("def _apply(") : src.index("def _mapping(")]
     assert set(re.findall(r'"(\w+)"', body)) == set(accepted)  # nothing the loader takes is left out
@@ -1432,12 +1432,12 @@ def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world
     assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "grind-1", "grind-2", "hunt"]
     seat = made[1]
     assert seat["role"] == "techlead" and seat["capabilities"] == [] and seat["lane"] == []
-    assert seat["controllers"] == ["ao-agentorc-orc-ao"] and seat["team"] == "ao-grind"
+    assert seat["controllers"] == ["ao-shiftlead-orc-ao"] and seat["team"] == "ao-grind"
     assert seat["profile"] == "paul" and "**techlead**" in seat["prompt"]
     for p in (made[0], *made[2:]):
-        assert "`ao-agentorc-techlead-ao`" in p["prompt"] and "{techlead}" not in p["prompt"]
+        assert "`ao-shiftlead-techlead-ao`" in p["prompt"] and "{techlead}" not in p["prompt"]
     out = capsys.readouterr()
-    assert "ao-agentorc-techlead-ao  techlead techlead" in out.out and "stale tmux" not in out.err
+    assert "ao-shiftlead-techlead-ao  techlead techlead" in out.out and "stale tmux" not in out.err
     assert cli.main(["team", "list"]) == 0
     assert "techlead: techlead-ao" in capsys.readouterr().out
 
@@ -1455,7 +1455,7 @@ def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world
     monkeypatch.setattr(cli, "call_sync", suffixed)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     err = capsys.readouterr().err
-    assert "started as ao-agentorc-techlead-ao-2, but the briefs name ao-agentorc-techlead-ao" in err
+    assert "started as ao-shiftlead-techlead-ao-2, but the briefs name ao-shiftlead-techlead-ao" in err
 
     # no seat: every brief says `none`, and nothing is started for it
     monkeypatch.setattr(cli, "call_sync", real)
@@ -1479,7 +1479,7 @@ def test_every_members_brief_names_its_manager(world, capsys, monkeypatch):
     grinders = [p for p in made if p["role"] == "grinder"]
     assert len(grinders) == 2
     for p in grinders:
-        assert 'ao msg ao-agentorc-orc-ao "done:' in p["prompt"] and "{manager}" not in p["prompt"]
+        assert 'ao msg ao-shiftlead-orc-ao "done:' in p["prompt"] and "{manager}" not in p["prompt"]
     assert "manager started as" not in capsys.readouterr().err
 
     # the manager came up under another id: the start stands and says so
@@ -1495,7 +1495,7 @@ def test_every_members_brief_names_its_manager(world, capsys, monkeypatch):
 
     monkeypatch.setattr(cli, "call_sync", suffixed)
     assert cli.main(["team", "start", "ao-grind"]) == 0
-    assert "manager started as ao-agentorc-orc-ao-2, but the members' briefs name ao-agentorc-orc-ao" in (
+    assert "manager started as ao-shiftlead-orc-ao-2, but the members' briefs name ao-shiftlead-orc-ao" in (
         capsys.readouterr().err
     )
 
@@ -1518,7 +1518,7 @@ def test_a_techlead_seat_reads_its_primer_first_and_the_start_warns_without_one(
     a path in its home checkout, filled into the seat's brief as `{context}` — and `ao team start`
     says so, and starts anyway, when the seat has none or the file is not there."""
     tmp_path, state = world
-    primer = tmp_path / "agentorc" / "docs" / "primer.md"
+    primer = tmp_path / "shiftlead" / "docs" / "primer.md"
     primer.parent.mkdir(parents=True, exist_ok=True)
     primer.write_text("# primer\n")
     doc = org_doc(tmp_path)
@@ -1565,7 +1565,7 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     # whose definition name only looks like one is never taken for it (review of PR #350)
     sessions[1]["name"] = "techlead-ao-2"
     assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
-    doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3", "home": "agentorc"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3", "home": "shiftlead"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     org = cli._org_here()
     assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}
@@ -1618,9 +1618,9 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     # no lane, whatever its role's: a seat's area is its brief's
     assert audit["role"] == "auditor" and audit["capabilities"] == [] and audit["lane"] == []
     assert "(none given)" in audit["prompt"]
-    assert audit["controllers"] == ["ao-agentorc-orc-ao"] and audit["team"] == "ao-grind"
-    assert "`ao-agentorc-techlead-ao`" in audit["prompt"]
-    assert "ao-agentorc-audit-ao  seat auditor" in capsys.readouterr().out
+    assert audit["controllers"] == ["ao-shiftlead-orc-ao"] and audit["team"] == "ao-grind"
+    assert "`ao-shiftlead-techlead-ao`" in audit["prompt"]
+    assert "ao-shiftlead-audit-ao  seat auditor" in capsys.readouterr().out
     assert cli.main(["team", "list", "--json"]) == 0
     (row,) = json.loads(capsys.readouterr().out)["teams"]
     assert row["seats"] == [{"name": "audit-ao", "role": "auditor", "trigger": "every", "after": "6h"}]
@@ -1638,8 +1638,8 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
 
 def test_every_unattended_member_carries_the_usage_gates_two_texts(world):
     """Design §6 *Usage gate* (TD-100 slice 2): the host agent types the record's `pause_prompt` and
-    `resume_prompt`, so a team's unattended members get both at create, in `agentorc.teams`' words."""
-    from agentorc import teams
+    `resume_prompt`, so a team's unattended members get both at create, in `shiftlead.teams`' words."""
+    from shiftlead import teams
 
     _tmp, state = world
     assert cli.main(["team", "start", "ao-grind"]) == 0
@@ -1677,10 +1677,10 @@ def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_
     `build-review` is current, and says it sits out rather than starting it."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     started(state)
     got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="designer")
     assert got["created"] == [] and "sits out under build-review: not started" in got["text"]
@@ -1692,10 +1692,10 @@ def test_a_live_add_reads_the_flow_the_person_picked(world):
     `settings.yml`, Add sits a designer out as it does where `build-review` is first (review of #1066)."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"].update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    doc["teams"]["ao-grind"].update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {flow: build-review}}\n")
     started(state)
     got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="designer")
@@ -1708,13 +1708,13 @@ def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(wo
     started(state)
     got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
     (made,) = got["created"]
-    assert made["name"] == "grind-3" and made["controllers"] == ["ao-agentorc-orc-ao"] and made["team"] == "ao-grind"
+    assert made["name"] == "grind-3" and made["controllers"] == ["ao-shiftlead-orc-ao"] and made["team"] == "ao-grind"
     assert [p["name"] for p in creates(state)] == ["grind-3"]  # the one member, not the team again
     state["calls"].clear()
     got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder")
     assert got["did"] == "grind count: 3 → 2" and got["wound_down"]["name"] == "grind-3"
     sent = [p for m, p in state["calls"] if m == "send"]
-    assert [p["id"] for p in sent] == ["ao-agentorc-grind-3"] and sent[0]["wrapup"] is True  # never a kill
+    assert [p["id"] for p in sent] == ["ao-shiftlead-grind-3"] and sent[0]["wrapup"] is True  # never a kill
     assert not [m for m, _ in state["calls"] if m == "kill"]
 
 
@@ -1752,13 +1752,13 @@ def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
         teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
     org = orgmod.merge_repo_teams(
         orgmod.load(path),
-        tmp_path / "agentorc",
+        tmp_path / "shiftlead",
         {"repo-team": {"manager": {"role": "manager"}, "members": [{"role": "grinder"}]}},
     )
     v = teamrun.members_view(org, "repo-team", [])
-    assert not v["editable"] and v["note"] == "defined in agentorc's .agentorc.yml — changed by PR"
+    assert not v["editable"] and v["note"] == "defined in shiftlead's .shiftlead.yml — changed by PR"
     # the edit itself refuses a repo's file, whatever path reaches it (TD-229 slice 4)
-    repo_file = tmp_path / "agentorc" / ".agentorc.yml"
+    repo_file = tmp_path / "shiftlead" / ".shiftlead.yml"
     repo_file.write_text("teams: {repo-team: {members: [{role: grinder}]}}\n")
     with pytest.raises(ValueError, match="changed by PR"):
         orgmod.edit_members(repo_file, "repo-team", add={"role": "grinder"})
@@ -1784,7 +1784,7 @@ def test_team_review_is_the_union_of_the_member_roles_held_when_the_team_has_a_s
     _reader_org(tmp_path)
     org = orgmod.load()
     team = org.teams["ao-grind"]
-    cfg = cli.repoconfig.discover(tmp_path / "agentorc")
+    cfg = cli.repoconfig.discover(tmp_path / "shiftlead")
     got = teams.team_review(team, teams.team_roles(team, cfg, org.roles))
     assert got == {"reader": "techlead", "held": ["docs/briefs/**", "src/sessionorc/**", "tests/**"], "bound": "2h"}
     assert teams.team_review(team, {}) is None  # no member role holds a path: nothing is held
@@ -1796,10 +1796,10 @@ def test_team_review_is_the_union_of_the_member_roles_held_when_the_team_has_a_s
 def test_new_with_a_team_takes_its_reader_and_its_live_manager(world, capsys):
     tmp_path, state = world
     _reader_org(tmp_path)
-    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    state["sessions"].append({"id": "ao-shiftlead-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
     assert cli.main(["new", "me", "--team", "ao-grind"]) == 0
     (made,) = creates(state)
-    assert made["team"] == "ao-grind" and made["controllers"] == ["ao-agentorc-orc-ao"]
+    assert made["team"] == "ao-grind" and made["controllers"] == ["ao-shiftlead-orc-ao"]
     assert made["review"]["held"] == ["docs/briefs/**", "src/sessionorc/**", "tests/**"]
     assert "held PRs read by team ao-grind's techlead on docs/briefs/**" in capsys.readouterr().out
 
@@ -1808,12 +1808,12 @@ def test_new_with_a_team_takes_its_manager_when_it_is_a_seat_on_call(world, caps
     """TD-276: `teamrun.live` dropped a manager on call, so `ao new --team` named no controller."""
     tmp_path, state = world
     _reader_org(tmp_path)
-    seat = {"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "closed", "team": "ao-grind"}
+    seat = {"id": "ao-shiftlead-orc-ao", "name": "orc-ao", "state": "closed", "team": "ao-grind"}
     seat["seat"] = {"trigger": "team"}
     state["sessions"].append(seat)
     assert cli.main(["new", "me", "--team", "ao-grind"]) == 0
     (made,) = creates(state)
-    assert made["controllers"] == ["ao-agentorc-orc-ao"]
+    assert made["controllers"] == ["ao-shiftlead-orc-ao"]
     assert "under orc-ao · on call: whoever fills the seat may act on it" in capsys.readouterr().out
     state["calls"].clear()
     state["sessions"] = [{**seat, "seat": None}]  # closed and no seat: nobody
@@ -1824,14 +1824,14 @@ def test_new_with_a_team_takes_its_manager_when_it_is_a_seat_on_call(world, caps
 def test_new_with_a_team_keeps_a_roles_own_review_and_a_typed_controller(world):
     tmp_path, state = world
     _reader_org(tmp_path)
-    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    state["sessions"].append({"id": "ao-shiftlead-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
     state["sessions"].append(
-        {"id": "ao-agentorc-boss", "name": "boss", "state": "idle", "dir": str(tmp_path / "agentorc")}
+        {"id": "ao-shiftlead-boss", "name": "boss", "state": "idle", "dir": str(tmp_path / "shiftlead")}
     )
     assert cli.main(["new", "me", "--team", "ao-grind", "--role", "grinder", "--controller", "boss"]) == 0
     (made,) = creates(state)
     assert made["review"]["held"] == ["src/sessionorc/**", "docs/briefs/**"]  # the role's, not the team's
-    assert made["controllers"] == ["ao-agentorc-boss"]
+    assert made["controllers"] == ["ao-shiftlead-boss"]
 
 
 def test_new_with_a_team_and_no_seat_or_no_live_manager_says_no_reader(world, capsys):
@@ -1859,15 +1859,17 @@ def test_new_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_brie
     assert cli.main(["new", "grind-9", "--role", "grinder", "--team", "ao-grind", "--unattended"]) == 0
     (made,) = creates(state)
     slots = made["prompt_from"]["slots"]
-    assert slots["{techlead}"] == {"text": "ao-agentorc-tl-ao"} and slots["{manager}"] == {"text": "ao-agentorc-orc-ao"}
-    assert "Your team's techlead is `ao-agentorc-tl-ao`" in made["prompt"]
-    assert 'ao msg ao-agentorc-orc-ao "done: <ref>' in made["prompt"] and "ao msg none" not in made["prompt"]
+    assert slots["{techlead}"] == {"text": "ao-shiftlead-tl-ao"} and slots["{manager}"] == {
+        "text": "ao-shiftlead-orc-ao"
+    }
+    assert "Your team's techlead is `ao-shiftlead-tl-ao`" in made["prompt"]
+    assert 'ao msg ao-shiftlead-orc-ao "done: <ref>' in made["prompt"] and "ao msg none" not in made["prompt"]
     # what a team start stores for the same member is what this create stores
     planned = teams.plan(orgmod.load(), "ao-grind", HOST).members[0].prompt_from["slots"]
     assert (planned["{techlead}"], planned["{manager}"]) == (slots["{techlead}"], slots["{manager}"])
     # a team with no seat, an undefined one and no team at all each read `none`, as before
     _reader_org(tmp_path, seat=False)
-    for argv, manager in ((["--team", "ao-grind"], "ao-agentorc-orc-ao"), (["--team", "nope"], "none"), ([], "none")):
+    for argv, manager in ((["--team", "ao-grind"], "ao-shiftlead-orc-ao"), (["--team", "nope"], "none"), ([], "none")):
         state["calls"].clear()
         assert cli.main(["new", "grind-9", "--role", "grinder", *argv]) == 0
         slots = creates(state)[0]["prompt_from"]["slots"]
@@ -1878,12 +1880,12 @@ def test_stop_leaves_a_persons_session_alone_and_names_it(world, capsys):
     tmp_path, state = world
     started(state)
     state["sessions"].append(
-        {"id": "ao-agentorc-me", "name": "me", "state": "working", "team": "ao-grind", "unattended": False}
+        {"id": "ao-shiftlead-me", "name": "me", "state": "working", "team": "ao-grind", "unattended": False}
     )
     capsys.readouterr()
     assert cli.main(["team", "stop", "ao-grind", "--now"]) == 0
     killed = [p["id"] for m, p in state["calls"] if m == "kill"]
-    assert "ao-agentorc-me" not in killed and len(killed) == 4
+    assert "ao-shiftlead-me" not in killed and len(killed) == 4
     assert "your session me stays: a team act never stops an interactive session" in capsys.readouterr().out
     for s in state["sessions"]:
         s["state"] = "closed" if s["name"] != "me" else "working"
@@ -1902,7 +1904,7 @@ def test_new_with_a_team_keeps_a_roles_deliberately_empty_controllers(world):
     solo.mkdir(parents=True)
     (solo / "role.yml").write_text("")
     (solo / "template.md").write_text("solo: {lane}\n")
-    state["sessions"].append({"id": "ao-agentorc-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
+    state["sessions"].append({"id": "ao-shiftlead-orc-ao", "name": "orc-ao", "state": "idle", "team": "ao-grind"})
     assert cli.main(["new", "me", "--team", "ao-grind", "--role", "solo"]) == 0
     (made,) = creates(state)
     assert made["controllers"] == []  # nobody may act on it, as the role says
@@ -1916,7 +1918,7 @@ def _td_world(world, monkeypatch, *, seat=True):
     tmp_path, state = world
     doc = org_doc(tmp_path)
     if seat:
-        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "agentorc"}
+        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "shiftlead"}
     write_org(tmp_path, doc)
     handed = []
 
@@ -1924,7 +1926,7 @@ def _td_world(world, monkeypatch, *, seat=True):
         assert method == "entry_add", method
         handed.append(params)
         if not params["teams"]:
-            raise cli.AgentError("no team services agentorc: there is no techlead seat to hand it to (design §4.10)")
+            raise cli.AgentError("no team services shiftlead: there is no techlead seat to hand it to (design §4.10)")
         if not params["teams"][0]["seat"]:
             raise cli.AgentError("ao-grind has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
         return {
@@ -1937,36 +1939,36 @@ def _td_world(world, monkeypatch, *, seat=True):
         }
 
     monkeypatch.setattr(cli, "call_sync", fake)
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     return tmp_path, handed
 
 
 def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkeypatch):
     tmp_path, handed = _td_world(world, monkeypatch)
-    assert cli.main(["td", "add", "--repo", "agentorc", "--type", "feature", "a", "picker for the lane"]) == 0
+    assert cli.main(["td", "add", "--repo", "shiftlead", "--type", "feature", "a", "picker for the lane"]) == 0
     assert handed == [
         {
-            "repo": str(tmp_path / "agentorc"),
+            "repo": str(tmp_path / "shiftlead"),
             "type": "feature",
             "text": "a picker for the lane",
-            "teams": [{"team": "ao-grind", "seat": "ao-agentorc-techlead-ao"}],
+            "teams": [{"team": "ao-grind", "seat": "ao-shiftlead-techlead-ao"}],
         }
     ]
     out = capsys.readouterr().out.splitlines()
-    assert out == ["m-1 handed to techlead-ao (agentorc, feature)", "ao-agentorc-techlead-ao: fills this seat"]
+    assert out == ["m-1 handed to techlead-ao (shiftlead, feature)", "ao-shiftlead-techlead-ao: fills this seat"]
     # standard input when there are no words, the Type debt unless said, and the result under --json
     monkeypatch.setattr(sys, "stdin", io.StringIO("  the parser drops\na trailing line\n"))
-    assert cli.main(["--json", "td", "add", "--repo", "agentorc"]) == 0
+    assert cli.main(["--json", "td", "add", "--repo", "shiftlead"]) == 0
     assert handed[1]["text"] == "the parser drops\na trailing line" and handed[1]["type"] == "debt"
     assert json.loads(capsys.readouterr().out)["id"] == "m-1"
     # a repo is named as the registry spells it — a symlinked checkout by its link — or by a path
-    (tmp_path / "link").symlink_to(tmp_path / "agentorc")
+    (tmp_path / "link").symlink_to(tmp_path / "shiftlead")
     (tmp_path / "home" / "repos.txt").write_text(f"{tmp_path / 'link'}\n")
-    for said in ("link", str(tmp_path / "agentorc"), "../agentorc"):
+    for said in ("link", str(tmp_path / "shiftlead"), "../shiftlead"):
         assert cli.main(["td", "add", "--repo", said, "words"]) == 0, said
-        assert handed[-1]["repo"] == str(tmp_path / "agentorc")
-    assert cli.main(["td", "add", "--repo", "agentorc", "words"]) == 1  # the registry calls it `link`
-    assert "no registered repo is named 'agentorc'" in capsys.readouterr().err
+        assert handed[-1]["repo"] == str(tmp_path / "shiftlead")
+    assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1  # the registry calls it `link`
+    assert "no registered repo is named 'shiftlead'" in capsys.readouterr().err
 
 
 def test_td_add_says_when_standard_input_cannot_be_read(world, capsys, monkeypatch):
@@ -1980,7 +1982,7 @@ def test_td_add_says_when_standard_input_cannot_be_read(world, capsys, monkeypat
             raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte")
 
     monkeypatch.setattr(sys, "stdin", Bytes())
-    assert cli.main(["td", "add", "--repo", "agentorc"]) == 1
+    assert cli.main(["td", "add", "--repo", "shiftlead"]) == 1
     assert "standard input could not be read" in capsys.readouterr().err and not handed
 
 
@@ -1988,7 +1990,7 @@ def test_td_add_from_a_worktree_hands_the_main_checkout(world, capsys, monkeypat
     """The repo defaults to the one the command is run in, and a worktree's path is not in the
     registry: it is the main checkout that `entry_add` is handed."""
     tmp_path, handed = _td_world(world, monkeypatch)
-    repo = tmp_path / "agentorc"
+    repo = tmp_path / "shiftlead"
     (repo / ".git").rmdir()
     git = ["git", "-c", "user.name=t", "-c", "user.email=t@t", "-C", str(repo)]
     subprocess.run([*git, "init", "-q"], check=True)
@@ -2004,7 +2006,7 @@ def test_td_add_from_a_worktree_hands_the_main_checkout(world, capsys, monkeypat
 
 def test_td_add_is_refused_in_words_where_the_forms_button_is_disabled(world, capsys, monkeypatch):
     tmp_path, handed = _td_world(world, monkeypatch, seat=False)
-    assert cli.main(["td", "add", "--repo", "agentorc", "words"]) == 1
+    assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1
     assert "ao-grind has no techlead seat" in capsys.readouterr().err
     assert cli.main(["td", "add", "--repo", "ao-api", "words"]) == 1  # registered, and no team's project holds it
     assert "no team services" in capsys.readouterr().err
@@ -2016,20 +2018,20 @@ def test_td_add_is_refused_in_words_where_the_forms_button_is_disabled(world, ca
     doc["projects"]["ao"]["repos"]["far"] = {"devenv": "/workspaces/far"}
     doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "far"}
     write_org(tmp_path, doc)
-    assert cli.main(["td", "add", "--repo", "agentorc", "words"]) == 1
+    assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1
     assert "techlead-ao: the techlead seat has no checkout on its host" in capsys.readouterr().err and not handed
 
 
 def test_td_add_is_a_persons_only_and_a_session_is_refused_before_stdin_is_read(world, capsys, monkeypatch):
     tmp_path, handed = _td_world(world, monkeypatch)
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-grind-1")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-grind-1")
 
     class Unread:
         def read(self):
             raise AssertionError("a session's standard input was read")
 
     monkeypatch.setattr(sys, "stdin", Unread())
-    assert cli.main(["td", "add", "--repo", "agentorc"]) == 1
+    assert cli.main(["td", "add", "--repo", "shiftlead"]) == 1
     err = capsys.readouterr().err
     assert "a person's own act" in err and "ao finding" in err and not handed
 
@@ -2040,9 +2042,9 @@ def test_td_add_is_a_persons_only_and_a_session_is_refused_before_stdin_is_read(
 def test_team_list_and_repo_say_a_team_is_over_its_line(world, capsys):
     tmp_path, state = world
     started(state)
-    root = str(tmp_path / "agentorc")
+    root = str(tmp_path / "shiftlead")
     mark = {"since": "2026-09-30T14:02:00Z", "repo": root, "crossed": [{"line": "prs", "value": 9, "limit": 8}]}
-    reading = {"name": "agentorc", "root": root, "prs": {"open": []}, "ledger": {"entries": []}, "at": mark["since"]}
+    reading = {"name": "shiftlead", "root": root, "prs": {"open": []}, "ledger": {"entries": []}, "at": mark["since"]}
     state["repos"] = {root: {**reading, "balance": {"ao-grind": mark}}}
     note = teamrun.balance_note(mark)
     assert note.startswith("over its line since ") and note.endswith(": 9 open PRs, line 8")
@@ -2117,7 +2119,7 @@ def test_a_role_with_no_context_takes_300k_and_a_seat_and_a_persons_own_session_
     assert cli.main(["new", "sup", "--team", "ao-grind", "--role", "plain", "--supervised"]) == 0  # a member
     assert [m["context_bound"] for m in creates(state)] == [None, None, 300_000, 300_000, 300_000]
     capsys.readouterr()
-    assert cli.main(["roles", "-d", str(tmp_path / "agentorc")]) == 0
+    assert cli.main(["roles", "-d", str(tmp_path / "shiftlead")]) == 0
     out = capsys.readouterr().out
     lines = {line.split()[0]: line for line in out.splitlines() if line and not line.startswith(" ")}
     assert lines["manager"].endswith("context bound: 300k (default)")
@@ -2137,12 +2139,12 @@ def test_a_manager_on_call_starts_as_a_seat_with_the_team_trigger(world, capsys)
     lead, *members = creates(state)
     assert lead["name"] == "orc-ao" and lead["seat"] == {"trigger": "team"}
     assert lead["supervised"] is True and lead["capabilities"] == ["control"] and lead["controllers"] == []
-    assert all(m.get("seat") is None and m["controllers"] == ["ao-agentorc-orc-ao"] for m in members)
+    assert all(m.get("seat") is None and m["controllers"] == ["ao-shiftlead-orc-ao"] for m in members)
     # its brief is the seat's (TD-259 slice 5): one reading from its own record, then the end — no round
     assert lead["prompt"].startswith("You are a **manager on call**") and "`seat_due`" in lead["prompt"]
     assert "ao wait --timeout" not in lead["prompt"] and "{" not in re.sub(r"`\{[^`]*\}`", "", lead["prompt"])
     assert lead["prompt_from"]["base"].endswith("briefs/manager_on_call.md")  # what a fill composes again (rule 7)
-    assert "ao-agentorc-orc-ao  manager" in capsys.readouterr().out  # a manager on the start's own lines
+    assert "ao-shiftlead-orc-ao  manager" in capsys.readouterr().out  # a manager on the start's own lines
     assert cli.main(["--json", "team", "list"]) == 0
     (row,) = json.loads(capsys.readouterr().out)["teams"]
     assert row["on_call"] is True and row["manager"] == "orc-ao"
@@ -2171,7 +2173,7 @@ def test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway
     6 and 8 do; every lane empty is a refusal, exit 1, unless `--anyway`; an unreadable ledger is
     *unknown*, never empty, and starts."""
     tmp_path, state = world
-    checkout = str(tmp_path / "agentorc")
+    checkout = str(tmp_path / "shiftlead")
 
     def entry(n, pickable="yes", kind="build"):
         return {"id": f"TD-{n}", "pickable": pickable, "kind": kind, "owner": ""}

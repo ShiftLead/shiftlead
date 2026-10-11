@@ -1,5 +1,5 @@
 """The promote's policy at the home (design §6 *Promote*, TD-132 slice 1): the three readings of every
-registered checkout whose `.agentorc.yml` carries `promote:`, kept as `promotes` on `host`; a run in
+registered checkout whose `.shiftlead.yml` carries `promote:`, kept as `promotes` on `host`; a run in
 flight concluded from `check`; under `auto: true` a run started once main has settled. A mixin
 `HostAgent` inherits; the file and subprocess work is `sessionorc.promote`'s, in a thread.
 """
@@ -132,7 +132,7 @@ class PromoteMixin:
                 raise RpcError(bad[root])
             r = readings.get(name)
             if r is None:
-                raise RpcError(f"{root} has no promote: block in its .agentorc.yml (design §5): nothing to press")
+                raise RpcError(f"{root} has no promote: block in its .shiftlead.yml (design §5): nothing to press")
             # the fresh reading replaces the held one whatever the press does next, so the Inbox row
             # a refusal leaves standing reads what was just read
             r["auto"] = self._promotes.get(name, {}).get("auto", False)
@@ -176,7 +176,7 @@ class PromoteMixin:
                 raise RpcError(bad[root])
             r = readings.get(name)
             if r is None:
-                raise RpcError(f"{root} has no promote: block in its .agentorc.yml (design §5): nothing to press")
+                raise RpcError(f"{root} has no promote: block in its .shiftlead.yml (design §5): nothing to press")
             r["auto"] = self._promotes.get(name, {}).get("auto", False)
             self._promotes[name] = r
             if back:

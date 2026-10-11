@@ -24,8 +24,8 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    layout (Org + narrow Focus); the terminal over the link; attachment upload over ssh (drag
    and drop, picker, paste — the copy path is the same plumbing).
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by samscrape's
-   `.agentorc.yml`; run both side by side for one window with tdgrind's cron disabled and the
-   host agent's policies enabled; compare `tdgrind runs` reports against agentorc run logs;
+   `.shiftlead.yml`; run both side by side for one window with tdgrind's cron disabled and the
+   host agent's policies enabled; compare `tdgrind runs` reports against shiftlead run logs;
    then delete `tdgrind.sh` from samscrape (ledger a TD there for the swap and the cron line
    in `infra/kmaster/crontab`). **Capabilities, report channels and presets** (§4.8) open this
    phase, because the migration is the first time several workers run at once and the Org has
@@ -38,7 +38,7 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    defined, its briefs ported from tdgrind. **Not built:** the run window, stall,
    credential-lapse, exit-reap and stranded-work policies; tdgrind's cron still runs, so the
    side-by-side window has not started.
-4. **Commands + board.** `.agentorc.yml` buttons (cmdorc where it fits), command-kind sessions
+4. **Commands + board.** `.shiftlead.yml` buttons (cmdorc where it fits), command-kind sessions
    and the Commands page, the Resumable page (§4.5 screen 4), the Due strip on the Org,
    stranded-work flags; each page gets its top-bar tab when it is built (TD-123). **Not
    started**, except the board's Snooze / Done write-back, built for the Inbox's board rows

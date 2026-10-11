@@ -199,9 +199,7 @@ async def test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_ho
         agent.sessions[sids["ownpr"]].progress = [ProgressEntry(ref="TD-367", pr=1201)]
         agent.sessions[sids["elsewhere"]].progress = [ProgressEntry(ref="TD-368", pr=1202)]
         agent.sessions[sids["fresh"]].git["branch"] = "td364-callers"
-        agent.sessions[sids["fresh"]].progress = [
-            ProgressEntry(ref="TD-364", source="derived", branch="td364-callers")
-        ]
+        agent.sessions[sids["fresh"]].progress = [ProgressEntry(ref="TD-364", source="derived", branch="td364-callers")]
         agent.sessions[sids["handed"]].progress = [ProgressEntry(ref="TD-366", pr=1199, source="derived")]
         agent.sessions[sids["reader"]].inbox.append(
             MailEntry(

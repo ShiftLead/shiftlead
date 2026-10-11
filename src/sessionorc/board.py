@@ -8,7 +8,7 @@ A board is dev-cadence's file and its items are read by dev-cadence's reader
 module only edits the one item it is pointed at, and only while origin's board still holds the item
 the person was shown, open, word for word. **The edit is made on origin's head and landed there**
 (TD-222, built by TD-264): in the host agent's own detached tree for the repo
-(`~/.agentorc/boards/<repo>/tree`), reset to `origin/<default>` at every press, committed with a
+(`~/.shiftlead/boards/<repo>/tree`), reset to `origin/<default>` at every press, committed with a
 fixed message, pushed on a branch of its own and carried onto the default branch by a pull request
 it opens and squash-merges at once — cadence §4.5's tool-made board edit. The person's checkout is
 never written, so its branch, a dirty file or a rebase under way refuses nothing; it catches up by
@@ -168,7 +168,7 @@ def message(text: str, action: str, due: str | None = None, *, answer: str = "")
         "reply": f"reply on {head}",
         "decide": f"decide {head}: {_clip(' '.join(str(answer or '').split()), ANSWER_MAX)}",
     }.get(action, f"done {head}")
-    return f"agentorc: {what} (session {who})"
+    return f"shiftlead: {what} (session {who})"
 
 
 def _git(root: Path, *args: str, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
@@ -216,7 +216,7 @@ def author(root: Path) -> str:
 BOUND = 40.0  # seconds from the fetch to the merge (§4.4)
 MOVED = "that line of the board no longer holds this item: reload the Inbox and try again"
 NOT_ON_ORIGIN = "this line is not on origin yet: push the checkout first"
-PR_BODY = "agentorc's board write-back: one line of the board, at the person's press (cadence §4.5)."
+PR_BODY = "shiftlead's board write-back: one line of the board, at the person's press (cadence §4.5)."
 
 
 def unreachable(why: str) -> Refused:
@@ -267,7 +267,7 @@ def _why(cp: subprocess.CompletedProcess[str], what: str) -> str:
 
 
 def tree_dir(root: Path) -> Path:
-    """The host agent's own tree for the repo at `root`: `~/.agentorc/boards/<repo>/tree` (§4.4)."""
+    """The host agent's own tree for the repo at `root`: `~/.shiftlead/boards/<repo>/tree` (§4.4)."""
     return paths.home() / "boards" / Path(root).name / "tree"
 
 
@@ -599,14 +599,14 @@ def add(
 ) -> dict[str, Any]:
     """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new line at the top
     of the open items of the board on origin's head for the checkout `root`'s repo, committed in the
-    host agent's own tree as `agentorc: board <item head> (from <entry id>)` and landed by its own
+    host agent's own tree as `shiftlead: board <item head> (from <entry id>)` and landed by its own
     PR, as an edit is; the checkout is never written. Refused on the same conditions as an edit,
     touching nothing on origin. Returns `{commit, message, pr, line}` — `line` the new item's line
     number.
 
     With `answer`, the **second add** (§4.4, §4.10 *A question about a reference outlives its asker*,
     TD-216): `text` is the orphaned question's first paragraph and the person's answer follows it on
-    the line as a reply does (` — <name>, <date>: <answer>`), committed as `agentorc: answer <item
+    the line as a reply does (` — <name>, <date>: <answer>`), committed as `shiftlead: answer <item
     head> (from <entry id>)`."""
     root = Path(root)
     today = today or date.today().isoformat()
@@ -617,7 +617,7 @@ def add(
     head = " ".join(str(text).split()).rstrip(".")
     if len(head) > HEAD_MAX:
         head = head[: HEAD_MAX - 1].rstrip() + "…"
-    msg = f"agentorc: {'board' if answer is None else 'answer'} {head} (from {entry})"
+    msg = f"shiftlead: {'board' if answer is None else 'answer'} {head} (from {entry})"
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:

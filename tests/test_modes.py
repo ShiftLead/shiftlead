@@ -18,7 +18,7 @@ from sessionorc.tmux import Tmux
 
 @pytest.mark.unit
 def test_no_home_line_or_one_naming_this_host_is_the_home(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     assert hosts.home_name() == hosts.local_host().name and not hosts.is_node()  # no file at all
     f = tmp_path / "hosts.yml"
     f.write_text("local:\n  name: kmaster\n")
@@ -34,7 +34,7 @@ def test_no_home_line_or_one_naming_this_host_is_the_home(tmp_path, monkeypatch)
     "bad", ["home: true\n", "home: [kmaster]\n", "home: {name: kmaster}\n", "home: '  '\n", "home: 3\n"]
 )
 def test_a_malformed_home_is_no_home_never_a_node_by_accident(tmp_path, monkeypatch, bad):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text(bad + "local:\n  name: laptop\n")
     assert hosts.home_name() == "laptop" and not hosts.is_node()
 
@@ -180,12 +180,12 @@ async def node(tmp_path, monkeypatch):
     home.mkdir()
     # `link.command`: never the default `ssh kmaster`, which on Paul's machine is the live system
     (home / "hosts.yml").write_text("home: kmaster\nlocal:\n  name: laptop\nlink: {command: ['false']}\n")
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
     monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", FAST_TICK)
     sock_name = private_socket_name()
-    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)
+    monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))

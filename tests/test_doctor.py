@@ -179,10 +179,10 @@ async def test_a_session_may_call_it(agent, tmp_path):
 
 
 def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, monkeypatch):
-    from agentorc.adapters.claude_code import CADENCE_HOOK_LINE, ClaudeCodeAdapter
+    from shiftlead.adapters.claude_code import CADENCE_HOOK_LINE, ClaudeCodeAdapter
 
     home = tmp_path / "home"
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     home.mkdir()
     (home / "profiles.yml").write_text(
@@ -197,7 +197,7 @@ def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, m
     (tmp_path / "g" / ".credentials.json").write_text(json.dumps({"claudeAiOauth": {"refreshTokenExpiresAt": exp}}))
     (tmp_path / "api").mkdir()
     (tmp_path / "api" / "settings.json").write_text(json.dumps({"apiKeyHelper": "pass show api"}))
-    hook = tmp_path / "agentorc-hook"
+    hook = tmp_path / "shiftlead-hook"
     hook.write_text("#!/bin/sh\n")
     hook.chmod(hook.stat().st_mode | stat.S_IXUSR)
     layers = home / "claude-hooks"
@@ -208,7 +208,7 @@ def test_claude_codes_profiles_read_their_layers_credentials_and_key(tmp_path, m
         (layers / name).write_text(json.dumps({"hooks": hooks, "statusLine": {"command": f"{cmd} --statusline"}}))
 
     layer("grind.json", str(hook))
-    layer("grind+unattended.json", "/nowhere/agentorc-hook")
+    layer("grind+unattended.json", "/nowhere/shiftlead-hook")
     layer("grind-api.json", str(hook))  # another profile's, whose name begins with this one's
     rows = {r["profile"]: r for r in ClaudeCodeAdapter().doctor_profiles()}
     g = rows["grind"]

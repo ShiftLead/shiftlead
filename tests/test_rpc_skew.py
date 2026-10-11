@@ -17,9 +17,9 @@ from contextlib import asynccontextmanager
 
 import pytest
 
-from agentorc import cli
 from sessionorc import client as clientmod
 from sessionorc.client import LocalClient
+from shiftlead import cli
 
 
 @asynccontextmanager
@@ -74,7 +74,7 @@ def test_progress_leaves_force_unset_unless_asked(monkeypatch, tmp_path):
     the client then drops, so a host agent that predates `force` answers the call."""
     calls: list[tuple[str, dict]] = []
     monkeypatch.setattr(cli, "call_sync", lambda m, **p: (calls.append((m, p)), {"id": "ao-x", "progress": []})[1])
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x")
     monkeypatch.chdir(tmp_path)
 
     assert cli.main(["progress", "claim", "TD-062", "--json"]) == 0

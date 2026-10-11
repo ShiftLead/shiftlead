@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """A scratch home to look at a UI change in (design §4.9b *A UI change is verified by its builder*, TD-291).
 
-Stands up a host agent and the web UI from the checkout this file sits in, on an `AGENTORC_HOME` of its
+Stands up a host agent and the web UI from the checkout this file sits in, on an `SHIFTLEAD_HOME` of its
 own under a short path (a unix socket's path is capped at about 108 bytes), a tmux server of its own and
 a free port, with a fixture repo — a git checkout with a board and a ledger, on the home's repo roster —
 and fixture sessions under the `shell` adapter. It prints the URL, and on Ctrl+C, SIGTERM or SIGHUP stops
 both processes, kills its tmux server and removes the home it made.
 
-It is never the live system: it refuses a home that is, or is under, `~/.agentorc`, and never runs
+It is never the live system: it refuses a home that is, or is under, `~/.shiftlead`, and never runs
 anything on the default tmux server: the agent is a child this script starts with a `Tmux` on a private
 socket, as `tests/conftest.py`'s fixture does, so the home, the server and the port are made and torn down
 as one.
@@ -38,9 +38,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
-LIVE_HOME = Path("~/.agentorc").expanduser()
+LIVE_HOME = Path("~/.shiftlead").expanduser()
 # what this process takes on itself once the agent is up, to start the fixture sessions through it
-SCRATCH_ENV = ("AGENTORC_HOME", "AGENTORC_TMUX_SOCKET", "CLAUDE_CONFIG_DIR", "DEV_CADENCE_REG_DIR")
+SCRATCH_ENV = ("SHIFTLEAD_HOME", "SHIFTLEAD_TMUX_SOCKET", "CLAUDE_CONFIG_DIR", "DEV_CADENCE_REG_DIR")
 FIXTURE_SESSIONS = ("look-shell-1", "look-shell-2", "look-shell-3")
 _LINE = "- [ ] {kind} {{today}} (session `look` on look) — **{head}** {rest}Context: TD-001. Due: {due}."
 BOARD = "\n".join(
@@ -105,7 +105,7 @@ def refuse_live(home: Path) -> str | None:
     """Why `home` may not be a scratch home, or None. The live home and anything under it are refused."""
     h, live = home.expanduser().resolve(), LIVE_HOME.resolve()
     if h == live or live in h.parents:
-        return f"{home} is the live agentorc home (or under it): a scratch home never is"
+        return f"{home} is the live shiftlead home (or under it): a scratch home never is"
     if len(str(h / "agent.sock")) > 100:
         return f"{home} is too long a path for a unix socket; use a short one (the default is under /tmp)"
     return None
@@ -119,11 +119,11 @@ def free_port() -> int:
 
 def child_env(home: Path, sock: str) -> dict[str, str]:
     env = dict(os.environ)
-    for k in ("AGENTORC_SESSION", "TMUX", "TMUX_PANE"):  # nobody's session, inside nobody's pane
+    for k in ("SHIFTLEAD_SESSION", "TMUX", "TMUX_PANE"):  # nobody's session, inside nobody's pane
         env.pop(k, None)
     env.update(
-        AGENTORC_HOME=str(home),
-        AGENTORC_TMUX_SOCKET=sock,
+        SHIFTLEAD_HOME=str(home),
+        SHIFTLEAD_TMUX_SOCKET=sock,
         CLAUDE_CONFIG_DIR=str(home / "claude"),  # never this machine's live Claude registry
         DEV_CADENCE_REG_DIR=str(home),  # the board reader's roster is the home's `repos.txt`, never the person's
         PYTHONPATH=os.pathsep.join([str(SRC), *filter(None, [env.get("PYTHONPATH")])]),
@@ -207,7 +207,7 @@ def remove_home(home: Path, quiet: float = 1.0, limit: float = 6.0, step: float 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="look_home.py", description=__doc__.split("\n\n")[0])
     ap.add_argument("--port", type=int, default=0, help="the UI's port (default: a free one)")
-    ap.add_argument("--home", type=Path, help="the scratch AGENTORC_HOME, which must not exist (default: under /tmp)")
+    ap.add_argument("--home", type=Path, help="the scratch SHIFTLEAD_HOME, which must not exist (default: under /tmp)")
     ap.add_argument("--sessions", type=int, default=len(FIXTURE_SESSIONS), help="fixture shell sessions to start")
     ap.add_argument("--agent", metavar="SOCKET", help=argparse.SUPPRESS)  # the child's own mode
     args = ap.parse_args(argv)
@@ -250,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"look_home: the host agent exited {agent.returncode}", file=sys.stderr)
             return 1
         os.environ.update({k: env[k] for k in SCRATCH_ENV})
-        os.environ.pop("AGENTORC_SESSION", None)
+        os.environ.pop("SHIFTLEAD_SESSION", None)
         sys.path.insert(0, str(SRC))
         from sessionorc.client import call_sync
 
@@ -262,7 +262,7 @@ def main(argv: list[str] | None = None) -> int:
             [
                 sys.executable,
                 "-c",
-                "import sys; from agentorc.ui.app import main; sys.exit(main(sys.argv[1:]))",
+                "import sys; from shiftlead.ui.app import main; sys.exit(main(sys.argv[1:]))",
                 "--bind",
                 "127.0.0.1",
                 "--port",
@@ -283,7 +283,7 @@ def main(argv: list[str] | None = None) -> int:
         if not wait_for(up, 20) or ui.poll() is not None:
             print("look_home: the UI never answered", file=sys.stderr)
             return 1
-        print(f"look home: http://127.0.0.1:{port}/  (AGENTORC_HOME={home}, tmux -L {sock})", flush=True)
+        print(f"look home: http://127.0.0.1:{port}/  (SHIFTLEAD_HOME={home}, tmux -L {sock})", flush=True)
         while not stopping and all(p.poll() is None for p in procs):
             time.sleep(0.2)
         if dead := [n for n, p in zip(("host agent", "UI"), procs, strict=True) if p.poll() is not None]:

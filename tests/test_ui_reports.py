@@ -13,7 +13,7 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-UI = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
 
 GROUPS_PROBE = """
 const fs = require("fs");
@@ -85,7 +85,7 @@ def test_drop_is_behind_more_on_in_progress_claims_and_its_confirm_names_the_cos
 
 @pytest.fixture
 def client(subprocess_agent):
-    from agentorc.ui.app import create_app
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         yield c
@@ -106,7 +106,7 @@ def test_the_panel_carries_the_i_mark_the_menu_and_the_pr_base(client, tmp_path)
 
 @pytest.mark.unit
 def test_repo_web_is_the_github_origin_or_nothing(tmp_path):
-    from agentorc import review
+    from shiftlead import review
 
     repo = tmp_path / "r"
     subprocess.run(["git", "init", "-q", str(repo)], check=True)

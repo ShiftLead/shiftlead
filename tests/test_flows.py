@@ -1,5 +1,5 @@
 """Flows (design §4.9c, TD-309 slice 1): a flow found and read — the package's built-ins and a repo's
-`.agentorc/flows/<name>/` — judged usable when whole, a role's `kind`, the repo's top-level `held:`,
+`.shiftlead/flows/<name>/` — judged usable when whole, a role's `kind`, the repo's top-level `held:`,
 and a team's `flows:` refused at its start when a flow is unknown, not usable or cannot be followed."""
 
 from __future__ import annotations
@@ -12,8 +12,8 @@ import pytest
 import yaml
 from test_cli_teams import HOST, world  # noqa: F401 — the fixture, by name
 
-from agentorc import flowdefs, repoconfig, teams
-from agentorc import org as orgmod
+from shiftlead import flowdefs, repoconfig, teams
+from shiftlead import org as orgmod
 
 pytestmark = pytest.mark.unit
 
@@ -23,7 +23,7 @@ def cfg_with(tmp_path: Path, text: str = "") -> repoconfig.RepoConfig:
 
 
 def repo_flow(root: Path, name: str, stages: list[dict], briefs: dict[str, str] | None = None, extra: str = "") -> Path:
-    d = root / ".agentorc" / "flows" / name
+    d = root / ".shiftlead" / "flows" / name
     d.mkdir(parents=True, exist_ok=True)
     (d / "flow.yml").write_text(yaml.safe_dump({"stages": stages}) + extra)
     for f, text in (briefs or {}).items():
@@ -50,7 +50,7 @@ def test_every_preset_has_a_kind_and_an_overlay_may_not_write_one(tmp_path):
     with pytest.raises(ValueError, match=r"grinder.kind: a role's kind is its definition's"):
         cfg_with(tmp_path, "roles:\n  grinder: {kind: seat}\n")
     # a key-only role defines nothing (§4.9c, TD-313): refused when the file is read, and never resolved
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  scout: {brief: d.md}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles:\n  scout: {brief: d.md}\n")
     with pytest.raises(ValueError, match="`roles`.scout: unknown role 'scout'"):
         repoconfig.load(tmp_path)
     with pytest.raises(KeyError, match="unknown role 'scout'"):
@@ -105,7 +105,7 @@ def test_a_repo_flow_is_found_by_its_directory_and_reaches_package_and_sibling_b
     )
     f = flowdefs.load("mine", cfg_with(tmp_path))
     assert f.place == "repo" and f.usable, f.problems
-    assert f.stages[0].path == tmp_path / ".agentorc" / "flows" / "base" / "b.md"
+    assert f.stages[0].path == tmp_path / ".shiftlead" / "flows" / "base" / "b.md"
     assert f.stages[1].path == flowdefs.PACKAGE_DIR / "td" / "review.md"
     assert flowdefs.load("nothing", cfg_with(tmp_path)) is None
     # a repo directory taking a built-in's name is never read: the built-in is the flow
@@ -171,10 +171,10 @@ def test_flows_on_a_team_is_a_list_of_names_each_once(tmp_path):
 
 @pytest.mark.unit
 def test_an_org_flow_is_found_over_a_repos_and_never_over_a_built_in(tmp_path, monkeypatch):
-    # §4.9c *Where flows and roles live* (TD-313): the org's `~/.agentorc/flows/<name>/` over a
+    # §4.9c *Where flows and roles live* (TD-313): the org's `~/.shiftlead/flows/<name>/` over a
     # repo's, whole; a directory taking a built-in's name is never read, in either place
     home = tmp_path / "home"
-    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
     hunt = [{"name": "find", "role": "hunter", "lane": ["free"], "brief": "find.md"}]
     repo_flow(tmp_path / "r", "hunt", hunt, {"find.md": "the repo's find words\n"})
     assert flowdefs.find("hunt", tmp_path / "r").place == "repo"
@@ -193,7 +193,7 @@ def test_an_org_flow_is_found_over_a_repos_and_never_over_a_built_in(tmp_path, m
     assert flowdefs.find("td").place == "package"
     rows = {(r["name"], r["source"]): r for r in flowdefs.visible([tmp_path / "r"])}
     assert rows[("hunt", str(org_flow))]["usable"]
-    assert "the org's flow hunt" in rows[("hunt", str(tmp_path / "r" / ".agentorc" / "flows" / "hunt"))]["shadowed"]
+    assert "the org's flow hunt" in rows[("hunt", str(tmp_path / "r" / ".shiftlead" / "flows" / "hunt"))]["shadowed"]
     assert "built-in's name" in rows[("td", str(flowdefs.org_dir() / "td"))]["shadowed"]
     (flowdefs.org_dir() / ".hidden").mkdir()
     (flowdefs.org_dir() / ".hidden" / "flow.yml").write_text("stages: []\n")
@@ -203,7 +203,7 @@ def test_an_org_flow_is_found_over_a_repos_and_never_over_a_built_in(tmp_path, m
 @pytest.mark.unit
 def test_an_org_flow_cannot_be_followed_by_a_team_on_a_node(tmp_path, monkeypatch):
     # §4.9c: a node team's briefs are read on the node, and the org's directories are the home's
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     d = flowdefs.org_dir() / "hunt"
     d.mkdir(parents=True)
     (d / "flow.yml").write_text("stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n")
@@ -212,7 +212,7 @@ def test_an_org_flow_cannot_be_followed_by_a_team_on_a_node(tmp_path, monkeypatc
     assert flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind") == []
     why = flowdefs.unfollowable(hunt, {"hunter"}, techlead=False, held=(), team="cm-grind", node="contractmatch")
     # and a member started under it reads its stage brief as a flow's, so no *flow changed* is raised
-    from agentorc import teamrun
+    from shiftlead import teamrun
 
     assert teamrun._is_stage(d / "find.md")
     assert flowdefs.cannot_follow("hunt", "cm-grind", why) == (
@@ -229,15 +229,15 @@ def _with(tmp_path: Path, **team) -> orgmod.Org:
 
 
 def test_a_team_listing_a_flow_it_can_follow_plans_and_one_it_cannot_is_refused(world, tmp_path):  # noqa: F811
-    root = tmp_path / "agentorc"
-    techlead = {"name": "techlead-ao", "home": "agentorc"}
+    root = tmp_path / "shiftlead"
+    techlead = {"name": "techlead-ao", "home": "shiftlead"}
     # nothing held: the review stage would hold every path
     org = _with(tmp_path, flows=["build-review"], techlead=techlead)
     with pytest.raises(
         teams.TeamError, match=r"build-review cannot be followed by ao-grind: nothing held — write held:"
     ):
         teams.plan(org, "ao-grind", HOST)
-    (root / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (root / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     teams.plan(org, "ao-grind", HOST)  # followable now
     # no techlead seat
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
@@ -258,7 +258,7 @@ def test_a_team_listing_a_flow_it_can_follow_plans_and_one_it_cannot_is_refused(
 def test_a_team_with_no_flows_plans_as_before_and_its_slots_take_their_kind(world, tmp_path):  # noqa: F811
     teams.plan(orgmod.load(), "ao-grind", HOST)  # the fixture's team: no flows, unchanged
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
-    doc["teams"]["ao-grind"]["members"].append({"role": "techlead", "name": "tl", "home": "agentorc"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "techlead", "name": "tl", "home": "shiftlead"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     with pytest.raises(teams.TeamError, match="a member takes a worker role, and 'techlead' is a seat"):
         teams.plan(orgmod.load(), "ao-grind", HOST)
@@ -350,10 +350,10 @@ def test_the_designer_is_a_preset_whose_template_wraps_it_flow_or_none(tmp_path)
 def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path):  # noqa: F811
     # §4.9c item 5, TD-309 slice 2a: `ao new --team` and the form's Team pick (`teams.brief_ids` with
     # the role and its repo) fill `{flow}` and `{stage}` from the team's current flow
-    root = tmp_path / "agentorc"
-    (root / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    root = tmp_path / "shiftlead"
+    (root / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     cfg = repoconfig.load(root)
-    org = _with(tmp_path, flows=["build-review", "build"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    org = _with(tmp_path, flows=["build-review", "build"], techlead={"name": "techlead-ao", "home": "shiftlead"})
     ids = teams.brief_ids(org, "ao-grind", HOST, "grinder", cfg)
     seat = ids["techlead"]
     assert seat and ids["flow"].text == (
@@ -373,11 +373,11 @@ def test_a_node_members_repo_stage_brief_is_read_on_its_checkout(tmp_path):
     # its compose, never from this host's disk; a `package:` brief is this host's own, as `check` reads
     node = tmp_path / "on-node"  # the node's checkout: nothing of it is on this disk
     there = {
-        node / ".agentorc" / "flows" / "mine" / "flow.yml": (
+        node / ".shiftlead" / "flows" / "mine" / "flow.yml": (
             "stages:\n  - {name: build, role: grinder, lane: [free-pick], brief: build.md}\n"
             "  - {name: review, role: techlead, brief: 'package:td/review.md'}\n"
         ),
-        node / ".agentorc" / "flows" / "mine" / "build.md": "the node's own build words\n",
+        node / ".shiftlead" / "flows" / "mine" / "build.md": "the node's own build words\n",
     }
 
     def read(path: Path) -> str | None:
@@ -390,11 +390,11 @@ def test_a_node_members_repo_stage_brief_is_read_on_its_checkout(tmp_path):
     assert mine is not None and mine.usable, mine.problems
     text, made = repoconfig.resolve_role(cfg, "grinder").compose(read=read, flow=flowdefs.under(mine, "grinder"))
     assert "the node's own build words" in text
-    assert made["slots"]["{stage}"] == {"file": str(node / ".agentorc" / "flows" / "mine" / "build.md")}
+    assert made["slots"]["{stage}"] == {"file": str(node / ".shiftlead" / "flows" / "mine" / "build.md")}
     _, made = repoconfig.resolve_role(cfg, "techlead").compose(read=read, flow=flowdefs.under(mine, "techlead"))
     assert made["slots"]["{stage}"] == {"file": str(flowdefs.PACKAGE_DIR / "td" / "review.md")}
     # a node that stops answering between the check and the compose refuses the member, by its file
-    del there[node / ".agentorc" / "flows" / "mine" / "build.md"]
+    del there[node / ".shiftlead" / "flows" / "mine" / "build.md"]
     with pytest.raises(ValueError, match="stage brief .*build.md cannot be read"):
         repoconfig.resolve_role(cfg, "grinder").compose(read=read, flow=flowdefs.under(mine, "grinder"))
 
@@ -405,7 +405,7 @@ def test_an_edit_to_a_stage_brief_is_brief_changed(tmp_path):
     # the repo's brief (design §6 rule 7, §4.9c *Briefs*)
     from sessionorc import brief
 
-    flow_dir = tmp_path / ".agentorc" / "flows" / "mine"
+    flow_dir = tmp_path / ".shiftlead" / "flows" / "mine"
     flow_dir.mkdir(parents=True)
     stage = "{name: build, role: grinder, lane: [free-pick], brief: build.md}"
     (flow_dir / "flow.yml").write_text(f"stages:\n  - {stage}\n")
@@ -429,14 +429,14 @@ def test_a_session_started_into_a_node_team_under_an_org_flow_composes_as_with_n
     (d / "flow.yml").write_text("stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n")
     (d / "find.md").write_text("find\n")
     org = _with(tmp_path, flows=["hunt"])
-    team, cfg = org.teams["ao-grind"], repoconfig.load(tmp_path / "agentorc")
+    team, cfg = org.teams["ao-grind"], repoconfig.load(tmp_path / "shiftlead")
     assert teams.flow_for(org, team, cfg, "hunter").stage == d / "find.md"
     assert teams.flow_for(org, team, cfg, "hunter", read=lambda p: None) is None
 
 
 def test_a_flow_that_cannot_be_read_on_its_host_composes_as_no_flow(world, tmp_path):  # noqa: F811
     # review of TD-309 slice 2a: a node's checkout that does not answer is never a 500 past the form
-    root = tmp_path / "agentorc"
+    root = tmp_path / "shiftlead"
     cfg = repoconfig.load(root)
     org = _with(tmp_path, flows=["mine"])
 
@@ -463,12 +463,12 @@ def test_a_start_under_a_flow_compiles_lanes_the_reader_and_the_path(world, tmp_
     """§4.9c *What a flow compiles to*: a member's lane is its own, else its stage's; a member stage's
     role takes the techlead on the repos' `held:`, its own `review:` set aside and said once; a
     seat, the manager and a member outside the flows take none; each brief carries the path."""
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    t.update(flows=["build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
     del t["members"][0]["lane"]  # the grinders take the stage's lane
-    doc["roles"]["grinder"]["review"] = {"reader": "techlead", "held": ["src/agentorc/**"]}
+    doc["roles"]["grinder"]["review"] = {"reader": "techlead", "held": ["src/shiftlead/**"]}
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     assert p.flow == "build-review" and not p.sit_out
     grinders = [x for x in p.members if x.role == "grinder"]
@@ -494,17 +494,17 @@ def test_a_start_under_a_flow_compiles_lanes_the_reader_and_the_path(world, tmp_
     t["members"][0]["lane"] = "free-pick"
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     assert p.flow is None and not any("set aside" in n for n in p.notes)
-    assert next(x for x in p.members if x.role == "grinder").review["held"] == ["src/agentorc/**"]
+    assert next(x for x in p.members if x.role == "grinder").review["held"] == ["src/shiftlead/**"]
 
 
 def test_a_member_the_current_flow_does_not_use_sits_out(world, tmp_path):  # noqa: F811
     """§4.9c *Members the flow does not use sit out*: a designer, a stage of `td` and of no stage of
     `build-review`, is not started while `build-review` is current, and is under `td`."""
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     assert p.sit_out == ["designer-ao"] and "designer-ao" not in [x.name for x in p.launches]
     assert "designer-ao: sits out under build-review" in p.notes
@@ -522,10 +522,10 @@ def test_a_member_the_current_flow_does_not_use_sits_out(world, tmp_path):  # no
 def test_a_session_started_into_a_team_takes_the_flows_reader(world, tmp_path):  # noqa: F811
     """§4.9c items 2 and 3 outside a start: a person's session and a member stage's role take the
     flow's reader; a role with no member stage takes none; a team with no flow keeps today's rule."""
-    root = tmp_path / "agentorc"
-    (root / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    root = tmp_path / "shiftlead"
+    (root / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     cfg = repoconfig.load(root)
-    org = _with(tmp_path, flows=["build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    org = _with(tmp_path, flows=["build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
     team = org.teams["ao-grind"]
     reader = {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": teams.REVIEW_BOUND}
     assert teams.flow_review(org, team, cfg) == (True, reader)
@@ -543,13 +543,13 @@ def test_remove_refuses_the_last_member_of_a_role_a_listed_flow_needs(world, tmp
     is listed, naming the flow, and leaves the file as it was; a grinder of two goes."""
     from test_cli_teams import org_doc
 
-    from agentorc import cli, teamrun
+    from shiftlead import cli, teamrun
 
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = org_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     path = tmp_path / "home" / "org.yml"
     path.write_text(yaml.safe_dump(doc, default_flow_style=None))
     before = path.read_text()
@@ -569,8 +569,8 @@ def test_remove_refuses_the_last_member_of_a_role_a_listed_flow_needs(world, tmp
 def test_a_feature_entry_opens_the_flows_design_stage(world, tmp_path):  # noqa: F811
     """§4.9c item 4: `entries.feature` defaults to the role of the current flow's stage whose lane
     holds `design-first`; a debt stays the techlead's; the team's own `entries:` wins."""
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
-    org = _with(tmp_path, flows=["td"], techlead={"name": "techlead-ao", "home": "agentorc"})
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
+    org = _with(tmp_path, flows=["td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
     team = org.teams["ao-grind"]
     assert teams.entry_role(org, team, "feature", HOST, HOST) == "designer"
     assert teams.entry_role(org, team, "debt", HOST, HOST) == "techlead"
@@ -595,11 +595,11 @@ def test_the_flow_setting_is_a_name_the_agent_takes_without_a_definition():
 def test_the_person_picks_a_listed_flow_and_an_unlisted_pick_reads_as_the_first(world, tmp_path):  # noqa: F811
     """§4.9c *A team lists its flows, and the person picks one*: `teams.<team>.flow` turns the team
     to a flow it lists; absent, the first; a value it no longer lists reads as the first, said."""
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     org = _write(tmp_path, doc)
     assert teams.current_flow(org.teams["ao-grind"]) == "td"
     picked = orgmod.with_settings(org, {"ao-grind": {"flow": "build-review"}, "other": {"flow": "td"}})
@@ -617,21 +617,21 @@ def test_the_person_picks_a_listed_flow_and_an_unlisted_pick_reads_as_the_first(
 def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     """`ao team flow <team> [<flow>]` (design §4.7): the flows, the current marked, each strip and why
     one cannot be followed; a pick of a listed flow is written through `set_settings`, any other refused."""
-    from agentorc import cli
+    from shiftlead import cli
 
     _, state = world
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     doc["teams"]["ao-grind"].update(
-        flows=["build", "td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"}
+        flows=["build", "td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"}
     )
     _write(tmp_path, doc)
     assert cli.main(["team", "flow", "ao-grind"]) == 0
     assert capsys.readouterr().out.splitlines() == [
-        "* build         build → you, through ao-agentorc-techlead-ao",
-        "  td            design → build → review → you, through ao-agentorc-techlead-ao",
+        "* build         build → you, through ao-shiftlead-techlead-ao",
+        "  td            design → build → review → you, through ao-shiftlead-techlead-ao",
         "                td cannot be followed by ao-grind: no designer — add one to members:, or drop td from flows:",
-        "  build-review  build → review → you, through ao-agentorc-techlead-ao",
+        "  build-review  build → review → you, through ao-shiftlead-techlead-ao",
     ]
     assert cli.main(["team", "flow", "ao-grind", "hunt"]) != 0
     assert "lists build, td, build-review, not 'hunt'" in capsys.readouterr().err
@@ -642,9 +642,9 @@ def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsy
     assert cli.main(["team", "flow", "ao-grind"]) == 0  # read back from the home's setting
     assert capsys.readouterr().out.splitlines()[-1].startswith("* build-review ")
     # a session's `ao` reads the pick as the person's does: the file, not the person-only `settings` read
-    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-grinder-ao-1")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-grinder-ao-1")
     assert teams.current_flow(cli._org_here().teams["ao-grind"]) == "build-review"
-    monkeypatch.delenv("AGENTORC_SESSION")
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
     del doc["teams"]["ao-grind"]["flows"]
     _write(tmp_path, doc)
     # no flows: a flow named is refused; the bare read and Apply read its seats alone (§4.9c, TD-399)
@@ -660,21 +660,22 @@ def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsy
 def test_ao_team_list_carries_the_flows_and_the_feature_role(world, tmp_path, capsys):  # noqa: F811
     """§4.9c *What is shown*: `ao team list` and its `--json` carry `flows`, `flow` and why a flow
     cannot be followed; `entries.feature` reads as the current flow fills it."""
-    from agentorc import cli
+    from shiftlead import cli
 
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     _write(tmp_path, doc)
     assert cli.main(["--json", "team", "list"]) == 0
     row = next(r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] == "ao-grind")
     assert row["flow"] == "td" and [f["name"] for f in row["flows"]] == ["td", "build-review"]
     assert row["entries"]["feature"] == "designer" and row["flow_note"] == ""
     assert cli.main(["team", "list"]) == 0
-    assert "  flow: td — design → build → review → you, through ao-agentorc-techlead-ao  (also lists build-review)" in (
-        capsys.readouterr().out
+    assert (
+        "  flow: td — design → build → review → you, through ao-shiftlead-techlead-ao  (also lists build-review)"
+        in (capsys.readouterr().out)
     )
     t["members"].pop()  # no designer: td cannot be followed, said under the team
     _write(tmp_path, doc)
@@ -689,9 +690,9 @@ def test_ao_org_lists_every_flow_and_check_fails_on_one_not_usable(world, tmp_pa
     """§4.7: `ao org` lists the built-ins and each registered repo's flows with source and whether
     usable; `ao org check` fails on a flow that is not usable, and a repo flow taking a built-in's
     name is listed as not read."""
-    from agentorc import cli
+    from shiftlead import cli
 
-    root = tmp_path / "agentorc"
+    root = tmp_path / "shiftlead"
     repo_flow(
         root, "hunt", [{"name": "find", "role": "hunter", "lane": ["free"], "brief": "find.md"}], {"find.md": "x"}
     )
@@ -699,11 +700,11 @@ def test_ao_org_lists_every_flow_and_check_fails_on_one_not_usable(world, tmp_pa
     assert cli.main(["--json", "org"]) == 0
     flows = {(f["name"], f["source"]): f for f in json.loads(capsys.readouterr().out)["flows"]}
     assert all(flows[(n, "package")]["usable"] for n in flowdefs.BUILTIN)
-    hunt = flows[("hunt", str(root / ".agentorc" / "flows" / "hunt"))]
+    hunt = flows[("hunt", str(root / ".shiftlead" / "flows" / "hunt"))]
     assert hunt["usable"], hunt["problems"]
-    assert flows[("td", str(root / ".agentorc" / "flows" / "td"))]["shadowed"].startswith("not read: td is a built-in")
+    assert flows[("td", str(root / ".shiftlead" / "flows" / "td"))]["shadowed"].startswith("not read: td is a built-in")
     assert cli.main(["org"]) == 0
-    assert f"flow hunt          usable  [{root / '.agentorc' / 'flows' / 'hunt'}]" in capsys.readouterr().out
+    assert f"flow hunt          usable  [{root / '.shiftlead' / 'flows' / 'hunt'}]" in capsys.readouterr().out
     assert cli.main(["org", "check"]) == 0
     capsys.readouterr()
     repo_flow(root, "broken", [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "gone.md"}])
@@ -715,7 +716,7 @@ def test_a_flow_file_that_cannot_be_read_is_a_problem_of_the_flow_not_a_crash(tm
     """Review of #1068: `ao org` and its check list every flow, so one bad file is that flow's problem."""
     d = repo_flow(tmp_path, "bad", [{"name": "b", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"}])
     (d / "flow.yml").write_bytes(b"stages: \xff\xfe\n")
-    (tmp_path / ".agentorc" / "flows" / "stray.txt").write_text("not a flow\n")
+    (tmp_path / ".shiftlead" / "flows" / "stray.txt").write_text("not a flow\n")
     rows = {f["name"]: f for f in flowdefs.visible([tmp_path])}
     assert not rows["bad"]["usable"] and "could not be read" in rows["bad"]["problems"][0]
     assert "stray.txt" not in rows and all(rows[n]["usable"] for n in flowdefs.BUILTIN)
@@ -725,14 +726,14 @@ def test_ao_org_check_warns_of_each_key_the_flow_fills_the_same(world, tmp_path,
     """§4.9c *What is shown*: `ao org check` warns, per team, of each key it writes that its current
     flow would fill with the same value — a lane in its written order, `entries.feature`, a stage
     role's `review:` in the repo's `roles:` with `held` as a set — and fails on none of them."""
-    from agentorc import cli
+    from shiftlead import cli
 
     held = "held: [src/sessionorc/**, docs/briefs/**]\n"
     review = "roles:\n  grinder:\n    review: {reader: techlead, held: [docs/briefs/**, src/sessionorc/**]}\n"
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(held + review)
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(held + review)
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td"], techlead={"name": "techlead-ao", "home": "agentorc"}, entries={"feature": "designer"})
+    t.update(flows=["td"], techlead={"name": "techlead-ao", "home": "shiftlead"}, entries={"feature": "designer"})
     t["members"][0]["lane"] = ["free-pick", "owner:grinder"]
     t["members"].append({"role": "designer", "name": "design", "lane": ["owner:designer", "design-first"]})
     org = _write(tmp_path, doc)
@@ -741,14 +742,14 @@ def test_ao_org_check_warns_of_each_key_the_flow_fills_the_same(world, tmp_path,
     assert got == [
         "team ao-grind: grind's lane: free-pick, owner:grinder is what flow td fills — org.yml may drop it",
         "team ao-grind: entries.feature: designer is what flow td fills — org.yml may drop it",
-        "team ao-grind: grinder's review: in .agentorc.yml is the reader flow td gives — the repo may drop it "
+        "team ao-grind: grinder's review: in .shiftlead.yml is the reader flow td gives — the repo may drop it "
         "(a session outside a flow still reads it)",
     ]  # the designer's lane is in another order, its pick order: not the same; the hunter is outside the flow
     assert cli.main(["org", "check"]) == 0
     out = capsys.readouterr().out
     assert "warning: team ao-grind: grind's lane: free-pick, owner:grinder is what flow td fills" in out
     # a held set that differs, and no flow at all: nothing to say
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text(held + review.replace("docs/briefs/**, ", ""))
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(held + review.replace("docs/briefs/**, ", ""))
     t["members"][0]["lane"] = "free-pick"
     t.pop("entries")
     org = _write(tmp_path, doc)
@@ -765,15 +766,15 @@ def test_ao_org_check_warns_of_each_key_the_flow_fills_the_same(world, tmp_path,
 def _switching(world, tmp_path, monkeypatch, flows):  # noqa: F811
     """A live ao-grind under `flows[0]`, its records as the start created them, each carrying the
     `brief` the home records (the stage file among its sources); `relaunch` calls answered and kept."""
-    from agentorc import cli, teamrun
+    from shiftlead import cli, teamrun
 
     _, state = world
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=flows, techlead={"name": "techlead-ao", "home": "agentorc"})
+    t.update(flows=flows, techlead={"name": "techlead-ao", "home": "shiftlead"})
     del t["members"][0]["lane"]
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "agentorc"})
+    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
     org = _write(tmp_path, doc)
     plan, _ = teamrun.start(cli.call_sync, org, "ao-grind", HOST)
     for x, rec in zip(plan.launches, state["sessions"], strict=True):
@@ -793,7 +794,7 @@ def _switching(world, tmp_path, monkeypatch, flows):  # noqa: F811
 
 
 def test_a_team_running_its_flow_reads_no_difference(world, tmp_path, capsys, monkeypatch):  # noqa: F811
-    from agentorc import cli
+    from shiftlead import cli
 
     _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
     assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
@@ -805,7 +806,7 @@ def test_a_team_running_its_flow_reads_no_difference(world, tmp_path, capsys, mo
 def test_a_live_add_under_the_flow_raises_no_flow_changed(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     # TD-309's *Done when*: **Members…** Add starts the member with the current flow's compiled lane,
     # reader and stage brief (§4.5a *Members dialog*), so the team still reads as running its flow
-    from agentorc import cli, teamrun
+    from shiftlead import cli, teamrun
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
     got = teamrun.add_member(cli.call_sync, tmp_path / "home" / "org.yml", "ao-grind", HOST, role="grinder")
@@ -828,7 +829,7 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     `build-review` gives no stage sits out by the home's `relaunch {sit_out}`, a grinder whose stage
     brief moved is handed its new launch, and the seat whose review brief is the same is untouched;
     then `build` takes the grinders' reader off and the seat's stage brief away."""
-    from agentorc import cli
+    from shiftlead import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review", "build"])
     assert cli.main(["team", "flow", "ao-grind", "build-review", "--apply"]) == 0
@@ -836,10 +837,10 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     assert state["teams"]["ao-grind"] == {"flow": "build-review"}
     calls = [(m, p) for m, p in state["calls"] if m == "relaunch"]
     sat = [p for _, p in calls if p.get("sit_out")]
-    assert [p["id"] for p in sat] == ["ao-agentorc-designer-ao"]
+    assert [p["id"] for p in sat] == ["ao-shiftlead-designer-ao"]
     handed = {p["id"]: p["launch"] for _, p in calls if "launch" in p}
-    assert sorted(handed) == ["ao-agentorc-grind-1", "ao-agentorc-grind-2"]
-    launch = handed["ao-agentorc-grind-1"]
+    assert sorted(handed) == ["ao-shiftlead-grind-1", "ao-shiftlead-grind-2"]
+    launch = handed["ao-shiftlead-grind-1"]
     assert sorted(launch) == ["lane", "prompt", "prompt_from", "review"]
     assert launch["prompt_from"]["slots"]["{stage}"]["file"].endswith("build-review/build.md")
     assert "designer-ao: sits out under build-review" in out
@@ -848,7 +849,7 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     for s in state["sessions"]:
         if s["id"] in handed:
             s["brief"] = {"sources": [{"path": handed[s["id"]]["prompt_from"]["slots"]["{stage}"]["file"]}]}
-        if s["id"] == "ao-agentorc-designer-ao":
+        if s["id"] == "ao-shiftlead-designer-ao":
             s.update(state="closed", closed_for={"why": "sit_out"})
     state["calls"].clear()
     assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
@@ -857,8 +858,8 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     assert cli.main(["--json", "team", "flow", "ao-grind", "build", "--apply"]) == 0
     got = json.loads(capsys.readouterr().out)["apply"]
     handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch"}
-    assert handed["ao-agentorc-grind-1"]["review"] is None
-    assert handed["ao-agentorc-techlead-ao"]["prompt_from"]["slots"]["{stage}"].get("file") is None
+    assert handed["ao-shiftlead-grind-1"]["review"] is None
+    assert handed["ao-shiftlead-techlead-ao"]["prompt_from"]["slots"]["{stage}"].get("file") is None
     lines = [d["line"] for d in got["applied"]]
     assert any(x.startswith("grind-1: relaunched — reader techlead → none") for x in lines)
 
@@ -868,10 +869,10 @@ def test_an_apply_clears_flow_changed_before_the_member_restarts(world, tmp_path
     lane, review}`; the record's own lane and `review` stay the old run's until the member restarts,
     so the mark — what it runs next — is what the flow is read against, and Apply is not offered
     again. A record's `held` in another order is no difference; another set is."""
-    from agentorc import cli
+    from shiftlead import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build"])
-    (tmp_path / "agentorc" / ".agentorc.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
+    (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
     read = [s for s in state["sessions"] if s.get("review")]
     assert {s["name"] for s in read} >= {"grind-1", "grind-2"}
     assert all(s["review"]["held"] == ["src/sessionorc/**"] for s in read)
@@ -888,7 +889,7 @@ def test_an_apply_clears_flow_changed_before_the_member_restarts(world, tmp_path
     assert cli.main(["--json", "team", "flow", "ao-grind", "build", "--apply"]) == 0
     assert "grind-1" in [d["name"] for d in json.loads(capsys.readouterr().out)["apply"]["applied"]]
     handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch" and "launch" in p}
-    assert handed["ao-agentorc-grind-1"]["review"] is None
+    assert handed["ao-shiftlead-grind-1"]["review"] is None
     old = dict(grind["review"])
     for s in state["sessions"]:  # the home took them: brief re-recorded, the mark set, lane and review the old run's
         if s["id"] in handed:
@@ -906,17 +907,17 @@ def test_an_apply_clears_flow_changed_before_the_member_restarts(world, tmp_path
 
 
 def teamrun_stage(launch: dict) -> str | None:
-    from agentorc import teamrun
+    from shiftlead import teamrun
 
     return teamrun.stage_of(launch["prompt_from"])
 
 
 def test_a_chain_is_compared_link_by_link_each_held_as_a_set():
-    from agentorc import teamrun
+    from shiftlead import teamrun
 
     chain = {
         "chain": [
-            {"stage": "ui", "reader": "ui-reader", "held": ["src/agentorc/ui/**", "docs/mockups/**"]},
+            {"stage": "ui", "reader": "ui-reader", "held": ["src/shiftlead/ui/**", "docs/mockups/**"]},
             {"stage": "review", "reader": "techlead", "held": ["src/sessionorc/**"]},
         ],
         "bound": teams.REVIEW_BOUND,
@@ -924,7 +925,7 @@ def test_a_chain_is_compared_link_by_link_each_held_as_a_set():
     key = teamrun._review_key
     reordered = {
         **chain,
-        "chain": [{**chain["chain"][0], "held": ["docs/mockups/**", "src/agentorc/ui/**"]}, chain["chain"][1]],
+        "chain": [{**chain["chain"][0], "held": ["docs/mockups/**", "src/shiftlead/ui/**"]}, chain["chain"][1]],
     }
     assert key(reordered) == key(chain)
     assert key({**chain, "chain": chain["chain"][::-1]}) != key(chain)  # the links' order is the flow's
@@ -937,16 +938,16 @@ def test_a_chain_is_compared_link_by_link_each_held_as_a_set():
 
 
 def test_a_switch_back_starts_the_member_that_sat_out(world, tmp_path, capsys, monkeypatch):  # noqa: F811
-    from agentorc import cli
+    from shiftlead import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["build-review", "td"])
-    assert "ao-agentorc-designer-ao" not in [s["id"] for s in state["sessions"]]  # sat out at the start
+    assert "ao-shiftlead-designer-ao" not in [s["id"] for s in state["sessions"]]  # sat out at the start
     assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
     assert json.loads(capsys.readouterr().out)["differences"] == []
     assert cli.main(["team", "flow", "ao-grind", "td", "--apply"]) == 0
     assert "designer-ao: starts under td" in capsys.readouterr().out
     made = [p for m, p in state["calls"] if m == "create"]
-    assert [p["name"] for p in made] == ["designer-ao"] and made[0]["controllers"] == ["ao-agentorc-orc-ao"]
+    assert [p["name"] for p in made] == ["designer-ao"] and made[0]["controllers"] == ["ao-shiftlead-orc-ao"]
     assert made[0]["lane"] == ["design-first", "owner:designer"]
 
 
@@ -956,7 +957,7 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
     capsys,
     monkeypatch,  # noqa: F811
 ):
-    from agentorc import cli
+    from shiftlead import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
     for s in state["sessions"]:
@@ -974,14 +975,14 @@ def test_apply_leaves_a_persons_session_and_an_unreachable_member_and_says_so(
         "designer-ao": "designer-ao: sits out under build-review — a person's session, left running: close it yourself",
         "grind-2": "grind-2: devenv is not answering — applied to the others",
     }
-    assert not [p for m, p in state["calls"] if m == "relaunch" and p["id"] != "ao-agentorc-grind-1"]
+    assert not [p for m, p in state["calls"] if m == "relaunch" and p["id"] != "ao-shiftlead-grind-1"]
 
 
 def test_a_flow_named_is_written_and_nothing_more(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     """§4.7, §4.9c *A switch takes one gate, Apply* (TD-356, TD-359): `ao team flow <team> <flow>`
     writes the setting, relaunches nothing, and prints the differences as the bare form does, ending
     with the hint; picking the old flow back reads nothing changed."""
-    from agentorc import cli
+    from shiftlead import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
     assert cli.main(["team", "flow", "ao-grind", "build-review"]) == 0
@@ -1002,7 +1003,7 @@ def test_a_flow_named_is_written_and_nothing_more(world, tmp_path, capsys, monke
 def test_a_pick_says_what_add_entrys_feature_now_opens(world, tmp_path, monkeypatch):  # noqa: F811
     """§4.5a team card **Flow** pick, §4.9c item 4: a pick to a flow with no design stage says
     *feature* now opens a techlead; a pick back to `td`, the designer; a pick that leaves it, nothing."""
-    from agentorc import cli, teamrun
+    from shiftlead import cli, teamrun
 
     _switching(world, tmp_path, monkeypatch, ["td", "build-review", "build"])
     org = cli._org_here()
@@ -1018,7 +1019,7 @@ def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys,
     """§4.9c *What a switch leaves alone*: a PR already asked of the techlead stays its, and the
     apply says so from the seat's `prs_waiting.asks` (TD-333) — the sender by its name, an address
     this home does not list as given."""
-    from agentorc import cli
+    from shiftlead import cli
 
     state, _ = _switching(world, tmp_path, monkeypatch, ["td", "build"])
     tl = next(s for s in state["sessions"] if s["name"] == "techlead-ao")
@@ -1026,9 +1027,9 @@ def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys,
         "n": 3,
         "oldest": "2026-10-05T09:00:00Z",
         "asks": [
-            {"from": "ao-agentorc-grind-1", "pr": 1020},
+            {"from": "ao-shiftlead-grind-1", "pr": 1020},
             {"from": "ao-x-w@devenv", "pr": 1021},
-            {"from": f"ao-agentorc-grind-2@{HOST}", "pr": 1022},
+            {"from": f"ao-shiftlead-grind-2@{HOST}", "pr": 1022},
         ],
     }
     assert cli.main(["team", "flow", "ao-grind", "build", "--apply"]) == 0
@@ -1039,7 +1040,7 @@ def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys,
     assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
     got = json.loads(capsys.readouterr().out)["apply"]
     assert got["stays"][0] == {
-        "from": "ao-agentorc-grind-1",
+        "from": "ao-shiftlead-grind-1",
         "pr": 1020,
         "reader": "techlead-ao",
         "line": "grind-1's PR #1020 stays with techlead-ao",
@@ -1053,7 +1054,7 @@ def test_a_switch_says_which_prs_stay_with_their_reader(world, tmp_path, capsys,
 def test_ao_team_list_says_flow_changed_while_the_records_differ(world, tmp_path, capsys, monkeypatch):  # noqa: F811
     """§4.9c *Switching*: a client reading a live team compares it with its current flow — a pick
     written and not yet applied (the page's, before slice 4b applies at once) reads *flow changed*."""
-    from agentorc import cli
+    from shiftlead import cli
 
     _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
     assert cli.main(["--json", "team", "list"]) == 0
@@ -1087,10 +1088,10 @@ def define_role(base: Path, name: str, yml: str = "kind: worker\n", template: st
 @pytest.mark.unit
 def test_a_role_directory_defines_a_role_the_orgs_over_a_repos_whole(tmp_path, monkeypatch):
     # §4.9c *Where flows and roles live*: `role.yml` (the role keys and `kind`) and `template.md`, the
-    # org's `~/.agentorc/roles/<name>/` over a repo's `.agentorc/roles/<name>/`, never merged by key
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    # org's `~/.shiftlead/roles/<name>/` over a repo's `.shiftlead/roles/<name>/`, never merged by key
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     root = tmp_path / "r"
-    repo_role = define_role(root / ".agentorc" / "roles", "security", "kind: seat\nicon: eye\nlane: [a]\n")
+    repo_role = define_role(root / ".shiftlead" / "roles", "security", "kind: seat\nicon: eye\nlane: [a]\n")
     cfg = repoconfig.load(root)
     sec = repoconfig.resolve_role(cfg, "security")
     assert (sec.kind, sec.icon, sec.lane, sec.source, sec.defined) == ("seat", "eye", ["a"], "repo role", repo_role)
@@ -1108,7 +1109,7 @@ def test_a_role_directory_defines_a_role_the_orgs_over_a_repos_whole(tmp_path, m
     text, made = sec.compose(["TD-1"])
     assert text == "sec: TD-1\nnone\n" and made["base"] == str(org_role / "template.md")
     (root / "s.md").write_text("the repo's security words\n")
-    (root / ".agentorc.yml").write_text("roles:\n  security: {brief: s.md, lane: [b]}\n")
+    (root / ".shiftlead.yml").write_text("roles:\n  security: {brief: s.md, lane: [b]}\n")
     sec = repoconfig.resolve_role(repoconfig.load(root), "security", {"security": {"profile": "fable"}})
     assert sec.source == "org role + org + repo" and sec.profile == "fable"
     assert sec.brief_text() == "sec: b\nthe repo's security words\n"
@@ -1119,7 +1120,7 @@ def test_a_role_directory_defines_a_role_the_orgs_over_a_repos_whole(tmp_path, m
 
 @pytest.mark.unit
 def test_a_role_directory_that_is_not_whole_is_refused(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     base = repoconfig.org_roles_dir()
     cfg = cfg_with(tmp_path)
     for yml, template, why in (
@@ -1152,9 +1153,9 @@ def test_a_role_directory_that_is_not_whole_is_refused(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_an_org_flow_uses_an_org_role_and_a_node_team_cannot(tmp_path, monkeypatch):
-    # TD-313's *Done when*, its first half: a role directory under `~/.agentorc/roles/` is used by an
+    # TD-313's *Done when*, its first half: a role directory under `~/.shiftlead/roles/` is used by an
     # org flow with no other file changed — and, on a node, the role is the home's (*security is an org role*)
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     d = flowdefs.org_dir() / "sweep"
     d.mkdir(parents=True)
     (d / "flow.yml").write_text("stages:\n  - {name: look, role: security, lane: [free], brief: look.md}\n")
@@ -1175,11 +1176,11 @@ def test_an_org_flow_uses_an_org_role_and_a_node_team_cannot(tmp_path, monkeypat
 
 def test_a_node_team_member_naming_an_org_role_is_refused_at_its_start(world, tmp_path):  # noqa: F811
     # §4.9c *An org flow or role is not usable by a team on a node*: a member's role, not only a flow's
-    # stage — its brief would be the home's `~/.agentorc/roles/`, which the node never reads
+    # stage — its brief would be the home's `~/.shiftlead/roles/`, which the node never reads
     define_role(repoconfig.org_roles_dir(), "security", "kind: worker\n", "sec {lane}\n")
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
-    doc["projects"]["ao"]["repos"]["agentorc"]["contractmatch"] = "/srv/cm/agentorc"
-    doc["teams"]["ao-grind"]["members"].append({"role": "security", "name": "sec", "home": "agentorc"})
+    doc["projects"]["ao"]["repos"]["shiftlead"]["contractmatch"] = "/srv/cm/shiftlead"
+    doc["teams"]["ao-grind"]["members"].append({"role": "security", "name": "sec", "home": "shiftlead"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     org = orgmod.load()
     teams.plan(org, "ao-grind", HOST)  # on the home, the org's role is the team's to use
@@ -1214,7 +1215,7 @@ def test_a_hunt_flow_in_the_orgs_directory_starts_its_members_from_it(world, tmp
     t["flows"] = ["hunt"]
     for m in t["members"]:
         m.pop("lane", None)
-    t["members"].append({"role": "security", "name": "security-ao", "home": "agentorc"})
+    t["members"].append({"role": "security", "name": "security-ao", "home": "shiftlead"})
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     assert p.flow == "hunt"
     by = {x.role: x for x in p.members}
@@ -1226,10 +1227,10 @@ def test_a_hunt_flow_in_the_orgs_directory_starts_its_members_from_it(world, tmp
 def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(world, tmp_path, capsys):  # noqa: F811
     """§4.9c: `ao org` says a repo's role directory the org's shadows, as a shadowed team; `ao org
     check` fails on one that is not whole or takes a preset's name."""
-    from agentorc import cli
+    from shiftlead import cli
 
-    root = tmp_path / "agentorc"
-    define_role(root / ".agentorc" / "roles", "security")
+    root = tmp_path / "shiftlead"
+    define_role(root / ".shiftlead" / "roles", "security")
     define_role(repoconfig.org_roles_dir(), "security")
     assert cli.main(["org"]) == 0
     out = capsys.readouterr().out
@@ -1237,12 +1238,12 @@ def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(worl
     assert "role security  not read: the org's role security" in out
     assert cli.main(["org", "check"]) == 0
     capsys.readouterr()
-    define_role(root / ".agentorc" / "roles", "hunter")
+    define_role(root / ".shiftlead" / "roles", "hunter")
     assert cli.main(["org", "check"]) == 1
     assert "lacking: role hunter (" in capsys.readouterr().out
-    shutil.rmtree(root / ".agentorc" / "roles" / "hunter")
+    shutil.rmtree(root / ".shiftlead" / "roles" / "hunter")
     # a directory with no role.yml is not whole, and a broken one leaves every other role listed
-    (root / ".agentorc" / "roles" / "stray").mkdir()
+    (root / ".shiftlead" / "roles" / "stray").mkdir()
     (repoconfig.org_roles_dir() / "security" / "template.md").unlink()
     assert cli.main(["org", "check"]) == 1
     out = capsys.readouterr().out
@@ -1253,7 +1254,7 @@ def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(worl
     capsys.readouterr()
     # org.yml's `roles:` key naming no definition is named, since the org file cannot see the repos
     (repoconfig.org_roles_dir() / "security" / "template.md").write_text("x\n")
-    shutil.rmtree(root / ".agentorc" / "roles" / "stray")
+    shutil.rmtree(root / ".shiftlead" / "roles" / "stray")
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
     doc.setdefault("roles", {})["grnder"] = {"lane": ["free-pick"]}
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
@@ -1267,10 +1268,10 @@ def test_ao_org_lists_every_role_directory_and_check_fails_on_one_not_whole(worl
 @pytest.mark.unit
 def test_held_may_be_a_mapping_of_named_path_sets(tmp_path):
     # §4.9c *A repo names its path sets*: a list as before, or named sets — `held` then their union
-    cfg = cfg_with(tmp_path, "held:\n  core: [src/sessionorc/**, docs/briefs/**]\n  ui: src/agentorc/ui/**\n")
-    assert cfg.held_sets == {"core": ["src/sessionorc/**", "docs/briefs/**"], "ui": ["src/agentorc/ui/**"]}
-    assert cfg.held == ["src/sessionorc/**", "docs/briefs/**", "src/agentorc/ui/**"]
-    assert repoconfig.held_for(cfg, "ui") == ["src/agentorc/ui/**"] and repoconfig.held_for(cfg) == cfg.held
+    cfg = cfg_with(tmp_path, "held:\n  core: [src/sessionorc/**, docs/briefs/**]\n  ui: src/shiftlead/ui/**\n")
+    assert cfg.held_sets == {"core": ["src/sessionorc/**", "docs/briefs/**"], "ui": ["src/shiftlead/ui/**"]}
+    assert cfg.held == ["src/sessionorc/**", "docs/briefs/**", "src/shiftlead/ui/**"]
+    assert repoconfig.held_for(cfg, "ui") == ["src/shiftlead/ui/**"] and repoconfig.held_for(cfg) == cfg.held
     assert repoconfig.held_for(cfg, "docs") is None
     assert cfg_with(tmp_path, "held: [a/**]\n").held_sets is None
     for text, why in (
@@ -1292,14 +1293,14 @@ def test_a_review_stage_of_any_seat_is_staffed_by_one_seat_on_asks(tmp_path):
         {"name": "review", "role": "techlead", "brief": "b.md", "held": "core"},
     ]
     repo_flow(tmp_path, "td-ui", stages, {"b.md": "x\n"})
-    cfg = cfg_with(tmp_path, "held: {core: [src/sessionorc/**], ui: [src/agentorc/ui/**]}\n")
+    cfg = cfg_with(tmp_path, "held: {core: [src/sessionorc/**], ui: [src/shiftlead/ui/**]}\n")
     flow = flowdefs.load("td-ui", cfg)
     assert flow.usable, flow.problems
     assert [s.held for s in flow.review_stages] == ["ui", "core"]
 
     def why(**kw):
         args = {"techlead": True, "held": cfg.held, "seats": [("auditor", "asks")], "held_sets": cfg.held_sets}
-        return flowdefs.unfollowable(flow, {"grinder"}, repo="agentorc", **(args | kw))
+        return flowdefs.unfollowable(flow, {"grinder"}, repo="shiftlead", **(args | kw))
 
     assert why() == []
     assert why(seats=[]) == ["no seat of role auditor — add one under seats: with trigger: asks"]
@@ -1308,14 +1309,14 @@ def test_a_review_stage_of_any_seat_is_staffed_by_one_seat_on_asks(tmp_path):
     ]
     assert why(seats=[("auditor", "asks")] * 2) == ["2 seats of role auditor on asks — a review stage has one reader"]
     assert why(techlead=False) == ["no techlead seat — add `techlead:` to the team"]
-    assert why(held_sets={"core": ["x"]}) == ["nothing held: no path set ui in agentorc"]
+    assert why(held_sets={"core": ["x"]}) == ["nothing held: no path set ui in shiftlead"]
 
 
 def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # noqa: F811
     # §4.9c *The record carries the chain*: one link per review stage, its seat's name and its set's
     # paths; a flow whose review is the techlead on every held path keeps the older shape
-    root = tmp_path / "agentorc"
-    (root / ".agentorc.yml").write_text("held: {core: [src/sessionorc/**], ui: [src/agentorc/ui/**]}\n")
+    root = tmp_path / "shiftlead"
+    (root / ".shiftlead.yml").write_text("held: {core: [src/sessionorc/**], ui: [src/shiftlead/ui/**]}\n")
     stages = [
         {"name": "build", "role": "grinder", "lane": ["free-pick"], "brief": "b.md"},
         {"name": "ui-review", "role": "auditor", "brief": "b.md", "held": "ui"},
@@ -1324,14 +1325,14 @@ def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # no
     repo_flow(root, "td-ui", stages, {"b.md": "x\n"})
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td-ui"], techlead={"name": "techlead-ao", "home": "agentorc"})
-    t["seats"] = [{"name": "ui-reader-ao", "role": "auditor", "trigger": "asks", "home": "agentorc"}]
+    t.update(flows=["td-ui"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t["seats"] = [{"name": "ui-reader-ao", "role": "auditor", "trigger": "asks", "home": "shiftlead"}]
     for m in t["members"]:
         m.pop("lane", None)
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     chain = {
         "chain": [
-            {"stage": "ui-review", "reader": "ui-reader-ao", "held": ["src/agentorc/ui/**"]},
+            {"stage": "ui-review", "reader": "ui-reader-ao", "held": ["src/shiftlead/ui/**"]},
             {"stage": "review", "reader": "techlead-ao", "held": ["src/sessionorc/**"]},
         ],
         "bound": teams.REVIEW_BOUND,
@@ -1341,10 +1342,10 @@ def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # no
     from sessionorc.models import normalize_review
 
     assert normalize_review(chain) == chain  # the host agent takes it as the compile writes it
-    assert teams.chain_line(chain) == "ui-reader-ao on src/agentorc/ui/**, then techlead-ao on src/sessionorc/**"
+    assert teams.chain_line(chain) == "ui-reader-ao on src/shiftlead/ui/**, then techlead-ao on src/sessionorc/**"
     # §4.9c *The words* (TD-315 slice 5): `{flow}` draws every review stage with its seat and its paths
     assert grinder.prompt_from["slots"]["{flow}"]["text"] == (
-        f"td-ui: **build** (grinder) → ui-review (ui-reader-ao, on src/agentorc/ui/**) → review "
+        f"td-ui: **build** (grinder) → ui-review (ui-reader-ao, on src/shiftlead/ui/**) → review "
         f"({p.techlead_id}, on src/sessionorc/**) → you, through {p.techlead_id}."
     )
     # the same seat edited out: not followable, in the shared words

@@ -167,7 +167,7 @@ def _what(c: dict[str, Any]) -> str:
 def line(c: dict[str, Any], ref: str) -> str:
     """The fixed line typed into an idle member's composer."""
     return (
-        f"[agentorc] PR #{c['pr']} failed the cadence check: {_what(c)} — fix it, then report "
+        f"[shiftlead] PR #{c['pr']} failed the cadence check: {_what(c)} — fix it, then report "
         f"`ao progress done {ref} --pr {c['pr']}` again"
     )
 

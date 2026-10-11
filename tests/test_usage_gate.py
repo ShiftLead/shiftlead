@@ -73,7 +73,7 @@ def test_the_four_keys_read_what_is_valid_and_parse_refuses_the_rest(tmp_path):
         "  bad: {reserve: 130, until: tomorrow}\n"
         "  odd: {colour: red}\n"
         "  stray: {reserve: 5, colour: red}\n"
-        "repos:\n  agentorc: {promote: {auto: false}}\n  x: {promote: {auto: maybe}}\n"
+        "repos:\n  shiftlead: {promote: {auto: false}}\n  x: {promote: {auto: maybe}}\n"
         "person:\n  open_in: none\n  terminal: {size: 13, face: JetBrains Mono, copy_on_select: 7}\n"
     )
     doc = settings.load(f)
@@ -81,7 +81,7 @@ def test_the_four_keys_read_what_is_valid_and_parse_refuses_the_rest(tmp_path):
         "ao-grind": {"until": "2026-09-26T12:00:00Z", "reserve": 10, "schedule": {"start": "reset"}},
         "stray": {"reserve": 5},  # one stray key costs that key, not the team
     }
-    assert settings.repos(doc) == {"agentorc": {"promote": {"auto": False}}}
+    assert settings.repos(doc) == {"shiftlead": {"promote": {"auto": False}}}
     assert settings.person(doc) == {"open_in": "none", "terminal": {"size": 13, "face": "JetBrains Mono"}}
     assert settings.team_extra(doc, "ao-grind") == 10 and settings.team_extra(doc, "") == 0
     assert settings.team_extra(doc, "bad") == 0
@@ -193,11 +193,11 @@ async def test_set_settings_writes_any_subset_and_the_settings_read_says_what_it
         got = await person.call(
             "set_settings",
             teams={"ao-grind": {"until": later, "reserve": 10}},
-            repos={"agentorc": {"promote": {"auto": False}}},
+            repos={"shiftlead": {"promote": {"auto": False}}},
             person={"open_in": "none", "terminal": {"size": 14}},
         )
         assert got["teams"] == {"ao-grind": {"until": later, "reserve": 10}}
-        assert got["repos"] == {"agentorc": {"promote": {"auto": False}}}
+        assert got["repos"] == {"shiftlead": {"promote": {"auto": False}}}
         assert got["person"] == {"open_in": "none", "terminal": {"size": 14}}
         # nothing is written when any part is refused
         with pytest.raises(AgentError, match="teams.ao-grind: .*whole percent"):

@@ -13,16 +13,16 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from agentorc import profiles as profiles_mod
-from agentorc.ui import settings_page as setmod
+from shiftlead import profiles as profiles_mod
+from shiftlead.ui import settings_page as setmod
 
-UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "agentorc" / "ui"
+UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=UTC)
 
 
 @pytest.fixture
 def client(subprocess_agent):
-    from agentorc.ui.app import create_app
+    from shiftlead.ui.app import create_app
 
     with TestClient(create_app()) as c:
         yield c
@@ -168,7 +168,7 @@ def test_read_only_cards_mark_what_the_file_leaves_to_its_default(tmp_path):
 def test_a_repo_card_draws_the_switch_only_where_the_file_carries_promote(tmp_path):
     with_block, without = tmp_path / "a", tmp_path / "b"
     with_block.mkdir(), without.mkdir()
-    (with_block / ".agentorc.yml").write_text("promote:\n  run: make install\n  check: make which\n")
+    (with_block / ".shiftlead.yml").write_text("promote:\n  run: make install\n  check: make which\n")
     cards = setmod.repo_cards([str(with_block), str(without)], {"a": {"promote": {"auto": True}}})
     a, b = cards
     assert a["promote"] and a["auto"] and {"promote.run", "promote.check"} <= {r["key"] for r in a["rows"]}
@@ -253,13 +253,13 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
             "ok"
         ]
 
-        assert client.post("/api/settings/repos", json={"repo": "agentorc", "auto": True}).json()["ok"]
-        assert call_sync("settings")["repos"]["agentorc"] == {"promote": {"auto": True}}
-        assert client.post("/api/settings/repos", json={"repo": "agentorc", "auto": "yes"}).status_code == 400
-        assert client.post("/api/settings/repos", json={"repo": "agentorc", "pull": False}).json()["ok"]
-        assert call_sync("settings")["repos"]["agentorc"] == {"promote": {"auto": True}, "pull": False}
-        assert client.post("/api/settings/repos", json={"repo": "agentorc", "pull": "no"}).status_code == 400
-        both = {"repo": "agentorc", "auto": True, "pull": True}  # one switch per press: never half-applied
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "auto": True}).json()["ok"]
+        assert call_sync("settings")["repos"]["shiftlead"] == {"promote": {"auto": True}}
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "auto": "yes"}).status_code == 400
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "pull": False}).json()["ok"]
+        assert call_sync("settings")["repos"]["shiftlead"] == {"promote": {"auto": True}, "pull": False}
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "pull": "no"}).status_code == 400
+        both = {"repo": "shiftlead", "auto": True, "pull": True}  # one switch per press: never half-applied
         assert client.post("/api/settings/repos", json=both).status_code == 400
 
         got = client.post("/api/settings/you", json={"open_in": "none", "terminal": {"size": 15, "face": "Fira Code"}})
@@ -317,7 +317,7 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         call_sync(
             "set_settings",
             person={"open_in": None, "terminal": None, "inbox": None, "attach": None, "composer": None},
-            repos={"agentorc": None},
+            repos={"shiftlead": None},
         )
 
 
@@ -510,7 +510,7 @@ def test_balance_card_reads_the_numbers_and_the_mark():
 def test_every_page_draws_the_usage_chip(client, subprocess_agent, monkeypatch):
     """design §4.5a *Org top bar* **usage** chip (TD-287): the top bar is one bar, so Settings and the
     other pages draw the account's chip as the Org does, read by one helper."""
-    from agentorc.ui import app as appmod
+    from shiftlead.ui import app as appmod
 
     reading = {"paul": {"windows": [{"label": "week", "pct": 42, "resets": None}], "fetched": "x", "profiles": []}}
 
@@ -529,7 +529,7 @@ def test_the_chip_reading_fails_quietly():
     still gives the reading."""
     import asyncio
 
-    from agentorc.ui.app import chip_usage
+    from shiftlead.ui.app import chip_usage
 
     async def down(method, **kw):
         raise RuntimeError("down")
@@ -548,9 +548,9 @@ def test_a_hidden_button_is_not_drawn_whatever_its_class_sets():
     """TD-296 #2: Settings' **Cancel** carries `hidden` until a field changes, but `.btn` sets
     `display: inline-flex`, which beats the UA's `[hidden] { display: none }`, so it showed always
     and pushed Save to its own line on a narrow card. `.btn[hidden]` puts it back."""
-    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    css = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.css").read_text()
     assert ".btn[hidden] { display: none; }" in css
-    html = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/templates/settings.html").read_text()
+    html = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/templates/settings.html").read_text()
     assert 'class="btn sm ghost setcancel" type="button" hidden' in html
 
 

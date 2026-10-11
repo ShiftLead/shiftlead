@@ -51,7 +51,7 @@ class HookFedStub:
     def billing_for(self, profile):
         return self.billing.get(profile)
 
-    external = []  # set by a test: `ExternalSession`s the stub sees outside agentorc (TD-010 a)
+    external = []  # set by a test: `ExternalSession`s the stub sees outside shiftlead (TD-010 a)
 
     def external_sessions(self):
         return list(self.external)

@@ -39,7 +39,7 @@ def _commit(root: Path, name: str) -> str:
 def checkout(tmp_path, monkeypatch):
     """A bare origin and the home's checkout of it on main, clean; `live` is a file outside the
     checkout that `check` prints and `run` writes — the promote made of two shell lines."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     origin = tmp_path / "origin.git"
     _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
     root = tmp_path / "repo"
@@ -47,7 +47,7 @@ def checkout(tmp_path, monkeypatch):
     _git(root, "init", "-q", "-b", "main")
     _git(root, "remote", "add", "origin", str(origin))
     live = tmp_path / "live"
-    (root / ".agentorc.yml").write_text(
+    (root / ".shiftlead.yml").write_text(
         f"promote:\n  run: git rev-parse HEAD > {live}\n  check: cat {live}\n"
     )  # fmt: skip
     first = _commit(root, "a")
@@ -81,17 +81,17 @@ def _wait_gone(pid: int) -> None:
 
 def test_the_block_is_read_by_key_alone(tmp_path):
     assert promote.block(tmp_path) is None  # no file
-    (tmp_path / ".agentorc.yml").write_text("roles: {}\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {}\n")
     assert promote.block(tmp_path) is None  # no key
-    (tmp_path / ".agentorc.yml").write_text("promote:\n  run: x\n  check: y\nroles: {nonsense: 1}\n")
+    (tmp_path / ".shiftlead.yml").write_text("promote:\n  run: x\n  check: y\nroles: {nonsense: 1}\n")
     assert promote.block(tmp_path) == {"run": "x", "check": "y"}
-    (tmp_path / ".agentorc.yml").write_text("promote:\n  run: x\n")
+    (tmp_path / ".shiftlead.yml").write_text("promote:\n  run: x\n")
     with pytest.raises(ValueError, match="needs check"):
         promote.block(tmp_path)
-    (tmp_path / ".agentorc.yml").write_text("promote: [x]\n")
+    (tmp_path / ".shiftlead.yml").write_text("promote: [x]\n")
     with pytest.raises(ValueError, match="mapping"):
         promote.block(tmp_path)
-    (tmp_path / ".agentorc.yml").write_text("promote: {run: x\n")
+    (tmp_path / ".shiftlead.yml").write_text("promote: {run: x\n")
     with pytest.raises(ValueError, match="cannot be read"):
         promote.block(tmp_path)
 
@@ -241,7 +241,7 @@ def test_auto_promotes_once_and_the_outcome_is_read_from_check(checkout, monkeyp
 
 def test_a_run_that_leaves_live_elsewhere_fails_and_stops_the_repo(checkout, monkeypatch, tmp_path):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
-    (checkout / ".agentorc.yml").write_text(
+    (checkout / ".shiftlead.yml").write_text(
         f"promote:\n  run: echo it broke; exit 3\n  check: cat {tmp_path / 'live'}\n"
     )
     _git(checkout, "add", "-A")
@@ -263,7 +263,7 @@ def test_a_run_that_leaves_live_elsewhere_fails_and_stops_the_repo(checkout, mon
 
 def test_a_run_past_the_bound_is_killed_and_failed(checkout, monkeypatch, tmp_path):
     monkeypatch.setattr(promote, "PROMOTE_SETTLE", 0.0)
-    (checkout / ".agentorc.yml").write_text(f"promote:\n  run: sleep 60\n  check: cat {tmp_path / 'live'}\n")
+    (checkout / ".shiftlead.yml").write_text(f"promote:\n  run: sleep 60\n  check: cat {tmp_path / 'live'}\n")
     _git(checkout, "add", "-A")
     _git(checkout, "commit", "-q", "-m", "block")
     _git(checkout, "push", "-q", "origin", "main")
@@ -280,7 +280,7 @@ def test_a_run_past_the_bound_is_killed_and_failed(checkout, monkeypatch, tmp_pa
 def test_a_malformed_block_is_skipped_never_fatal(checkout, tmp_path):
     other = tmp_path / "other"
     other.mkdir()
-    (other / ".agentorc.yml").write_text("promote: {run: x}\n")
+    (other / ".shiftlead.yml").write_text("promote: {run: x}\n")
     readings, _, bad = promote.survey(
         [str(other), str(checkout), str(tmp_path / "gone")], {}, True, {}, datetime.now(UTC)
     )
@@ -332,7 +332,7 @@ async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(ag
         with pytest.raises(AgentError, match="nothing to promote"):
             await person.call("promote", repo="repo")  # live is main already
         live = checkout.parent / "live"
-        (checkout / ".agentorc.yml").write_text(
+        (checkout / ".shiftlead.yml").write_text(
             f"promote:\n  run: sleep 1; git rev-parse HEAD > {live}\n  check: cat {live}\n"
         )
         main = _merge(checkout, "b")
@@ -401,16 +401,16 @@ def test_the_press_is_a_home_edit_refused_offline_at_a_node():
 
 
 def test_ao_promote_status_prints_the_readings(monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     reading = {
         "live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": False,
         "failed": {"sha": "9" * 40, "at": "t", "why": "it broke", "log": "/l", "tail": ["boom"]},
     }  # fmt: skip
-    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"agentorc": reading}})
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"shiftlead": reading}})
     assert cli.main(["promote", "status"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("agentorc · live 4444444 · main 9999999, 3 ahead · checks green · auto off")
+    assert out.startswith("shiftlead · live 4444444 · main 9999999, 3 ahead · checks green · auto off")
     assert "FAILED 9999999 at t: it broke" in out and "    boom" in out
 
 
@@ -420,8 +420,10 @@ def test_ao_promote_status_prints_the_readings(monkeypatch, capsys):
 async def test_the_promote_row_snoozes_by_repo_in_the_attention_store(agent):
     await park_ticks(agent)
     async with LocalClient() as person:
-        got = await person.call("attention_snooze", id="promote:agentorc", kind="promote", until="2030-01-01T00:00:00Z")
-    assert got["row"] == "promote:agentorc|promote" and agent.attention_snoozed[got["row"]] == "2030-01-01T00:00:00Z"
+        got = await person.call(
+            "attention_snooze", id="promote:shiftlead", kind="promote", until="2030-01-01T00:00:00Z"
+        )
+    assert got["row"] == "promote:shiftlead|promote" and agent.attention_snoozed[got["row"]] == "2030-01-01T00:00:00Z"
 
 
 async def test_a_press_that_finds_its_run_done_files_the_note(agent, checkout):
@@ -442,14 +444,14 @@ async def test_a_press_that_finds_its_run_done_files_the_note(agent, checkout):
 
 
 def test_this_repos_block_is_the_promote_pair_read_from_the_checkout():
-    """TD-132 slice 4: agentorc's own `.agentorc.yml` carries `promote:` with `run` and `check` alone —
+    """TD-132 slice 4: shiftlead's own `.shiftlead.yml` carries `promote:` with `run` and `check` alone —
     `run` is CLAUDE.md's pair with the checkout's path taken from where it runs, `check` the live venv's
     build record. Its `teams:` and `roles:` are TD-229 slice 2's (`tests/test_org.py`)."""
     root = Path(__file__).resolve().parent.parent
-    doc = yaml.safe_load((root / ".agentorc.yml").read_text())
+    doc = yaml.safe_load((root / ".shiftlead.yml").read_text())
     assert "promote" in doc and set(doc["promote"]) == {"run", "check"}  # `auto` is settings.yml's
     b = promote.block(root)
-    assert "/agentorc-venv/bin" in b["run"] and '"$(pwd -P)[ui]"' in b["run"] and b["run"].endswith("service install")
+    assert "/shiftlead-venv/bin" in b["run"] and '"$(pwd -P)[ui]"' in b["run"] and b["run"].endswith("service install")
     assert "/home/kmaster" not in b["run"] + b["check"]  # never a hard-coded checkout or home
     assert "build.info()" in b["check"] and "sys.exit(" in b["check"]  # no record → exit 1 saying why
 
@@ -461,9 +463,9 @@ def _rollback_block(checkout: Path, run_extra: str = "") -> Path:
     """The fixture's block, its `run` also recording where it ran and what it was handed."""
     live = checkout.parent / "live"
     seen = checkout.parent / "seen"
-    handed = "$AGENTORC_PROMOTE_SHA $AGENTORC_PROMOTE_FROM $AGENTORC_PROMOTE_ROOT"
+    handed = "$SHIFTLEAD_PROMOTE_SHA $SHIFTLEAD_PROMOTE_FROM $SHIFTLEAD_PROMOTE_ROOT"
     run = f'{run_extra}git rev-parse HEAD > {live}; echo "$(pwd -P) {handed}" > {seen}'
-    (checkout / ".agentorc.yml").write_text(yaml.safe_dump({"promote": {"run": run, "check": f"cat {live}"}}))
+    (checkout / ".shiftlead.yml").write_text(yaml.safe_dump({"promote": {"run": run, "check": f"cat {live}"}}))
     _git(checkout, "add", "-A")
     _git(checkout, "commit", "-q", "-m", "block")
     _git(checkout, "push", "-q", "origin", "main")
@@ -642,7 +644,7 @@ async def test_a_run_that_refuses_before_changing_anything_is_a_failure(agent, c
     await park_ticks(agent)
     _register(checkout)
     live = checkout.parent / "live"
-    (checkout / ".agentorc.yml").write_text(
+    (checkout / ".shiftlead.yml").write_text(
         yaml.safe_dump({"promote": {"run": "echo too old to go back to; exit 2", "check": f"cat {live}"}})
     )
     _git(checkout, "add", "-A")
@@ -674,19 +676,19 @@ async def test_a_leftover_tree_does_not_stop_the_next_rollback(agent, checkout):
 
 
 def test_ao_promote_status_reads_rolled_back_and_held(monkeypatch, capsys):
-    from agentorc import cli
+    from shiftlead import cli
 
     reading = {
         "live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": True,
         "held": {"sha": "4" * 40, "from": "9" * 40, "main": "9" * 40, "at": "t"},
     }  # fmt: skip
-    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"agentorc": reading}})
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"shiftlead": reading}})
     assert cli.main(["promote", "status"]) == 0
     out = capsys.readouterr().out
     assert out.startswith(
-        "agentorc · live 4444444, rolled back from 9999999 · main 9999999, 3 ahead · checks green · auto on · held"
+        "shiftlead · live 4444444, rolled back from 9999999 · main 9999999, 3 ahead · checks green · auto on · held"
     )
     calls = []
-    monkeypatch.setattr(cli, "call_sync", lambda m, **p: calls.append((m, p)) or {"repo": "agentorc", "which": "held"})
-    assert cli.main(["promote", "clear", "agentorc"]) == 0
-    assert calls == [("clear_promote", {"repo": "agentorc"})] and "the hold is cleared" in capsys.readouterr().out
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: calls.append((m, p)) or {"repo": "shiftlead", "which": "held"})
+    assert cli.main(["promote", "clear", "shiftlead"]) == 0
+    assert calls == [("clear_promote", {"repo": "shiftlead"})] and "the hold is cleared" in capsys.readouterr().out

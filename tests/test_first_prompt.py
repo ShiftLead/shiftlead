@@ -10,11 +10,11 @@ import pytest
 from _stubs import ComposerStub
 from conftest import FAST_TICK, wait_for
 
-from agentorc.adapters.claude_code.hook import translate
-from agentorc.ui import cards
 from sessionorc import adapters, agent_common, mail
 from sessionorc.adapters import LaunchSpec
 from sessionorc.client import LocalClient
+from shiftlead.adapters.claude_code.hook import translate
+from shiftlead.ui import cards
 
 pytestmark = pytest.mark.integration
 

@@ -1,5 +1,5 @@
 """TD-196: `ui/app.py` split into modules by page, each re-exported from the app. A guard on the one
-hazard the split carries: the suite patches a few names on `agentorc.ui.app`, and a moved function
+hazard the split carries: the suite patches a few names on `shiftlead.ui.app`, and a moved function
 that read one of them bare would read its own module's copy, which no patch reaches — the suite
 could still pass while testing the real client. So a split module reads a patched name through the
 app at call time, never bare; and the app keeps re-exporting every name a split module defines."""
@@ -14,7 +14,7 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-# patched by the suite as `agentorc.ui.app.X`
+# patched by the suite as `shiftlead.ui.app.X`
 PATCHED = {"LocalClient", "read_boards", "rpc", "PtySession", "repo_teams"}
 # the modules moved out of app.py (TD-196), in the order they were split
 SPLIT = ("common", "cards", "inbox", "org", "repo")
@@ -58,7 +58,7 @@ def _bare_reads(tree: ast.Module) -> list[str]:
 
 @pytest.mark.parametrize("name", SPLIT)
 def test_no_split_module_reads_a_patched_name_bare(name):
-    mod = importlib.import_module(f"agentorc.ui.{name}")
+    mod = importlib.import_module(f"shiftlead.ui.{name}")
     tree = ast.parse(Path(mod.__file__).read_text(encoding="utf-8"))
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -79,8 +79,8 @@ def test_the_guard_sees_a_bare_read_and_passes_a_local():
 
 @pytest.mark.parametrize("name", SPLIT)
 def test_the_app_re_exports_every_name_a_split_module_defines(name):
-    from agentorc.ui import app
+    from shiftlead.ui import app
 
-    mod = importlib.import_module(f"agentorc.ui.{name}")
+    mod = importlib.import_module(f"shiftlead.ui.{name}")
     missing = sorted(n for n in _defined(Path(mod.__file__)) if getattr(app, n, None) is not getattr(mod, n))
-    assert not missing, f"agentorc.ui.app no longer re-exports {missing} from ui/{name}.py"
+    assert not missing, f"shiftlead.ui.app no longer re-exports {missing} from ui/{name}.py"

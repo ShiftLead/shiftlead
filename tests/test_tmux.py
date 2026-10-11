@@ -33,9 +33,9 @@ def test_server_survives_empty(tmux):
 
 def test_env_pipe_pane_and_paste(tmux, tmp_path):
     log = tmp_path / "run.log"
-    tmux.new_session("ao-t-b", str(tmp_path), ["bash", "--norc", "--noprofile"], {"AGENTORC_SESSION": "ao-t-b"})
+    tmux.new_session("ao-t-b", str(tmp_path), ["bash", "--norc", "--noprofile"], {"SHIFTLEAD_SESSION": "ao-t-b"})
     tmux.pipe_pane("ao-t-b", log)
-    tmux.send_literal("ao-t-b", "echo env=$AGENTORC_SESSION")
+    tmux.send_literal("ao-t-b", "echo env=$SHIFTLEAD_SESSION")
     tmux.send_enter("ao-t-b")
     assert wait_for(lambda: log.exists() and "env=ao-t-b" in log.read_text())
     tmux.paste("ao-t-b", "echo one\necho two")
@@ -137,7 +137,7 @@ def test_a_command_too_long_for_tmux_is_launched_through_a_script(tmux, tmp_path
     a short command is passed exactly as before."""
     from sessionorc import tmux as tmux_mod
 
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     out = tmp_path / "out"
     brief = "- a brief with 'quotes', \"doubles\", $dollars, `ticks` and a\nnewline; " * 600  # ~40 KB
     assert len(brief.encode()) > 16_384

@@ -1,12 +1,12 @@
 """`ao new --role` and `ao roles` (design §4.7, §4.8, §5): what the preset and the repo's
-`.agentorc.yml` fill in, with the RPC mocked — the agent's side of `create` is tested elsewhere."""
+`.shiftlead.yml` fill in, with the RPC mocked — the agent's side of `create` is tested elsewhere."""
 
 import json
 import re
 
 import pytest
 
-from agentorc import cli
+from shiftlead import cli
 
 pytestmark = pytest.mark.unit
 
@@ -19,9 +19,9 @@ FLEET = [
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
-    # A temp AGENTORC_HOME or `orgmod.load()` reads the machine's real `~/.agentorc/org.yml`, whose
+    # A temp SHIFTLEAD_HOME or `orgmod.load()` reads the machine's real `~/.shiftlead/org.yml`, whose
     # `roles:` overlay would change every source label here (found 2026-09-13, once one existed).
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     (tmp_path / ".git").mkdir()
     for s in FLEET:
         s["dir"] = s["repo"] = str(tmp_path)
@@ -47,7 +47,7 @@ def created(calls):
 
 def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
     root, calls = repo
-    (root / ".agentorc.yml").write_text("roles: {grinder: {profile: grind}}\nledger: docs/debt.md\n")
+    (root / ".shiftlead.yml").write_text("roles: {grinder: {profile: grind}}\nledger: docs/debt.md\n")
     assert cli.main(["new", "g1", "--role", "grinder", "--lane", "TD-027,TD-019"]) == 0
     p = created(calls)
     assert p["role"] == "grinder" and p["lane"] == ["TD-027", "TD-019"] and p["capabilities"] == []
@@ -86,7 +86,7 @@ def test_old_role_names_are_unknown_and_techlead_starts_the_go_between(repo, cap
     assert cli.main(["new", "t1", "--role", "techlead"]) == 0
     p = created(calls)
     assert p["role"] == "techlead" and p["capabilities"] == [] and "**techlead**" in p["prompt"]
-    assert "{techlead}" not in p["prompt"] and "$AGENTORC_SESSION" in p["prompt"]
+    assert "{techlead}" not in p["prompt"] and "$SHIFTLEAD_SESSION" in p["prompt"]
 
 
 def test_grant_orchestrate_on_the_command_line_is_refused(repo, capsys):
@@ -100,7 +100,7 @@ def test_grant_orchestrate_on_the_command_line_is_refused(repo, capsys):
 
 def test_controllers_default_from_the_role_then_the_repo_and_names_resolve(repo, capsys):
     root, calls = repo
-    (root / ".agentorc.yml").write_text("controllers: [orc]\nroles: {hunter: {controllers: [w1]}}\n")
+    (root / ".shiftlead.yml").write_text("controllers: [orc]\nroles: {hunter: {controllers: [w1]}}\n")
     assert cli.main(["new", "g1", "--role", "grinder"]) == 0
     assert created(calls)["controllers"] == [ORC]  # the repo's, resolved from the name to the id
     assert "starts with no controller" not in capsys.readouterr().out
@@ -120,15 +120,15 @@ def test_a_configured_controller_that_is_not_running_is_skipped_not_refused(repo
     name that does not resolve is dropped with one line, and the no-controller line prints when
     none remain. An explicit `--controller` naming an unknown session is still an error."""
     root, calls = repo
-    (root / ".agentorc.yml").write_text("controllers: [ghost-orc, orc]\nroles: {hunter: {controllers: [gone]}}\n")
+    (root / ".shiftlead.yml").write_text("controllers: [ghost-orc, orc]\nroles: {hunter: {controllers: [gone]}}\n")
     assert cli.main(["new", "g1"]) == 0
     out, err = capsys.readouterr()
-    assert err.strip() == "controllers: `ghost-orc` from .agentorc.yml (repo) is not running — skipped"
+    assert err.strip() == "controllers: `ghost-orc` from .shiftlead.yml (repo) is not running — skipped"
     assert created(calls)["controllers"] == [ORC] and "starts with no controller" not in out
     calls.clear()
     assert cli.main(["new", "h1", "--role", "hunter"]) == 0
     out, err = capsys.readouterr()
-    assert err.strip() == "controllers: `gone` from .agentorc.yml (role hunter) is not running — skipped"
+    assert err.strip() == "controllers: `gone` from .shiftlead.yml (role hunter) is not running — skipped"
     assert created(calls)["controllers"] == [] and "starts with no controller: nobody may act on it" in out
     calls.clear()
     assert cli.main(["new", "x", "--controller", "ghost-orc"]) == 1
@@ -141,7 +141,7 @@ def test_a_role_with_an_empty_controllers_list_means_nobody_not_the_repo_default
     which a truth test cannot tell from a preset that never mentioned controllers — so the repo's
     default must not fill it in. Found by the review of PR #116."""
     root, calls = repo
-    (root / ".agentorc.yml").write_text("controllers: [orc]\nroles: {hunter: {controllers: []}}\n")
+    (root / ".shiftlead.yml").write_text("controllers: [orc]\nroles: {hunter: {controllers: []}}\n")
     assert cli.main(["new", "h1", "--role", "hunter"]) == 0
     out, _ = capsys.readouterr()
     assert created(calls)["controllers"] == [] and "starts with no controller: nobody may act on it" in out
@@ -154,7 +154,7 @@ def test_an_unknown_role_or_grant_is_an_error_naming_it(repo, capsys):
     root, calls = repo
     assert cli.main(["--json", "new", "g1", "--role", "sage"]) == 1
     assert json.loads(capsys.readouterr().out)["error"].startswith("unknown role 'sage' — no preset")
-    (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
+    (root / ".shiftlead.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert cli.main(["new", "g1", "--role", "grinder"]) == 1
     assert "grants: unknown grant 'fly'" in capsys.readouterr().err
 
@@ -168,16 +168,16 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
         and re.search(r"^manager +\[built-in\]", out, re.M)
         and "grants: control" in out
     )
-    (root / ".agentorc.yml").write_text(
+    (root / ".shiftlead.yml").write_text(
         "controllers: [orc]\nroles:\n  grinder: {profile: grind, brief: docs/briefs/g.md}\n  reviewer: {lane: [ui]}\n"
     )
-    d = root / ".agentorc" / "roles" / "reviewer"  # a `roles:` key overlays a definition (§4.9c)
+    d = root / ".shiftlead" / "roles" / "reviewer"  # a `roles:` key overlays a definition (§4.9c)
     d.mkdir(parents=True)
     (d / "role.yml").write_text("{}\n")
     (d / "template.md").write_text("# reviewer\n")
     assert cli.main(["roles"]) == 0
     out = capsys.readouterr().out
-    assert out.splitlines()[0] == f"roles from {root / '.agentorc.yml'}"
+    assert out.splitlines()[0] == f"roles from {root / '.shiftlead.yml'}"
     assert "grinder   [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
     assert "brief: docs/briefs/g.md" in out and "reviewer  [repo role + repo]  lane: ui" in out
     assert "label: Grinder" in out and "label: Reviewer" in out  # what the page shows (design §4.8 *The names*)
@@ -189,11 +189,11 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert next(r for r in data["roles"] if r["name"] == "plain")["message"] is None
     assert next(r for r in data["roles"] if r["name"] == "grinder")["source"] == "built-in + repo"
     # its saved prompts (design §4.8, TD-170): the labels, on their own line; the text is the file's
-    (root / ".agentorc.yml").write_text(
+    (root / ".shiftlead.yml").write_text(
         "roles: {plain: {prompts: [{label: sweep, text: /stranded-work}, {label: ok, text: go}]}}\n"
     )
     assert cli.main(["roles"]) == 0 and "  prompts: sweep, ok" in capsys.readouterr().out
-    (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
+    (root / ".shiftlead.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert cli.main(["roles"]) == 1 and "unknown grant 'fly'" in capsys.readouterr().err
 
 

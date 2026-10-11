@@ -97,8 +97,8 @@ def rec(sid, root, **kw):
 
 
 def client(monkeypatch, tmp_path, Fake):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    from agentorc.ui import app as ui
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
     monkeypatch.setattr(ui, "read_boards", lambda *a, **k: ([], ""))
@@ -167,7 +167,7 @@ def test_a_repo_no_team_services_has_its_repo_facet_alone_and_an_unknown_one_is_
 
 
 def test_the_ledger_lists_sort_by_priority_then_id_and_the_chips_count():
-    from agentorc.ui.app import doing_chips, ledger_lists, pr_standing
+    from shiftlead.ui.app import doing_chips, ledger_lists, pr_standing
 
     lists = {x["key"]: x for x in ledger_lists(reading("/r"), [])}
     assert [e["id"] for e in lists["pickable"]["rows"]][:2] == ["TD-301", "TD-310"] and lists["pickable"]["fold"] == 2
@@ -194,7 +194,7 @@ def test_a_team_given_the_repo_with_nothing_live_keeps_its_facets(tmp_path, monk
     fleet = [rec("g1", root, state="exited", progress=[{"ref": "TD-301", "status": "claimed", "pr": 811}])]
     doing = {"grind": [{"id": "g1", "text": "stopped for the night", "at": _iso(NOW)}]}
     c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet, doing))
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "repo_teams", lambda org, host: {str(tmp_path.joinpath("samscrape").resolve()): "grind"})
     html = c.get("/repo/samscrape").text
@@ -285,7 +285,7 @@ def test_a_decided_board_line_is_first_in_pickable_with_its_answer_and_who_holds
     """TD-384 slice 2 (§4.5a *Repo page: decided lines*): a work order heads the *pickable* list —
     `board:<key>`, its head text, *decided <answer> · <date>*, *pickable by <team>* or *held by* —
     is counted in the kind bar's *pickable* and the lanes line, and not in the priorities."""
-    from agentorc.ui.app import ledger_lists, repo_facet
+    from shiftlead.ui.app import ledger_lists, repo_facet
 
     root = str(tmp_path / "samscrape")
     r = {**reading(root), "work_orders": {"orders": [ORDER]}}
@@ -315,7 +315,7 @@ def test_a_decided_board_line_is_first_in_pickable_with_its_answer_and_who_holds
 
 def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
     """TD-384 slice 2: the team card's TDs in motion draws a claim on `board:<key>` as any reference."""
-    from agentorc.ui.app import motion_rows
+    from shiftlead.ui.app import motion_rows
 
     r = {**reading("/r"), "work_orders": {"orders": [ORDER]}}
     m = rec("g1", "/r", progress=[{"ref": "board:1a2b3c4d", "status": "claimed"}])
@@ -335,10 +335,10 @@ def test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_noth
     shows *TDs in motion (0)*, *nothing claimed* and the Doing head."""
     root = str(tmp_path / "samscrape")
     fleet = [rec("g1", root, state="exited")]
-    from agentorc.ui import org as uiorg
+    from shiftlead.ui import org as uiorg
 
     c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet))
-    from agentorc.ui import app as ui
+    from shiftlead.ui import app as ui
 
     (g,) = ui.team_groups([{**fleet[0], "rank": 1}], (), {root: reading(root)}, {})
     assert uiorg.drawn_facets(g["summary"]) == ["repo"]  # the card's: the repo alone holds something

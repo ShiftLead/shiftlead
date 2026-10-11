@@ -10,14 +10,14 @@ import pathlib
 import pytest
 import yaml
 
-from agentorc.ui import uiconf
+from shiftlead.ui import uiconf
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
 def home(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     uiconf.set_read({"person": {}, "migrate": []})
     yield tmp_path
     uiconf.set_read({"person": {}, "migrate": []})
@@ -103,7 +103,7 @@ def test_vscode_file_is_the_vscode_scheme_not_the_file_scheme(home):
 
 
 def test_the_org_page_names_a_refused_value(home, monkeypatch):
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     write(home, "open_in: cursor\n")
     html = templates.get_template("org.html").render(
@@ -115,7 +115,7 @@ def test_the_org_page_names_a_refused_value(home, monkeypatch):
 
 
 def test_the_card_and_focus_draw_the_persons_label_escaped_and_none_draws_nothing(home):
-    from agentorc.ui.app import templates, view
+    from shiftlead.ui.app import templates, view
 
     rec = {"id": "ao-w", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": "/r", "state": "idle",
            "since": "2026-09-21T01:00:00Z", "confidence": "hook", "pane": True, "tail": [],
@@ -143,7 +143,7 @@ def test_a_failed_read_keeps_the_last_and_a_retired_ui_yml_is_named(home):
         {"person": {}, "migrate": ["/h/ui.yml: ui.yml is no longer read — its open_in lives under person:"]}
     )
     assert "no longer read" in uiconf.migrate_note() and uiconf.open_in() == uiconf.OpenIn()
-    from agentorc.ui.app import templates
+    from shiftlead.ui.app import templates
 
     html = templates.get_template("org.html").render(
         sessions=[], groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
@@ -205,7 +205,7 @@ def test_editor_file_serves_the_templates_file_form_and_file_link_its_defaults(h
 
 def test_the_records_editor_carries_first_and_wait(home):
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
-    from agentorc.ui.app import view
+    from shiftlead.ui.app import view
 
     rec = {"id": "ao-x-1", "name": "w", "kind": "agent", "dir": str(home), "state": "idle"}
     ed = view(rec)["editor"]

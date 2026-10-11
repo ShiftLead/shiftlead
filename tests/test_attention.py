@@ -23,10 +23,10 @@ def _rec(**kw) -> Session:
 
 
 def test_the_home_and_the_page_name_the_same_state_rows():
-    """`models.attention_kind` and `agentorc.ui.app.state_kind` are a **parity pair** (§4.5a *Inbox
+    """`models.attention_kind` and `shiftlead.ui.app.state_kind` are a **parity pair** (§4.5a *Inbox
     row: state*): the home needs the predicate to know when a row ends, the page to draw it, and a
     kind added to one must be added to the other or the trail would miss endings the page showed."""
-    from agentorc.ui.app import state_kind
+    from shiftlead.ui.app import state_kind
 
     cases = [
         (_rec(state="needs-you", pending=Pending(kind="permission", text="rm?", tool_use_id="t1")), "permission"),

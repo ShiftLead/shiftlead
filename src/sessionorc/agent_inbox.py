@@ -408,7 +408,7 @@ class InboxMixin:
     ) -> dict[str, Any]:
         """**Reply** on a board row (design §4.4 *Board write-back*, §4.5a *Due strip / Inbox board
         row → Reply*; TD-142 slice 1): the person's words appended to the item's own line as
-        ` — <name>, <date>: <reply>` and committed as `agentorc: reply on <head> (session <name>)`,
+        ` — <name>, <date>: <reply>` and committed as `shiftlead: reply on <head> (session <name>)`,
         refused as `board_edit` refuses. The line stays open and counted: a reply is not Done.
 
         Then the mail half (TD-142 slice 2): each live record holding an unexpired declared lease

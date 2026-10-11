@@ -185,15 +185,15 @@ def test_host_json_without_a_last_tick_loads_as_before(tmp_path):
 
 
 def test_session_end_carries_its_reason():
-    from agentorc.adapters.claude_code.hook import translate
+    from shiftlead.adapters.claude_code.hook import translate
 
     assert translate({"hook_event_name": "SessionEnd", "reason": "prompt_input_exit"})["reason"] == "prompt_input_exit"
     assert "reason" not in translate({"hook_event_name": "SessionEnd"})
 
 
 def test_only_a_scraped_state_is_marked_a_guess():
-    from agentorc import cli
-    from agentorc.ui import cards
+    from shiftlead import cli
+    from shiftlead.ui import cards
 
     base = Session(id="ao-x", name="x", kind="interactive", dir="/tmp", adapter="shell", state="exited").view()
     for conf, guessed in (("scraped", True), ("tick", False), ("hook", False)):

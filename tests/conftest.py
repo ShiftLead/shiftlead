@@ -9,11 +9,11 @@ Two agents are on offer:
   call `asyncio.run`, which hangs against the in-process fixture because a sync test body never
   pumps that fixture's loop.
 
-Both use a private tmux server (`-L ao-test-<uuid>`), a temp `AGENTORC_HOME` and a temp
+Both use a private tmux server (`-L ao-test-<uuid>`), a temp `SHIFTLEAD_HOME` and a temp
 `CLAUDE_CONFIG_DIR` (the default profile's registry; the occupancy check would otherwise see this
 machine's live Claude sessions, TD-010 a), never the
 user's. `subprocess_agent` sets the env in the test process too: the UI under `TestClient` runs
-here and reads `paths.socket_path()` and `AGENTORC_TMUX_SOCKET` from `os.environ` at call time.
+here and reads `paths.socket_path()` and `SHIFTLEAD_TMUX_SOCKET` from `os.environ` at call time.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ def _anchor_off(monkeypatch: pytest.MonkeyPatch) -> None:
     main checkout. A test of something else starts the team it writes and counts what it created,
     so the suite reads the default as off; the anchor's own tests (tests/test_anchor_seat.py) turn it
     back on, and one of them holds the shipped value."""
-    from agentorc import org
+    from shiftlead import org
 
     monkeypatch.setattr(org, "ANCHOR_DEFAULT", False)
 
@@ -72,7 +72,7 @@ def _no_real_repos_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
     person's home only on the default home (TD-298: any other home reads its own `repos.txt`, which
     `hosts.default_repos_registry()` names) — and from TD-069 step 3 the Inbox runs the board reader
     over every repo on it. A test never reads the person's roster, even one that points
-    `AGENTORC_HOME` at the default: it gets an empty one unless it writes its own."""
+    `SHIFTLEAD_HOME` at the default: it gets an empty one unless it writes its own."""
     from sessionorc import hosts
 
     monkeypatch.setattr(hosts, "DEFAULT_REPOS_REGISTRY", str(tmp_path / "no-roster" / "repos.txt"))
@@ -187,7 +187,7 @@ def _no_persons_settings_carried_over():
     template directly would draw with it — so a result hung on file order (TD-275). Each test starts
     with nothing read, which is what a fresh UI has."""
     try:
-        from agentorc.ui import uiconf
+        from shiftlead.ui import uiconf
     except ImportError:  # the `ui` extra is not installed: nothing to reset
         yield
         return
@@ -197,19 +197,19 @@ def _no_persons_settings_carried_over():
 
 @pytest.fixture(scope="session", autouse=True)
 def _never_this_machines_home(tmp_path_factory):
-    """No test reads this machine's `~/.agentorc` or `~/.claude` (TD-044).
+    """No test reads this machine's `~/.shiftlead` or `~/.claude` (TD-044).
 
-    The agent fixtures set their own `AGENTORC_HOME`, but a *unit* test that only calls into
-    `agentorc.cli` sets nothing — and since `org.yml` landed (TD-040), `ao roles` reads it from
+    The agent fixtures set their own `SHIFTLEAD_HOME`, but a *unit* test that only calls into
+    `shiftlead.cli` sets nothing — and since `org.yml` landed (TD-040), `ao roles` reads it from
     `paths.home()`, so on a machine with a real fleet definition those tests saw Paul's roles and
     failed. Session scope on purpose: it is set up before the module- and function-scoped agent
     fixtures, which then override it with their own temp home for the tests that need one."""
     mp = pytest.MonkeyPatch()
-    mp.setenv("AGENTORC_HOME", str(tmp_path_factory.mktemp("unit-home")))
+    mp.setenv("SHIFTLEAD_HOME", str(tmp_path_factory.mktemp("unit-home")))
     mp.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("unit-claude")))
-    mp.delenv("AGENTORC_SESSION", raising=False)  # a test run inside an ao session is not a caller
+    mp.delenv("SHIFTLEAD_SESSION", raising=False)  # a test run inside an ao session is not a caller
     # …and nor is its ancestry: the exit-3 sentence reads the pane's environment above `ao` (TD-089)
-    from agentorc import cli
+    from shiftlead import cli
 
     mp.setattr(cli, "PROC", tmp_path_factory.mktemp("no-proc"))
     yield
@@ -244,9 +244,9 @@ def wait_for_sync(pred: Callable[[], object], timeout: float = 5.0, step: float 
 def pane_line(sid: str) -> str:
     """What tmux itself says about a session's pane, for a wait that timed out (TD-025): the
     record's state and tail alone cannot tell a slow shell start from a pane that never appeared."""
-    sock = os.environ.get("AGENTORC_TMUX_SOCKET")
+    sock = os.environ.get("SHIFTLEAD_TMUX_SOCKET")
     if not sock:
-        return "(no AGENTORC_TMUX_SOCKET: pane not inspected)"
+        return "(no SHIFTLEAD_TMUX_SOCKET: pane not inspected)"
     try:
         pane = Tmux(socket_name=sock).main_panes().get(sid)
     except Exception as e:  # noqa: BLE001 — a diagnostic must never mask the assertion
@@ -341,12 +341,12 @@ async def park_ticks(agent) -> None:
 
 @pytest.fixture
 async def agent(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))  # never this machine's live registry
-    monkeypatch.delenv("AGENTORC_SESSION", raising=False)  # tests run inside an ao session are not a caller
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)  # tests run inside an ao session are not a caller
     monkeypatch.setattr("sessionorc.agent_common.TICK_SECONDS", FAST_TICK)
     sock_name = private_socket_name()
-    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
+    monkeypatch.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
@@ -376,13 +376,13 @@ def subprocess_agent(tmp_path_factory):
     sock_name = private_socket_name()
     proc: subprocess.Popen | None = None
     try:
-        mp.setenv("AGENTORC_HOME", str(home))
+        mp.setenv("SHIFTLEAD_HOME", str(home))
         mp.setenv("CLAUDE_CONFIG_DIR", str(home / "claude"))  # never this machine's live registry
-        mp.setenv("AGENTORC_TMUX_SOCKET", sock_name)
-        mp.setenv("AGENTORC_TICK", str(FAST_TICK))
-        # `ao` sends AGENTORC_SESSION as the caller (design §4.8); a test run from inside an ao
+        mp.setenv("SHIFTLEAD_TMUX_SOCKET", sock_name)
+        mp.setenv("SHIFTLEAD_TICK", str(FAST_TICK))
+        # `ao` sends SHIFTLEAD_SESSION as the caller (design §4.8); a test run from inside an ao
         # session would otherwise be gated as a session acting on another one
-        mp.delenv("AGENTORC_SESSION", raising=False)
+        mp.delenv("SHIFTLEAD_SESSION", raising=False)
         # the board write-back lands an edit through `gh` (§4.4, TD-264): the child gets the fake
         mp.setenv("PATH", f"{fake_gh_bin(home / 'fake-bin')}{os.pathsep}{os.environ.get('PATH', '')}")
         proc = subprocess.Popen(
@@ -446,10 +446,10 @@ def composerstubs(monkeypatch):
 
 
 def run_hook(session: str, payload: dict, wait: str = "5", env: dict[str, str] | None = None):
-    """Run `agentorc-hook` as Claude Code would: payload on stdin, session in the env."""
-    env = {**(env or os.environ), "AGENTORC_SESSION": session, "AGENTORC_PERMISSION_WAIT": wait}
+    """Run `shiftlead-hook` as Claude Code would: payload on stdin, session in the env."""
+    env = {**(env or os.environ), "SHIFTLEAD_SESSION": session, "SHIFTLEAD_PERMISSION_WAIT": wait}
     return subprocess.run(
-        [sys.executable, "-m", "agentorc.adapters.claude_code.hook"],
+        [sys.executable, "-m", "shiftlead.adapters.claude_code.hook"],
         input=json.dumps(payload),
         capture_output=True,
         text=True,

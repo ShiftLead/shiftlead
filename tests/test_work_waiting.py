@@ -10,12 +10,12 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks
 
-from agentorc import teamrun
 from sessionorc import modes, work
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import WORK_SETTLE
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import Session
+from shiftlead import teamrun
 
 DECLARED = {"at": "2026-09-28T06:56:00Z", "why": "nothing pickable"}
 
