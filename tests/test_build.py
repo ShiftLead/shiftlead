@@ -189,7 +189,7 @@ def test_the_chip_says_promoting_held_the_page_and_a_stale_node():
     assert build.stamp("2025-01-02T03:04:00+00:00").startswith("2025-")
 
 
-def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(repo):
+def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(repo, monkeypatch):
     """The techlead's read of TD-132 slice 5: where the home's `promotes` reading holds the checkout
     the build came from, at the same live commit, the chip takes main's distance from it — the
     Inbox's Promote row's number — rather than this checkout's last fetch; otherwise it measures here."""
@@ -217,3 +217,20 @@ def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(
     for other in ({**reading, "live": "0" * 40}, {**reading, "root": str(repo.parent)}, {**reading, "main": None}):
         assert build_chip({**info, "promotes": {"src": other}})["text"].endswith(" · main +1")
     assert build_chip(None) is None
+    # TD-548: each linked node that is up and stale is named, and no other; the page's own build where
+    # it differs from the host agent's (§4.5a)
+    monkeypatch.setattr(build, "info", lambda: {})  # an editable install: the page has no record
+    links = {
+        "box": {"up": True, "stale": True, "build": "c" * 40},
+        "down": {"up": False, "stale": True, "build": "d" * 40},
+        "fresh": {"up": True, "stale": False, "build": "e" * 40},
+        "odd": "not a dict",
+    }
+    got = build_chip({**info, "links": links})
+    assert got["title"].endswith("\nbox: ccccccc, stale") and "ddddddd" not in got["title"]
+    assert "eeeeeee" not in got["title"] and "this page" not in got["title"]
+    page = {"commit": "b" * 40, "source": "/nonexistent", "built_at": "2026-10-10T16:00:00Z"}
+    monkeypatch.setattr(build, "info", lambda: page)
+    assert "\nthis page: bbbbbbb 2026-10-10T16:00:00Z" in build_chip(info)["title"]
+    monkeypatch.setattr(build, "info", lambda: {**page, "commit": built})  # the same build: not named
+    assert "this page" not in build_chip(info)["title"]

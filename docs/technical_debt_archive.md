@@ -9572,3 +9572,21 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-539 (the build), TD-546 (the probe pattern).
 
 **Resolved:** 2026-10-11 (PR #1508) — `tests/test_ui_build_chip.py` runs `app.js` in node against a stub `#buildchip` under `TZ=America/New_York`: the load draw reprints `data-at`/`data-rest` in the browser's zone, an Inbox poll handed `build_chip` redraws it (the year in front only for another year), a chip with no `at` keeps its text, and a poll with no chip changes nothing. Deleting the load draw, the poll's redraw, the year rule or the `at` branch each fails it.
+
+## TD-548: `common.build_chip`'s stale-node list and the page's own build are untested: the two lines can go and `test_build.py` and `test_ui_promote.py` stay green
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-11 (test-audit-ao-1, auditing #1500, TD-539)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/agentorc/ui/common.py` (`build_chip`: `more["nodes"] = [... s.get("up") and s.get("stale")]`, `more["page"] = build.info()`); `tests/test_build.py::test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row`
+
+**Why:** #1500's docstring says the chip names *"The page's own `build.info()` ... where it differs, and each linked node marked stale"*. `test_the_chip_says_promoting_held_the_page_and_a_stale_node` calls `build.chip(..., page=…, nodes=[…])` directly, so the formatting is held, but the code that builds `nodes` from `info["links"]` and passes `build.info()` as `page` is exercised by no test: no fixture there carries `links`, and the page's build equals the host's in a test run. Probes over all of `tests/`: replace the `nodes` comprehension's condition with `False`, and delete `more["page"] = build.info()` — both `pytest -x` runs pass.
+
+**Fix:** in `test_build.py`'s `build_chip` test: an `info` with `links: {box: {up: True, stale: True, build: <sha>}, down: {up: False, stale: True}, fresh: {up: True}}` expects the title to end with `box: <sha7>, stale` and name neither of the others; and with `build.info` monkeypatched to another commit, `this page: …` is in the title.
+
+**Related:** TD-539 (the build), TD-547.
+
+**Resolved:** 2026-10-11 (PR #1509) — `tests/test_build.py::test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row` hands `build_chip` linked nodes (up and stale, stale but down, up and fresh, not a dict) and expects only the first named `, stale`; with `build.info` monkeypatched to another commit it expects `this page: …`, and to the same commit none. Dropping the comprehension's condition, its `up`, or the `page` line each fails it.
