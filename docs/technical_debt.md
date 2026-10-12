@@ -42,6 +42,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
+| TD-558 | The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry | Medium | Open |
+| TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Open |
+| TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Open |
+| TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Open |
 
 ---
 
@@ -609,4 +613,68 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
 
 **Related:** TD-060, TD-552.
+
+## TD-558: The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, Paul pressed Start on ao-grind)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a team card **Start** (*What the lanes hold, before the start*), §4.4 *In a team's lanes*; `src/shiftlead/teamrun.py` (`lanes`), `src/sessionorc/ledger.py` (`in_lanes`), `src/shiftlead/ui/static/app.js` (`startPress`)
+
+**Why:** on 2026-10-12 Paul pressed **Start** on ao-grind and got the *nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts* dialog (`grinder: 0 · designer: 0`), while the repo card read *2 pickable (ao-grind 1 · dev-cadence 1)*. Both readers follow the design. `teamrun.lanes` reads only `plan.members`' lanes ("each member's lane", §4.5a). `ledger.in_lanes` reads every lane on the team's records, the anchor seat's `[anchor]` among them, so ao-grind's 1 was TD-060 (`Owner: anchor`). The anchor lane also held six live checks whose builds were live. A Start does create the anchor seat, and that seat fills on its lane (§4.9b, §6 rule 3), so the dialog's *the team will wind down as soon as it starts* was not true: once the checkout was free the anchor started and took its lane.
+
+**Fix:** design one reading for both. The Start dialog's line counts every lane the start creates, the anchor seat's and any seat with a `work` trigger included (*grinder: 0 · designer: 0 · anchor: 7*), and *empty* holds only when all of them are empty. The card's per-team count either names the lane it comes from or uses the same set. Where a seat cannot fill because its checkout is held (TD-559), the line says that too. **Done when** the Start dialog and the repo card agree on what a team's lanes hold, and the dialog does not open while a lane the start creates holds work.
+
+**Related:** TD-559, TD-381 (the anchor seat), TD-265 (the dialog), TD-361 (*In a team's lanes*).
+
+## TD-559: A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9b *The anchor seat*, §6 rule 3 (the fill's occupancy gate), §4.5a row *on call: the anchor seat's words*; `seat_held` on the record; the Inbox's *Needs you* sources
+
+**Why:** on 2026-10-11 a plain `claude` started at 14:29 in a VS Code terminal in `/home/kmaster/shiftlead`, outside ShiftLead. That made it the one agent in the main checkout (§9 invariant 2), so ao-grind's anchor seat never filled. Its record read `seat_held: {by: shiftlead-90, why: "held by shiftlead-90 (claude-code, outside shiftlead, idle)"}`. Its lane held TD-060 and six live checks, and three design entries (TD-290, TD-410, TD-457) were blocked on those checks. All the person saw was the seat's slot, *on call — the checkout is yours · …*, on a folded team. When Paul closed that session on 2026-10-12, the anchor started by itself (rule 3's fill, as designed). Paul: *show an error when a member's worktree (e.g. the anchor) is occupied by a non-team-member.*
+
+**Fix:** design an error-weight signal for a seat or member whose fill (or start) is held off by a session that is not one of the team's: it names the holder and how long it has held the seat, and offers what to do. A Needs-you Inbox row, or a warning on the team header that shows while the team is folded, or both. Also decide whether it stays quiet while the holder is the person's own interactive session and the lane is empty, and goes up only once the lane holds work. **Done when** a held seat whose lane holds work is visible as an error without unfolding the team, naming the holding session.
+
+**Related:** TD-558, TD-381, TD-457.
+
+## TD-560: The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 screen 6 *The ledger's entries that wait on you* (TD-367), §4.5a row *Inbox: For you in the ledger (n) fold*; `src/shiftlead/ui/inbox.py` (`ledger_for_you`), `ledger_for_you.html`
+
+**Why:** TD-367 made the ledger's *for you* entries (`Owner: paul`, `decision (paul)`) a fold of one-line links. It is counted nowhere and has no control, because an entry has no date and no asker, and the Inbox's counts mean *due now*. That design rejected counted rows and a section of their own. Paul, 2026-10-12: keep them out of *due*, but give them **a separate space in the Inbox** that is also the place for future items that are not pressing, and draw them with **the same interface as every Inbox item**: the options listed, a recommended answer, and a Reply.
+
+**Fix:** design a not-due Inbox section, *Later* or similar, that holds the undated *for you* entries and any other non-pressing item, kept out of the due counts. Each row is drawn as a mail row is: its first paragraph, its options with the recommended one marked, and **Reply**. Decide where the options come from: an entry has none today, so either the ledger entry carries `**Options:**` and a default, or the Reply goes to the repo's techlead or anchor as an `ask` reply that the entry's owner writes back to the ledger. Decide also where a reply lands (the entry's Status, a board line, mail to the anchor) and how a dated item enters or leaves the section. This reverses part of TD-367's rejection; the history gets a dated line. **Done when** the design draws the section, its rows' controls, and the reply's path into the ledger, and a build entry is open.
+
+**Related:** TD-367, TD-368, TD-561.
+
+## TD-561: Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.10 *How a message to a person is written* (TD-127), §4.5 screen 6 (the Inbox row), §4.7 `ao msg`; the mail envelope; the board's `Format:` line (its bold lead is a subject already)
+
+**Why:** Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier.* Today a row draws its first paragraph (TD-127: one to three sentences, *no summary field*). That rule rejected a second text on purpose, so a row has no short headline to scan by. Board lines already open with a bolded lead, which acts as one.
+
+**Fix:** design a required `subject` on every entry filed to the person: mail (`ao msg --subject`, refused or warned when missing, with a length bound), board lines (the bold lead as the subject), the home's own entries (lapse notes, work rows), and TD-560's ledger rows (the entry's title). The Inbox row and the message page draw the subject first and the first paragraph under it, and the find box matches it. The briefs and presets say the rule. This reverses TD-127's *no summary field*; the history gets a dated line. **Done when** the design names the field, where each kind of entry gets it, how a missing one is treated, and how the row draws it, and a build entry is open.
+
+**Related:** TD-127, TD-560.
 
