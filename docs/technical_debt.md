@@ -43,7 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Designed — TD-597 builds it |
-| TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
+| TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Designed — TD-596 builds it |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
@@ -55,6 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-594 | §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size, the new shell having none remembered | Low | Open |
 | TD-597 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
+| TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
 
 ---
 
@@ -650,7 +651,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-12 (the designer) — (1) the person's own shell is a `shell` record, interactive (`unattended: false`), with no `role`, no team and an empty `controllers` list — what Open shell here, + New ▾ Shell and `ao shell` from outside a pane make; a session-made shell lists its creator as controller from birth, so none qualifies; `person_shell(record)` beside `PERSON_ONLY` is the one definition and `person_only` reads it; (2) the right is the record's state at each request, never kept: a mode flip, a controller added or a role loses it on the next call; (3) Paul's risk is written in §4.8a as the person's own doing — the pane's signals cannot tell a hand-started agent from the shell's prompt, no narrowing is designed (a first-process rule reads /proc per request and is defeated by `exec`), the log names the shell's id; (4) one gate, every `PERSON_ONLY` RPC alike, the act still recorded as the shell's, the identity table unchanged. §4.8 *The person's own shell is the person*, §4.8a *A process under the person's shell is the shell*, §4.5a *Focus: Open shell here*. No mockup: nothing drawn changes. Built by TD-596. Was: Open.
+**Blocked by:** TD-596
 **Location:** design §4.8 *A person's own act is a named RPC, and the gate is one list*; §4.8a (identity: how the host agent tells which session is calling); §6 *Promote*; §4.5a *Focus: Open shell here*; `src/sessionorc/agent_common.py` (`person_only` ~L287); `src/sessionorc/mail.py` (`is_person`, `PERSON_ONLY`)
 
 **Why:** Paul, 2026-10-12, after `ao promote shiftlead` was refused in a shell he had opened with **Open shell here** (*error: ao-ao-paul-ao-paul-shell cannot run promote: a person's own act, refused to every session*): *A shell being directly controlled by the user should have permissions to promote/other without interference. I suppose the risk is that the user then creates an llm session there - but that's probably out of scope (and on the user).* Today the only place the person can run a person-only act from the terminal is a terminal outside ShiftLead, so the dashboard's own shell is no use for it.
@@ -872,6 +874,30 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** §4.5a's row says the window opens at the default size; `pdm run test` passes (the doc-bound tests read this table).
 
 **Related:** TD-577, TD-579 (#1563), TD-046.
+
+---
+
+## TD-596: Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-580's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.8 *The person's own shell is the person*, §4.8a *A process under the person's shell is the shell*, §4.5a *Focus: Open shell here*; `src/sessionorc/mail.py` (`PERSON_ONLY` ~L118, `is_person` ~L176: add `person_shell(record)`), `src/sessionorc/agent_common.py` (`person_only` ~L287: takes the caller's record, or a lookup, and passes when `person_shell` does; the refusal's words), every RPC that calls `person_only` (the thirty of the list, `agent_*.py`; the call site hands the record — `self.sessions.get(caller)` or the home's view of a node's record, §4.4a *Acts across the link*, where the check runs at the node), `src/sessionorc/models.py` (~L902 `adapter`, ~L912 `unattended`, ~L974 `controllers`, ~L1057 `role`: the fields read), `src/shiftlead/cli.py` (the refusal printed as the agent words it); `tests/test_person_only.py` (the list-to-code test), `tests/test_identity*.py` (an act from the shell's pane is logged as the shell)
+
+**Why:** TD-580: Paul, 2026-10-12 — *A shell being directly controlled by the user should have permissions to promote/other without interference*; `ao promote shiftlead` from a shell opened with **Open shell here** was refused (*a person's own act, refused to every session*), so the dashboard's own shell could not do what a terminal outside ShiftLead can.
+
+**Fix:**
+1. `mail.person_shell(record) -> bool`: `record.adapter == "shell" and not record.unattended and not record.role and not record.team and not record.controllers` (the team field as the record names it; a seat is never a shell). Docstring: §4.8's sentence.
+2. `person_only(caller, act, section, record=None)`: passes when `is_person(caller)` or `record is not None and person_shell(record)`; every call site hands the caller's record from the agent's sessions (a caller it does not know stays a session, refused as today); the refusal reads *a person's own act, refused to every session but the person's own shell (design §4.8)*. Across the link (§4.4a) the node runs the check with the record it holds, as it runs it today.
+3. Nothing else: the identity verdict (§4.8a) is untouched, `by:` fields and the identity log keep the shell's id, `is_person` keeps meaning *no caller*; where an RPC writes `"person"` for `is_person(caller)` it writes the shell's id for a shell, as it does for any session.
+4. Tests: `test_person_only.py` — for each RPC in `PERSON_ONLY`, a person's shell record (adapter `shell`, `unattended` false, no role, no team, empty controllers) passes and the refusal is absent; an agent session, an unattended shell, a shell with a controller and a shell with a role are each refused with the new words; a record not found is refused; the list-to-code test still holds both directions; a `promote` from the shell is recorded with the shell's id (`by`); `ao promote` from a session that is a person's shell prints the agent's reply, not the refusal.
+
+**Done when** `ao promote` (and every other person-only act) runs from a shell the person opened with **Open shell here** or **+ New ▾ Shell**, is still refused to every agent session, an unattended shell, a controlled shell and a role's session, the act is logged as the shell's, and the tests above pass.
+
+**Related:** TD-580 (the design), TD-581 (the promote press under `auto`), TD-077 (identity), TD-577 / TD-579 (Open shell here's tab).
 
 ---
 
