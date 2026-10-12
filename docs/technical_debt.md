@@ -42,7 +42,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Designed — TD-564 builds it |
 | TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Designed — TD-565 builds it |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Designed — TD-566 builds it |
 | TD-565 | Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line | Medium | Open |
@@ -615,23 +614,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
 
 **Related:** TD-060, TD-552.
-
-## TD-559: A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-paul, Paul's ask)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td559-seat-held-row.png`) — an error-weight signal from the record the tick already writes: `seat_held` gains `since` (the first tick that read this holder, reset by another; a held Start writes the start's time), and (1) **Inbox row: seat held** under *Needs you*, counted, once the hold is older than `SEAT_HELD_GRACE` (fifteen minutes, so a person's visit to the checkout raises nothing), naming the holder in the tick's words (*held 3 h by shiftlead-90 (claude-code, outside shiftlead, idle)*, or the tree's *branch td-x, 2 files uncommitted*), the work (`seat_due.ids`, three named) and what to do; Open focuses the holder where it is a record of this home, else the seat's card; Dismiss keeps this `since`'s row away, as the restart row's does; Snooze as every row's; (2) **team header: seat held** mark, *· anchor held 3 h*, amber, visible while the team is folded. Decided: the row covers the tree's own reasons too, since the person's uncommitted work in the checkout holds the same work unseen; it stays quiet while the lane is empty, since `seat_held` is written only while work is due, and under the grace. §4.5a two rows, §4.5 screen 6, §6 rule 3, §4.9b. Built by TD-564. Was: Open.
-**Blocked by:** TD-564
-**Location:** design §4.9b *The anchor seat*, §6 rule 3 (the fill's occupancy gate), §4.5a rows *Inbox row: seat held*, *team header: seat held*, *on call: the anchor seat's words*; `seat_held` on the record; the Inbox's *Needs you* sources
-
-**Why:** on 2026-10-11 a plain `claude` started at 14:29 in a VS Code terminal in `/home/kmaster/shiftlead`, outside ShiftLead. That made it the one agent in the main checkout (§9 invariant 2), so ao-grind's anchor seat never filled. Its record read `seat_held: {by: shiftlead-90, why: "held by shiftlead-90 (claude-code, outside shiftlead, idle)"}`. Its lane held TD-060 and six live checks, and three design entries (TD-290, TD-410, TD-457) were blocked on those checks. All the person saw was the seat's slot, *on call — the checkout is yours · …*, on a folded team. When Paul closed that session on 2026-10-12, the anchor started by itself (rule 3's fill, as designed). Paul: *show an error when a member's worktree (e.g. the anchor) is occupied by a non-team-member.*
-
-**Fix:** design an error-weight signal for a seat or member whose fill (or start) is held off by a session that is not one of the team's: it names the holder and how long it has held the seat, and offers what to do. A Needs-you Inbox row, or a warning on the team header that shows while the team is folded, or both. Also decide whether it stays quiet while the holder is the person's own interactive session and the lane is empty, and goes up only once the lane holds work. **Done when** a held seat whose lane holds work is visible as an error without unfolding the team, naming the holding session.
-
-**Related:** TD-558, TD-381, TD-457.
 
 ## TD-560: The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply
 
