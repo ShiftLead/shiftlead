@@ -475,6 +475,8 @@ def acts(r: dict[str, Any], now: datetime) -> dict[str, Any] | None:
         return None
     if not r.get("live") or r.get("live_why"):
         return {"waiting": "live"}
+    if r.get("failed") or r.get("held"):  # the policy promotes nothing while either stands, checks or not
+        return None
     u = unmet(r)
     if u is not None and u[0] != "checks":
         return None
@@ -485,7 +487,9 @@ def acts(r: dict[str, Any], now: datetime) -> dict[str, Any] | None:
         for limit, at in ((PROMOTE_SETTLE, r.get("moved")), (PROMOTE_MAX_WAIT, r.get("ahead_since")))
         if (age := _age(at, now)) is not None
     ]
-    if not left or min(left) <= 0:
+    if not left:  # neither clock can be read: `survey` will not act on one it cannot read
+        return None
+    if min(left) <= 0:
         return {"at": "next tick"}
     return {"settles_in": round(min(left))}
 

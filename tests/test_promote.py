@@ -763,6 +763,10 @@ def test_what_the_home_will_do_under_auto_in_the_rows_words():
         assert promote.acts({**base, **off}, now) is None, off
     assert promote.acts({**base, "failed": {"sha": "9" * 40}}, now) is None
     assert promote.acts({**base, "held": {"sha": "4" * 40}}, now) is None
+    # a failure or hold stands whatever the checks read; and no clock read is no promise (review of #1589)
+    assert promote.acts({**base, "checks": "pending", "failed": {"sha": "9" * 40}}, now) is None
+    assert promote.acts({**base, "checks": "pending", "held": {"sha": "4" * 40}}, now) is None
+    assert promote.acts({**base, "moved": None, "ahead_since": None}, now) is None
     words = [promote.acts_words(a) for a in ({"settles_in": 360}, {"at": "next tick"}, {"checks": "failed"})]
     assert words == ["settles in 6 min", "promotes at the next tick", "checks failed — promotes when green"]
     assert promote.acts_words({"waiting": "live"}) == "waiting for a live reading"
