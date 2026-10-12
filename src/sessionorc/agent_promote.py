@@ -96,7 +96,7 @@ class PromoteMixin:
         return found[0]
 
     def _promote_person(self, method: str, caller: Any) -> None:
-        agent_common.person_only(caller, f"run {method}", "§6 *Promote*", self.sessions)
+        agent_common.person_only(caller, f"run {method}", "§6 *Promote*", self._graph())
         if self.mode != "home":
             raise RpcError(f"{method} runs at the home (design §6 Promote): this host is a node")
 

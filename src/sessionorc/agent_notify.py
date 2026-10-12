@@ -196,7 +196,7 @@ class NotifyMixin:
         secrets and link, whatever `on` says — *shiftlead · a test from <home>* and the Inbox's
         address — answering the send's result in words. A person's own (`mail.PERSON_ONLY`), at the
         home alone (`modes.HOME_EDITS` forwards it from a node)."""
-        agent_common.person_only(caller, "send a Telegram test", "§4.10", self.sessions)
+        agent_common.person_only(caller, "send a Telegram test", "§4.10", self._graph())
         if self.mode != "home":
             raise RpcError("notify_test runs at the home (design §4.10): this host is a node")
         tg = settings_mod.notify(settings_mod.load()).get("telegram") or {}

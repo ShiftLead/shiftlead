@@ -76,7 +76,7 @@ class InboxMixin:
     # person inbox: a snooze, a pause and a *Go with it* are the person's, and no session has them.
 
     def _person_entry(self, msg: str, caller: Any, what: str) -> MailEntry:
-        agent_common.person_only(caller, f"{what} mail", "§4.10", self.sessions)
+        agent_common.person_only(caller, f"{what} mail", "§4.10", self._graph())
         held = [e for e in self.person_inbox if e.id == msg]
         if not held:
             raise RpcError(f"the person inbox holds no entry {msg}")
@@ -162,7 +162,7 @@ class InboxMixin:
         **A person's only**, refused to every session exactly as `inbox_delete` is and, like it, no
         never-gated read (§4.8a): a session that could dismiss the person's rows could bury its own
         question."""
-        agent_common.person_only(caller, "dismiss the person's rows", "§4.10 *The Inbox is a queue*", self.sessions)
+        agent_common.person_only(caller, "dismiss the person's rows", "§4.10 *The Inbox is a queue*", self._graph())
         ids = [str(x) for x in ([msg] if isinstance(msg, str) else list(msg or [])) if str(x).strip()]
         if not ids:
             raise RpcError("dismiss names the entries to dismiss, by id (design §4.10)")
@@ -219,7 +219,7 @@ class InboxMixin:
         *not now* is kept in the home's own attention store, per record **and row kind** — a
         session's permission and its stalled row are two rows, and snoozing one is not snoozing the
         other. No `until` clears it. A person's only, as every act on the person's Inbox is."""
-        agent_common.person_only(caller, "snooze the person's rows", "§4.10", self.sessions)
+        agent_common.person_only(caller, "snooze the person's rows", "§4.10", self._graph())
         # `promote` (§4.5a *Inbox row: promote*, TD-132): keyed `promote:<repo>`, a repo and not a
         # record, so Snooze is by time alone and a later merge does not wake the row; `work`
         # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`
@@ -274,7 +274,7 @@ class InboxMixin:
         page, handed as a Reply's `refs` are, and the answer is one of them word for word — or,
         where the live look's pair is among them, `Not right:` and the person's words. Anything
         else typed is a Reply."""
-        agent_common.person_only(caller, "edit the board", "§4.4", self.sessions)
+        agent_common.person_only(caller, "edit the board", "§4.4", self._graph())
         root, want = self._board_root(board)
         if action == "reply":
             raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
@@ -354,7 +354,7 @@ class InboxMixin:
             "add an entry to the ledger this way — a session writes one on its branch (cadence §2), "
             "or files `ao finding`",
             "§4.9 *Add an entry to the ledger*",
-            self.sessions,
+            self._graph(),
         )
         want = str(repo or "").strip()
         roots = hosts.local_host().repos()
@@ -422,7 +422,7 @@ class InboxMixin:
         written first; a refused send is said in `note` and `mail_refused`, never raised, since
         the line is committed and a second press would write it twice. `sent` is `[{session, id,
         ref}]`, `session` the holder's name."""
-        agent_common.person_only(caller, "reply on the board", "§4.4", self.sessions)
+        agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         root, want = self._board_root(board)
         try:
             done = await asyncio.to_thread(board_mod.write_back, root, int(line), text, "reply", None, reply=reply)
@@ -488,7 +488,7 @@ class InboxMixin:
         after its commit, a node's over the link. Returns `{sent: [{session, id, ref}], refused:
         ["<name> (holds <ref>): <why>"]}`, a refused send said, never raised. With `repo` (the
         board's checkout's name) it also writes the trail line, in the result's words (`reply_note`)."""
-        agent_common.person_only(caller, "reply on the board", "§4.4", self.sessions)
+        agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         head = " ".join(str(head or "").split())
         if len(head) > BOARD_HEAD_CHARS:
             head = head[: BOARD_HEAD_CHARS - 1].rstrip() + "…"
@@ -724,7 +724,7 @@ class InboxMixin:
         read from that reading, and refused when it no longer sorts *for you* or an open decided line
         already names it. The ledger itself is never written. The repo's work orders are read again
         once the line lands, so the row leaves on the next poll."""
-        agent_common.person_only(caller, "answer a ledger entry", "§4.5", self.sessions)
+        agent_common.person_only(caller, "answer a ledger entry", "§4.5", self._graph())
         root = next((r for r in self._repos if r == repo or str(Path(r).resolve()) == str(Path(repo).resolve())), None)
         if root is None:
             raise RpcError(f"{repo} is not a repo this home reads (its repos registry)")
@@ -968,7 +968,7 @@ class InboxMixin:
         do not ask again and a later one does, and the mark is removed. A person's own, refused to a
         session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`). `{team, cleared,
         ids}`: `cleared` false when no work was waiting."""
-        agent_common.person_only(caller, "clear a team's waiting work", "§6 rule 8", self.sessions)
+        agent_common.person_only(caller, "clear a team's waiting work", "§6 rule 8", self._graph())
         if self.mode != "home":
             raise RpcError("clear_work runs at the home (design §6 rule 8): this host is a node")
         team = str(team or "").strip()
@@ -1012,7 +1012,7 @@ class InboxMixin:
         held}`: `started` false and `held` the mark's `{why, …}` when a bound holds the start back,
         which the page says in the row's words; false with no `held` when no work was waiting. Under
         `on_work: off` the tick writes no mark, so there is nothing for it to start."""
-        agent_common.person_only(caller, "start a team's waiting members", "§6 rule 8", self.sessions)
+        agent_common.person_only(caller, "start a team's waiting members", "§6 rule 8", self._graph())
         if self.mode != "home":
             raise RpcError("work_start runs at the home (design §6 rule 8): this host is a node")
         team = str(team or "").strip()
@@ -1054,7 +1054,7 @@ class InboxMixin:
         refused to a session as `clear_work` is, and the home's alone (`modes.HOME_EDITS`): both
         fields are home-owned, a node's member's too. `{id, kind, cleared}`: `cleared` the PRs
         whose mark went, empty when none stood."""
-        agent_common.person_only(caller, "dismiss a mark", "§4.5a", self.sessions)
+        agent_common.person_only(caller, "dismiss a mark", "§4.5a", self._graph())
         if self.mode != "home":
             raise RpcError("clear_mark runs at the home (design §6 rules 10 and 11): this host is a node")
         s = self._find(self._addr(id))

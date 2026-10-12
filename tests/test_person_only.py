@@ -51,6 +51,7 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
     assert set(rpcs) >= mail.PERSON_ONLY, sorted(mail.PERSON_ONLY - set(rpcs))
     bare = HostAgent.__new__(HostAgent)
     bare.sessions = {}  # the one thing the check reads: a caller this host does not hold is a session
+    bare.remote = {}
     for name in sorted(mail.PERSON_ONLY):
         fn = rpcs[name]
         params = [p for p in inspect.signature(fn).parameters if p not in ("self", "caller")]
@@ -126,6 +127,7 @@ def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
     }
     bare = HostAgent.__new__(HostAgent)
     bare.sessions = callers
+    bare.remote = {}
     for name in sorted(mail.PERSON_ONLY):
         params = [p for p in inspect.signature(rpcs[name]).parameters if p not in ("self", "caller")]
 
@@ -155,3 +157,14 @@ def test_the_right_is_the_records_state_at_the_call():
     s.controllers, s.unattended = [], True
     with pytest.raises(RpcError):
         person_only("ao-sh", "change the settings", "§5", records)
+
+
+def test_a_nodes_shell_is_read_from_the_homes_copy_of_its_record():
+    """§4.4a: a node forwards a home edit (`promote`, the settings) with its caller as `id@node`; the
+    home reads the record from the one graph, so a person's shell on a node passes there too."""
+    home = HostAgent.__new__(HostAgent)
+    home.sessions, home.remote = {}, {"laptop": {"ao-sh": _shell("ao-sh")}}
+    assert person_only("ao-sh@laptop", "run promote", "§6 *Promote*", home._graph()) is None
+    home.remote["laptop"]["ao-sh"].controllers = ["ao-lead"]
+    with pytest.raises(RpcError, match="^ao-sh@laptop cannot run promote"):
+        person_only("ao-sh@laptop", "run promote", "§6 *Promote*", home._graph())

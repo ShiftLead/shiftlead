@@ -133,7 +133,7 @@ class SettingsMixin:
         has passed and its reserve priority. `migrate` names a `ui.yml` still on disk, which is no
         longer read. **A person's own**, refused to a session as `set_settings` is: `person:` is
         theirs, and what a session needs of the gate `gate` answers."""
-        agent_common.person_only(caller, "read the settings", "§5 settings.yml", self.sessions)
+        agent_common.person_only(caller, "read the settings", "§5 settings.yml", self._graph())
         doc, now = settings_mod.load(), datetime.now(UTC)
         gate = (await self.rpc_gate())["profiles"]
         teams = {
@@ -188,7 +188,7 @@ class SettingsMixin:
           trust*, TD-233), None clearing it back to the default hour.
         - `notify`: `{telegram: {on?, secrets?, link?} | None}` (§4.10 *Told on Telegram when nobody is
           looking*, TD-319), a field set to None cleared; `on: true` with no secrets is refused."""
-        agent_common.person_only(caller, "change the settings", "§5 settings.yml", self.sessions)
+        agent_common.person_only(caller, "change the settings", "§5 settings.yml", self._graph())
         if all(v is None for v in (reserves, teams, repos, person, usage, notify)):
             raise RpcError(
                 "set_settings needs reserves, teams, repos, person, usage or notify (design §5 settings.yml)"
@@ -315,7 +315,7 @@ class SettingsMixin:
         **Members…**'s `edit_members` — as `org: ao-grind +grinder-ao-3`. A person's own, and the
         home's alone (`modes.HOME_EDITS`). `{committed}`: false when nothing changed, the home is no
         work tree, or git failed (logged; the write it follows stands)."""
-        agent_common.person_only(caller, "commit the definitions", "§4.9", self.sessions)
+        agent_common.person_only(caller, "commit the definitions", "§4.9", self._graph())
         if self.mode != "home":
             raise RpcError("commit_defs runs at the home (design §4.9): this host is a node")
         message = " ".join(str(message or "").split())

@@ -292,7 +292,7 @@ class IdentityMixin:
         cleared its replica would have the alarms back on the node's next report. A person at a
         node may clear only that node's records (`PERSON_NODE_BOUND`); the host's own list is
         whichever host was asked, and never travels."""
-        agent_common.person_only(caller, "acknowledge an identity alarm", "§4.8a", self.sessions)
+        agent_common.person_only(caller, "acknowledge an identity alarm", "§4.8a", self._graph())
         if not id or id == PERSON:
             self.identity_alarms = []
             self._id_host_dirty = False
@@ -330,7 +330,7 @@ class IdentityMixin:
         session to hand it to**: a record with no live controller — one a person started alone, a
         lead's own — is refused in words, and the page reads `alarm_to` so it does not draw the
         control there at all."""
-        agent_common.person_only(caller, "file an identity alarm", "§4.8a", self.sessions)
+        agent_common.person_only(caller, "file an identity alarm", "§4.8a", self._graph())
         s = self._graph().get(self._addr(id))
         if s is None:
             raise RpcError(f"no session {self._addr(id)}")
@@ -393,7 +393,7 @@ class IdentityMixin:
         of which are refused to every session while the mark stands (`_refuse_suspended`). A verb
         to clear it would be a fourth road back, and the whole point of the mark is that there are
         only the two a person walks themselves."""
-        agent_common.person_only(caller, "suspend a session", "§4.8a", self.sessions)
+        agent_common.person_only(caller, "suspend a session", "§4.8a", self._graph())
         # the graph, not `self.sessions`: a node's record is marked **here**, since the field is
         # the home's, and `_get` refuses an address that names another host (§4.4a)
         s = self._graph().get(self._addr(id))
