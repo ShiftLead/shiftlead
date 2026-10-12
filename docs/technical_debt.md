@@ -48,6 +48,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-564 | Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark | Medium | Open |
 | TD-565 | Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line | Medium | Open |
 | TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
+| TD-568 | The Inbox's *Later* help says each ledger row has *its answers and a Reply*; the build (#1537, slice 1) draws **Open** alone | Low | Open |
 
 ---
 
@@ -737,3 +738,21 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** every row of the Inbox, the message page and `ao inbox` leads with a subject — mail's given or derived with a warning, the home's rows' by kind, a board row's its head line, a ledger row's its title — the find box matches it, the presets and briefs say `--subject`, and the tests above pass.
 
 **Related:** TD-561 (the design), TD-127 (the first-paragraph rule), TD-560 / TD-565 (the ledger row's subject), TD-564 (the seat-held row's).
+
+## TD-568: The Inbox's *Later* help says each ledger row has *its answers and a Reply*; the build (#1537, slice 1) draws **Open** alone
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, auditing #1530–#1537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/inbox.html` (`info['later']`, L22), `src/shiftlead/ui/templates/inbox_row.html` (the `ledger` macro)
+
+**Why:** PR #1537 (TD-565 slice 1) added the section help `'later': '… the ledger’s entries that are yours or wait on your decision — each with its answers and a Reply.'` (`inbox.html:22`), which the *i* mark on **Later** shows. The same PR's `ledger` macro draws, in its foot, **Open** and nothing else (`inbox_row.html`, `<a class="btn sm ghost" … >Open</a>`); no answer button, **Go with it** or **Reply**, and no `ledger_decide` RPC exists on `origin/main` (`grep -rn ledger_decide src/` is empty). TD-565's own **Status** says those are slice 2. The design (§4.5a *Inbox row: ledger entry*) is true of the finished row, so the help text, which is shown now, says what the page cannot yet do.
+
+**Fix:** reword `info['later']` to what the row holds until slice 2 lands (the ledger's entries, each with its *details* and **Open**), and put the words back in slice 2; or fold it into TD-565's slice 2 as an item. The §4.5a help list and `help.py` do not carry this string (the section help is the template's), so no doc-bound test moves.
+
+**Done when** no section help promises a control the section does not draw.
+
+**Related:** TD-565, TD-560, #1537.
