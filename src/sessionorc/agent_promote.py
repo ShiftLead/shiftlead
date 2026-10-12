@@ -136,6 +136,7 @@ class PromoteMixin:
             # the fresh reading replaces the held one whatever the press does next, so the Inbox row
             # a refusal leaves standing reads what was just read
             r["auto"] = self._promotes.get(name, {}).get("auto", False)
+            r["acts"] = promote_mod.acts(r, datetime.now(UTC))  # the row a refusal leaves reads `auto`'s clock too
             self._promotes[name] = r
             if (u := promote_mod.unmet(r, press=True)) is not None:
                 raise RpcError(f"promote {name} refused — {u[1]} (design §6 Promote, precondition: {u[0]})")

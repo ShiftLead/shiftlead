@@ -1,6 +1,6 @@
 """TD-132 slice 3, design §4.5a *Inbox row: promote* (§6 *Promote*): the row drawn from the home's
 `promotes` reading alone — counted under `auto: false` while main is ahead and on a failure, FYI while
-a run is in flight, nothing but a failure under `auto: true` — its Snooze by time in the attention
+a run is in flight, and under `auto: true` FYI while main is ahead (TD-581) — its Snooze by time in the attention
 store, and Promote and Dismiss through `/api/person/<action>`."""
 
 from __future__ import annotations
@@ -48,8 +48,11 @@ def test_in_flight_is_fyi_and_uncounted():
     assert s["count"] == 0 and [e["row"] for e in s["fyi"]] == ["promote"]
 
 
-def test_under_auto_nothing_but_a_failure_and_a_failure_whatever_auto_says():
-    assert promote_rows({"shiftlead": reading(auto=True)}) == []
+def test_under_auto_a_failure_is_needs_you_in_place_of_the_fyi_row():
+    (r,) = promote_rows({"shiftlead": reading(auto=True)})
+    assert r["fyi"] and r["auto_row"]  # TD-581: the FYI row, below
+    flight = {"sha": MAIN, "at": "2026-09-27T10:05:00+00:00", "by": "auto", "log": "/l"}
+    assert promote_rows({"shiftlead": reading(auto=True, inflight=flight)}) == []  # the note says when it is live
     failed = {
         "sha": MAIN,
         "at": "2026-09-27T10:30:00+00:00",
@@ -60,7 +63,7 @@ def test_under_auto_nothing_but_a_failure_and_a_failure_whatever_auto_says():
     }
     for auto in (True, False):
         (r,) = promote_rows({"shiftlead": reading(auto=auto, failed=failed)})
-        assert not r["fyi"] and r["failed"]["why"] == "it broke"
+        assert not r["fyi"] and not r["auto_row"] and r["failed"]["why"] == "it broke"
         assert inbox_sections([], states=[r])["count"] == 1
 
 
@@ -99,6 +102,54 @@ def test_a_snoozed_row_is_in_no_count_and_merges_do_not_wake_it():
     for n in (3, 5):  # a later merge moves main and the count; the row stays aside
         s = inbox_sections([], states=promote_rows({"shiftlead": reading(ahead=n)}), attention_snoozed=snoozed)
         assert s["count"] == 0 and [e["row"] for e in s["snoozed"]] == ["promote"]
+
+
+def test_under_auto_main_ahead_is_an_fyi_row_saying_when_the_home_will_act():
+    """§4.5a *Inbox row: promote* under `auto: true` (TD-581): FYI, uncounted, while main is ahead and
+    nothing is in flight — the reading with *· auto on ·* and the `acts` word — its press **Promote
+    now**, Snooze ▾ and no Dismiss; the row is the build chip's anchor, `id="promote-<repo>"`."""
+    from shiftlead.ui.app import templates
+    from shiftlead.ui.help import first_sentence
+
+    base = "shiftlead · live 4444444 · main 9999999, 3 commits ahead · checks green · auto on"
+    for acts, words in (
+        ({"settles_in": 360}, " · settles in 6 min"),
+        ({"settles_in": 61}, " · settles in 2 min"),
+        ({"at": "next tick"}, " · promotes at the next tick"),
+        ({"checks": "pending"}, " · checks pending — promotes when green"),
+        ({"waiting": "live"}, " · waiting for a live reading"),
+        (None, ""),
+    ):
+        (r,) = promote_rows({"shiftlead": reading(auto=True, acts=acts)})
+        assert r["text"] == base + words, acts
+        s = inbox_sections([], states=[r])
+        assert s["count"] == 0 and [e["row"] for e in s["fyi"]] == ["promote"]
+    # the checks are the row's own words under `auto`: no *not now: checks …* line beside them
+    unmet = {"name": "checks", "text": "checks on main are pending"}
+    (r,) = promote_rows({"shiftlead": reading(auto=True, checks="pending", acts={"checks": "pending"}, unmet=unmet)})
+    assert r["unmet"] is None
+    tree = {"name": "tree", "text": "the checkout has 1 uncommitted change"}
+    (r,) = promote_rows({"shiftlead": reading(auto=True, unmet=tree)})
+    assert r["unmet"] == tree
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="fyi")
+    assert 'id="promote-shiftlead"' in html and ">Promote now</button>" in html and ">Promote</button>" not in html
+    assert f'title="{first_sentence("promote-now")}"'.replace("'", "&#39;") in html
+    assert 'data-row="promote" data-when="1w"' in html and 'data-act="clear_promote"' not in html
+    assert "not now: the checkout has 1 uncommitted change" in html
+    # by hand the press still reads Promote
+    (r,) = promote_rows({"shiftlead": reading()})
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="needs")
+    assert ">Promote</button>" in html and "Promote now" not in html and 'id="promote-shiftlead"' in html
+
+
+def test_a_snoozed_auto_row_is_set_aside_as_any_row_is():
+    until = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+    rows = promote_rows({"shiftlead": reading(auto=True, acts={"settles_in": 360})})
+    s = inbox_sections([], states=rows, attention_snoozed={"promote:shiftlead|promote": until})
+    assert s["count"] == 0 and [e["row"] for e in s["snoozed"]] == ["promote"] and s["fyi"] == []
+    past = (datetime.now(UTC) - timedelta(days=1)).isoformat()
+    s = inbox_sections([], states=rows, attention_snoozed={"promote:shiftlead|promote": past})
+    assert [e["row"] for e in s["fyi"]] == ["promote"] and s["snoozed"] == []
 
 
 @pytest.fixture

@@ -33,6 +33,7 @@ from sessionorc import build, paths
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
 PROMOTE_SETTLE = 600.0  # main must stand still this long before `auto` promotes (§6)
+PROMOTE_MAX_WAIT = 1800.0  # or main has been ahead of live this long, still or not (§6, TD-581)
 PROMOTE_BOUND = 1200.0  # a run past this is killed and failed (§6)
 CHECK_TIMEOUT = 60.0
 GIT_TIMEOUT = 60.0
@@ -156,6 +157,18 @@ def read_since(root: str | Path, live: str | None, main: str | None) -> dict[str
     if got is not None:
         out["pending"], out["pending_more"] = got
     return out
+
+
+def read_ahead_since(root: str | Path, live: str | None, main: str | None) -> str | None:
+    """`ahead_since` (§6 *Promote*, TD-581): when main first moved past the live commit — the
+    committer time of the oldest commit on main's first-parent line that live does not hold (a squash
+    merge stamps it), so the cap, like the settle, survives a restart of the home. None when live is
+    main's head, either is unknown, or git cannot say."""
+    if not live or not main or live == main:
+        return None
+    out, _ = _git(root, "log", "--first-parent", "--format=%cI", f"{live}..{main}")
+    lines = (out or "").splitlines()
+    return lines[-1].strip() if lines else None
 
 
 def read_checks(root: str | Path, sha: str) -> tuple[str, str]:
@@ -427,15 +440,70 @@ def tail(log_path: Any, lines: int = 20) -> list[str]:
 # -- one pass over the registry (the home's tick, detached) ---------------------------------------
 
 
-def settled(moved: Any, now: datetime) -> bool:
-    """Main has stood still for `PROMOTE_SETTLE`: a burst of merges is one promote."""
+def _age(at: Any, now: datetime) -> float | None:
+    """Seconds since an ISO time, or None when it is not one."""
     try:
-        t = datetime.fromisoformat(str(moved))
+        t = datetime.fromisoformat(str(at))
     except ValueError:
-        return False
+        return None
     if t.tzinfo is None:
         t = t.replace(tzinfo=UTC)
-    return (now - t).total_seconds() >= PROMOTE_SETTLE
+    return (now - t).total_seconds()
+
+
+def settled(moved: Any, now: datetime) -> bool:
+    """Main has stood still for `PROMOTE_SETTLE`: a burst of merges is one promote."""
+    age = _age(moved, now)
+    return age is not None and age >= PROMOTE_SETTLE
+
+
+def waited(ahead_since: Any, now: datetime) -> bool:
+    """Main has been ahead of live for `PROMOTE_MAX_WAIT`, still or not (§6, TD-581): the settle is
+    a batching rule, never a hold without limit."""
+    age = _age(ahead_since, now)
+    return age is not None and age >= PROMOTE_MAX_WAIT
+
+
+def acts(r: dict[str, Any], now: datetime) -> dict[str, Any] | None:
+    """When the home will act on a reading under `auto: true` (§4.5a *Inbox row: promote*, TD-581),
+    for the Inbox row, the build chip's hover and `ao promote status`: `{"waiting": "live"}` while
+    `check` is not answering, `{"checks": <verdict>}` while they are not green, `{"settles_in": s}`
+    — the sooner of the settle's remainder and the cap's — or `{"at": "next tick"}` once either has
+    run out. None when `auto` is off, main is not ahead, a run is in flight, or something else the
+    policy waits on stands (the row says that in its own words)."""
+    if not r.get("auto") or not r.get("main") or r.get("live") == r.get("main") or r.get("inflight"):
+        return None
+    if not r.get("live") or r.get("live_why"):
+        return {"waiting": "live"}
+    u = unmet(r)
+    if u is not None and u[0] != "checks":
+        return None
+    if u is not None:
+        return {"checks": str(r.get("checks") or "unknown")}
+    left = [
+        limit - age
+        for limit, at in ((PROMOTE_SETTLE, r.get("moved")), (PROMOTE_MAX_WAIT, r.get("ahead_since")))
+        if (age := _age(at, now)) is not None
+    ]
+    if not left or min(left) <= 0:
+        return {"at": "next tick"}
+    return {"settles_in": round(min(left))}
+
+
+def acts_words(a: Any) -> str:
+    """The `acts` reading in the row's words: *settles in m min*, *promotes at the next tick*,
+    *checks pending — promotes when green*, *waiting for a live reading*; "" for none."""
+    if not isinstance(a, dict):
+        return ""
+    if isinstance(a.get("settles_in"), int | float):
+        return f"settles in {max(1, -(-int(a['settles_in']) // 60))} min"
+    if a.get("at"):
+        return "promotes at the next tick"
+    if a.get("checks"):
+        return f"checks {a['checks']} — promotes when green"
+    if a.get("waiting"):
+        return "waiting for a live reading"
+    return ""
 
 
 def note_text(repo: str, intent: dict[str, Any], behind: int | None = None) -> str:
@@ -503,9 +571,10 @@ def survey(
     keyed by the repo's name — `(readings, notes, bad)`. `full` takes all three readings (the
     reports' cadence); otherwise only `check`, and only for a repo with a run in flight. A run in
     flight is concluded, and under `auto: true` one is started when live ≠ main, the three
-    preconditions hold and main has settled. `notes` are the *promoted …* lines for the person
-    inbox; `bad` names each checkout whose block could not be used, with why. `fetched` holds the
-    pull's fetch of main for each root it fetched this pass (`pulls`), which `read_main` reuses."""
+    preconditions hold and main has settled or been ahead for `PROMOTE_MAX_WAIT`. `notes` are the
+    *promoted …* lines for the person inbox; `bad` names each checkout whose block could not be
+    used, with why. `fetched` holds the pull's fetch of main for each root it fetched this pass
+    (`pulls`), which `read_main` reuses."""
     readings: dict[str, dict[str, Any]] = {}
     notes: list[str] = []
     bad: dict[str, str] = {}
@@ -541,6 +610,7 @@ def survey(
                 r.setdefault("live", None)
                 r["live_why"] = why
             r["ahead"] = ahead(root, r.get("live"), r.get("main"))
+            r["ahead_since"] = read_ahead_since(root, r.get("live"), r.get("main"))
             for k in ("live_at", "pending", "pending_more"):
                 r.pop(k, None)
             r.update(read_since(root, r.get("live"), r.get("main")))
@@ -560,10 +630,12 @@ def survey(
         # answering is *unknown*, not behind — even with a last good reading kept beside its why —
         # and the row still offers the person's press
         read = bool(r.get("live")) and not r.get("live_why")
-        if r["auto"] and behind and read and unmet(r) is None and settled(r.get("moved"), now):
+        clock = settled(r.get("moved"), now) or waited(r.get("ahead_since"), now)
+        if r["auto"] and behind and read and unmet(r) is None and clock:
             r["inflight"] = start(root, repo, r["main"], b["run"], "auto", r.get("ahead"), frm=r.get("live"))
         u = unmet(r)
         r["unmet"] = {"name": u[0], "text": u[1]} if u else None
+        r["acts"] = acts(r, now)
         if r["failed"]:
             r["failed"] = {**r["failed"], "tail": tail(r["failed"].get("log"))}
         readings[repo] = r

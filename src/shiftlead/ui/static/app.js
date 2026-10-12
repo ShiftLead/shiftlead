@@ -1220,7 +1220,8 @@
   };
   // §4.5a top bar **build** chip (TD-539): *live <MM-DD HH:MM>* in the browser's zone — the year in
   // front only when it is not this one — from `data-at`, then `data-rest`. Drawn at load and again
-  // from each Inbox poll's `build_chip`, so a merge shows without a reload.
+  // from each Inbox poll's `build_chip`, so a merge shows without a reload. *main +n* is a link to
+  // the Inbox's promote row (`data-link`, `data-href`, TD-581): the chip's one pressable part.
   function buildStamp(at) {
     const d = new Date(Date.parse(at || ""));
     if (isNaN(d)) return "";
@@ -1233,10 +1234,20 @@
     if (!el) return;
     if (c) {
       el.className = `mono ${c.cls || ""}`; el.title = c.title || "";
-      if (c.at) { el.dataset.at = c.at; el.dataset.rest = c.rest || ""; } else { delete el.dataset.at; delete el.dataset.rest; el.textContent = c.text || ""; }
+      if (c.at) { el.dataset.at = c.at; el.dataset.rest = c.rest || ""; } else { delete el.dataset.at; delete el.dataset.rest; }
+      if (c.href && c.link) { el.dataset.href = c.href; el.dataset.link = c.link; } else { delete el.dataset.href; delete el.dataset.link; }
     }
     const when = el.dataset.at ? buildStamp(el.dataset.at) : "";
-    if (when) el.textContent = `live ${when}${el.dataset.rest || ""}`;
+    // at load with no `data-at` the server's own rendering stands
+    const full = when ? `live ${when}${el.dataset.rest || ""}` : c ? c.text || "" : null;
+    if (full === null) return;
+    const link = el.dataset.link, href = el.dataset.href;
+    if (link && href && full.endsWith(link)) {
+      el.textContent = full.slice(0, -link.length);
+      const a = document.createElement("a");
+      a.href = href; a.textContent = link; a.title = "the Inbox's promote row";
+      el.appendChild(a);
+    } else el.textContent = full;
   }
   drawBuildChip(null);
   if ($("#personneeds")) {

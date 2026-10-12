@@ -300,6 +300,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "promote-now",
+        "Promote now",
+        "Inbox row: promote",
+        (
+            "Makes main's head live now while `auto` is on, without waiting for the home's own clock: the same "
+            "press as Promote, the settle and the thirty-minute wait skipped. Press it when what is merged "
+            "should run before the time the row names. It goes through checks that are not green, as your press "
+            "does, and it is refused, in words, while a run is in flight, a failure stands, or the checkout is "
+            "not clean on main."
+        ),
+    ),
+    Help(
         "promote-snooze",
         "Snooze ▾",
         "Inbox row: promote",
@@ -493,6 +505,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Inbox",
         (
             "promote",
+            "promote-now",
             "promote-snooze",
             "promote-dismiss",
             "work-start",

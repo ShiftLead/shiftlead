@@ -234,3 +234,32 @@ def test_the_org_chip_reads_the_homes_promote_reading_so_it_agrees_with_the_row(
     assert "\nthis page: bbbbbbb 2026-10-10T16:00:00Z" in build_chip(info)["title"]
     monkeypatch.setattr(build, "info", lambda: {**page, "commit": built})  # the same build: not named
     assert "this page" not in build_chip(info)["title"]
+
+
+def test_main_ahead_on_the_chip_links_to_the_inbox_row_and_the_hover_says_when_auto_acts(repo, monkeypatch):
+    """§4.5a top bar **build** chip (TD-581): *main +n* is a link to the Inbox's promote row
+    (`/inbox#promote-<repo>`), the chip's one pressable part, when the home's reading holds the build;
+    under `auto` the hover gains *auto on · settles in m min* after the pending commits."""
+    from shiftlead.ui.app import templates
+    from shiftlead.ui.common import build_chip
+
+    monkeypatch.setattr(build, "info", lambda: {})
+    built = _git(repo, "rev-parse", "HEAD")
+    b = {"commit": built, "source": str(repo), "built_at": "t"}
+    reading = {"root": str(repo), "live": built, "main": "9" * 40, "ahead": 3, "auto": True}
+    reading |= {"pending": [{"sha": "9" * 40, "subject": "the fix"}], "pending_more": 0, "acts": {"settles_in": 360}}
+    info = {"built_from": b, "started_at": "s", "promotes": {"shiftlead": reading}}
+    got = build_chip(info)
+    assert (got["link"], got["href"]) == ("main +3", "/inbox#promote-shiftlead")
+    assert "\nnot live yet:\n9999999 the fix\n\nauto on · settles in 6 min" in got["title"]
+    html = templates.get_template("base.html").render(build_chip=got, request=None)
+    assert 'data-href="/inbox#promote-shiftlead" data-link="main +3"' in html
+    assert '<a href="/inbox#promote-shiftlead" title="the Inbox\'s promote row">main +3</a></span>' in html
+    assert "· main +3<" not in html  # the count is drawn once, as the link
+    got = build_chip({**info, "promotes": {"shiftlead": {**reading, "acts": {"at": "next tick"}}}})
+    assert got["title"].endswith("auto on · promotes at the next tick")
+    # by hand, no line; at main, in flight or measured here, no link
+    assert "auto on" not in build_chip({**info, "promotes": {"shiftlead": {**reading, "acts": None}}})["title"]
+    for r in ({**reading, "ahead": 0, "main": built}, {**reading, "inflight": {"sha": "9" * 40}}):
+        assert "href" not in build_chip({**info, "promotes": {"shiftlead": r}})
+    assert "href" not in build_chip({**info, "promotes": {}})

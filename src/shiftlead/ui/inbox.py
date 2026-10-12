@@ -24,6 +24,7 @@ from sessionorc import held as held_mod
 from sessionorc import hosts
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mail_mod
+from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
@@ -757,7 +758,11 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
     every part from that structured reading, never text a session wrote. Under `auto: false` a repo
     main is ahead of is *Needs you*, counted (the press is what stands between merged and live); a
     run **in flight** is FYI (`fyi`), uncounted, its Promote disabled; a **failure** is *Needs you*
-    whatever `auto` says. Under `auto: true` nothing but a failure: the normal flow is the note.
+    whatever `auto` says. **Under `auto: true`** (TD-581) a repo main is ahead of, nothing in flight
+    and no failure or hold, is FYI too (`auto_row`), uncounted and snoozable, saying when the home
+    will act — *· auto on ·* and the reading's `acts` in its words — with **Promote now**; a
+    failure or a hold is drawn under *Needs you* in its place, and a run in flight under `auto`
+    draws nothing: the note says when it is live.
     Aged from when main moved (`moved`, its head's committer time). Keyed `promote:<repo>` in the
     attention store, so Snooze is by time alone and more merges do not wake a snoozed row.
 
@@ -774,7 +779,8 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         flight = r.get("inflight") if isinstance(r.get("inflight"), dict) else None
         held = r.get("held") if isinstance(r.get("held"), dict) else None
         behind = bool(r.get("main")) and r.get("live") != r.get("main")
-        if not failed and not held and (r.get("auto") or not (flight or behind)):
+        auto_row = bool(r.get("auto")) and behind and not (failed or held or flight)
+        if not failed and not held and not auto_row and (r.get("auto") or not (flight or behind)):
             continue
         live = str(r.get("live") or "")[:7]
         main = str(r.get("main") or "")[:7]
@@ -790,6 +796,8 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         text += f" · checks {checks}"
         if held:
             text += f" · auto {'on' if r.get('auto') else 'off'} · held"
+        elif auto_row:
+            text += " · auto on" + (f" · {w}" if (w := promote_mod.acts_words(r.get("acts"))) else "")
         when = str(
             (failed or {}).get("at") or (flight or {}).get("at") or (held or {}).get("at") or r.get("moved") or ""
         )
@@ -807,11 +815,13 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "text": text,
                 "live_why": r.get("live_why") if not live else None,
                 "checks_why": r.get("checks_why"),
-                "unmet": r.get("unmet"),
+                # under `auto` the checks are the row's own words (*checks pending — promotes when green*)
+                "unmet": None if auto_row and (r.get("unmet") or {}).get("name") == "checks" else r.get("unmet"),
+                "auto_row": auto_row,
                 "failed": failed,
                 "held": held,
                 "inflight": flight,
-                "fyi": bool(flight) and not failed,
+                "fyi": (bool(flight) and not failed) or auto_row,
                 "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),
             }
         )
@@ -1845,10 +1855,12 @@ def inbox_sections(
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
     for r in states:
-        if r.get("fyi"):
-            out["fyi"].append(r)  # a promote in flight (§4.5a *Inbox row: promote*): FYI, uncounted
-            continue
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
+        if r.get("fyi") and not (r.get("auto_row") and _iso(raw) and _iso(raw) > at):
+            # a promote in flight, or one `auto` will make (§4.5a *Inbox row: promote*): FYI, uncounted;
+            # the `auto` row has Snooze ▾, so a snoozed one is set aside as any row is
+            out["fyi"].append(r)
+            continue
         if isinstance(raw, str) and raw.startswith("dismissed:"):
             # the restart row's **Dismiss** (§4.5a, TD-103): that one mark's row is gone from every
             # section; a new mark carries a new `at` and raises a new row
