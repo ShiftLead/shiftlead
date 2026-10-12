@@ -56,6 +56,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
 | TD-599 | The Inbox's *Answered for you* group may repeat FYI: fold it in, or give it a **Dismiss all** of its own | Medium | Designed — TD-602 builds it |
 | TD-602 | Build TD-599: **Dismiss all** on the Inbox's *Answered for you* heading — FYI's rule, the ids on screen in the group, one confirm with the number | Medium | Open |
+| TD-603 | Board lines have no identifier: the person quotes a line's text to refer to it in chat, a reply or a session | Medium | Open |
+| TD-604 | Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work | Medium | Open |
 
 ---
 
@@ -942,6 +944,53 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** the person can clear the *answered for you* rows they have read in one press, only those on screen, the group still stands apart from FYI with its Overrule, and the tests above pass; the builder's look (design §4.9b: the heading with rows, the confirm) is named in the PR.
 
 **Related:** TD-599 (the design), TD-075 (the group), TD-079 (FYI's Dismiss all).
+
+---
+
+## TD-603: Board lines have no identifier: the person quotes a line's text to refer to it in chat, a reply or a session
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** the board's `Format:` line (`docs/user_attention.md`, cadence §3, dev-cadence's; ledgerboard's once TD-584/TD-585 land); the board reader (§4.4 *Board write-back*); `board_reply` (`src/sessionorc/agent_inbox.py`), which finds a line by its text; the Inbox's board rows and the Due strip (§4.5a)
+
+**Why:** Paul, 2026-10-12: *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?* Mail already has one (`m-6a272ca2abcd`) and a ledger entry has `TD-NNN`; a board line has only its date, its session and its words. To point a session at a line, or to ask about one in chat, the person pastes its head ("A team member must be a Claude session…"), and a line's head is also what `board_reply` and a close match on, so a session that rewords a line loses the person's reference to it.
+
+**Fix:** design first.
+- Choose the id: written into the line at creation (a short `UA-NNN`, numbered per board like TD ids and never reused, the archive included), or derived (a short hash of date, session and the first words, which a reword changes). The anchor's lean: written, since a derived one is not stable under the edits a line gets (replies appended, *Closed:*).
+- Where it is written: the `Format:` line is cadence's (dev-cadence) and the board's parser is to be ledgerboard's (TD-584/TD-585), so the change is proposed there, and lines written before it stay valid without one.
+- Where it is drawn and accepted: the Inbox's board row and the Due strip show it; `board_reply` and a close accept it in place of the line's text; `ao` and the SessionStart nudge print it; a person can type it in chat (`UA-12`) and a session can find the line by it (`grep`).
+- Mockup of the row with the id.
+
+**Done when** every new board line carries an id, the Inbox and the Due strip draw it, a reply or a close can name a line by it, and old lines without one still read.
+
+**Related:** TD-584 / TD-585 (ledgerboard), TD-126 (a board reply's outcome), TD-587 (`ao board edit`).
+
+---
+
+## TD-604: Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 (the Repo page; the team card's *TDs in motion*, `docs/design/4.5-ui.md` ~L244), §4.5a *team card: TDs in motion* and the Repo page's rows; §4.4 *Repo facts* (what the host agent reads of the ledger); `docs/technical_debt_archive.md`, whose entries carry `**Resolved:** <date> (…PR #N)`
+
+**Why:** Paul, 2026-10-12: *show recently completed TDs in the repo screen and/or in the "TDs in motion" card*. *TDs in motion* lists the references a member holds now, and the Repo page the open entries; once an entry archives it drops out of both, so the person cannot see from the UI what the teams finished today or this week, only the *closed* count in the Technical debt facet's period blocks.
+
+**Fix:** design first.
+- What "completed" is read from: the archive's `**Resolved:**` date and its PR (§4.4 *Repo facts*, at `origin/<default>`), the same readings the facet's *closed* block counts.
+- Where it is drawn: on the Repo page, a *Recently completed* section under the open entries for the facet's window (day · week · month), each row its id, title, resolved date, PR and who closed it when the line names one; on the team card, either a *done* phase at the foot of *TDs in motion* for the window, or a link from the facet's *closed* block to the Repo page's section. The designer weighs whether the card has room (§4.5 *A team's card*) and picks one, or both.
+- Mockups for each surface changed.
+
+**Done when** the person can see, from the Repo page and/or the team card, which entries closed in the chosen window, with their PRs, and the design and mockups say so.
+
+**Related:** TD-591 (the Repo page), TD-071 (Org page ideas).
 
 ---
 
