@@ -1320,12 +1320,15 @@
   }
 
   // ---- events websocket with backoff; a reconnect reloads the snapshot once ----
-  function connectEvents(onEvent) {
+  // `query` asks for a light stream (TD-572): `light=1` on the Focus and Inbox pages, which draw no
+  // cards and no team groups, and hear of another record only when it moves (its state, team or
+  // controllers); `focus=<id>` keeps that one record's deltas whole.
+  function connectEvents(onEvent, query) {
     let delay = 500, reconnected = false, leaving = false;
     window.addEventListener("pagehide", () => { leaving = true; });
     window.addEventListener("pageshow", () => { leaving = false; });
     function open() {
-      const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events`);
+      const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events${query ? `?${query}` : ""}`);
       // The handshake succeeds even when the agent is down (the server accepts, then closes), so
       // "connected" means the first message, not onopen — otherwise a down agent reload-loops.
       ws.onopen = () => { delay = 500; };
@@ -3022,7 +3025,7 @@
     connectEvents((ev) => {
       if (!["repos", "doing", "session", "gone"].includes(ev.event)) return;
       clearTimeout(soon); soon = setTimeout(reread, 1500);
-    });
+    }, "light=1");
   };
 
   // ---- New session: the anchor rule, shown before you press Start ----
@@ -4400,7 +4403,7 @@
           document.title = `${s.name} · forgotten`;
         }
       }
-    });
+    }, `light=1&focus=${encodeURIComponent(id)}`);
   };
   // ---- keys (design §4.5a **keys** and **?** overlay, §4.5 *Keys on every page*, TD-124) ----
   // One table of (keys, page, control), read by one `keydown` handler and by the `?` overlay, so

@@ -25,6 +25,12 @@ from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
 PHASES = ("add", "design", "grind", "review")
 DOING_KEPT = 50  # the doing log's ring per team (§4.8), as the host agent keeps it
+# The events stream's groups (§4.5a *team groups*, TD-572): a delta that changes one of these fields on
+# its record — or names a record the stream has not seen — carries the groups with it, since it can
+# move a card or change a count; any other delta (a pane's tail, a context reading) leaves them to one
+# re-reading at most every `HEADS_EVERY` seconds, and a reading that matches the last one sent is not sent.
+HEADS_EVERY = 1.0
+SHAPE_KEYS = ("state", "team", "controllers", "name", "seat", "unattended")
 WINDOWS = ("day", "week", "month")
 LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
 PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))
