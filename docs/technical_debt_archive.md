@@ -10356,3 +10356,23 @@ Then the build, with tests that a person's interactive shell may promote and an 
 **Related:** TD-580 (the design), TD-581 (the promote press under `auto`), TD-077 (identity), TD-577 / TD-579 (Open shell here's tab).
 
 **Resolved:** 2026-10-12 (PR #1583) — `mail.person_shell(record)`; `agent_common.person_only` takes this host's records and lets a person's shell by; the refusal reads *refused to every session but the person's own shell*; a shell's promote is recorded `by` the shell's id; `ao td add` asks the record before its client-side refusal. Held by `test_person_only.py` (the exception against the whole list), `test_promote.py`, `test_identity.py` (a request from the shell's own pane under `enforce`), `test_cli_teams.py`.
+
+---
+
+## TD-590: ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/hosts.py` (`DEFAULT_REPOS_REGISTRY`), `~/.shiftlead/`
+
+**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. ShiftLead's list of repos defaults to dev-cadence's machine roster, so a machine without dev-cadence has none.
+
+**Resolved:** 2026-10-12 (PR #1592) — `sessionorc.hosts`: `repos.txt` under the home is read first (`default_repos_registry()`), and on the default home dev-cadence's `~/.config/dev-cadence/repos.txt` is imported after it (`Host.repos_import`, `default_repos_import()`), each repo once; `repos_registry:` names one file in place of both; a scratch home reads its own file alone (TD-298). Design §5 *Repos*. Tests: `tests/test_hosts.py`.
+
+**Done when** a host with no dev-cadence roster lists the repos ShiftLead was given, and one with it lists both, with tests.
+
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591.
