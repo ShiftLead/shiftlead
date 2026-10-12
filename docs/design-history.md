@@ -366,6 +366,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-567, ao-paul; Paul saw ao-grind's header flash between *started 2m ago* and a datetime): the team card's **work waiting** note and *started <t>* draw the age alone, the instant on hover — the page's local-time rewrite and the header's deltas had taken turns.
 - 2026-10-12 (TD-561, the designer): a **subject** row — every row's first bold line, the message page's heading, `ao inbox`'s head line. Built by TD-566.
 - 2026-10-12 (TD-560, the designer): the row **Inbox: For you in the ledger (n) fold** becomes **Inbox: Later section** and **Inbox row: ledger entry** (answers, Go with it, Reply, Open); *Not due yet* sits in *Later*; the rail's *Urgency* lists *Later* and its *Kinds* gain *ledger entries*. Built by TD-565.
 - 2026-10-12 (TD-559, the designer; Paul, after a plain `claude` started outside ShiftLead in the main checkout on 2026-10-11 held ao-grind's anchor seat off TD-060 and six live checks for a day, seen only as *on call — the checkout is yours · …* on a folded team: *show an error when a member's worktree (e.g. the anchor) is occupied by a non-team-member*): **Inbox row: seat held** — a held anchor seat with work due, under *Needs you* once the hold is older than `SEAT_HELD_GRACE` (fifteen minutes), naming the holder, the wait and the work, Open / Dismiss / Snooze; **team header: seat held** mark, *· anchor held 3 h*, visible folded. Both from `seat_held`, which gains `since` (§6 rule 3, §4.9b). Built by TD-564.

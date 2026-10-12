@@ -300,3 +300,20 @@ def test_a_running_teams_row_starts_its_members_through_work_start(page):
     answers["work_start"] = {"team": "wt", "started": False, "ids": [], "held": None}
     assert c.post("/api/person/work_start", json={"team": "wt"}).status_code == 409
     assert c.post("/api/person/work_start", json={}).status_code == 400
+
+
+def test_the_team_headers_times_stay_fuzzy():
+    """The header's *started <t>* and *waiting since <t>* draw the age the server wrote, the instant on
+    hover: a `localtime` span there was rewritten to a datetime by the page's tick and back to the age
+    by each header delta, so the two flashed in turn."""
+    from shiftlead.ui.app import team_groups
+
+    rec = {"id": "w", "name": "w", "team": "t", "state": "idle", "state_class": "idle", "state_label": "idle",
+           "scraped": False, "rank": 5, "controllers": [], "capabilities": []}  # fmt: skip
+    (g,) = team_groups([rec])
+    render = uiapp.templates.get_template("group_head.html").render
+    head = render(g={**g, "work_started": {"at": AT, "age": "2m", "first": "TD-213"}})
+    assert f'started <span title="{AT}">2m ago</span> for TD-213' in head and "localtime" not in head
+    note = {"at": AT, "age": "5m", "n": 2, "title": "g: TD-213, TD-214"}
+    head = render(g={**g, "live": False, "wound_down": True, "work_note": note})
+    assert f'2 entries waiting since <span title="{AT}">5m ago</span>' in head and "localtime" not in head
