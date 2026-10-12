@@ -10222,3 +10222,23 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-588 (`{gate}` in the briefs), TD-591 (the missing-gate line).
 
 **Resolved:** 2026-10-12 (PR #1572) — `sessionorc.cadence.gate` reads `gate:` (set, defaulted to `scripts/check_cadence.py --pr {pr} --json`, absent); a set gate is run by `sh -c` in the checkout and judged by its exit code, one row *gate: <command, filled> exited <n>*; a repo with no gate is recorded once a PR as `verdict: none` — nothing run, nobody told — and `ao status -v` prints *no gate: a person merges*; `shiftlead.repoconfig` accepts the key. Tests: `tests/test_cadence_policy.py` (the three kinds, the exit code, the no-gate record and a gate gained later), `tests/test_repoconfig.py`. The briefs' `{gate}` is TD-588's, the seam state on the Repo page and in `ao doctor` TD-591's.
+
+## TD-600: `test_recent_files.py`'s limit check compares two reads whole, and a deleted file's `at` is each read's clock
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (grinder-ao-1, seen on #1583's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `tests/test_recent_files.py` `test_the_branchs_commits_and_the_tree_newest_first_a_path_once` (the last line); `src/sessionorc/gitinfo.py` `changed_files`
+
+**Why:** #1583's first CI run failed on test (3.12) at `assert changed_files(repo, "origin/main", 2) == got[:2]` (run 38315692077; green on rerun, and on 3.13). `changed_files` gives a deleted, uncommitted path the read's own time, so `old.txt`'s `at` differs between the test's two reads whenever they straddle a second.
+
+**Fix:** compare the limited read with the first by path; the first read's `at` and `sha` assertions stay.
+
+**Done when** the line holds whatever the clock does between the reads.
+
+**Related:** TD-463 (the CI flakes since 2026-10-03), TD-538 (the record's `files`).
+
+**Resolved:** 2026-10-12 (PR #1588) — the limit check compares `[f["path"] …]` of both reads.
