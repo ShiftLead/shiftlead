@@ -1461,6 +1461,10 @@ def inbox_rows():
         mcard(BAR["exited"], "", "push", "", "exited 2h ago",
               '<div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>',
               b(ICON["resume"] + "Reopen and push", "primary") + b("Resume") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), state=("exited", "exited")),
+        # TD-559: an anchor seat held off its work past the grace — the holder, the wait and the work, in the tick's words
+        mcard(BAR["needs"], "seat held", "ao-grind-anchor", "ao-grind", "held 3h",
+              '<div class="txt"><b>Anchor seat held 3 h by <span class="mono">shiftlead-90</span></b> (claude-code, outside shiftlead, idle) · 7 in its lane: TD-060, TD-292, TD-358 and 4 more — close it, or finish there, and the seat fills on the next tick.</div><div class="meta">on call — the checkout is yours · a session holds it: shiftlead-90</div>',
+              b("Dismiss") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
         mcard(BAR["needs"], "promote", "shiftlead", "", "main moved 12m ago",
               '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
               b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
