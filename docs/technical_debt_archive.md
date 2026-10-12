@@ -9936,3 +9936,19 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-565 (#1537), TD-560.
 
 **Resolved:** 2026-10-12 (PR #1545) — `test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts` (`tests/test_ui_inbox_ledger.py`) asserts the poll's `html.rail_teams` draws the *Teams* lines of `ao-grind` and `sam-grind`; dropping `ledger_rows(lf)` from the poll's `rail_rows` call empties it and fails the test.
+
+## TD-571: A ledger row's `added` year suffix and its default-index guard are held by no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/inbox.py` (`_added_words` L2003: the `, {d.year}` branch; `ledger_for_you` L2068: `not isinstance(d, bool)`, L2083: `isinstance(x, str)`), `tests/test_ui_inbox_ledger.py`
+
+**Why:** #1537 added three guards that no test fails on. Probes, each run against `tests/test_ui_inbox_ledger.py tests/test_ledger_derived.py tests/test_ui_board.py` (76 passed unchanged): (1) `_added_words` returning `words` with no year suffix passes — the one dated row asserts `.startswith("added Oct 7")`, which holds with or without `, 2025`, and its date is this year's; (2) `ok = isinstance(d, int) and d < len(answers)` passes, so a `default: True` reads as index 1 and recommends the second answer; (3) dropping `if isinstance(x, str)` from `detail` passes.
+
+**Related:** TD-565 (#1537).
+
+**Resolved:** 2026-10-12 (PR #1546) — `test_a_rows_year_its_default_and_its_detail_read_only_what_they_can` (`tests/test_ui_inbox_ledger.py`) builds a row added in 2001 with `default=True` and a non-string `detail` line, and asserts `added Oct 7, 2001`, no default and the string lines alone; each of the three probes fails it.

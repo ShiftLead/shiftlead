@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Designed — TD-566 builds it |
 | TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
-| TD-571 | A ledger row's added year suffix and its default-index guard are held by no test | Low | Open |
 
 ---
 
@@ -655,19 +654,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** every row of the Inbox, the message page and `ao inbox` leads with a subject — mail's given or derived with a warning, the home's rows' by kind, a board row's its head line, a ledger row's its title — the find box matches it, the presets and briefs say `--subject`, and the tests above pass.
 
 **Related:** TD-561 (the design), TD-127 (the first-paragraph rule), TD-560 / TD-565 (the ledger row's subject), TD-564 (the seat-held row's).
-
-## TD-571: A ledger row's `added` year suffix and its default-index guard are held by no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1537)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/inbox.py` (`_added_words` L2003: the `, {d.year}` branch; `ledger_for_you` L2068: `not isinstance(d, bool)`, L2083: `isinstance(x, str)`), `tests/test_ui_inbox_ledger.py`
-
-**Why:** #1537 added three guards that no test fails on. Probes, each run against `tests/test_ui_inbox_ledger.py tests/test_ledger_derived.py tests/test_ui_board.py` (76 passed unchanged): (1) `_added_words` returning `words` with no year suffix passes — the one dated row asserts `.startswith("added Oct 7")`, which holds with or without `, 2025`, and its date is this year's; (2) `ok = isinstance(d, int) and d < len(answers)` passes, so a `default: True` reads as index 1 and recommends the second answer; (3) dropping `if isinstance(x, str)` from `detail` passes.
-
-**Fix:** a row dated last year asserts `added Oct 7, 2025` (pin `date.today` or use a fixed past year); an entry with `default=True` has `default == ""`; one with a non-string in `detail` draws the strings alone. **Done when** each of the three probes fails a test.
-
-**Related:** TD-565 (#1537).
