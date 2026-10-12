@@ -1010,6 +1010,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-12 (TD-582, the designer; Paul, 2026-10-12, through Add entry: *a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions*): the gate gains **across teams, by project** — two sessions with the same `project` badge, mail only; *An agreement between peers* — a `steer` to the peer, binding once written in the shared entry, the PR or the design, a disagreement up each side's own path, no copies to controllers. Was: no edge between teams, and a peer's agreement bound nothing. Built by TD-601.
 - 2026-10-12 (TD-574, grinder-ao-2; the docs audit of #1536–#1546): *A subject on every entry*'s **Drawn** names the two rows that draw no subject line, a ledger row and a trail row, whose subject is already their first text — as TD-566 built them.
 - 2026-10-12 (TD-561, the designer; Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier*): **A subject on every entry** — `subject`, at most 80 characters, on everything the person reads: `ao msg --subject`, warned and derived from the first sentence when missing, a reply's its question's, the home's rows' given by their kind, a board row's its head line, a ledger row's its title; drawn as the row's first bold line, the message page's heading, `ao inbox`'s head line, matched by the find box. Reverses TD-127's *no summary field* as far as a headline goes; the first-paragraph rule stands. Built by TD-566.
 - 2026-10-10 (TD-530, the designer): *A file for a session* — a person's message may name a file attached in the dialog, its path text in the body; a structured `files` field set aside until the path has been used. Built by TD-531.
@@ -1338,6 +1339,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 9. Invariants
 
+- 2026-10-12 (TD-582, the designer): invariant 9's named exception covers the `project` badge's cross-team mail edge beside the `team` badge's. Built by TD-601.
 - 2026-10-09 (TD-488, the designer): invariant 8 adds that on the installed home the tmux server runs outside the user manager's subtree, so no stop of the agent, the UI or the manager ends a session.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §9 keeps every invariant; the TD markers hung on invariants 2, 5, 11 and 14 (TD-381, TD-041, TD-036, TD-083, TD-103) left for this record; 1,364 → 1,359 words.
 - 2026-10-07 (TD-381, the designer): invariant 2 names the anchor seat as the checkout's one agent only while no person's session holds it.
