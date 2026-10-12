@@ -691,7 +691,11 @@ async def test_dismiss_clears_a_list_for_a_person_and_for_nobody_else(agent, tmp
     from sessionorc.store import IdentityAlarmStore
 
     async with LocalClient() as me:
-        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        a = (
+            await me.call(
+                "create", name="a", dir=str(tmp_path), adapter="shell", role="worker", argv=["bash", "--norc"]
+            )
+        )["id"]
     agent._id_alarm({"channel": f"session {a}", "claimed": "ao-b", "rpc": "msg"}, a)
     agent._id_alarm({"channel": "outside", "claimed": a, "rpc": "kill"}, None)
 
@@ -728,12 +732,30 @@ async def test_a_session_under_a_pane_cannot_acknowledge_its_own_alarms_under_en
     the never-gated reads, so the evidence stays where it is."""
     agent.identity_mode = "enforce"
     async with LocalClient() as me:
-        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        a = (
+            await me.call(
+                "create", name="a", dir=str(tmp_path), adapter="shell", role="worker", argv=["bash", "--norc"]
+            )
+        )["id"]
         agent._id_alarm({"channel": f"session {a}", "claimed": "ao-b", "rpc": "msg"}, a)
         got = await _probe(me, tmp_path, a, "ack", {"id": 1, "method": "identity_ack", "params": {"id": a}})
         assert "error" in got and "a person's own act" in got["error"]
         assert (await me.call("get", id=a))["identity_alarms"]
         assert "identity_ack" not in identity.READS
+
+
+async def test_a_process_under_the_persons_own_shell_is_the_shell_and_holds_the_persons_acts(agent, tmp_path):
+    """§4.8a *A process under the person's shell is the shell* (TD-580): under `enforce`, a request
+    from inside the pane of a shell the person opened runs as that shell — the channel names it — and
+    the person-only gate lets it by on the record; the same pane under a role is refused."""
+    agent.identity_mode = "enforce"
+    async with LocalClient() as me:
+        sh = (await me.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        got = await _probe(me, tmp_path, sh, "own", {"id": 1, "method": "settings", "params": {}})
+        assert "result" in got, got
+        agent.sessions[sh].role = "worker"  # the right is the record's state at the call, never kept
+        got = await _probe(me, tmp_path, sh, "role", {"id": 1, "method": "settings", "params": {}})
+        assert got["error"].startswith(f"{sh} cannot read the settings: a person's own act"), got
 
 
 def test_a_nodes_session_alarms_reach_the_home_on_the_replica():
@@ -859,7 +881,11 @@ async def test_log_td_hands_an_alarm_to_the_session_that_answers_for_it(agent, h
     for d in ("l", "w"):
         (tmp_path / d).mkdir()
     async with LocalClient() as person, LocalClient() as feeder:
-        lead = (await person.call("create", name="l", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        lead = (
+            await person.call(
+                "create", name="l", dir=str(tmp_path / "l"), adapter="shell", role="worker", argv=["bash"]
+            )
+        )["id"]
         w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
             "id"
         ]

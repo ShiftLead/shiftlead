@@ -147,7 +147,7 @@ class LinkMixin:
         """`ao host forget` (design §4.4a "A container node"): the host's records at the home are
         closed as a closed session is kept — never deleted, their run logs are the node's volume —
         and its link, if up, is dropped. A person's act: a session may not forget a host."""
-        agent_common.person_only(caller, "forget a host", "§4.4a")
+        agent_common.person_only(caller, "forget a host", "§4.4a", self._graph())
         if self.mode != "home":
             raise RpcError(f"{self.host} is a node of {self.home}: hosts are forgotten at the home")
         if host == self.host:

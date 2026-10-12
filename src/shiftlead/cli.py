@@ -32,6 +32,7 @@ from sessionorc.models import (
     FOLDED_KINDS,
     GRANTS,
     STATE_RANK,
+    Session,
     context_over,
     context_reading,
     pr_marks,
@@ -2520,8 +2521,11 @@ def cmd_td_add(args: argparse.Namespace) -> int:
     `ask` to the techlead seat of the repo's first servicing team, carrying `entry` and marked
     `handed`. The repo defaults to the one the command is run in, and it is the **main checkout**
     that is handed, by path: a worktree's path is not in the registry. A person's only: a session is
-    refused here before its standard input is read, and by the host agent whatever this says."""
-    if sid := os.environ.get("SHIFTLEAD_SESSION"):
+    refused here before its standard input is read, and by the host agent whatever this says — but
+    the person's own shell (§4.8 *The person's own shell is the person*, TD-580), as the agent lets it by."""
+    if (sid := os.environ.get("SHIFTLEAD_SESSION")) and not mailmod.person_shell(
+        Session.from_dict(call_sync("get", id=sid))
+    ):
         raise AgentError(
             f"{sid} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
             "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"

@@ -1926,6 +1926,8 @@ def _td_world(world, monkeypatch, *, seat=True):
     handed = []
 
     def fake(method, **params):
+        if method == "get":  # the caller's own record, inside a pane: an agent session's
+            return {"id": params["id"], "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/"}
         assert method == "entry_add", method
         handed.append(params)
         if not params["teams"]:
@@ -1972,6 +1974,26 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
         assert handed[-1]["repo"] == str(tmp_path / "shiftlead")
     assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1  # the registry calls it `link`
     assert "no registered repo is named 'shiftlead'" in capsys.readouterr().err
+
+
+def test_td_add_runs_from_the_persons_own_shell_and_is_refused_to_a_session(world, capsys, monkeypatch):
+    """§4.8 *The person's own shell is the person* (TD-580): inside a pane the record decides — a shell
+    with no role, team or controller is handed on as the person is; any other session is refused here,
+    before its standard input is read."""
+    tmp_path, handed = _td_world(world, monkeypatch)
+    fake = cli.call_sync
+    records = {
+        "ao-sh": {"id": "ao-sh", "name": "sh", "kind": "interactive", "adapter": "shell", "dir": "/"},
+        "ao-w": {"id": "ao-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/"},
+    }
+    monkeypatch.setattr(
+        cli, "call_sync", lambda method, **p: records[p["id"]] if method == "get" else fake(method, **p)
+    )
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-sh")
+    assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 0 and handed[-1]["text"] == "words"
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-w")
+    assert cli.main(["td", "add", "--repo", "shiftlead", "more"]) == 1
+    assert "ao-w cannot add an entry this way" in capsys.readouterr().err and len(handed) == 1
 
 
 def test_td_add_says_when_standard_input_cannot_be_read(world, capsys, monkeypatch):

@@ -124,7 +124,9 @@ async def test_dismiss_takes_the_ids_on_screen_and_refuses_an_open_question(agen
     ids **this browser has on screen** — mail and trail alike — never *everything FYI holds now*.
     An open question is refused, an id already gone is skipped, and a session is refused outright."""
     async with LocalClient() as person:
-        s = await person.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        s = await person.call(
+            "create", name="w", dir=str(tmp_path), adapter="shell", role="worker", argv=["bash", "--norc"]
+        )
         sid = s["id"]
         async with LocalClient(caller=sid) as w:
             note = (await w.call("msg", to="person", text="the venv is broken"))["entry"]
@@ -166,7 +168,9 @@ async def test_a_state_rows_snooze_lives_in_the_homes_own_store(agent, tmp_path)
     `snoozed_until`, so the home keeps it — per record **and row kind**, since one session may
     raise two rows and snoozing one is not snoozing the other."""
     async with LocalClient() as person:
-        s = await person.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        s = await person.call(
+            "create", name="w", dir=str(tmp_path), adapter="shell", role="worker", argv=["bash", "--norc"]
+        )
         sid = s["id"]
         async with LocalClient(caller=sid) as w:
             with pytest.raises(AgentError, match="cannot snooze the person's rows: a person's own act"):

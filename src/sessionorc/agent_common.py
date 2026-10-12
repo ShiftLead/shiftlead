@@ -20,6 +20,7 @@ import struct
 import tarfile
 import time
 import unicodedata
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -284,12 +285,21 @@ class LeadTyped(RpcError):
     paint a long line over two rows and the composer read returns only the first (review of PR #1158)."""
 
 
-def person_only(caller: Any, act: str, section: str) -> None:
+def person_only(caller: Any, act: str, section: str, records: Mapping[str, Session]) -> None:
     """The one check of a person's own act (`mail.PERSON_ONLY`, design §4.8 *A person's own act is a
     named RPC, and the gate is one list*): the first statement of each such RPC, refusing every
-    session in one shape — who called, what it may not do, the section that says why."""
-    if not mail.is_person(caller):
-        raise RpcError(f"{caller} cannot {act}: a person's own act, refused to every session (design {section})")
+    session in one shape — who called, what it may not do, the section that says why — but the
+    person's own shell (`mail.person_shell`, TD-580), read from `records` at the call: the one graph
+    (`_graph`), so a node's shell forwarding a home edit is read from the home's copy of its record
+    under `id@host`. A caller it does not hold stays a session, refused."""
+    if mail.is_person(caller):
+        return
+    if mail.person_shell(records.get(caller) if isinstance(caller, str) else None):
+        return
+    raise RpcError(
+        f"{caller} cannot {act}: a person's own act, refused to every session but the person's own shell "
+        f"(design {section})"
+    )
 
 
 def _is_branch_claim(e: Any) -> bool:
