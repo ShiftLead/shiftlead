@@ -132,6 +132,7 @@ PERSON_ONLY = frozenset(
         "board_edit",
         "board_reply",
         "board_reply_hand",
+        "ledger_decide",
         "entry_add",
         "settings",
         "set_settings",

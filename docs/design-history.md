@@ -151,6 +151,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-12 (TD-565 slice 2, grinder-ao-2): *Board write-back* names the person's answer to a ledger entry as an add on the second add's road (`ledger_decide`, `shiftlead: board decide TD-n (person)`), so the adds the board ever takes are three, not two.
 - 2026-10-12 (TD-560, the designer): *Repo facts* — a *for you* entry's reading carries `added`, `answers` and `detail` for the Inbox's row. Built by TD-565.
 - 2026-10-12 (TD-558, the designer): *In a team's lanes* names the Start dialog as a reader of the same lanes, from the plan, before any record exists. Built by TD-563.
 - 2026-10-10 (TD-530, the designer; Paul: *when we create or reply to an inbox message we should be able to copy files/images into the message; this should probably use the same mechanism we use for the focus screen*): *Attachment drop* — the Message and Reply dialog takes the same road, to the addressee's directory. Built by TD-531.

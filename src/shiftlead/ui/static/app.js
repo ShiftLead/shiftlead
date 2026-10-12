@@ -652,7 +652,7 @@
   // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
   const PRESS_VERBS = {
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
-    board_notright: "deciding…", board_add: "writing…", snooze: "snoozing…", attention_snooze: "snoozing…",
+    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
@@ -708,7 +708,7 @@
     // answer; a press that asks first (a prompt, a composer) is marked once it is answered
     const row = b.closest(".mailrow");
     const key = AO.pressKey(action, b.dataset.boardAct);
-    const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);
+    const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add", "ledger", "ledger_reply"].includes(key);
     const leaves = !!row && !keeps && (PRESS_LEAVES.includes(key) || !!staterow);
     let waiting = null, left = false;
     const say = (text, ok, href) => {
@@ -938,6 +938,23 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // design §4.5a **Inbox row: ledger entry** (TD-565): an answer sends its index, **Go with it** the
+      // default, **Reply** the composer's words — each `ledger_decide`, one decided line written on the
+      // repo's board. The row stays, pending, until the reading lists that line and the refresh drops it.
+      if (action === "ledger" || action === "ledger_reply") {
+        const want = { repo: b.dataset.repo, id: b.dataset.ref };
+        if (action === "ledger_reply") {
+          const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote });
+          if (!m) return;
+          want.words = m.text;
+        } else if (b.dataset.go) want.go = true;
+        else want.answer = Number(b.dataset.index);
+        pressed();
+        const res = await act("person", "ledger", want);
+        say(`decided: ${res.decided || b.dataset.answer} — written on the board on origin, ${b.dataset.ref}'s work order`, true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       if (action === "board_add") {
         const res = await AO.boardAdd(b, pressed);
         if (!res) return;
@@ -1030,12 +1047,12 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
       // wrote nothing, and its toast says so in its own words
-      const writes = ["reply", "answer", "gowithit"].includes(action);
+      const writes = ["reply", "answer", "gowithit", "ledger", "ledger_reply"].includes(action);
       const rowerr = writes && b.closest(".mailrow") && b.closest(".mailrow").querySelector(".rowerr");
       if (rowerr) { rowerr.textContent = `not written: ${e.message}`; rowerr.hidden = false; }
       // a row the press took away comes back with the next refresh, carrying the refusal on its error
@@ -2360,9 +2377,21 @@
       AO.reopenFolds(hz);
     }
     // the ledger's entries that wait on you (TD-368, TD-565): put back whole when they changed, their
-    // folds reopened as the person left them
+    // folds reopened as the person left them, a refused write's words kept, and a ringed row (TD-124)
+    // holding nothing back — the ring goes back on the same row, or the one in its place, as a section's
     const lf = $("#ledgerforyou");
-    if (lf && AO.maySwapSection(lf, document.activeElement) && AO.ledgerSwap(lf, got.html.ledger)) AO.reopenFolds(lf);
+    const lon = document.activeElement, lring = lon && lon.matches && lon.matches(".mailrow") && lf && lf.contains(lon) ? lon : null;
+    if (lf && AO.maySwapSection(lf, lring ? null : lon)) {
+      const errs = AO.rowErrs(lf), at = lring ? $$(".mailrow", lf).indexOf(lring) : -1;
+      if (AO.ledgerSwap(lf, got.html.ledger)) {
+        AO.restoreRowErrs(lf, errs);
+        AO.reopenFolds(lf);
+        if (lring) {
+          const rows = $$(".mailrow", lf), back = rows.find((r) => r.dataset.msg === lring.dataset.msg) || rows[at] || rows[rows.length - 1];
+          if (back) back.focus({ preventScroll: true });
+        }
+      }
+    }
     // *Later* (TD-565): drawn while it holds a row coming up, a *not shown* fold or a ledger row
     const lt = $("#sec-later");
     if (lt) lt.classList.toggle("hidden", !AO.laterHas(lt) && !rail.sec.includes("later"));

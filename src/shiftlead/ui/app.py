@@ -3209,6 +3209,28 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, **more)
             await board_items(board=board)
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+        if action == "ledger":
+            # design §4.5a **Inbox row: ledger entry** (§4.5 screen 6, TD-565): an answer by its index,
+            # **Go with it** (`go`) or a Reply's `words`, for the entry `id` in the checkout `repo`; the
+            # home reads the entry from its repo facts and writes one decided board line, or refuses
+            repo, ref = str(body.get("repo") or "").strip(), str(body.get("id") or "").strip()
+            if not repo or not ref:
+                raise HTTPException(400, "a ledger answer names the repo and the entry")
+            more: dict[str, Any] = {}
+            if body.get("go"):
+                more["go"] = True
+            elif body.get("answer") is not None:
+                try:
+                    more["answer"] = int(body["answer"])
+                except (TypeError, ValueError):
+                    raise HTTPException(400, "a ledger answer is the answer's index") from None
+            else:
+                words = str(body.get("words") or "").strip()
+                if not words:
+                    raise HTTPException(400, "a ledger Reply needs its words")
+                more["words"] = words
+            got = await call("ledger_decide", repo=repo, id=ref, **more)
+            return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "dismiss":
             # design §4.10 *The Inbox is a queue* (TD-079 step 2): **Dismiss** and **Dismiss all**.
             # A **list of ids**, because *Dismiss all* dismisses the entries **this browser has on

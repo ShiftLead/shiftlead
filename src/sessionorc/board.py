@@ -1,7 +1,8 @@
 """Board write-back (design §4.4, TD-069 step 3): **Snooze**, **Done**, **Reply** (TD-142) and
 **Decide** (TD-255) on one item of a repo's `docs/user_attention.md`, made by the host agent — and
-its two **adds**, *Put on the board* (TD-140) and an orphaned question's answer (TD-216), the only
-lines this system ever adds to a board.
+its three **adds**, *Put on the board* (TD-140), an orphaned question's answer (TD-216) and the
+person's answer to a ledger entry that waits on them (TD-565), the only lines this system ever adds
+to a board.
 
 A board is dev-cadence's file and its items are read by dev-cadence's reader
 (`nudge_user_attention.py --report --json`), which gives each item's line number and text; this
@@ -618,6 +619,45 @@ def add(
     if len(head) > HEAD_MAX:
         head = head[: HEAD_MAX - 1].rstrip() + "…"
     msg = f"shiftlead: {'board' if answer is None else 'answer'} {head} (from {entry})"
+    return _insert(root, line, msg)
+
+
+def decided_line(title: str, ref: str, answers: list[str], default: int | None, words: str, today: str) -> str:
+    """The one line the person's answer to a ledger entry writes (design §4.5 screen 6 *The ledger's
+    entries that wait on you*, TD-565): a decided `decide` line in the board's own format, its
+    `Answers:` the entry's with `(default)` on the one marked —
+    `- [ ] decide <today> (person) — <title>. Context: <ref>. Due: <today>. Answers: a | b (default).
+    Decided: <words> (<today>).` — so it is a work order at once (§4.4, §6 rule 6). Refused for empty
+    words, words carrying a field's name, or a line the board's reader would not read back."""
+    head = " ".join(str(title or "").split()).rstrip(".") or ref
+    said = " ".join(str(words or "").split())
+    if not said:
+        raise Refused("a decision needs its words: one of the entry's answers, or what you typed")
+    if FIELD_NAME_RE.search(said):
+        raise Refused("an answer may not carry Answers: or Decided: — say it in other words")
+    opts = [
+        " ".join(str(a).split()).replace("|", "\\|") + (" (default)" if i == default else "")
+        for i, a in enumerate(answers or ())
+        if str(a).strip()
+    ]
+    tail = f" Answers: {' | '.join(opts)}." if opts else ""
+    body = f"decide {today} (person) — {_sentence(head)} Context: {ref}. Due: {today}.{tail} Decided: {said} ({today})."
+    d = DECIDED_RE.search(body)
+    if d is None or d.group("text") != said:
+        raise Refused(f"the board's reader would not read back 'Decided: {said}': say it in other words")
+    return f"- [ ] {body}\n"
+
+
+def add_decided(root: str | Path, line: str, ref: str) -> dict[str, Any]:
+    """The third add (design §4.4 *Board write-back*, TD-565): `line` (`decided_line`) at the top of
+    the open items of the board on origin's head, by the second add's road, committed as
+    `shiftlead: board decide <ref> (person)`. Returns `{commit, message, pr, line}`."""
+    return _insert(Path(root), line, f"shiftlead: board decide {ref} (person)")
+
+
+def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
+    """An add's press: `line` above the first item of the board's open items on origin's head, in
+    the host agent's own tree, landed by its own PR as an edit is."""
     with _EDIT:
         clock = _Clock()
         if shutil.which("gh") is None:

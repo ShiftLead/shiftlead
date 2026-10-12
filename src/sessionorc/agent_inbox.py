@@ -16,6 +16,7 @@ from sessionorc import (
     agent_common,
     hosts,
     mail,
+    workorders,
 )
 from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
@@ -703,6 +704,92 @@ class InboxMixin:
             **({"mail_refused": mail_refused} if mail_refused else {}),
             **({"asker_refused": asker_refused} if asker_refused else {}),
         }
+
+    async def rpc_ledger_decide(
+        self,
+        repo: str,
+        id: str,
+        words: str = "",
+        answer: int | None = None,
+        go: bool = False,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """The person's answer to a ledger entry that waits on them (design §4.5 screen 6 *The ledger's
+        entries that wait on you*, §4.5a *Inbox row: ledger entry*, TD-565): one of its answers by
+        index (`answer`), its default (`go`, **Go with it**) or the Reply's `words`, written as one
+        decided line at the top of the repo's open board items by the second add's road (§4.4 *Board
+        write-back*) — `Context:` the id, committed as `shiftlead: board decide <id> (person)` — so it
+        is a work order at once. `repo` is the checkout the home's repo facts key it by; the entry is
+        read from that reading, and refused when it no longer sorts *for you* or an open decided line
+        already names it. The ledger itself is never written. The repo's work orders are read again
+        once the line lands, so the row leaves on the next poll."""
+        agent_common.person_only(caller, "answer a ledger entry", "§4.5")
+        root = next((r for r in self._repos if r == repo or str(Path(r).resolve()) == str(Path(repo).resolve())), None)
+        if root is None:
+            raise RpcError(f"{repo} is not a repo this home reads (its repos registry)")
+        view = self._repos.get(root) or {}
+        name = str(view.get("name") or Path(root).name)
+        e = next(
+            (
+                x
+                for x in ((view.get("ledger") or {}).get("entries") or [])
+                if isinstance(x, dict) and x.get("id") == id and x.get("for_page") == "for-you"
+            ),
+            None,
+        )
+        if e is None:
+            raise RpcError(f"{id} no longer waits on you in {name}'s ledger: reload the Inbox")
+        if any(
+            id in (o.get("refs") or []) or f"{name}#{id}" in (o.get("refs") or [])
+            for o in ((view.get("work_orders") or {}).get("orders") or [])
+            if isinstance(o, dict)
+        ):
+            raise RpcError(f"{id} is already decided on {name}'s board: its session acts on it")
+        answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
+        d = e.get("default")
+        default = d if isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers) else None
+        if go:
+            if default is None:
+                raise RpcError(f"{id} marks no answer (default): pick one of its answers, or Reply")
+            said = answers[default]
+        elif answer is not None:
+            if isinstance(answer, bool) or not isinstance(answer, int) or not 0 <= answer < len(answers):
+                raise RpcError(f"{id} has no answer {answer!r}: reload the Inbox")
+            said = answers[answer]
+        else:
+            said = str(words or "")
+        key = f"ledger:{root}:{id}"
+        if key in self._board_adding:
+            raise RpcError(f"{id} is already being decided")
+        self._board_adding.add(key)
+        try:
+            today = datetime.now().date().isoformat()
+            try:
+                line = board_mod.decided_line(str(e.get("title") or ""), id, answers, default, said, today)
+                done = await asyncio.to_thread(board_mod.add_decided, root, line, id)
+            except board_mod.Refused as err:
+                raise RpcError(str(err)) from None
+        finally:
+            self._board_adding.discard(key)
+        log.info("board %s: %s", root, done["message"])
+        await self._reread_work_orders(root)
+        return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
+
+    async def _reread_work_orders(self, root: str) -> None:
+        """The repo's work orders read again now (§4.4 *Repo facts*), so a ledger entry answered on the
+        board leaves *Later* on the page's next poll rather than at the next `REPOS_EVERY`. A failed
+        read changes nothing: the next full reading lists the line."""
+        try:
+            got = await asyncio.to_thread(workorders.read, root)
+        except Exception:  # noqa: BLE001 — the line is landed; the reading catches up on its own
+            log.exception("re-reading the work orders of %s failed", root)
+            return
+        if "error" in got or root not in self._repos:
+            return
+        orders = {"orders": [workorders.entry(o) for o in got["orders"]], "at": now_iso()}
+        self._repos[root] = {**self._repos[root], "work_orders": orders}
+        self.repos_store.save(self._repos)
+        await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
