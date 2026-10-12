@@ -143,6 +143,80 @@ def test_a_ledger_row_is_a_mail_rows_shape(tmp_path, monkeypatch):
     assert "No team" not in t002 and ">ledger · yours</span>" in t002 and ">H</span>" in t002
 
 
+def test_a_ledger_rows_answers_go_with_it_and_reply(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: ledger entry** (TD-565 slice 2): the entry's answers as one button each,
+    sending the index, the default marked; **Go with it** only on a row with a default; **Reply** on
+    every row; each names the checkout the home's repo facts key the repo by, and the entry."""
+    from shiftlead.ui.app import ledger_for_you
+
+    root = str(tmp_path / "agentorc")
+    html = _render(ledger_for_you(_repos(tmp_path), _fleet(tmp_path), {}), tmp_path, monkeypatch)
+    t133 = _row(html, "ledger:agentorc:TD-133")
+    group = t133[t133.index('aria-label="this entry\'s answers"') :]
+    assert group.count('data-act="ledger"') >= 3 and 'data-index="2"' in group
+    first = group[group.index('data-index="0"') : group.index('data-index="1"')]
+    assert "&ldquo;At the reset&rdquo;" in first and '<span class="st adflt">default</span>' in first
+    assert "adflt" not in group[group.index('data-index="1"') : group.index("</div>")]
+    assert f'data-repo="{root}"' in t133 and 'data-ref="TD-133"' in t133
+    assert 'data-go="1"' in t133 and ">Go with it</button>" in t133
+    assert 'data-act="ledger_reply"' in t133 and ">Reply</button>" in t133
+    t002 = _row(html, "ledger:agentorc:TD-002")
+    assert 'data-act="ledger_reply"' in t002 and "Go with it" not in t002 and "this entry's answers" not in t002
+
+
+def test_an_entry_an_open_decided_line_names_leaves_later(tmp_path):
+    """§4.5 screen 6 (TD-565): once the reading lists an open decided line whose `Context:` names
+    the entry — the repo's work orders' `refs`, bare or `<repo>#` — its row leaves *Later*; another
+    repo's id of the same number does not take it."""
+    from shiftlead.ui.app import ledger_for_you
+
+    repos = _repos(tmp_path)
+    a = str(tmp_path / "agentorc")
+    repos[a]["work_orders"] = {"orders": [{"id": "board:1", "refs": ["TD-133"]}, {"refs": ["agentorc#TD-002"]},
+                                          {"refs": ["samscrape#TD-156"]}]}  # fmt: skip
+    rows = ledger_for_you(repos, [], {})["groups"][0]["rows"]
+    assert [r["id"] for r in rows] == ["TD-156", "TD-319"]
+
+
+def test_the_route_hands_an_answer_go_with_it_or_words_to_ledger_decide(tmp_path, monkeypatch):
+    """`POST /api/person/ledger`: the index, `go` or the Reply's words, with the repo and the id, to
+    the home's `ledger_decide`; a press missing any of them is refused before the call."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    calls = []
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append((method, kw))
+            return {"decided": "x", "line": 7}
+
+    monkeypatch.setattr(ui, "LocalClient", Fake)
+    c = TestClient(ui.create_app())
+    for body, want in (
+        ({"repo": "/r", "id": "TD-1", "answer": 1}, {"answer": 1}),
+        ({"repo": "/r", "id": "TD-1", "go": True}, {"go": True}),
+        ({"repo": "/r", "id": "TD-1", "words": " drop it "}, {"words": "drop it"}),
+    ):
+        got = c.post("/api/person/ledger", json=body)
+        assert got.status_code == 200 and got.json()["decided"] == "x"
+        assert calls[-1] == ("ledger_decide", {"repo": "/r", "id": "TD-1", **want})
+    n = len(calls)
+    for body in ({"id": "TD-1", "go": True}, {"repo": "/r", "go": True}, {"repo": "/r", "id": "TD-1"},
+                 {"repo": "/r", "id": "TD-1", "answer": "one"}):  # fmt: skip
+        assert c.post("/api/person/ledger", json=body).status_code == 400
+    assert len(calls) == n
+
+
 def test_the_rail_counts_later_from_the_horizon_and_the_ledger():
     """`rail_rows` puts the ledger's rows in `later` and the horizon's coming up in `coming`, which
     the rail reads as *Later*: its line, its heading and a section pick; *Needs you* keeps its own."""
@@ -264,5 +338,10 @@ def test_a_repos_name_goes_with_its_last_row_and_the_poll_puts_later_back():
     # …and the page calls them where the rules apply
     js = app_js.read_text()
     assert "AO.ledgerFilter(document);" in js
-    assert "AO.ledgerSwap(lf, got.html.ledger)) AO.reopenFolds(lf);" in js
+    assert "if (AO.ledgerSwap(lf, got.html.ledger)) {" in js
+    # a ringed row holds no swap back, and the ring goes back on it (review of #1537), as a section's
+    swap = js[js.index('const lf = $("#ledgerforyou");') :]
+    swap = swap[: swap.index("AO.laterHas(lt)")]
+    assert "AO.maySwapSection(lf, lring ? null : lon)" in swap and "AO.restoreRowErrs(lf, errs);" in swap
+    assert "back.focus({ preventScroll: true })" in swap
     assert '!AO.laterHas(lt) && !rail.sec.includes("later")' in js

@@ -32,6 +32,8 @@ from sessionorc.mail import self_decide_refusal
 # **`board_reply_hand`** (§4.5a *Inbox board row → Reply*, TD-142 slice 2): a board reply's mail half, a
 # `handed` note from the person to each lease holder, as `entry_add`'s. `board_reply` itself is served
 # where the repos registry holds the repo and hands this half on (review of PR #1019).
+# **`ledger_decide`** (§4.5a *Inbox row: ledger entry*, TD-565): the entry is read from the home's repo
+# facts, which a node holds none of, and the line lands on the board of a checkout the home's registry names.
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
 # holds the replica the home last sent, which the next frame overwrites.
 # **`clear_work`** (§6 rule 8, TD-227): Dismiss writes the members' `lane_seen` and the home's own
@@ -62,6 +64,7 @@ HOME_EDITS = frozenset(
         "set_settings",
         "entry_add",
         "board_reply_hand",
+        "ledger_decide",
         "clear_work",
         "work_start",
         "clear_mark",

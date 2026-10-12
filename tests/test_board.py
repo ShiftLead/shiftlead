@@ -4,6 +4,7 @@ checkout is not in a state to take that commit."""
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 from pathlib import Path
 
@@ -999,3 +1000,116 @@ def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board
         board.write_back(repo, 8, "n/a — undated.", "done")
     bare = Path(git(repo, "remote", "get-url", "origin"))
     assert len(calls) == 1 and len(json.loads((bare / "fake-gh.json").read_text())["prs"]) == 2
+
+
+LEDGER_TITLE = "When should a team start on its own?"
+
+
+def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tmp_path):
+    """TD-565 (design §4.5 screen 6 *The ledger's entries that wait on you*): the person's answer to a
+    ledger entry is a decided `decide` line — the title, `Context:` the id, due today, the entry's
+    answers with its default marked, the words as `Decided:` — which the repo's own reader lists as a
+    work order naming the id; empty words, a field's name in them, are refused."""
+    import shutil
+
+    from sessionorc import workorders
+
+    line = board.decided_line(
+        LEDGER_TITLE + ".", "TD-133", ["At the reset", "At 9|10"], 0, "At  the reset", "2026-10-12"
+    )
+    assert line == (
+        f"- [ ] decide 2026-10-12 (person) — {LEDGER_TITLE} Context: TD-133. Due: 2026-10-12. "
+        "Answers: At the reset (default) | At 9\\|10. Decided: At the reset (2026-10-12).\n"
+    )
+    bare = board.decided_line(LEDGER_TITLE, "TD-133", [], None, "Not this quarter", "2026-10-12")
+    assert "Answers:" not in bare and bare.endswith("Due: 2026-10-12. Decided: Not this quarter (2026-10-12).\n")
+    root = tmp_path / "r"
+    (root / "docs").mkdir(parents=True)
+    (root / "scripts").mkdir()
+    shutil.copy2(Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts")
+    (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{line}"))
+    (o,) = workorders.read(root, fetch=False)["orders"]
+    assert o["decided"] == {"text": "At the reset", "date": "2026-10-12"} and "TD-133" in o["refs"]
+    # a field's name in the title or an answer stays words: the line still reads back its id (review of #1542)
+    odd = board.decided_line("Add a Context: field. Due: soon", "TD-9", ["Due: Friday", "No"], 0, "No", "2026-10-12")
+    assert "— Add a Context field. Due soon. Context: TD-9. Due: 2026-10-12. Answers: Due Friday (default) | No." in odd
+    (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{odd}"))
+    (o,) = workorders.read(root, fetch=False)["orders"]
+    assert o["refs"] == ["TD-9"] and o["decided"]["text"] == "No"
+    for words in ("", "  ", "keep it. Decided: drop"):
+        with pytest.raises(board.Refused):
+            board.decided_line(LEDGER_TITLE, "TD-133", [], None, words, "2026-10-12")
+
+
+def test_the_third_add_lands_the_decided_line_at_the_top_committed_by_the_id(repo):
+    line = board.decided_line(LEDGER_TITLE, "TD-133", ["Yes", "No"], 1, "No", "2026-10-12")
+    got = board.add_decided(repo, line, "TD-133")
+    assert origin_board(repo).splitlines()[got["line"] - 1] == line.rstrip("\n")
+    assert got["line"] == 7 and got["message"] == "shiftlead: board decide TD-133 (person)"
+    assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
+    assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout is never written
+
+
+async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading(agent, repo, tmp_path, monkeypatch):
+    """`ledger_decide` (§4.5a *Inbox row: ledger entry*, TD-565): an answer by index, Go with it or a
+    Reply's words, for an entry the home's repo facts sort *for you*; refused to a session, for an
+    entry no longer *for you*, one an open decided line already names, Go with it with no default, an
+    index out of range, and a repo the home does not read. The ledger is never written."""
+    import shutil
+
+    shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
+    root = str(repo)
+
+    async def held() -> None:  # the reading is this test's: the tick reads no registry over it
+        return None
+
+    monkeypatch.setattr(agent, "_refresh_repos", held)
+    entry = {
+        "id": "TD-133", "title": LEDGER_TITLE, "for_page": "for-you", "owner": "grinder",
+        "answers": ["At the reset", "At a fixed time"], "default": 0,
+    }  # fmt: skip
+    agent._repos = {
+        root: {
+            "name": "repo", "root": root,
+            "ledger": {"entries": [entry, {"id": "TD-134", "title": "x", "for_page": "for-you", "answers": []},
+                                   {"id": "TD-10", "title": "y", "for_page": "pickable"}]},
+            "work_orders": {"orders": []},
+        }
+    }  # fmt: skip
+    async with LocalClient() as me:
+        w = (await me.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=w) as worker:
+            with pytest.raises(AgentError, match="a person's own act"):
+                await worker.call("ledger_decide", repo=root, id="TD-133", go=True)
+        for kw, why in (
+            ({"repo": root, "id": "TD-10", "go": True}, "no longer waits on you"),
+            ({"repo": str(tmp_path / "nope"), "id": "TD-133", "go": True}, "not a repo this home reads"),
+            ({"repo": root, "id": "TD-134", "go": True}, "marks no answer"),
+            ({"repo": root, "id": "TD-133", "answer": 2}, "has no answer 2"),
+            ({"repo": root, "id": "TD-133", "words": "  "}, "needs its words"),
+        ):
+            with pytest.raises(AgentError, match=why):
+                await me.call("ledger_decide", **kw)
+        # two presses at once (two tabs): one line, the other refused (review of #1542)
+        async with LocalClient() as tab:
+            both = await asyncio.gather(
+                me.call("ledger_decide", repo=root, id="TD-133", go=True),
+                tab.call("ledger_decide", repo=root, id="TD-133", go=True),
+                return_exceptions=True,
+            )
+        refused = [x for x in both if isinstance(x, AgentError)]
+        assert len(refused) == 1 and "already" in str(refused[0])
+        got = next(x for x in both if isinstance(x, dict))
+        assert origin_board(repo).count("Context: TD-133.") == 1
+        assert got["decided"] == "At the reset" and got["message"] == "shiftlead: board decide TD-133 (person)"
+        line = origin_board(repo).splitlines()[got["line"] - 1]
+        assert line.startswith("- [ ] decide ") and "(person) — When should a team start on its own? Context:" in line
+        assert "Context: TD-133." in line and line.endswith("Decided: At the reset (" + line[-12:])
+        # the home read the board again: the line is a work order naming the id, and a second press is refused
+        orders = agent._repos[root]["work_orders"]["orders"]
+        assert [o["decided"]["text"] for o in orders] == ["At the reset"] and "TD-133" in orders[0]["refs"]
+        with pytest.raises(AgentError, match="already decided"):
+            await me.call("ledger_decide", repo=root, id="TD-133", answer=1)
+        got = await me.call("ledger_decide", repo=root, id="TD-134", words="Drop it — the cost is not worth it")
+        assert "Decided: Drop it — the cost is not worth it (" in origin_board(repo).splitlines()[got["line"] - 1]
+        await me.call("kill", id=w)

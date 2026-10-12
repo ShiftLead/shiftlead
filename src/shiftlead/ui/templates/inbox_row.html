@@ -842,7 +842,10 @@
    while a member holds it, its age from `Added:` with the priority letter; the id and the title as
    the first paragraph; *details* the entry's **Why** and **Fix** from the reading's `detail`, through
    the closed subset as a board item's block is — drawn open on a row with answers, as a board
-   `decide` row's. Everything is the reading's text, never a control built from it (TD-071 item 8).
+   `decide` row's. **answers** are the entry's `**Answers:**` line as the reading gives it — a
+   structured field, as a board item's `answers` are (TD-071 item 8) — the default's marked; a press
+   sends its **index**, **Go with it** the default, **Reply** the composer's words, each `ledger_decide`,
+   which writes one decided line on the repo's board: the row leaves once the reading lists it.
    **Open** is the Repo page on the id. #}
 {% macro ledger(e, section) -%}
 <div class="row gap wrap mhead">
@@ -857,9 +860,21 @@
 {%- if e.detail %}
 <details class="fold" data-fold="{{ e.row_id }}"{% if fold_open or e.answers %} open{% endif %}><summary>details</summary><div class="body md detailblock">{{ md(e.detail, origin) }}</div></details>
 {%- endif %}
+{%- if e.answers %}
+<div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
+  <span class="st sugglabel">its answers</span>
+  {%- for a in e.answers %}
+  <button class="btn sm answer" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-index="{{ loop.index0 }}" data-answer="{{ a }}" title="{{ a }}"><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {%- endfor %}
+</div>
+{%- endif %}
 <div class="row gap wrap mfoot">
-  <span class="st">in {{ e.name }}'s ledger — waits on you, with no date</span>
+  <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
   <span class="grow"></span>
+  <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
+  {%- if e.default %}
+  <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-go="1" data-answer="{{ e.default }}" title="the answer marked default, written on {{ e.name }}'s board as your decision on {{ e.id }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Go with it</button>
+  {%- endif %}
   <a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
 </div>
 {%- endmacro %}

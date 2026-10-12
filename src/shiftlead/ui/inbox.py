@@ -2069,8 +2069,9 @@ def ledger_for_you(
     order), one group per repo with any, each in the Repo page's order (priority, then id). A row is
     a mail row's shape — `row: "ledger"`, its `kind` (*ledger · yours* for `Owner: paul`, *ledger ·
     your decision* for a `decision (paul)` item), `name` the repo, `team`, `at` its `Added:` date and
-    `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text)
-    and `url` — with `held` the names of the live records of that repo claiming it; the team the
+    `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text),
+    `root` and `url` — with `held` the names of the live records of that repo claiming it; an entry an
+    open decided line's `Context:` names (the repo's work orders' `refs`) is left out; the team the
     rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
     checkout), else the team most of its live records carry, else none; the link the Repo page
     opened on the id. `n` is every row, counted under *Later* alone."""
@@ -2081,10 +2082,20 @@ def ledger_for_you(
     for root, r in (repos or {}).items():
         if not isinstance(r, dict):
             continue
+        name = str(r.get("name") or Path(str(r.get("root") or root)).name)
+        # an entry an open decided line names has been answered: that line is its row now, a
+        # *Waiting on them* row while it waits on its session (TD-565)
+        decided = {
+            str(ref).rsplit("#", 1)[-1]
+            for o in ((r.get("work_orders") or {}).get("orders") or [])
+            if isinstance(o, dict)
+            for ref in o.get("refs") or ()
+            if "#" not in str(ref) or str(ref).rsplit("#", 1)[0] == name
+        }
         entries = [
             e
             for e in ((r.get("ledger") or {}).get("entries") or [])
-            if isinstance(e, dict) and e.get("for_page") == "for-you"
+            if isinstance(e, dict) and e.get("for_page") == "for-you" and e.get("id") not in decided
         ]
         if not entries:
             continue
@@ -2095,7 +2106,6 @@ def ledger_for_you(
             if s.get("team"):
                 tally[str(s["team"])] = tally.get(str(s["team"]), 0) + 1
         team = (named or {}).get(str(here)) or (max(sorted(tally), key=lambda t: tally[t]) if tally else "")
-        name = str(r.get("name") or here.name)
         rows = []
         for e in sorted(entries, key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"])):
             held = [
@@ -2127,6 +2137,7 @@ def ledger_for_you(
                     "detail": "\n".join(str(x) for x in e.get("detail") or () if isinstance(x, str)).strip("\n"),
                     "answers": answers,
                     "default": answers[d] if ok else "",
+                    "root": str(r.get("root") or root),  # the checkout `ledger_decide` names the repo by
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
                 }
             )
