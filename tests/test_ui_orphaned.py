@@ -112,7 +112,7 @@ def test_only_a_failed_write_is_drawn_as_not_written():
     Read from the source: the row's error is gated by the three presses that write."""
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     catch = js[js.index("const named = { identity_log:") : js.index("not written: ${e.message}")]
-    assert 'const writes = ["reply", "answer", "gowithit"].includes(action);' in catch
+    assert 'const writes = ["reply", "answer", "gowithit", "ledger", "ledger_reply"].includes(action);' in catch
     assert "const rowerr = writes && " in catch
     for press in ("snooze", "unmail", "pause"):
         assert f'"{press}"' not in catch.split("const writes = ")[1].split(";")[0]

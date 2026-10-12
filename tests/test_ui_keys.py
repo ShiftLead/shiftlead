@@ -214,12 +214,14 @@ def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     assert got["answers"] == [["first", "second"], []]
     assert "if (!k || (k.nth && !answers.length)) return;" in js
     assert (
-        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add"].includes(key);' in js
+        'const keeps = ["suspend", "board_decide", "board_reply", "board_notright", "board_add", '
+        '"ledger", "ledger_reply"].includes(key);' in js
     )  # the row stays
     assert e["inbox_g"] == "Go with it"
     assert [k["keys"] for k in got["keys"] if k.get("nth")] == [["1", "2", "3", "4"]]
     row = (UI / "templates" / "inbox_row.html").read_text()
-    assert row.count('class="btn sm answer"') == 2  # the `answers` macro and the board row's, no third shape
+    # the `answers` macro, the board row's and the ledger row's (TD-565), no fourth shape
+    assert row.count('class="btn sm answer"') == 3
     assert "AO.keyAnswers(ringed(page))" in js and "if (a && !a.disabled) a.click()" in js
 
 
