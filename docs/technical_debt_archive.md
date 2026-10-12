@@ -10034,3 +10034,26 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-566, TD-561, TD-127.
 
 **Resolved:** 2026-10-12 (PR #1548) — the primer's Inbox line now says a message to the person carries a `--subject`, a headline apart from its first paragraph (§4.10 *A subject on every entry*, TD-561); TD-566's **Resolved** names the primer as the one repo brief part that carries the shape rule (no other file under `docs/briefs/` states it: `grep -n 'one shape' docs/briefs/*.md`; `grinder-ao-1.md` names a first paragraph only for a look).
+
+## TD-576: #1542's `ledger_decide` — the checkout match by resolved path, the `Repo#id` ref, the re-read after the line lands and the node refusal — are held by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1542)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_inbox.py` (`rpc_ledger_decide`, `_reread_work_orders`), `src/sessionorc/modes.py` (the node-refused list), `tests/test_board.py` (`ledger_decide` tests, ~L1054), `tests/test_ui_inbox_ledger.py`
+
+**Why:** #1542 (TD-565 slice 2) has tests for the answer, Go, Reply, the person-only caller and the double press. Probe: each change below, one at a time, then `pytest -q tests/test_board.py tests/test_ui_board.py tests/test_ui_inbox_ledger.py tests/test_ui_inbox.py tests/test_workorders.py tests/test_person_only.py`: every one still passes.
+- `rpc_ledger_decide`'s `r == repo or str(Path(r).resolve()) == str(Path(repo).resolve())` → `r == repo`: the docstring says the repo is *the checkout the home's repo facts key it by*, and the resolved-path clause (a symlinked checkout) is read by no test.
+- the already-decided check's `f"{name}#{id}" in refs` removed: an entry named `samscrape#TD-9` by an open decided line is decided again; `ledger_for_you`'s twin clause is held (`test_an_entry_an_open_decided_line_names_leaves_later`), this one is not.
+- `_reread_work_orders`: `if "error" in got or root not in self._repos` → `if root not in self._repos` (a failed read raises `KeyError` on `got["orders"]` after the line has landed, so the press reports a failure for a landed decision; no test returns `{"error": …}` from the read), `self.repos_store.save(self._repos)` removed (the re-read is lost at a restart), and the `repos` broadcast removed (the page's *Later* section never leaves): all three pass. `no-reread` alone is caught; its three effects are not.
+- `modes.py`'s node-refused list without `"ledger_decide"` (and `mail.py`'s is caught): the comment says a node holds no repo facts, and no test names `ledger_decide` in `HOME_EDITS`, so a press at a node would be refused as *not a repo this home reads* instead of by the list's own rule.
+- `isinstance(answer, bool)` dropped: `answer=True` picks answer 1.
+
+**Fix:** tests in `tests/test_board.py`: a repo given by a symlink path, an open decided line naming `Repo#TD-x`, a `workorders.read` that returns `{"error": …}` and one that raises (the repo's `work_orders` unchanged, the line landed), a re-read that changes the saved registry and broadcasts one `repos` event, a node-mode agent refusing `ledger_decide`, and `answer=True` refused. **Done when** each probe above fails a test.
+
+**Related:** TD-565 (#1542), TD-575.
+
+**Resolved:** 2026-10-12 (PR #1559) — `tests/test_board.py`: `test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_lands` (a symlinked checkout, `repo#TD-7` already decided, `answer=True` refused, a re-read returning `error` and one raising leave the work orders alone while the line lands, a good one saves the registry and broadcasts one `repos` event) and `test_ledger_decide_is_the_homes_edit`. Each of the seven probes fails a test.
