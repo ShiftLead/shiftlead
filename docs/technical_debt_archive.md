@@ -9902,3 +9902,5 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Done when** a Focus tab's stream carries no groups and only its own session in full, the Org's carries the groups only on a shape change or once a second, and the tests in `tests/test_ui_events_light.py` pass.
 
 **Related:** TD-176 (the groups on every delta), TD-058 (the `/events` handler's end).
+
+**Resolved:** 2026-10-12 (PR #1544) — the groups ride on a delta only on a `SHAPE_KEYS` change, a new record or the stream's first, else one `groups` event per `HEADS_EVERY`, never re-sent unchanged; the Focus and Inbox pages take `/events?light=1` (Focus with `focus=<id>`): no markup, no groups, another record only when it moves.
