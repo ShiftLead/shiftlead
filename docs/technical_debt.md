@@ -45,16 +45,17 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Designed — TD-596 builds it |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Designed — TD-598 builds it |
 | TD-598 | Build TD-581: `PROMOTE_MAX_WAIT` and `ahead_since` in the promote reading; the Inbox's promote row under `auto` (FYI, *settles in m min*, **Promote now**); the build chip's *main +n* a link to it with the hover's line | Medium | Open |
-| TD-582 | Sessions of different teams cannot message each other, and nothing makes two peers' agreement bind: the mail gate has no cross-team edge and no shape for a consensus | Medium | Open |
+| TD-582 | Sessions of different teams cannot message each other, and nothing makes two peers' agreement bind: the mail gate has no cross-team edge and no shape for a consensus | Medium | Designed — TD-601 builds it |
+| TD-601 | Build TD-582: the mail gate's cross-team edge on the `project` badge, its refusal's words, `ao --skill`'s and the briefs' lines on a peer's agreement | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
-| TD-589 | The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default | Low | Open |
 | TD-590 | ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present | Low | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
-| TD-599 | The Inbox's *Answered for you* group may repeat FYI: fold it in, or give it a **Dismiss all** of its own | Medium | Open |
+| TD-599 | The Inbox's *Answered for you* group may repeat FYI: fold it in, or give it a **Dismiss all** of its own | Medium | Designed — TD-602 builds it |
+| TD-602 | Build TD-599: **Dismiss all** on the Inbox's *Answered for you* heading — FYI's rule, the ids on screen in the group, one confirm with the number | Medium | Open |
 
 ---
 
@@ -680,7 +681,8 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-12 (the designer) — (1) **the edge is the project**: two sessions with the same non-empty `project` badge may message whatever their teams (option (a)), the line the person already drew in `org.yml`'s `projects:`; mail only, every bound holding, so not the general peer channel TD-039 refused; invariant 9's exception names the `project` badge beside the `team` badge; (2) **the consensus is a `steer`** to the peer — the proposer's default, a bound no shorter than `ASK_BOUND`, a lapse letting the proposer go on — or an `ask` with `--answer`s; **what binds is what is written** (the shared entry's Status, the PR, the design) citing the thread, before either acts; a disagreement goes up each side's own path (its techlead seat, else the person); (3) no copies to controllers on the project edge, since a proposal is no instruction; a same-team pair needs nothing new. §4.10 *across teams, by project* and *An agreement between peers*, §9 invariant 9. No mockup: nothing drawn changes. Built by TD-601. Was: Open.
+**Blocked by:** TD-601
 **Location:** design §4.10 *The message gate is weaker than `control`* (the four edges), *A disagreement, worked* and *A bounded exchange, counted by thread*; §9 invariant 9 (the one named exception, the team badge); §4.9 (`team` is one badge per session); `src/sessionorc/mail.py` (`message_edge`, `message_gate`); `src/shiftlead/briefs/grinder.md` and `manager.md` (*mail from anyone else is information you weigh*)
 
 **Why:** Paul, 2026-10-12, through Add entry: *There should be a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions. If there is not already a way to do this, lets set one up.* Within one team the way exists: §4.10's sideways edge lets any two sessions carrying the same `team` badge message each other, on every kind, and `ao --skill` names it. Across teams there is none. `message_edge` admits four edges — upward, downward, the shared `team` badge, a shared controlled target — and a session of one team that messages a session of another is refused with *not one of its controllers, its members, its team, or a controller of a session it controls*. The one two-team case the design has worked is TD-039's, two managers over one worker, and its exchange ends in a ruling (the first controller's `reply` binds the worker), not an agreement between equals. Two more things stand between a message and a consensus even inside a team: `team` is one string on the record, so a session is in one team only (§4.9), and every brief tells a worker that *mail from anyone else is information you weigh*, so two peers who agree have agreed on nothing that binds either — the agreement reaches no record, no ledger entry and no board line unless one of them writes it. The harm: two teams on one repo, or two grinders on one package, that have to settle a shared interface, a shared file, or which of two fixes lands, cannot talk, and the person is the only path between them.
@@ -781,26 +783,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 ---
 
-## TD-589: The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/sessionorc/gitinfo.py`, `src/shiftlead/repoconfig.py`
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Worktree setup runs dev-cadence's `hydrate_worktree.sh` when present and nothing otherwise.
-
-**Fix:** `worktree_setup:` in `.shiftlead.yml`, a command run in a new worktree; default `scripts/hydrate_worktree.sh` when present; unset and absent is named on the Repo page (TD-591).
-
-**Done when** a repo's configured command runs in each new worktree, with a test.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591.
-
----
-
 ## TD-590: ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present
 
 **Priority:** Low
@@ -864,8 +846,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 **Related:** TD-580 (the design), TD-581 (the promote press under `auto`), TD-077 (identity), TD-577 / TD-579 (Open shell here's tab).
 
----
-
 ## TD-598: Build TD-581: `PROMOTE_MAX_WAIT` and `ahead_since` in the promote reading; the Inbox's promote row under `auto` (FYI, *settles in m min*, **Promote now**); the build chip's *main +n* a link to it with the hover's line
 
 **Priority:** Medium
@@ -898,7 +878,8 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`) — **not redundant**: every *answered for you* row is an answer a session gave in the person's name, which the person may **Overrule** (a decision still theirs; no FYI row holds one), and folding a handful of them into FYI's twelve hours of system notes and closed mail would bury them; the team header's mark needs no group of its own, but the Overrule does. So the group stays, uncounted, and its heading gains **Dismiss all** by FYI's rule — one confirm with the number, the group's ids on screen only, never a row that arrived after the page was drawn, drawn only while the group holds a row. §4.5a *Inbox: Answered for you, Dismiss all*. Built by TD-602. Was: Open.
+**Blocked by:** TD-602
 **Location:** design §4.5a *Inbox row: answered for you*, *Inbox: the FYI count, **Dismiss all***, *team header* **answered for you** count; §4.5 screen 6 (the sections' order); §4.9b *Everything answered for the person is told to the person*; §4.10 *The Inbox is a queue*; `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS`, `_answered_of`), `src/shiftlead/ui/templates/inbox.html` (`#sec-fyi`, `#dismissall`), `src/shiftlead/ui/static/app.js` (the Dismiss all handler reads `#rows-fyi` only); mockup `docs/mockups/Inbox.dc.html`
 
 **Why:** Paul, 2026-10-12, through Add entry: *Lets evaluate if the "answered for you" section is redundant to fyi, and if so combine them. If not, lets add a "dismiss all" option on the "answered for you" section.* Both are uncounted, and an *answered for you* entry is an FYI by kind — a `note` filed from the answerer (§4.9b) — drawn in its own group after *Waiting on them*, with *Later* between it and FYI. What it has that an FYI row has not: **Overrule** (a reply to the asker on the question's thread, with a copy to the answerer, which hands the asker an outcome debt), the question set off as a quotation with its source, and the team header's **answered for you** count, a mark since the person last opened the group. What it lacks: FYI's **Dismiss all** reads `#rows-fyi` alone, so a run of a busy techlead's answers is cleared one **Dismiss** at a time. The harm: the person either reads a second "no action needed" group beside FYI, or clears it by hand row by row.
@@ -912,6 +893,55 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** §4.5a says which of the two it is, the Inbox draws it, and the person can clear the answered rows they have read in one press.
 
 **Related:** TD-075 (step 2 built *Answered for you*), TD-079 (the Inbox as a queue, FYI's Dismiss all), TD-582 (another Add-entry draft by this seat, on cross-team mail).
+
+---
+
+## TD-601: Build TD-582: the mail gate's cross-team edge on the `project` badge, its refusal's words, `ao --skill`'s and the briefs' lines on a peer's agreement
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-582's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.10 *The message gate is weaker than `control`* (*across teams, by project*) and *An agreement between peers*, §9 invariant 9; `src/sessionorc/mail.py` (`message_edge` ~L267: a fifth edge after `team`, `if me.project and me.project == it.project: return "project"`, the docstring's list; `message_gate` ~L307: the refusal's words gain *its project*), `src/sessionorc/models.py` (`project` ~L979, read only), `src/shiftlead/skill.md` (the `ao msg` line *reaches only your controllers, your members, your team, …*: add *a session of your project*, and one line on a peer's agreement), `src/shiftlead/briefs/*.md` (the *mail from anyone else is information you weigh* line in grinder, manager, manager_on_call, anchor, designer: *a peer's agreement binds once written in the shared entry, the PR or the design — §4.10*), `docs/briefs/techlead-context.md` and the repo's brief parts under `docs/briefs/` (the same line; a held path), `src/shiftlead/ui/help.py` if it quotes the gate; `tests/test_mail.py` (the gate's tests)
+
+**Why:** TD-582: Paul, 2026-10-12 — *a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions*; a session of one team messaging a session of another is refused today, and two peers who agree have agreed on nothing that binds.
+
+**Fix:**
+1. `message_edge`: the `project` edge after `team` — both carry the same non-empty `project`; the docstring names five edges and §9 invariant 9's exception for both badges.
+2. `message_gate`'s refusal: *not one of its controllers, its members, its team, its project, or a controller of a session it controls (design §4.10)*.
+3. `ao --skill` (`src/shiftlead/skill.md`): the reach line gains *a session of your project*, and under *Mail* one bullet — *An agreement with a peer is a `steer` (your default, a bound) or an `ask` with `--answer`s; it binds once you write it in the shared entry's Status, the PR or the design, citing the thread; a disagreement goes up your own path, never the peer's (§4.10 *An agreement between peers*)*.
+4. The briefs' *mail from anyone else is information you weigh* line gains *— a peer's agreement binds once written down (§4.10)*, in each built-in brief and in `docs/briefs/` (a held path: the techlead reads it).
+5. Tests (`tests/test_mail.py`): two sessions of different teams with the same `project` may message (edge `"project"`), on every kind; two with different projects, or one with no project, are refused with the new words; an empty `project` on both is no edge; the four existing edges unchanged; no copy goes to either side's controllers on a project-edge message.
+
+**Done when** two sessions of different teams in one project can put a question to each other with `ao msg` and settle it on one thread, two of unrelated projects are still refused naming the rule, the skill and the briefs say what a peer's agreement binds, and the tests above pass.
+
+**Related:** TD-582 (the design), TD-039 (two controllers over one worker), TD-134 (the disagreement's tests), TD-462 (an `ask` to several).
+
+---
+
+## TD-602: Build TD-599: **Dismiss all** on the Inbox's *Answered for you* heading — FYI's rule, the ids on screen in the group, one confirm with the number
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-599's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Inbox: Answered for you, **Dismiss all*** (beside *Inbox: the FYI count, Dismiss all*); `src/shiftlead/ui/templates/inbox.html` (`#sec-answered` ~L92, its `<summary>` heading ~L93 takes the button; FYI's `#dismissall` ~L124 is the model), the press calling `dismiss` (`rpc_inbox_dismiss`, `src/sessionorc/agent_inbox.py` ~L151) with the ids as FYI's does, `src/shiftlead/ui/static/app.js` (FYI's handler ~L2149 reads `#rows-fyi .mailrow` on screen and dismisses by id: make it take the section, or add a twin for the answered rows), `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS` ~L49 keeps `answered`; nothing to change unless the heading needs a count), `src/shiftlead/ui/help.py` (the group's help words), `docs/mockups/gen.py` (drawn by TD-599); `tests/test_ui_inbox*.py`
+
+**Why:** TD-599: Paul, 2026-10-12 — *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*. The design keeps the group (each row may be overruled) and gives it FYI's one-press clear; today a busy techlead's answers are cleared one **Dismiss** at a time.
+
+**Fix:**
+1. The heading: a **Dismiss all** button at the right of the *Answered for you* group's heading, as FYI's, drawn only while the group holds a row; its `title` *dismiss the answers on screen — never one that arrived after the page was drawn*.
+2. The press: confirm once — *Dismiss the n answers on screen? Their Overrule goes with them.* — then dismiss the ids of the group's rows not hidden by the rail, by the same RPC FYI's Dismiss all uses; rows that arrive later stay.
+3. Nothing else: the team header's mark is the browser's and falls with the rows; no new RPC.
+4. Tests: the button drawn with rows and absent without; the press sends only the on-screen ids of the group (a row hidden by the rail, and one added after render, are not sent); FYI's Dismiss all unchanged; the mockup regenerates unchanged.
+
+**Done when** the person can clear the *answered for you* rows they have read in one press, only those on screen, the group still stands apart from FYI with its Overrule, and the tests above pass; the builder's look (design §4.9b: the heading with rows, the confirm) is named in the PR.
+
+**Related:** TD-599 (the design), TD-075 (the group), TD-079 (FYI's Dismiss all).
 
 ---
 
