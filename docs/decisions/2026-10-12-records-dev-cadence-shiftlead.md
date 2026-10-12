@@ -1,9 +1,10 @@
 # ADR 2026-10-12: three repos — records holds the ledger and board formats once, dev-cadence is how a repo works, ShiftLead is how sessions are run
 
-**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), under review (Fable round 3).
+**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), under review (Fable round 4).
 **Date:** 2026-10-12
 **Supersedes:** the placement of the ledger and board formats in [ADR 2026-10-08](2026-10-08-agentorc-dev-cadence-split.md);
-the rest of that ADR stands.
+the rest of that ADR stands. Its Status line gains "superseded in part by ADR 2026-10-12 (the formats'
+placement); the rest stands" (cadence §7.5's one edit), in build 3.
 **Related:** design §5, §8; dev-cadence TD-093, TD-095, TD-099, TD-101, TD-102 (the tool-neutral work),
 TD-100 (archived: the session adapter, and its plan's scope line, dev-cadence PR #235); dev-cadence's
 [2026-09-26 tracker decision](https://github.com/ShiftLead/dev-cadence/blob/main/docs/plans/2026-09-26-tracker-integration-one-interface.md).
@@ -77,12 +78,12 @@ Pure functions over text; anything outside the text is passed in.
   `resolve(item) -> (state, why)`, state `open | archived | unresolved`, answers a cross-repo
   `<repo>#TD-NNN` and `why` goes into the flag — dev-cadence passes a resolver over its roster and
   `origin/<default>`, ShiftLead one over its registry; the archive's shape; the `Answers:` value grammar
-  wherever it appears; an imported entry's `Source:` field (`jira:PROJ-123`), kept byte-for-byte by
-  every edit.
+  wherever it appears; an imported entry's `**Tracker:**` field (`JIRA-123`, as the 2026-09-26
+  decision names it), kept byte-for-byte by every edit.
 - **Board:** parse items to a record — the fixtures' JSON is the API: `line, text, kind, due,
-  due_error, answers, default, decided, replies, session, host, refs, detail`, with `item_key()` and
-  `item_head()` as functions; the today-relative fields (`overdue_days`, `due_tag`, `waiting_on`) are
-  functions of `(item, today)`; `escalate` (dev-cadence's thresholds) stays nudge's. Also
+  due_error, answers, default, decided, waiting_on, replies, session, host, refs, detail`, with
+  `item_head()` as a function; the today-relative fields (`overdue_days`, `due_tag`) are functions of
+  `(item, today)`; `escalate` (dev-cadence's thresholds) stays nudge's. Also
   `item_refs()`, `detail_block()`, `closed_items()`, `KIND_RE`/`Kinds:`, `ARCHIVE_AT`; composing a new
   item, `item_line(text, due, session, host, context)` and `decided_line(…)`; the
   snooze/done/reply/decide edits (`edit_line()`); and one commit subject per write,
@@ -101,9 +102,12 @@ Pure functions over text; anything outside the text is passed in.
 ### How records is consumed
 
 - **One file, carried by the sync that already exists.** records publishes tagged releases. The file
-  is a library (no shebang) and opens with two lines records writes into the release itself:
-  `# ledgerboard v<x.y> sha256:<of the rest>` and `# SYNCED FILE — canonical copy: ShiftLead/records
-  ledgerboard.py`, so the release travels inside the file and no consumer's copy differs from it.
+  is a library (no shebang, a module docstring) and opens with two lines records writes into the
+  release itself: `# ledgerboard v<x.y> sha256:<of the rest>` and `# SYNCED FILE — canonical copy:
+  ShiftLead/records ledgerboard.py (vendored by dev-cadence as files/scripts/ledgerboard.py)`, so the
+  release travels inside the file and no consumer's copy differs from it. dev-cadence's provenance
+  test (`tests/test_sync_provenance.sh`) accepts that second form for a vendored file — the one place
+  its `MARKER` is not the rule — so `SYNCED FILE` still opens it.
   dev-cadence vendors it as `files/scripts/ledgerboard.py`, a SYNC file like any other (its scripts
   import siblings by name), so the lock and `--verify` carry it with no format change.
 - **ShiftLead carries two copies, held byte-equal.** As a dev-cadence consumer it has the synced
@@ -132,10 +136,11 @@ Pure functions over text; anything outside the text is passed in.
   Inbox's `ORIGIN_PHRASES` and `BOARD_FIELDS` go. Without dev-cadence, nothing needs to recognise a
   write-back's commit subject: the write-back merges its own PR.
 - **Uses when present, with a seam in `.shiftlead.yml` when not** (all new design, see *Builds*):
-  - `gate:` a command that exits 0 for a mergeable PR (`{pr}` filled). Default:
-    `python3 scripts/check_cadence.py --pr {pr}` when that script exists. With no gate, the review stage
-    never merges on its own: the card says "no gate: a person merges", where today
-    `sessionorc/cadence.py` returns "could not look".
+  - `gate:` a command that exits 0 for a mergeable PR (`{pr}` filled); ShiftLead judges a configured
+    gate by its exit code alone. The default, when `scripts/check_cadence.py` exists, is that script
+    run as today with `--json`, a known shape whose rows the review card keeps showing. With no gate,
+    the review stage never merges on its own: the card says "no gate: a person merges", where today
+    `sessionorc/cadence.py` returns nothing.
   - `commands:` `test` and `lint`, which fill `{test}` and `{lint}` in the built-in briefs; this repo's
     `pdm run …` moves to its own `.shiftlead.yml`.
   - `worktree_setup:` default `scripts/hydrate_worktree.sh` when present.
@@ -160,9 +165,9 @@ Each is a ledger entry in the repo named, filed when this ADR is accepted; the d
 | # | Repo | What |
 |---|---|---|
 | 1 | records | Create the repo; `ledgerboard.py` moved from dev-cadence's `ledger.py` parsing, nudge's board readers and `board_edit.py`'s `edit_line()`/subject — **moved, not rewritten, except `pickable()`'s resolver**, which becomes a parameter; `SPEC.md` from the seed templates' format paragraphs and cadence §2/§3's format rules; fixtures; release v1.0. Passes both repos' existing format tests unchanged. |
-| 2 | dev-cadence | Vendor v1.0 as a SYNC file; `ledger.py`, `nudge_user_attention.py`, `board_edit.py`, `check_cadence.py` call it; the seeds and cadence.md point at `SPEC.md`; §7's rows; README's pinning exception; a `cadence-changes.md` entry; sync. |
+| 2 | dev-cadence | Vendor v1.0 as a SYNC file, and the provenance test's vendored form; `ledger.py`, `nudge_user_attention.py`, `board_edit.py`, `check_cadence.py` call it; the seeds and cadence.md point at `SPEC.md`; §7's rows; README's pinning exception; a `cadence-changes.md` entry; sync. |
 | 3 | ShiftLead design | §5: `gate:`, `worktree_setup:`, `commands:` read by the briefs, the roster; §4.7: `ao doctor`'s repo rows, `ao repo init` (an empty ledger); §4.5a: the Repo page's missing-seam lines and the Inbox reading in-process; §6: the review stage with no gate; §8: this ADR's rule. |
-| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; the byte-equality and fixture tests. |
+| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its two append subjects collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; the byte-equality and fixture tests. |
 | 5 | ShiftLead | The seams of build 3, each its own entry: gate, commands into briefs, worktree_setup, roster import, doctor and Repo page rows, `ao repo init`. |
 
 ## Consequences
@@ -170,11 +175,12 @@ Each is a ledger entry in the repo named, filed when this ADR is accepted; the d
 - A format change is three PRs in order: records (spec, code, fixtures, a release), then dev-cadence's
   vendor and sync, then ShiftLead's vendor. Slower than one repo; it is the price of one definition. A
   consumer may lag a release; it may not diverge from one.
-- `ledger.py` stops importing `nudge_user_attention`: the roster stays in nudge (dev-cadence's), and the
-  resolver is the only place they meet.
+- `ledgerboard.py` imports nothing of either repo; dev-cadence's `ledger.py` keeps its
+  `nudge_user_attention` import only to build the resolver from the roster (`Roster.resolve` returns
+  `(state, why)`, a change in build 2 as `Registry`'s is in build 4).
 - External trackers (Jira, Asana) are never records': the importer that maps a tracker into the ledger
   is dev-cadence's (its TD-065, the 2026-09-26 decision), in its own repo if it ever needs a non-stdlib
-  client; ShiftLead may run it on a schedule as it runs the gate. records owns only the `Source:` field.
+  client; ShiftLead may run it on a schedule as it runs the gate. records owns only the `Tracker:` field's shape.
 - dev-cadence's open tool-neutral entries (TD-093, TD-095, TD-099, TD-101, TD-102) proceed unchanged;
   records is tool-neutral already.
 
