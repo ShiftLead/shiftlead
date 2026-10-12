@@ -9904,3 +9904,35 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-176 (the groups on every delta), TD-058 (the `/events` handler's end).
 
 **Resolved:** 2026-10-12 (PR #1544) — the groups ride on a delta only on a `SHAPE_KEYS` change, a new record or the stream's first, else one `groups` event per `HEADS_EVERY`, never re-sent unchanged; the Focus and Inbox pages take `/events?light=1` (Focus with `focus=<id>`): no markup, no groups, another record only when it moves.
+
+## TD-569: `ao inbox --thread`'s and `--sent`'s head lines print the subject, and no test would notice if they stopped
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1536)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/cli.py` (`_subj(e)` at L2855, the `--sent` listing; L2886, `_thread`'s head), `tests/test_cli.py` (`test_msg_subject_and_the_inbox_head_line_that_shows_it`)
+
+**Why:** #1536 (TD-566 slice 1) put `_subj(e)` on three head lines of `ao inbox`: the person's listing (L2950), `--thread` (L2886) and `--sent` (L2855). The one test asserts only the first, `' · note · "PR #9 waits" · ' in out` after a plain `cli.main(["inbox"])`. Probe: in a worktree on `origin/main`, remove `{_subj(e)}` from the two other f-strings and run `tests/test_cli.py tests/test_mail.py`: every test passes, apart from `test_explain_file_and_session`, which fails in this worktree with or without the change (*unknown adapter 'claude-code'*, the adapter not registered here). Design §4.7 says `ao inbox`'s head line carries the subject on each of its forms; two of three could lose it unseen.
+
+**Related:** TD-566 (#1536), TD-561.
+
+**Resolved:** 2026-10-12 (PR #1545) — `test_msg_subject_and_the_inbox_head_line_that_shows_it` (`tests/test_cli.py`) prints `ao inbox --thread <id>` and `ao inbox --sent` for the subject-carrying entry and asserts the quoted subject on each head line; removing `_subj(e)` from either line fails it.
+
+## TD-570: The Inbox poll's `rail_teams` markup is asserted by no test, and #1537 changed what it counts
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/app.py` (`api_person_inbox`, L3088: `rail_rows(sections, hz["ahead"], ledger_rows(lf))`, and `got["html"]["rail_teams"]` just below), `tests/test_ui_inbox_ledger.py` (`test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts`)
+
+**Why:** #1537 (TD-565 slice 1) made the Inbox page's rail and the poll's `rail_teams` both count the ledger's rows under *Later*, so a team whose only row is a ledger entry gets its *Teams* line. The page's route is held (`'<span class="raillabel">Later</span><span class="railn">5</span>' in page`); the poll's is not. `grep -rn "rail_teams\|teams_group" tests/` finds nothing: the field is read by no test at all, before or after the PR. Probe: change L3088 to `rail_rows(sections, hz["ahead"])` and run `tests/test_ui_inbox_ledger.py tests/test_ledger_derived.py tests/test_ui_board.py`: 76 passed. A ledger-only team would then vanish from the rail on the first poll after the page loaded.
+
+**Related:** TD-565 (#1537), TD-560.
+
+**Resolved:** 2026-10-12 (PR #1545) — `test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts` (`tests/test_ui_inbox_ledger.py`) asserts the poll's `html.rail_teams` draws the *Teams* lines of `ao-grind` and `sam-grind`; dropping `ledger_rows(lf)` from the poll's `rail_rows` call empties it and fails the test.
