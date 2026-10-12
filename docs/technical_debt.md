@@ -42,8 +42,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Designed — TD-593 builds it |
-| TD-593 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
+| TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Designed — TD-597 builds it |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
@@ -55,6 +54,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-590 | ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present | Low | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-594 | §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size, the new shell having none remembered | Low | Open |
+| TD-597 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
 
 ---
 
@@ -631,8 +631,8 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer; mockup `Focus.dc.html`, shot `docs/mockups/reviews/2026-10-12-td578-transcript-editor-button.png`) — it sits **in the Focus header, right after Transcript**, labelled with the editor's own label and the *‹›* glyph as the Session card's button is (*‹› VS Code*), since the person is at the terminal wanting the conversation and the Session card's button is the directory's; the link is **the Transcript page's VS Code link** (`transcript_editor`: `open_in`'s template with the file's path in place of the directory), **one launch** — the two-launch rule is for a repo file landing in the worktree's window, and the transcript is the tool's file; the path comes from the record, which gains `transcript` (§4.2) set with `adapter_id`, so Focus reads no file for it; hidden until the hook reports the id, as Transcript is, and absent where the Transcript page's button is (`open_in: none`, another host's record, no tool session id). §4.5a *Focus header* **‹› VS Code**, §4.5 screen 9, §4.2. Built by TD-593. Was: Open.
-**Blocked by:** TD-593
+**Status:** Designed 2026-10-12 (the designer; mockup `Focus.dc.html`, shot `docs/mockups/reviews/2026-10-12-td578-transcript-editor-button.png`) — it sits **in the Focus header, right after Transcript**, labelled with the editor's own label and the *‹›* glyph as the Session card's button is (*‹› VS Code*), since the person is at the terminal wanting the conversation and the Session card's button is the directory's; the link is **the Transcript page's VS Code link** (`transcript_editor`: `open_in`'s template with the file's path in place of the directory), **one launch** — the two-launch rule is for a repo file landing in the worktree's window, and the transcript is the tool's file; the path comes from the record, which gains `transcript` (§4.2) set with `adapter_id`, so Focus reads no file for it; hidden until the hook reports the id, as Transcript is, and absent where the Transcript page's button is (`open_in: none`, another host's record, no tool session id). §4.5a *Focus header* **‹› VS Code**, §4.5 screen 9, §4.2. Built by TD-597. Was: Open.
+**Blocked by:** TD-597
 **Location:** design §4.5a *Focus header* **Transcript** (the page in a new tab), *Transcript* (the page's **VS Code** on the raw file), *Focus side panel, Session card* **editor** button (the directory), §4.5 screen 9 *Transcript*; §5 `person.open_in`; `src/shiftlead/ui/templates/focus.html` (~L106–110 the Transcript link, ~L286 the Session card's editor button), `src/shiftlead/ui/transcript.py` `transcript_editor` (the file link the Transcript page builds), `src/shiftlead/ui/app.py` ~L1385 (where it is built, for the Transcript page alone)
 
 **Why:** Paul, 2026-10-12: *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others). This will give the ability for a user to easily read/search the current transcript in their favorite editor.* Today the transcript file reaches the editor only through the Transcript page: Focus → **Transcript** (a new tab, a snapshot of the last twenty turns) → its **VS Code**. Reading or searching the whole of a live session's conversation is the editor's work, and the person is on Focus when they want it; the link itself already exists (`transcript_editor`, the `open_in` template with the file's path, §4.5a *Transcript*), so Focus lacks one press, not a mechanism.
@@ -853,7 +853,29 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584 (the design: what it draws and from where), TD-585 (the vendored `ledgerboard.py` that `ao repo init`'s ledger and the ledger check read), TD-586 (the missing-gate line).
 
-## TD-593: Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is
+---
+
+## TD-594: §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1561–#1567)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.5a-controls.md` row *Focus | Open shell here* (the Shift / popped-out sentence); `src/shiftlead/ui/static/app.js` `AO.shellHere` and `AO.popFeatures`
+
+**Why:** The row reads *"Shift+press, or a press in a popped-out window, opens it as **Pop out** opens one instead — a chromeless window named `ao-focus-<id>`, sized as the browser remembers for the session (row *Pop out*)"*. Pop out remembers a size per session (`store.get(`win.${id}`)`), keyed by the id of the session being popped. `AO.shellHere` (#1563) opens the window **before** the create answers, so the new shell's id does not exist yet, and calls `window.open("", "", AO.popFeatures(null))`: always the default `popup,width=1184,height=860`, which `test_open_shell_here_opens_beside_the_page_it_was_pressed_on` asserts (`got["win"]["features"] == "popup,width=1184,height=860"`). Nothing is remembered for a session that did not exist; the sentence promises a size the code cannot read. (The window is also opened under no name and renamed to `ao-focus-<id>` after the create, which the row does say.)
+
+**Fix:** reword the clause in the row: the window opens at Pop out's default size, and remembers its own from then on as any popped-out window does. No behaviour change, and no history line (a wording of the same fact).
+
+**Done when** §4.5a's row says the window opens at the default size; `pdm run test` passes (the doc-bound tests read this table).
+
+**Related:** TD-577, TD-579 (#1563), TD-046.
+
+---
+
+## TD-597: Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is
 
 **Priority:** Medium
 **Type:** feature
@@ -874,26 +896,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, the button appears when the hook reports the tool session id, and it is absent wherever the Transcript page's **VS Code** is; the tests above pass, and the builder's look (design §4.9b: Focus on a live session, the press landing the file in the editor) is named in the PR.
 
 **Related:** TD-578 (the design), TD-166 (the Transcript page), TD-525 (the Session card's editor button), TD-532 / TD-536 (a file link's two launches, which this is not).
-
----
-
-## TD-594: §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1561–#1567)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/design/4.5a-controls.md` row *Focus | Open shell here* (the Shift / popped-out sentence); `src/shiftlead/ui/static/app.js` `AO.shellHere` and `AO.popFeatures`
-
-**Why:** The row reads *"Shift+press, or a press in a popped-out window, opens it as **Pop out** opens one instead — a chromeless window named `ao-focus-<id>`, sized as the browser remembers for the session (row *Pop out*)"*. Pop out remembers a size per session (`store.get(`win.${id}`)`), keyed by the id of the session being popped. `AO.shellHere` (#1563) opens the window **before** the create answers, so the new shell's id does not exist yet, and calls `window.open("", "", AO.popFeatures(null))`: always the default `popup,width=1184,height=860`, which `test_open_shell_here_opens_beside_the_page_it_was_pressed_on` asserts (`got["win"]["features"] == "popup,width=1184,height=860"`). Nothing is remembered for a session that did not exist; the sentence promises a size the code cannot read. (The window is also opened under no name and renamed to `ao-focus-<id>` after the create, which the row does say.)
-
-**Fix:** reword the clause in the row: the window opens at Pop out's default size, and remembers its own from then on as any popped-out window does. No behaviour change, and no history line (a wording of the same fact).
-
-**Done when** §4.5a's row says the window opens at the default size; `pdm run test` passes (the doc-bound tests read this table).
-
-**Related:** TD-577, TD-579 (#1563), TD-046.
 
 ---
 
