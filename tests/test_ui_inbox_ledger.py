@@ -234,7 +234,7 @@ def test_the_rail_counts_later_from_the_horizon_and_the_ledger():
 
 def test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts(tmp_path, monkeypatch):
     """The route reads the home's `repos` and the fleet; the poll's `html.ledger` is the same box,
-    so the page keeps it current."""
+    so the page keeps it current, and its `html.rail_teams` draws the teams the ledger's rows carry."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     from shiftlead.ui import app as ui
 
@@ -263,6 +263,11 @@ def test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts(tmp_path, 
     got = c.get("/api/person/inbox").json()
     assert 'href="/repo/samscrape#TD-400"' in got["html"]["ledger"]
     assert got["needs"] == 0  # counted in no number that means *due now*
+    # the poll's *Teams* lines count the ledger's rows as the route's do (TD-570): a team whose only
+    # rows are ledger entries keeps its line after the first poll
+    for team in ("ao-grind", "sam-grind"):
+        assert f'data-value="{team}"' in got["html"]["rail_teams"]
+        assert f'<span class="raillabel">{team}</span><span class="railn">0</span>' in got["html"]["rail_teams"]
 
 
 LEDGER_PROBE = """
