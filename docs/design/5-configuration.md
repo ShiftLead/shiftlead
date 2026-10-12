@@ -213,9 +213,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     presses are the write-back (§4.4).
   - **`gate:`** — the merge gate, a command with `{pr}` filled that exits 0 for a mergeable PR, judged
     by its exit code alone; default, when `scripts/check_cadence.py` exists, that script run `--pr {pr}
-    --json`, the one shape whose rows the review card and the cadence row keep drawing (§6 rule 10).
-    Unset and absent: **the review stage never merges on its own**, and the card, the Repo page and
-    the briefs say *no gate: a person merges* (§6 rule 10, §4.9c).
+    --json`, the one shape whose rows the record's checks entry keeps (§6 rule 10). Unset and absent:
+    **the review stage never merges on its own**, the record's entry reads `verdict: none` and
+    `ao status -v` prints *no gate: a person merges* (§6 rule 10); the Repo page (TD-591) and the
+    briefs (§4.9c, TD-588) say the same.
   - **`commands:`** — a mapping; `test` and `lint` fill `{test}` and `{lint}` in the built-in briefs and
     flows (§4.8 *A repo's brief*), each unset one filling with its seam's sentence (*no test command:
     run what the repo's README says*). This repo's own `pdm run …` lives here and in its own brief,

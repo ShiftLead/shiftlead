@@ -49,7 +49,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-582 | Sessions of different teams cannot message each other, and nothing makes two peers' agreement bind: the mail gate has no cross-team edge and no shape for a consensus | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
-| TD-586 | The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default | Medium | Open |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
 | TD-589 | The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default | Low | Open |
@@ -761,26 +760,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 ---
 
-## TD-586: The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/shiftlead/repoconfig.py`, `src/sessionorc/cadence.py`, the td flow's review stage, the review card
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Today the gate is `scripts/check_cadence.py` or nothing, and nothing reads as "could not look".
-
-**Fix:** per the ADR's *What ShiftLead requires*: `gate:` in `.shiftlead.yml`, a command that exits 0 for a mergeable PR (`{pr}` filled), judged by exit code alone; the default, when `scripts/check_cadence.py` exists, is that script with `--json` and its rows on the card; with none, the review stage never merges on its own and the card says "no gate: a person merges".
-
-**Done when** a repo with `gate: "true"`, one with the default, and one with none each behave as the ADR says, with tests.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-588 (`{gate}` in the briefs), TD-591 (the missing-gate line).
-
----
-
 ## TD-587: `board:` path key and `ao board edit` (done, snooze) for a session's own branch
 
 **Priority:** Medium
@@ -815,7 +794,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. The built-in briefs hard-code this repo's layout (`pdm run test`, `docs/cadence.md`, `scripts/check_cadence.py`, `scripts/board_edit.py`, `docs/design/`), so a repo without dev-cadence, or with another layout, gets wrong instructions.
 
-**Fix:** per the ADR's *Briefs and flows name no repo's layout* and its `commands:` seam: `.shiftlead.yml`'s `commands:` (`test`, `lint`; today accepted and read by nothing) is read by `repoconfig.py` and fills `{test}` and `{lint}`; `{ledger_check}` defaults to `python3 scripts/ledger.py --check` and `{cadence_rules}` to "read docs/cadence.md §1–§4" only when those files exist, each otherwise the seam's sentence; the variables: `{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}`; an unset one fills with a sentence naming the seam, never empty; `{pr}` inside `{gate}` filled after; this repo's specifics move to its own `.shiftlead.yml` and brief; a session's board edit is `ao board edit` (TD-587); a test fails on `docs/cadence.md`, `/cadence`, `scripts/`, `docs/technical_debt.md`, `docs/user_attention.md`, `docs/design/` or `pdm run` outside a variable.
+**Fix:** per the ADR's *Briefs and flows name no repo's layout* and its `commands:` seam: `.shiftlead.yml`'s `commands:` (`test`, `lint`; today accepted and read by nothing) is read by `repoconfig.py` and fills `{test}` and `{lint}`; `{ledger_check}` defaults to `python3 scripts/ledger.py --check` and `{cadence_rules}` to "read docs/cadence.md §1–§4" only when those files exist, each otherwise the seam's sentence; the variables: `{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}`; an unset one fills with a sentence naming the seam, never empty; `{pr}` inside `{gate}` filled after; this repo's specifics move to its own `.shiftlead.yml` and brief; a session's board edit is `ao board edit` (TD-587); a test fails on `docs/cadence.md`, `/cadence`, `scripts/`, `docs/technical_debt.md`, `docs/user_attention.md`, `docs/design/` or `pdm run` outside a variable. A repo with no gate (§5 *The seams* `gate:` unset and no `scripts/check_cadence.py`) fills the briefs' gate step with *no gate: a person merges* (§6 rule 10, §4.9c) — what TD-586 records and nothing draws yet.
 
 **Done when** `commands:` is read, the test passes, and a brief filled for this repo reads as it does today.
 

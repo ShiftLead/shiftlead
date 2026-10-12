@@ -1404,6 +1404,7 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
         "commands": [],
         "teams": {},
         "promote": {"run": "scripts/promote.sh", "check": "scripts/live_sha.sh"},
+        "gate": "python3 scripts/check_cadence.py --pr {pr} --json",
         "held": ["src/sessionorc/**"],
     }
     assert named == set(accepted)
