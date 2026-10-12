@@ -843,7 +843,8 @@ def test_the_filters_cover_state_rows(tmp_path, monkeypatch):
     html = rows("needs", state_rows_of([r]))
     assert 'data-team="ao-grind"' in html
     find = html.split('data-find="')[1].split('"')[0]
-    assert find == "w1 error checker reading the fetcher run pytest? ao-grind needs you"  # team, pill: TD-135
+    # team, pill: TD-135; the subject last, the tool's where the text names one (TD-566)
+    assert find == "w1 error checker reading the fetcher run pytest? ao-grind needs you permission · w1"
     none = rows("needs", state_rows_of([rec("ao-q", "needs-you", pending={"kind": "q", "text": "?"})]))
     assert 'data-team=""' in none and ">No team<" in none
 
@@ -3093,6 +3094,7 @@ def test_a_held_anchor_seat_is_a_needs_you_row_past_the_grace(tmp_path, monkeypa
         "and 2 more — commit and push, or check out main, and the seat fills"
     )
     assert s["text"].startswith("anchor seat held 1 h by ao-b (working) · 1 in its lane: TD-1 — close it")
+    assert a["subject"] == "anchor seat held · ao"  # §4.10 *A subject on every entry* (TD-566)
     assert a["at"] == since and a["mark"] == "seat_held" and a["id"] == "ao-a:seat_held"
     # Open: the holder's Focus where it is a record of this home, else the seat's own card
     assert a["holder"] == "" and s["holder"] == "ao-b"
@@ -3313,3 +3315,81 @@ def test_an_entry_closed_while_snoozed_is_listed_by_its_close_not_in_the_fold():
     )
     assert [e["id"] for e in got["snoozed"]] == ["m-1"]
     assert "m-2" in [e["id"] for e in got["fyi"]]
+
+
+# -- the subject (design §4.10 *A subject on every entry*, §4.5a **subject**; TD-561, built by TD-566) --
+
+
+@pytest.mark.unit
+def test_every_row_the_home_builds_carries_its_kinds_subject(tmp_path, monkeypatch):
+    """TD-566 item 3: a state row is *<kind> · <what>* — the tool for a permission, the session's
+    name otherwise —, a restart row by the mark that raised it, a cadence row by its PR, the promote
+    and team-start rows by repo and team, a board row its head line before `Context:`, a trail row
+    its *how*; and the find matches each."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.inbox import board_rows, promote_rows, row_find, row_subject, work_rows
+
+    perm = {**PERMISSION, "text": "Bash: git push origin main"}
+    states = state_rows_of(
+        [
+            rec("ao-p", "needs-you", pending=perm),
+            rec("ao-s", "stalled?", name="grinder-ao-1"),
+            rec("ao-l", "limited", name="ao-grind-anchor"),
+            rec("ao-x", "idle", name="grinder-ao-2", restart_ceiling={"at": "2026-10-12T10:00:00Z", "count": 3}),
+        ]
+    )
+    subjects = {r["row"]: r["subject"] for r in states}
+    assert subjects == {
+        "permission": "permission · Bash",
+        "stalled": "stalled? · grinder-ao-1",
+        "limited": "limited · ao-grind-anchor",
+        "restart": "restarts exhausted · grinder-ao-2",
+    }
+    assert all(r["subject"].lower() in row_find(r) for r in states)
+    promote = promote_rows({"shiftlead": {"live": "a" * 40, "main": "b" * 40, "auto": False}})
+    assert promote[0]["subject"] == "promote · shiftlead"
+    work = work_rows({"ao-grind": {"at": "2026-10-12T10:00:00Z", "members": {"ao-g": ["TD-1", "TD-2", "TD-3"]}}}, {})
+    assert work[0]["subject"] == "lanes gained 3 entries · ao-grind"
+    item = {
+        "line": 7,
+        "due": "2026-10-12",
+        "text": "**Pick the font for the Inbox** — two shapes drawn. Context: TD-9. Due: 2026-10-12",
+    }
+    report = {"today": "2026-10-12", "boards": [{"root": "/w", "board": "/w/docs/user_attention.md", "items": [item]}]}
+    board = board_rows(report)[0]
+    assert board["subject"] == "Pick the font for the Inbox" and "pick the font" in row_find(board)
+    bare = {"line": 8, "due": "2026-10-20", "text": "Decide the font. Due: 2026-10-20"}
+    report["boards"][0]["items"] = [bare]
+    assert board_rows(report)[0]["subject"] == "Decide the font."  # no bold head: the line before its `Due:`
+    assert row_subject({"row": "trail", "how": "answered in the terminal"}) == "answered in the terminal"
+    assert row_subject({"row": "ledger", "id": "TD-9", "title": "Pick the font"}) == "Pick the font"  # TD-565's row
+
+
+@pytest.mark.unit
+def test_a_mail_row_draws_its_subject_first_and_the_find_matches_it():
+    """TD-566 item 4: the subject is the row's first text line, bold and clipped by the page's CSS
+    and whole in `title`, the first paragraph under it; an entry with none (written before the
+    field) stands under its first sentence, as `ao msg` would have derived it."""
+    from shiftlead.ui.app import row_find
+
+    given = entry("m-1", "ask", text="Which branch? The fix is ready.", subject="branch for the fix")
+    html = rows("needs", [given])
+    assert '<div class="subj" title="branch for the fix">branch for the fix</div>' in html
+    assert html.index('class="subj"') < html.index('class="body md"')
+    assert "branch for the fix" in row_find(given)
+    older = rows("fyi", [entry("m-2", "note", text="merged #517. one gap left")])
+    assert '<div class="subj" title="merged #517.">merged #517.</div>' in older
+    css = (UI / "static" / "app.css").read_text()
+    assert ".inboxpage .mailrow .subj {" in css and "text-overflow: ellipsis" in css.split(".mailrow .subj {")[1]
+
+
+@pytest.mark.integration
+def test_the_message_page_heads_with_the_subject_and_its_tab_says_it(client, tmp_path):
+    """TD-566 item 4: the message page's heading is the entry's subject and its tab title *<subject>
+    · Inbox · ShiftLead*; the entry's own row does not say it twice."""
+    sid = sender_session(client, tmp_path)
+    ask = send(sid, text="merge #9?\n\nthe reading", kind="ask", subject="merge the font fix")
+    html = client.get(f"/inbox/{ask['id']}").text
+    assert "<title>merge the font fix · Inbox · ShiftLead</title>" in html
+    assert '<span class="h1 msgsubj" title="merge the font fix">merge the font fix</span>' in html
+    assert ".msgpage .msgentry > .mailrow > .subj { display: none; }" in (UI / "static" / "app.css").read_text()

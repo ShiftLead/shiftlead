@@ -42,8 +42,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Designed — TD-566 builds it |
-| TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
 
 ---
 
@@ -613,44 +611,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
-## TD-561: Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-paul, Paul's ask)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td561-subject-line.png`) — a `subject` on everything the person reads, at most `SUBJECT_CHARS` (80): mail from `ao msg --subject`, **warned and derived, never refused** (the first sentence, said on a line, as TD-127's first-paragraph warning is); a reply, an outcome note and an *answered for you* entry take their question's; the home's rows one their kind gives with the reference (*permission · Bash*, *restarts exhausted · grinder-ao-2*, *lanes gained 3 entries · ao-grind*); a board row its head line's *what's needed* (already the headline cadence §3.3 asks for — the `Format:` line changes nothing, so no dev-cadence change); a ledger row (TD-560) its title. Drawn as the row's first bold line, clipped, the whole on hover; the message page's heading and tab title; `ao inbox`'s head line; the find box matches it. The presets' message-shape line says `--subject` (the templates under `src/shiftlead/briefs/`; `docs/briefs/**` is the build's). Reverses TD-127's *no summary field* as far as a headline goes; the first-paragraph rule stands. §4.10 *A subject on every entry*, §4.7 `ao msg`, §4.5a *subject* row, §4.5 *The message page*. Built by TD-566. Was: Open.
-**Blocked by:** TD-566
-**Location:** design §4.10 *A subject on every entry* (after *How a message to a person is written*), §4.5a row *subject*, §4.5 screen 6 *The message page*, §4.7 `ao msg`; the mail envelope
-
-**Why:** Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier.* Today a row draws its first paragraph (TD-127: one to three sentences, *no summary field*). That rule rejected a second text on purpose, so a row has no short headline to scan by. Board lines mostly open with a bolded lead by habit, but the `Format:` line does not require one.
-
-**Fix:** design a required `subject` on every entry filed to the person: mail (`ao msg --subject`, refused or warned when missing, with a length bound), board lines (a required lead in the `Format:` line, a dev-cadence change), the home's own entries (lapse notes, work rows), and TD-560's ledger rows (the entry's title). The Inbox row and the message page draw the subject first and the first paragraph under it, and the find box matches it. The briefs and presets say the rule. This reverses TD-127's *no summary field*; the history gets a dated line. **Done when** the design names the field, where each kind of entry gets it, how a missing one is treated, and how the row draws it, and a build entry is open.
-
-**Related:** TD-127, TD-560.
-
-
-## TD-566: Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (the designer, TD-561's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1 (PR #1536, grinder-ao-1): Fix items 1–2, the envelope (`MailEntry.subject`, `mail.subject_of`, `rpc_msg`'s `subject`, its inheritance and `warnings`) and the CLI (`ao msg --subject`, the stderr line, `ao inbox`'s head line). Left for slice 2: items 3–5 — every Inbox row's `subject` and `row_find`, the row's and the message page's drawing, the briefs' message-shape line and the help — and item 6's tests for them.
-**Location:** design §4.10 *A subject on every entry*, §4.7 `ao msg`, §4.5a *subject* row, §4.5 screen 6 *The message page*; `src/sessionorc/agent_mail.py` (`rpc_msg` ~L75: the `subject` parameter, the derivation and its warning line, a reply's inherited from its question ~L581, the `system` note ~L931), `src/sessionorc/models.py` (`MailEntry` ~L296: the `subject` field), `src/sessionorc/mail.py` (`SUBJECT_CHARS`, `subject_of(text)`, beside the other caps), `src/shiftlead/cli.py` (`ao msg --subject` ~L3665; the warning beside `FIRST_PARA_WORDS` ~L2626; `cmd_inbox` ~L2902: the head line), `src/shiftlead/ui/inbox.py` (`state_rows` ~L237 and the other row builders: `subject` by kind; `row_find` ~L1853), `src/shiftlead/ui/templates/inbox_row.html` (the `body` macro ~L44: the subject line first), `inbox_entry.html` (the heading, the `title` block), `src/shiftlead/ui/templates/board_horizon.html` / the board row (the head line's text as subject), `ledger_for_you.html` (TD-565's rows: the title), `src/shiftlead/briefs/*.md` (the message-shape line), `docs/briefs/techlead-context.md` and the repo's brief parts under `docs/briefs/` (the same line; a held path, this entry's), `src/shiftlead/ui/help.py` (the help's Inbox words), `docs/mockups/gen.py` (drawn by TD-561), `tests/test_mail.py`, `tests/test_cli.py` (`shape_warning`'s tests), `tests/test_ui_inbox*.py`
-
-**Why:** TD-561: Paul, 2026-10-12 — *require all inbox items to include a subject line — that makes browsing them easier*; a row draws its first paragraph and has no headline to scan by.
-
-**Fix:**
-1. The envelope: `MailEntry.subject` (a string, at most `SUBJECT_CHARS` 80); `rpc_msg` takes `subject`; on a message to the person (or a `--source` reply) with none, `subject_of(text)` derives it — the text to the first `.`, `?` or `!` followed by a space or the end, else the first 80 characters, clipped at a word with an ellipsis — and the reply carries `warnings: ["no --subject: \"…\" stands as one"]`, printed by the CLI as the first-paragraph warning is; one past 80 is clipped and said. A `reply`, an outcome note and an *answered for you* entry copy their question's subject; a `system` note derives its own. A message to a session takes `--subject` too and derives nothing (a session reads the text).
-2. The CLI: `ao msg --subject <line>`; `ao inbox` prints the subject on the entry's head line after the kind, before the status.
-3. The rows: every row builder in `inbox.py` sets `subject` — mail from the envelope; a state row *<kind> · <what>* (*permission · Bash*, *question · grinder-ao-1*, *limited · ao-grind-anchor*, *stalled? · <name>*, *exited with unpushed work · <name>*); the restart row *restarts exhausted · <name>* / *restart held · <name>* / *restart wanted · <name>*; the seat-held row (TD-564) *anchor seat held · <team>*; the work row *lanes gained n entries · <team>*; the identity alarm *identity alarm · <name>*; the cadence and held rows *cadence check failed · #n* / *merged without its read · #n*; the promote row *promote · <repo>*; a board row the head line's text before `Context:`; a ledger row (TD-565) the title; a trail row its *how*. `row_find` includes it.
-4. Drawn: `inbox_row.html`'s `body` opens with `<div class="subj">` — bold, `white-space: nowrap`, `text-overflow: ellipsis`, the whole in `title` —, the first paragraph under it; `inbox_entry.html` heads with the subject and sets the tab title *<subject> · Inbox · ShiftLead*; the thread's rows show theirs.
-5. The presets: the message-shape line in `src/shiftlead/briefs/*.md` and the repo's parts under `docs/briefs/` gains *and a `--subject`: the entry's headline in a few words, apart from the first paragraph*; the help's Inbox paragraph names the subject.
-6. Tests: the derivation (first sentence; no sentence end; clipping at 80 at a word; the warning line present and absent); a reply inherits; a system note derives; each home row's subject by kind; the row draws it first and the find matches it; the message page's heading and title; `ao inbox`'s head line; the mockup regenerates.
-
-**Done when** every row of the Inbox, the message page and `ao inbox` leads with a subject — mail's given or derived with a warning, the home's rows' by kind, a board row's its head line, a ledger row's its title — the find box matches it, the presets and briefs say `--subject`, and the tests above pass.
-
-**Related:** TD-561 (the design), TD-127 (the first-paragraph rule), TD-560 / TD-565 (the ledger row's subject), TD-564 (the seat-held row's).

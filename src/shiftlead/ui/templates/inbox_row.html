@@ -39,7 +39,16 @@
    nothing else; the one pressable thing it can make is an off-origin `http(s)` link with its host
    after it. The row's controls stay outside the fold, so a row is answered folded, and the
    `data-find` on the row still holds the whole text. #}
+{# §4.5a **subject** (§4.10 *A subject on every entry*, TD-566): every row's first text line — the
+   entry's headline, bold, one line clipped with an ellipsis and whole on hover — with the first
+   paragraph under it. Display only. #}
+{% macro subj(e) -%}
+{%- set t = row_subject(e) %}
+{%- if t %}<div class="subj" title="{{ t }}">{{ t }}</div>{% endif %}
+{%- endmacro %}
+
 {% macro body(e) -%}
+{{ subj(e) }}
 {%- set s = shaped(e.text, origin) %}
 <div class="body md">{{ s.lead }}</div>
 {%- if s.rest %}
@@ -228,6 +237,7 @@
   <span class="grow"></span>
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
+{#- the trail row's subject is its *how*, which its head already says (*resolved: …*): not twice -#}
 {%- if e.text %}<div class="body">{{ e.text }}</div>{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.kind == 'board reply' %}
@@ -490,6 +500,7 @@
 
 {% macro state(e, section) -%}
 {{ state_head(e) }}
+{{ subj(e) }}
 {#- a row that names pull requests draws each `#n` as a link (§4.5a, TD-258): the words are the
     record's fields, and `e.text` is the same words unlinked, which Find reads -#}
 <div class="body">{% if e.parts %}{% for p in e.parts %}{% if p.url %}<a class="ref" href="{{ p.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">{{ p.text }}</a>{% else %}{{ p.text }}{% endif %}{% endfor %}{% else %}{{ e.text }}{% endif %}</div>
@@ -605,6 +616,7 @@
    it standing (§4.10 — only an answer ends a row). #}
 {% macro alarm(e, section) -%}
 {{ state_head(e) }}
+{{ subj(e) }}
 <div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests this session made under another session's name.{% endif %}</div>
 <ul class="alarms">
   {%- for a in e.alarms %}
@@ -674,6 +686,7 @@
     text is (§4.10), its bold head and the sentence after it drawn and the rest under *details*,
     kept open across the poll as a message's fold is; the `Due:` is the head's due words, the
     `Context:` closes the fold, and the person's replies stand under the text, outside it. -#}
+{{ subj(e) }}
 {%- if e.lead is defined %}
 <div class="body md">{{ md(e.lead, origin) }}</div>
 {#- §4.5a **Inbox board row: detail block** (TD-312): the reader's `detail` drawn after the rest of
@@ -766,6 +779,7 @@
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="since main moved">{{ e.age or '' }}</span>{% endif %}
 </div>
+{{ subj(e) }}
 <div class="body">{{ e.text }}{% if e.live_why %} — live unknown: {{ e.live_why }}{% endif %}{% if e.checks_why %} — checks: {{ e.checks_why }}{% endif %}</div>
 {%- if e.failed %}
 <div class="body">failed: promoting {{ (e.failed.sha or '')[:7] }} — {{ e.failed.why }}{% if e.failed.exit is not none %} (exit {{ e.failed.exit }}){% endif %}. Nothing is promoted for {{ e.repo }} until this is dismissed or a press succeeds.</div>
@@ -808,6 +822,7 @@
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="since the entries were read as waiting">{{ e.age or '' }}</span>{% endif %}
 </div>
+{{ subj(e) }}
 <div class="body">{{ e.team }} ·
   {%- if e.running %}{% for f in e.finished %} {{ f.name }} finished{% if f.at %} <span class="localtime" data-at="{{ f.at }}" title="{{ f.at }}">{{ f.at }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}
   {%- else %} wound down{% if e.wound_down %} <span class="localtime" data-at="{{ e.wound_down }}" title="{{ e.wound_down }}">{{ e.wound_down }}</span>{% endif %}{% endif %} ·
