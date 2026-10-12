@@ -10182,3 +10182,23 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Related:** TD-584, TD-591.
 
 **Resolved:** 2026-10-12 (PR #1574) — TD-591's **Related:** names TD-584 (the design), TD-585 (the vendored `ledgerboard.py`) and TD-586 (the missing-gate line); its **Blocked by:** is unchanged.
+
+## TD-594: §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1561–#1567)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/design/4.5a-controls.md` row *Focus | Open shell here* (the Shift / popped-out sentence); `src/shiftlead/ui/static/app.js` `AO.shellHere` and `AO.popFeatures`
+
+**Why:** The row reads *"Shift+press, or a press in a popped-out window, opens it as **Pop out** opens one instead — a chromeless window named `ao-focus-<id>`, sized as the browser remembers for the session (row *Pop out*)"*. Pop out remembers a size per session (`store.get(`win.${id}`)`), keyed by the id of the session being popped. `AO.shellHere` (#1563) opens the window **before** the create answers, so the new shell's id does not exist yet, and calls `window.open("", "", AO.popFeatures(null))`: always the default `popup,width=1184,height=860`, which `test_open_shell_here_opens_beside_the_page_it_was_pressed_on` asserts (`got["win"]["features"] == "popup,width=1184,height=860"`). Nothing is remembered for a session that did not exist; the sentence promises a size the code cannot read. (The window is also opened under no name and renamed to `ao-focus-<id>` after the create, which the row does say.)
+
+**Fix:** reword the clause in the row: the window opens at Pop out's default size, and remembers its own from then on as any popped-out window does. No behaviour change, and no history line (a wording of the same fact).
+
+**Done when** §4.5a's row says the window opens at the default size; `pdm run test` passes (the doc-bound tests read this table).
+
+**Related:** TD-577, TD-579 (#1563), TD-046.
+
+**Resolved:** 2026-10-12 (PR #1581) — §4.5a's *Focus | Open shell here* row says the Shift / popped-out window opens at **Pop out**'s default size, the shell having no id to remember a size by until the create answers, and remembers its own size from then on as any popped-out window does (`app.js` stores `win.<id>` once its Focus loads with `?window=1`). Wording only; no behaviour change.

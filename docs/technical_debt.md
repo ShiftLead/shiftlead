@@ -53,7 +53,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-589 | The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default | Low | Open |
 | TD-590 | ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present | Low | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
-| TD-594 | §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size, the new shell having none remembered | Low | Open |
 | TD-597 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
 | TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
 
@@ -854,26 +853,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** a repo with only a ledger shows each missing seam on the Repo page and in `ao doctor`, and `ao repo init` on a bare repo makes a ledger ShiftLead reads, with tests.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584 (the design: what it draws and from where), TD-585 (the vendored `ledgerboard.py` that `ao repo init`'s ledger and the ledger check read), TD-586 (the missing-gate line).
-
----
-
-## TD-594: §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1561–#1567)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/design/4.5a-controls.md` row *Focus | Open shell here* (the Shift / popped-out sentence); `src/shiftlead/ui/static/app.js` `AO.shellHere` and `AO.popFeatures`
-
-**Why:** The row reads *"Shift+press, or a press in a popped-out window, opens it as **Pop out** opens one instead — a chromeless window named `ao-focus-<id>`, sized as the browser remembers for the session (row *Pop out*)"*. Pop out remembers a size per session (`store.get(`win.${id}`)`), keyed by the id of the session being popped. `AO.shellHere` (#1563) opens the window **before** the create answers, so the new shell's id does not exist yet, and calls `window.open("", "", AO.popFeatures(null))`: always the default `popup,width=1184,height=860`, which `test_open_shell_here_opens_beside_the_page_it_was_pressed_on` asserts (`got["win"]["features"] == "popup,width=1184,height=860"`). Nothing is remembered for a session that did not exist; the sentence promises a size the code cannot read. (The window is also opened under no name and renamed to `ao-focus-<id>` after the create, which the row does say.)
-
-**Fix:** reword the clause in the row: the window opens at Pop out's default size, and remembers its own from then on as any popped-out window does. No behaviour change, and no history line (a wording of the same fact).
-
-**Done when** §4.5a's row says the window opens at the default size; `pdm run test` passes (the doc-bound tests read this table).
-
-**Related:** TD-577, TD-579 (#1563), TD-046.
 
 ---
 
