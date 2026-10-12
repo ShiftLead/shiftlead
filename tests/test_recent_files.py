@@ -84,7 +84,8 @@ def test_the_branchs_commits_and_the_tree_newest_first_a_path_once(tmp_path):
     assert by["a.py"] == {"path": str(repo / "a.py"), "at": "2023-11-14T22:15:00Z", "sha": second}
     assert by["b c.py"]["sha"] == first and by["b c.py"]["at"] == "2023-11-14T22:13:20Z"
     assert "sha" not in by["old.txt"] and "sha" not in by["new.md"]
-    assert changed_files(repo, "origin/main", 2) == got[:2]  # the newest `limit`
+    # the newest `limit` — by path: old.txt's `at` is each read's own clock, so two reads a second apart differ
+    assert [f["path"] for f in changed_files(repo, "origin/main", 2)] == [f["path"] for f in got[:2]]
 
 
 def test_a_merged_branch_lists_nothing_and_a_tree_with_no_origin_lists_its_own(tmp_path):
