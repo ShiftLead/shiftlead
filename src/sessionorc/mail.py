@@ -273,7 +273,9 @@ def message_edge(
 
     - **upward**: the target is in the sender's own `controllers`;
     - **downward**: the sender is in the target's `controllers` (its `members:`);
-    - **team**: both carry the same non-empty `team` badge — §9 invariant 9's one named exception;
+    - **team**: both carry the same non-empty `team` badge;
+    - **project**: both carry the same non-empty `project` badge, whatever their teams (TD-582) —
+      with `team`, §9 invariant 9's named exception, for mail alone;
     - **shared target**: some record names both in its `controllers` (two leads over one worker).
     """
     me, it = records.get(sender), records.get(target)
@@ -285,6 +287,8 @@ def message_edge(
         return "downward"
     if me.team and me.team == it.team:
         return "team"
+    if me.project and me.project == it.project:
+        return "project"
     if any(sender in (c := controllers(r)) and target in c for r in records.values()):
         return "shared target"
     return None
@@ -296,7 +300,7 @@ def message_gate(
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
     are not a session and may message anyone (§4.8) — and any session may message the person
     inbox (`target == PERSON`). Otherwise a session may message along one of
-    `message_edge`'s four edges and nothing else, refused by naming §4.10's graph rather than
+    `message_edge`'s five edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. Returns the refusal, or None when the message may land."""
     if sender == PERSON or target == PERSON:
         return None  # the person inbox is ungated (§4.10 "A session reaches a person")
@@ -307,7 +311,7 @@ def message_gate(
     if message_edge(records, sender, target, controllers=controllers) is None:
         return (
             f"{sender} cannot message {target}: not one of its controllers, its members, its team, "
-            f"or a controller of a session it controls (design §4.10)"
+            f"its project, or a controller of a session it controls (design §4.10)"
         )
     return None
 

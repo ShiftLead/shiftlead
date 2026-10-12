@@ -17,10 +17,11 @@ Every command below is one you can run. Nothing here explains why — design §4
 and where each repo is checked out on each host). `ao team start` reads the definition, checks
 everything first, then creates the manager and each member with the manager as its controller. Nothing
 about a team is stored on a session's record but two strings, `team` and `project`, and nothing
-keys on them (§9 invariant 9) — the definition is the whole of it. **One exception, and it lands
-exactly on the `manager: {role: person}` case below:** the mail gate's *sideways* edge keys on the
-`team` badge, so on a team with no manager session the badge is the only edge between members there
-is (§4.10). Everywhere else the badge is a label.
+keys on them (§9 invariant 9) — the definition is the whole of it. **One exception, for mail
+alone:** the mail gate keys on both badges — its *sideways* edge on `team`, so on a team with no
+manager session (the `manager: {role: person}` case below) the badge is the only edge between
+members there is, and its *across teams* edge on `project`, so two teams on one project may settle
+things by mail (§4.10). Everywhere else the badges are labels.
 
 ---
 
