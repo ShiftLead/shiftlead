@@ -42,9 +42,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Designed — TD-579 builds it |
 | TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Open |
-| TD-579 | Build TD-577: **Open shell here** opens the shell's Focus in a new tab (Shift, or a popped-out window: a window as Pop out opens one), the placeholder opened in the press and sent to `/focus/<id>` when the create answers; the pressing page stays | Medium | Open |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Open |
@@ -624,29 +622,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
-## TD-577: **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-paul, with Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer) — the target is **a new tab** by default, the pressing page staying; Shift+press, or a press in a popped-out window, opens **a window as Pop out opens one** (chromeless, `ao-focus-<id>`, the remembered size), so a person in a window gets a window; the browser's choice is not offered because the press is an RPC, not a link, and the modifiers a link honours are the browser's own. The opening: the tab or window is opened in the press, before the RPC, as a same-origin placeholder reading *opening a shell in <dir>…*, then sent to `/focus/<id>` (`?window=1` and the window's name for a window) when the id comes back; a refused create closes the placeholder and the pressing page shows the refusal; a blocked open creates no shell and says *the browser blocked the tab — allow pop-ups for this page*, as Pop out says. §4.5a *Focus: Open shell here* (the rule; *card: more ▾* points at it), §4.5 screen 1 *+ New ▾*. No mockup: nothing drawn changes but a toast. Built by TD-579. Was: Open.
-**Blocked by:** TD-579
-**Location:** design §4.5a *card: more ▾* (Open shell here), *Focus: Open shell here*, *card: Focus* and *Pop out* (the new-tab and window rules); `src/shiftlead/ui/static/app.js` (the `shell-here` press sets `location.href` to the new shell's `/focus/<id>`, ~L983); `src/shiftlead/ui/templates/focus.html` (~L104), `card.html` (~L152)
-
-**Why:** Paul, 2026-10-12: *opening a shell should not overwrite the current window (should be new tab or new window)*. He pressed **Open shell here** from a session's Focus to run a command beside it, and the Focus he was working in was replaced by the shell's. Getting it back meant navigating back, and the terminal re-attached. The press always does this, from a card's *more ▾* as well as from Focus.
-
-**Fix:** design it first, then build it:
-1. Decide the target: a new tab, a popped-out window as **Pop out** opens one (row *Pop out*), or the browser's choice, with modifiers honoured as the **Focus** link honours them.
-2. Decide the opening itself: the page has to open the tab or window synchronously in the click, before the `shell-here` RPC answers, or the browser blocks it as a popup. That means opening a placeholder and pointing it at `/focus/<id>` once the id comes back, and closing it, with the error shown on the pressing page, if the create is refused.
-3. State in §4.5a that the pressing page stays where it was.
-Then the build: `app.js`'s `shell-here` branch, and a test that the press no longer sets `location.href`.
-
-**Done when** **Open shell here** leaves the page it was pressed on in place, and the shell's Focus opens in a new tab or window, from Focus and from a card.
-
-**Related:** TD-572 (the Focus tabs' cost: more tabs are cheap since #1544).
-
 ## TD-578: Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript**
 
 **Priority:** Medium
@@ -664,27 +639,6 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, and the button is absent wherever the Transcript page's **VS Code** is.
 
 **Related:** TD-166 (the Transcript page and its VS Code), TD-154, TD-095 / TD-525 (the editor button on the card and the Session card), TD-532 (a file link's two launches).
-
-## TD-579: Build TD-577: **Open shell here** opens the shell's Focus in a new tab (Shift, or a popped-out window: a window as Pop out opens one), the placeholder opened in the press and sent to `/focus/<id>` when the create answers; the pressing page stays
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (the designer, TD-577's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Focus: Open shell here* (the rule) and *card: more ▾*, §4.5 screen 1 *+ New ▾*; `src/shiftlead/ui/static/app.js` (the act handler's `shell-here` branch ~L983, which sets `location.href` after `await act(...)`; `AO.popOut` ~L380 and `AO.popFeatures` / `AO.popName` ~L368, whose window features and name the window form reuses; `AO.poppedId` ~L3697); `src/shiftlead/ui/templates/focus.html` (~L104) and `card.html` (~L152), the two buttons; `tests/test_ui.py` (~L1776, the Focus buttons), `tests/test_ui_org.py` (~L943), `tests/test_ui_popout.py` (the window form's neighbours)
-
-**Why:** TD-577: Paul, 2026-10-12 — *opening a shell should not overwrite the current window (should be new tab or new window)*; the press replaced the Focus he was working beside, and getting it back meant navigating back and re-attaching.
-
-**Fix:**
-1. `app.js`: the `shell-here` branch moves ahead of the `await`. In the press: `window.open("", "_blank")` for a tab, or, when `ev.shiftKey` or `AO.poppedId` is set, `window.open("", "", AO.popFeatures(null))` for a window; the handler needs the event, so pass it from the click listener. A null result: `AO.toast("the browser blocked the tab — allow pop-ups for this page")` (the window's words for a window) and return before any RPC. Otherwise write the placeholder — `document.title` and one line, *opening a shell in <dir>…*, the dir from the button's `data-dir` (add it to both templates) — then `await act(id, "shell-here")`; on `res.id` set `w.name = AO.popName(res.id)` for a window and `w.location.href` to `/focus/<id>` (`?window=1` for a window); on a thrown refusal `w.close()` and let the handler's own error path show it. The pressing page never sets `location.href` for this act.
-2. The templates: `data-dir="{{ s.dir }}"` on both buttons; the Focus button's `title` says *a shell session in this session's directory, in a new tab (Shift: a window)*.
-3. Tests: the branch no longer assigns `location.href` (a source assertion on the act handler, or a node probe of it as `test_ui_popout.py` runs one); the templates carry `data-dir`; the Focus button's title names the tab. A browser-driven check is not expected — the act is `window.open`, which the suite cannot drive; the builder looks at it (design §4.9b: a press from a Focus tab, a Shift+press, and a press from a popped-out window, each leaving the pressing page in place) and names the look in the PR.
-
-**Done when** **Open shell here** leaves the page it was pressed on in place and the shell's Focus opens in a new tab — a window as Pop out opens one on Shift or from a popped-out window — from Focus and from a card's *more ▾*; a refused create closes the placeholder and shows the refusal on the pressing page; the tests above pass and the builder's look is named in the PR.
-
-**Related:** TD-577 (the design), TD-046 (Pop out), TD-572 (a Focus tab's cost).
 
 ## TD-580: A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session
 
