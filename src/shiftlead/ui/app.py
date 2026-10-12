@@ -288,14 +288,17 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
     FACETS,  # noqa: F401
+    HEADS_EVERY,
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
+    LIGHT_KEYS,
     MOTION_PRIORITIES,  # noqa: F401
     PHASES,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
     REF_WIDTH,  # noqa: F401
     ROLLUP_STATES,  # noqa: F401
+    SHAPE_KEYS,
     WINDOWS,  # noqa: F401
     _bars,  # noqa: F401
     _blocks,  # noqa: F401
@@ -3370,6 +3373,46 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
     @app.websocket("/events")
     async def events(ws: WebSocket):
         await ws.accept()
+        # `?light=1` is the Focus and Inbox pages' stream: no card markup and no groups, another
+        # record's delta only when it can move something (`SHAPE_KEYS`), and `focus`'s own in full —
+        # one Focus tab was otherwise as costly to the UI as an Org page (TD-572)
+        light = ws.query_params.get("light") == "1"
+        focus = ws.query_params.get("focus") or ""
+        # The groups are the costly part of a delta — every header and the rollup, read over the
+        # whole fleet — so they ride on a delta only when it can move them (`SHAPE_KEYS`), and are
+        # otherwise re-read at most every `HEADS_EVERY` seconds by `flush`; a reading equal to the
+        # last one sent is not sent again (TD-572).
+        # One reading at a time, sent before the next is read (`sending`): a flush's reading is never
+        # sent after a newer delta's, and `dirty` is cleared before the read, so a delta that lands
+        # during it marks the next one.
+        last: dict[str, Any] = {"key": None, "at": 0.0}
+        dirty = asyncio.Event()
+        sending = asyncio.Lock()
+
+        async def fresh_heads(known, repos, doing, *, always: bool = False) -> dict[str, Any]:
+            dirty.clear()
+            last["at"] = time.monotonic()
+            got = await heads(known, repos, doing)
+            key = json.dumps(got, sort_keys=True)
+            if key == last["key"] and not always:
+                return {}
+            last["key"] = key
+            return got
+
+        async def flush(known, repos, doing) -> None:
+            while True:
+                await dirty.wait()
+                await asyncio.sleep(max(0.0, last["at"] + HEADS_EVERY - time.monotonic()))
+                async with sending:
+                    if not dirty.is_set():
+                        continue
+                    try:
+                        got = await fresh_heads(known, repos, doing)
+                    except Exception:  # noqa: BLE001 — an agent that could not answer: try again next time
+                        dirty.set()
+                        continue
+                    if got:
+                        await ws.send_text(json.dumps({"event": "groups", **got}))
 
         async def gone() -> None:
             # The page never sends on this socket, so the next message is its disconnect. Without
@@ -3394,11 +3437,22 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 for name, acc in usage_accounts(await call("usage")).items():
                     for p in acc["profiles"]:
                         acct_of[p["name"]] = name
+            flusher = None if light else asyncio.ensure_future(flush(known, repos, doing))
+            try:
+                await follow(c, known, repos, doing, acct_of)
+            finally:
+                if flusher:
+                    flusher.cancel()
+                    await asyncio.gather(flusher, return_exceptions=True)
+
+        async def follow(c, known, repos, doing, acct_of) -> None:
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
                     was = known.get(s["id"]) or {}
                     known[s["id"]] = s
+                    reshaped = not was or any(s.get(k) != was.get(k) for k in SHAPE_KEYS)
+                    stirred = reshaped or any(s.get(k) != was.get(k) for k in LIGHT_KEYS)
                     moved = s.get("run_until") != was.get("run_until")
                     if s.get("team") and moved and s.get("run_until") != uiconf.team_until(str(s["team"])):
                         # a team's stop time stamps its members while the Save that moved it is still
@@ -3406,6 +3460,12 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         # stamp with the old time and says it differs (TD-337)
                         with contextlib.suppress(Exception):
                             uiconf.set_read(await call("settings"))
+                    if light and s["id"] != focus:
+                        # a light stream (the Focus and Inbox pages) hears that another record moved,
+                        # not what it now looks like: they re-read what they draw (TD-572)
+                        if stirred:
+                            await ws.send_text(json.dumps({"event": "session", "id": s["id"], "state": s["state"]}))
+                        continue
                     v = view(
                         s,
                         list(known.values()),
@@ -3415,22 +3475,29 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         waits=await h.person_waits(),
                     )
                     compact_in(v, known.values(), repos)
-                    # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
-                    # `controllers` change on one record can move a card, change a lead, or turn
-                    # grouping on or off for the whole page, and only the server sees the fleet.
-                    await ws.send_text(
-                        json.dumps(
-                            {
-                                "event": "session",
-                                "id": s["id"],
-                                "state": s["state"],
-                                "rank": v["rank"],  # the view's: unseen idle sorts above idle
-                                "html": render_card(v),
-                                "session": v,
-                                **await heads(known, repos, doing),
-                            }
-                        )
-                    )
+                    delta = {
+                        "event": "session",
+                        "id": s["id"],
+                        "state": s["state"],
+                        "rank": v["rank"],  # the view's: unseen idle sorts above idle
+                        "session": v,
+                    }
+                    if light:
+                        await ws.send_text(json.dumps(delta))
+                        continue
+                    # `groups` rides on a delta that can move them (design §4.5a **team groups**): a
+                    # badge or a `controllers` change on one record can move a card, change a lead, or
+                    # turn grouping on or off for the whole page, and only the server sees the fleet.
+                    # Any other delta marks them for `flush`. A reshaping delta carries them even when
+                    # a flush already sent this reading: a new card is placed by its own delta's groups.
+                    delta["html"] = render_card(v)
+                    if reshaped or last["key"] is None:
+                        async with sending:
+                            delta.update(await fresh_heads(known, repos, doing, always=True))
+                            await ws.send_text(json.dumps(delta))
+                    else:
+                        dirty.set()
+                        await ws.send_text(json.dumps(delta))
                 elif ev.get("event") in ("repos", "doing"):
                     # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
                     # member said what it is doing (§4.8 *the doing log*): kept here, passed through
@@ -3446,14 +3513,20 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         ring.append(ev["entry"])
                         del ring[:-DOING_KEPT]
                     await ws.send_text(json.dumps(ev))
-                    await ws.send_text(json.dumps({"event": "groups", **await heads(known, repos, doing)}))
+                    if not light:
+                        dirty.set()
                 elif ev.get("event") in ("gone", "usage"):
                     if ev.get("event") == "gone":
                         # only a `gone` names a session; a `usage` event carries a profile, and
                         # popping on it would one day evict a live session by coincidence
                         went = str(ev.get("id") or "")
                         known.pop(went, None)
-                        await ws.send_text(json.dumps({**ev, **await heads(known, repos, doing)}))
+                        if light:
+                            await ws.send_text(json.dumps(ev))
+                            continue
+                        async with sending:
+                            got = await fresh_heads(known, repos, doing, always=True)
+                            await ws.send_text(json.dumps({**ev, **got}))
                         # A card's *under* chip names another record, so the session that went
                         # is not the only card now out of date: every card listing it as a
                         # controller has to be redrawn, or it keeps naming and linking to a
