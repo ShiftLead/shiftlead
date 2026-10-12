@@ -44,11 +44,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-558 | The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry | Medium | Designed — TD-563 builds it |
 | TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Designed — TD-564 builds it |
-| TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Open |
+| TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Designed — TD-565 builds it |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Open |
 | TD-562 | `ao migrate`'s top-level `*.yml`/`*.yaml`/`*.json` globs, the console-script lookbehind and the undecodable-file skip are held by no test: each can go and `test_migrate.py` stays green | Low | Open |
 | TD-563 | Build TD-558: the Start dialog and `ao team start` count every lane the start creates — the anchor seat's and the manager's among the members' — by the page's kinds, and say a held checkout | Medium | Open |
 | TD-564 | Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark | Medium | Open |
+| TD-565 | Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line | Medium | Open |
 
 ---
 
@@ -659,8 +660,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-paul, Paul's ask)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** design §4.5 screen 6 *The ledger's entries that wait on you* (TD-367), §4.5a row *Inbox: For you in the ledger (n) fold*; `src/shiftlead/ui/inbox.py` (`ledger_for_you`), `ledger_for_you.html`
+**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td560-later-section.png`) — (1) **Later**, an uncounted section after *Answered for you* and before FYI, listed in the rail's *Urgency*, holding the board's rows coming up (the *Not due yet* block moves in from under *Needs you*, fold and line with it) and the ledger's *for you* entries. (2) A ledger row is a mail row's shape: kind *ledger · yours* / *ledger · your decision*, the repo as its name, the team badge, *held by*, the age from `Added:` with the priority letter, the title as the first paragraph, *details* with the entry's Why and Fix (the reading gains `added`, `answers`, `detail`), its answers from an **`**Answers:**`** line in cadence §3.5's form, **Go with it**, **Reply**, **Open** (the Repo page on the id). (3) An answer or a Reply writes one decided board line at the top of the repo's open items by the second add's road (`Context: TD-n`, `Decided: …`), a work order at once; the session that picks it drops `decision (paul)` or acts on the words for an `Owner: paul` entry; the row leaves when the reading lists that line, which is a *Waiting on them* row. Nothing edits the ledger from the Inbox. Counted nowhere that means *due now*; the rail's *Kinds* gain *ledger entries*. Reverses TD-367's fold and its rejection of a section of its own; its rejection of counted rows stands. §4.5 screen 6 (*Later*, *The ledger's entries that wait on you*, *Coming up*), §4.5a three rows and the rail, §4.4 *Repo facts*. Built by TD-565. Was: Open.
+**Blocked by:** TD-565
+**Location:** design §4.5 screen 6 *Later*, *The ledger's entries that wait on you*; §4.5a rows *Inbox: Later section*, *Inbox row: ledger entry*, *Not due yet*; `src/shiftlead/ui/inbox.py` (`ledger_for_you`), `ledger_for_you.html`
 
 **Why:** TD-367 made the ledger's *for you* entries (`Owner: paul`, `decision (paul)`) a fold of one-line links. It is counted nowhere and has no control, because an entry has no date and no asker, and the Inbox's counts mean *due now*. That design rejected counted rows and a section of their own. Paul, 2026-10-12: keep them out of *due*, but give them **a separate space in the Inbox** that is also the place for future items that are not pressing, and draw them with **the same interface as every Inbox item**: the options listed, a recommended answer, and a Reply.
 
@@ -747,3 +749,26 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** a held anchor seat whose lane holds work is a counted *Needs you* row past fifteen minutes, naming the holding session and the work, with Open / Dismiss / Snooze, and a mark on the folded team's header, both gone when the seat fills or nothing is due; and the tests above pass.
 
 **Related:** TD-559 (the design), TD-558 / TD-563 (the Start line's held note), TD-381 (the anchor seat), TD-386 (`seat_held`), TD-103 (the restart row, the model).
+
+## TD-565: Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-560's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 screen 6 *Later*, *The ledger's entries that wait on you*, *The board's horizon* (*Coming up*); §4.5a rows *Inbox: Later section*, *Inbox row: ledger entry*, *Not due yet*, *the rail*; §4.4 *Repo facts*; `src/sessionorc/ledger.py` (the entry parse ~L350–380: `added`, `answers`, `detail` on a *for you* entry), `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS` ~L49, `RAIL_UNDER` ~L1829: `coming`/`unshown` under `later`; `ledger_for_you` ~L1987 → rows in a mail row's shape; `row_find` ~L1853), `src/shiftlead/ui/templates/inbox.html` (a `sec-later` section between `sec-answered` and `sec-fyi`; `#boardhorizon` and `#ledgerforyou` move into it), `ledger_for_you.html` (the rows as `inbox_row.html` draws a board `decide` row: kind, name, badge, age, `body`, the answers' dashed group, the controls), `inbox_rail.html` / `app.js` (the *Later* line in *Urgency*, *ledger entries* in *Kinds*, the poll putting the section back), `src/sessionorc/agent_inbox.py` (the answer's RPC beside `_answer_orphan` ~L594: the second add's road, `board_edit.py`'s add with `Decided:`), `src/shiftlead/ui/help.py` (the section's blurb), `docs/mockups/gen.py` (drawn by TD-560), `tests/test_ui_inbox*.py`, `tests/test_ledger.py` (the parse), the board write-back tests
+
+**Why:** TD-560: Paul, 2026-10-12 — the *for you* entries are a fold of links counted nowhere and with no control; he wants them out of *due* but in a space of their own in the Inbox, drawn as every Inbox item is, with the options, a recommended answer and a Reply.
+
+**Fix:**
+1. The reading: `ledger.py` carries, on a *for you* entry, `added` (the `Added:` date), `answers` (the `**Answers:**` line parsed as the board reader parses `Answers:`, cadence §3.5: a list and the `(default)` index) and `detail` (the **Why** and **Fix** paragraphs, at most `MAX_DETAIL_LINES` as the board's block); nothing on other entries, so the repo facts' size barely moves.
+2. The section: `later` in `INBOX_SECTIONS` after `answered`; the board horizon's box and the ledger box move under it in `inbox.html`; the rail's *Urgency* lists *Later* with its count (the horizon's rows, the fold's once opened, and the ledger rows), `RAIL_UNDER` maps `coming` and `unshown` to `later`; the *Kinds* group gains *ledger entries*; the top bar, the Org rollup and *Needs you*'s counts unchanged. The section's info blurb says what it holds.
+3. The row: `ledger_for_you` yields rows with `row: "ledger"`, `kind`, `name` (the repo), `team`, `at` (`added`), `pri`, `held`, `title`, `detail`, `answers`, `default`, `url`; the template draws them with `inbox_row.html`'s macros (the body's first paragraph is the title, *details* the detail, open when answers exist), the answers' dashed group, **Go with it** when a default exists, **Reply** (the Reply dialog, `about` the id), **Open**.
+4. The answer: a `ledger_decide` RPC (home-owned; `modes.py`) taking the repo, the id and the words (an answer's text, or the Reply's) writes one head line at the top of the repo's open board items by the second add's road — `- [ ] decide <today> (person) — <title>. Context: <id>. Due: <today>. Answers: <the entry's, where any>. Decided: <words> (<today>).` — committed as `shiftlead: board decide <id> (person)`; refused with the add's own refusals (a dirty checkout, no board). The next reading lists the decided line; `ledger_for_you` leaves out an entry an open decided line's `Context:` names.
+5. Tests: the parse (added, answers with a default, detail clipped; nothing on a non-*for you* entry); the section drawn only with rows, uncounted in the top bar and the rollup, listed in the rail with its count; the horizon's rows under *Later* and `RAIL_UNDER`; the row's shape and controls, the answers group with the default marked, Reply on every row; the RPC's line and commit message, the entry gone from the rows on the next reading; the mockup regenerates.
+
+**Done when** the Inbox draws *Later* with the board's coming-up rows and the ledger's *for you* entries as full rows — answers, Go with it, Reply, Open — an answer lands as a decided board line that the next reading lists as a *Waiting on them* row, no number meaning *due now* moves, and the tests above pass.
+
+**Related:** TD-560 (the design), TD-367 / TD-368 (the fold it replaces), TD-220 / TD-281 (the horizon), TD-213 (the second add), TD-380 (a decided line is a work order), TD-561 (the subject line, whose ledger row's subject is the title).
