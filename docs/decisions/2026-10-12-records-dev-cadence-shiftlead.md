@@ -1,6 +1,6 @@
 # ADR 2026-10-12: three repos — records holds the ledger and board formats once, dev-cadence is how a repo works, ShiftLead is how sessions are run
 
-**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); Sonnet READY after three rounds; Fable's check of those changes adopted (2026-10-12), confirmation round under way; awaiting Paul's acceptance.
+**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); Sonnet READY after three rounds; Fable's check of those changes adopted and confirmed by a fourth Sonnet round (READY); awaiting Paul's acceptance.
 **Date:** 2026-10-12
 **Supersedes:** the placement of the ledger and board formats in [ADR 2026-10-08](2026-10-08-agentorc-dev-cadence-split.md);
 the rest of that ADR stands. Its Status line gains "superseded in part by ADR 2026-10-12 (the formats'
@@ -155,10 +155,11 @@ Pure functions over text; anything outside the text is passed in.
   (unreached, behind, local, both) from the comparison, as it reads the write-back's tree. The
   Inbox's `ORIGIN_PHRASES` and `BOARD_FIELDS` go. Without dev-cadence, nothing needs to recognise a
   write-back's commit subject: the write-back merges its own PR. A ShiftLead session closes or edits a
-  board line on its own work branch with a new verb, `ao board edit <done|snooze|reply> --line <n>
+  board line on its own work branch with a new verb, `ao board edit <done|snooze> --line <n>
   --expect "<start>" …` (`--board` defaulting to `.shiftlead.yml`'s `board:`), which calls records'
   `edit_line()` and commits with `subject("shiftlead", …)` on the current branch, touching nothing else.
-  `decide` is not offered: a `Decided:` is the person's answer, written only by the write-back (the
+  `decide` and `reply` are not offered: cadence §3.5 makes both the person's words, written only by the
+  write-back (the
   `board_edit` RPC refuses every session, `agent_common.person_only`). `ao board edit` is a session's own
   edit on its own branch, not that RPC. Briefs name that verb in every repo, so a session never needs
   `scripts/board_edit.py`, which stays for sessions dev-cadence serves without ShiftLead. The person's
@@ -206,13 +207,13 @@ Each is a ledger entry in the repo named, filed when this ADR is accepted; the d
 | 1 | records | Create the repo; `ledgerboard.py` moved from dev-cadence's `ledger.py` parsing, nudge's board readers and `board_edit.py`'s `edit_line()`/subject — **moved, not rewritten, except `pickable()`'s resolver**, which becomes a parameter; `SPEC.md` from the seed templates' format paragraphs and cadence §2/§3's format rules; fixtures; release v1.0 by a `release.sh` that writes the header and tags. records is a dev-cadence consumer (its own ledger, board and CI) that keeps `ledgerboard.py` as source and vendors nothing back. **Test bar:** dev-cadence's ledger, board, parity and check-cadence suites pass unchanged against the vendored module (run in build 2's branch before v1.0 is tagged), and records' fixtures are generated from them. Its subject parser also reads the three insert subjects ShiftLead writes today (`shiftlead: board …`, `shiftlead: answer …`, `shiftlead: board decide …`), for as long as a branch or PR may carry them. |
 | 2 | dev-cadence | Vendor v1.0 as a SYNC file, and the provenance test's vendored form; `ledger.py`, `nudge_user_attention.py`, `board_edit.py`, `check_cadence.py` call it; the seeds and cadence.md point at `SPEC.md`; §7's rows; README's pinning exception; §3.4/§4.5: the edit is made through records' `edit_line()` — `board_edit.py`, or a session's own tool on its own branch (ShiftLead's `ao board edit`); a `cadence-changes.md` entry (sync before running a newer script by hand); `vendor_records.sh`, the fixtures test and the header-hash check; `scripts/ledgerboard.py` added to `sync.sh`'s `SYNC_FILES` and to no case of `optout_files()`; sync. |
 | 3 | ShiftLead design | §5: `gate:`, `worktree_setup:`, `board:`, `commands:` read by the briefs, the roster; §4.7: `ao doctor`'s repo rows, `ao repo init` (an empty ledger); §4.5a: the Repo page's missing-seam lines and the Inbox reading in-process; §6: the review stage with no gate; §4.7 and §4.9a: `ao board edit` for a session's own branch, and *What a session does with a decided line* closing it with `ao board edit done`; §8: this ADR's rule. |
-| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its three insert subjects (`board`, `answer`, `board decide`) collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; `vendor_records.sh`, the byte-equality and fixture tests. **Tests rewritten, each assertion listed in the entry:** `tests/test_board.py` (the `message()` subjects, its `DECIDED_RE` uses), `test_ui_inbox*.py`, `test_reports.py`, `test_workorders.py` and `test_ledger*.py` where they touch a dropped regex or subject. |
+| 4 | ShiftLead | Vendor v1.0 (the sync PR brings `scripts/ledgerboard.py`; `vendor_records.sh 1.0` adds the wheel copy and fixtures); `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its three insert subjects (`board`, `answer`, `board decide`) collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; `vendor_records.sh` (fixtures and wheel copy only), the byte-equality and fixture tests. **Tests rewritten, each assertion listed in the entry:** `tests/test_board.py` (the `message()` subjects, its `DECIDED_RE` uses), `test_ui_inbox*.py`, `test_reports.py`, `test_workorders.py` and `test_ledger*.py` where they touch a dropped regex or subject. |
 | 5 | ShiftLead | The seams of build 3, each its own entry: gate, commands into briefs, worktree_setup, roster import, doctor and Repo page rows, `ao repo init`, `board:`, `ao board edit`, and the briefs, flows and `team_skill.md` made free of any repo's layout with the test that holds them so. |
 
 ## Consequences
 
 - A format change is three PRs in order: records (spec, code, fixtures, a release), then dev-cadence's
-  vendor and sync, then ShiftLead's vendor. Slower than one repo; it is the price of one definition. A
+  vendor and sync, then ShiftLead's sync PR (which runs its `vendor_records.sh`). Slower than one repo; it is the price of one definition. A
   consumer may lag a release; it may not diverge from one.
 - `ledgerboard.py` imports nothing of either repo; dev-cadence's `ledger.py` keeps its
   `nudge_user_attention` import only to build the resolver from the roster (`Roster.resolve` returns
