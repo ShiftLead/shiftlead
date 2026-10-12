@@ -9708,3 +9708,37 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-060, TD-552, TD-553.
 
 **Resolved:** 2026-10-11 (PR #1518) — TD-060's row title reads *The rename to ShiftLead's loose ends: TD-552's text sweep and TD-553's fallback; archives when both are done*, and its `**Owner:**` is `anchor`, the seat that archives it; nothing else in the entry changed.
+
+## TD-558: The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, Paul pressed Start on ao-grind)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Location:** design §4.5a team card **Start** (*What the lanes hold, before the start*), §4.4 *In a team's lanes*; `src/shiftlead/teamrun.py` (`lanes`), `src/sessionorc/ledger.py` (`in_lanes`), `src/shiftlead/ui/static/app.js` (`startPress`)
+
+**Why:** on 2026-10-12 Paul pressed **Start** on ao-grind and got the *nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts* dialog (`grinder: 0 · designer: 0`), while the repo card read *2 pickable (ao-grind 1 · dev-cadence 1)*. Both readers follow the design. `teamrun.lanes` reads only `plan.members`' lanes ("each member's lane", §4.5a). `ledger.in_lanes` reads every lane on the team's records, the anchor seat's `[anchor]` among them, so ao-grind's 1 was TD-060 (`Owner: anchor`). The anchor lane also held six live checks whose builds were live. A Start does create the anchor seat, and that seat fills on its lane (§4.9b, §6 rule 3), so the dialog's *the team will wind down as soon as it starts* was not true: once the checkout was free the anchor started and took its lane.
+
+**Related:** TD-559, TD-381 (the anchor seat), TD-265 (the dialog), TD-361 (*In a team's lanes*).
+
+**Resolved:** 2026-10-12 (the designer; archived with its build TD-563, PR #1532) — the Start dialog, `ao team start`'s first line and the repo card's lanes line count one set of lanes, design §4.5a team card **Start** *What the lanes hold, before the start*.
+
+## TD-563: Build TD-558: the Start dialog and `ao team start` count every lane the start creates — the anchor seat's and the manager's among the members' — by the page's kinds, and say a held checkout
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (the designer, TD-558's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.5a team card **Start** (*What the lanes hold, before the start*), §4.7 *Teams*, §4.4 *In a team's lanes*; `src/shiftlead/teamrun.py` (`lanes` ~L555, `NOTHING_TO_PICK` ~L552), `src/shiftlead/cli.py` (`ao team start`'s first line ~L902), `src/shiftlead/ui/app.py` (`/api/teams/{name}/lanes` ~L2415), `src/shiftlead/ui/static/app.js` (`startPress` ~L1855: the dialog's text), `tests/test_cli_teams.py` (`test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway` ~L2170), `tests/test_ui_teams.py` (`test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway` ~L426)
+
+**Why:** TD-558: `teamrun.lanes` read `plan.members`' lanes alone, so on 2026-10-12 Paul's Start on ao-grind opened *nothing to pick … grinder: 0 · designer: 0* while the anchor seat's lane held TD-060 and six live checks, and the repo card, reading every record's lane through `ledger.in_lanes`, counted them. The dialog's *the team will wind down as soon as it starts* was false: the anchor started on its lane once the checkout was free.
+
+**Done when** the Start dialog, `ao team start`'s first line and the repo card's lanes line agree on what a team's lanes hold, the dialog does not open while a lane the start creates holds work, a held anchor checkout is named on the line, and the tests above pass.
+
+**Related:** TD-558 (the design), TD-559 (the held seat's signal), TD-265 (the dialog), TD-361 (*In a team's lanes*), TD-381 (the anchor seat).
+
+**Resolved:** 2026-10-12 (PR #1532) — `teamrun.lanes` reads every lane the start creates (the manager's where its role has one, each member role's once, the anchor seat's), counts each by the page's kinds in the kind bar's order and names a held anchor checkout after its count; `roles` is `{n, by_kind, held}`. Held by `tests/test_cli_teams.py::test_a_start_counts_every_lane_it_creates_by_kind_the_anchor_seats_and_the_managers_too` and `tests/test_ui_teams.py::test_a_start_whose_members_lanes_are_empty_and_the_anchors_not_opens_no_dialog`; the rule is design §4.5a team card **Start** *What the lanes hold, before the start*.

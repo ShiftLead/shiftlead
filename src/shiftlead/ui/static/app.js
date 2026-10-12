@@ -1848,7 +1848,8 @@
   // the header, and the fresh Stop would be pressable while the first request is still out — a
   // second wrap-up prompt to every member (review of PR #183). The team's name is the guard.
   const pendingTeams = new Set();
-  // design §4.5a team card **Start** (TD-262, built by TD-265): what the members' lanes hold is read on
+  // design §4.5a team card **Start** (TD-262, built by TD-265; TD-563): what every lane the start creates —
+  // the members', the manager's where it has one, the anchor seat's — holds is read on
   // the press. Every lane empty opens the Start anyway / Cancel dialog in place of starting — one
   // confirm, a concluded team's closes as its second line; otherwise a concluded team's own confirm
   // carries the lane line, and the start's toast says it. A ledger that cannot be read opens nothing.
@@ -1868,7 +1869,7 @@
     if (picks && picks.empty) {
       const dlg = $("#startdlg");
       $("#starthead").textContent = `Start ${name}?`;
-      $("#starttext").textContent = "Nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts.";
+      $("#starttext").textContent = "Nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts.";
       $("#startcloses").textContent = b.dataset.closes ? `It first closes ${b.dataset.closes}.` : "";
       $("#startcloses").hidden = !b.dataset.closes;
       $("#startlanes").textContent = line;

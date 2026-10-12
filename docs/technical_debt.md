@@ -42,12 +42,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-558 | The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry | Medium | Designed — TD-563 builds it |
 | TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Designed — TD-564 builds it |
 | TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Designed — TD-565 builds it |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Designed — TD-566 builds it |
 | TD-562 | `ao migrate`'s top-level `*.yml`/`*.yaml`/`*.json` globs, the console-script lookbehind and the undecodable-file skip are held by no test: each can go and `test_migrate.py` stays green | Low | Open |
-| TD-563 | Build TD-558: the Start dialog and `ao team start` count every lane the start creates — the anchor seat's and the manager's among the members' — by the page's kinds, and say a held checkout | Medium | Open |
 | TD-564 | Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark | Medium | Open |
 | TD-565 | Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line | Medium | Open |
 | TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
@@ -620,23 +618,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
-## TD-558: The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-12 (ao-paul, Paul pressed Start on ao-grind)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer) — one set of lanes for both readers: the Start dialog and `ao team start`'s first line count **every lane the start creates** — each member role's once, the manager's where its role has one, the anchor seat's `[anchor]` (a seat with a trigger has none) — which are the lanes the team's records carry once it runs, so the card's lanes line (§4.4 *In a team's lanes*) counts the same set and the two differ only where the definition changed since the records were written. Each role's count is its member's own (rule 6's view over the open entries, whatever the page kind, as the compact card draws it), worded by the page's kinds, *grinder: 3 pickable · designer: 2 design · anchor: 1 pickable, 6 live check* (the anchor's live checks are named *live check*, never *pickable*); *empty*, the dialog and the refusal, holds only when every lane is empty, the anchor's too; the members' lanes empty and the anchor's not starts the team on the seat's lane and opens no confirm. Where the anchor's checkout is not free, the line says *· held by <session>* after the count, from the `checkout_held` reading the start already gates the seat on; the error-weight signal for a held seat is TD-559's. `--json`'s `roles` becomes `{role: {n, by_kind, held}}`. §4.5a team card **Start**, §4.7 *Teams*, §4.4 *In a team's lanes*. Built by TD-563. Was: Open.
-**Blocked by:** TD-563
-**Location:** design §4.5a team card **Start** (*What the lanes hold, before the start*), §4.4 *In a team's lanes*; `src/shiftlead/teamrun.py` (`lanes`), `src/sessionorc/ledger.py` (`in_lanes`), `src/shiftlead/ui/static/app.js` (`startPress`)
-
-**Why:** on 2026-10-12 Paul pressed **Start** on ao-grind and got the *nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts* dialog (`grinder: 0 · designer: 0`), while the repo card read *2 pickable (ao-grind 1 · dev-cadence 1)*. Both readers follow the design. `teamrun.lanes` reads only `plan.members`' lanes ("each member's lane", §4.5a). `ledger.in_lanes` reads every lane on the team's records, the anchor seat's `[anchor]` among them, so ao-grind's 1 was TD-060 (`Owner: anchor`). The anchor lane also held six live checks whose builds were live. A Start does create the anchor seat, and that seat fills on its lane (§4.9b, §6 rule 3), so the dialog's *the team will wind down as soon as it starts* was not true: once the checkout was free the anchor started and took its lane.
-
-**Fix:** design one reading for both. The Start dialog's line counts every lane the start creates, the anchor seat's and any seat with a `work` trigger included (*grinder: 0 · designer: 0 · anchor: 7*), and *empty* holds only when all of them are empty. The card's per-team count either names the lane it comes from or uses the same set. Where a seat cannot fill because its checkout is held (TD-559), the line says that too. **Done when** the Start dialog and the repo card agree on what a team's lanes hold, and the dialog does not open while a lane the start creates holds work.
-
-**Related:** TD-559, TD-381 (the anchor seat), TD-265 (the dialog), TD-361 (*In a team's lanes*).
-
 ## TD-559: A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen
 
 **Priority:** Medium
@@ -705,29 +686,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when:** each probe in **Why** fails `tests/test_migrate.py`.
 
 **Related:** TD-060 (#1505), TD-556.
-
-## TD-563: Build TD-558: the Start dialog and `ao team start` count every lane the start creates — the anchor seat's and the manager's among the members' — by the page's kinds, and say a held checkout
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-12 (the designer, TD-558's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a team card **Start** (*What the lanes hold, before the start*), §4.7 *Teams*, §4.4 *In a team's lanes*; `src/shiftlead/teamrun.py` (`lanes` ~L555, `NOTHING_TO_PICK` ~L552), `src/shiftlead/cli.py` (`ao team start`'s first line ~L902), `src/shiftlead/ui/app.py` (`/api/teams/{name}/lanes` ~L2415), `src/shiftlead/ui/static/app.js` (`startPress` ~L1855: the dialog's text), `tests/test_cli_teams.py` (`test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway` ~L2170), `tests/test_ui_teams.py` (`test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway` ~L426)
-
-**Why:** TD-558: `teamrun.lanes` read `plan.members`' lanes alone, so on 2026-10-12 Paul's Start on ao-grind opened *nothing to pick … grinder: 0 · designer: 0* while the anchor seat's lane held TD-060 and six live checks, and the repo card, reading every record's lane through `ledger.in_lanes`, counted them. The dialog's *the team will wind down as soon as it starts* was false: the anchor started on its lane once the checkout was free.
-
-**Fix:**
-1. `teamrun.lanes` reads every launch of the plan that carries a lane — `plan.lead` where the manager's role has one, `plan.anchor`, each of `plan.members` (a role once; `plan.seats` carry none) — with `ledger.lane_matches` over every open entry of the reading, whatever its page kind (the member's own count, `in_lanes`' `members`), `by_kind` by `for_page` in the kind bar's order; `roles` is `{role: {n, by_kind, held}}`, `n` None where the ledger could not be read.
-2. For `plan.anchor`, one `checkout_held` call (as `start` makes it, ~L695); `held` is the holder's id from the reading's `by`, absent when free or when the call fails.
-3. The line: each role once in plan order, `role: 0`, `role: 3 pickable`, `role: 2 design`, `role: 1 pickable, 6 live check` (kinds in the kind bar's order, a kind at 0 left out), `· held by <id>` after a held anchor's count, `ledger unreadable` as today; `empty` is true only when every readable lane counts 0 (an unreadable one is unknown, never empty, as today).
-4. `NOTHING_TO_PICK` and the dialog's `#starttext` read *nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts* (the page's text keeps its capital); the CLI's refusal and `--json`'s `lanes` keep their shape.
-5. Tests: the anchor's lane counted and worded by kind (a live check whose build is live reads *live check*); a team whose members' lanes are empty and whose anchor's is not starts without a dialog, the line in the toast and the concluded team's confirm; a held checkout's line names the holder and still counts; a designer lane reads *design*; `anchor: false` reads as today; a manager role with a lane counted once.
-
-**Done when** the Start dialog, `ao team start`'s first line and the repo card's lanes line agree on what a team's lanes hold, the dialog does not open while a lane the start creates holds work, a held anchor checkout is named on the line, and the tests above pass.
-
-**Related:** TD-558 (the design), TD-559 (the held seat's signal), TD-265 (the dialog), TD-361 (*In a team's lanes*), TD-381 (the anchor seat).
 
 ## TD-564: Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark
 

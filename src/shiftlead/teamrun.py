@@ -549,22 +549,56 @@ def repos_via(call: Call) -> orgmod.ReposOf:
     return repos_of
 
 
-NOTHING_TO_PICK = "nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts"
+NOTHING_TO_PICK = (
+    "nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts"
+)
+# the page's kinds in the kind bar's order, each in its word (§4.4 *Repo facts*; `ui.repo.LEDGER_LISTS`,
+# written out since the page imports this module): how a lane's count reads by kind before a start
+LANE_WORDS = (
+    ("pickable", "pickable"),
+    ("design", "design"),
+    ("for-you", "for you"),
+    ("live-check", "live check"),
+    ("blocked", "blocked"),
+    ("evaluation", "evaluation"),
+    ("other", "other"),
+)
+
+
+def _lane_count(role: str, got: dict[str, Any]) -> str:
+    """One role's part of the lanes line: *anchor: 1 pickable, 6 live check · held by shiftlead-90*."""
+    n, by_kind = got["n"], got["by_kind"]
+    count = (
+        "ledger unreadable"
+        if n is None
+        else ", ".join(f"{by_kind[k]} {w}" for k, w in LANE_WORDS if by_kind.get(k))
+        if n
+        else "0"
+    )
+    held = got.get("held")
+    if held:
+        # a session holds the checkout, by its id; a dirty tree or one off its branch, by its words (§4.9b)
+        count += f" · held by {held}" if held != "checkout" else f" · {got.get('held_why') or 'checkout not free'}"
+    return f"{role}: {count}"
 
 
 def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] | None:
-    """What the members' lanes hold before a start (design §4.5a team card **Start**, *What the lanes
-    hold, before the start*; TD-262, built by TD-265): each role with a lane, once, read against its
-    checkout's ledger as rules 6 and 8 read it — `ledger.lane_matches` over the home's `repos`
-    reading — as `{line, empty, roles}`: *grinder: 3 pickable · designer: 0*. `empty` only when every
-    lane was read and none matched; a ledger that cannot be read is *unknown*, never empty. None when
-    there is nothing to say: no member has a lane, or the plan itself fails, which the start reports
-    in its own words."""
+    """What every lane the start creates holds before it (design §4.5a team card **Start**, *What the
+    lanes hold, before the start*; TD-262, built by TD-265; TD-558, built by TD-563): the manager's where
+    its role carries one, each member role's once, and the anchor seat's — the lanes the team's records
+    carry once it runs — each read against its checkout's ledger as rules 6 and 8 read it
+    (`ledger.lane_matches` over the home's `repos` reading, whatever the entry's page kind) and said by
+    the page's kinds: *grinder: 3 pickable · designer: 0 · anchor: 1 pickable, 6 live check*. A held
+    anchor checkout (`checkout_held`, the reading the start gates the seat on) is named after its count,
+    which still stands. Returns `{line, empty, roles}`, `roles` as `{role: {n, by_kind, held}}` — `n`
+    None for a ledger that cannot be read, which is *unknown*, never empty; `held` the holder, absent
+    when free. `empty` only when every lane was read and none matched. None when there is nothing to
+    say: no launch has a lane, or the plan itself fails, which the start reports in its own words."""
     try:
         plan = teams.plan(org, name, host, files=files_via(call))
     except (teams.TeamError, ValueError, OSError):
         return None
-    holders = [x for x in plan.members if x.lane]
+    holders = [x for x in [plan.lead, *plan.members, plan.anchor] if x is not None and x.lane]
     if not holders:
         return None
     try:
@@ -572,21 +606,28 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
         readings = got if isinstance(got, dict) else {}
     except Exception:  # noqa: BLE001 — no reading is every lane unknown, never a refused start
         readings = {}
-    roles: dict[str, int | None] = {}
+    roles: dict[str, dict[str, Any]] = {}
     for x in holders:
         if x.role in roles:
             continue  # a role once: its members share a lane (§4.9)
         led = (readings.get(str(x.dir)) or {}).get("ledger") or {}
         entries = led.get("entries") if "error" not in led else None
-        roles[x.role] = (
-            sum(1 for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e))
-            if isinstance(entries, list)
-            else None
-        )
-    line = " · ".join(
-        f"{role}: {'ledger unreadable' if n is None else (f'{n} pickable' if n else '0')}" for role, n in roles.items()
-    )
-    return {"line": line, "empty": all(n == 0 for n in roles.values()), "roles": roles}
+        if isinstance(entries, list):
+            mine = [e for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e)]
+            by_kind = {k: sum(1 for e in mine if (e.get("for_page") or "other") == k) for k, _ in LANE_WORDS}
+            roles[x.role] = {"n": len(mine), "by_kind": by_kind}
+        else:
+            roles[x.role] = {"n": None, "by_kind": {}}
+        if x is plan.anchor:
+            try:
+                held = (call("checkout_held", host=x.host, dir=str(x.dir)) or {}).get("held")
+            except Exception:  # noqa: BLE001 — a reading that failed says nothing of the checkout
+                held = None
+            if isinstance(held, dict) and held.get("by"):
+                roles[x.role]["held"] = str(held["by"])
+                roles[x.role]["held_why"] = str(held.get("why") or "")
+    line = " · ".join(_lane_count(role, got) for role, got in roles.items())
+    return {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles}
 
 
 def keep_mail_for(

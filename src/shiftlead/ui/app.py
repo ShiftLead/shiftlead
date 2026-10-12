@@ -2414,8 +2414,8 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/teams/{name}/lanes")
     async def api_team_lanes(name: str):
-        """What the members' lanes hold before a start (§4.5a team card **Start**, TD-265): read on the
-        press, so the page opens its Start anyway / Cancel dialog when every lane is empty."""
+        """What every lane the start creates holds before it (§4.5a team card **Start**, TD-265, TD-563):
+        read on the press, so the page opens its Start anyway / Cancel dialog when every lane is empty."""
         if hosts.is_node():
             raise HTTPException(409, node_org_note())
         org, _notes = org_here()
