@@ -42,6 +42,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
+| TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Open |
 
 ---
 
@@ -611,3 +612,24 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
+## TD-577: **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a *card: more ▾* (Open shell here), *Focus: Open shell here*, *card: Focus* and *Pop out* (the new-tab and window rules); `src/shiftlead/ui/static/app.js` (the `shell-here` press sets `location.href` to the new shell's `/focus/<id>`, ~L983); `src/shiftlead/ui/templates/focus.html` (~L104), `card.html` (~L152)
+
+**Why:** Paul, 2026-10-12: *opening a shell should not overwrite the current window (should be new tab or new window)*. He pressed **Open shell here** from a session's Focus to run a command beside it, and the Focus he was working in was replaced by the shell's. Getting it back meant navigating back, and the terminal re-attached. The press always does this, from a card's *more ▾* as well as from Focus.
+
+**Fix:** design it first, then build it:
+1. Decide the target: a new tab, a popped-out window as **Pop out** opens one (row *Pop out*), or the browser's choice, with modifiers honoured as the **Focus** link honours them.
+2. Decide the opening itself: the page has to open the tab or window synchronously in the click, before the `shell-here` RPC answers, or the browser blocks it as a popup. That means opening a placeholder and pointing it at `/focus/<id>` once the id comes back, and closing it, with the error shown on the pressing page, if the create is refused.
+3. State in §4.5a that the pressing page stays where it was.
+Then the build: `app.js`'s `shell-here` branch, and a test that the press no longer sets `location.href`.
+
+**Done when** **Open shell here** leaves the page it was pressed on in place, and the shell's Focus opens in a new tab or window, from Focus and from a card.
+
+**Related:** TD-572 (the Focus tabs' cost: more tabs are cheap since #1544).
