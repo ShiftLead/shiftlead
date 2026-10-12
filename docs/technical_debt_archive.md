@@ -9995,7 +9995,7 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 
 **Related:** TD-561 (the design), TD-127 (the first-paragraph rule), TD-560 / TD-565 (the ledger row's subject), TD-564 (the seat-held row's).
 
-**Resolved:** 2026-10-12 (PRs #1536, #1543) — slice 1 (#1536): `MailEntry.subject`, `mail.subject_of` / `clip_subject`, `rpc_msg`'s `subject`, its inheritance by a reply, an outcome and an *answered for you* entry, the *no --subject* warning, `ao msg --subject` and `ao inbox`'s head line. Slice 2 (#1543): `kind_subject` / `row_subject` in `inbox.py` — every state, restart, seat-held (*anchor seat held · <team>*), alarm, cadence, held, promote, team-start and board row's subject by kind, a trail row's *how*, a ledger row's title (drawn already as its first paragraph, so no line above it), mail's envelope or, for an entry older than the field, its first sentence; the `subj` line first on every row, the message page's heading and tab title; `row_find` adds it; the message-shape line in the five presets. Checked on a scratch home (#1543's UI check) and held by `test_mail.py`, `test_cli.py`, `test_ui_inbox.py`. Not built: *the help's Inbox paragraph* — §4.5a *The help text* is one paragraph per control and holds none for the Inbox, and `subject` is display only; and a warning for a `--subject` dropped on a reply, which the techlead's read of #1536 says nothing owes (the Reply dialog types none).
+**Resolved:** 2026-10-12 (PRs #1536, #1543) — slice 1 (#1536): `MailEntry.subject`, `mail.subject_of` / `clip_subject`, `rpc_msg`'s `subject`, its inheritance by a reply, an outcome and an *answered for you* entry, the *no --subject* warning, `ao msg --subject` and `ao inbox`'s head line. Slice 2 (#1543): `kind_subject` / `row_subject` in `inbox.py` — every state, restart, seat-held (*anchor seat held · <team>*), alarm, cadence, held, promote, team-start and board row's subject by kind, a trail row's *how*, a ledger row's title (drawn already as its first paragraph, so no line above it), mail's envelope or, for an entry older than the field, its first sentence; the `subj` line first on every row, the message page's heading and tab title; `row_find` adds it; the message-shape line in the five presets, and in the repo's own brief parts the one that carries the shape rule, `docs/briefs/techlead-context.md` (TD-573, a held path, so a PR of its own). Checked on a scratch home (#1543's UI check) and held by `test_mail.py`, `test_cli.py`, `test_ui_inbox.py`. Not built: *the help's Inbox paragraph* — §4.5a *The help text* is one paragraph per control and holds none for the Inbox, and `subject` is display only; and a warning for a `--subject` dropped on a reply, which the techlead's read of #1536 says nothing owes (the Reply dialog types none).
 
 ## TD-574: Design says every Inbox row's first line is its subject; the ledger row and the trail row draw none
 
@@ -10014,3 +10014,23 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-566, TD-561, TD-565.
 
 **Resolved:** 2026-10-12 (PR #1549) — the words, as the build was right: §4.5a's **subject** row and §4.10 *A subject on every entry*'s **Drawn** say a ledger row and a trail row draw no subject line of their own, their subject being their first text already (the dated facts in `docs/design-history.md`); `test_the_trail_puts_a_row_that_resolved_without_you_into_fyi` (`tests/test_ui_inbox.py`) and the *Later* section's test in `tests/test_ui_inbox_ledger.py` assert neither row draws a `subj` line.
+
+## TD-573: The techlead's context primer says a message to the person has one shape, its first paragraph; TD-566's `--subject` never reached it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1536–#1546)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/briefs/techlead-context.md` ~L58–61 (a held path: `docs/briefs/**`); design §4.10 *A subject on every entry*; TD-566's **Fix** item 5
+
+**Why:** TD-566's **Location** names `docs/briefs/techlead-context.md` and its Fix item 5 "the repo's brief parts under `docs/briefs/` (the same line; a held path, this entry's)" as getting the message-shape line with `--subject`; §4.10 says "The presets say `--subject` in the message-shape line". #1543 changed the five `src/shiftlead/briefs/*.md` presets and nothing under `docs/briefs/`, and the archived **Resolved** line neither claims the repo's parts nor lists them under *Not built*. The primer still reads `the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message to a person is written*, TD-127` (L60), with no word of a subject. `grep -n subject docs/briefs/*.md` returns nothing on `origin/main` (27fff9e1). A techlead reading only the primer is told the shape without the headline every message now warns for.
+
+**Fix:** add the headline to the primer's sentence (*and a `--subject`, a headline apart from that paragraph, §4.10 *A subject on every entry***); say in TD-566's **Resolved** that the repo's own brief parts were left (or add the line to each that carries the shape rule). Held path: the techlead seat merges it.
+
+**Done when** `grep -n subject docs/briefs/techlead-context.md` finds the line and TD-566's **Resolved** says what was done with the repo's parts.
+
+**Related:** TD-566, TD-561, TD-127.
+
+**Resolved:** 2026-10-12 (PR #1548) — the primer's Inbox line now says a message to the person carries a `--subject`, a headline apart from its first paragraph (§4.10 *A subject on every entry*, TD-561); TD-566's **Resolved** names the primer as the one repo brief part that carries the shape rule (no other file under `docs/briefs/` states it: `grep -n 'one shape' docs/briefs/*.md`; `grinder-ao-1.md` names a first paragraph only for a look).
