@@ -967,7 +967,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Status:** Open
 **Location:** design §4.5a *Inbox row: answered for you*, *Inbox: the FYI count, **Dismiss all***, *team header* **answered for you** count; §4.5 screen 6 (the sections' order); §4.9b *Everything answered for the person is told to the person*; §4.10 *The Inbox is a queue*; `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS`, `_answered_of`), `src/shiftlead/ui/templates/inbox.html` (`#sec-fyi`, `#dismissall`), `src/shiftlead/ui/static/app.js` (the Dismiss all handler reads `#rows-fyi` only); mockup `docs/mockups/Inbox.dc.html`
 
-**Why:** Paul, 2026-10-12, through Add entry: *Lets evaluate if the "answered for you" section is redundant to fyi, and if so combine them. If not, lets add a "dismiss all" option on the "answered for you" section.* Both are uncounted, and an *answered for you* entry is an FYI by kind — a `note` filed from the answerer (§4.9b) — drawn in its own group under *Waiting on them* and above FYI. What it has that an FYI row has not: **Overrule** (a reply to the asker on the question's thread, with a copy to the answerer, which hands the asker an outcome debt), the question set off as a quotation with its source, and the team header's **answered for you** count, a mark since the person last opened the group. What it lacks: FYI's **Dismiss all** reads `#rows-fyi` alone, so a run of a busy techlead's answers is cleared one **Dismiss** at a time. The harm: the person either reads a second "no action needed" group beside FYI, or clears it by hand row by row.
+**Why:** Paul, 2026-10-12, through Add entry: *Lets evaluate if the "answered for you" section is redundant to fyi, and if so combine them. If not, lets add a "dismiss all" option on the "answered for you" section.* Both are uncounted, and an *answered for you* entry is an FYI by kind — a `note` filed from the answerer (§4.9b) — drawn in its own group after *Waiting on them*, with *Later* between it and FYI. What it has that an FYI row has not: **Overrule** (a reply to the asker on the question's thread, with a copy to the answerer, which hands the asker an outcome debt), the question set off as a quotation with its source, and the team header's **answered for you** count, a mark since the person last opened the group. What it lacks: FYI's **Dismiss all** reads `#rows-fyi` alone, so a run of a busy techlead's answers is cleared one **Dismiss** at a time. The harm: the person either reads a second "no action needed" group beside FYI, or clears it by hand row by row.
 
 **Fix:** design it first, in §4.5a and §4.5 screen 6:
 1. **The evaluation.** Say whether the group earns its place: what the person does with an *answered for you* row that they do not do with an FYI — **Overrule** is a decision on a teammate's answer, FYI rows hold none — and whether the team header's count needs a group to be "since last opened".
@@ -977,7 +977,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 **Done when** §4.5a says which of the two it is, the Inbox draws it, and the person can clear the answered rows they have read in one press.
 
-**Related:** TD-075 (step 2 built *Answered for you*), TD-079 (the Inbox as a queue, FYI's Dismiss all), TD-582 (Add entry, the same seat).
+**Related:** TD-075 (step 2 built *Answered for you*), TD-079 (the Inbox as a queue, FYI's Dismiss all), TD-582 (another Add-entry draft by this seat, on cross-team mail).
 
 ---
 
