@@ -43,11 +43,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-558 | The Start dialog says *nothing to pick* while the repo card counts the team's anchor lane: one counts members' lanes, the other every lane the team's records carry | Medium | Designed — TD-563 builds it |
-| TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Open |
+| TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Designed — TD-564 builds it |
 | TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Open |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Open |
 | TD-562 | `ao migrate`'s top-level `*.yml`/`*.yaml`/`*.json` globs, the console-script lookbehind and the undecodable-file skip are held by no test: each can go and `test_migrate.py` stays green | Low | Open |
 | TD-563 | Build TD-558: the Start dialog and `ao team start` count every lane the start creates — the anchor seat's and the manager's among the members' — by the page's kinds, and say a held checkout | Medium | Open |
+| TD-564 | Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark | Medium | Open |
 
 ---
 
@@ -641,8 +642,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-paul, Paul's ask)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** design §4.9b *The anchor seat*, §6 rule 3 (the fill's occupancy gate), §4.5a row *on call: the anchor seat's words*; `seat_held` on the record; the Inbox's *Needs you* sources
+**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td559-seat-held-row.png`) — an error-weight signal from the record the tick already writes: `seat_held` gains `since` (the first tick that read this holder, reset by another; a held Start writes the start's time), and (1) **Inbox row: seat held** under *Needs you*, counted, once the hold is older than `SEAT_HELD_GRACE` (fifteen minutes, so a person's visit to the checkout raises nothing), naming the holder in the tick's words (*held 3 h by shiftlead-90 (claude-code, outside shiftlead, idle)*, or the tree's *branch td-x, 2 files uncommitted*), the work (`seat_due.ids`, three named) and what to do; Open focuses the holder where it is a record of this home, else the seat's card; Dismiss keeps this `since`'s row away, as the restart row's does; Snooze as every row's; (2) **team header: seat held** mark, *· anchor held 3 h*, amber, visible while the team is folded. Decided: the row covers the tree's own reasons too, since the person's uncommitted work in the checkout holds the same work unseen; it stays quiet while the lane is empty, since `seat_held` is written only while work is due, and under the grace. §4.5a two rows, §4.5 screen 6, §6 rule 3, §4.9b. Built by TD-564. Was: Open.
+**Blocked by:** TD-564
+**Location:** design §4.9b *The anchor seat*, §6 rule 3 (the fill's occupancy gate), §4.5a rows *Inbox row: seat held*, *team header: seat held*, *on call: the anchor seat's words*; `seat_held` on the record; the Inbox's *Needs you* sources
 
 **Why:** on 2026-10-11 a plain `claude` started at 14:29 in a VS Code terminal in `/home/kmaster/shiftlead`, outside ShiftLead. That made it the one agent in the main checkout (§9 invariant 2), so ao-grind's anchor seat never filled. Its record read `seat_held: {by: shiftlead-90, why: "held by shiftlead-90 (claude-code, outside shiftlead, idle)"}`. Its lane held TD-060 and six live checks, and three design entries (TD-290, TD-410, TD-457) were blocked on those checks. All the person saw was the seat's slot, *on call — the checkout is yours · …*, on a folded team. When Paul closed that session on 2026-10-12, the anchor started by itself (rule 3's fill, as designed). Paul: *show an error when a member's worktree (e.g. the anchor) is occupied by a non-team-member.*
 
@@ -722,3 +724,26 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the Start dialog, `ao team start`'s first line and the repo card's lanes line agree on what a team's lanes hold, the dialog does not open while a lane the start creates holds work, a held anchor checkout is named on the line, and the tests above pass.
 
 **Related:** TD-558 (the design), TD-559 (the held seat's signal), TD-265 (the dialog), TD-361 (*In a team's lanes*), TD-381 (the anchor seat).
+
+## TD-564: Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-559's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Inbox row: seat held*, *team header: seat held*; §4.5 screen 6 (*Needs you*); §6 rule 3 (`seat_held: {by, why, since}`); §4.9b *The anchor seat*; `src/sessionorc/models.py` (`seat_held` ~L1159), `src/sessionorc/agent_tick.py` (`_checkout_held` ~L2423, `_checkout_why` ~L2445, `_fill` ~L2495: where `seat_held` is written, and the lane reading ~L2270 that clears it), `src/sessionorc/agent.py` (`create` with `held`: the Start's record), `src/sessionorc/agent_common.py` (`SEAT_HELD_GRACE`), `src/shiftlead/ui/inbox.py` (`restart_mark` ~L102 as the model, `state_rows` ~L237, `inbox_sections`' dismiss ~L1739), `src/shiftlead/ui/cards.py` (`seat_held_words` ~L813), `src/shiftlead/ui/org.py` / the team header template (the on-call count's neighbour), `src/shiftlead/ui/static/app.js` (the header's delta), `docs/mockups/gen.py` (the row, drawn by TD-559), `tests/test_inbox_*.py`, `tests/test_ui_teams.py`, the anchor seat's tests (`seat_held`)
+
+**Why:** TD-559: on 2026-10-11 a plain `claude` outside ShiftLead held ao-grind's anchor seat off TD-060 and six live checks for a day, and all the person saw was the slot's *on call — the checkout is yours · …* on a folded team.
+
+**Fix:**
+1. `seat_held` carries `since`: `_checkout_why` returns `{by, why}` as today and the writer (`_fill`, and the lane reading that keeps or clears it) sets `since` to `now` when `by` differs from the record's current `seat_held.by`, else keeps the record's; `create` with `held` writes `since` as the record's `created`. `why` may change under one `since` (the holder's state).
+2. `SEAT_HELD_GRACE = 15 * 60` in `agent_common`; a `seat_held_mark(v, now)` in `inbox.py` beside `restart_mark`: None unless the view carries `seat_held` with `since` older than the grace; else `(since, text)` with the text of §4.5a — the age from `since`, the holder's words (`why` as the tick wrote it), the count and three ids of `seat_due.ids`, and the closing clause by `by` (`checkout`: *commit and push, or check out main, and the seat fills*; a session: *close it, or finish there, and the seat fills on the next tick*).
+3. `state_rows` raises `base(v, "seat_held", text)` with `at: since`, `mark: "seat_held"`, `holder: by` where `by` is a record of this home (the view's `focus` target) else none; the template draws Open (to the holder's Focus, else the seat's), Dismiss (`dismissed:<since>` under the `sid|seat_held` key, the restart row's mechanism) and Snooze ▾.
+4. The team header: the records' delta carries each seat's `seat_held` already; the header draws *· anchor held <age>* after the on-call count when a seat of the team is held past the grace, class the warning's amber, the row's text as its title; nothing otherwise.
+5. Tests: `since` set on first read, kept across `why` changes, reset on a new `by`, written by a held Start; no row under the grace, a row past it, counted under *Needs you*; the row names a holder outside shiftlead by `occupants`' words and offers no holder Focus; Dismiss hides this `since` and a new holder's row returns; the row leaves when `seat_held` clears; the header mark drawn folded and gone when clear; the mockup regenerates.
+
+**Done when** a held anchor seat whose lane holds work is a counted *Needs you* row past fifteen minutes, naming the holding session and the work, with Open / Dismiss / Snooze, and a mark on the folded team's header, both gone when the seat fills or nothing is due; and the tests above pass.
+
+**Related:** TD-559 (the design), TD-558 / TD-563 (the Start line's held note), TD-381 (the anchor seat), TD-386 (`seat_held`), TD-103 (the restart row, the model).

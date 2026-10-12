@@ -243,7 +243,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the checkout**: the `create` is in the home repo's main checkout, refused by occupancy (§9
      invariant 2) while any session holds it and refused while the checkout is dirty or off its
      default branch, each leaving `seat_due` standing with the reason on the record — **`seat_held:
-     {by, why}`** (home-owned) — for the card's slot (*on call — the checkout is yours · branch
+     {by, why, since}`** (home-owned; `since` the first tick that read this `by`, kept while the holder is the same and reset by another, so the Inbox row and the header mark of §4.5a *Inbox row: seat held* age from it, past `SEAT_HELD_GRACE`) — for the card's slot (*on call — the checkout is yours · branch
      td-x, 2 files uncommitted*); the next tick tries again. **`ao team start` is gated by the
      same reading**: a Start whose checkout is not free writes the seat's record held — `closed`,
      no pane, `seat_held` with the reason, which stands while its lane holds work due and is
