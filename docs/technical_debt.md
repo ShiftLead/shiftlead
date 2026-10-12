@@ -46,6 +46,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-576 | #1542's `ledger_decide`: the resolved-path checkout match, the `Repo#id` ref, the re-read after the line lands and the node refusal are held by no test (test audit) | Medium | Open |
 | TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Designed — TD-579 builds it |
 | TD-579 | Build TD-577: **Open shell here** opens the shell's Focus in a new tab (Shift, or a popped-out window: a window as Pop out opens one), the placeholder opened in the press and sent to `/focus/<id>` when the create answers; the pressing page stays | Medium | Open |
+| TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
+| TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
 
 ---
 
@@ -700,3 +702,48 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Done when** **Open shell here** leaves the page it was pressed on in place and the shell's Focus opens in a new tab — a window as Pop out opens one on Shift or from a popped-out window — from Focus and from a card's *more ▾*; a refused create closes the placeholder and shows the refusal on the pressing page; the tests above pass and the builder's look is named in the PR.
 
 **Related:** TD-577 (the design), TD-046 (Pop out), TD-572 (a Focus tab's cost).
+
+## TD-580: A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.8 *A person's own act is a named RPC, and the gate is one list*; §4.8a (identity: how the host agent tells which session is calling); §6 *Promote*; §4.5a *Focus: Open shell here*; `src/sessionorc/agent_common.py` (`person_only` ~L287); `src/sessionorc/mail.py` (`is_person`, `PERSON_ONLY`)
+
+**Why:** Paul, 2026-10-12, after `ao promote shiftlead` was refused in a shell he had opened with **Open shell here** (*error: ao-ao-paul-ao-paul-shell cannot run promote: a person's own act, refused to every session*): *A shell being directly controlled by the user should have permissions to promote/other without interference. I suppose the risk is that the user then creates an llm session there - but that's probably out of scope (and on the user).* Today the only place the person can run a person-only act from the terminal is a terminal outside ShiftLead, so the dashboard's own shell is no use for it.
+
+**Fix:** design it first:
+1. Decide which records count as the person's: an **interactive** (`attended`) `shell` session that the person created, with no role and no `unattended`. Name the fields that decide it, as §4.8a would read them.
+2. Decide whether the right is the record's for its whole life, or only while it stays interactive. A flip to unattended, a role, or a manager as controller should lose it.
+3. Decide the risk Paul named: an agent started inside that shell inherits its identity. Say it plainly in §4.8a as the person's responsibility (out of scope, Paul), or narrow the right (e.g. only to a process the shell itself ran, not its descendants) if §4.8a can tell them apart.
+4. Make `person_only` read the decision in one place, so every person-only RPC follows it.
+Then the build, with tests that a person's interactive shell may promote and an agent session, an unattended shell or a role's session still may not.
+
+**Done when** `ao promote` (and every other person-only act) runs from a shell the person opened with **Open shell here** or **+ New ▾ Shell**, and is still refused to every agent session.
+
+**Related:** TD-581 (the promote press under `auto`), TD-577 (Open shell here's tab), TD-077 (identity).
+
+## TD-581: Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 *Promote* (`PROMOTE_SETTLE`, `auto`), §4.5a *Inbox row: promote* (*Under `auto: true` nothing is drawn but a failure*), §4.5a *Org top bar* **build** chip, §4.7 `ao promote`; `src/sessionorc/promote.py` (`PROMOTE_SETTLE` L35, the settle ~L431); `src/shiftlead/ui/inbox.py` (the promote row)
+
+**Why:** 2026-10-12: #1544 (the Focus lag fix) merged at 17:39 UTC. ao-grind kept merging every few minutes, so main never stood still for `PROMOTE_SETTLE` (ten minutes) and the fix stayed off the live copy for more than half an hour while Paul's terminals lagged. With `auto: true` the Inbox draws no Promote row unless a promote has failed, so the page offered no press. `ao promote` was refused from every ShiftLead terminal (TD-580), so the only way to promote was a terminal outside ShiftLead. Paul: *Lets also add the TD to force a promote.*
+
+**Fix:** design it first:
+1. Give the person a press to promote main's head now while `auto` is on and main is ahead: the build chip's hover or click (*main +n · Promote now*), and/or the Inbox's promote row drawn uncounted under FYI while main is ahead under `auto`.
+2. The press skips `PROMOTE_SETTLE` but keeps the three preconditions (§6: checkout on main's head and clean, checks green or the person pressing through, nothing in flight), refused in place in their words.
+3. Decide whether a long run of merges should also cap the wait under `auto` (e.g. promote once main has been ahead for `PROMOTE_MAX_WAIT` even without a quiet ten minutes). This is the press without the person.
+Then the build, with tests that the press promotes under `auto` inside the settle, and that the settle still holds the tick.
+
+**Done when** the person can promote main's head from the page, at once, while `auto` is on, and §6 says whether a busy main can hold `auto` off without limit.
+
+**Related:** TD-580 (person-only acts from the person's shell), TD-572 (#1544, the fix that waited), TD-132 (the promote policy).
