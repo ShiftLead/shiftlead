@@ -47,6 +47,10 @@ PERSON_FYI_SENDER_DEPTH: int | None = 500  # so one looping sender leaves the ot
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down
+# A subject on every entry (§4.10 *A subject on every entry*, TD-561): the headline a person browses the
+# Inbox by, apart from the text, at most this many characters.
+SUBJECT_CHARS = 80
+_SENTENCE = re.compile(r"(.+?[.?!])(?:\s|$)")
 # Suggested answers (§4.10 *Suggested answers*, 2026-09-20, TD-070): how many an `ask` or a `steer`
 # may carry, and how long each may be. They are a field of their own and do not
 # count toward `TEXT_CAP`. Each is cleaned **more strictly than displayed text is** (the tail's
@@ -144,6 +148,28 @@ PERSON_ONLY = frozenset(
         "attach",
     }
 )
+
+
+def clip_subject(line: str) -> str:
+    """A subject as one line of at most `SUBJECT_CHARS` (§4.10 *A subject on every entry*): whitespace
+    and control characters folded to single spaces, and a longer one clipped at a word with an
+    ellipsis."""
+    flat = " ".join("".join(ch if ch >= " " else " " for ch in str(line)).split())
+    if len(flat) <= SUBJECT_CHARS:
+        return flat
+    cut = flat[: SUBJECT_CHARS - 1]
+    if flat[SUBJECT_CHARS - 1] != " " and " " in cut:
+        cut = cut.rsplit(" ", 1)[0]  # never half a word
+    return cut.rstrip(" ,;:-—") + "…"
+
+
+def subject_of(text: str) -> str:
+    """The subject a text with none stands under (§4.10 *A subject on every entry*, TD-561): its first
+    sentence — to the first full stop, question or exclamation mark followed by a space or the end —
+    else the text itself, either one clipped as `clip_subject` clips."""
+    flat = " ".join("".join(ch if ch >= " " else " " for ch in str(text)).split())
+    m = _SENTENCE.match(flat)
+    return clip_subject(m.group(1) if m else flat)
 
 
 def is_person(caller: Any) -> bool:

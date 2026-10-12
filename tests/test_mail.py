@@ -2687,3 +2687,59 @@ def test_a_retained_conflict_entry_is_read_as_an_ask():
     assert "conflict" not in MAIL_KINDS and "conflict" not in ASK_KINDS
     e = MailEntry.from_dict({"id": "m-1", "from": "w", "to": ["l1", "l2"], "kind": "conflict", "text": "?", "at": "x"})
     assert e.kind == "ask" and e.open
+
+
+@pytest.mark.unit
+def test_a_subject_is_the_first_sentence_else_the_text_clipped_at_a_word():
+    """Design §4.10 *A subject on every entry* (TD-561, built by TD-566): `subject_of` takes the text
+    to the first full stop, question or exclamation mark followed by a space or the end; with none,
+    the text itself; either one past `SUBJECT_CHARS` clipped at a word with an ellipsis."""
+    assert mail.subject_of("PR #12 is ready. It changes the fetcher.") == "PR #12 is ready."
+    assert mail.subject_of("Merge it now?\n\nThe reading follows.") == "Merge it now?"
+    assert mail.subject_of("Done!") == "Done!"
+    assert mail.subject_of("v1.2 shipped and works") == "v1.2 shipped and works"  # a dot inside a word ends nothing
+    assert mail.subject_of("no sentence end at all") == "no sentence end at all"
+    assert mail.subject_of("line one\nline two") == "line one line two"  # one line, whitespace folded
+    long = "word " * 30
+    got = mail.subject_of(long)
+    assert len(got) <= mail.SUBJECT_CHARS and got.endswith("word…") and "wor…" not in got
+    assert mail.clip_subject("a" * 100) == "a" * (mail.SUBJECT_CHARS - 1) + "…"  # one word: clipped where it must be
+    assert mail.clip_subject("  short \x1b one ") == "short one"
+
+
+async def test_mail_the_person_reads_carries_a_subject_given_derived_or_its_questions(agent, tmp_path):
+    """Design §4.10 *A subject on every entry* (TD-566): `--subject` is the envelope's; mail to the person
+    with none takes its first sentence and the reply says so in `warnings`; one past 80 is clipped and
+    said; a reply, an outcome note and an *answered for you* entry carry their question's; mail between
+    sessions derives nothing; a `system` note derives its own."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl")]
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            given = await wc.call("msg", to="person", text="The body.\n\nMore.", subject="PR #9 waits")
+            assert given["entry"]["subject"] == "PR #9 waits" and given["warnings"] == []
+            derived = await wc.call("msg", to="person", text="Merge #9 now? It is green.", kind="ask")
+            assert derived["entry"]["subject"] == "Merge #9 now?"
+            assert derived["warnings"] == ['no --subject: "Merge #9 now?" stands as one']
+            clipped = await wc.call("msg", to="person", text="x", subject="long " * 20)
+            assert len(clipped["entry"]["subject"]) <= mail.SUBJECT_CHARS
+            assert clipped["warnings"] and clipped["warnings"][0].startswith("--subject past 80 characters")
+            # a reply and an outcome note carry the question's; the person types none
+            q = derived["entry"]
+            answer = await person.call("msg", to=w, text="yes", kind="reply", reply_to=q["id"])
+            assert answer["entry"]["subject"] == "Merge #9 now?" and answer["warnings"] == []
+            done = await wc.call("msg", to="person", text="done: merged #9", outcome="done", for_=q["id"])
+            assert done["entry"]["subject"] == "Merge #9 now?" and done["warnings"] == []
+            # between sessions: a given one rides, none is derived
+            plain = await wc.call("msg", to=tl, text="Step 3 waits. Fine?", kind="ask")
+            assert plain["entry"]["subject"] is None and plain["warnings"] == []
+            titled = await wc.call("msg", to=tl, text="x", subject="step 3")
+            assert titled["entry"]["subject"] == "step 3"
+            # answered from the record: the reply and the person's FYI carry the question's derived one
+            got = await tc.call("msg", reply_to=plain["entry"]["id"], kind="reply", text="yes", source="TD-075")
+            fyi = next(e for e in agent.person_inbox if e.id == got["answered_for_you"])
+            assert got["entry"]["subject"] == fyi.subject == "Step 3 waits."
+        agent._system_note("person", "The tick wound ao-grind down. Nothing was open.")
+        assert agent.person_inbox[-1].subject == "The tick wound ao-grind down."
+        for sid in (w, tl):
+            await person.call("kill", id=sid)

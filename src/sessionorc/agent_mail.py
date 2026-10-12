@@ -93,6 +93,7 @@ class MailMixin:
         pr: Any = None,
         shots: Any = None,
         verdict: Any = None,
+        subject: str | None = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -134,6 +135,7 @@ class MailMixin:
                 pr,
                 shots,
                 verdict,
+                subject,
             )
         except RpcError as e:
             if key:
@@ -234,6 +236,7 @@ class MailMixin:
         pr: Any = None,
         shots: Any = None,
         verdict: Any = None,
+        subject: str | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -522,9 +525,9 @@ class MailMixin:
                     "session (design §4.10)"
                 )
         # -- copies: a controller's mail `about` its member reaches the member's other controllers --
-        subject = records.get(self._addr(about)) if about and not reply_to and me is not None else None
-        if subject is not None and sender in self._ctl(subject):
-            copies = [c for c in self._ctl(subject) if c not in (sender, *named)]
+        about_rec = records.get(self._addr(about)) if about and not reply_to and me is not None else None
+        if about_rec is not None and sender in self._ctl(about_rec):
+            copies = [c for c in self._ctl(about_rec) if c not in (sender, *named)]
         # a copy follows a resume as an addressee does: a passer, or a thread's other controller,
         # resumed since the thread began gets its copy on the record that continues it
         copies = [c for c in follow(copies) if c in records and c not in (sender, *named)]
@@ -590,6 +593,21 @@ class MailMixin:
         entry.verdict = verdict
         entry.shots = looks
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
+        # §4.10 *A subject on every entry* (TD-561): a thread has one subject, so an answer, an outcome
+        # and a follow-up carry their question's; mail the person reads is given one or warned, never
+        # refused; mail between sessions takes a given one and derives nothing (a session reads the text)
+        warnings: list[str] = []
+        question = replied if replied is not None else on_thread
+        reads = PERSON in named or fyi
+        if question is not None and (question.subject or reads):
+            entry.subject = question.subject or mail.subject_of(question.text)
+        elif subject is not None and str(subject).strip():
+            entry.subject = mail.clip_subject(str(subject))
+            if len(" ".join(str(subject).split())) > mail.SUBJECT_CHARS:
+                warnings.append(f'--subject past {mail.SUBJECT_CHARS} characters: clipped to "{entry.subject}"')
+        elif reads:
+            entry.subject = mail.subject_of(text)
+            warnings.append(f'no --subject: "{entry.subject}" stands as one')
         if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
             # `bound` is None exactly when the addressee is the person and the kind is `ask`: that
             # one never expires, and the person inbox's depths are what bound it instead (§4.10).
@@ -645,6 +663,7 @@ class MailMixin:
                 root=root,
             )
             note.team = entry.team
+            note.subject = entry.subject  # the question's (§4.10)
             note.answered = {"question": replied.text, "asker": replied.from_, "answerer": sender, "source": src}
             self.person_inbox.append(note)
             self.person_store.save(self.person_inbox)
@@ -738,6 +757,7 @@ class MailMixin:
             "forwarded": forwarded,
             "closed": replied.id if closes and replied is not None else None,
             "answered_for_you": fyi_id,  # the FYI filed to the person for a reply with a source (§4.9b)
+            "warnings": warnings,  # §4.10 *A subject on every entry*: said on a line, never refused
             # advice, not a refusal: the id comes back either way (design §4.10)
             "advice": advice,
         }
@@ -930,6 +950,7 @@ class MailMixin:
         under that team rather than *No team* (§4.10 *An envelope carries its sender's team*)."""
         entry = MailEntry(id="m-" + secrets.token_hex(6), from_=SYSTEM, to=[to], at=now_iso(), kind="note", text=text)
         entry.team = team or None
+        entry.subject = mail.subject_of(text)  # a `system` note's derived as any text's (§4.10, TD-561)
         entry.uncharged = wake == "uncharged"
         if to == PERSON:
             self.person_inbox.append(entry)

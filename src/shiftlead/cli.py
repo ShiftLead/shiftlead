@@ -2712,6 +2712,9 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "verdict": args.verdict,
         # design §4.10 *A look* (TD-292): repo-relative, so the page finds them on origin's default
         "shots": [_shot_path(x) for x in args.shot] if args.shot else None,
+        # design §4.10 *A subject on every entry* (TD-561): the entry's headline; none on mail the
+        # person reads is derived by the home and said in `warnings`
+        "subject": args.subject,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
     # design §4.10: a message the person reads — to `person`, or a `--source` reply, which the home
@@ -2720,6 +2723,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         warn = shape_warning(text)
         if warn:
             print(warn, file=sys.stderr)
+    for warn in got.get("warnings") or []:  # the home's own, said and never refused (§4.10)
+        print(warn, file=sys.stderr)
 
     def prose() -> None:
         if "entry" not in got:
@@ -2846,11 +2851,18 @@ def _sent(args: argparse.Namespace) -> int:
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
             about = f" about {e['about']}" if e.get("about") else ""
             state = f" · {e['closed_reason']}" if e.get("closed_reason") else ""
-            print(f"\n→ {', '.join(e.get('to') or [])} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}{state}")
+            to = ", ".join(e.get("to") or [])
+            print(f"\n→ {to} · {e['id']} · {e['kind']}{reply}{_subj(e)} · {e['at']}{about}{state}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
 
     return emit(args, got, prose)
+
+
+def _subj(e: dict[str, Any]) -> str:
+    """An entry's subject on its head line, after the kind (design §4.10 *A subject on every entry*,
+    §4.7 `ao inbox`, TD-561), or nothing for one sent without."""
+    return f' · "{e["subject"]}"' if e.get("subject") else ""
 
 
 def _thread(args: argparse.Namespace) -> int:
@@ -2871,7 +2883,8 @@ def _thread(args: argparse.Namespace) -> int:
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
             about = f" about {e['about']}" if e.get("about") else ""
             mark = "  ← this one" if e["id"] == got["id"] else ""
-            print(f"\n[{e['from_role']}] {e['from']}{to} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}{mark}")
+            head = f"[{e['from_role']}] {e['from']}{to} · {e['id']} · {e['kind']}{reply}{_subj(e)}"
+            print(f"\n{head} · {e['at']}{about}{mark}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
             if o := e.get("outcome"):
@@ -2934,7 +2947,7 @@ def cmd_inbox(args: argparse.Namespace) -> int:
         for e in got["entries"]:
             about = f" about {e['about']}" if e.get("about") else ""
             reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
-            head = f"[{e['from_role']}] {e['from']} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}"
+            head = f"[{e['from_role']}] {e['from']} · {e['id']} · {e['kind']}{reply}{_subj(e)} · {e['at']}{about}"
             print(f"\n{head} · {_inbox_status(e)}")
             if st := standing.get(e["id"]):
                 print(f"  {st['text']}")
@@ -3685,6 +3698,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--cites", help="an ask to two or more: the `sends` ids it cannot reconcile, comma-separated")
     p.add_argument(
         "--pr", type=int, metavar="N", help="an ask: the pull request it puts in front of its reader (design §4.9b)"
+    )
+    p.add_argument(
+        "--subject",
+        metavar="LINE",
+        help="the entry's headline in a few words, apart from the text (at most 80 characters); "
+        "a message to the person with none takes its first sentence, and says so (design §4.10)",
     )
     p.add_argument(
         "--verdict",

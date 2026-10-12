@@ -1187,6 +1187,23 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
         call_sync("kill", id=sid)
 
 
+def test_msg_subject_and_the_inbox_head_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """Design §4.10 *A subject on every entry*, §4.7 (TD-566): `ao msg --subject` rides the envelope;
+    a message to the person with none sends, and stderr says which first sentence stands as one;
+    `ao inbox` prints the subject on the head line after the kind."""
+    w = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    monkeypatch.setenv("SHIFTLEAD_SESSION", w)
+    assert cli.main(["msg", "--subject", "PR #9 waits", "person", "The body.\n\nThe reading."]) == 0
+    assert capsys.readouterr().err == ""
+    assert cli.main(["msg", "--kind", "ask", "person", "Merge #9 now? It is green.\n\nThe reading."]) == 0
+    assert 'no --subject: "Merge #9 now?" stands as one' in capsys.readouterr().err
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert f"{w} · " in out and ' · note · "PR #9 waits" · ' in out and ' · ask · "Merge #9 now?" · ' in out
+    call_sync("kill", id=w)
+
+
 def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-136 slice 1 (design §4.7): `ao inbox --thread <id>` prints the thread oldest first, the
     person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
