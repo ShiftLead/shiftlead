@@ -48,3 +48,4 @@
 - [Designer run lessons 2026-10-06](designer-run-lessons-2026-10-06.md) — a steer needs `--default`; a build number taken mid-PR: squash, rebase once, renumber in the one resolution
 - [ao msg's warning precedes its JSON](ao-msg-warning-precedes-json.md) — a jq parse error on the reply is not a failed send; strip the warning line, check `entry.id` or `ao inbox --sent` before resending
 - [Never kill a parent pid unseen](never-kill-a-parent-pid-unseen.md) — a `kill $ppid` loop over `sleep 90` matches killed `systemd --user` and the whole org for 4h20m (2026-10-09); kill only pids you started and recorded
+- [Designer run lessons 2026-10-12](designer-run-lessons-2026-10-12.md) — a techlead-answered steer owes no --outcome; `ao inbox --json` has a trailer line (raw_decode); a ledger rebase conflict: re-run the edit script on main's copy
