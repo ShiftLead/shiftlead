@@ -131,8 +131,9 @@ it with `place: {<team>: <host>}`, and its checkout there is that host's registr
 repo's name (a repo's file never names a host).
 
 `.shiftlead.yml` takes these keys and refuses any other: `ledger`, `roles`, `controllers`,
-`teams` and `promote` (read by the home's promote, design §6), `held` (the paths a flow's review stage
-waits for, design §4.9c), and `unattended`, `ready_when` and
+`teams` and `promote` (read by the home's promote, design §6), `gate` (the merge gate's command,
+`{pr}` filled; unset, `scripts/check_cadence.py` where it exists, design §5 *The seams*), `held` (the
+paths a flow's review stage waits for, design §4.9c), and `unattended`, `ready_when` and
 `commands`, which nothing reads yet — **never `projects`**, which is the org's (design §5).
 
 **Ignore `.claude/worktrees/`** in the repo's `.gitignore` before the first start: every team
