@@ -43,6 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Designed — TD-579 builds it |
+| TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Open |
 | TD-579 | Build TD-577: **Open shell here** opens the shell's Focus in a new tab (Shift, or a popped-out window: a window as Pop out opens one), the placeholder opened in the press and sent to `/focus/<id>` when the create answers; the pressing page stays | Medium | Open |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
@@ -645,6 +646,24 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Done when** **Open shell here** leaves the page it was pressed on in place, and the shell's Focus opens in a new tab or window, from Focus and from a card.
 
 **Related:** TD-572 (the Focus tabs' cost: more tabs are cheap since #1544).
+
+## TD-578: Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript**
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a *Focus header* **Transcript** (the page in a new tab), *Transcript* (the page's **VS Code** on the raw file), *Focus side panel, Session card* **editor** button (the directory), §4.5 screen 9 *Transcript*; §5 `person.open_in`; `src/shiftlead/ui/templates/focus.html` (~L106–110 the Transcript link, ~L286 the Session card's editor button), `src/shiftlead/ui/transcript.py` `transcript_editor` (the file link the Transcript page builds), `src/shiftlead/ui/app.py` ~L1385 (where it is built, for the Transcript page alone)
+
+**Why:** Paul, 2026-10-12: *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others). This will give the ability for a user to easily read/search the current transcript in their favorite editor.* Today the transcript file reaches the editor only through the Transcript page: Focus → **Transcript** (a new tab, a snapshot of the last twenty turns) → its **VS Code**. Reading or searching the whole of a live session's conversation is the editor's work, and the person is on Focus when they want it; the link itself already exists (`transcript_editor`, the `open_in` template with the file's path, §4.5a *Transcript*), so Focus lacks one press, not a mechanism.
+
+**Fix:** design it first, then build it: a button on Focus that is the editor button's template (§5 `person.open_in`, the same form as the Session card's button and the Transcript page's **VS Code**) with the transcript file's path (`transcript_path`, §4.3) in place of the directory, on the record's host. The design round settles where it sits (the header beside **Transcript**, or the Session card beside the directory's editor button) and its label, and states it in §4.5a; the same absences as the Transcript page's button — `open_in: none`, another host's record, a record with no tool session id (a `shell`, a command run) — and it appears when the hook reports one, as **Transcript** does. Then the build: `focus.html`, the link built where Focus's `editor` is, a test that the href is the template with the file's path.
+
+**Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, and the button is absent wherever the Transcript page's **VS Code** is.
+
+**Related:** TD-166 (the Transcript page and its VS Code), TD-154, TD-095 / TD-525 (the editor button on the card and the Session card), TD-532 (a file link's two launches).
 
 ## TD-579: Build TD-577: **Open shell here** opens the shell's Focus in a new tab (Shift, or a popped-out window: a window as Pop out opens one), the placeholder opened in the press and sent to `/focus/<id>` when the create answers; the pressing page stays
 
