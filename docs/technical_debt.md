@@ -670,11 +670,11 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Location:** design §4.10 *How a message to a person is written* (TD-127), §4.5 screen 6 (the Inbox row), §4.7 `ao msg`; the mail envelope; the board's `Format:` line (its bold lead is a subject already)
+**Location:** design §4.10 *How a message to a person is written* (TD-127), §4.5 screen 6 (the Inbox row), §4.7 `ao msg`; the mail envelope; the board's `Format:` line (`docs/user_attention.md`, which names no subject)
 
-**Why:** Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier.* Today a row draws its first paragraph (TD-127: one to three sentences, *no summary field*). That rule rejected a second text on purpose, so a row has no short headline to scan by. Board lines already open with a bolded lead, which acts as one.
+**Why:** Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier.* Today a row draws its first paragraph (TD-127: one to three sentences, *no summary field*). That rule rejected a second text on purpose, so a row has no short headline to scan by. Board lines mostly open with a bolded lead by habit, but the `Format:` line does not require one.
 
-**Fix:** design a required `subject` on every entry filed to the person: mail (`ao msg --subject`, refused or warned when missing, with a length bound), board lines (the bold lead as the subject), the home's own entries (lapse notes, work rows), and TD-560's ledger rows (the entry's title). The Inbox row and the message page draw the subject first and the first paragraph under it, and the find box matches it. The briefs and presets say the rule. This reverses TD-127's *no summary field*; the history gets a dated line. **Done when** the design names the field, where each kind of entry gets it, how a missing one is treated, and how the row draws it, and a build entry is open.
+**Fix:** design a required `subject` on every entry filed to the person: mail (`ao msg --subject`, refused or warned when missing, with a length bound), board lines (a required lead in the `Format:` line, a dev-cadence change), the home's own entries (lapse notes, work rows), and TD-560's ledger rows (the entry's title). The Inbox row and the message page draw the subject first and the first paragraph under it, and the find box matches it. The briefs and presets say the rule. This reverses TD-127's *no summary field*; the history gets a dated line. **Done when** the design names the field, where each kind of entry gets it, how a missing one is treated, and how the row draws it, and a build entry is open.
 
 **Related:** TD-127, TD-560.
 
