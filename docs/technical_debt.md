@@ -42,6 +42,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
+| TD-573 | The techlead's context primer still says a message to the person is its first paragraph alone: TD-566's `--subject` never reached it (docs audit) | Low | Open |
+| TD-574 | §4.5a's *subject* row and §4.10 say every row draws the subject first; the ledger row and the trail row draw none above their text (docs audit) | Low | Open |
 
 ---
 
@@ -611,3 +613,39 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
+
+## TD-573: The techlead's context primer says a message to the person has one shape, its first paragraph; TD-566's `--subject` never reached it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1536–#1546)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/briefs/techlead-context.md` ~L58–61 (a held path: `docs/briefs/**`); design §4.10 *A subject on every entry*; TD-566's **Fix** item 5
+
+**Why:** TD-566's **Location** names `docs/briefs/techlead-context.md` and its Fix item 5 "the repo's brief parts under `docs/briefs/` (the same line; a held path, this entry's)" as getting the message-shape line with `--subject`; §4.10 says "The presets say `--subject` in the message-shape line". #1543 changed the five `src/shiftlead/briefs/*.md` presets and nothing under `docs/briefs/`, and the archived **Resolved** line neither claims the repo's parts nor lists them under *Not built*. The primer still reads `the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message to a person is written*, TD-127` (L60), with no word of a subject. `grep -n subject docs/briefs/*.md` returns nothing on `origin/main` (27fff9e1). A techlead reading only the primer is told the shape without the headline every message now warns for.
+
+**Fix:** add the headline to the primer's sentence (*and a `--subject`, a headline apart from that paragraph, §4.10 *A subject on every entry***); say in TD-566's **Resolved** that the repo's own brief parts were left (or add the line to each that carries the shape rule). Held path: the techlead seat merges it.
+
+**Done when** `grep -n subject docs/briefs/techlead-context.md` finds the line and TD-566's **Resolved** says what was done with the repo's parts.
+
+**Related:** TD-566, TD-561, TD-127.
+
+## TD-574: Design says every Inbox row's first line is its subject; the ledger row and the trail row draw none
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1536–#1546)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.5a-controls.md` row *Inbox row, message page, `ao inbox` | subject* (L13); `docs/design/4.10-messages.md` *A subject on every entry* (~L606–608); `src/shiftlead/ui/templates/inbox_row.html` L240 (the trail row), `src/shiftlead/ui/templates/ledger_for_you.html`
+
+**Why:** §4.5a: *"display only: every row's first text line, bold, one line clipped with an ellipsis … a ledger row's its title"*; §4.10: *"a trail row its *how*. **Drawn**: the row's first text line, bold, one line …"*. The code: `inbox_row.html` L240 `{#- the trail row's subject is its *how*, which its head already says …: not twice -#}` draws no `subj` line, and `ledger_for_you.html` has no `subj` (its title is the first paragraph, as TD-566's **Resolved** says). So two kinds of row the design says draw a bold subject line draw none; the design's *every row* is not true, and neither design file says the exception. The TD-566 **Resolved** names the ledger case and is silent on the trail.
+
+**Fix:** say it in §4.5a's *subject* row and §4.10 (a ledger row's title and a trail row's *how* are the row's first text already, so no separate line is drawn above them), and the dated fact to `docs/design-history.md`; or draw the line, if the design's picture is the one wanted — the owner decides (the fix is the words if the build was right).
+
+**Done when** the design says what the two rows draw, or they draw the line, and a test in `tests/test_ui_inbox.py` holds whichever is true.
+
+**Related:** TD-566, TD-561, TD-565.
