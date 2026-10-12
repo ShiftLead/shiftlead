@@ -1,6 +1,6 @@
 # ADR 2026-10-12: three repos — records holds the ledger and board formats once, dev-cadence is how a repo works, ShiftLead is how sessions are run
 
-**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); awaiting Paul's acceptance.
+**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); Sonnet rounds under way; awaiting Paul's acceptance.
 **Date:** 2026-10-12
 **Supersedes:** the placement of the ledger and board formats in [ADR 2026-10-08](2026-10-08-agentorc-dev-cadence-split.md);
 the rest of that ADR stands. Its Status line gains "superseded in part by ADR 2026-10-12 (the formats'
@@ -117,25 +117,50 @@ Pure functions over text; anything outside the text is passed in.
   that the header's hash matches the body. `src/sessionorc/ledgerboard.py` is excluded from ruff's
   format and lint in `pyproject.toml` (`scripts/` already is): it is read, never formatted, or the first
   `pdm run fmt` breaks both checks. A repo using ShiftLead without dev-cadence has only the wheel's.
-- **Each consumer's CI runs records' fixtures** against its copy.
+- **The fixtures travel the same way, to the two repos that test the module.** Each of dev-cadence and
+  ShiftLead has a `vendor_records.sh` that copies, from a records tag, `ledgerboard.py` (to
+  `files/scripts/`, or to both of ShiftLead's paths) and the fixtures (to `tests/records/`, beside a
+  `MANIFEST` naming the tag and each file's sha256). Fixtures are tooling, not SYNC: a consumer repo
+  never receives them. Each repo's CI runs them against its copy (`tests/test_records_fixtures.sh`,
+  `tests/test_records_fixtures.py`) and checks the module's header hash. No CI checks out another repo.
+- **A new release reaches ShiftLead in one PR.** ShiftLead takes a release by running its
+  `vendor_records.sh`, which replaces both copies and the fixtures at once, so the byte-equality test
+  never sees a half-taken release. When a dev-cadence sync brings a newer `scripts/ledgerboard.py`
+  than the wheel copy, the test fails on purpose: that sync PR runs `vendor_records.sh` too. A lagging
+  ShiftLead is one that has not synced, never one with two versions.
+- **`ledgerboard.py` is in no rule's opt-out set** in `sync.sh`: every consumer that has any of the
+  scripts that import it has it.
 - **dev-cadence's README rule changes:** "no version pinning beyond the lock" gains one exception — a
   vendored records release, pinned by its header.
 - **Until a consumer's first sync after release 1.0**, its lock has no line for `ledgerboard.py`, so
-  `--verify` cannot judge that file; the byte-equality test is ShiftLead's guard meanwhile.
+  `--verify` cannot judge that file; the byte-equality test is ShiftLead's guard meanwhile. In
+  dev-cadence itself, which has no lock of its own, CI checks the header's hash against the body.
+- **A synced script and the module arrive together.** A consumer (samscrape, contractmatch) sees nothing
+  until its next sync, which brings `ledgerboard.py` with the scripts that import it. build 2's
+  `cadence-changes.md` entry says so: sync before running a newer `nudge_user_attention.py` by hand.
 
 ### What ShiftLead requires of a repo, and what it only uses
 
 - **Requires:** a ledger in records format at `.shiftlead.yml`'s `ledger:` path (default
   `docs/technical_debt.md`). External trackers stay outside: per the 2026-09-26 decision, a tracker is
   mapped *into* the ledger by an importer.
-- **Board:** optional. Without one, the person's channel is ShiftLead's own inbox. With one, the Inbox
+- **Board:** optional, at `.shiftlead.yml`'s new `board:` path (default `docs/user_attention.md`).
+  Without one, the person's channel is ShiftLead's own inbox. With one, the Inbox
   reads it **in-process through `ledgerboard.py`** and never runs `nudge_user_attention.py`; a repo with a
   board needs no dev-cadence. Boards are still read against origin (§4.5 screen 6, TD-221): ShiftLead
   reads each board twice itself — the checkout's file and `origin/<default>:docs/user_attention.md` after
   its own fetch (git is ShiftLead's) — parses both through `ledgerboard.py`, and derives the origin note
   (unreached, behind, local, both) from the comparison, as it reads the write-back's tree. The
   Inbox's `ORIGIN_PHRASES` and `BOARD_FIELDS` go. Without dev-cadence, nothing needs to recognise a
-  write-back's commit subject: the write-back merges its own PR.
+  write-back's commit subject: the write-back merges its own PR. Every board edit ShiftLead or its
+  sessions make goes through ShiftLead's `board.py` (an `ao` verb for a session), never
+  `scripts/board_edit.py`, so a repo without dev-cadence's scripts loses nothing.
+- **Briefs and flows name no dev-cadence file.** Every `docs/cadence.md`, `/cadence`,
+  `scripts/check_cadence.py`, `scripts/board_edit.py` and `docs/user_attention.md` in the built-in briefs
+  and flows (`briefs/*.md`, `flows/td/review.md`, `briefs/techlead.stage.md`) becomes a variable
+  (`{gate}`, `{board}`, `{board_edit}`, `{test}`, `{lint}`) or a clause filled only in a dev-cadence repo
+  (`{cadence_rules}`: "read docs/cadence.md §1–§4" there, nothing elsewhere). A test walks `briefs/` and
+  `flows/` and fails on a literal one outside those variables.
 - **Uses when present, with a seam in `.shiftlead.yml` when not** (all new design, see *Builds*):
   - `gate:` a command that exits 0 for a mergeable PR (`{pr}` filled); ShiftLead judges a configured
     gate by its exit code alone. The default, when `scripts/check_cadence.py` exists, is that script
@@ -165,11 +190,11 @@ Each is a ledger entry in the repo named, filed when this ADR is accepted; the d
 
 | # | Repo | What |
 |---|---|---|
-| 1 | records | Create the repo; `ledgerboard.py` moved from dev-cadence's `ledger.py` parsing, nudge's board readers and `board_edit.py`'s `edit_line()`/subject — **moved, not rewritten, except `pickable()`'s resolver**, which becomes a parameter; `SPEC.md` from the seed templates' format paragraphs and cadence §2/§3's format rules; fixtures; release v1.0. Passes both repos' existing format tests unchanged. |
-| 2 | dev-cadence | Vendor v1.0 as a SYNC file, and the provenance test's vendored form; `ledger.py`, `nudge_user_attention.py`, `board_edit.py`, `check_cadence.py` call it; the seeds and cadence.md point at `SPEC.md`; §7's rows; README's pinning exception; a `cadence-changes.md` entry; sync. |
-| 3 | ShiftLead design | §5: `gate:`, `worktree_setup:`, `commands:` read by the briefs, the roster; §4.7: `ao doctor`'s repo rows, `ao repo init` (an empty ledger); §4.5a: the Repo page's missing-seam lines and the Inbox reading in-process; §6: the review stage with no gate; §8: this ADR's rule. |
-| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its three insert subjects (`board`, `answer`, `board decide`) collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; the byte-equality and fixture tests. |
-| 5 | ShiftLead | The seams of build 3, each its own entry: gate, commands into briefs, worktree_setup, roster import, doctor and Repo page rows, `ao repo init`. |
+| 1 | records | Create the repo; `ledgerboard.py` moved from dev-cadence's `ledger.py` parsing, nudge's board readers and `board_edit.py`'s `edit_line()`/subject — **moved, not rewritten, except `pickable()`'s resolver**, which becomes a parameter; `SPEC.md` from the seed templates' format paragraphs and cadence §2/§3's format rules; fixtures; release v1.0 by a `release.sh` that writes the header and tags. records is a dev-cadence consumer (its own ledger, board and CI) that keeps `ledgerboard.py` as source and vendors nothing back. **Test bar:** dev-cadence's ledger, board, parity and check-cadence suites pass unchanged against the vendored module (run in build 2's branch before v1.0 is tagged), and records' fixtures are generated from them. Its subject parser also reads the three insert subjects ShiftLead writes today (`shiftlead: board …`, `shiftlead: answer …`, `shiftlead: board decide …`), for as long as a branch or PR may carry them. |
+| 2 | dev-cadence | Vendor v1.0 as a SYNC file, and the provenance test's vendored form; `ledger.py`, `nudge_user_attention.py`, `board_edit.py`, `check_cadence.py` call it; the seeds and cadence.md point at `SPEC.md`; §7's rows; README's pinning exception; a `cadence-changes.md` entry (sync before running a newer script by hand); `vendor_records.sh`, the fixtures test and the header-hash check; `ledgerboard.py` in no opt-out set; sync. |
+| 3 | ShiftLead design | §5: `gate:`, `worktree_setup:`, `board:`, `commands:` read by the briefs, the roster; §4.7: `ao doctor`'s repo rows, `ao repo init` (an empty ledger); §4.5a: the Repo page's missing-seam lines and the Inbox reading in-process; §6: the review stage with no gate; §8: this ADR's rule. |
+| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its three insert subjects (`board`, `answer`, `board decide`) collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; `vendor_records.sh`, the byte-equality and fixture tests. **Tests rewritten, each assertion listed in the entry:** `tests/test_board.py` (the `message()` subjects, its `DECIDED_RE` uses), `test_ui_inbox*.py`, `test_reports.py`, `test_workorders.py` and `test_ledger*.py` where they touch a dropped regex or subject. |
+| 5 | ShiftLead | The seams of build 3, each its own entry: gate, commands into briefs, worktree_setup, roster import, doctor and Repo page rows, `ao repo init`, `board:`, and the briefs and flows made free of dev-cadence's paths with the test that holds them so. |
 
 ## Consequences
 
