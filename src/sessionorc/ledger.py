@@ -41,7 +41,7 @@ FIELD = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one li
 # the fields read further down the body when the header block lacks them: the script's three by their
 # exact spelling, as it reads them, and ours by any spelling
 BELOW_EXACT = ("Priority", "Type", "Blocked by")
-BELOW = ("owner", "kind")
+BELOW = ("owner", "kind", "answers")  # `answers`: a *for you* entry's, wherever it is written (TD-565)
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 ID_ITEM = re.compile(r"^TD-(\d+)$")
 XREPO_ITEM = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")  # cadence §2.4's `<repo>#TD-NNN`
@@ -57,6 +57,14 @@ PRIORITIES = ("high", "medium", "low")
 TYPES = ("debt", "feature")  # cadence §2.11: pick order within a Priority; the first is the default
 # The windows every count is kept for: the last day, week and month, rolling.
 WINDOWS = {"day": timedelta(days=1), "week": timedelta(days=7), "month": timedelta(days=30)}
+# A *for you* entry's reading for its Inbox row (§4.5 screen 6 *The ledger's entries that wait on you*,
+# TD-565): its `**Answers:**` in cadence §3.5's form, and its Why and Fix clipped as a board item's
+# detail block is (dev-cadence's `MAX_DETAIL_LINES`).
+ANSWER_SPLIT = re.compile(r"(?<!\\)\|")
+DEFAULT_MARK = re.compile(r"\s*\(default\)\s*$", re.I)
+DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+DETAIL_FIELDS = ("Why", "Fix")
+MAX_DETAIL_LINES = 20
 
 
 def strip_comments(text: str) -> str:
@@ -97,6 +105,39 @@ def _header(body: str) -> dict[str, str]:
         if m.group(1) in BELOW_EXACT or k in BELOW:
             fields[k] = m.group(2)
     return fields
+
+
+def answers_of(value: str) -> tuple[list[str], int | None]:
+    """An `**Answers:**` line read as the board's reader reads `Answers:` (cadence §3.5): the items
+    split on `|` (`\\|` a literal bar), the closing full stop dropped, and the index of the one
+    marked ` (default)` — None unless exactly one is (cadence §3.5, TD-066: at most one, and with
+    two there is no single recommendation), as the reader's `parse_default` gives it."""
+    out: list[str] = []
+    marked: list[int] = []
+    for raw in ANSWER_SPLIT.split((value or "").strip().rstrip(".")):
+        words = raw.replace("\\|", "|").strip()
+        if DEFAULT_MARK.search(words):
+            words = DEFAULT_MARK.sub("", words).strip()
+            if words:
+                marked.append(len(out))
+        if words:
+            out.append(words)
+    return out, marked[0] if len(marked) == 1 else None
+
+
+def detail_of(body: str) -> list[str]:
+    """The entry's **Why** and **Fix** paragraphs, each from its `**Name:**` line to the next blank
+    line, at most `MAX_DETAIL_LINES` lines in all — what a *for you* row folds under *details*."""
+    lines = body.split("\n")
+    out: list[str] = []
+    for name in DETAIL_FIELDS:
+        at = next((i for i, ln in enumerate(lines) if ln.startswith(f"**{name}:**")), None)
+        if at is None:
+            continue
+        while at < len(lines) and lines[at].strip():
+            out.append(lines[at].rstrip())
+            at += 1
+    return out[:MAX_DETAIL_LINES]
 
 
 def _norm(tid: str) -> str:
@@ -381,6 +422,12 @@ def entries(
             e["built"] = built(fields.get("kind", ""))
             e["live"] = "yes" if live is not None and e["built"] and all(live(n) for n in e["built"]) else "no"
         e["for_page"] = kind_of(e)
+        if e["for_page"] == "for-you":
+            # the Inbox row's reading (TD-565), on these entries alone so the repo facts barely grow
+            added = DATE.search(fields.get("added", ""))
+            e["added"] = added.group(0) if added else ""
+            e["answers"], e["default"] = answers_of(fields.get("answers", ""))
+            e["detail"] = detail_of(t[m.end() : nxt.start() if nxt else len(t)])
         out.append(e)
     return out
 

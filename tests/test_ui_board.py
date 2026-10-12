@@ -649,9 +649,9 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
 
 
 @pytest.mark.unit
-def test_the_rail_counts_coming_up_as_board_items_and_in_no_section():
+def test_the_rail_counts_coming_up_as_board_items_and_under_later():
     """§4.5 screen 6: the rail's *board items* counts the rows coming up; *Needs you* does not, and a
-    *Needs you* pick keeps them, as they sit in its section."""
+    *Later* pick keeps them, as they sit in its section (TD-565)."""
     from shiftlead.ui.app import rail_counts, rail_picks, rail_rows
 
     due = {"row": "board", "id": "b1", "team": "t", "find": "now"}
@@ -660,8 +660,11 @@ def test_the_rail_counts_coming_up_as_board_items_and_in_no_section():
     got = rail_counts(rows, rail_picks({}))
     assert got["kinds"]["board"]["all"] == 2 and got["sections"]["needs"]["all"] == 1
     assert got["heads"]["needs"]["all"] == 1 and got["teams"]["t"]["all"] == 1
+    assert got["sections"]["later"]["all"] == 1 and got["heads"]["later"]["all"] == 1
     picked = rail_counts(rows, rail_picks({"sec": "needs", "kind": "board"}))
-    assert picked["kinds"]["board"]["shown"] == 2 and picked["heads"]["needs"]["shown"] == 1
+    assert picked["kinds"]["board"]["shown"] == 1 and picked["heads"]["needs"]["shown"] == 1
+    picked = rail_counts(rows, rail_picks({"sec": "needs,later", "kind": "board"}))
+    assert picked["kinds"]["board"]["shown"] == 2 and picked["heads"]["later"]["shown"] == 1
 
 
 @pytest.mark.unit

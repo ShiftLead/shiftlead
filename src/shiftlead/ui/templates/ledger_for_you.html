@@ -1,26 +1,15 @@
-{# design §4.5 screen 6 *The ledger's entries that wait on you*, §4.5a **Inbox: For you in the
-   ledger (n)** fold (TD-367; built — TD-368 slice 3). Under the *Needs you* rows and the board's: the
-   entries the home's repo facts sort *for you*, grouped by repo — closed by default, the browser
-   remembering it open (`inboxledger`), nothing drawn at zero. Counted in no number and in no rail
-   group; the rail's *Teams* picks and the find filter its rows (`.ledgerrow`'s `data-team`,
-   `data-find`). A row is one link to the Repo page on its id and has no control: an entry is
-   edited in its file, a decision given where it was asked. `lf` is `ledger_for_you`'s. The Inbox
+{# design §4.5 screen 6 *The ledger's entries that wait on you*, §4.5a **Inbox row: ledger entry**
+   (TD-367; built — TD-368, drawn as full rows in *Later* by TD-565). The entries the home's repo
+   facts sort *for you*, grouped under the repo's name, each a mail row (`inbox_row.html`'s `ledger`),
+   in section `later`: counted under *Later* alone, in the rail's *ledger entries*, filtered by every
+   pick and the find as every row is. Nothing drawn at zero. `lf` is `ledger_for_you`'s. The Inbox
    renders this at load and its poll puts it back (`html.ledger`). #}
+{% import "inbox_row.html" as hr with context %}
 {%- if lf and lf.n %}
-<details class="fold ledgerfold" id="ledgerfold">
-  <summary><span class="boardsubh">For you in the ledger</span> <span class="meta">({{ lf.n }})</span> <span class="meta">entries that wait on you · not counted</span></summary>
-  {%- for g in lf.groups %}
-  <div class="ledgergroup">
-    <div class="meta mono ledgerrepo">{{ g.repo }}</div>
-    {%- for e in g.rows %}
-    <a class="ledgerrow" href="{{ e.url }}" data-team="{{ e.team }}" data-find="{{ (e.id ~ ' ' ~ e.title ~ ' ' ~ g.repo ~ ' ' ~ e.why ~ ' ' ~ e.held ~ ' ' ~ e.team) | lower }}" title="{{ e.id }} on the {{ g.repo }} Repo page">
-      <span class="ref">{{ e.id }}</span>
-      <span class="ledgertitle">{{ e.title }}</span>
-      <span class="meta">{{ e.pri }} · {{ e.why }}{% if e.held %} · held by {{ e.held }}{% endif %}</span>
-      <span class="badge team">{{ e.team or 'No team' }}</span>
-    </a>
-    {%- endfor %}
-  </div>
-  {%- endfor %}
-</details>
+{%- for g in lf.groups %}
+<div class="ledgergroup">
+  <div class="meta mono ledgerrepo">{{ g.repo }}</div>
+  <div class="inboxrows">{% for e in g.rows %}{{ hr.row(e, 'later') }}{% endfor %}</div>
+</div>
+{%- endfor %}
 {%- endif %}

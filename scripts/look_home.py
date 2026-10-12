@@ -95,7 +95,11 @@ LEDGER = """# Technical debt
 **Status:** Open
 **Location:** nowhere
 
-**Why:** an entry that waits on the person, so the Inbox's *For you in the ledger* fold has a row (TD-368).
+**Why:** an entry that waits on the person, so the Inbox's *Later* section has a ledger row (TD-368, TD-565).
+
+**Fix:** nothing to fix; its Why and Fix are the row's *details*.
+
+**Answers:** Keep it (default) | Drop it.
 
 **Done when:** never.
 """

@@ -825,12 +825,46 @@
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: ledger entry** (§4.5 screen 6 *The ledger's entries that wait on you*,
+   TD-565) ─────────────────────────────────────────────────────────────────────────────────────
+   One entry the home's repo facts sort *for you*, in *Later*, drawn in a mail row's shape: its kind
+   (*ledger · yours* or *ledger · your decision*), the repo as its name, the team badge, *held by*
+   while a member holds it, its age from `Added:` with the priority letter; the id and the title as
+   the first paragraph; *details* the entry's **Why** and **Fix** from the reading's `detail`, through
+   the closed subset as a board item's block is — drawn open on a row with answers, as a board
+   `decide` row's. Everything is the reading's text, never a control built from it (TD-071 item 8).
+   **Open** is the Repo page on the id. #}
+{% macro ledger(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
+  <span class="badge kindmark k-ledger">{{ e.kind }}</span>
+  {%- if e.held %} <span class="st">held by {{ e.held }}</span>{% endif %}
+  <span class="grow"></span>
+  <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
+</div>
+<div class="body"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>
+{%- if e.detail %}
+<details class="fold" data-fold="{{ e.row_id }}"{% if fold_open or e.answers %} open{% endif %}><summary>details</summary><div class="body md detailblock">{{ md(e.detail, origin) }}</div></details>
+{%- endif %}
+<div class="row gap wrap mfoot">
+  <span class="st">in {{ e.name }}'s ledger — waits on you, with no date</span>
+  <span class="grow"></span>
+  <a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
+</div>
+{%- endmacro %}
+
 {#- every row carries an error line (§4.5a *Inbox row: pending*, TD-340): a refused write, or a press
     that took its row away and was refused, drawn there once the refresh brings the row back -#}
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
 <div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {{ board(e, section, origin_first) }}
+<div class="st rowerr" role="alert" hidden></div>
+</div>
+{%- elif e.row == 'ledger' %}
+<div class="mailrow ledgerrow" tabindex="0" data-msg="{{ e.row_id }}" data-at="{{ e.at or '' }}" data-kind="ledger" data-rkind="ledger" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+{{ ledger(e, section) }}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'trail' %}
