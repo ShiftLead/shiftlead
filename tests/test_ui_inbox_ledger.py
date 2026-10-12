@@ -76,6 +76,20 @@ def test_the_fold_lists_each_repos_for_you_entries_in_the_repo_pages_order(tmp_p
     assert ledger_for_you({}, [], {}) == {"n": 0, "groups": []}
 
 
+
+def test_a_rows_year_its_default_and_its_detail_read_only_what_they_can(tmp_path):
+    """TD-571: a row added in another year says the year after the day; a `default` that is a bool
+    is no index, so no answer is recommended; a `detail` line that is not a string is dropped."""
+    from shiftlead.ui.app import ledger_for_you
+
+    root = str(tmp_path / "agentorc")
+    e = _e("TD-9", added="2001-10-07", answers=["Yes", "No"], default=True, detail=["one", 3, "two"])
+    row = ledger_for_you({root: {"name": "agentorc", "root": root, "ledger": {"entries": [e]}}}, [], {})
+    row = row["groups"][0]["rows"][0]
+    assert row["added"] == "added Oct 7, 2001"
+    assert row["answers"] == ["Yes", "No"] and row["default"] == ""
+    assert row["detail"] == "one\ntwo"
+
 def _render(lf, tmp_path, monkeypatch, horizon=None):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
