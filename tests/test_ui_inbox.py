@@ -3358,6 +3358,7 @@ def test_every_row_the_home_builds_carries_its_kinds_subject(tmp_path, monkeypat
     board = board_rows(report)[0]
     assert board["subject"] == "Pick the font for the Inbox" and "pick the font" in row_find(board)
     assert row_subject({"row": "trail", "how": "answered in the terminal"}) == "answered in the terminal"
+    assert row_subject({"row": "ledger", "id": "TD-9", "title": "Pick the font"}) == "Pick the font"  # TD-565's row
 
 
 @pytest.mark.unit
