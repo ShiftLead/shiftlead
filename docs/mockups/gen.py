@@ -1416,6 +1416,7 @@ INBOX_BLURB = {
     "Steering": "Not counted. Open steers whose clock is running, soonest first, each with the default it will take. Doing nothing is a valid answer: at its bound the session goes with its default.",
     "Waiting on them": "Not counted — these wait on a session, not on you. Questions you answered whose asker has not yet said what came of it, and board items you decided or replied to, until a session closes them. Dismiss says you do not need to hear back.",
     "Answered for you": "Not counted. Questions a teammate answered for you from the record, each with its source. Overrule sends your word to the asker.",
+    "Later": "Not counted. What waits on you and is not pressing: the board's items not yet due, as your setting draws them, and the ledger's entries that are yours or wait on your decision — each with its answers and a Reply.",
     "FYI": "The second number, never added to the first. Notes, what resolved itself (the trail), and closed questions, kept for 12 hours. Nothing here has to be acted on; it opens itself when there is something new.",
 }
 
@@ -1543,32 +1544,36 @@ def inbox(picks=False):
     needs, steering, waiting, answered, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
-        secs = [("Needs you", 7, False), ("Steering", 3, False), ("Waiting on them", 2, False), ("Answered for you", 1, False), ("FYI", 14, False)]
+        secs = [("Needs you", 7, False), ("Steering", 3, False), ("Waiting on them", 2, False), ("Answered for you", 1, False), ("Later", 4, False), ("FYI", 14, False)]
         teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 3, False)]
-        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 3, False), ("notes", 3, False), ("trail", 6, False)]
+        kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 3, False), ("ledger entries", 3, False), ("notes", 3, False), ("trail", 6, False)]
         b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
-        later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Board, coming up</span><span class="n" style="background: transparent; color: #6b7280;">1</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
+        later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Not due yet</span><span class="n" style="background: transparent; color: #6b7280;">1</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
             + mcard("#cbd0d6", "board", "dev-cadence", "dc-grind", "due in 6 d · Oct 4",
                     '<div class="txt" style="color: #4b5563;">Decide whether the sweep reads worktrees of a repo that is not in the roster.</div>',
                     b("Reply") + b("Snooze ▾") + b("Done") + b("Open board", "ghost"))
             + '<div class="muted" style="padding: 2px 2px 8px; font-size: 12px;"><span style="font-size: 10px;">▸</span> not shown (14)</div><div class="muted" style="padding: 2px 2px 8px; font-size: 12px;">showing the next 10 board items per team · 14 not shown, the next due Oct 12 — <a href="#">show</a> · <a href="#">Settings</a></div>')
-        # TD-367: the ledger's entries that wait on the person — a fold, drawn open here, counted nowhere; one link per row
-        lrow = lambda tid, pri, title, why, repo, team, held="": mcard("#cbd0d6", "ledger", tid, team, f"{pri} · {why}" + (f" · {held}" if held else ""),
-                                                                      f'<div class="txt" style="color: #4b5563;">{title}</div>',
-                                                                      f'<a href="#" class="muted" style="font-size: 12px;">{tid} on the {repo} Repo page →</a>')
-        ledger = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>For you in the ledger</span><span class="n" style="background: transparent; color: #6b7280;">3</span><span class="muted" style="font-size: 12px; font-weight: 400;">entries that wait on you · not counted</span></div>'
-            + '<div class="muted mono" style="padding: 2px 2px 4px; font-size: 12px;">shiftlead</div>'
-            + lrow("TD-156", "M", "UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel", "yours", "shiftlead", "ao-grind")
-            + lrow("TD-133", "L", "Build the team start at the reset — schedules: in settings.yml, the tick's replay, ao schedule, the card's starts note", "your decision", "shiftlead", "ao-grind")
-            + lrow("TD-319", "L", "Build the Telegram channel — the home tells the person what newly stops a session or a team", "your decision", "shiftlead", "ao-grind", "held by grinder-ao-1"))
-        body = (isec("Needs you", 7, opened=True) + "".join(needs) + later + ledger + isec("Steering", 3) + "".join(steering)
-                + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
+        gap = '<span style="flex-grow: 1;"></span>'
+        # TD-560: the ledger's entries that wait on the person, in *Later* — each a mail row: kind, repo, team, age, the title, details, its answers, Reply, Open
+        lrow = lambda tid, pri, title, why, repo, team, held="", detail="", answers=None: mcard("#cbd0d6", f"ledger · {why}", repo, team, f"added Oct 7 · {pri}" + (f" · held by {held}" if held else ""),
+            f'<div class="txt"><b>{tid}</b> {title}</div>' + (fold("details", open_=bool(answers), body=detail) if detail else "")
+            + ('<div class="sugg"><span class="lbl">its answers</span>' + "".join(b(a) for a in answers) + '</div>' if answers else ""),
+            (b("Reply") + b("Go with it", "primary") if answers else b("Reply", "primary")) + gap + b(ICON["focus"] + "Open", "ghost"))
+        ledger = ('<div class="muted mono" style="padding: 2px 2px 4px; font-size: 12px;">shiftlead</div>'
+            + lrow("TD-133", "L", "Build the team start at the reset — schedules: in settings.yml, the tick's replay, ao schedule, the card's starts note", "your decision", "shiftlead", "ao-grind",
+                   detail='<b>Why:</b> a team started by hand at the reset loses the first hour of the window. <b>Fix:</b> a <span class="mono">schedules:</span> block the tick replays; the card says <i>starts 05:00</i>.',
+                   answers=["At the reset · default", "At a fixed time", "Not now"])
+            + lrow("TD-156", "M", "UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel", "yours", "shiftlead", "ao-grind",
+                   detail='<b>Why:</b> the two ends of a session sit on different surfaces. <b>Fix:</b> a look at the header and the side panel together, with Paul.')
+            + lrow("TD-319", "L", "Build the Telegram channel — the home tells the person what newly stops a session or a team", "your decision", "shiftlead", "ao-grind", held="grinder-ao-1"))
+        body = (isec("Needs you", 7, opened=True) + "".join(needs) + isec("Steering", 3) + "".join(steering)
+                + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("Later", 4) + later + ledger + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · <span style="font-size: 10px;">▸</span> Snoozed (1) · back on their dates · not counted</div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
                 "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks. <b>A board row</b> (TD-126) says its sender's standing before the press — <i>still on TD-122 — grinder-ao-2 holds it</i>, <i>moved on</i> or <i>gone</i> — and carries <b>Reply</b>: the words go on the board line under Paul's name always, and to the lease holder as well while one exists; a reply is not Done. <b>A message has one shape</b> (TD-127): its first paragraph is the whole of what you need, the rest folds under <i>details</i> — closed on the ask row, open on the <i>answered for you</i> row, where the reading is a rendered list from the closed markdown subset and the one link carries its host after its text.")
     else:
-        secs = [("Needs you", "2 of 7", True), ("Steering", "0 of 2", False), ("Waiting on them", "0 of 2", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
+        secs = [("Needs you", "2 of 7", True), ("Steering", "0 of 2", False), ("Waiting on them", "0 of 2", False), ("Answered for you", "0 of 1", False), ("Later", "0 of 4", False), ("FYI", "0 of 14", False)]
         teams = [("ao-grind", "2 of 3", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 3", False)]
         kinds = [("questions", "1 of 1", False), ("steering", "0 of 2", False), ("session states", "1 of 3", False), ("board items", "0 of 3", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
         body = (isec("Needs you", "2 of 7") + "".join(needs[:2])
