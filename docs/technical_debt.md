@@ -44,7 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Designed — TD-597 builds it |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Designed — TD-596 builds it |
-| TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
@@ -56,6 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-594 | §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size, the new shell having none remembered | Low | Open |
 | TD-597 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
+| TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
 
 ---
 
@@ -877,28 +877,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 ---
 
-## TD-597: Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (the designer, TD-578's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Focus header* **‹› VS Code**, §4.5 screen 9, §4.2 (`transcript`); `src/sessionorc/models.py` (the record ~L907: `adapter_id`; add `transcript`), `src/sessionorc/agent*.py` where `adapter_id` is set from the first hook (~L1515 of `models.py` lists the fields a host sets after birth — `transcript` joins them, from the adapter's `transcript_path`, §4.3), the `/events` delta that carries `adapter_id`; `src/shiftlead/ui/app.py` (`focus` ~L1308: `editor` for the Session card; add `transcript_editor(s["transcript"], here)` for the header — `transcript.py` ~L84 already builds it for the Transcript page), `src/shiftlead/ui/templates/focus.html` (~L109: the `#ftranscript` link; the new `<a id="ftranscript_editor" class="btn sm link editor">` after it, `hidden` as it is), `src/shiftlead/ui/static/app.js` (~L4188: where `#ftranscript` is unhidden on `adapter_id`; the new link's `href` set from the delta's `transcript` through `editor.file`-style filling, or re-read on the next poll), `docs/mockups/gen.py` (drawn by TD-578); `tests/test_ui_transcript.py`, `tests/test_ui.py` (~L1776, the Focus header's pieces), `tests/test_agent.py` (the record's `transcript`)
-
-**Why:** TD-578: Paul, 2026-10-12 — *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others)*; reading or searching a live session's whole conversation is the editor's work, and the file reached it only through the Transcript page.
-
-**Fix:**
-1. The record: `transcript` (a host-local path or null), set where `adapter_id` is set from the first hook, from the adapter's `transcript_path(session_id, cwd, profile)`; null where the adapter locates none; carried in the same delta as `adapter_id` and in the `get`/`seen` reads.
-2. Focus: `app.py`'s `focus` builds `transcript_editor(s.get("transcript"), here)` beside `editor`; `focus.html` draws, right after `#ftranscript`, `<a id="ftranscript_editor" class="btn sm link editor" href="…" title="the transcript file in <label>">‹› <label></a>`, `hidden` while the record has no `transcript` or the link is None at render; `app.js` unhides it with `#ftranscript` when a delta brings `adapter_id` and `transcript` (the href filled client-side from `editor.file` with the path, or the page's next poll re-reads the record — pick the one that lands the href without a reload, as **Transcript** does).
-3. Absences: `open_in: none` → not drawn (`transcript_editor` returns None); another host's record (`here` false) → not drawn; no `transcript` on the record → hidden.
-4. Tests: a record with `adapter_id` and `transcript` on this host draws the link with the file's path in the template's `{path}` and no `:line`; `open_in: none` draws none; another host's record draws none; a shell record draws it hidden; the delta carrying `adapter_id` unhides it (a node probe as `test_ui_popout.py` runs one, or a source assertion); the agent sets `transcript` with `adapter_id`; the mockup regenerates unchanged.
-
-**Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, the button appears when the hook reports the tool session id, and it is absent wherever the Transcript page's **VS Code** is; the tests above pass, and the builder's look (design §4.9b: Focus on a live session, the press landing the file in the editor) is named in the PR.
-
-**Related:** TD-578 (the design), TD-166 (the Transcript page), TD-525 (the Session card's editor button), TD-532 / TD-536 (a file link's two launches, which this is not).
-
 ## TD-596: Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception
 
 **Priority:** Medium
@@ -920,6 +898,30 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** `ao promote` (and every other person-only act) runs from a shell the person opened with **Open shell here** or **+ New ▾ Shell**, is still refused to every agent session, an unattended shell, a controlled shell and a role's session, the act is logged as the shell's, and the tests above pass.
 
 **Related:** TD-580 (the design), TD-581 (the promote press under `auto`), TD-077 (identity), TD-577 / TD-579 (Open shell here's tab).
+
+---
+
+## TD-597: Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-578's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Focus header* **‹› VS Code**, §4.5 screen 9, §4.2 (`transcript`); `src/sessionorc/models.py` (the record ~L907: `adapter_id`; add `transcript`), `src/sessionorc/agent*.py` where `adapter_id` is set from the first hook (~L1515 of `models.py` lists the fields a host sets after birth — `transcript` joins them, from the adapter's `transcript_path`, §4.3), the `/events` delta that carries `adapter_id`; `src/shiftlead/ui/app.py` (`focus` ~L1308: `editor` for the Session card; add `transcript_editor(s["transcript"], here)` for the header — `transcript.py` ~L84 already builds it for the Transcript page), `src/shiftlead/ui/templates/focus.html` (~L109: the `#ftranscript` link; the new `<a id="ftranscript_editor" class="btn sm link editor">` after it, `hidden` as it is), `src/shiftlead/ui/static/app.js` (~L4188: where `#ftranscript` is unhidden on `adapter_id`; the new link's `href` set from the delta's `transcript` through `editor.file`-style filling, or re-read on the next poll), `docs/mockups/gen.py` (drawn by TD-578); `tests/test_ui_transcript.py`, `tests/test_ui.py` (~L1776, the Focus header's pieces), `tests/test_agent.py` (the record's `transcript`)
+
+**Why:** TD-578: Paul, 2026-10-12 — *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others)*; reading or searching a live session's whole conversation is the editor's work, and the file reached it only through the Transcript page.
+
+**Fix:**
+1. The record: `transcript` (a host-local path or null), set where `adapter_id` is set from the first hook, from the adapter's `transcript_path(session_id, cwd, profile)`; null where the adapter locates none; carried in the same delta as `adapter_id` and in the `get`/`seen` reads.
+2. Focus: `app.py`'s `focus` builds `transcript_editor(s.get("transcript"), here)` beside `editor`; `focus.html` draws, right after `#ftranscript`, `<a id="ftranscript_editor" class="btn sm link editor" href="…" title="the transcript file in <label>">‹› <label></a>`, `hidden` while the record has no `transcript` or the link is None at render; `app.js` unhides it with `#ftranscript` when a delta brings `adapter_id` and `transcript` (the href filled client-side from `editor.file` with the path, or the page's next poll re-reads the record — pick the one that lands the href without a reload, as **Transcript** does).
+3. Absences: `open_in: none` → not drawn (`transcript_editor` returns None); another host's record (`here` false) → not drawn; no `transcript` on the record → hidden.
+4. Tests: a record with `adapter_id` and `transcript` on this host draws the link with the file's path in the template's `{path}` and no `:line`; `open_in: none` draws none; another host's record draws none; a shell record draws it hidden; the delta carrying `adapter_id` unhides it (a node probe as `test_ui_popout.py` runs one, or a source assertion); the agent sets `transcript` with `adapter_id`; the mockup regenerates unchanged.
+
+**Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, the button appears when the hook reports the tool session id, and it is absent wherever the Transcript page's **VS Code** is; the tests above pass, and the builder's look (design §4.9b: Focus on a live session, the press landing the file in the editor) is named in the PR.
+
+**Related:** TD-578 (the design), TD-166 (the Transcript page), TD-525 (the Session card's editor button), TD-532 / TD-536 (a file link's two launches, which this is not).
 
 ---
 
