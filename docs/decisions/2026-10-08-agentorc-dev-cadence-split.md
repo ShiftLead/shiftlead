@@ -1,6 +1,6 @@
 # ADR 2026-10-08: dev-cadence is what a repo needs with no agentorc on the machine; agentorc is what needs a host agent, a record or a second session
 
-**Status:** decided 2026-10-08 by the anchor (owed to it by TD-159, Paul's question of 2026-09-25). Paul may overrule it with a superseding ADR.
+**Status:** decided 2026-10-08 by the anchor (owed to it by TD-159, Paul's question of 2026-09-25). Paul may overrule it with a superseding ADR. Superseded in part by [ADR 2026-10-12](2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (the formats' placement); the rest stands.
 **Date:** 2026-10-08
 **Related:** TD-159, TD-425, TD-035, TD-055, TD-060, TD-070, TD-118, TD-125, TD-126, TD-142; [ADR 2026-09-06](2026-09-06-adopt-dev-cadence.md); design §4.3, §8
 
