@@ -1664,6 +1664,8 @@ def test_the_trail_puts_a_row_that_resolved_without_you_into_fyi():
     assert "it was a <b>permission</b> row, up for 30m" in html
     assert 'data-act="dismiss" data-id="person" data-msg="t-1"' in html
     assert 'data-kind="trail"' in html and 'class="badge kindmark k-trail"' in html  # a mark, not a control
+    # its subject is its *how*, which the head says: no line of its own above the text (§4.5a *subject*, TD-574)
+    assert 'class="subj"' not in html
     # a malformed trail entry costs its row, never the page (the `_age` rule)
     assert sections_of([], trail=["nonsense", {}, t])["fyi_n"] == 1
 
