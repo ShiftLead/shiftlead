@@ -926,7 +926,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   page's switch — the one part of the block a person flips, so it is not in the checked-in file) the
   home promotes when live ≠ main, the three hold, and main has stood still for `PROMOTE_SETTLE` (ten
   minutes) — a burst of merges is one promote, since for this repo every promote restarts the host
-  agent. **`auto` acts only on a live it has read**: while `check` is not answering (live *unknown*,
+  agent — **or main has been ahead of live for `PROMOTE_MAX_WAIT` (thirty minutes)** whether or not it
+  has stood still (TD-581: on 2026-10-12 a team merging every few minutes kept main from standing
+  still for over half an hour, and the fix for Paul's lagging terminals stayed off the live copy that
+  long): the reading keeps `ahead_since`, the time main first moved past the live commit, cleared
+  when live catches up, and the settle is a batching rule, never a hold without limit. **The person's
+  press stands under `auto` too**: the Inbox row (§4.5a *Inbox row: promote*, drawn under FYI while
+  main is ahead, saying when the home will act) and `ao promote` (§4.7) promote main's head at once —
+  the settle and the wait are the policy's clocks, not preconditions, so a press skips both and is
+  refused only on (1) and (3), as with `auto` off. **`auto` acts only on a live it has read**: while `check` is not answering (live *unknown*,
   with its reason, a last good reading kept beside it), the home waits for a reading rather than
   take unknown for behind, and the row still offers the person's press. With **`auto: false`** the
   Inbox row (§4.5a *Inbox row: promote*) and `ao promote` (§4.7) are the press: refused, naming it,

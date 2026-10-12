@@ -1476,9 +1476,10 @@ def inbox_rows():
         mcard(BAR["needs"], "seat held", "ao-grind-anchor", "ao-grind", "held 3h",
               '<div class="txt"><b>Anchor seat held 3 h by <span class="mono">shiftlead-90</span></b> (claude-code, outside shiftlead, idle) · 7 in its lane: TD-060, TD-292, TD-358 and 4 more — close it, or finish there, and the seat fills on the next tick.</div><div class="meta">on call — the checkout is yours · a session holds it: shiftlead-90</div>',
               b("Dismiss") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), subject="anchor seat held · ao-grind"),
-        mcard(BAR["needs"], "promote", "shiftlead", "", "main moved 12m ago",
-              '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
-              b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), subject="promote · shiftlead · 3 commits ahead"),
+        # TD-581: under auto the row is FYI, uncounted, and says when the home will promote; Promote now skips the settle
+        mcard(BAR["idle"], "promote", "shiftlead", "", "main moved 4m ago",
+              '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto on · <b>settles in 6 min</b></div><div class="meta">the home promotes once main has stood still 10 min, and 30 min after it first moved at the latest; Promote now skips the wait and goes through the checks as your press does; the checkout on main and clean, nothing in flight, still hold</div>',
+              b("Promote now", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), subject="promote · shiftlead · 3 commits ahead · settles in 6 min"),
         # TD-290: a look nobody could settle is an `ask` that names screenshots — counted here; Send to reviewer hands it to the techlead seat
         mcard(BAR["needs"], "ask · look", "grinder-ao-2", "ao-grind", "12m ago · about TD-122",
               '<div class="txt"><b>Yours to judge: is the usage chip readable at a glance in the dark theme?</b> #517 is merged. I checked on a scratch home that there is one chip per account, the hover lists every window, and both themes draw it; nobody could say whether it reads well.</div>'
