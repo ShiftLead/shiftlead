@@ -49,6 +49,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-565 | Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line | Medium | Open |
 | TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
 | TD-568 | The Inbox's *Later* help says each ledger row has *its answers and a Reply*; the build (#1537, slice 1) draws **Open** alone | Low | Open |
+| TD-569 | ao inbox --thread's and --sent's head lines print the subject, and no test would notice if they stopped | Low | Open |
 
 ---
 
@@ -756,3 +757,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** no section help promises a control the section does not draw.
 
 **Related:** TD-565, TD-560, #1537.
+
+## TD-569: `ao inbox --thread`'s and `--sent`'s head lines print the subject, and no test would notice if they stopped
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1536)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/cli.py` (`_subj(e)` at L2855, the `--sent` listing; L2886, `_thread`'s head), `tests/test_cli.py` (`test_msg_subject_and_the_inbox_head_line_that_shows_it`)
+
+**Why:** #1536 (TD-566 slice 1) put `_subj(e)` on three head lines of `ao inbox`: the person's listing (L2950), `--thread` (L2886) and `--sent` (L2855). The one test asserts only the first, `' · note · "PR #9 waits" · ' in out` after a plain `cli.main(["inbox"])`. Probe: in a worktree on `origin/main`, remove `{_subj(e)}` from the two other f-strings and run `tests/test_cli.py tests/test_mail.py`: every test passes, apart from `test_explain_file_and_session`, which fails in this worktree with or without the change (*unknown adapter 'claude-code'*, the adapter not registered here). Design §4.7 says `ao inbox`'s head line carries the subject on each of its forms; two of three could lose it unseen.
+
+**Fix:** extend that test (or add one beside it) to print `ao inbox --thread <id>` and `ao inbox --sent` for the same entries and assert the quoted subject on each head line. **Done when** removing `_subj(e)` from either line fails a test.
+
+**Related:** TD-566 (#1536), TD-561.
