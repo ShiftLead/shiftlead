@@ -183,3 +183,108 @@ def test_the_focus_route_renders_chromeless_on_window_1(client, tmp_path):
     assert "<title>pop · " in win.text
     rec = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert not any("window" in k or "popped" in k for k in rec)
+
+
+SHELL_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({
+  dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+}, o);
+const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: noop, createElement: () => el() };
+const opened = [];
+let block = false;
+const window = { open(url, name, features) {
+  if (block) return null;
+  const w = { url, name, features, location: { href: "about:blank" }, document: { title: "", body: {} },
+    closed: false, close() { this.closed = true; } };
+  opened.push(w);
+  return w;
+} };
+global.window = window; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/focus/a", protocol: "http:", host: "x", href: "/focus/a" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const toasts = [];
+AO.toast = (t) => toasts.push(t);
+const snap = (w) => ({ name: w.name, features: w.features, href: w.location.href, title: w.document.title,
+  text: w.document.body.textContent, closed: w.closed });
+(async () => {
+  const out = {};
+  let seen = null;
+  // the placeholder is written before the create answers: read it from inside the RPC
+  AO.act = async (id, action) => { seen = snap(opened[opened.length - 1]); return { id: "ao-sh-1" }; };
+  await AO.shellHere("a", "/repo/x", false);
+  out.tab = { during: seen, after: snap(opened[0]) };
+  await AO.shellHere("a", "/repo/x", true);
+  out.win = snap(opened[1]);
+  AO.act = async () => { throw new Error("refused: no such dir"); };
+  try { await AO.shellHere("a", "/repo/x", false); out.refused = "no throw"; } catch (e) { out.refused = e.message; }
+  out.refusedWin = snap(opened[2]);
+  block = true;
+  let called = false;
+  AO.act = async () => { called = true; return { id: "x" }; };
+  out.blocked = await AO.shellHere("a", "/repo/x", true);
+  out.blockedCalled = called;
+  out.toasts = toasts;
+  out.pageHref = location.href;
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+@pytest.mark.unit
+def test_open_shell_here_opens_beside_the_page_it_was_pressed_on():
+    """§4.5a *Focus: Open shell here* (TD-577): a tab (or, asked for, a window as Pop out opens one)
+    is opened in the press and reads *opening a shell in <dir>…* until the create answers, then goes
+    to the shell's Focus; a refused create closes it and throws to the press's error path; a blocked
+    open creates nothing and says so. The pressing page's own location is never touched."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "shell_probe.js"
+    probe.write_text(SHELL_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    line = "opening a shell in /repo/x…"
+    assert got["tab"]["during"] == {
+        "name": "_blank",
+        "href": "about:blank",
+        "title": line,
+        "text": line,
+        "closed": False,
+    }  # a tab: no window features
+    assert got["tab"]["after"]["href"] == "/focus/ao-sh-1" and not got["tab"]["after"]["closed"]
+    assert got["win"]["features"] == "popup,width=1184,height=860"
+    assert got["win"]["name"] == "ao-focus-ao-sh-1" and got["win"]["href"] == "/focus/ao-sh-1?window=1"
+    assert got["refused"] == "refused: no such dir" and got["refusedWin"]["closed"] is True
+    assert got["blocked"] is None and got["blockedCalled"] is False
+    assert got["toasts"] == ["the browser blocked the window — allow pop-ups for this page"]
+    assert got["pageHref"] == "/focus/a"
+
+
+@pytest.mark.unit
+def test_open_shell_here_never_moves_the_pressing_page(tmp_path, monkeypatch):
+    """The press handler hands `shell-here` to `AO.shellHere` with Shift or a popped-out window as the
+    window form, and no line of app.js sends the pressing page to the shell; both buttons carry the
+    directory the placeholder names and a title that says where the shell opens."""
+    js = (UI / "static" / "app.js").read_text()
+    assert "AO.shellHere(id, b.dataset.dir, ev.shiftKey || !!AO.poppedId)" in js
+    assert not re.search(r'shell-here"[^\n]*location\.href', js)
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
+
+    card = templates.get_template("card.html").render(s=view({**BASE, "dir": str(tmp_path)}))
+    focus = _focus(monkeypatch, tmp_path, False)
+    title = "a shell session in this session's directory, in a new tab (Shift: a window)"
+    for html in (card, focus):
+        btn = re.search(r'<button[^>]*data-act="shell-here"[^>]*>', html).group(0)
+        assert f'data-dir="{tmp_path}"' in btn and title in btn, btn

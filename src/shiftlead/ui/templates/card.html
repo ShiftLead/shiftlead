@@ -149,7 +149,7 @@
         <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">Kill</button>
         {# enabled only when Ready to close passes (§4.5): dimmed here means disabled, and says why #}
         <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% else %} title="{{ help_title('close') }}"{% endif %}>Close</button>
-        <button data-act="shell-here" data-id="{{ s.id }}">Open shell here</button>
+        <button data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">Open shell here</button>
         {# design §4.5a **Pop out** (TD-046): client-side, nothing is written to the record #}
         <button data-act="popout" data-id="{{ s.id }}" title="open its Focus in its own browser window, for alt-tab — a second press raises it">Pop out</button>
         <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
