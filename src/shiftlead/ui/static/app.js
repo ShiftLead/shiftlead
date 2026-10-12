@@ -2046,7 +2046,6 @@
       ans.open = store.get("inboxanswered", true);
       ans.addEventListener("toggle", () => { store.set("inboxanswered", ans.open); markAnsweredSeen(); });
     }
-    ledgerFold();
     // the board's *not shown* fold (TD-220): its rows join the rail's *board items* while it is open
     document.addEventListener("toggle", (ev) => { if (ev.target.matches && ev.target.matches("details.boardfold")) inboxFilter(); }, true);
     // design §4.5 screen 6 *The rail* (TD-135): the picks are the page's URL. A bare `/inbox` takes
@@ -2360,8 +2359,13 @@
       AO.restoreRowErrs(hz, errs);
       AO.reopenFolds(hz);
     }
-    // the ledger's entries that wait on you (TD-368): put back whole, reopened as the browser remembers it
-    if (AO.ledgerSwap($("#ledgerforyou"), got.html.ledger)) ledgerFold();
+    // the ledger's entries that wait on you (TD-368, TD-565): put back whole when they changed, their
+    // folds reopened as the person left them
+    const lf = $("#ledgerforyou");
+    if (lf && AO.maySwapSection(lf, document.activeElement) && AO.ledgerSwap(lf, got.html.ledger)) AO.reopenFolds(lf);
+    // *Later* (TD-565): drawn while it holds a row coming up, a *not shown* fold or a ledger row
+    const lt = $("#sec-later");
+    if (lt) lt.classList.toggle("hidden", !AO.laterHas(lt) && !rail.sec.includes("later"));
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
     const w = $("#sec-waiting");
@@ -2407,8 +2411,8 @@
   // fourth group: every word typed must match, in any order, as a substring of the row's
   // `data-find`. `railCounts` is `app.py`'s `rail_counts` again, over the rows in the DOM — every
   // count is a count of rows on the page now — and a test holds the two to one answer.
-  const RAIL_SECS = ["needs", "steering", "waiting", "answered", "fyi"];
-  const RAIL_KINDS = ["questions", "steering", "states", "board", "notes", "trail"];
+  const RAIL_SECS = ["needs", "steering", "waiting", "answered", "later", "fyi"];
+  const RAIL_KINDS = ["questions", "steering", "states", "board", "ledger", "notes", "trail"];
   const FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>";
   let rail = { team: [], sec: [], kind: [], find: "" };
   const findOpened = new Set();
@@ -2442,11 +2446,12 @@
     return String(find || "").toLowerCase().split(/\s+/).map(trim).filter(Boolean);
   };
   const railKey = { team: "team", sec: "section", kind: "kind" };
-  // the board's rows coming up and the fold's (TD-220) sit under *Needs you* and are picked with it
-  const RAIL_UNDER = { coming: "needs", unshown: "needs" };
+  // the board's rows coming up and the fold's (TD-220) sit under *Later* (TD-565), counted and picked with it
+  const RAIL_UNDER = { coming: "later", unshown: "later" };
+  const railVal = (r, g) => (g === "sec" ? RAIL_UNDER[r.section] || r.section : r[railKey[g]]);
   function railPasses(r, picks, words, skip) {
     for (const g of ["team", "sec", "kind"]) {
-      const v = g === "sec" ? RAIL_UNDER[r.section] || r.section : r[railKey[g]];
+      const v = railVal(r, g);
       if (g !== skip && picks[g].length && !picks[g].includes(v)) return false;
     }
     return words.every((w) => r.find.includes(w));
@@ -2457,7 +2462,7 @@
     if (rows.some((r) => r.team === "none")) teams.push("none");
     (picks.team || []).forEach((t) => { if (!teams.includes(t)) teams.push(t); });
     const line = (group, value, among) => {
-      const mine = among.filter((r) => r[railKey[group]] === value);
+      const mine = among.filter((r) => railVal(r, group) === value);
       const shown = picks[group].length && !picks[group].includes(value) ? 0 : mine.filter((r) => railPasses(r, picks, words, group)).length;
       return { shown, all: mine.length };
     };
@@ -2465,7 +2470,7 @@
     const out = { filtered: !!(picks.team.length || picks.sec.length || picks.kind.length || words.length), sections: {}, teams: {}, team_order: teams, kinds: {}, heads: {} };
     RAIL_SECS.forEach((s) => {
       out.sections[s] = line("sec", s, rows);
-      out.heads[s] = { shown: rows.filter((r) => r.section === s && railPasses(r, picks, words)).length, all: rows.filter((r) => r.section === s).length };
+      out.heads[s] = { shown: rows.filter((r) => railVal(r, "sec") === s && railPasses(r, picks, words)).length, all: rows.filter((r) => railVal(r, "sec") === s).length };
     });
     teams.forEach((t) => { out.teams[t] = line("team", t, needs); });
     RAIL_KINDS.forEach((k) => { out.kinds[k] = line("kind", k, rows); });
@@ -2518,18 +2523,10 @@
       });
     });
   };
-  // design §4.5 screen 6 *The ledger's entries that wait on you* (TD-368): the fold is closed by
-  // default and this browser remembers it open; its toggle is wired again each time the poll draws it.
-  // The three rules are `AO.` so that `tests/test_ui_inbox_ledger.py` runs them under node (TD-374).
-  AO.ledgerFold = function (d) {
-    d.open = store.get("inboxledger", false);
-    d.addEventListener("toggle", () => store.set("inboxledger", d.open));
-  };
-  function ledgerFold() {
-    const d = $("#ledgerfold"); if (!d) return;
-    AO.ledgerFold(d);
-    inboxFilter();
-  }
+  // design §4.5 screen 6 *The ledger's entries that wait on you* (TD-368, TD-565): full rows in
+  // *Later*. The rules are `AO.` so that `tests/test_ui_inbox_ledger.py` runs them under node (TD-374).
+  // *Later* holds something: a row coming up, a *not shown* fold, or a ledger row
+  AO.laterHas = (sec) => !!sec.querySelector("#rows-coming .mailrow, details.boardfold, #ledgerforyou .mailrow");
   // the poll's swap: put back whole when the server's markup changed — compared with what it sent
   // last, not with the DOM, whose `open` and `hidden` differ. True when it swapped.
   AO.ledgerSwap = function (lf, html) {
@@ -2537,13 +2534,8 @@
     lf.innerHTML = lf.dataset.src = html;
     return true;
   };
-  // the fold's rows: in no rail group and no count, filtered by the *Teams* picks and the find
-  // alone; a repo's name goes with its last row shown
-  AO.ledgerFilter = function (root, teams, words) {
-    $$(".inboxpage .ledgerrow", root).forEach((el) => {
-      const r = railRow(el);
-      el.hidden = !((!teams.length || teams.includes(r.team)) && words.every((w) => r.find.includes(w)));
-    });
+  // the rows are filtered as every row is; a repo's name goes with its last row shown
+  AO.ledgerFilter = function (root) {
     $$(".inboxpage .ledgergroup", root).forEach((g) => { g.hidden = !$$(".ledgerrow", g).some((el) => !el.hidden); });
   };
   const railRow = (el) => ({ section: el.dataset.section || "", team: el.dataset.team || "none", kind: el.dataset.rkind || "", find: el.dataset.find || "" });
@@ -2558,9 +2550,9 @@
       const r = railRow(el);
       el.hidden = !railPasses(r, rail, words, r.section === "snoozed" ? "sec" : "");
     });
-    // …and the board's rows coming up, and the fold's once it is open (TD-220): the rail's *board
-    // items* counts the board rows on the page, and no section's number counts either
-    const rows = $$([...RAIL_SECS.map((k) => `#rows-${k} .mailrow`), "#rows-coming .mailrow", "details.boardfold[open] #rows-unshown .mailrow"].join(", ")).map(railRow);
+    // …and the board's rows coming up, the fold's once it is open (TD-220) and the ledger's (TD-565):
+    // counted under *Later*, by their kinds and in no number that means *due now*
+    const rows = $$([...RAIL_SECS.map((k) => `#rows-${k} .mailrow`), "#rows-coming .mailrow", "details.boardfold[open] #rows-unshown .mailrow", "#ledgerforyou .mailrow"].join(", ")).map(railRow);
     const c = AO.railCounts(rows, rail);
     // a team line for a picked team the poll no longer carries, so the pick can be undone
     const rt = $("#railteams");
@@ -2577,8 +2569,8 @@
       b.classList.toggle("dim", c.filtered && !cnt.shown);
     });
     $("#railclear").disabled = !c.filtered;  // held in place, so the toggles never move under the pointer (TD-423)
-    // the ledger's rows (TD-368): the *Teams* picks and the find alone
-    AO.ledgerFilter(document, rail.team, words);
+    // a repo's name in *Later* goes with its last ledger row shown (TD-565)
+    AO.ledgerFilter(document);
     // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
     // the same counts, picked first so a pick never scrolls out of sight
     const pn = rail.team.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);
@@ -2602,7 +2594,8 @@
       sec.classList.toggle("railout", rail.sec.length > 0 && !rail.sec.includes(k));
       const h = c.heads[k];
       $("#n-" + k).textContent = c.filtered ? num(h, true) : h.all ? `${h.all}` : "";
-      const empty = $(".note.empty", sec); if (empty) empty.hidden = h.shown > 0;
+      // *Later* says it is empty only when a pick emptied it: unfiltered, a fold and a line are not nothing
+      const empty = $(".note.empty", sec); if (empty) empty.hidden = h.shown > 0 || (k === "later" && !c.filtered);
     });
     const sz = $("#snoozedbox"); if (sz) sz.classList.toggle("railout", rail.sec.length > 0);
     // the find's own count, and the folds it opens (§4.5 screen 6 *Find*): a match inside FYI or

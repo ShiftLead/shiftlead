@@ -247,6 +247,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     ledger_for_you,  # noqa: F401
+    ledger_rows,  # noqa: F401
     live_look,  # noqa: F401
     look_pair,  # noqa: F401
     look_review,  # noqa: F401
@@ -2859,8 +2860,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     board_view = h.board_view
 
     async def ledger_view(fleet: list[dict[str, Any]]) -> dict[str, Any]:
-        """The fold **For you in the ledger** (§4.5 screen 6, TD-368) from the home's repo facts and the
-        definitions' team per repo; empty when either cannot be read — the fold then draws nothing."""
+        """The ledger's rows of *Later* (§4.5 screen 6, TD-368, TD-565) from the home's repo facts and the
+        definitions' team per repo; empty when either cannot be read — nothing is then drawn."""
         repos: dict[str, Any] = {}
         named: dict[str, str] = {}
         with contextlib.suppress(Exception):
@@ -2902,17 +2903,18 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             fleet=fleet,
         )
         picks = rail_picks(request.query_params)
+        lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet)
         return templates.TemplateResponse(
             request,
             "inbox.html",
             {
                 "sections": sections,
                 "picks": picks,
-                "rail": rail_counts(rail_rows(sections, hz["ahead"]), picks),
+                "rail": rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), picks),
                 "origin": page_origin(request),
                 "board_note": board_note,
                 "horizon": hz,
-                "ledger": {"n": 0, "groups": []} if agent_down else await ledger_view(fleet),
+                "ledger": lf,
                 "board_choices": board_choices(),
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
@@ -3077,11 +3079,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         got["html"] = inbox_html(sections, page_origin(request))
         # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
         got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=page_origin(request))
-        got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=await ledger_view(fleet))
+        lf = await ledger_view(fleet)
+        got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=lf, origin=page_origin(request))
         # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its rows,
         # so the poll brings the group's markup as it brings the rows'; the script presses the lines
         # the URL picks and recounts every line from the rows on the page
-        rail = rail_counts(rail_rows(sections, hz["ahead"]), rail_picks({}))
+        rail = rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), rail_picks({}))
         got["html"]["rail_teams"] = str(
             templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
         )

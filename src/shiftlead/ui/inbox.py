@@ -1806,27 +1806,31 @@ def inbox_sections(
 
 # *Urgency*: the page's own sections in the page's order. The snoozed list is not one of them: it
 # is in no section and no count (§4.10 *Snooze*).
-RAIL_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi")
+# *Later* (TD-565) is the board's rows coming up, the fold's once opened, and the ledger's *for you*
+# rows: its own boxes the poll puts back, so it is a rail section and not one of `INBOX_SECTIONS`.
+RAIL_SECTIONS = ("needs", "steering", "waiting", "answered", "later", "fyi")
 RAIL_SECTION_NAMES = {
     "needs": "Needs you",
     "steering": "Steering",
     "waiting": "Waiting on them",
     "answered": "Answered for you",
+    "later": "Later",
     "fyi": "FYI",
 }
 # *Kinds*: a row's coarse kind, one per line (§4.5 screen 6 *The rail*)
-RAIL_KINDS = ("questions", "steering", "states", "board", "notes", "trail")
+RAIL_KINDS = ("questions", "steering", "states", "board", "ledger", "notes", "trail")
 RAIL_KIND_NAMES = {
     "questions": "questions",
     "steering": "steering",
     "states": "session states",
     "board": "board items",
+    "ledger": "ledger entries",
     "notes": "notes",
     "trail": "trail",
 }
-# the board's rows coming up and the fold's (TD-220) are drawn under *Needs you* and picked with it,
-# but are in none of its numbers: a section pick reads them as the section they sit in
-RAIL_UNDER = {"coming": "needs", "unshown": "needs"}
+# the board's rows coming up and the fold's (TD-220) are drawn under *Later* (TD-565) and counted
+# and picked with it: a section pick, a section line and a heading read them as *Later*
+RAIL_UNDER = {"coming": "later", "unshown": "later"}
 RAIL_NO_TEAM = "none"  # a row that carries no team, in the URL and on the rail's *no team* line
 _FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
 
@@ -1841,6 +1845,8 @@ def rail_kind(e: Mapping[str, Any]) -> str:
         return "board"
     if row == "trail":
         return "trail"
+    if row == "ledger":
+        return "ledger"
     if row:
         return "states"
     if e.get("kind") in PERSON_ASK_KINDS or e.get("passed_up"):
@@ -1858,6 +1864,8 @@ def row_find(e: Mapping[str, Any], section: str = "") -> str:
     row = e.get("row")
     if row == "trail":
         return _find_text(e.get("name"), e.get("team"), e.get("kind"), "trail", e.get("how"), e.get("text"))
+    if row == "ledger":
+        return _find_text(e.get("id"), e.get("title"), e.get("name"), e.get("team"), e.get("kind"), e.get("held"))
     if row:  # the home's own text for the row, and its team and pill, which the row draws too
         return _find_text(e.get("find"), e.get("team"), e.get("state_label"))
     answered = e.get("answered") if section == "answered" and isinstance(e.get("answered"), dict) else {}
@@ -1911,11 +1919,16 @@ def rail_picks(query: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def rail_rows(sections: Mapping[str, Any], ahead: Collection[Mapping[str, Any]] = ()) -> list[dict[str, str]]:
+def rail_rows(
+    sections: Mapping[str, Any],
+    ahead: Collection[Mapping[str, Any]] = (),
+    ledger: Collection[Mapping[str, Any]] = (),
+) -> list[dict[str, str]]:
     """Every row on the page that the rail counts, as the four things a pick reads: its section,
     team (`none` for no team), coarse kind and find text. The snoozed list is in no count. `ahead` is
-    the board's rows coming up (TD-220), in section `coming`: counted by the rail's *board items* and
-    in no section's number; the fold's rows (`unshown`) join only once it is opened, in the browser."""
+    the board's rows coming up (TD-220), in section `coming`, and `ledger` the ledger's *for you*
+    rows (`ledger_rows`), in section `later`: both counted under *Later* (TD-565); the fold's rows
+    (`unshown`) join only once it is opened, in the browser."""
     return [
         {
             "section": sec,
@@ -1923,7 +1936,7 @@ def rail_rows(sections: Mapping[str, Any], ahead: Collection[Mapping[str, Any]] 
             "kind": rail_kind(e),
             "find": row_find(e, sec),
         }
-        for sec, rows in [*((s, sections.get(s) or ()) for s in RAIL_SECTIONS), ("coming", ahead)]
+        for sec, rows in [*((s, sections.get(s) or ()) for s in RAIL_SECTIONS), ("coming", ahead), ("later", ledger)]
         for e in rows
     ]
 
@@ -1954,8 +1967,11 @@ def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -
     # a picked team no row carries still gets its line, so the pick can be undone
     teams += [t for t in picks.get("team") or () if t not in teams]
 
+    def val(r: Mapping[str, str], group: str) -> str:
+        return RAIL_UNDER.get(r[key[group]], r[key[group]]) if group == "sec" else r[key[group]]
+
     def line(group: str, value: str, among: Collection[Mapping[str, str]]) -> dict[str, int]:
-        mine = [r for r in among if r[key[group]] == value]
+        mine = [r for r in among if val(r, group) == value]
         shown = 0 if pick[group] and value not in pick[group] else sum(1 for r in mine if passes(r, group))
         return {"shown": shown, "all": len(mine)}
 
@@ -1968,8 +1984,8 @@ def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -
         "kinds": {k: line("kind", k, rows) for k in RAIL_KINDS},
         "heads": {
             s: {
-                "shown": sum(1 for r in rows if r["section"] == s and passes(r)),
-                "all": sum(1 for r in rows if r["section"] == s),
+                "shown": sum(1 for r in rows if val(r, "sec") == s and passes(r)),
+                "all": sum(1 for r in rows if val(r, "sec") == s),
             }
             for s in RAIL_SECTIONS
         },
@@ -1984,18 +2000,36 @@ templates.env.globals["rail_rows"] = rail_rows
 templates.env.globals["rail_counts"] = rail_counts
 
 
+def _added_words(day: str) -> str:
+    """A ledger row's age words from its `Added:` date (§4.5a **Inbox row: ledger entry**):
+    *added Oct 7*, the year after it when it is not this year's; nothing for a date it cannot read."""
+    try:
+        d = date.fromisoformat(day)
+    except ValueError:
+        return ""
+    words = f"added {d.strftime('%b')} {d.day}"
+    return words if d.year == date.today().year else f"{words}, {d.year}"
+
+
+def ledger_rows(lf: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """`ledger_for_you`'s rows, every group's, in its order: what the rail counts under *Later*."""
+    return [r for g in (lf or {}).get("groups") or () for r in g.get("rows") or ()]
+
+
 def ledger_for_you(
     repos: Mapping[str, Any], fleet: Collection[dict[str, Any]], named: Mapping[str, str] | None = None
 ) -> dict[str, Any]:
-    """The Inbox's **For you in the ledger (n)** fold (design §4.5 screen 6 *The ledger's entries
-    that wait on you*, §4.5a, TD-368): the entries §4.4 *Repo facts* sorts *for you* in the home's
-    repo facts (`repos`, keyed by checkout, in the registry's order), one group per repo with any,
-    each in the Repo page's order (priority, then id). A row is `{id, title, pri, why, held, team,
-    url}`: *yours* for `Owner: paul`, *your decision* for a `decision (paul)` item; *held by* the
-    names of the live records of that repo claiming it; the team the rail's *Teams* picks filter by
-    — the definitions' team for the repo (`named`, by resolved checkout), else the team most of its
-    live records carry, else none; the link the Repo page opened on the id. `n` is every row,
-    counted in no number of the page's."""
+    """The ledger's rows of the Inbox's **Later** section (design §4.5 screen 6 *The ledger's entries
+    that wait on you*, §4.5a **Inbox row: ledger entry**, TD-368, TD-565): the entries §4.4 *Repo
+    facts* sorts *for you* in the home's repo facts (`repos`, keyed by checkout, in the registry's
+    order), one group per repo with any, each in the Repo page's order (priority, then id). A row is
+    a mail row's shape — `row: "ledger"`, its `kind` (*ledger · yours* for `Owner: paul`, *ledger ·
+    your decision* for a `decision (paul)` item), `name` the repo, `team`, `at` its `Added:` date and
+    `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text)
+    and `url` — with `held` the names of the live records of that repo claiming it; the team the
+    rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
+    checkout), else the team most of its live records carry, else none; the link the Repo page
+    opened on the id. `n` is every row, counted under *Later* alone."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
 
     live = [s for s in fleet if s.get("state") not in ("exited", "closed") and s.get("repo")]
@@ -2029,16 +2063,31 @@ def ledger_for_you(
                 )
             ]
             owner = str(e.get("owner") or "").lower() == "paul"
+            answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
+            d = e.get("default")
+            ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
+            added = str(e.get("added") or "")
             rows.append(
                 {
+                    "row": "ledger",
                     "id": e["id"],
+                    "row_id": f"ledger:{name}:{e['id']}",  # the row's `data-msg` and fold key: an id is per repo
+                    "kind": "ledger · yours" if owner else "ledger · your decision",
+                    "name": name,
                     "title": e.get("title") or "",
                     "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
-                    "why": "yours" if owner else "your decision",
                     "held": ", ".join(held),
                     "team": team,
+                    "at": added,
+                    "added": _added_words(added),
+                    "detail": "\n".join(str(x) for x in e.get("detail") or () if isinstance(x, str)).strip("\n"),
+                    "answers": answers,
+                    "default": answers[d] if ok else "",
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
                 }
             )
         groups.append({"repo": name, "rows": rows})
     return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}
+
+
+templates.env.globals["ledger_rows"] = ledger_rows
