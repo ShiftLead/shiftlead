@@ -714,7 +714,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Added:** 2026-10-12 (ao-dc-decouple, with Paul)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open.
+**Status:** Open — ledgerboard v1.0 is released (ShiftLead/ledgerboard, tag `v1.0`; its `fixtures/run.py` and `SPEC.md`), and dev-cadence vendors it (its TD-106). Moving to it changes four things ShiftLead does today — each is v1.0 keeping dev-cadence's behaviour, the definition until now: (1) `done` appends `Closed: <today>.`, where `board.py` only ticks; (2) `decide` on a decided line rewrites it — keep `board.py`'s refusal as a check in front of the call; (3) `decided_line`/a reply refuse `Context:` and `Closed:` in the words as well as `Answers:`/`Decided:`; (4) the subjects are `subject()`'s — `reply <head>` not `reply on <head>`, the head by `edit_head()` (prefix and fields dropped, 60 chars) not the bold run, and `append` for every add (the three old insert subjects still read as appends). `item_line` takes `(text, due, today, session, host, context)`, as `board.py`'s does; the ADR's shorter signature omits `today`. A resolver may return `(state, why)` or a mapping. Was: Open.
 **Blocked by:** TD-584, dev-cadence#TD-106
 **Location:** `src/sessionorc/{ledger,board,reports,workorders}.py`, `src/shiftlead/ui/inbox.py`, new `src/sessionorc/ledgerboard.py` and `scripts/vendor_ledgerboard.sh` (both created by this entry), `pyproject.toml` (ruff exclude), `tests/`
 
