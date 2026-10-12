@@ -152,6 +152,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *Board write-back* parses items through `ledgerboard.py`, its subjects ledgerboard's; the cross-repo resolver reads the home's own roster. Built by TD-585 and TD-590.
 - 2026-10-12 (TD-565 slice 2, grinder-ao-2): *Board write-back* names the person's answer to a ledger entry as an add on the second add's road (`ledger_decide`, `shiftlead: board decide TD-n (person)`), so the adds the board ever takes are three, not two.
 - 2026-10-12 (TD-560, the designer): *Repo facts* — a *for you* entry's reading carries `added`, `answers` and `detail` for the Inbox's row. Built by TD-565.
 - 2026-10-12 (TD-558, the designer): *In a team's lanes* names the Start dialog as a reader of the same lanes, from the plan, before any record exists. Built by TD-563.
@@ -269,6 +270,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): screen 6 reads board items in-process through `ledgerboard.py`, never `nudge_user_attention.py`; the copy-picking rule (TD-278) goes with it. Built by TD-585.
 - 2026-10-12 (TD-577, the designer): screen 1's **+ New ▾** text says **Open shell here** opens the shell's Focus in a new tab or a window, never in place of the pressing page. Built by TD-579.
 - 2026-10-12 (TD-572, ao-paul; Paul: *there is lag per keystroke in this (and the other focus) terminals … no lag when typing into the composer*): *Live state* gains the groups' coalescing and the light stream. Every delta had carried the groups, read over the whole fleet, and every page — each Focus tab too — held a full stream: with three Focus tabs and a few working sessions the UI process sat at a full core, its loop up to 3 s behind (a static file's p99 2.4 s), each page receiving ~0.9 MB/s, and a keystroke into a Focus terminal waited behind it. §4.5a *card: compact*'s count and *wound down* note follow: re-read within a second, not on every delta.
 - 2026-10-12 (TD-561, the designer): *The message page* heads with the entry's subject. Built by TD-566.
@@ -370,6 +372,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): **Repo page: missing seams** row; the **origin note** derives from the page's own two reads through `ledgerboard.py`. Built by TD-591 and TD-585.
 - 2026-10-12 (TD-577, the designer; Paul, 2026-10-12, after a press from a Focus replaced the Focus he was working in: *opening a shell should not overwrite the current window (should be new tab or new window)*): **Focus: Open shell here** opens the shell's Focus in a new tab, the pressing page staying; Shift+press, or a press in a popped-out window, a window as **Pop out** opens one; the tab or window opened in the press as a placeholder and sent to `/focus/<id>` once the create answers, closed on a refusal, nothing created when the browser blocks it. Was: the press set the pressing page's location to the new Focus, from Focus and from a card. Built by TD-579.
 - 2026-10-12 (TD-574, grinder-ao-2; the docs audit of #1536–#1546): the **subject** row says a ledger row and a trail row draw no line of their own — their subject is already their first text — as TD-566 built them.
 - 2026-10-12 (TD-567, ao-paul; Paul saw ao-grind's header flash between *started 2m ago* and a datetime): the team card's **work waiting** note and *started <t>* draw the age alone, the instant on hover — the page's local-time rewrite and the header's deltas had taken turns.
@@ -662,6 +665,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): `ao repo init` (an empty ledger), `ao board edit done|snooze` (a session's own line edit on its branch through ledgerboard's `edit_line()`), `ao doctor`'s **repos** check. Built by TD-587 and TD-591.
 - 2026-10-12 (TD-561, the designer): `ao msg --subject <line>`; a missing one on a message to the person is derived and said; `ao inbox` prints it. Built by TD-566.
 - 2026-10-10 (TD-060 step 2, the anchor): `ao migrate` — the one-time move from the old machine names.
 - 2026-10-10 (TD-507, grinder-ao-2; found in TD-465's live check): the doctor's **hooks** reading leaves out dev-cadence's SessionStart line of any vintage — every command naming `scripts/cadence_hooks.sh` or `scripts/nudge_user_attention.py` — not only today's line byte for byte: the `+cadence` layers written on 2026-09-11 and 2026-09-23 carried the runner line from before 2026-09-25, and the live `ao doctor` warned that it *does not resolve*.
@@ -872,6 +876,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9a Winding down: a team that runs out of work
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *What a session does with a decided line* closes it with `ao board edit done`, `scripts/board_edit.py` the same edit without ShiftLead. Built by TD-587.
 - 2026-10-09 (TD-468, grinder-ao-1): *The home's note says more* built — `_finished_tell` adds, after a blank line, *Claims left*, *Restarts*, *Alarms*, *Open to you* and *Usage* lines, each only when it has something to say (members' restarts and claims; alarms over every record of the team). A `wanted` restart's entry keeps the member's own why as `said`, so the line reads *2 context bound*; a person's Restart and a team's `start`/`work` replays are not counted. `usage_at_start` is written by `_mark_team_start` when nothing of the team runs: at the dispatcher for a create carrying `team_start` (which `ao team start` sets, before the create is routed, so a node's start is kept at the home), and at the tick's `start` and `work` replays; a restart never writes it.
 - 2026-10-09 (TD-110, the designer): **the home's note says more** — rule 9's wind-down note gains claims left, restarts by why, standing alarms, open questions to the person and each profile's usage against the start's reading (`teams.<team>.usage_at_start`); no `ao team report`, no board line. Built by TD-468.
 - 2026-10-08 (TD-053 step 4, the anchor): **the three guards against false exhaustion were settled: one kept, one moved to the home, one dropped.** The design had left them unset, to be chosen against a running team: the manager re-reading the ledger before a team-wide wind-down, and an exhaustion declared soon after a start reported rather than acted on. By this date rule 9 (TD-240) had made *finished* the home's reading, with `FINISHED_SETTLE`, and rules 6 and 8 read the lanes themselves. So the second opinion is the home's and not the manager's. The early bound was dropped: the running teams' early declarations were correct (grinder-sam-1 at 90 s after a full search; samscrape-grind-anchor at 24 s on an empty lane), so a bound would have sent the person right answers. `RESTART_EARLY` stays the restart's alone.
@@ -1112,6 +1117,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *The seams* — `board:`, `gate:`, `worktree_setup:`, `commands:` (`test`, `lint`) and what `ledger:` requires (a ledger in ledgerboard format); *Repos* is ShiftLead's own roster importing dev-cadence's. Was: `commands:` read by nothing, the roster dev-cadence's file. Built by TD-585–TD-591.
 - 2026-10-10 (TD-060 step 2, the anchor): a repo's file is `.shiftlead.yml`; `.agentorc.yml` is read while no `.shiftlead.yml` is beside it.
 - 2026-10-10 (TD-536, the designer): `person.file_link: {folder_first, wait}` and the template's optional `file`. Built by TD-537.
 - 2026-10-10 (TD-532, the designer): the `vscode` file form's line names the folder form sent a second before it. Built by TD-535.
@@ -1149,6 +1155,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): rule 10 runs the repo's `gate:`, judged by exit code, `check_cadence.py --json` its default; a repo with no gate is not checked and the review stage never merges on its own — *no gate: a person merges*. Was: no script, no reading. Built by TD-586.
 - 2026-10-12 (TD-559, the designer): rule 3's `seat_held` gains `since`, kept while the holder is the same, for the Inbox row's and the header mark's age; `SEAT_HELD_GRACE`. Built by TD-564.
 - 2026-10-10 (TD-539, the designer): the promote readings carry `live_at` and `pending` for the build chip. Built by TD-542.
 - 2026-10-09 (TD-516, grinder-ao-1): rule 6's *Unknown is not* not live — until the promote's first reading since a start, a repo reading gives each live check the `live` its checkout's last reading gave it (`_carry_live`). Before, `_promotes` began empty, every live check read `no`, `work.reread` pruned it from `lane_seen`, and the survey brought it back as new: each promote's restart filled the anchor seat with nothing new five to six minutes later (five times on 2026-10-09).
@@ -1314,6 +1321,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 8. Lessons carried in
 
+- 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *Which side a thing lives on* becomes three layers — ledgerboard holds the formats once, dev-cadence how a repo works, ShiftLead how sessions are run — and *no second parser* in place of the 2026-10-08 paragraph's second reader held by a parity test. Built by TD-585.
 - 2026-10-08 (TD-425, grinder-ao-1): the synced-file rule's `CADENCE_ATTENTION_SCOPE` is set by every launch (§4.3); the hook's `ao status` branch stays the one exception until dev-cadence drops it on TD-425's live check.
 - 2026-10-08 (TD-159, the anchor): the rule for which side a thing lives on, agentorc or dev-cadence, added from the inventory in ADR 2026-10-08. A synced file never calls `ao`, and agentorc passes a difference in by an environment variable.
 - No dated facts removed.

@@ -45,7 +45,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Open |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
-| TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Open |
+| TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
 | TD-586 | The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default | Medium | Open |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
@@ -694,8 +694,9 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Added:** 2026-10-12 (ao-dc-decouple, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open.
-**Location:** design §4.5a, §4.7, §4.9a, §5, §6, §8; `docs/design-history.md`; the 2026-10-08 ADR's Status line
+**Status:** Designed 2026-10-12 (the designer) — every section the ADR names says what it decided: §5 *The seams* (`board:`, `gate:`, `commands:` `test`/`lint`, `worktree_setup:`, what `ledger:` requires, each seam's fixed sentence; *Repos* ShiftLead's own roster importing dev-cadence's); §4.7 `ao repo init`, `ao board edit done|snooze` (on the session's branch, `--line`/`--expect`, no `decide`/`reply`, refused on the default branch and a dirty index), `ao doctor` **repos** (a missing ledger a lack, an unset seam a warning); §4.5a *Repo page: missing seams* and the origin note from two in-process reads; §4.5 screen 6 and §4.4 read boards through `ledgerboard.py`, the copy-picking rule gone; §4.9a closes a decided line with `ao board edit done`; §6 rule 10 runs `gate:` by exit code, *no gate: a person merges*; §8 three layers and *no second parser*; the 2026-10-08 ADR's Status line. No mockup: the one drawn change is the Repo page's seam lines, plain text under the title. Help-list wording stays with the builds. TD-585–TD-591 build it; this PR drops TD-584 from their `Blocked by:`. Was: Open.
+**Blocked by:** TD-585, TD-586, TD-587, TD-588, TD-589, TD-590, TD-591
+**Location:** design §5 *The seams* and *Repos*, §4.7 `ao repo init` / `ao board edit` / `ao doctor` **repos**, §4.5a *Repo page: missing seams* and *origin note*, §4.5 screen 6, §4.4 *Repo facts* and *Board write-back*, §4.9a, §6 rule 10, §8; `docs/design-history.md`; the 2026-10-08 ADR's Status line
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Its builds need the design first (CLAUDE.md: a change in behaviour is a change to the design first).
 
@@ -715,7 +716,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — ledgerboard v1.0 is released (ShiftLead/ledgerboard, tag `v1.0`; its `fixtures/run.py` and `SPEC.md`), and dev-cadence vendors it (its TD-106). Moving to it changes four things ShiftLead does today — each is v1.0 keeping dev-cadence's behaviour, the definition until now: (1) `done` appends `Closed: <today>.`, where `board.py` only ticks; (2) `decide` on a decided line rewrites it — keep `board.py`'s refusal as a check in front of the call; (3) `decided_line`/a reply refuse `Context:` and `Closed:` in the words as well as `Answers:`/`Decided:`; (4) the subjects are `subject()`'s — `reply <head>` not `reply on <head>`, the head by `edit_head()` (prefix and fields dropped, 60 chars) not the bold run, and `append` for every add (the three old insert subjects still read as appends). `item_line` takes `(text, due, today, session, host, context)`, as `board.py`'s does; the ADR's shorter signature omits `today`. A resolver may return `(state, why)` or a mapping. Was: Open.
-**Blocked by:** TD-584, dev-cadence#TD-106
+**Blocked by:** dev-cadence#TD-106
 **Location:** `src/sessionorc/{ledger,board,reports,workorders}.py`, `src/shiftlead/ui/inbox.py`, new `src/sessionorc/ledgerboard.py` and `scripts/vendor_ledgerboard.sh` (both created by this entry), `pyproject.toml` (ruff exclude), `tests/`
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. ShiftLead parses both formats itself today (`sessionorc/ledger.py`, `board.py`, the Inbox's regexes) and runs dev-cadence's `nudge_user_attention.py` for the board.
@@ -736,7 +737,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Blocked by:** TD-584
 **Location:** `src/shiftlead/repoconfig.py`, `src/sessionorc/cadence.py`, the td flow's review stage, the review card
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Today the gate is `scripts/check_cadence.py` or nothing, and nothing reads as "could not look".
@@ -757,7 +757,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Blocked by:** TD-584, TD-585
+**Blocked by:** TD-585
 **Location:** `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py`, `src/sessionorc/board.py`, §4.7's help list (`src/shiftlead/ui/help.py`)
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. A session closes a decided board line with `scripts/board_edit.py`, a dev-cadence script, so a repo without dev-cadence cannot.
@@ -778,7 +778,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Blocked by:** TD-584, TD-586, TD-587
+**Blocked by:** TD-586, TD-587
 **Location:** `src/shiftlead/briefs/*.md`, `src/shiftlead/flows/**/*.md` (five), `src/shiftlead/team_skill.md`, `repoconfig.py`/`teams.py` (the filling), this repo's `.shiftlead.yml` and own brief
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. The built-in briefs hard-code this repo's layout (`pdm run test`, `docs/cadence.md`, `scripts/check_cadence.py`, `scripts/board_edit.py`, `docs/design/`), so a repo without dev-cadence, or with another layout, gets wrong instructions.
@@ -799,7 +799,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Blocked by:** TD-584
 **Location:** `src/sessionorc/gitinfo.py`, `src/shiftlead/repoconfig.py`
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Worktree setup runs dev-cadence's `hydrate_worktree.sh` when present and nothing otherwise.
@@ -820,7 +819,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Blocked by:** TD-584
 **Location:** `src/sessionorc/hosts.py` (`DEFAULT_REPOS_REGISTRY`), `~/.shiftlead/`
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. ShiftLead's list of repos defaults to dev-cadence's machine roster, so a machine without dev-cadence has none.
@@ -841,7 +839,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open.
-**Blocked by:** TD-584, TD-586, TD-587, TD-589
+**Blocked by:** TD-586, TD-587, TD-589
 **Location:** `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/cli.py`, §4.5a/§4.7 help (`src/shiftlead/ui/help.py`)
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Every dev-cadence feature ShiftLead uses switches itself off silently when the file is absent.
