@@ -159,6 +159,15 @@ def test_what_a_person_did_on_an_offline_node_survives_the_homes_copy():
     assert len(home.sends) == 2  # idempotent: a replayed snapshot adds nothing
 
 
+def test_a_nodes_first_hook_brings_its_transcript_home():
+    """`transcript` is identity set on the session's own host with `adapter_id` (§4.4a, TD-597): a node's
+    report carries it to the home's copy, so the home's Focus can draw the file's link."""
+    node, home = rec(), rec()
+    node.adapter_id, node.transcript = "conv-1", "/p/conv-1.jsonl"
+    apply_node(home, node.to_dict())
+    assert (home.adapter_id, home.transcript) == ("conv-1", "/p/conv-1.jsonl")
+
+
 @pytest.mark.unit
 def test_a_copy_that_disagrees_on_identity_is_another_session():
     with pytest.raises(NotTheSameSession, match="`host`"):
