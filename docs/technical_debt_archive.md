@@ -10202,3 +10202,23 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Related:** TD-577, TD-579 (#1563), TD-046.
 
 **Resolved:** 2026-10-12 (PR #1581) — §4.5a's *Focus | Open shell here* row says the Shift / popped-out window opens at **Pop out**'s default size, the shell having no id to remember a size by until the create answers, and remembers its own size from then on as any popped-out window does (`app.js` stores `win.<id>` once its Focus loads with `?window=1`). Wording only; no behaviour change.
+
+## TD-586: The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/repoconfig.py`, `src/sessionorc/cadence.py`, the td flow's review stage, the review card
+
+**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Today the gate is `scripts/check_cadence.py` or nothing, and nothing reads as "could not look".
+
+**Fix:** per the ADR's *What ShiftLead requires*: `gate:` in `.shiftlead.yml`, a command that exits 0 for a mergeable PR (`{pr}` filled), judged by exit code alone; the default, when `scripts/check_cadence.py` exists, is that script with `--json` and its rows on the card; with none, the review stage never merges on its own and the card says "no gate: a person merges".
+
+**Done when** a repo with `gate: "true"`, one with the default, and one with none each behave as the ADR says, with tests.
+
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-588 (`{gate}` in the briefs), TD-591 (the missing-gate line).
+
+**Resolved:** 2026-10-12 (PR #1572) — `sessionorc.cadence.gate` reads `gate:` (set, defaulted to `scripts/check_cadence.py --pr {pr} --json`, absent); a set gate is run by `sh -c` in the checkout and judged by its exit code, one row *gate: <command, filled> exited <n>*; a repo with no gate is recorded once a PR as `verdict: none` — nothing run, nobody told — and `ao status -v` prints *no gate: a person merges*; `shiftlead.repoconfig` accepts the key. Tests: `tests/test_cadence_policy.py` (the three kinds, the exit code, the no-gate record and a gate gained later), `tests/test_repoconfig.py`. The briefs' `{gate}` is TD-588's, the seam state on the Repo page and in `ao doctor` TD-591's.

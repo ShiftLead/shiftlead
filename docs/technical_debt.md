@@ -48,7 +48,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-598 | Build TD-581: `PROMOTE_MAX_WAIT` and `ahead_since` in the promote reading; the Inbox's promote row under `auto` (FYI, *settles in m min*, **Promote now**); the build chip's *main +n* a link to it with the hover's line | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
-| TD-586 | The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default | Medium | Open |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
 | TD-589 | The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default | Low | Open |
@@ -732,26 +731,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** `git grep` finds no ledger or board line-shape regex outside `ledgerboard.py` in `src/`, the Inbox runs no dev-cadence script, and the suite passes.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); ledgerboard#TD-001 (release v1.0); dev-cadence#TD-106 (dev-cadence vendors it).
-
----
-
-## TD-586: The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/shiftlead/repoconfig.py`, `src/sessionorc/cadence.py`, the td flow's review stage, the review card
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Today the gate is `scripts/check_cadence.py` or nothing, and nothing reads as "could not look".
-
-**Fix:** per the ADR's *What ShiftLead requires*: `gate:` in `.shiftlead.yml`, a command that exits 0 for a mergeable PR (`{pr}` filled), judged by exit code alone; the default, when `scripts/check_cadence.py` exists, is that script with `--json` and its rows on the card; with none, the review stage never merges on its own and the card says "no gate: a person merges".
-
-**Done when** a repo with `gate: "true"`, one with the default, and one with none each behave as the ADR says, with tests.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-588 (`{gate}` in the briefs), TD-591 (the missing-gate line).
 
 ---
 
