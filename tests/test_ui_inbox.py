@@ -3358,6 +3358,9 @@ def test_every_row_the_home_builds_carries_its_kinds_subject(tmp_path, monkeypat
     report = {"today": "2026-10-12", "boards": [{"root": "/w", "board": "/w/docs/user_attention.md", "items": [item]}]}
     board = board_rows(report)[0]
     assert board["subject"] == "Pick the font for the Inbox" and "pick the font" in row_find(board)
+    bare = {"line": 8, "due": "2026-10-20", "text": "Decide the font. Due: 2026-10-20"}
+    report["boards"][0]["items"] = [bare]
+    assert board_rows(report)[0]["subject"] == "Decide the font."  # no bold head: the line before its `Due:`
     assert row_subject({"row": "trail", "how": "answered in the terminal"}) == "answered in the terminal"
     assert row_subject({"row": "ledger", "id": "TD-9", "title": "Pick the font"}) == "Pick the font"  # TD-565's row
 

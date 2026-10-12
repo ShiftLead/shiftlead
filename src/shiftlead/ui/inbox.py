@@ -1431,6 +1431,13 @@ def board_detail(it: Mapping[str, Any]) -> str:
     return "\n".join(got).strip("\n")
 
 
+def board_subject_text(text: str) -> str:
+    """A board line's text before its `Due:` and without its `Context:` — what a head-less line's
+    subject is cut from, so a headline never carries the due date or the answers after it."""
+    due = board_mod.DUE_RE.search(text)
+    return CONTEXT_RE.sub("", text[: due.start()] if due else text).strip() or text
+
+
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per open item of the report — its repo, its due words, the whole text, and the board at that
@@ -1485,7 +1492,7 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     "head": board_head(text),
                     # §4.10 *A subject on every entry*: the head line's *what's needed*, already its
                     # headline (cadence §3.3) — before the `Context:`, which is under *details*
-                    "subject": mail_mod.clip_subject(board_head(CONTEXT_RE.sub("", text))),
+                    "subject": mail_mod.clip_subject(board_head(board_subject_text(text))),
                     "name": Path(root).name if root else "",
                     "due": str(it.get("due") or ""),
                     "due_tag": tag,

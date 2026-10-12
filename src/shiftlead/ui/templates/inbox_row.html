@@ -237,7 +237,7 @@
   <span class="grow"></span>
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
-{{ subj(e) }}
+{#- the trail row's subject is its *how*, which its head already says (*resolved: …*): not twice -#}
 {%- if e.text %}<div class="body">{{ e.text }}</div>{% endif %}
 <div class="row gap wrap mfoot">
   {%- if e.kind == 'board reply' %}

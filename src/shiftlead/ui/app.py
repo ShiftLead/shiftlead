@@ -239,6 +239,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_rows,  # noqa: F401
     board_standing,  # noqa: F401
     board_standings,  # noqa: F401
+    board_subject_text,  # noqa: F401
     board_text,  # noqa: F401
     board_waiting_on,  # noqa: F401
     board_waits,  # noqa: F401
