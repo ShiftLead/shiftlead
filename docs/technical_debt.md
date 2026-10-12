@@ -45,7 +45,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-559 | A seat or member held off by a session outside the team is a quiet slot line: the person sees no error, and the team's anchor work waits unseen | Medium | Designed — TD-564 builds it |
 | TD-560 | The ledger's undated *for you* entries get their own Inbox section, not due, drawn as every Inbox row is — its options and a Reply | Medium | Designed — TD-565 builds it |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Designed — TD-566 builds it |
-| TD-562 | `ao migrate`'s top-level `*.yml`/`*.yaml`/`*.json` globs, the console-script lookbehind and the undecodable-file skip are held by no test: each can go and `test_migrate.py` stays green | Low | Open |
 | TD-564 | Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark | Medium | Open |
 | TD-565 | Build TD-560: the Inbox's *Later* section — the board's coming-up rows moved in, the ledger's *for you* entries as full rows with `Answers:`, Go with it, Reply and Open, an answer written as a decided board line | Medium | Open |
 | TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
@@ -668,24 +667,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** design a required `subject` on every entry filed to the person: mail (`ao msg --subject`, refused or warned when missing, with a length bound), board lines (a required lead in the `Format:` line, a dev-cadence change), the home's own entries (lapse notes, work rows), and TD-560's ledger rows (the entry's title). The Inbox row and the message page draw the subject first and the first paragraph under it, and the find box matches it. The briefs and presets say the rule. This reverses TD-127's *no summary field*; the history gets a dated line. **Done when** the design names the field, where each kind of entry gets it, how a missing one is treated, and how the row draws it, and a build entry is open.
 
 **Related:** TD-127, TD-560.
-
-## TD-562: `ao migrate`'s top-level `*.yml`/`*.yaml`/`*.json` globs, the console-script lookbehind and the undecodable-file skip are held by no test: each can go and `test_migrate.py` stays green
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1521 and #1522)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/migrate.py` (`TEXT_GLOBS`, the console-script rule in `REWRITES`, `run`'s `except (OSError, UnicodeDecodeError)`); `tests/test_migrate.py::_old_home`, `::test_migrate_rewrites_the_venv_and_scripts_reloads_after_the_units_go_and_leaves_symlinks`
-
-**Why:** #1522 (TD-556) holds every probe TD-556 named, and the module's docstring and `TEXT_GLOBS` promise more: *"the YAML and JSON at its top, the launch records, each node's `hosts.yml`/`profiles.yml`"* and a console-script rule *"as whole words (never inside an `ao-agentorc-…` session id)"*. Probes over `tests/test_migrate.py` alone, each restored after: delete `"*.yml"` from `TEXT_GLOBS` — `16 passed`; delete `"*.yaml"` — `16 passed`; delete `"*.json"` (leaving `launch/*.json`) — `16 passed`; the fixture's only top-level file, `org.yml`, holds `agentorc` bare, which no rule rewrites, and the symlinked `linked.yml` is skipped, so no top-level file is ever rewritten in a test. Remove the lookbehind `(?<![\w-])` from the `agentorc-(hook|agent|ui|watch)` rule — `16 passed`: the fixture's `ao-agentorc-agent-1` is held by the lookahead `(?![\w-])` alone, so a session id that *ends* in a script name (`ao-agentorc-ui`) would be rewritten to `ao-shiftlead-ui` unnoticed. Narrow `except (OSError, UnicodeDecodeError)` to `except OSError` — `16 passed`: no fixture file is undecodable, so a binary file under a glob would abort the move after the home was renamed.
-
-**Fix:** in `test_migrate.py`: a top-level `settings.yml`, `x.yaml` and `x.json` each carrying `/h/.agentorc/x` and expecting `/h/.shiftlead/x`; a launch record whose session id is `ao-agentorc-ui` stays as it is; a top-level `.json` of invalid UTF-8 bytes does not stop `run`, and is left as it was.
-
-**Done when:** each probe in **Why** fails `tests/test_migrate.py`.
-
-**Related:** TD-060 (#1505), TD-556.
 
 ## TD-564: Build TD-559: `seat_held.since`, the *seat held* Inbox row under Needs you past `SEAT_HELD_GRACE`, and the team header's mark
 
