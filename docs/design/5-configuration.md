@@ -222,7 +222,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     run what the repo's README says*). This repo's own `pdm run …` lives here and in its own brief,
     not in the built-ins, which name no repo's layout ([ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md),
     *Briefs and flows name no repo's layout*; TD-588).
-  - **`worktree_setup:`** — a command run by the shell in each new worktree after it is created
+  - **`worktree_setup:`** — a command run by the shell in each new worktree, its path `$1`, after it is created
     (`sessionorc.gitinfo.ensure_worktree`; a worktree reused is not set up again), default
     `scripts/hydrate_worktree.sh` when present and executable, given the worktree's path; unset and
     absent, nothing runs and the Repo page says *no worktree setup* (TD-589). A setup that fails

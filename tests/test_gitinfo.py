@@ -190,10 +190,10 @@ def test_a_new_worktree_is_set_up_by_the_repos_worktree_setup(tmp_path):
     for text in ("worktree_setup: ''\n", "worktree_setup: [a]\n", "worktree_setup: [\n"):
         (repo / ".shiftlead.yml").write_text(text)
         assert worktree_setup(repo)[0] == "defaulted", text
-    (repo / ".shiftlead.yml").write_text("worktree_setup: ' pwd > .setup-ran '\n")
-    assert worktree_setup(repo) == ("set", "pwd > .setup-ran")
+    (repo / ".shiftlead.yml").write_text("worktree_setup: ' pwd > .setup-ran; echo \"$1\" >> .setup-ran '\n")
+    assert worktree_setup(repo) == ("set", 'pwd > .setup-ran; echo "$1" >> .setup-ran')
     wt = ensure_worktree(repo, "set")
-    assert (wt / ".setup-ran").read_text().strip() == str(wt), "run in the new worktree"
+    assert (wt / ".setup-ran").read_text().split() == [str(wt)] * 2, "run in the new worktree, its path $1"
     assert not (wt / ".hydrated").exists(), "the configured command, not the default"
     assert not (ensure_worktree(repo, "set") / ".hydrated").exists() and (wt / ".setup-ran").is_file()
     (wt / ".setup-ran").unlink()

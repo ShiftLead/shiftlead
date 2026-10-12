@@ -93,7 +93,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
     (after a fetch) or from HEAD when there is no origin. Reused when it already exists. A new one is
     then set up by the repo's `worktree_setup` (§5 *The seams*, TD-589): a configured command, run by
-    the shell in the new worktree, or by default the repo's own `scripts/hydrate_worktree.sh` when
+    the shell in the new worktree with its path as `$1`, or by default the repo's own `scripts/hydrate_worktree.sh` when
     present (dev-cadence repos), so the worktree gets the untracked pieces git leaves out."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
         raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
@@ -123,7 +123,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     if kind == "absent" or not command:
         return path
     if kind == "set":
-        what, argv, cwd = command, ["sh", "-c", command], str(path)
+        what, argv, cwd = command, ["sh", "-c", command, "sh", str(path)], str(path)  # the path its `$1`
     else:
         what, argv, cwd = "hydrate_worktree.sh", [str(repo / HYDRATE), str(path)], None
     try:
