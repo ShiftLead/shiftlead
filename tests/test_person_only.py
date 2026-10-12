@@ -13,7 +13,8 @@ import pytest
 
 from sessionorc import mail
 from sessionorc.agent import HostAgent
-from sessionorc.agent_common import RpcError
+from sessionorc.agent_common import RpcError, person_only
+from sessionorc.models import Session
 
 # what each RPC's first statement may call to make the check: the check, or one of the two
 # helpers that make it and keep what else each does (the entry lookup, *runs at the home*)
@@ -49,6 +50,7 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
     assert len(mail.PERSON_ONLY) == 30
     assert set(rpcs) >= mail.PERSON_ONLY, sorted(mail.PERSON_ONLY - set(rpcs))
     bare = HostAgent.__new__(HostAgent)
+    bare.sessions = {}  # the one thing the check reads: a caller this host does not hold is a session
     for name in sorted(mail.PERSON_ONLY):
         fn = rpcs[name]
         params = [p for p in inspect.signature(fn).parameters if p not in ("self", "caller")]
@@ -58,7 +60,10 @@ def test_every_name_in_the_list_is_an_rpc_that_refuses_a_session_before_reading_
                 asyncio.run(call)
         msg = str(e.value)
         assert msg.startswith("ao-repo-worker cannot "), (name, msg)
-        assert ": a person's own act, refused to every session (design §" in msg, (name, msg)
+        assert ": a person's own act, refused to every session but the person's own shell (design §" in msg, (
+            name,
+            msg,
+        )
 
 
 def test_every_rpc_that_makes_the_check_is_in_the_list():
@@ -79,8 +84,74 @@ def test_the_lists_neighbours_keep_their_own_rules():
 
 
 def test_a_person_passes_the_check():
-    from sessionorc.agent_common import person_only
-
-    assert person_only(None, "restart a session", "§6 rule 2") is None
+    assert person_only(None, "restart a session", "§6 rule 2", {}) is None
     with pytest.raises(RpcError, match=r"^0 cannot restart a session: a person's own act"):
-        person_only(0, "restart a session", "§6 rule 2")  # any caller present is a session (§4.8a)
+        person_only(0, "restart a session", "§6 rule 2", {})  # any caller present is a session (§4.8a)
+    with pytest.raises(RpcError, match=r"^\['x'\] cannot restart"):
+        person_only(["x"], "restart a session", "§6 rule 2", {"x": _shell("x")})  # never looked up
+
+
+# ── the person's own shell is the person (§4.8, TD-580) ──────────────────────────────────────────
+
+
+def _shell(sid: str, **over) -> Session:
+    """A shell the person opened: Open shell here, + New ▾ Shell, `ao shell` outside a pane."""
+    return Session(**{"id": sid, "name": sid, "kind": "interactive", "dir": "/", "adapter": "shell", **over})
+
+
+NOT_THE_PERSONS = {
+    "an agent session": {"adapter": "claude-code"},
+    "an unattended shell": {"unattended": True},
+    "a controlled shell": {"controllers": ["ao-repo-lead"]},
+    "a role's shell": {"role": "grinder"},
+    "a team's shell": {"team": "ao-grind"},
+}
+
+
+def test_person_shell_is_a_shell_interactive_with_no_role_team_or_controller():
+    assert mail.person_shell(_shell("s"))
+    assert not mail.person_shell(None)
+    for what, over in NOT_THE_PERSONS.items():
+        assert not mail.person_shell(_shell("s", **over)), what
+
+
+def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
+    """The one exception, held against the whole list: called from a person's shell each RPC gets
+    past the check (whatever it fails on next, it is not the refusal); called from an agent session,
+    an unattended, controlled, role's or team's shell, or a caller the host does not hold, each is
+    refused in the new words."""
+    rpcs = _rpcs()
+    callers = {"ao-sh": _shell("ao-sh")} | {
+        f"ao-{i}": _shell(f"ao-{i}", **o) for i, o in enumerate(NOT_THE_PERSONS.values())
+    }
+    bare = HostAgent.__new__(HostAgent)
+    bare.sessions = callers
+    for name in sorted(mail.PERSON_ONLY):
+        params = [p for p in inspect.signature(rpcs[name]).parameters if p not in ("self", "caller")]
+
+        def call(caller, name=name, params=params):
+            out = getattr(bare, f"rpc_{name}")(**dict.fromkeys(params), caller=caller)
+            if inspect.iscoroutine(out):
+                asyncio.run(out)
+
+        try:
+            call("ao-sh")
+        except Exception as e:  # noqa: BLE001 — the bare agent fails on whatever it reads next
+            assert "a person's own act" not in str(e), (name, str(e))
+        for sid in [*callers.keys() - {"ao-sh"}, "ao-gone"]:
+            with pytest.raises(RpcError, match="refused to every session but the person's own shell") as e:
+                call(sid)
+            assert str(e.value).startswith(f"{sid} cannot "), (name, sid)
+
+
+def test_the_right_is_the_records_state_at_the_call():
+    """Never kept: a controller added, `ao mode` to unattended, or a role, and the next call is refused."""
+    s = _shell("ao-sh")
+    records = {"ao-sh": s}
+    assert person_only("ao-sh", "change the settings", "§5", records) is None
+    s.controllers = ["ao-repo-lead"]
+    with pytest.raises(RpcError, match="but the person's own shell"):
+        person_only("ao-sh", "change the settings", "§5", records)
+    s.controllers, s.unattended = [], True
+    with pytest.raises(RpcError):
+        person_only("ao-sh", "change the settings", "§5", records)

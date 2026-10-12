@@ -1713,7 +1713,7 @@ class HostAgent(
         **A person's own**, refused to a session as `set_settings` is, and the home's alone
         (`modes.HOME_EDITS`); a node's member is closed and created over the link. Every refusal is
         made before anything is touched; the reply is the new record."""
-        agent_common.person_only(caller, "restart a session", "§6 rule 2")
+        agent_common.person_only(caller, "restart a session", "§6 rule 2", self.sessions)
         if self.mode != "home":
             raise RpcError("restart runs at the home (design §6 rule 2): this host is a node")
         s = self._find(id)
@@ -1769,7 +1769,7 @@ class HostAgent(
         what it holds — but by the home, which writes `sit_out: {at}` and, once the member is settled,
         closes it itself and marks it `closed_for: {why: sit_out}` (the tick's `_sit_out_close`). It
         takes no launch; never a seat (rule 3 fills one when it is due) or a scheduled record."""
-        agent_common.person_only(caller, "relaunch a session", "§4.9c")
+        agent_common.person_only(caller, "relaunch a session", "§4.9c", self.sessions)
         if self.mode != "home":
             raise RpcError("relaunch runs at the home (design §4.9c): this host is a node")
         s = self._find(id)
@@ -2188,7 +2188,7 @@ class HostAgent(
         `person.attach.max` (§5) is refused on its first piece, before anything is written. A
         person's own act, for a session on this host only: `_get` refuses a node's, whose copy over
         ssh is §7's phase 2."""
-        agent_common.person_only(caller, "attach a file", "§4.5a")
+        agent_common.person_only(caller, "attach a file", "§4.5a", self.sessions)
         s = self._get(id)
         if upload:
             up = self._uploads.get(upload)

@@ -182,6 +182,22 @@ def is_person(caller: Any) -> bool:
     return caller is None
 
 
+def person_shell(record: Session | None) -> bool:
+    """The person's own shell (design §4.8 *The person's own shell is the person*, TD-580): a `shell`
+    session, interactive, with no role, no team and no controller — what **Open shell here**, **+ New
+    ▾ Shell** and `ao shell` make, and what no session can make, since a session's shell lists its
+    creator as a controller from birth. Read from the record at each request, never kept: `ao mode`,
+    `ao control … add` or a role ends it on the next call. The one exception to `PERSON_ONLY`."""
+    return (
+        record is not None
+        and record.adapter == "shell"
+        and not record.unattended
+        and not record.role
+        and not record.team
+        and not record.controllers
+    )
+
+
 Controllers = Callable[[Session], list[str]]
 
 

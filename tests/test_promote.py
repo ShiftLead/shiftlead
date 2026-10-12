@@ -18,6 +18,7 @@ from conftest import park_ticks
 
 from sessionorc import hosts, promote
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import Session
 
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
 
@@ -323,6 +324,25 @@ async def test_the_press_is_a_persons_and_refused_to_a_session(agent, checkout):
             await worker.call("promote", repo="repo")
         with pytest.raises(AgentError, match="a person's own"):
             await worker.call("clear_promote", repo="repo")
+
+
+async def test_the_persons_own_shell_presses_and_the_press_is_recorded_as_the_shell(agent, checkout, monkeypatch):
+    """§4.8 *The person's own shell is the person* (TD-580): a shell the person opened — interactive,
+    no role, no team, no controller — runs `promote` as the person does, and `by` names the shell;
+    the same shell given a controller is refused on its next call."""
+    await park_ticks(agent)
+    _register(checkout)
+    main = _merge(checkout, "b")
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha: ("pending", ""))
+    shell = Session(id="ao-repo-sh", name="sh", kind="interactive", adapter="shell", dir=str(checkout))
+    agent.sessions[shell.id] = shell
+    async with LocalClient(caller=shell.id) as sh:
+        assert (await sh.call("promote", repo="repo"))["sha"] == main
+        assert agent._promotes["repo"]["inflight"]["by"] == "ao-repo-sh"
+        _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
+        shell.controllers = ["ao-repo-lead"]
+        with pytest.raises(AgentError, match="refused to every session but the person's own shell"):
+            await sh.call("clear_promote", repo="repo")
 
 
 async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(agent, checkout, monkeypatch):

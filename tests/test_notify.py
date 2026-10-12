@@ -479,7 +479,12 @@ async def test_send_a_test_is_the_persons_and_sends_whatever_on_says(agent, sent
         assert (await agent.rpc_host())["notify"]["last_ok"] == got["at"]
         sid = (
             await person.call(
-                "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"]
+                "create",
+                name="w",
+                dir=str(tmp_path),
+                adapter="shell",
+                role="worker",
+                argv=["bash", "--norc", "--noprofile"],
             )
         )["id"]
         try:

@@ -1220,7 +1220,9 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
     """TD-136 slice 1 (design §4.7): `ao inbox --thread <id>` prints the thread oldest first, the
     person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
     refused in the host agent's words; `--unread` does not combine with it."""
-    worker = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    worker = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", role="worker", argv=["bash", "--norc"])[
+        "id"
+    ]
     monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["--json", "msg", "person", "rebase or merge?", "--kind", "ask"]) == 0
     asked = json.loads(capsys.readouterr().out)["entry"]["id"]
