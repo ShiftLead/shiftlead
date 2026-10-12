@@ -1415,7 +1415,7 @@ INBOX_BLURB = {
     "Needs you": "Counted — the top bar's first number is exactly this list. A pending permission or question, a limited or stalled session, an exited session with unpushed work, an open ask, a paused steer, an outcome reported blocked. What is on a tool's clock first, then oldest first.",
     "Steering": "Not counted. Open steers whose clock is running, soonest first, each with the default it will take. Doing nothing is a valid answer: at its bound the session goes with its default.",
     "Waiting on them": "Not counted — these wait on a session, not on you. Questions you answered whose asker has not yet said what came of it, and board items you decided or replied to, until a session closes them. Dismiss says you do not need to hear back.",
-    "Answered for you": "Not counted. Questions a teammate answered for you from the record, each with its source. Overrule sends your word to the asker.",
+    "Answered for you": "Not counted. Questions a teammate answered for you from the record, each with its source. Overrule sends your word to the asker; Dismiss all clears the ones on screen once you have read them.",
     "Later": "Not counted. What waits on you and is not pressing: the board's items not yet due, as your setting draws them, and the ledger's entries that are yours or wait on your decision — each with its answers and a Reply.",
     "FYI": "The second number, never added to the first. Notes, what resolved itself (the trail), and closed questions, kept for 12 hours. Nothing here has to be acted on; it opens itself when there is something new.",
 }
@@ -1578,7 +1578,7 @@ def inbox(picks=False):
                    detail='<b>Why:</b> the two ends of a session sit on different surfaces. <b>Fix:</b> a look at the header and the side panel together, with Paul.')
             + lrow("TD-319", "L", "Build the Telegram channel — the home tells the person what newly stops a session or a team", "your decision", "shiftlead", "ao-grind", held="grinder-ao-1"))
         body = (isec("Needs you", 7, opened=True) + "".join(needs) + isec("Steering", 3) + "".join(steering)
-                + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("Later", 4) + later + ledger + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
+                + isec("Waiting on them", 2) + "".join(waiting) + isec("Answered for you", 1, fyi_extra) + "".join(answered) + isec("Later", 4) + later + ledger + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · <span style="font-size: 10px;">▸</span> Snoozed (1) · back on their dates · not counted</div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
