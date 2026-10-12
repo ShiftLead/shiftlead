@@ -56,6 +56,9 @@ def test_a_compaction_is_not_a_start():
     after it, so reading it as `working` left an idle session `stalled?` for ever."""
     ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "compact"}
     assert translate(ev) == {"adapter_id": "u1"}  # no state: it stays what it was
+    # the payload's file is the record's `transcript` (design §4.2, TD-578), on any event with an id
+    tp = "/home/k/.claude/projects/-r/u1.jsonl"
+    assert translate({**ev, "transcript_path": tp}) == {"adapter_id": "u1", "transcript": tp}
     assert translate({**ev, "model": "claude-opus-5"}) == {"adapter_id": "u1", "model": "claude-opus-5"}
     assert translate({"hook_event_name": "SessionStart", "source": "compact"}) is None
     assert translate({**ev, "source": "startup"})["state"] == "working"

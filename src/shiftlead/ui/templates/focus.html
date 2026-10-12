@@ -108,6 +108,13 @@
          the page and hidden until then, since a hook reports the id after the first paint. #}
       <a class="btn sm link{% if not s.adapter_id %} hidden{% endif %}" id="ftranscript" href="/transcript/{{ s.id }}" target="_blank" rel="noopener"
          title="what this session said and did, read from its tool's file without resuming it (design §4.5 screen 9)">☰ Transcript</a>
+      {# design §4.5a Focus header **‹› VS Code** (TD-578): the transcript file in the person's editor, one
+         launch — the Transcript page's own link. Not drawn under `open_in: none` or for another host's
+         record; hidden until the hook reports the file, as **Transcript** is until the id. #}
+      {% if s.transcript_drawn %}{% set te = s.transcript_editor or s.editor %}
+      <a class="btn sm link editor{% if not s.transcript_editor %} hidden{% endif %}" id="ftranscript_editor" href="{{ s.transcript_editor.url if s.transcript_editor else '#' }}"
+         data-label="{{ te.label }}" title="the transcript file in {{ te.label }}">‹› {{ te.label }}</a>
+      {% endif %}
       <span class="grow"></span>
       {% if s.state != 'scheduled' %}
       <details class="more">

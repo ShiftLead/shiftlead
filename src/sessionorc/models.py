@@ -157,8 +157,8 @@ HOME_OWNED = frozenset(
     }
 )
 IDENTITY = frozenset({
-    "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "created", "host",
-    "start_context",
+    "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "transcript", "created",
+    "host", "start_context",
 })  # fmt: skip
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
@@ -905,6 +905,9 @@ class Session:
     repo: str | None = None
     worktree: str | None = None
     adapter_id: str | None = None  # the tool's own session id (Claude Code uuid) once known
+    # the file the tool writes the conversation to, on this record's host (design §4.2, TD-578): set
+    # with `adapter_id` from the hook, so a page links it without a read; None where none is reported
+    transcript: str | None = None
     state: State = "working"
     since: str = field(default_factory=now_iso)
     pending: Pending | None = None
@@ -1512,8 +1515,8 @@ SENDS_KEPT = 20  # the bound `sessionorc.mail.SENDS_KEEP` holds the list to; mod
 
 
 # What makes two copies the same session. The rest of `IDENTITY` is set or changed on the session's
-# own host after it exists — `adapter_id` by the first hook, `name` by a rename, `profile`, `repo`,
-# `worktree`, `created` — so it travels with the node's report and is never grounds for refusing one
+# own host after it exists — `adapter_id` (and its `transcript`) by the first hook, `name` by a rename,
+# `profile`, `repo`, `worktree`, `created` — so it travels with the node's report and is never grounds for refusing one
 # (review of PR #202: a record reported before its first hook would have frozen at the home).
 SAME_SESSION = frozenset({"id", "host", "kind", "adapter", "dir"})
 
