@@ -3149,7 +3149,7 @@ def test_every_inbox_control_has_its_verb_under_way():
     row = (root / "templates/inbox_row.html").read_text()
     macro = row[row.index("{% macro row(e, section") :]
     assert macro.count('<div class="st rowerr" role="alert" hidden></div>') == 5  # each of the five row shapes
-    assert row.count('class="st rowerr"') == 4  # and nowhere else, so a row has one
+    assert row.count('class="st rowerr"') == 5  # and nowhere else, so a row has one
     # the frame of a press: marked before the request leaves, the row out first when the press takes it
     assert "pressed();\n      const res = await act(id, action2 || action, body);" in js
     assert (
