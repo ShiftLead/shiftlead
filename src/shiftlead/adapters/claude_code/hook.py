@@ -59,8 +59,9 @@ SESSION_START_NOT_A_START = {"compact"}
 # SessionStart sources that land at the composer with no turn to follow: `claude --resume` prints the
 # old conversation and waits, so no Stop ever reports `idle` and `working` would read `stalled?` at
 # STALL_AFTER, never rung (TD-155). A prompt given with the resume reports `working` through its own
-# UserPromptSubmit, which fires after this.
-SESSION_START_AT_THE_COMPOSER = {"resume"}
+# UserPromptSubmit, which fires after this. `/clear` starts a new conversation in the same process and
+# waits at an empty composer the same way (TD-592).
+SESSION_START_AT_THE_COMPOSER = {"resume", "clear"}
 # A launch with no prompt lands at the composer too: the launch says so in `AT_COMPOSER_ENV` (TD-283).
 
 # Tool events that report `working` without being a turn's start. Each carries its name in `event`

@@ -10098,3 +10098,19 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-574 (#1549), TD-566, TD-561.
 
 **Resolved:** 2026-10-12 (PR #1562) — §4.5a's **subject** cell lists the first paragraph, the message page's heading and tab title, `ao inbox`'s head line and the find box, then ends with the exception for a ledger row and a trail row as its own sentence; no list item follows it.
+
+## TD-592: A `/clear` reads `working` until the next turn ends: `SessionStart` with source `clear` lands at the composer and fires no `Stop`
+
+**Priority:** Medium
+**Type:** bug
+**Added:** 2026-10-12 (ao-paul; Paul: *this session has been sitting idle since I ran the /clear, but its chip says working here in the focus screen and in the org screen*)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/adapters/claude_code/hook.py` (`SESSION_START_AT_THE_COMPOSER`), design §4.2's state table.
+
+**Why:** `/clear` fires `SessionEnd` (reason `clear`, ignored: the process lives on) and then `SessionStart` (source `clear`), which fell through to `STATE_EVENTS` and reported `working`. No turn follows a `/clear`, so no `Stop` reported `idle`, and the Focus and Org chips read `working` at an empty composer until the next turn ended, headed for `stalled?` at `STALL_AFTER` — the shape TD-155 fixed for `resume`.
+
+**Related:** TD-155 (`resume`), TD-090 (`compact`), TD-283 (`startup` with no prompt).
+
+**Resolved:** 2026-10-12 (PR #1565) — `SESSION_START_AT_THE_COMPOSER = {"resume", "clear"}`; design §4.2's state table carries the row. Held by `test_a_clear_lands_at_the_composer`; TD-283's test now asserts `clear` → `idle`.

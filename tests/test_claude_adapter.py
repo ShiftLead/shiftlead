@@ -58,8 +58,7 @@ def test_a_compaction_is_not_a_start():
     assert translate(ev) == {"adapter_id": "u1"}  # no state: it stays what it was
     assert translate({**ev, "model": "claude-opus-5"}) == {"adapter_id": "u1", "model": "claude-opus-5"}
     assert translate({"hook_event_name": "SessionStart", "source": "compact"}) is None
-    for source in ("startup", "clear"):
-        assert translate({**ev, "source": source})["state"] == "working"
+    assert translate({**ev, "source": "startup"})["state"] == "working"
 
 
 def test_a_resume_lands_at_the_composer():
@@ -72,14 +71,24 @@ def test_a_resume_lands_at_the_composer():
     assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
 
 
+def test_a_clear_lands_at_the_composer():
+    """TD-592: `/clear` starts a new conversation in the same process and waits at an empty composer;
+    no Stop follows, so `working` sat on the chip until the next turn ended."""
+    ev = {"hook_event_name": "SessionStart", "session_id": "u2", "source": "clear"}
+    assert translate(ev) == {"adapter_id": "u2", "state": "idle", "pending": None}
+    # the SessionEnd before it says nothing: the process lives on
+    assert translate({"hook_event_name": "SessionEnd", "session_id": "u1", "reason": "clear"}) is None
+
+
 def test_a_launch_with_no_prompt_starts_idle():
     """TD-283: a launch with no prompt (Add entry's **Open a session**, `ao new` without one) lands at
     the composer, and no Stop follows until a turn runs; the launch marks it in the pane's environment
-    and its `startup` reads `idle`. A launch with a prompt, a resume and a `/clear` are as before."""
+    and its `startup` reads `idle`. A launch with a prompt, a resume and a `/clear` are as before
+    (a `/clear` reads `idle` since TD-592)."""
     ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "startup"}
     assert translate(ev, at_composer=True) == {"adapter_id": "u1", "state": "idle", "pending": None}
     assert translate(ev)["state"] == "working"
-    assert translate({**ev, "source": "clear"}, at_composer=True)["state"] == "working"
+    assert translate({**ev, "source": "clear"}, at_composer=True)["state"] == "idle"
     assert translate({**ev, "source": "compact"}, at_composer=True) == {"adapter_id": "u1"}
     turn = {"hook_event_name": "UserPromptSubmit", "session_id": "u1"}
     assert translate(turn, at_composer=True)["state"] == "working"  # its first turn is a turn
