@@ -42,7 +42,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-573 | The techlead's context primer still says a message to the person is its first paragraph alone: TD-566's `--subject` never reached it (docs audit) | Low | Open |
 
 ---
 
@@ -612,21 +611,3 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
-
-## TD-573: The techlead's context primer says a message to the person has one shape, its first paragraph; TD-566's `--subject` never reached it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1536–#1546)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/briefs/techlead-context.md` ~L58–61 (a held path: `docs/briefs/**`); design §4.10 *A subject on every entry*; TD-566's **Fix** item 5
-
-**Why:** TD-566's **Location** names `docs/briefs/techlead-context.md` and its Fix item 5 "the repo's brief parts under `docs/briefs/` (the same line; a held path, this entry's)" as getting the message-shape line with `--subject`; §4.10 says "The presets say `--subject` in the message-shape line". #1543 changed the five `src/shiftlead/briefs/*.md` presets and nothing under `docs/briefs/`, and the archived **Resolved** line neither claims the repo's parts nor lists them under *Not built*. The primer still reads `the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message to a person is written*, TD-127` (L60), with no word of a subject. `grep -n subject docs/briefs/*.md` returns nothing on `origin/main` (27fff9e1). A techlead reading only the primer is told the shape without the headline every message now warns for.
-
-**Fix:** add the headline to the primer's sentence (*and a `--subject`, a headline apart from that paragraph, §4.10 *A subject on every entry***); say in TD-566's **Resolved** that the repo's own brief parts were left (or add the line to each that carries the shape rule). Held path: the techlead seat merges it.
-
-**Done when** `grep -n subject docs/briefs/techlead-context.md` finds the line and TD-566's **Resolved** says what was done with the repo's parts.
-
-**Related:** TD-566, TD-561, TD-127.
