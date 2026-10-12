@@ -55,7 +55,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-590 | ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present | Low | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-594 | §4.5a *Focus: Open shell here* says the window is sized as the browser remembers for the session; the build opens it at the default size, the new shell having none remembered | Low | Open |
-| TD-593 | TD-591's **Related:** line names TD-591 itself, and none of the entries it is built from | Low | Open |
 
 ---
 
@@ -852,7 +851,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 **Done when** a repo with only a ledger shows each missing seam on the Repo page and in `ao doctor`, and `ao repo init` on a bare repo makes a ledger ShiftLead reads, with tests.
 
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591.
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584 (the design: what it draws and from where), TD-585 (the vendored `ledgerboard.py` that `ao repo init`'s ledger and the ledger check read), TD-586 (the missing-gate line).
 
 ## TD-593: Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is
 
@@ -875,26 +874,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, the button appears when the hook reports the tool session id, and it is absent wherever the Transcript page's **VS Code** is; the tests above pass, and the builder's look (design §4.9b: Focus on a live session, the press landing the file in the editor) is named in the PR.
 
 **Related:** TD-578 (the design), TD-166 (the Transcript page), TD-525 (the Session card's editor button), TD-532 / TD-536 (a file link's two launches, which this is not).
-
----
-
-## TD-593: TD-591's **Related:** line names TD-591 itself, and none of the entries it is built from
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1561–#1567)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt.md`, entry TD-591, its **Related:** line
-
-**Why:** #1564 filed TD-585–TD-591; TD-591's last line reads *"**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591."* — the entry names itself. The design #1567 wrote says what TD-591 draws and from where: §4.5a *Repo page: missing seams* and §4.7 `ao doctor` **repos** read the seam state of `gate:` (TD-586), `board:` (TD-587) and `worktree_setup:` (TD-589), and `ao repo init` writes the ledger TD-585's vendored `ledgerboard.py` reads. Its **Blocked by:** names TD-586, TD-587, TD-589; TD-586's own **Related:** says *"TD-591 (the missing-gate line)"*, so the link runs one way only. A reader following *Related* from TD-591 gets nowhere.
-
-**Fix:** replace the self-reference in TD-591's **Related:** with TD-584 (the design that says what it builds), TD-585 (the module `ao repo init` and the ledger check read) and TD-586 (the gate line). No change to its **Blocked by:**.
-
-**Done when** TD-591's **Related:** names no id that is its own, and `pdm run test` passes (the ledger tests read the file).
-
-**Related:** TD-584, TD-591.
 
 ---
 
