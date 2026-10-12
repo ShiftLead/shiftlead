@@ -106,11 +106,16 @@ def test_a_repos_reading_is_passed_through_and_marks_the_groups_for_the_flush(tm
 def test_a_reading_equal_to_the_last_one_sent_is_not_sent_again(tmp_path, monkeypatch):
     """g1's tail moves twice: the second marks the groups, the flush reads them, and they are the
     same as the first delta's — so nothing is sent."""
+    from shiftlead.ui import app as ui
+
+    real, calls = ui.render_heads, []
+    monkeypatch.setattr(ui, "render_heads", lambda groups: calls.append(1) or real(groups))
 
     def pushed(g1, g2):
         return first_then({"event": "session", "session": {**g1, "tail": ["c"]}})(g1, g2)
 
     evs = received(client(monkeypatch, tmp_path, pushed), "/events")
+    assert len(calls) == 2  # the first delta's reading and the flush's: the flush did read
     assert [e["event"] for e in evs] == ["session", "session"]
 
 
