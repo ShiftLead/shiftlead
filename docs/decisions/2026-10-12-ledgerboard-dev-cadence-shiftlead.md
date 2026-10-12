@@ -221,7 +221,7 @@ Each is a ledger entry in the repo named, filed when this ADR is accepted; the d
 - External trackers (Jira, Asana) are never ledgerboard's: the importer that maps a tracker into the ledger
   is dev-cadence's (its TD-065, the 2026-09-26 decision), in its own repo if it ever needs a non-stdlib
   client; ShiftLead may run it on a schedule as it runs the gate. ledgerboard owns only the `Tracker:` field's shape.
-- dev-cadence's open tool-neutral entries (TD-093, TD-095, TD-099, TD-101, TD-102) proceed unchanged;
+- dev-cadence's open tool-neutral entries (TD-095, TD-099, TD-101, TD-102) proceed unchanged;
   ledgerboard is tool-neutral already.
 
 ## Open questions
