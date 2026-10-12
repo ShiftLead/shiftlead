@@ -49,6 +49,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-568 | The Inbox's *Later* help says each ledger row has *its answers and a Reply*; the build (#1537, slice 1) draws **Open** alone | Low | Open |
 | TD-569 | ao inbox --thread's and --sent's head lines print the subject, and no test would notice if they stopped | Low | Open |
 | TD-570 | The Inbox poll's rail_teams markup is asserted by no test, and #1537 changed what it counts | Low | Open |
+| TD-571 | A ledger row's added year suffix and its default-index guard are held by no test | Low | Open |
 
 ---
 
@@ -749,3 +750,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in the poll test, assert `got["html"]["rail_teams"]` names the team the ledger's rows carry (`ao-grind`, `sam-defined`) and its count. **Done when** dropping `ledger_rows(lf)` from the poll's `rail_rows` call fails a test.
 
 **Related:** TD-565 (#1537), TD-560.
+
+## TD-571: A ledger row's `added` year suffix and its default-index guard are held by no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1537)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/inbox.py` (`_added_words` L2003: the `, {d.year}` branch; `ledger_for_you` L2068: `not isinstance(d, bool)`, L2083: `isinstance(x, str)`), `tests/test_ui_inbox_ledger.py`
+
+**Why:** #1537 added three guards that no test fails on. Probes, each run against `tests/test_ui_inbox_ledger.py tests/test_ledger_derived.py tests/test_ui_board.py` (76 passed unchanged): (1) `_added_words` returning `words` with no year suffix passes — the one dated row asserts `.startswith("added Oct 7")`, which holds with or without `, 2025`, and its date is this year's; (2) `ok = isinstance(d, int) and d < len(answers)` passes, so a `default: True` reads as index 1 and recommends the second answer; (3) dropping `if isinstance(x, str)` from `detail` passes.
+
+**Fix:** a row dated last year asserts `added Oct 7, 2025` (pin `date.today` or use a fixed past year); an entry with `default=True` has `default == ""`; one with a non-string in `detail` draws the strings alone. **Done when** each of the three probes fails a test.
+
+**Related:** TD-565 (#1537).
