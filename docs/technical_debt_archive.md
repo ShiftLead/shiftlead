@@ -10078,3 +10078,23 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-572 (#1544).
 
 **Resolved:** 2026-10-12 (PR #1556) — `tests/test_ui_events_paths.py`, a sibling of `test_ui_events_light.py` whose fake `subscribe` takes each test's events: a `gone` carries the groups unchanged on `/events` and is sent alone on `?light=1`; a `doing` and a `repos` event are passed through and followed by one `groups`; a reading equal to the last is not sent; a flush whose reading failed (`render_heads` raising once) sends on its next turn. Each of the five probes fails a test; the repo reading is dated days back so its ages hold still between two readings.
+
+## TD-583: §4.5a's **subject** row puts the exception for a ledger row and a trail row mid-list, so the message page's heading and `ao inbox`'s head line read as the exception's own
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1547–#1559)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/design/4.5a-controls.md` row *Inbox row, message page, `ao inbox` | subject* (L13); the same sentence in `docs/design/4.10-messages.md` *A subject on every entry*, **Drawn** (~L606–612), is built the other way and reads right
+
+**Why:** #1549 (TD-574) inserted the exception into the row's `;`-separated list of what the subject is drawn as. §4.5a now reads: *"…a ledger row's its title); the first paragraph under it. A ledger row and a trail row draw no line of their own: their subject is already the row's first text — the ledger row's id and title as its first paragraph, the trail row's *how* in its head (*resolved: …*, or *replied: …* for a board reply); the message page's heading and tab title; `ao inbox`'s head line after the kind. The find box matches it"*. The period before *A ledger row* ends the list, and the two items after the exception (*the message page's heading and tab title*, *`ao inbox`'s head line*) continue its sentence, so they read as what the ledger and trail rows draw instead — which is not so: they are drawn for every entry. §4.10 puts the same exception in its own dash clause and then returns to the list (*"… so no line is drawn above it; the message page's heading and tab title …"*), and reads correctly.
+
+**Fix:** reorder the §4.5a cell: the message page's heading and tab title, `ao inbox`'s head line and the find box first; the exception for a ledger row and a trail row last, as its own sentence. No change of meaning, and no history line (a wording of the same fact).
+
+**Done when** §4.5a's **subject** cell ends with the exception sentence and no list item follows it; `pdm run test` passes (the doc-bound tests read this table).
+
+**Related:** TD-574 (#1549), TD-566, TD-561.
+
+**Resolved:** 2026-10-12 (PR #1562) — §4.5a's **subject** cell lists the first paragraph, the message page's heading and tab title, `ao inbox`'s head line and the find box, then ends with the exception for a ledger row and a trail row as its own sentence; no list item follows it.
