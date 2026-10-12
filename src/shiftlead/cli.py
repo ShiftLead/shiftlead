@@ -899,8 +899,9 @@ def cmd_team_start(args: argparse.Namespace) -> int:
         org = _org_here()
     except ValueError as e:
         return fail(args, str(e), 1)
-    # what the lanes hold, before anything starts (§4.5a team card **Start**, §4.7; TD-265): the first
-    # line, and a refusal when every lane is empty unless `--anyway` — the person may know better
+    # what every lane the start creates holds, before anything starts (§4.5a team card **Start**, §4.7;
+    # TD-265, TD-563): the first line, and a refusal when every lane is empty unless `--anyway` — the
+    # person may know better
     here = hosts.local_host().name
     picks = teamrun.lanes(call_sync, org, args.name, here)
     if picks and picks["empty"] and not args.anyway:
@@ -3413,7 +3414,9 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("-p", "--profile", help="a profile for every session in it, over the role's and the member's")
     q.add_argument(
-        "--anyway", action="store_true", help="start it although every member's lane is empty (the page's Start anyway)"
+        "--anyway",
+        action="store_true",
+        help="start it although every lane is empty, the anchor seat's too (the page's Start anyway)",
     )
     q.set_defaults(fn=cmd_team_start)
 

@@ -33,6 +33,7 @@ class Fleet:
         self.verdicts: dict[str, dict] = {}
         self.repos: dict[str, dict] = {}
         self.waiting: dict[str, list] = {}  # the `host` reading's (TD-274)
+        self.held: dict | None = None  # `checkout_held`'s reading of the anchor's checkout (§4.9b)
 
     def handle(self, method: str, params: dict):
         self.calls.append((method, params))
@@ -44,6 +45,8 @@ class Fleet:
             return dict(self.repos)
         if method == "recent_dirs":
             return []
+        if method == "checkout_held":
+            return {"held": self.held}
         if method == "adapters":
             return ["claude-code", "shell"]
         if method == "name_check":
@@ -430,11 +433,11 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
     page without **Start anyway** is refused before anything is created."""
     tmp_path, fleet = world
     checkout = str(tmp_path / "shiftlead")
-    some = [{"id": "TD-1", "pickable": "yes", "kind": "build", "owner": ""}]
+    some = [{"id": "TD-1", "pickable": "yes", "kind": "build", "owner": "", "for_page": "pickable"}]
     fleet.repos = {checkout: {"ledger": {"entries": some}}}
     got = client.get("/api/teams/ao-grind/lanes").json()
     assert (got["line"], got["empty"]) == ("grinder: 1 pickable", False)
-    fleet.repos = {checkout: {"ledger": {"entries": [{**some[0], "pickable": "no"}]}}}
+    fleet.repos = {checkout: {"ledger": {"entries": [{**some[0], "pickable": "no", "for_page": "blocked"}]}}}
     got = client.get("/api/teams/ao-grind/lanes").json()
     assert (got["line"], got["empty"]) == ("grinder: 0", True)
     r = client.post("/api/teams/ao-grind/start", json={})
@@ -464,8 +467,33 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
     assert 'data-closes="a, b"' in head
     js = (Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'if (b && b.dataset.teamAct === "start") return startPress(b);' in js
-    assert "Nothing to pick: every member's lane is empty, so the team will wind down as soon as it starts." in js
+    assert (
+        "Nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts."
+        in js
+    )
     assert "if (picks && picks.empty)" in js and "It first closes ${b.dataset.closes}." in js
+
+
+def test_a_start_whose_members_lanes_are_empty_and_the_anchors_not_opens_no_dialog(world, client):
+    """design §4.5a team card **Start**, *What the lanes hold, before the start* (TD-558, built by
+    TD-563): the anchor seat's lane is one the start creates, so work there is no empty team — the
+    press starts, the line saying the anchor's count by kind, and a held checkout names its holder."""
+    tmp_path, fleet = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["anchor"] = True
+    doc["teams"]["ao-grind"]["members"][0]["lane"] = ["free-pick", "owner:grinder"]
+    write_org(tmp_path, doc)
+    checkout = str(tmp_path / "shiftlead")
+    live = {"id": "TD-9", "pickable": "yes", "kind": "live-check", "live": "yes", "owner": "anchor"}
+    fleet.repos = {checkout: {"ledger": {"entries": [{**live, "for_page": "live-check"}]}}}
+    got = client.get("/api/teams/ao-grind/lanes").json()
+    assert (got["line"], got["empty"]) == ("grinder: 0 · anchor: 1 live check", False)
+    fleet.held = {"by": "shiftlead-90", "why": "held by shiftlead-90"}
+    got = client.get("/api/teams/ao-grind/lanes").json()
+    assert got["line"] == "grinder: 0 · anchor: 1 live check · held by shiftlead-90"
+    anchor = got["roles"]["anchor"]
+    assert (anchor["n"], anchor["by_kind"]["live-check"], anchor["held"]) == (1, 1, "shiftlead-90")
+    assert client.post("/api/teams/ao-grind/start", json={}).status_code == 200 and fleet.creates()
 
 
 def test_start_runs_the_shared_sequence_and_the_members_carry_controllers_lead(world, client):
