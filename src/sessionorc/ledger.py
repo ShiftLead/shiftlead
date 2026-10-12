@@ -110,18 +110,19 @@ def _header(body: str) -> dict[str, str]:
 def answers_of(value: str) -> tuple[list[str], int | None]:
     """An `**Answers:**` line read as the board's reader reads `Answers:` (cadence §3.5): the items
     split on `|` (`\\|` a literal bar), the closing full stop dropped, and the index of the one
-    marked ` (default)`, at most one — the first so marked."""
+    marked ` (default)` — None unless exactly one is (cadence §3.5, TD-066: at most one, and with
+    two there is no single recommendation), as the reader's `parse_default` gives it."""
     out: list[str] = []
-    default: int | None = None
+    marked: list[int] = []
     for raw in ANSWER_SPLIT.split((value or "").strip().rstrip(".")):
         words = raw.replace("\\|", "|").strip()
         if DEFAULT_MARK.search(words):
             words = DEFAULT_MARK.sub("", words).strip()
-            if default is None and words:
-                default = len(out)
+            if words:
+                marked.append(len(out))
         if words:
             out.append(words)
-    return out, default
+    return out, marked[0] if len(marked) == 1 else None
 
 
 def detail_of(body: str) -> list[str]:
