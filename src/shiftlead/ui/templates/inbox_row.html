@@ -527,7 +527,7 @@
       its checkout past `SEAT_HELD_GRACE`. **Open** focuses the holder where it is a record of this
       home, else the seat's own card — a holder outside shiftlead is closed in its own terminal;
       **Dismiss** keeps `dismissed:<since>`, the restart row's mechanism, so a new holder is a new row. -#}
-  <span class="st">the checkout is yours — the seat fills once it is free</span>
+  <span class="st">the anchor seat waits on its checkout — nothing here frees it; the seat fills once it is free</span>
   <span class="grow"></span>
   {{ state_snooze(e) }}
   {% if e.holder %}<a class="btn sm ghost" href="/focus/{{ e.holder }}" title="Focus on the session holding the checkout, {{ e.holder }}">Open</a>{% else %}{{ open_btn(e, 'Open') }}{% endif %}

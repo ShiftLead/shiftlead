@@ -1445,7 +1445,7 @@ def test_a_teams_header_marks_its_anchor_seat_held_past_the_grace(tmp_path, monk
     g, head = head_of({"by": "checkout", "why": "branch td-x, 2 files uncommitted", "since": ago(hours=3, minutes=1)})
     assert g["seat_held"]["age"] == "3 h"
     assert head.count("· anchor held 3 h<") == 2  # its two places, one shown by the fold's state
-    assert 'class="meta seatheld unfoldonly" title="anchor seat held 3 h: branch td-x' in head
+    assert 'class="meta seatheld atmail" title="anchor seat held 3 h: branch td-x' in head
     assert 'class="meta seatheld foldonly"' in head
     assert head.index("seatheld foldonly") > head.index("counts foldonly")
     for quiet in ({"by": "checkout", "why": "1 file uncommitted", "since": ago(minutes=5)}, None):

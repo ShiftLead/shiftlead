@@ -372,6 +372,23 @@ async def test_a_held_create_writes_its_reason_as_seat_held(agent, tmp_path):
 
 
 @pytest.mark.integration
+async def test_a_held_starts_since_is_kept_by_the_tick_that_reads_the_same_holder(agent, tmp_path):
+    """TD-559 (§6 rule 3): a held Start's `seat_held.since` is its record's `created`, and the first
+    tick's fill, refused by the same holder, keeps it — the wait counts from the Start."""
+    await park_ticks(agent)
+    root = _checkout(tmp_path)
+    _reading(agent, root, _entry("TD-1"))
+    (root / "a.txt").write_text("a\n")
+    async with LocalClient() as person:
+        sid = await _anchor(person, root, held=True, held_reason={"by": "checkout", "why": "1 file uncommitted"})
+        rec = agent.sessions[sid]
+        await agent._keep_running(datetime.now(UTC) + timedelta(hours=1))
+        assert agent.sessions[sid] is rec and rec.seat_due["ids"] == ["TD-1"]
+        assert rec.seat_held == {"by": "checkout", "why": "1 file uncommitted", "since": rec.created}
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
 async def test_a_none_in_a_checkout_not_its_own_leaves_the_stretch_for_a_clean_one(agent, tmp_path):
     """TD-395 (§6 rule 3): a `work` seat's `none` with the tree dirty or off its default branch writes
     `lane_seen` with no ids, so the same ids fill it once the checkout is clean."""

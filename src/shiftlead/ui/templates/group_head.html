@@ -35,7 +35,7 @@
 {#- design §4.5a team header **seat held** mark (TD-559): the anchor seat held off its work past
     `SEAT_HELD_GRACE`, the Inbox row's text its title — after the ✉ count unfolded, after the on-call
     count folded; display only #}
-{% if g.seat_held %}<span class="meta seatheld unfoldonly" title="{{ g.seat_held.title }}">· anchor held {{ g.seat_held.age }}</span>{% endif %}
+{% if g.seat_held %}<span class="meta seatheld atmail" title="{{ g.seat_held.title }}">· anchor held {{ g.seat_held.age }}</span>{% endif %}
 {# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
    team's sessions gave from the record since this browser last opened the Inbox's group — a
    **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
