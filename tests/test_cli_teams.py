@@ -1479,7 +1479,7 @@ def test_every_members_brief_names_its_manager(world, capsys, monkeypatch):
     grinders = [p for p in made if p["role"] == "grinder"]
     assert len(grinders) == 2
     for p in grinders:
-        assert 'ao msg ao-shiftlead-orc-ao "done:' in p["prompt"] and "{manager}" not in p["prompt"]
+        assert "Your manager is `ao-shiftlead-orc-ao` (" in p["prompt"] and "{manager}" not in p["prompt"]
     assert "manager started as" not in capsys.readouterr().err
 
     # the manager came up under another id: the start stands and says so
@@ -1510,7 +1510,7 @@ def test_every_members_brief_names_its_manager(world, capsys, monkeypatch):
     for p in creates(state):
         assert "{manager}" not in p["prompt"]
         if p["role"] == "grinder":
-            assert 'ao msg none "done:' in p["prompt"] and "a person leads your team" in p["prompt"]
+            assert "Your manager is `none` (where it reads `none`, a person leads your team)" in p["prompt"]
 
 
 def test_a_techlead_seat_reads_its_primer_first_and_the_start_warns_without_one(world, capsys):
@@ -1863,7 +1863,8 @@ def test_new_with_a_team_and_a_role_names_the_teams_seat_and_manager_in_the_brie
         "text": "ao-shiftlead-orc-ao"
     }
     assert "Your team's techlead is `ao-shiftlead-tl-ao`" in made["prompt"]
-    assert 'ao msg ao-shiftlead-orc-ao "done: <ref>' in made["prompt"] and "ao msg none" not in made["prompt"]
+    assert "Your manager is `ao-shiftlead-orc-ao` (" in made["prompt"]
+    assert "Your manager is `none`" not in made["prompt"]
     # what a team start stores for the same member is what this create stores
     planned = teams.plan(orgmod.load(), "ao-grind", HOST).members[0].prompt_from["slots"]
     assert (planned["{techlead}"], planned["{manager}"]) == (slots["{techlead}"], slots["{manager}"])
