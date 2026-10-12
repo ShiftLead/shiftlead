@@ -1125,6 +1125,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-12 (TD-589, grinder-ao-1): `worktree_setup:` built — `sessionorc.gitinfo.worktree_setup` reads it (set, defaulted to an executable `scripts/hydrate_worktree.sh`, absent); a set command runs by the shell in the new worktree in place of the default; `shiftlead.repoconfig` accepts the key.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *The seams* — `board:`, `gate:`, `worktree_setup:`, `commands:` (`test`, `lint`) and what `ledger:` requires (a ledger in ledgerboard format); *Repos* is ShiftLead's own roster importing dev-cadence's. Was: `commands:` read by nothing, the roster dev-cadence's file. Built by TD-585–TD-591.
 - 2026-10-10 (TD-060 step 2, the anchor): a repo's file is `.shiftlead.yml`; `.agentorc.yml` is read while no `.shiftlead.yml` is beside it.
 - 2026-10-10 (TD-536, the designer): `person.file_link: {folder_first, wait}` and the template's optional `file`. Built by TD-537.

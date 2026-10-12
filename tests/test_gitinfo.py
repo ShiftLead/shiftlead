@@ -155,3 +155,52 @@ def test_git_info_names_the_commit_so_a_detached_head_can_be_named(tmp_path):
     run("git", "checkout", "-q", "--detach", cwd=repo)
     info = git_info(repo)
     assert info.branch == "(detached)" and info.oid == sha
+
+
+def test_a_new_worktree_is_set_up_by_the_repos_worktree_setup(tmp_path):
+    """TD-589, §5 *The seams* `worktree_setup:`: a configured command runs by the shell in each new
+    worktree, in place of the default `scripts/hydrate_worktree.sh` (run with the worktree's path);
+    neither, and nothing runs. A setup that fails names itself, and the worktree stays."""
+    import os
+
+    import pytest
+
+    from sessionorc.gitinfo import WorktreeError, ensure_worktree, worktree_setup
+
+    repo = tmp_path / "solo"
+    repo.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "f").write_text("1")
+    run("git", "add", "f", cwd=repo)
+    run("git", "commit", "-q", "-m", "one", cwd=repo)
+    assert worktree_setup(repo) == ("absent", None)
+    plain = ensure_worktree(repo, "plain")
+    assert sorted(p.name for p in plain.iterdir()) == [".git", "f"], "no setup: nothing runs"
+
+    hydrate = repo / "scripts" / "hydrate_worktree.sh"
+    hydrate.parent.mkdir()
+    hydrate.write_text('#!/bin/sh\necho hydrated > "$1/.hydrated"\n')
+    assert worktree_setup(repo) == ("absent", None), "a script that cannot be run is no default"
+    os.chmod(hydrate, 0o755)
+    assert worktree_setup(repo) == ("defaulted", "scripts/hydrate_worktree.sh")
+    assert (ensure_worktree(repo, "hydrated") / ".hydrated").is_file()
+
+    for text in ("worktree_setup: ''\n", "worktree_setup: [a]\n", "worktree_setup: [\n"):
+        (repo / ".shiftlead.yml").write_text(text)
+        assert worktree_setup(repo)[0] == "defaulted", text
+    (repo / ".shiftlead.yml").write_text("worktree_setup: ' pwd > .setup-ran '\n")
+    assert worktree_setup(repo) == ("set", "pwd > .setup-ran")
+    wt = ensure_worktree(repo, "set")
+    assert (wt / ".setup-ran").read_text().strip() == str(wt), "run in the new worktree"
+    assert not (wt / ".hydrated").exists(), "the configured command, not the default"
+    assert not (ensure_worktree(repo, "set") / ".hydrated").exists() and (wt / ".setup-ran").is_file()
+    (wt / ".setup-ran").unlink()
+    ensure_worktree(repo, "set")
+    assert not (wt / ".setup-ran").exists(), "a worktree that exists is reused, not set up again"
+
+    (repo / ".shiftlead.yml").write_text("worktree_setup: 'echo no npm >&2; exit 4'\n")
+    with pytest.raises(WorktreeError, match=r"but echo no npm >&2; exit 4 failed: no npm"):
+        ensure_worktree(repo, "broken")
+    assert (repo / ".claude" / "worktrees" / "broken" / "f").is_file(), "the worktree is kept"
