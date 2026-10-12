@@ -1066,7 +1066,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { "shell-here": "Open shell here", identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
