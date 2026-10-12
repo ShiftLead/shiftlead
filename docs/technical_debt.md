@@ -44,8 +44,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-561 | Every Inbox entry carries a subject line: a short headline, apart from the first paragraph, so the Inbox can be browsed by it | Medium | Designed — TD-566 builds it |
 | TD-566 | Build TD-561: `subject` on every entry the person reads — `ao msg --subject`, derived and warned when missing, the home's rows' by kind — drawn first on the row, the message page and `ao inbox`, matched by the find | Medium | Open |
-| TD-569 | ao inbox --thread's and --sent's head lines print the subject, and no test would notice if they stopped | Low | Open |
-| TD-570 | The Inbox poll's rail_teams markup is asserted by no test, and #1537 changed what it counts | Low | Open |
 | TD-571 | A ledger row's added year suffix and its default-index guard are held by no test | Low | Open |
 
 ---
@@ -657,38 +655,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** every row of the Inbox, the message page and `ao inbox` leads with a subject — mail's given or derived with a warning, the home's rows' by kind, a board row's its head line, a ledger row's its title — the find box matches it, the presets and briefs say `--subject`, and the tests above pass.
 
 **Related:** TD-561 (the design), TD-127 (the first-paragraph rule), TD-560 / TD-565 (the ledger row's subject), TD-564 (the seat-held row's).
-
-## TD-569: `ao inbox --thread`'s and `--sent`'s head lines print the subject, and no test would notice if they stopped
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1536)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/cli.py` (`_subj(e)` at L2855, the `--sent` listing; L2886, `_thread`'s head), `tests/test_cli.py` (`test_msg_subject_and_the_inbox_head_line_that_shows_it`)
-
-**Why:** #1536 (TD-566 slice 1) put `_subj(e)` on three head lines of `ao inbox`: the person's listing (L2950), `--thread` (L2886) and `--sent` (L2855). The one test asserts only the first, `' · note · "PR #9 waits" · ' in out` after a plain `cli.main(["inbox"])`. Probe: in a worktree on `origin/main`, remove `{_subj(e)}` from the two other f-strings and run `tests/test_cli.py tests/test_mail.py`: every test passes, apart from `test_explain_file_and_session`, which fails in this worktree with or without the change (*unknown adapter 'claude-code'*, the adapter not registered here). Design §4.7 says `ao inbox`'s head line carries the subject on each of its forms; two of three could lose it unseen.
-
-**Fix:** extend that test (or add one beside it) to print `ao inbox --thread <id>` and `ao inbox --sent` for the same entries and assert the quoted subject on each head line. **Done when** removing `_subj(e)` from either line fails a test.
-
-**Related:** TD-566 (#1536), TD-561.
-
-## TD-570: The Inbox poll's `rail_teams` markup is asserted by no test, and #1537 changed what it counts
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1537)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`api_person_inbox`, L3088: `rail_rows(sections, hz["ahead"], ledger_rows(lf))`, and `got["html"]["rail_teams"]` just below), `tests/test_ui_inbox_ledger.py` (`test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts`)
-
-**Why:** #1537 (TD-565 slice 1) made the Inbox page's rail and the poll's `rail_teams` both count the ledger's rows under *Later*, so a team whose only row is a ledger entry gets its *Teams* line. The page's route is held (`'<span class="raillabel">Later</span><span class="railn">5</span>' in page`); the poll's is not. `grep -rn "rail_teams\|teams_group" tests/` finds nothing: the field is read by no test at all, before or after the PR. Probe: change L3088 to `rail_rows(sections, hz["ahead"])` and run `tests/test_ui_inbox_ledger.py tests/test_ledger_derived.py tests/test_ui_board.py`: 76 passed. A ledger-only team would then vanish from the rail on the first poll after the page loaded.
-
-**Fix:** in the poll test, assert `got["html"]["rail_teams"]` names the team the ledger's rows carry (`ao-grind`, `sam-defined`) and its count. **Done when** dropping `ledger_rows(lf)` from the poll's `rail_rows` call fails a test.
-
-**Related:** TD-565 (#1537), TD-560.
 
 ## TD-571: A ledger row's `added` year suffix and its default-index guard are held by no test
 
