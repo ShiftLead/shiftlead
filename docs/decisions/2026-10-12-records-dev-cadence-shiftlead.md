@@ -1,6 +1,6 @@
 # ADR 2026-10-12: three repos — records holds the ledger and board formats once, dev-cadence is how a repo works, ShiftLead is how sessions are run
 
-**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), under review (Fable round 4).
+**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); awaiting Paul's acceptance.
 **Date:** 2026-10-12
 **Supersedes:** the placement of the ledger and board formats in [ADR 2026-10-08](2026-10-08-agentorc-dev-cadence-split.md);
 the rest of that ADR stands. Its Status line gains "superseded in part by ADR 2026-10-12 (the formats'
@@ -22,7 +22,7 @@ readers, held equal by parity tests. That is where drift lives today (line count
 | Format | dev-cadence | ShiftLead |
 |---|---|---|
 | Ledger | `files/scripts/ledger.py` (611 lines), which imports `nudge_user_attention` for the roster | `src/sessionorc/ledger.py` (698), its own `ROW_RE`-like table reader in `sessionorc/reports.py`, and its own `Answers:` grammar on ledger entries (TD-565) |
-| Board, read | `parse_board()`, `item_key()`, `item_refs()`, `item_head()`, `detail_block()`, `closed_items()`, `KIND_RE`, `ARCHIVE_AT` in `files/scripts/nudge_user_attention.py` (1,815 lines in all) | `src/shiftlead/ui/inbox.py` runs that script's `--report --json` (preferring a dev-cadence clone's `files/` copy, TD-278) and adds its own `SUBHEAD_RE`/`CONTEXT_RE`/`REPLY_MARK_RE`; `sessionorc/workorders.py` loads the script to get `item_key()` |
+| Board, read | `parse_board()`, `item_key()`, `item_refs()`, `item_head()`, `detail_block()`, `closed_items()`, `KIND_RE`, `ARCHIVE_AT` in `files/scripts/nudge_user_attention.py` (1,809 lines in all) | `src/shiftlead/ui/inbox.py` runs that script's `--report --json` (preferring a dev-cadence clone's `files/` copy, TD-278) and adds its own `SUBHEAD_RE`/`CONTEXT_RE`/`REPLY_MARK_RE`; `sessionorc/workorders.py` loads the script to get `item_key()` |
 | Board, edit | `files/scripts/board_edit.py` (289): `edit_line()` and the `{tool}: …` commit subject | `src/sessionorc/board.py` (685): its own `edit_line()`, `message()` and read regexes (`ANSWERS_RE`, `DECIDED_RE`, `CONTEXT_RE`, `HEAD_RE`, `SESSION_RE`) |
 | Commit subjects of board edits | written by `board_edit.py`; read by `check_cadence.py` `BOARD_EDIT_MSG_RE` and `STAMP_LINE_RE` (the carve-out classes) | written by `board.py` `message()` |
 
@@ -42,7 +42,7 @@ repo's own layout (`briefs/grinder.md`: `pdm run test`; `team_skill.md` says so)
 1. **Keep two repos and the parity pairs.** Drift is caught after the fact, by tests on one side.
    Rejected: it is the thing Paul named.
 2. **Two repos; ShiftLead runs dev-cadence's scripts as its readers.** One implementation, but ShiftLead
-   would depend on a 1,815-line script whose other 90% is the cadence's process (delivery, forge lines,
+   would depend on a 1,809-line script whose other 90% is the cadence's process (delivery, forge lines,
    sweeps), and the formats stay bundled with a process ShiftLead says is optional.
 3. **Move the formats into ShiftLead.** Rejected for the 2026-10-08 ADR's reason: every repo that runs
    the cadence without ShiftLead would depend on the orchestrator.
@@ -76,7 +76,8 @@ Pure functions over text; anything outside the text is passed in.
   table's rows (`ROW_RE`); `Blocked by` parsing; derived **pickable** over the whole ledger, as both
   sides have it today: `pickable(ledger, archive, resolve)` → entries, blocked, flags, where
   `resolve(item) -> (state, why)`, state `open | archived | unresolved`, answers a cross-repo
-  `<repo>#TD-NNN` and `why` goes into the flag — dev-cadence passes a resolver over its roster and
+  `<repo>#TD-NNN` and `why` goes into the flag (ShiftLead's `live` callable, its promote state, stays
+  ShiftLead's, passed around the call) — dev-cadence passes a resolver over its roster and
   `origin/<default>`, ShiftLead one over its registry; the archive's shape; the `Answers:` value grammar
   wherever it appears; an imported entry's `**Tracker:**` field (`JIRA-123`, as the 2026-09-26
   decision names it), kept byte-for-byte by every edit.
@@ -140,7 +141,7 @@ Pure functions over text; anything outside the text is passed in.
     gate by its exit code alone. The default, when `scripts/check_cadence.py` exists, is that script
     run as today with `--json`, a known shape whose rows the review card keeps showing. With no gate,
     the review stage never merges on its own: the card says "no gate: a person merges", where today
-    `sessionorc/cadence.py` returns nothing.
+    `sessionorc/cadence.py` returns `None` (no reading).
   - `commands:` `test` and `lint`, which fill `{test}` and `{lint}` in the built-in briefs; this repo's
     `pdm run …` moves to its own `.shiftlead.yml`.
   - `worktree_setup:` default `scripts/hydrate_worktree.sh` when present.
@@ -167,7 +168,7 @@ Each is a ledger entry in the repo named, filed when this ADR is accepted; the d
 | 1 | records | Create the repo; `ledgerboard.py` moved from dev-cadence's `ledger.py` parsing, nudge's board readers and `board_edit.py`'s `edit_line()`/subject — **moved, not rewritten, except `pickable()`'s resolver**, which becomes a parameter; `SPEC.md` from the seed templates' format paragraphs and cadence §2/§3's format rules; fixtures; release v1.0. Passes both repos' existing format tests unchanged. |
 | 2 | dev-cadence | Vendor v1.0 as a SYNC file, and the provenance test's vendored form; `ledger.py`, `nudge_user_attention.py`, `board_edit.py`, `check_cadence.py` call it; the seeds and cadence.md point at `SPEC.md`; §7's rows; README's pinning exception; a `cadence-changes.md` entry; sync. |
 | 3 | ShiftLead design | §5: `gate:`, `worktree_setup:`, `commands:` read by the briefs, the roster; §4.7: `ao doctor`'s repo rows, `ao repo init` (an empty ledger); §4.5a: the Repo page's missing-seam lines and the Inbox reading in-process; §6: the review stage with no gate; §8: this ADR's rule. |
-| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its two append subjects collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; the byte-equality and fixture tests. |
+| 4 | ShiftLead | Vendor v1.0; `ledger.py`, `board.py`, `reports.py`, `workorders.py` and `ui/inbox.py` call it and drop their line-shape regexes; `board.py`'s `message()`, `item_line()` and `decided_line()` become records calls with `tool="shiftlead"`, its three insert subjects (`board`, `answer`, `board decide`) collapsing into `append`; `Registry` returns `(state, why)`; the Inbox reads checkout and origin itself and derives the origin note; the ruff exclusion; the byte-equality and fixture tests. |
 | 5 | ShiftLead | The seams of build 3, each its own entry: gate, commands into briefs, worktree_setup, roster import, doctor and Repo page rows, `ao repo init`. |
 
 ## Consequences
