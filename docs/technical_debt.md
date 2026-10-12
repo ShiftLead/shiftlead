@@ -997,13 +997,13 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** design §4.5a *Inbox: Answered for you, **Dismiss all*** (beside *Inbox: the FYI count, Dismiss all*); `src/shiftlead/ui/templates/inbox.html` (the *Answered for you* group's heading — find its section by `answered` beside `#sec-fyi` ~L118; FYI's `#dismissall` ~L124 is the model), `src/shiftlead/ui/static/app.js` (FYI's handler ~L2149 reads `#rows-fyi .mailrow` on screen and dismisses by id: make it take the section, or add a twin for the answered rows), `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS` ~L49 keeps `answered`; nothing to change unless the heading needs a count), `src/shiftlead/ui/help.py` (the group's help words), `docs/mockups/gen.py` (drawn by TD-599); `tests/test_ui_inbox*.py`
+**Location:** design §4.5a *Inbox: Answered for you, **Dismiss all*** (beside *Inbox: the FYI count, Dismiss all*); `src/shiftlead/ui/templates/inbox.html` (`#sec-answered` ~L92, its `<summary>` heading ~L93 takes the button; FYI's `#dismissall` ~L124 is the model), the press calling `dismiss` (`rpc_inbox_dismiss`, `src/sessionorc/agent_inbox.py` ~L151) with the ids as FYI's does, `src/shiftlead/ui/static/app.js` (FYI's handler ~L2149 reads `#rows-fyi .mailrow` on screen and dismisses by id: make it take the section, or add a twin for the answered rows), `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS` ~L49 keeps `answered`; nothing to change unless the heading needs a count), `src/shiftlead/ui/help.py` (the group's help words), `docs/mockups/gen.py` (drawn by TD-599); `tests/test_ui_inbox*.py`
 
 **Why:** TD-599: Paul, 2026-10-12 — *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*. The design keeps the group (each row may be overruled) and gives it FYI's one-press clear; today a busy techlead's answers are cleared one **Dismiss** at a time.
 
 **Fix:**
 1. The heading: a **Dismiss all** button at the right of the *Answered for you* group's heading, as FYI's, drawn only while the group holds a row; its `title` *dismiss the answers on screen — never one that arrived after the page was drawn*.
-2. The press: confirm once — *Dismiss the n answers on screen? Overrule stays possible from the thread until it is pruned.* — then dismiss the ids of the group's rows not hidden by the rail, by the same RPC FYI's Dismiss all uses; rows that arrive later stay.
+2. The press: confirm once — *Dismiss the n answers on screen? Their Overrule goes with them.* — then dismiss the ids of the group's rows not hidden by the rail, by the same RPC FYI's Dismiss all uses; rows that arrive later stay.
 3. Nothing else: the team header's mark is the browser's and falls with the rows; no new RPC.
 4. Tests: the button drawn with rows and absent without; the press sends only the on-screen ids of the group (a row hidden by the rail, and one added after render, are not sent); FYI's Dismiss all unchanged; the mockup regenerates unchanged.
 
