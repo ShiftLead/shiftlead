@@ -276,6 +276,13 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .mailrow .st { font-size: var(--t-mono-s); color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
 /* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
 .inboxpage .mailrow .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; }
+/* §4.5a **subject** (§4.10 *A subject on every entry*, TD-566): the row's first text line, bold, one line
+   clipped with an ellipsis — the whole on hover — and the first paragraph under it */
+.inboxpage .mailrow .subj { font-size: var(--t-body); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.inboxpage:not(.msgpage) .mailrow[data-page] > .subj { cursor: pointer; }
+/* the message page: the subject is its heading, so the entry's own row does not say it twice */
+.msgpage .msgsubj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.msgpage .msgentry > .mailrow > .subj { display: none; }
 /* the board's horizon (§4.5 screen 6, TD-220): rows not yet due in the quiet colour, a sub-heading, the fold and the line */
 .inboxpage .mailrow[data-section="coming"] .body, .inboxpage .mailrow[data-section="unshown"] .body { color: var(--muted); }
 .boardsub { margin: 12px 0 6px; align-items: baseline; } .boardsubh { font-weight: 600; }

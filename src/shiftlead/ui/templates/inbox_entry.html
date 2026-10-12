@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% block title %}Inbox · ShiftLead{% endblock %}
+{#- §4.5 screen 6 *The message page*: the entry's subject heads the page and its tab (TD-566) -#}
+{% block title %}{% if entry and not gone %}{{ row_subject(entry) }} · {% endif %}Inbox · ShiftLead{% endblock %}
 {# design §4.5 screen 6 *The message page*, §4.5a **Inbox message page** (TD-129, built by TD-136;
    mockup `InboxMessage.dc.html`). Three parts, in Paul's order: **the entry** — its row, drawn by
    the row's own macro in the section the list has it in, so the head, the text (*details* open: a
@@ -22,6 +23,7 @@
     <span class="grow"></span>
     <span class="st age" data-since="{{ t.at or '' }}">{{ t.age or '' }}</span>
   </div>
+  {{ r.subj(t) }}
   {%- set s = shaped(t.text, origin) %}
   <div class="body md">{{ s.lead }}</div>
   {%- if s.rest %}<details class="fold" data-fold="{{ t.id }}" open><summary>details</summary><div class="body md">{{ s.rest }}</div></details>{% endif %}
@@ -34,7 +36,8 @@
 <div class="page inboxpage msgpage" data-back="{{ back_url }}" data-msg="{{ mid }}">
   <div class="row gap wrap">
     <a class="btn sm" id="msgback" href="{{ back_url }}" title="back to the list, at this entry (Esc)">‹ Back</a>
-    <span class="h1">Inbox</span>
+    {%- set subject = row_subject(entry) if entry and not gone else '' %}
+    {%- if subject %}<span class="h1 msgsubj" title="{{ subject }}">{{ subject }}</span>{% else %}<span class="h1">Inbox</span>{% endif %}
     <span class="grow"></span>
     <span class="meta" id="msgpos"></span>
   </div>

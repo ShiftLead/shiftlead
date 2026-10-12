@@ -993,6 +993,8 @@ SHAPE = (
     "then the reading, for the record. A reply with `--source` begins with its verdict."
 )
 
+SUBJECT = " With it a `--subject`: the entry's headline in a few words, apart from the first paragraph."
+
 
 def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
@@ -1000,6 +1002,8 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     root = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "briefs"
     for name in ("techlead.md", "manager.md", "grinder.md", "designer.md"):  # the designer a preset since TD-309
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
+        # TD-566 (§4.10 *A subject on every entry*): a headline beside the first-paragraph rule
+        assert SHAPE + SUBJECT in (root / name).read_text(encoding="utf-8"), name
     # since TD-310 the repo's designer brief is the template's `{repo}` supplement, so it says it no
     # longer: the rule is in the template around it, once (§4.9c *The designer gets a template*)
     designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"

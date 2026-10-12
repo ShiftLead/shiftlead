@@ -66,9 +66,48 @@ def _find_text(*parts: Any) -> str:
     return " ".join(str(p).strip() for p in parts if str(p or "").strip()).lower()
 
 
+def kind_subject(kind: str, what: Any = "") -> str:
+    """A row the home builds, as its subject (§4.10 *A subject on every entry*, TD-566): *<kind> ·
+    <what>*, the reference in it — *permission · Bash*, *stalled? · grinder-ao-1* — clipped as mail's."""
+    what = " ".join(str(what or "").split())
+    return mail_mod.clip_subject(f"{kind} · {what}" if what else kind)
+
+
+def restart_subject(words: str, name: str) -> str:
+    """The restart row's subject: *restarts exhausted · <name>*, its kind the one its words open with."""
+    return kind_subject(next((k for k in RESTART_SUBJECTS if words.startswith(k)), "restart"), name)
+
+
+def row_subject(e: Mapping[str, Any]) -> str:
+    """The subject a row draws first (§4.10 *A subject on every entry*, §4.5a **subject**): the one its
+    builder set; else mail's — the envelope's, or, on an entry written before the field (or by a
+    build that did not set it), derived from its text as `ao msg` derives one; a trail row its *how*."""
+    if e.get("subject"):
+        return str(e["subject"])
+    if e.get("row") == "trail":
+        return mail_mod.clip_subject(str(e.get("how") or ""))
+    if e.get("row") == "ledger":  # §4.5 screen 6 *Later*: a ledger entry's title (TD-565)
+        return mail_mod.clip_subject(str(e.get("title") or ""))
+    if e.get("row"):
+        return ""
+    return mail_mod.subject_of(str(e.get("text") or ""))
+
+
 # design §4.5a **Inbox row: state**: the row kinds that are a *needs you* session, and so exactly
 # what the Org's needs-you count counts. Kept beside `state_kind` because the two are one rule.
 NEEDS_YOU_ROWS = ("permission", "question", "needs")
+# §4.10 *A subject on every entry* (TD-566): each state row's kind as its subject says it, before the
+# session's name — *stalled? · grinder-ao-1* — in §4.5a's words for the row
+STATE_SUBJECTS = {
+    "needs": "needs you",
+    "stalled": "stalled?",
+    "unpushed": "exited with unpushed work",
+    "idle_open": "idle · open work",
+    "unclosed": "manager did not close",
+    "alarm": "identity alarm",
+}
+# …and the restart row's, by which of its marks raised it: what `restart_mark`'s words open with
+RESTART_SUBJECTS = ("fills exhausted", "restarts exhausted", "restart held", "restart wanted")
 
 
 def state_kind(v: dict[str, Any]) -> str:
@@ -297,13 +336,16 @@ def state_rows(
     rows: list[dict[str, Any]] = []
     now = datetime.now(UTC)  # one instant for the whole list, as `inbox_sections` takes one
 
-    def base(v: dict[str, Any], row: str, text: str, *, extra: str = "") -> dict[str, Any]:
+    def base(v: dict[str, Any], row: str, text: str, *, extra: str = "", subject: str = "") -> dict[str, Any]:
         doing = v.get("doing") or {}
+        name = v.get("name") or v["id"]
+        subject = subject or kind_subject(STATE_SUBJECTS.get(row, row), name)
         return {
             "row": row,
             "id": f"{v['id']}:{row}",  # the row's own key on the page; a record may raise two
             "sid": v["id"],
-            "name": v.get("name") or v["id"],
+            "name": name,
+            "subject": subject,
             "team": v.get("team") or "",
             "role": v.get("role") or "",
             "role_icon": v.get("role_icon") or "",
@@ -334,7 +376,9 @@ def state_rows(
         text = str(pend.get("text") or "")
         kind = state_kind(v)
         if kind == "permission":
-            rows.append(base(v, kind, text))
+            # the tool's name is what the adapter's text opens with, *Bash: git push* (§4.2)
+            tool = text.split(":", 1)[0] if ":" in text else ""
+            rows.append(base(v, kind, text, subject=kind_subject("permission", tool or v.get("name") or v["id"])))
         elif kind == "question":
             rows.append(base(v, kind, f"{pend.get('kind')}: {text}" if pend.get("kind") else text))
         elif kind == "needs":
@@ -351,7 +395,7 @@ def state_rows(
             # also be exited with unpushed work, and the two are answered differently
             rows.append(
                 {
-                    **base(v, "restart", mark[1]),
+                    **base(v, "restart", mark[1], subject=restart_subject(mark[1], v.get("name") or v["id"])),
                     "at": mark[0] or v.get("since") or "",
                     "age": "",
                     "restartable": bool(v.get("restartable")),  # never a seat: *fills exhausted* has no Restart
@@ -370,10 +414,16 @@ def state_rows(
             rows.append({**base(v, "unclosed", mark[1]), "at": mark[0], "age": ""})
         for c in cadence_marks(v, names):
             # one row a PR, and the PR in the row's kind: it is the snooze's key (`cadence:<pr>`)
-            row = base(v, f"cadence:{c['pr']}", _parts_text(c["parts"]))
+            row = base(
+                v,
+                f"cadence:{c['pr']}",
+                _parts_text(c["parts"]),
+                subject=kind_subject("cadence check failed", f"#{c['pr']}"),
+            )
             rows.append({**row, **c, "at": c["at"] or row["at"], "age": "", "mark": "cadence"})
         if held := held_mark(v):
-            row = base(v, "held", _parts_text(held["parts"]))
+            prs = ", ".join(f"#{p['text'][1:]}" for p in held["parts"] if p.get("text", "").startswith("#"))
+            row = base(v, "held", _parts_text(held["parts"]), subject=kind_subject("merged without its read", prs))
             rows.append({**row, "at": held["at"] or row["at"], "age": "", "mark": "held", "parts": held["parts"]})
         if alarms := v.get("alarms"):
             row = base(v, "alarm", alarm_note(alarms))
@@ -401,6 +451,7 @@ def state_rows(
                 "id": "host:alarm",
                 "sid": "",
                 "name": host or host_name(),
+                "subject": kind_subject("identity alarm", host or host_name()),
                 "team": "",
                 "role": "",
                 "role_icon": "",
@@ -747,6 +798,7 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "id": f"promote:{repo}",
                 "name": repo,
                 "repo": repo,
+                "subject": kind_subject("promote", repo),
                 "team": "",
                 "at": when,
                 "age": _age(when, at),
@@ -871,6 +923,11 @@ def work_rows(
                 "id": f"work:{team}",
                 "name": str(team),
                 "team": str(team),
+                # §4.10 *A subject on every entry*: *lanes gained 3 entries · ao-grind*; a row of
+                # questions alone has no count to give, so its kind is the row's own, *team start*
+                "subject": kind_subject(
+                    f"lanes gained {n} entr{'y' if n == 1 else 'ies'}" if n else "team start", team
+                ),
                 "at": str(mark.get("at") or ""),
                 "age": _age(mark.get("at"), at),
                 "wound_down": str(down) if down else "",
@@ -1424,6 +1481,9 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     # by its words; `head` and `name` are what the *Not right* hand-off sends
                     "pair": live_look(it),
                     "head": board_head(text),
+                    # §4.10 *A subject on every entry*: the head line's *what's needed*, already its
+                    # headline (cadence §3.3) — before the `Context:`, which is under *details*
+                    "subject": mail_mod.clip_subject(board_head(CONTEXT_RE.sub("", text))),
                     "name": Path(root).name if root else "",
                     "due": str(it.get("due") or ""),
                     "due_tag": tag,
@@ -1902,19 +1962,19 @@ def rail_kind(e: Mapping[str, Any]) -> str:
 
 def row_find(e: Mapping[str, Any], section: str = "") -> str:
     """The row's whole visible text, lowercased once, which the find matches every word against
-    (§4.5 screen 6 *Find*): a mail row's sender, team, kind, `about`, PR and text; the rows the
-    home builds carry their own (`find` on a state, alarm or board row); a trail row its name,
-    kind, `how` and text. `data-find` on every row kind is this."""
+    (§4.5 screen 6 *Find*): a mail row's sender, team, kind, `about`, PR, text and subject; the rows
+    the home builds carry their own (`find` on a state, alarm or board row) and their subject; a
+    trail row its name, kind, `how` and text. `data-find` on every row kind is this."""
     row = e.get("row")
     if row == "trail":
         return _find_text(e.get("name"), e.get("team"), e.get("kind"), "trail", e.get("how"), e.get("text"))
     if row == "ledger":
         return _find_text(e.get("id"), e.get("title"), e.get("name"), e.get("team"), e.get("kind"), e.get("held"))
-    if row:  # the home's own text for the row, and its team and pill, which the row draws too
-        return _find_text(e.get("find"), e.get("team"), e.get("state_label"))
+    if row:  # the home's own text for the row, its subject, and its team and pill, which the row draws too
+        return _with_subject(_find_text(e.get("find"), e.get("team"), e.get("state_label")), e)
     answered = e.get("answered") if section == "answered" and isinstance(e.get("answered"), dict) else {}
     pr = e.get("pr")
-    return _find_text(
+    found = _find_text(
         e.get("from_name") or e.get("from"),
         e.get("team"),
         e.get("kind"),
@@ -1925,10 +1985,19 @@ def row_find(e: Mapping[str, Any], section: str = "") -> str:
         answered.get("question") if answered else "",
         answered.get("source") if answered else "",
     )
+    return _with_subject(found, e)
+
+
+def _with_subject(found: str, e: Mapping[str, Any]) -> str:
+    """A row's find text and its subject, the subject added once and only where the text does not
+    already hold it — a subject derived from the text is its first sentence."""
+    subject = row_subject(e).lower()
+    return f"{found} {subject}".strip() if subject and subject not in found else found
 
 
 templates.env.globals["rail_kind"] = rail_kind
 templates.env.globals["row_find"] = row_find
+templates.env.globals["row_subject"] = row_subject
 templates.env.globals["rail_sections"] = RAIL_SECTIONS
 templates.env.globals["rail_section_names"] = RAIL_SECTION_NAMES
 templates.env.globals["rail_kinds"] = RAIL_KINDS

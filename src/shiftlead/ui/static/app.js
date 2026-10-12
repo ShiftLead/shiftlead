@@ -2102,7 +2102,7 @@
     // for `j` / `k` there (this tab's own memory, `sessionStorage`)
     document.addEventListener("click", (e) => {
       const link = e.target.closest(".inboxpage .mailrow a.pagelink");
-      const body = !link && e.target.closest(".inboxpage .mailrow[data-page] .body");
+      const body = !link && e.target.closest(".inboxpage .mailrow[data-page] .body, .inboxpage .mailrow[data-page] > .subj");
       if (!link && !body) return;
       if (body && (e.target.closest("a, summary, button") || String(window.getSelection ? window.getSelection() : "").trim())) return;
       if (link && (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) return;  // a new tab is the browser's
@@ -2538,7 +2538,7 @@
     };
     $$("[data-findmarked]", root).forEach((el) => { if (el.dataset.findmarked !== key) unmark(el); });
     if (!words.length) return;
-    $$(".mailrow:not([hidden]) .body, .mailrow:not([hidden]) .boardreply", root).forEach((body) => {
+    $$(".mailrow:not([hidden]) .subj, .mailrow:not([hidden]) .body, .mailrow:not([hidden]) .boardreply", root).forEach((body) => {
       if (body.dataset.findmarked === key) return;
       body.dataset.findmarked = key;
       const walk = document.createTreeWalker(body, NodeFilter.SHOW_TEXT), nodes = [];
