@@ -37,7 +37,7 @@
 - [ao msg: options before recipients](ao-msg-options-before-recipients.md) — `ao msg person --kind note "…"` exits 2; put options first, and never pipe a send through `tail`
 - [A designed entry needs a Blocked by line](designed-entry-needs-blocked-by.md) — pickable is derived from Blocked by and no Pickable line is written; name the build entries (2026-10-01)
 - [Steer replies land on the board](steer-replies-land-on-the-board.md) — Paul's Reply to a steer reaches main's board via the anchor, not a new run's inbox; grep the board for each open steer id before merging at a bound
-- [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write; never chain `git commit` after an edit script
+- [Edit scripts assert before writing](edit-script-asserts-before-writing.md) — check every replacement count first, then write, re-reading per replacement; never chain `git commit` after an edit script
 - [Never count the unread inbox](never-count-the-unread-inbox.md) — `ao inbox --unread` marks entries read; save it to a file, never pipe it through `jq length`; check open questions from the full inbox before stopping
 - [Stop a scratch home by its pid](stop-a-scratch-home-by-its-pid.md) — `pkill -f`/`pgrep -f` on look_home args kills the tool's own shell; `ps | grep '[l]ook…'`, then kill the number
 - [Designer run lessons 2026-10-04](designer-run-lessons-2026-10-04.md) — a history line goes above a section's newest lines, never at its tail; re-check the build number at the merge; no checkout while a reviewer reads the worktree
@@ -46,5 +46,5 @@
 - [Designer run lessons 2026-10-05](designer-run-lessons-2026-10-05.md) — a steer's first paragraph is warned past ~100 words (read the reply past the warning line); the manager seat may hold no session; a fact-check by commit ref frees the worktree
 - [Unused weekly tokens are lost velocity](unused-weekly-tokens-are-lost-velocity.md) — the weekly window does not carry over; near the reset keep every session busy, never defer to "save" it
 - [Designer run lessons 2026-10-06](designer-run-lessons-2026-10-06.md) — a steer needs `--default`; a build number taken mid-PR: squash, rebase once, renumber in the one resolution
-- [ao msg's warning precedes its JSON](ao-msg-warning-precedes-json.md) — a jq parse error on the reply is not a failed send; strip the warning line, check `entry.id` before resending
+- [ao msg's warning precedes its JSON](ao-msg-warning-precedes-json.md) — a jq parse error on the reply is not a failed send; strip the warning line, check `entry.id` or `ao inbox --sent` before resending
 - [Never kill a parent pid unseen](never-kill-a-parent-pid-unseen.md) — a `kill $ppid` loop over `sleep 90` matches killed `systemd --user` and the whole org for 4h20m (2026-10-09); kill only pids you started and recorded
