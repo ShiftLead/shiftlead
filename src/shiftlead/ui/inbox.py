@@ -27,7 +27,7 @@ from sessionorc import mail as mail_mod
 from sessionorc import settings as settings_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
-from sessionorc.agent_common import WRAPUP_GRACE
+from sessionorc.agent_common import SEAT_HELD_GRACE, WRAPUP_GRACE
 from sessionorc.client import call_sync
 from sessionorc.models import (
     normalize_ref,
@@ -131,6 +131,43 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
         decided = _first_line(wanted.get("decided") or "") or "early"  # a mark older than the field
         return str(wanted.get("at") or ""), f"restart wanted · {decided} — {why}"
     return None
+
+
+def held_for(secs: float) -> str:
+    """A hold's age in the seat-held row's and mark's words (§4.5a *Inbox row: seat held*): *20 min*,
+    *3 h*, *2 d*."""
+    secs = max(0, int(secs))
+    if secs < 3600:
+        return f"{secs // 60} min"
+    return f"{secs // 3600} h" if secs < 86400 else f"{secs // 86400} d"
+
+
+def seat_held_mark(v: Mapping[str, Any], now: datetime) -> tuple[str, str] | None:
+    """Design §4.5a **Inbox row: seat held** (§6 rule 3 `seat_held`, TD-559): `(since, the row's words)`
+    for an anchor seat whose fill the checkout has held off longer than `SEAT_HELD_GRACE` — else None,
+    and None for a hold older than the field (no `since`). The words are the tick's: the holder as
+    `why` has it (a session's `held by <who>`, `occupants`' reading of one outside shiftlead), or the
+    tree's own reason; the wait from `since`; the work as `seat_due.ids`, three named; and what frees
+    it, by `by`."""
+    held = v.get("seat_held")
+    if not isinstance(held, Mapping) or v.get("superseded_by"):
+        return None
+    since = _instant(held.get("since"))
+    if since is None or now - since < SEAT_HELD_GRACE:
+        return None
+    by, why = str(held.get("by") or ""), _first_line(str(held.get("why") or ""))
+    age = held_for((now - since).total_seconds())
+    due = v.get("seat_due")
+    ids = [str(i) for i in ((due.get("ids") if isinstance(due, Mapping) else None) or [])]
+    named = ", ".join(ids[:3]) + (f" and {len(ids) - 3} more" if len(ids) > 3 else "")
+    work = f" · {len(ids)} in its lane: {named}" if ids else ""
+    if by == "checkout":
+        text = f"anchor seat held {age}: {why or 'the checkout is not clean'}{work}"
+        return str(held["since"]), f"{text} — commit and push, or check out main, and the seat fills"
+    who = why.removeprefix("held by ").strip() or by
+    return str(held["since"]), (
+        f"anchor seat held {age} by {who}{work} — close it, or finish there, and the seat fills on the next tick"
+    )
 
 
 def unclosed_mark(v: dict[str, Any], now: datetime) -> tuple[str, str] | None:
@@ -320,6 +357,13 @@ def state_rows(
                     "restartable": bool(v.get("restartable")),  # never a seat: *fills exhausted* has no Restart
                 }
             )
+        if mark := seat_held_mark(v, now):
+            # §4.5a *Inbox row: seat held* (TD-559): as old as `since`, so a new holder is a new row and
+            # Dismiss (`dismissed:<since>`) hides only this one; Open goes to the holder where it is a
+            # record of this home, else to the seat's card
+            by = str(v["seat_held"].get("by") or "")
+            row = base(v, "seat_held", mark[1])
+            rows.append({**row, "at": mark[0], "age": "", "mark": "seat_held", "holder": by if by in names else ""})
         if mark := idle_open_mark(v, views, now):
             rows.append({**base(v, "idle_open", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
         if mark := unclosed_mark(v, now):

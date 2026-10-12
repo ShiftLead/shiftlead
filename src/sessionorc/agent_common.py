@@ -110,6 +110,10 @@ ENTRY_TYPES = ("debt", "feature")
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
+# An anchor seat held off its work (§6 rule 3 `seat_held`) is a person's row and a team header's mark
+# only past this (design §4.5a *Inbox row: seat held*, TD-559): a person's visit to the checkout raises
+# nothing; a hold that outlasts it is the wait the person could not see.
+SEAT_HELD_GRACE = timedelta(minutes=15)
 # The usage gate (design §6, TD-100) resumes a paused session no sooner than this after the pause:
 # a reading that flickers across the line must not type pause and resume at a session every minute.
 RESUME_MIN = timedelta(minutes=10)

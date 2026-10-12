@@ -470,7 +470,7 @@
    the row kind, because a session's permission and its stalled row are two rows. A permission, a
    question and `limited` are never offered one: something is waiting on the tool's own clock. #}
 {% macro state_snooze(e) -%}
-{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') or e.mark == 'cadence' %}
+{%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open', 'seat_held') or e.mark == 'cadence' %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
     {%- if e.snoozed_until %}
@@ -522,6 +522,16 @@
   <button class="btn sm" data-act="resume" data-id="{{ e.sid }}">Resume</button>
   {{ open_btn(e, 'Open') }}
   <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="restart" data-until="dismissed:{{ e.at }}" title="remove this row: the mark stays on the record and its card, and a new mark raises a new row">Dismiss</button>
+  {%- elif e.row == 'seat_held' %}
+  {#- §4.5a **Inbox row: seat held** (§6 rule 3 `seat_held`, TD-559): the anchor seat's fill held off by
+      its checkout past `SEAT_HELD_GRACE`. **Open** focuses the holder where it is a record of this
+      home, else the seat's own card — a holder outside shiftlead is closed in its own terminal;
+      **Dismiss** keeps `dismissed:<since>`, the restart row's mechanism, so a new holder is a new row. -#}
+  <span class="st">the checkout is yours — the seat fills once it is free</span>
+  <span class="grow"></span>
+  {{ state_snooze(e) }}
+  {% if e.holder %}<a class="btn sm ghost" href="/focus/{{ e.holder }}" title="Focus on the session holding the checkout, {{ e.holder }}">Open</a>{% else %}{{ open_btn(e, 'Open') }}{% endif %}
+  <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="seat_held" data-until="dismissed:{{ e.at }}" title="remove this row: the hold stays on the record, the card and the team's header, and a new holder raises a new row">Dismiss</button>
   {%- elif e.row == 'idle_open' %}
   {#- §4.5a **Inbox row: idle · open work** (§6 rule 3 `idle_open`, TD-259): a member of a team with
       no manager, nudged once and still idle with its work open. Nobody else reads it, so it is

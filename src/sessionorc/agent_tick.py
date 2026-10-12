@@ -2501,6 +2501,12 @@ class TickMixin:
             # the anchor's fill is a `create` in the checkout itself: never over a holder, never into
             # the person's uncommitted work or branch; `seat_due` stands and the next tick tries again
             held = await self._checkout_held(s)
+            if held:
+                # `since` is the first tick that read this holder (§6 rule 3, TD-559): kept while `by` is
+                # the same — its `why` may change under it — and reset by another, a new hold
+                was = s.seat_held or {}
+                stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+                held["since"] = (was.get("by") == held["by"] and was.get("since")) or stamp
             if held != s.seat_held:
                 s.seat_held = held
                 if held:

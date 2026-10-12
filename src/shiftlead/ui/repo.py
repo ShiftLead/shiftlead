@@ -7,7 +7,7 @@ each name from the app as before.
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +21,8 @@ from shiftlead import repoconfig, review, teamrun, teams
 
 from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
-from .common import _age, host_name
-from .inbox import work_note, work_started
+from .common import _age, _instant, host_name
+from .inbox import held_for, seat_held_mark, work_note, work_started
 from .org import compact_line, drawn_facets, lane_count, team_lanes, team_repo, team_summary
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
@@ -346,6 +346,14 @@ def team_groups(
         dead = [m for m in crew if not m.get("seat") and m.get("state") in DEAD] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
+        # §4.5a *team header: seat held* (TD-559): the team's anchor seat held off its work past the
+        # grace, the row's own reading — the oldest hold where a team ever had two
+        now = datetime.now(UTC)
+        held = [(_instant(mark[0]), mark[1]) for m in members if (mark := seat_held_mark(m, now))]
+        held_mark = None
+        if team != NO_TEAM and held:
+            since, text = min(held, key=lambda h: h[0] or now)
+            held_mark = {"age": held_for((now - (since or now)).total_seconds()), "title": text}
         # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are its *asked you* line (TD-354)
         summary = (
             team_summary(team, members, repos, doing, waiting, needs=needs, fleet=views) if team != NO_TEAM else None
@@ -371,6 +379,7 @@ def team_groups(
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "prs_waiting": waiting,
+                "seat_held": held_mark,
                 "summary": summary,
                 "live": live,
                 # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the

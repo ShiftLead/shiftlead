@@ -7,7 +7,7 @@ Start over a held checkout writing the seat's record alone, closed, for rule 3 t
 from __future__ import annotations
 
 import subprocess
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -57,6 +57,10 @@ async def _anchor(person, root: Path, **kw) -> str:
         "seat": {"trigger": "work"},
     }
     return (await person.call("create", **{**params, **kw}))["id"]
+
+
+def _z(at: datetime) -> str:
+    return at.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _end(agent, sid: str) -> None:
@@ -183,15 +187,22 @@ async def test_the_fill_waits_on_a_holder_or_the_persons_tree_and_says_why(agent
         monkeypatch.setattr(agent, "occupants", lambda d: list(holders))
         await agent._keep_running(now)
         assert agent.sessions[sid] is first and first.seat_due["ids"] == ["TD-2"]
-        assert first.seat_held == {"by": "ao-repo-paul", "why": "held by ao-repo-paul (working)"}
+        assert first.seat_held == {"by": "ao-repo-paul", "why": "held by ao-repo-paul (working)", "since": _z(now)}
+        # the holder's state changes under the same `by`: the words follow it, the wait keeps its age
+        # (TD-559: `since` is the first tick that read this holder)
+        holders[:] = ["ao-repo-paul (idle)"]
+        await agent._keep_running(now + timedelta(minutes=5))
+        assert first.seat_held == {"by": "ao-repo-paul", "why": "held by ao-repo-paul (idle)", "since": _z(now)}
         # the person left, but their work is uncommitted on a branch: still the person's
         holders.clear()
         _git(root, "switch", "-q", "-c", "td-x")
         (root / "a.txt").write_text("a\n")
         (root / "b.txt").write_text("b\n")
-        await agent._keep_running(now)
+        later = now + timedelta(minutes=20)
+        await agent._keep_running(later)
         assert agent.sessions[sid] is first
-        assert first.seat_held == {"by": "checkout", "why": "branch td-x, 2 files uncommitted"}
+        # another holder — the tree itself — is a new hold, and a new `since`
+        assert first.seat_held == {"by": "checkout", "why": "branch td-x, 2 files uncommitted", "since": _z(later)}
         # back on main and clean: the fill lands and nothing waits any more
         _git(root, "switch", "-q", "main")
         (root / "a.txt").unlink()
@@ -356,7 +367,7 @@ async def test_a_held_create_writes_its_reason_as_seat_held(agent, tmp_path):
             await _anchor(person, root, held=True, held_reason=["checkout", "2 files uncommitted"])
         sid = await _anchor(person, root, held=True, held_reason=why)
         rec = agent.sessions[sid]
-        assert rec.state == "closed" and rec.seat_held == why
+        assert rec.state == "closed" and rec.seat_held == {**why, "since": rec.created}  # TD-559: from the Start
         await person.call("kill", id=sid)
 
 
@@ -377,7 +388,7 @@ async def test_a_none_in_a_checkout_not_its_own_leaves_the_stretch_for_a_clean_o
         _end(agent, sid)
         await agent._keep_running(datetime.now(UTC))
         assert agent.sessions[sid] is first and first.seat_due["ids"] == ["TD-1"]
-        assert first.seat_held == {"by": "checkout", "why": "1 file uncommitted"}
+        assert first.seat_held["by"] == "checkout" and first.seat_held["why"] == "1 file uncommitted"
         (root / "a.txt").unlink()
         await agent._keep_running(datetime.now(UTC))
         new = agent.sessions[sid]
