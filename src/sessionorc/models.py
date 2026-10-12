@@ -401,6 +401,11 @@ class MailEntry:
     # create under the id `from` names clears it (`adopted_at` then keeps that it ever was).
     orphaned: dict[str, str] | None = None
     adopted_at: str | None = None
+    # The entry's headline (design §4.10 *A subject on every entry*, TD-561): at most
+    # `mail.SUBJECT_CHARS`, given by `ao msg --subject` or derived from the text's first sentence on
+    # mail the person reads; a reply, an outcome note and an *answered for you* entry carry their
+    # question's — a thread has one subject. None on session mail sent without one.
+    subject: str | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
