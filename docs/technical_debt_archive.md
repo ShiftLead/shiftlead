@@ -10162,3 +10162,23 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Related:** TD-577 (the design), TD-046 (Pop out), TD-572 (a Focus tab's cost).
 
 **Resolved:** 2026-10-12 (PR #1563) — `AO.shellHere` in `app.js` opens the tab or window in the press with the *opening a shell in <dir>…* placeholder, sends it to `/focus/<id>` (`?window=1` and its name for a window) when the create answers, closes it on a refusal; the buttons carry `data-dir` and the new title. Held by `tests/test_ui_popout.py` (`test_open_shell_here_opens_beside_the_page_it_was_pressed_on`, a node probe; `test_open_shell_here_never_moves_the_pressing_page`). The builder's look on a scratch home is the PR's UI check: a Focus tab, a Shift+press, a popped-out window and a card's *more ▾* each left the pressing page in place; a refused create closed the placeholder and toasted the refusal.
+
+## TD-593: TD-591's **Related:** line names TD-591 itself, and none of the entries it is built from
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1561–#1567)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/technical_debt.md`, entry TD-591, its **Related:** line
+
+**Why:** #1564 filed TD-585–TD-591; TD-591's last line reads *"**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591."* — the entry names itself. The design #1567 wrote says what TD-591 draws and from where: §4.5a *Repo page: missing seams* and §4.7 `ao doctor` **repos** read the seam state of `gate:` (TD-586), `board:` (TD-587) and `worktree_setup:` (TD-589), and `ao repo init` writes the ledger TD-585's vendored `ledgerboard.py` reads. Its **Blocked by:** names TD-586, TD-587, TD-589; TD-586's own **Related:** says *"TD-591 (the missing-gate line)"*, so the link runs one way only. A reader following *Related* from TD-591 gets nowhere.
+
+**Fix:** replace the self-reference in TD-591's **Related:** with TD-584 (the design that says what it builds), TD-585 (the module `ao repo init` and the ledger check read) and TD-586 (the gate line). No change to its **Blocked by:**.
+
+**Done when** TD-591's **Related:** names no id that is its own, and `pdm run test` passes (the ledger tests read the file).
+
+**Related:** TD-584, TD-591.
+
+**Resolved:** 2026-10-12 (PR #1574) — TD-591's **Related:** names TD-584 (the design), TD-585 (the vendored `ledgerboard.py`) and TD-586 (the missing-gate line); its **Blocked by:** is unchanged.
