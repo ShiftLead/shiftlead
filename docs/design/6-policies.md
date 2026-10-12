@@ -821,12 +821,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      script runs at the home) and told by the clause alone, as rule 5 tells it. **Not this
      rule's**: a PR from a session with no `progress` entry naming it (a person's anchor — the
      cadence is theirs to run). **The gate is the repo's `gate:`** (§5 *The seams*; [ADR 2026-10-12](../decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584, built by TD-586): a configured command is run with `{pr}` filled and judged
-     by its exit code alone — `verdict` PASS or FAIL, one row, *gate: <the command> exited <n>*;
+     by the shell in the checkout and judged by its exit code alone — `verdict` PASS or FAIL, one
+     row, *gate: <the command, filled> exited <n>*, and a run that does not end in the script's time
+     is no reading;
      the default, when the checkout holds `scripts/check_cadence.py`, is that script `--json` as
      above, its rows kept. **A repo with no gate** — the key unset and no script — is not checked:
      the review stage never merges on its own, the review card and the cadence row say *no gate: a
      person merges* in place of a verdict, and the member's brief says the same (§4.9c, §4.8 *A
-     repo's brief*), where before the home returned no reading and said nothing.
+     repo's brief*), where before the home returned no reading and said nothing. The home writes
+     it once a PR, with nothing run and nothing asked of `gh`, as the entry's `verdict: none` —
+     no line, no clause, no row; `ao status -v` prints *#842 no gate: a person merges* — and a
+     gate the repo gains later reads the PR as any.
   11. **Merged without its read** (`sessionorc.held`, the tick's `_held_pass` and `_held_line`;
      the Inbox row from `ui/inbox.py` `held_mark`). `ao pr held <n>` is the author's own read of
      its record's `review` against the PR's files (§4.9b *The reader*); whether a held PR merged

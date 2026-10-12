@@ -419,3 +419,12 @@ def test_a_role_has_saved_prompts_replaced_whole_per_layer(tmp_path):
         (tmp_path / ".shiftlead.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
         with pytest.raises(ValueError, match=why):  # the error names the role and the entry
             repoconfig.load(tmp_path)
+
+
+def test_the_gate_is_a_command(tmp_path):
+    """TD-586, §5 *The seams*: `gate:` is accepted, a command, and refused as anything else."""
+    assert repoconfig.load_text("gate: make gate PR={pr}\n", tmp_path).gate == "make gate PR={pr}"
+    assert repoconfig.load_text("ledger: docs/debt.md\n", tmp_path).gate is None
+    for text in ("gate: ''\n", "gate: [a]\n", "gate: 3\n"):
+        with pytest.raises(ValueError, match="must be a command"):
+            repoconfig.load_text(text, tmp_path)
