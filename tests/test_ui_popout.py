@@ -277,8 +277,18 @@ def test_open_shell_here_never_moves_the_pressing_page(tmp_path, monkeypatch):
     window form, and no line of app.js sends the pressing page to the shell; both buttons carry the
     directory the placeholder names and a title that says where the shell opens."""
     js = (UI / "static" / "app.js").read_text()
-    assert "AO.shellHere(id, b.dataset.dir, ev.shiftKey || !!AO.poppedId)" in js
+    # the hand-off comes before the handler's first await: a window opened after one is no longer
+    # inside the click, and the browser blocks it as a pop-up
+    handler = js[js.index('document.addEventListener("click", async (ev) => {') :]
+    hand = re.search(
+        r'if \(action === "shell-here"\) \{\s*'
+        r"await AO\.shellHere\(id, b\.dataset\.dir, ev\.shiftKey \|\| !!AO\.poppedId\);\s*return;",
+        handler,
+    )
+    assert hand and hand.start() < handler.index("await "), "shell-here is not handed off before any await"
     assert not re.search(r'shell-here"[^\n]*location\.href', js)
+    # a refusal is shown on the pressing page under the control's name, not its wire name
+    assert '"shell-here": "Open shell here"' in js
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     from shiftlead.ui.app import templates, view
 

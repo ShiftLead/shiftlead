@@ -10122,7 +10122,7 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Added:** 2026-10-12 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer) — the target is **a new tab** by default, the pressing page staying; Shift+press, or a press in a popped-out window, opens **a window as Pop out opens one** (chromeless, `ao-focus-<id>`, the remembered size), so a person in a window gets a window; the browser's choice is not offered because the press is an RPC, not a link, and the modifiers a link honours are the browser's own. The opening: the tab or window is opened in the press, before the RPC, as a same-origin placeholder reading *opening a shell in <dir>…*, then sent to `/focus/<id>` (`?window=1` and the window's name for a window) when the id comes back; a refused create closes the placeholder and the pressing page shows the refusal; a blocked open creates no shell and says *the browser blocked the tab — allow pop-ups for this page*, as Pop out says. §4.5a *Focus: Open shell here* (the rule; *card: more ▾* points at it), §4.5 screen 1 *+ New ▾*. No mockup: nothing drawn changes but a toast. Built by TD-579. Was: Open.
+**Status:** Resolved
 **Blocked by:** TD-579
 **Location:** design §4.5a *card: more ▾* (Open shell here), *Focus: Open shell here*, *card: Focus* and *Pop out* (the new-tab and window rules); `src/shiftlead/ui/static/app.js` (the `shell-here` press sets `location.href` to the new shell's `/focus/<id>`, ~L983); `src/shiftlead/ui/templates/focus.html` (~L104), `card.html` (~L152)
 
@@ -10147,7 +10147,7 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Added:** 2026-10-12 (the designer, TD-577's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Resolved
 **Location:** design §4.5a *Focus: Open shell here* (the rule) and *card: more ▾*, §4.5 screen 1 *+ New ▾*; `src/shiftlead/ui/static/app.js` (the act handler's `shell-here` branch ~L983, which sets `location.href` after `await act(...)`; `AO.popOut` ~L380 and `AO.popFeatures` / `AO.popName` ~L368, whose window features and name the window form reuses; `AO.poppedId` ~L3697); `src/shiftlead/ui/templates/focus.html` (~L104) and `card.html` (~L152), the two buttons; `tests/test_ui.py` (~L1776, the Focus buttons), `tests/test_ui_org.py` (~L943), `tests/test_ui_popout.py` (the window form's neighbours)
 
 **Why:** TD-577: Paul, 2026-10-12 — *opening a shell should not overwrite the current window (should be new tab or new window)*; the press replaced the Focus he was working beside, and getting it back meant navigating back and re-attaching.
