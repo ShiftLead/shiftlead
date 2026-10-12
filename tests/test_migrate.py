@@ -67,6 +67,26 @@ def test_migrate_moves_the_home_rewrites_its_files_and_removes_the_old_units(tmp
     assert any(line.startswith("moved ") for line in done)
 
 
+def test_migrate_rewrites_every_top_level_file_and_keeps_a_session_id_ending_in_a_script_name(tmp_path):
+    """TD-562: `TEXT_GLOBS`' top-level `*.yml`, `*.yaml` and `*.json` are each rewritten; the console-script
+    rule's lookbehind keeps a session id that *ends* in a script name (`ao-agentorc-ui`) as it is; and a
+    top-level file that is not UTF-8 neither stops the move nor is touched."""
+    old = _old_home(tmp_path)
+    for name in ("settings.yml", "x.yaml", "x.json"):
+        (old / name).write_text("home: /h/.agentorc/x\n")
+    (old / "launch" / "ao-ui.json").write_text(json.dumps({"env": {"AGENTORC_SESSION": "ao-agentorc-ui"}}))
+    binary = b"\xff\xfe/h/.agentorc/x\x00"
+    (old / "blob.json").write_bytes(binary)
+    new = tmp_path / ".shiftlead"
+    _seen, systemctl = _calls()
+    done = migrate.run(old=old, new=new, unit_dir=tmp_path / "units", sessions=lambda: [], systemctl=systemctl)
+    for name in ("settings.yml", "x.yaml", "x.json"):
+        assert (new / name).read_text() == "home: /h/.shiftlead/x\n", name
+    assert json.loads((new / "launch" / "ao-ui.json").read_text()) == {"env": {"SHIFTLEAD_SESSION": "ao-agentorc-ui"}}
+    assert (new / "blob.json").read_bytes() == binary
+    assert any(line.startswith("rewrote ") and "settings.yml" in line for line in done)
+
+
 @pytest.mark.parametrize(
     ("live", "make_new", "make_old", "why"),
     [
