@@ -3736,6 +3736,8 @@ class TickMixin:
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
         if aid:
             s.adapter_id = aid
+        if (path := event.get("transcript")) and isinstance(path, str):
+            s.transcript = path  # the tool's file for this run, pushed with the id (§4.2, TD-578)
         if model := event.get("model"):
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):

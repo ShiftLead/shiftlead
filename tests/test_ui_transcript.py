@@ -172,3 +172,47 @@ def test_the_page_script_keeps_the_button_and_the_banner_s_words_in_step():
     assert 'tr.classList.toggle("hidden", !v.adapter_id)' in js
     assert "read its transcript</a>" in js and "const read = v.adapter_id ?" in js
     assert "AO.transcript = function" in js and "?part=1&before=" in js
+
+
+@pytest.mark.unit
+def test_the_focus_header_offers_the_transcript_file_in_the_editor(tmp_path, monkeypatch):
+    """§4.5a Focus header **‹› VS Code** (TD-578, built by TD-597): right after **Transcript**, the
+    Transcript page's own link on the record's `transcript` — the file's path, one launch, no `:line`.
+    Hidden until the hook reports the file; not drawn under `open_in: none` or for another host's record."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    monkeypatch.setattr("shiftlead.ui.cards.host_name", lambda: "kmaster")
+    from shiftlead.ui import uiconf
+    from shiftlead.ui.app import templates, view
+
+    path = "/home/k/.claude/projects/-r-wt/s1.jsonl"
+
+    def focus(**rec):
+        v = view({**REC, "host": "kmaster", "state": "idle", **rec})
+        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+
+    def link(html):
+        m = re.search(r'<a class="btn sm link editor[^"]*" id="ftranscript_editor"[^>]*>', html)
+        return m.group(0) if m else None
+
+    html = focus(transcript=path)
+    a = link(html)
+    assert a and 'class="btn sm link editor"' in a, "a record with a transcript draws the link, shown"
+    href = re.search(r'href="([^"]*)"', a).group(1)
+    assert href.startswith("vscode://") and re.search(re.escape(path) + r"(?![:\d])", href), href  # no :line
+    assert html.index('id="ftranscript"') < html.index('id="ftranscript_editor"')  # right after Transcript
+    assert "data-folder" not in a and 'title="the transcript file in ' in a  # one launch
+    # no file reported yet (a shell, or before the first hook): drawn, hidden
+    assert 'class="btn sm link editor hidden"' in link(focus(transcript=None))
+    assert 'class="btn sm link editor hidden"' in link(focus(adapter="shell", adapter_id=None))
+    # another host's record: the file is not at that path here
+    assert link(focus(transcript=path, host="laptop")) is None
+    monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
+    assert link(focus(transcript=path)) is None
+
+
+@pytest.mark.unit
+def test_the_page_script_lands_the_transcript_link_with_the_delta():
+    """The link is unhidden and its href set when a delta brings the view's `transcript_editor`."""
+    js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
+    assert 'te.classList.toggle("hidden", !v.transcript_editor);' in js
+    assert "if (v.transcript_editor) te.href = v.transcript_editor.url;" in js

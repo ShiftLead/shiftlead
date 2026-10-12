@@ -78,6 +78,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-12 (TD-597, the build): `transcript` is the path the hook reports (Claude Code's `transcript_path`), not the adapter's locator, which finds no file before the conversation's first write and so had nothing to set at the first hook. Was: the adapter's `transcript_path`.
 - 2026-10-12 (TD-578, the designer): the record carries `transcript`, the tool's file path on its host, set with `adapter_id`. Built by TD-597.
 - 2026-10-12 (TD-592, ao-paul; Paul: *this session has been sitting idle since I ran the /clear, but its chip says working*): `SessionStart` with `source: clear` reports `idle`. Until this date it read `working`, as TD-155 had found for `resume`: `/clear` lands at an empty composer, no `Stop` follows, and the chip sat `working` until the next turn ended, headed for `stalled?`.
 - 2026-10-10 (TD-543, the designer; Paul: *do we leverage that and add the recent urls and files from the terminal to our list?*): the record's `links` — the http/https URLs the transcript holds in the assistant's text and tool results, read incrementally from a cursor on the tick, newest twenty, prompts and loopback hosts left out; never from the pane. Built by TD-544.
