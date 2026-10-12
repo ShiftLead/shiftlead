@@ -1,0 +1,42 @@
+# docs/cadence.toml — this repo's cadence settings (TD-096). Consumer-owned: sync.sh creates it
+# once and never overwrites it. People write it; tools only read it and never rewrite it, so a
+# comment saying why a value was chosen is safe here (cadence.md §9.18).
+#
+# Every tool reads a value through `python3 scripts/cadence_config.py get <key>` (Python >= 3.11).
+# The first that has it wins: env CADENCE_<KEY> (CADENCE_REVIEW_MODEL), this file, the machine's
+# ${XDG_CONFIG_HOME:-~/.config}/dev-cadence/cadence.toml, the default. `cadence_config.py`
+# prints every key with its value and source; `--check` names a key nothing reads.
+# To change a value, uncomment its line and edit the value (each is shown at its default).
+
+# The independent reviewer's model (§4.8): a cheaper model than the author's, never the same.
+# review-model = "sonnet"
+
+# The model the deep sweep's agents run on (/stranded-work deep).
+# sweep-model = "sonnet"
+
+# The agent tools that work this repo, comma-separated ("claude, codex"). The safety nets —
+# the anchor guard, the reaper, the session index, the sweep row — must see each one's
+# sessions; one they cannot (no backend yet, or no state on this machine) is reported as
+# "cannot see", never as nobody here (TD-100). Without "claude", the memory guard skips the
+# checks that guard Claude Code's auto-memory (TD-095).
+# agents = "claude"
+
+# Where scripts/open_worktree.sh puts worktrees, relative to the clone root (§1, TD-101). The
+# anchor guard, the hydrate scan and the workspace generator follow it. The default is where
+# `claude --worktree` puts them; worktrees already elsewhere are not moved.
+# worktree-root = ".claude/worktrees"
+
+# --- opt-outs (cadence.md Adoption checklist step 9): what this repo does not adopt, each
+# naming the ADR that decided it. Read by sync.sh and sync.sh --verify; --verify reports each
+# as OPTED-OUT. Nothing uncommented here means the whole cadence is adopted.
+#
+# [not-adopted]
+# "§4" = "docs/decisions/0001-….md"
+#     §4 (branch → PR → squash) is not how this repo works: scripts/git-hooks/pre-push is
+#     neither shipped nor locked (an unedited copy is removed; an edited one is kept, with a
+#     WARN), no pre-push shim is installed (an existing one is removed either way), and
+#     sync-all.sh pushes its sync branch for the owner to merge instead of opening a PR.
+#
+# [skip-seed]
+# "docs/claude-memory/MEMORY.md" = "docs/decisions/0001-….md"
+#     that SEED file is never created (one that exists is left alone — it is yours).

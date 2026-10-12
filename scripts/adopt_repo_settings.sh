@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/adopt_repo_settings.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/adopt_repo_settings.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Check (default) or apply the GitHub repo settings the cadence assumes (TD-034).
 #
@@ -15,7 +15,8 @@
 #   --check   (default) print each setting, current vs cadence; exit 1 on drift,
 #             0 when clean, 2 when gh cannot answer (not authenticated, offline,
 #             not a GitHub repo). Mutates nothing.
-#   --apply   PATCH the drifted settings, then re-read and confirm. Idempotent:
+#   --apply   PATCH the drifted settings, then re-read and confirm (a few reads, since
+#             GitHub's read can lag the write, TD-107). Idempotent:
 #             a clean repo is left untouched (no API write at all). Before the write it
 #             asks, naming the repo, when stdin is a terminal; with no terminal it refuses
 #             (exit 2, naming --yes) — the repo came from `origin`'s URL, and a write to
@@ -131,8 +132,25 @@ echo "applying: gh api -X PATCH repos/$REPO ${DRIFT[*]}"
 if ! gh api -X PATCH "repos/$REPO" "${DRIFT[@]}" >/dev/null; then
     echo "apply failed: gh api PATCH repos/$REPO returned non-zero (need admin on the repo?)" >&2; exit 2
 fi
-after="$(read_settings)"
+# GitHub's read can lag its write: on a repo created minutes earlier the re-read right
+# after a PATCH that worked still showed the old values (TD-107). So read again, a few
+# times, before calling it a failure. ADOPT_READ_TRIES / ADOPT_READ_SLEEP (seconds) move
+# the bounds; the tests set the sleep to 0.
+tries="${ADOPT_READ_TRIES:-5}"; pause="${ADOPT_READ_SLEEP:-2}"
+case "$tries" in ''|*[!0-9]*) tries=5 ;; esac   # a non-number would never end the loop below
+n=0
+while :; do
+    n=$((n + 1))
+    after="$(read_settings)"
+    compare "$after" >/dev/null
+    [ "${#DRIFT[@]}" -eq 0 ] && [ -n "$after" ] && break
+    [ "$n" -ge "$tries" ] && break
+    sleep "$pause"
+done
 echo "after:"
 compare "$after"
-if [ "${#DRIFT[@]}" -eq 0 ]; then echo "applied"; exit 0; fi
-echo "apply did not stick: settings still drift after PATCH" >&2; exit 1
+if [ "${#DRIFT[@]}" -eq 0 ] && [ -n "$after" ]; then
+    if [ "$n" -gt 1 ]; then echo "applied (after $n reads — GitHub's first read lagged the write)"; else echo "applied"; fi
+    exit 0
+fi
+echo "apply did not stick: settings still drift after PATCH ($n reads, ${pause}s apart)" >&2; exit 1

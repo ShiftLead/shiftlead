@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/install_git_hooks.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/install_git_hooks.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 #
 # install_git_hooks.sh [REPO] — put this repo's git hooks in force in EVERY worktree of
@@ -27,7 +27,7 @@
 # sync, and by hand on a clone that predates it. Exit 0 installed or already fine (WARNs
 # may print), 2 cannot install here (not a git clone, a bare repo, a separate git dir,
 # no hooks beside this script). CADENCE_HOOKS_SKIP (space-separated hook names; sync.sh sets
-# it from docs/cadence-local.conf, TD-072) names hooks that get no shim: ours is removed.
+# it from the repo's opt-outs in docs/cadence.toml, TD-072/TD-096) names hooks that get no shim: ours is removed.
 set -u
 
 REPO="${1:-.}"
@@ -73,9 +73,9 @@ for src in "$here"/git-hooks/*; do
     case " ${CADENCE_HOOKS_SKIP:-} " in
         *" $name "*)
             if [ -f "$dst" ] && grep -qF "$MARK" "$dst" 2>/dev/null; then
-                rm -f "$dst" && echo "  hook  $name: shim removed — opted out (docs/cadence-local.conf)"
+                rm -f "$dst" && echo "  hook  $name: shim removed — opted out by the repo (docs/cadence.toml)"
             else
-                echo "  hook  $name: opted out (docs/cadence-local.conf) — no shim"
+                echo "  hook  $name: opted out by the repo (docs/cadence.toml) — no shim"
             fi
             continue ;;
     esac
@@ -103,7 +103,7 @@ exit 0
 done
 
 # A shim of ours whose hook neither this copy nor the MAIN checkout (what the shim runs)
-# ships — opted out in docs/cadence-local.conf (TD-072), or dropped from the payload —
+# ships — opted out in docs/cadence.toml (TD-072, TD-096), or dropped from the payload —
 # only prints "missing" on every run: remove it. While the main checkout still has the hook
 # (a sync into a worktree, not yet merged) the shim stays; the next sync there removes it.
 for dst in "$common"/hooks/*; do

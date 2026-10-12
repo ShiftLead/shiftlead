@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/reap_worktrees.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/reap_worktrees.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Report (and optionally remove) worktrees whose work has landed on origin/main.
 #
@@ -221,28 +221,24 @@ LOCKED="$(git worktree list --porcelain | awk '
 # missing-interpreter case, and an unreachable branch no test can pin is a
 # liability rather than defence in depth.
 LIVE_CWDS="$(ANCHOR_DIR="$ANCHOR_DIR" python3 - <<'PY' 2>/dev/null
-import os, sys, pathlib
+import os, sys
 sys.path.insert(0, os.environ["ANCHOR_DIR"])
 try:
-    # An UNREADABLE or MISSING registry is not the same fact as an EMPTY one,
-    # and live_sessions() returns [] for all three. Empty means "nobody is
-    # working"; the other two mean "this machine cannot tell you". Collapsing
-    # them retires the only liveness signal the reaper has.
-    #
-    # os.listdir, not is_dir(): is_dir() only needs the PARENT searchable, so
-    # it returns True for a directory that cannot actually be read — and
-    # pathlib's glob() swallows the PermissionError and yields nothing, so
-    # live_sessions() reports an empty registry with no exception raised.
-    # Verified: chmod 000 on a populated sessions dir gives is_dir()=True and
-    # glob()=[]. That combination reaped a live worktree in review. listdir
-    # raises on both missing and unreadable, and the handler below turns any
-    # OSError into the sentinel.
-    os.listdir(pathlib.Path.home() / ".claude" / "sessions")
-    from check_anchor import live_sessions, procfs_available
+    # A MISSING or UNREADABLE registry is not the same fact as an EMPTY one:
+    # empty means "nobody is working", the other two "this machine cannot tell
+    # you". The session adapter (agent_sessions.py, TD-100) keeps them apart —
+    # a tool the repo lists that it cannot look at comes back in `blind`, never
+    # as an empty list — and its listdir probe is the one that caught chmod 000
+    # on a populated registry reading as empty, which reaped a live worktree in
+    # review. Any blind tool turns into the sentinel: nothing is reaped.
+    from agent_sessions import live, procfs_available
     # No procfs: liveness is undeterminable, so idleness is too (TD-043).
     if not procfs_available():
         raise RuntimeError("no procfs")
-    for s in live_sessions():
+    seen = live(os.getcwd())
+    if seen.blind:
+        raise RuntimeError("; ".join(seen.blind))
+    for s in seen.items:
         cwd = s.get("cwd")
         if cwd:
             print(cwd)

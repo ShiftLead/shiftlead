@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/check_anchor.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/check_anchor.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """SessionStart anchor guard — detect a second session in the main checkout.
 
 Cadence rule (docs/cadence.md §1): ONE anchor session per checkout; every other
 concurrent session isolates in a worktree. This hook makes the rule mechanical:
-at session start it reads the live-session registry (~/.claude/sessions/*.json,
-one file per running Claude Code process) and, if another live session already
+at session start it reads the live sessions through the session adapter
+(agent_sessions.py, TD-100 — for Claude Code, its registry: one file per running
+process) and, if another live session already
 occupies this checkout, prints a loud warning — which SessionStart hooks inject
 into the new session's context — telling it to isolate before touching
 anything. One session per checkout applies to worktrees too: starting in an
 already-occupied worktree warns the same way. Silent when this session is the
-first (anchor) in its checkout. Always exits 0 (non-blocking).
+first (anchor) in its checkout — and when a tool the repo lists (the `agents`
+setting) cannot be looked at, it says so rather than calling this session the anchor.
+Always exits 0 (non-blocking).
 
 Self-exclusion is by session id AND by process ancestry: after /resume the new
 session id differs from the one in the registry entry for this very process
@@ -43,224 +46,37 @@ Usage:
                                # from stdin; silent unless there's a conflict
 """
 
+import functools
 import json
 import os
-import re
 import subprocess
 import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-# A registry pid must belong to a process that plausibly IS its Claude Code
-# session. Claude Code's own comm varies by install (native binary vs. a node
-# launcher), so this is an allowlist of plausible names, not an identity test —
-# its job is only to reject the obvious impostors a recycled pid produces (bash,
-# python, vite, sleep). Widen it rather than narrowing it: a name missing here
-# resurrects the false-conflict bug this filter exists to kill.
-SESSION_COMMS = {"claude", "node"}
-
-# Clock skew allowance between the entry's startedAt (wall clock, written by the
-# session process) and the process start derived from /proc. Both come from the
-# same kernel, so the real spread is sub-second; this is slack, not a threshold.
-START_SKEW_SEC = 120
-
-
-def _proc_start_ticks(pid: int) -> int | None:
-    """Field 22 of /proc/<pid>/stat — process start in clock ticks since boot.
-
-    The comm field is parenthesized and may itself contain spaces or parens, so
-    split after the LAST ')'. Raw ticks, deliberately unconverted: this is the
-    unit the registry records, and comparing raw values avoids every rounding
-    and clock-correction question that converting to wall-clock introduces.
-    """
-    try:
-        stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
-        return int(stat[stat.rindex(")") + 2:].split()[19])
-    except (OSError, ValueError, IndexError):
-        return None
-
-
-def _proc_start_epoch(pid: int) -> float | None:
-    """Wall-clock start time of PID, or None if it can't be determined.
-
-    btime in /proc/stat is the boot epoch; both it and the tick count are
-    host-kernel values readable from inside a container, which is precisely the
-    case this exists to serve.
-    """
-    ticks = _proc_start_ticks(pid)
-    if ticks is None:
-        return None
-    try:
-        hz = os.sysconf("SC_CLK_TCK")
-        btime = None
-        for line in Path("/proc/stat").read_text(encoding="ascii", errors="replace").splitlines():
-            if line.startswith("btime "):
-                btime = int(line.split()[1])
-                break
-        if btime is None or not hz:
-            return None
-        return btime + ticks / hz
-    except (OSError, ValueError, AttributeError):
-        return None
-
-
-def _entry_proc_start(entry: dict) -> int | None:
-    """The entry's recorded procStart in clock ticks (Claude Code writes it as a string)."""
-    try:
-        return int(entry["procStart"])
-    except (KeyError, TypeError, ValueError):
-        return None
-
-
-def _pid_is_dead(entry: dict) -> bool:
-    """True only when the entry's pid is POSITIVELY not this session's process.
-
-    Undeterminable cases return False (keep the entry) — a guard that stays
-    quiet is worse than one that occasionally warns twice.
-    """
-    pid = _entry_pid(entry)
-    if pid is None:
-        return False  # no pid recorded — nothing to disprove
-    if not procfs_available():
-        # No procfs at all (macOS, some sandboxes): a missing /proc/<pid> proves
-        # nothing, and reading it as "dead" silenced the guard and made every
-        # worktree look idle to the reaper (TD-043). Undeterminable — keep it.
-        return False
-    if not Path(f"/proc/{pid}").exists():
-        return True  # stale registry entry (same-namespace case)
-
-    # PRIMARY, and exact: the registry records procStart in the same units and
-    # epoch as /proc/<pid>/stat field 22, so equality identifies the SAME
-    # PROCESS rather than merely a plausible one. Both values come from the one
-    # kernel, so this is namespace-independent, and it needs neither the comm
-    # allowlist nor btime — no wall-clock conversion means no exposure to a
-    # post-boot clock correction shifting derived start times. Present on every
-    # entry from Claude Code versions in circulation; the heuristics below exist
-    # only for entries that predate the field.
-    recorded = _entry_proc_start(entry)
-    actual = _proc_start_ticks(pid)
-    if recorded is not None and actual is not None:
-        return recorded != actual
-
-    # FALLBACK, in order of strength. Start time is checked first and decides on
-    # its own: the session writes its own registry entry, so its process always
-    # predates the entry, and a process that started after it took the pid later.
-    started = entry.get("startedAt")
-    proc_start = _proc_start_epoch(pid)
-    if isinstance(started, (int, float)) and proc_start is not None:
-        return proc_start > started / 1000 + START_SKEW_SEC
-
-    # Weakest, and only when nothing better is available: an unrecognized comm.
-    # Deliberately last — comm is an allowlist, and /proc/<pid>/comm truncates at
-    # 15 chars, so a future Claude Code launched under a different name would be
-    # judged dead here and the guard would stop reporting real conflicts. That
-    # silent-permissive direction is why this never runs while procStart or a
-    # usable start time is available.
-    try:
-        comm = Path(f"/proc/{pid}/comm").read_text(encoding="ascii", errors="replace").strip()
-    except OSError:
-        comm = ""
-    return bool(comm) and comm not in SESSION_COMMS
-
-
-def procfs_available() -> bool:
-    """Whether this host has a procfs to judge liveness by (TD-043)."""
-    return Path("/proc/self").exists()
-
-
-def live_sessions() -> list[dict]:
-    reg = Path.home() / ".claude" / "sessions"
-    if not reg.is_dir():
-        return []
-    out = []
-    for f in reg.glob("*.json"):
-        try:
-            obj = json.loads(f.read_text(encoding="utf-8", errors="replace"))
-        except (json.JSONDecodeError, OSError):
-            continue
-        if not isinstance(obj, dict) or "sessionId" not in obj:
-            continue
-        if _pid_is_dead(obj):
-            continue
-        out.append(obj)
-    return out
-
-
-REGISTRY_SETTLE_S = 5  # a registry file younger than this may still be being written
-
-
-def registry_format_note() -> str | None:
-    """TD-050 canary: the session registry is an undocumented Claude Code internal
-    (verified against Claude Code 2.1.280). When the NEWEST settled entry does not parse as
-    a session, the format moved — and the anchor guard, the reaper's idle gate and
-    list_sessions all degrade to "nobody is here" without a word. Judged on the newest
-    file older than REGISTRY_SETTLE_S, never on this session's own entry (written as the
-    session starts, racing the hooks) and never on "any file parses" (one stale entry in the
-    old format would mask a change forever); a file younger than that may be mid-write."""
-    reg = Path.home() / ".claude" / "sessions"
-    now = time.time()
-    try:
-        settled = sorted(((f.stat().st_mtime, f) for f in reg.glob("*.json")
-                          if now - f.stat().st_mtime >= REGISTRY_SETTLE_S), reverse=True)
-    except OSError:
-        return None
-    if not settled:
-        return None
-    newest = settled[0][1]
-    try:
-        obj = json.loads(newest.read_text(encoding="utf-8", errors="replace"))
-        if isinstance(obj, dict) and "sessionId" in obj and "pid" in obj:
-            return None
-    except (json.JSONDecodeError, OSError):
-        pass
-    return (f"⚠ the newest entry in Claude Code's session registry ({newest}) does not read as a "
-            "session — its format may have changed (verified against 2.1.280). Until the scripts "
-            "are updated, the anchor guard, the reaper's idle gate and list_sessions see no sessions.")
-
-
-def _ancestor_pids() -> set[int]:
-    """Pids identifying THIS session: us up to our own claude process, via /proc.
-
-    The hook runs as a descendant of the claude process, so the session that
-    spawned it is always an ancestor. The walk stops at (and includes) the
-    first ancestor whose comm is "claude" — that one is our session; anything
-    ABOVE it is foreign, possibly a different claude session that spawned the
-    shell this one was started from, and excluding it would silently suppress
-    a genuine conflict. If no claude ancestor is identifiable (no /proc, or a
-    wrapper changes comm), the walk runs to the top — over-inclusive fallback,
-    trading the rare nested-session false negative for never regressing the
-    /resume fix. On systems without /proc entirely the walk stops at the first
-    miss and returns whatever it collected (worst case just our own pid — the
-    pre-fix behavior, never worse).
-    """
-    pids: set[int] = set()
-    pid = os.getpid()
-    while pid > 1 and pid not in pids and len(pids) < 64:
-        pids.add(pid)
-        try:
-            comm = Path(f"/proc/{pid}/comm").read_text(encoding="ascii", errors="replace").strip()
-        except OSError:
-            comm = ""
-        if comm == "claude" and pid != os.getpid():
-            break  # our own session process — its ancestors are not us
-        try:
-            status = Path(f"/proc/{pid}/status").read_text(encoding="ascii", errors="replace")
-        except OSError:
-            break
-        m = re.search(r"^PPid:\s*(\d+)", status, re.MULTILINE)
-        if not m:
-            break
-        pid = int(m.group(1))
-    return pids
-
-
-def _entry_pid(s: dict) -> int | None:
-    try:
-        return int(s.get("pid"))
-    except (TypeError, ValueError):
-        return None
-
+# The live-session registry, liveness and the self walk are the session adapter's (TD-100):
+# the Claude backend lives in agent_sessions.py beside this script. Re-exported here, since
+# reap_worktrees.sh and older callers import them from this module.
+# NB patch agent_sessions.procfs_available, not this module's copy: liveness runs there.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+try:
+    import agent_sessions  # noqa: E402,F401
+except ImportError:  # a partial sync: one line, never a traceback in SessionStart
+    print("⚠ anchor check did not run: agent_sessions.py is missing beside check_anchor.py — re-run sync.sh")
+    sys.exit(0)
+from agent_sessions import (  # noqa: E402
+    SESSION_COMMS,  # noqa: F401
+    _ancestor_pids,
+    _entry_pid,
+    _pid_is_dead,  # noqa: F401
+    cannot_see,
+    format_canary,
+    live,
+    live_sessions,  # noqa: F401
+    procfs_available,  # noqa: F401
+    registry_format_note,  # noqa: F401
+)
 
 # Occupancy resolution runs per registry entry, so its git calls need tighter
 # bounds than the single call main() makes for its own cwd. A hung `git` — stale
@@ -334,6 +150,18 @@ def _occupancy_repo_root(p: Path) -> "Path | None":
     return result
 
 
+@functools.lru_cache(maxsize=None)
+def _worktree_parts(root: Path) -> tuple[str, ...]:
+    """The `worktree-root` setting as path parts (cadence_config.py, TD-101). A setting that
+    cannot be read falls back to the default: the guard degrades, it never fails here."""
+    try:
+        import cadence_config as C
+        value, _ = C.resolve("worktree-root", C.sources(str(root)))
+    except Exception:  # noqa: BLE001 — no helper, an unreadable file, an invalid value
+        value = ".claude/worktrees"
+    return Path(str(value)).parts
+
+
 def occupies(session_cwd: str, root: Path) -> bool:
     """True if a session started at session_cwd is working in ROOT's main checkout."""
     try:
@@ -344,9 +172,12 @@ def occupies(session_cwd: str, root: Path) -> bool:
         return True
     if root not in p.parents:
         return False
-    # sessions inside <root>/.claude/worktrees/<name> are isolated, not occupants
+    # sessions inside <root>/<worktree-root>/<name> are isolated, not occupants — the
+    # worktree root is the setting open_worktree.sh creates them under (TD-101). Only a
+    # fast path: a worktree anywhere else is cleared by the nested-root test below.
     rel = p.relative_to(root).parts
-    if len(rel) >= 2 and rel[0] == ".claude" and rel[1] == "worktrees":
+    wt = _worktree_parts(root)
+    if len(rel) > len(wt) and rel[: len(wt)] == wt:
         return False
     # Being UNDER root's directory is not the same as being IN root's checkout.
     # An independent repo nested in the working dir — a sibling checkout kept
@@ -378,7 +209,7 @@ def main() -> int:
     self_id = data.get("session_id", "")
     cwd = Path(data.get("cwd") or os.getcwd()).resolve()
 
-    note = registry_format_note()
+    note = format_canary()
     if note:
         print(note)
 
@@ -395,18 +226,22 @@ def main() -> int:
         return 0
 
     self_pids = _ancestor_pids()
+    seen = live(root)
     others = [
-        s for s in live_sessions()
-        if s.get("sessionId") != self_id
+        s for s in seen.items
+        if s.get("id") != self_id
         and _entry_pid(s) not in self_pids  # self after /resume: old id, our own pid
         and occupies(s.get("cwd", ""), root)
     ]
     if not others:
-        if not hook:
+        if seen.blind:
+            # A tool the repo lists cannot be looked at: unknown, never "you are the anchor" (TD-100)
+            print(f"⚠ anchor check: {cannot_see(seen)} — whether another session is in {root} is unknown.")
+        elif not hook:
             print(f"OK: no other live session in {root} — this session is the anchor.")
         return 0
 
-    lines = [f"⚠ ANCHOR CONFLICT: {root} already hosts {len(others)} other live Claude Code session(s):"]
+    lines = [f"⚠ ANCHOR CONFLICT: {root} already hosts {len(others)} other live session(s):"]
     for s in others:
         started = s.get("startedAt")
         when = (
@@ -414,7 +249,7 @@ def main() -> int:
             if isinstance(started, (int, float)) else "?"
         )
         lines.append(
-            f"  • session {s.get('sessionId', '?')[:8]} (pid {s.get('pid', '?')}, started {when}) "
+            f"  • {s.get('tool', '?')} session {(s.get('id') or '?')[:8]} (pid {s.get('pid', '?')}, started {when}) "
             f"in {s.get('cwd', '?')}"
         )
     lines.append(

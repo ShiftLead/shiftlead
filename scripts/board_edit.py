@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/board_edit.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/board_edit.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """Make one tool-made edit to one attention-board item, the same way for every tool (TD-036).
 
@@ -44,8 +44,8 @@ origin's head and lands the commit by a PR it opens and squash-merges at once, t
 with this message (cadence.md §4.5, TD-083) — or, where the forge takes a direct push,
 pushes it under ``ALLOW_MAIN_PUSH=1``.
 
-The field formats are ``nudge_user_attention.py``'s (imported, never re-typed: one
-reader, one writer — cadence.md §7 parity pairs). Every edit is re-parsed before it is
+The field formats and the edits themselves are ``ledgerboard.py``'s (ShiftLead/ledgerboard:
+the formats defined once — imported, never re-typed). Every edit is re-parsed before it is
 written, and refused if the reader would not read back what was meant.
 
 Exit: 0 edited (and committed); 1 git failed (the board is restored); 2 usage; 3 refused.
@@ -60,126 +60,12 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import nudge_user_attention as N  # noqa: E402  # sibling SYNC script: the reader whose formats this writes
-
-SESSION_RE = re.compile(r"\(session ([^\s,)]+)")
-HEAD_CHARS = 60
-
-
-class Refused(Exception):
-    pass
-
-
-FIELDS_RE = re.compile(r"\s+\b(?:Context|Due|Answers|Decided):")
-FIELD_NAME_RE = re.compile(r"\b(?:Context|Answers|Decided|Closed):")  # in a reply, the reader would read the field
-
-
-def item_head(text: str) -> str:
-    """What the item is about: after its `date (session …) — ` prefix, before its
-    `Context:`/`Due:`/`Answers:`/`Decided:` fields, markdown bold dropped, clipped."""
-    span = N.reply_span(text)  # a reply's words are the person's: never part of the head
-    text = text[: span[0]] if span else text
-    what = text.split(" — ", 1)[1] if " — " in text else text
-    what = FIELDS_RE.split(what, 1)[0].replace("*", "").strip() or text
-    return what if len(what) <= HEAD_CHARS else what[: HEAD_CHARS - 1] + "…"
-
-
-def _trailing_field_start(body: str, after_due: bool = False) -> int | None:
-    """Where the item's Answers:/Decided: trailer begins, for inserting a Due: before it —
-    or, `after_due`, a reply: then only as the reader finds the fields, after the Due:."""
-    due = N.DUE_RE.search(body) if after_due else None
-    off = due.end() if due else 0
-    starts = [m.start() for m in (N.ANSWERS_RE.search(body, off), N.DECIDED_RE.search(body, off)) if m]
-    return min(starts) if starts else None
-
-
-def edit_line(body: str, action: str, *, to: date | None = None, answer: str | None = None,
-              why: str | None = None, reply: str | None = None, by: str | None = None,
-              today: date | None = None) -> str:
-    """The item line `body` (no line ending) after `action`; raises Refused."""
-    today = today or date.today()  # noqa: DTZ011  # local civil date, as the readers use
-    if action == "done":
-        why = " ".join((why or "").split()).rstrip(".?!")  # the field supplies its one period
-        field = f"Closed: {today.isoformat()}{f' — {why}' if why else ''}."
-        head = re.sub(r"^(\s*-\s*)\[ \]", r"\1[x]", body, count=1).rstrip()
-        new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {field}"
-        m = N.CLOSED_RE.search(new)
-        if N.ITEM_RE.match(new) or not N.CLOSED_ITEM_RE.match(new) or not m \
-                or m.group("date") != today.isoformat() or N.item_key(new) != N.item_key(body):
-            raise Refused("the reader would not read the item back as closed today with its "
-                          "text unchanged")
-        return new
-    text = N.ITEM_RE.match(body).group("text")
-    if action == "snooze":
-        m = N.DUE_RE.search(body)
-        if m:
-            new = body[: m.start("due")] + to.isoformat() + body[m.end("due"):]
-        else:
-            at = _trailing_field_start(body)
-            span = N.reply_span(body)  # a reply is read only after the Due:, so the date goes ahead of it
-            if span:
-                head = body[: span[0]].rstrip()
-                new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} Due: {to.isoformat()}.{body[span[0]:]}"
-            elif at is None:
-                head = body.rstrip()
-                new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} Due: {to.isoformat()}."
-            else:
-                new = f"{body[:at].rstrip()} Due: {to.isoformat()}. {body[at:]}"
-        got = N.parse_board(new, warn=False)
-        if not got or got[0].due != to or got[0].answers != N.parse_answers(text) \
-                or got[0].decided != N.parse_decided(text):
-            raise Refused(f"after the edit the reader does not read Due: {to.isoformat()} "
-                          "with the item's other fields unchanged")
-        return new
-    if action == "decide":
-        answer = " ".join(answer.split())
-        if not answer:
-            raise Refused("--answer is empty")
-        field = f"Decided: {answer} ({today.isoformat()})."
-        if N.parse_decided(text) is not None:
-            m = N.DECIDED_RE.search(body)
-            new = f"{body[: m.start()].rstrip()} {field}"
-        else:
-            # the field starts a sentence (the reader's rule): end an unpunctuated item first
-            head = body.rstrip()
-            new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {field}"
-        got = N.parse_board(new, warn=False)
-        if not got or got[0].decided != (answer, today) or got[0].answers != N.parse_answers(text) \
-                or got[0].due != N.parse_board(body, warn=False)[0].due:
-            raise Refused(f"the reader would not read back 'Decided: {answer}' with the item's "
-                          "other fields unchanged — rephrase the answer")
-        return new
-    if action == "reply":
-        words, by = " ".join((reply or "").split()), " ".join((by or "").split())
-        if not words:
-            raise Refused("--text is empty — a reply needs its words")
-        if FIELD_NAME_RE.search(words):
-            raise Refused("a reply may not carry Context:, Answers:, Decided: or Closed: — the reader "
-                          "would read it as the field; say it in other words")
-        if (N.DUE_RE.search(words) or N.DUE_ATTEMPT_RE.search(words)) and not N.DUE_RE.search(body):
-            raise Refused("this item has no Due: date, so a reply may not carry one — the "
-                          "reader would take it for the item's; snooze sets its date")
-        tail = f" — {by}, {today.isoformat()}: {words}"
-        at = _trailing_field_start(body, after_due=True)
-        if at is None:
-            new = body.rstrip() + tail
-        else:
-            # ahead of the fields the reader anchors at the line's end: a reply never
-            # un-decides an item, and never becomes part of its last answer
-            head = body[:at].rstrip() + tail
-            new = f"{head}{'' if head.endswith(('.', '?', '!')) else '.'} {body[at:]}"
-        was, got = N.parse_board(body, warn=False)[0], N.parse_board(new, warn=False)
-        replies = N.parse_replies(new)
-        if not got or (got[0].due, got[0].answers, got[0].decided) != (was.due, was.answers, was.decided) \
-                or N.parse_default(got[0].text) != N.parse_default(text) \
-                or N.item_refs(got[0].text) != N.item_refs(text) \
-                or replies[:-1] != N.parse_replies(body) or not replies \
-                or replies[-1][:2] != (by, today.isoformat()) or replies[-1][2].rstrip(".") != words.rstrip(".") \
-                or N.item_key(new) != N.item_key(body):
-            raise Refused("the reader would not read the reply back, by that name, with the "
-                          "item's other fields unchanged — rephrase it (or --by)")
-        return new
-    raise Refused(f"unknown action {action}")
+import ledgerboard as LB  # noqa: E402  # sibling SYNC file: the board format and its edits, defined once (ShiftLead/ledgerboard)
+from ledgerboard import (  # noqa: E402,F401  # re-exported: tests reach them as board_edit.<name>
+    Refused,
+    edit_line,
+)
+from ledgerboard import edit_head as item_head  # noqa: E402,F401
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess:
@@ -239,7 +125,7 @@ def main(argv: list[str] | None = None) -> int:
         line = lines[a.line - 1]
         body = line.rstrip("\r\n")
         eol = line[len(body):]
-        m = N.ITEM_RE.match(body)
+        m = LB.ITEM_RE.match(body)
         if not m:
             raise Refused(f"line {a.line} is not an open item: {body[:80]!r}")
         text = m.group("text").strip()
@@ -271,9 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.no_commit:
         print(f"board_edit: {a.action} line {a.line}{what} (not committed)")
         return 0
-    sm = SESSION_RE.search(text)
-    session = a.session or (sm.group(1) if sm else "n/a")
-    msg = f"{a.tool}: {a.action} {item_head(text)}{what} (session {session})"
+    msg = LB.subject(a.tool, a.action, text, to=a.to, answer=a.answer, session=a.session)
     r = _git(root, "commit", "-q", "-m", msg, "--", str(board))
     if r.returncode != 0:
         board.write_bytes(raw)

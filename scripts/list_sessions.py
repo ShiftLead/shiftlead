@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/list_sessions.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/list_sessions.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
-"""Index of Claude Code sessions for one or more repos — richer than /resume's blurbs.
+"""Index of agent sessions for one or more repos — richer than /resume's blurbs.
 
-Scans the JSONL transcripts under ~/.claude/projects/ for each given repo's
-project dir AND its worktree variants, and prints one block per session: id,
-start, last activity, git branch, how it STARTED (first real user message), how
-it ENDED (last assistant text), the latest compaction RECAP and session slug
-when present (more relevant when a session starts/ends with a slash command or
-harness noise), an ACTIVE-NOW flag from the live registry (~/.claude/sessions/),
-the directory the session ran from (the repo checkout or its worktree — this is
+Reads each given repo's transcripts (its own and its worktrees') through the session
+adapter, agent_sessions.py (TD-100). For Claude Code these are the JSONL files under its
+per-project dirs. It prints one block per session: id, start, last activity, git branch,
+how it STARTED (first real user message), how it ENDED (last assistant text), the latest
+compaction RECAP and session slug when present (more relevant when a session starts or
+ends with a slash command or harness noise), an ACTIVE-NOW flag from the adapter's live
+sessions, the directory the session ran from (the repo checkout or its worktree — this is
 what distinguishes repos in a combined index), and the session's open items on
 that repo's docs/user_attention.md (flagged, with the item text listed in the
 session's details).
@@ -36,7 +36,8 @@ person or the sweeping session to judge; it decides nothing.
 markdown overview table plus per-session detail sections (what the
 generate_session_index.sh cron wrapper writes to docs/session_index.md).
 
-Resume a listed session with:  claude --resume <session-uuid>
+Resume a listed session with the line each block prints (Claude Code: claude --resume <session-uuid>).
+A tool the `agents` setting lists that the adapter cannot read is named on stderr, not skipped.
 """
 
 import argparse
@@ -48,51 +49,12 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# Claude Code's own rule (TD-11), read from its bundle (2.1.283: `k`, `qx`, `Le`, `KJ`):
-#   n = path.replace(/[^a-zA-Z0-9]/g, "-")      # per UTF-16 code unit
-#   n.length <= 200 ? n : n.slice(0, 200) + "-" + Math.abs(javaHash(path)).toString(36)
-# Parity (§7): check_claude_memory.sh's ENCODED calls this function for any path its sed
-# fast path cannot get right (non-ASCII, or past the cap); tests/test_list_sessions.sh
-# holds the expectations, taken from that JS run under node. Not modelled: Claude Code's
-# CLAUDE_CODE_PROJECT_DIR_NAME override (honoured only with CLAUDE_CONFIG_DIR set), and
-# a caller passing a Path has already had `//` collapsed, where the JS sees the raw string.
-PROJECT_DIR_MAX = 200
-
-
-def munge(path: Path) -> str:
-    """Path -> Claude Code's project-dir name.
-
-    Claude Code replaces every non-alphanumeric character with '-', not just
-    '/' and '.'. Spelling out only those two silently loses any repo whose path
-    contains '_' (or anything else): /workspaces/work_history lives in
-    ~/.claude/projects/-workspaces-work-history, and the two-replace version
-    looked for -workspaces-work_history, found nothing, and reported "no
-    project dirs" — indistinguishable from a repo that genuinely has no
-    sessions. The character class is a superset of the old behavior ('-' maps
-    to itself), so it changes nothing for paths that already worked.
-
-    JavaScript strings are UTF-16, so the replace counts code units: an accented
-    letter (NFC) is one '-', a decomposed one is its base letter plus one '-', and a
-    character outside the BMP (an emoji) is TWO. A name past 200 units is cut there
-    and suffixed with a base-36 hash of the whole path (TD-11).
-    """
-    s = str(path)
-    units = s.encode("utf-16-le", "surrogatepass")
-    out = "".join(c if c.isascii() and c.isalnum() else "-" * (len(c.encode("utf-16-le", "surrogatepass")) // 2)
-                  for c in s)
-    if len(out) <= PROJECT_DIR_MAX:
-        return out
-    h = 0
-    for i in range(0, len(units), 2):   # Java's String.hashCode, as int32
-        h = (h * 31 + int.from_bytes(units[i:i + 2], "little")) & 0xFFFFFFFF
-    h = abs(h - (1 << 32) if h >= 1 << 31 else h)
-    digits = ""
-    while True:
-        h, r = divmod(h, 36)
-        digits = "0123456789abcdefghijklmnopqrstuvwxyz"[r] + digits
-        if not h:
-            break
-    return f"{out[:PROJECT_DIR_MAX]}-{digits}"
+# Where sessions and transcripts live is the session adapter's (TD-100): the Claude backend
+# — munge(), its project dirs, the live registry — is agent_sessions.py beside this script.
+# munge and project_dirs are re-exported: check_claude_memory.sh and the tests call them here.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import agent_sessions  # noqa: E402
+from agent_sessions import PROJECT_DIR_MAX, munge, project_dirs  # noqa: E402,F401
 
 
 def short_path(p: Path) -> str:
@@ -100,21 +62,6 @@ def short_path(p: Path) -> str:
     s = str(p)
     home = str(Path.home())
     return "~" + s[len(home):] if s.startswith(home + "/") else s
-
-
-def project_dirs(repo: Path) -> list[Path]:
-    """The repo's own project dir plus worktree-variant dirs."""
-    base = Path.home() / ".claude" / "projects"
-    if not base.is_dir():
-        return []
-    dirs = []
-    exact = base / munge(repo)
-    if exact.is_dir():
-        dirs.append(exact)
-    # worktrees live under <repo>/.claude/worktrees/<name> → munged prefix match
-    wt_prefix = munge(repo) + "--claude-worktrees-"
-    dirs += [d for d in base.iterdir() if d.is_dir() and d.name.startswith(wt_prefix)]
-    return dirs
 
 
 # Board items name the session that parked them — `(session <first-8-of-uuid> on <host>)`,
@@ -230,39 +177,17 @@ def _try_json(line: str):
 
 
 def active_sessions() -> dict[str, str]:
-    """sessionId -> cwd for currently-running sessions (live registry).
+    """session id -> cwd for currently-running sessions, from the session adapter.
 
-    Liveness is check_anchor.live_sessions()'s, not a second test of its own: bare
-    /proc/<pid> existence manufactures false liveness under a bind-mounted
-    ~/.claude (a reused low pid), and the index then said "already running" for a
-    dead session nobody resumed (TD-043). The naive test below is only the
-    fallback for an install without check_anchor.py beside this script.
-    """
-    try:
-        here = str(Path(__file__).resolve().parent)
-        if here not in sys.path:
-            sys.path.insert(0, here)
-        from check_anchor import live_sessions
-    except ImportError:
-        live_sessions = None
-    if live_sessions is not None:
-        return {s["sessionId"]: s.get("cwd", "") for s in live_sessions()}
-    reg = Path.home() / ".claude" / "sessions"
-    live = {}
-    if not reg.is_dir():
-        return live
-    for f in reg.glob("*.json"):
-        try:
-            obj = _try_json(f.read_text(encoding="utf-8", errors="replace") or "")
-        except OSError:
-            continue  # the session exited and removed its entry since the glob
-        if not obj or "sessionId" not in obj:
-            continue
-        pid = obj.get("pid")
-        if pid and not Path(f"/proc/{pid}").exists():
-            continue  # stale registry entry
-        live[obj["sessionId"]] = obj.get("cwd", "")
-    return live
+    Liveness is the adapter's corroborated test (procStart first), not a bare
+    /proc/<pid>, which manufactures false liveness under a bind-mounted ~/.claude (a
+    reused low pid) — the index then said "already running" for a dead session nobody
+    resumed (TD-043). A tool the adapter cannot see is named once on stderr: its
+    sessions' ACTIVE-NOW flags are unknown, not false (TD-100)."""
+    seen = agent_sessions.live()
+    if seen.blind:
+        print(f"note: {agent_sessions.cannot_see(seen)} — ACTIVE-NOW flags are unknown.", file=sys.stderr)
+    return {s["id"]: s.get("cwd", "") for s in seen.items if s.get("id")}
 
 
 def board_items(repo: Path) -> dict[str, list[str]]:
@@ -306,7 +231,8 @@ def _session_flags(s: dict, live: dict, parked: dict) -> list[str]:
 
 
 def _resume(s: dict, live: dict) -> str:
-    return "already running — switch to it" if s["id"] in live else f"claude --resume {s['id']}"
+    return ("already running — switch to it" if s["id"] in live
+            else agent_sessions.resume_hint(s["id"], s.get("tool", "claude")))
 
 
 def _times(s: dict) -> tuple[str, str]:
@@ -489,14 +415,14 @@ def main() -> int:
     scanned = 0  # transcript files read, for the TD-050 canary below
     parked: dict[str, list[str]] = {}
     missing = []
-    marker = "--claude-worktrees-"
+    blind: list[str] = []
     for repo in repos:
-        dirs = project_dirs(repo)
-        if not dirs:
+        found = agent_sessions.history_dirs(repo)
+        blind += [b for b in found.blind if b not in blind]
+        if not found.items:
             missing.append(repo)
             continue
-        for d in dirs:
-            wt_name = d.name.split(marker, 1)[1] if marker in d.name else None
+        for tool, d, wt_name in found.items:
             # NB wt_name comes from the munged project-dir name, so dots in a worktree
             # name display as dashes — display-only, and the path still names the repo.
             run_dir = repo / ".claude" / "worktrees" / wt_name if wt_name else repo
@@ -514,16 +440,19 @@ def main() -> int:
                 s = scan_session(f, args.chars)
                 if s:
                     s["where"] = short_path(run_dir)
+                    s["tool"] = tool
                     sessions.append(s)
         for sid, items in board_items(repo).items():
             parked.setdefault(sid, []).extend(items)
+    if blind:
+        # a tool the repo lists cannot be looked at: the index is partial, said first (TD-100)
+        print(f"note: cannot see {'; '.join(blind)} — this index leaves those sessions out.", file=sys.stderr)
     if len(missing) == len(repos):
-        print(f"No Claude Code project dirs found under ~/.claude/projects/ for: "
-              f"{', '.join(str(r) for r in repos)}")
+        print(f"No session transcripts found for: {', '.join(str(r) for r in repos)}"
+              + (f" (cannot see {'; '.join(blind)})" if blind else ""))
         return 1
     for repo in missing:
-        print(f"note: no Claude Code project dirs found for {repo} under ~/.claude/projects/ — skipped.",
-              file=sys.stderr)
+        print(f"note: no session transcripts found for {repo} — skipped.", file=sys.stderr)
 
     if scanned and not sessions:
         # TD-050 canary: transcripts are an undocumented Claude Code format (verified

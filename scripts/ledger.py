@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/ledger.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/ledger.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """What in the TD ledger may be picked now, and what is blocked on what (TD-064).
 
@@ -62,147 +62,44 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import nudge_user_attention as N  # noqa: E402  # sibling SYNC script: the roster, origin and default-branch readers (§9)
+import ledgerboard as LB  # noqa: E402  # sibling SYNC file: the ledger format, defined once (ShiftLead/ledgerboard)
+import nudge_user_attention as N  # noqa: E402  # sibling SYNC script: the roster, origin and default-branch readers (§9) — the resolver only
+from ledgerboard import (  # noqa: E402,F401  # re-exported: readers and tests reach them as ledger.<name>
+    BLOCKED_RE,
+    CADENCE_FIELDS,
+    COMMENT_RE,
+    DECISION_RE,
+    EDIT_ERRORS,
+    FIELD_RE,
+    FIELDS_DECL_RE,
+    HEADING_RE,
+    ID_ITEM_RE,
+    PRIORITIES,
+    PRIORITY_RE,
+    ROW_RE,
+    SECTION_RE,
+    TYPE_RE,
+    TYPES,
+    WORD_RE,
+    XREPO_ITEM_RE,
+    _num,
+    declared,
+    entries,
+    field_key,
+    first_word,
+    header_block,
+    parse_blocked,
+)
+from ledgerboard import heading_nums as _heading_nums  # noqa: E402
 
-HEADING_RE = re.compile(r"^## (TD-(\d+)):\s*(.*)$", re.MULTILINE)
-SECTION_RE = re.compile(r"^## ", re.MULTILINE)
-ROW_RE = re.compile(r"^\|\s*(TD-(\d+))\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|", re.MULTILINE)
-# Parity (cadence.md §7): §2.12's header-block rule; agentorc's src/sessionorc/ledger.py reads the same lines.
-FIELD_RE = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one line, one field
-FIELDS_DECL_RE = re.compile(r"^Fields:[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # the preamble's declaration
-CADENCE_FIELDS = ("priority", "type", "added", "status", "blocked by", "location")  # §2.12's list
-PRIORITY_RE = re.compile(r"^\*\*Priority:\*\*\s*(\w+)", re.MULTILINE)
-# Parity (cadence.md §7): the §2 entry shape and the seed template's field write this.
-BLOCKED_RE = re.compile(r"^\*\*Blocked by:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)  # one line only
-# Parity (cadence.md §7): §2.11 and the seed template's field write this; TYPES is its vocabulary.
-TYPE_RE = re.compile(r"^\*\*Type:\*\*[ \t]*(.*?)[ \t]*$", re.MULTILINE)
-TYPES = ("debt", "feature")  # pick order within a Priority; the first is the default
-COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)  # the seed template's example entry lives in one
-ID_ITEM_RE = re.compile(r"^TD-(\d+)$")
-# Parity (cadence.md §7): §2.4's `<repo>#TD-NNN` item and the seed template's field write this.
-XREPO_ITEM_RE = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")
 LEDGER_REL, ARCHIVE_REL = "docs/technical_debt.md", "docs/technical_debt_archive.md"
-DECISION_RE = re.compile(r"\bdecision\s*\(([^)]+)\)", re.IGNORECASE)
-WORD_RE = re.compile(r"[^\s,;]+")
-PRIORITIES = ("high", "medium", "low")
 ALIASES = ("type", "owner", "kind")  # --type X is --where type=X, and so on
-
-
-def _num(tid: str) -> int:
-    return int(tid.split("-", 1)[1])
-
-
-def _heading_nums(text: str | None) -> set[int]:
-    """The entry numbers with a ``## TD-NNN:`` heading in a ledger or archive (comments dropped)."""
-    return {int(m.group(2)) for m in HEADING_RE.finditer(COMMENT_RE.sub("", text or ""))}
-
-
-def field_key(name: str) -> str:
-    """``Blocked by`` / ``blocked-by`` / ``BLOCKED_BY`` all read as ``blocked by``."""
-    return re.sub(r"[-_\s]+", " ", name.strip()).lower()
-
-
-def first_word(value: str | None) -> str:
-    """A field's value: its first word, lower-cased; the rest of the line is a free comment."""
-    m = WORD_RE.search(value or "")
-    return m.group(0).strip("*_`").rstrip(".:").lower() if m else ""  # `**Decided` reads as decided
-
-
-def header_block(body: str) -> dict[str, str]:
-    """Every ``**Name:** value`` line of the header block: after the heading's blank lines, up to the next blank line."""
-    fields: dict[str, str] = {}
-    started = False
-    for line in body.split("\n"):
-        if not line.strip():
-            if started:
-                break
-            continue
-        started = True
-        m = FIELD_RE.match(line)
-        if m:
-            fields.setdefault(field_key(m.group(1)), m.group(2))  # a repeated field: the first wins
-    return fields
-
-
-def declared(text: str) -> tuple[dict[str, tuple[str, ...]], list[str]]:
-    """The preamble's ``Fields:`` vocabularies ({key: values}) and flags for what it cannot read."""
-    text = COMMENT_RE.sub("", text)
-    first = HEADING_RE.search(text)
-    pre = text[: first.start() if first else len(text)]
-    vocab: dict[str, tuple[str, ...]] = {}
-    flags = []
-    for m in FIELDS_DECL_RE.finditer(pre):
-        line = m.group(1).replace("`", "").split(" — ", 1)[0]
-        for part in (p.strip() for p in line.split(";")):
-            if not part:
-                continue
-            name, eq, vals = part.partition("=")
-            key = field_key(name)
-            values = tuple(v for v in (first_word(x) for x in vals.split("|")) if v)
-            if not eq or not key or not values:
-                flags.append(f"⚠ Fields: cannot read {part!r} — write Name = value | value")
-            elif key in CADENCE_FIELDS:
-                flags.append(f"⚠ Fields: {key!r} is the cadence's own field (cadence.md §2.12) — "
-                             "its vocabulary is not redeclared; ignored")
-            else:
-                vocab[key] = values
-    return vocab, flags
-
-
-def entries(text: str) -> list[dict]:
-    """The ledger's entry bodies, in file order: id, title, priority, blocked (raw or None), fields.
-
-    HTML comments are dropped first: the seed ledger's entry template is a commented-out
-    `## TD-001: …` that is not an entry. Priority, Type and Blocked by come from the header
-    block; one written further down the body is still read (the safe direction) and flagged."""
-    text = COMMENT_RE.sub("", text)
-    out = []
-    for m in HEADING_RE.finditer(text):
-        nxt = SECTION_RE.search(text, m.end())  # a body ends at the next `## ` heading of any kind
-        body = text[m.end(): nxt.start() if nxt else len(text)]
-        fields = header_block(body)
-        below = []
-        for key, rx in (("priority", PRIORITY_RE), ("type", TYPE_RE), ("blocked by", BLOCKED_RE)):
-            if key not in fields:
-                bm = rx.search(body)
-                if bm:
-                    fields[key] = bm.group(1)
-                    below.append(key)
-        prio = first_word(fields.get("priority")) or None
-        type_raw = fields.get("type") or None
-        blocked = fields.get("blocked by") or None  # an empty field (the template's line left blank) blocks nothing
-        out.append({"id": m.group(1), "title": m.group(3).strip(),
-                    "priority": prio.capitalize() if prio else None,
-                    "type_raw": (type_raw.split() or [None])[0] if type_raw else None,  # a value of only \r or NBSP is no Type
-                    "blocked_raw": blocked, "fields": fields, "below": below})
-    return out
-
-
-def parse_blocked(raw: str) -> tuple[list[str], list[str], list[str]]:
-    """(entry ids — ``TD-NNN`` or ``<repo>#TD-NNN`` — decision holders, unreadable items) of one Blocked by value."""
-    ids, who, bad = [], [], []
-    d = DECISION_RE.search(raw)
-    if d:
-        who.append(d.group(1).strip())
-        rest = raw[d.end():].strip()
-        if rest.startswith(","):  # a list continuing past the decision: it was not written last
-            bad.append(f"after the decision: {rest[1:].strip()}")
-        raw = raw[: d.start()]  # otherwise what follows the decision is its pointer, never read
-    for item in (x.strip() for x in raw.split(",")):
-        if not item:
-            continue
-        if ID_ITEM_RE.match(item) or XREPO_ITEM_RE.match(item):
-            ids.append(item)  # a `<repo>#TD-NNN` item is resolved by pickable(), not here
-        else:
-            bad.append(item)
-    return ids, who, bad
 
 
 GIT_TIMEOUT = float(os.environ.get("LEDGER_GIT_TIMEOUT", "10"))  # s per git call into another clone; tests shorten it
@@ -282,132 +179,14 @@ class Roster:
         return out
 
 
-class _Flags(list):
-    """The flags as the sentences every mode prints (a list of str, as before), with a record
-    beside each for --check: level (error for ⚠, info for ℹ), entry id, field, kind."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.recs: list[dict] = []
-
-    def add(self, text: str, tid: str | None, field: str, kind: str) -> None:
-        self.append(text)
-        self.recs.append({"level": "error" if text.startswith("⚠") else "info", "id": tid,
-                          "field": field, "kind": kind, "text": text})
-
-
 def pickable(ledger: str, archive: str, roster: Roster | None = None, undeclared: bool = False) -> dict:
-    """Every live entry, sorted, with its derived pickable, open blockers and raw fields; plus flags.
-    ``undeclared`` (--check) also flags a header field with no vocabulary, when the ledger declares any."""
-    live = entries(ledger)
-    live_nums = {_num(e["id"]) for e in live}
-    archived = _heading_nums(archive)
-    rows = {int(m.group(2)): (i, m.group(4))
-            for i, m in enumerate(ROW_RE.finditer(COMMENT_RE.sub("", ledger)))}
-    vocab, decl_flags = declared(ledger)
-    flags = _Flags()
-    for text in decl_flags:
-        flags.add(text, None, "fields", "fields-decl")
-    roster = roster or Roster()
-    pick, blocked = [], []
-    for pos, e in enumerate(live):
-        n = _num(e["id"])
-        order, table_prio = rows.get(n, (len(rows) + pos, None))
-        prio = e["priority"] or table_prio or "?"
-        rank = PRIORITIES.index(prio.lower()) if prio.lower() in PRIORITIES else len(PRIORITIES)
-        etype = (e["type_raw"] or TYPES[0]).lower()
-        for key in e["below"]:
-            flags.add(f"ℹ {e['id']}: its {key.capitalize()} line is below the header block — "
-                      "read anyway; move it up (cadence.md §2.12)", e["id"], key, "below-header")
-        if etype not in TYPES:
-            flags.add(f"⚠ {e['id']}: unknown Type {e['type_raw']!r} — write one of "
-                      f"{' | '.join(TYPES)}; read as {TYPES[0]}", e["id"], "type", "type")
-            etype = TYPES[0]
-        for key, allowed in vocab.items():
-            v = first_word(e["fields"].get(key))
-            if v and v not in allowed:
-                flags.add(f"⚠ {e['id']}: {key} {v!r} is not in the preamble's Fields: vocabulary "
-                          f"({' | '.join(allowed)})", e["id"], key, "vocabulary")
-        if undeclared and vocab:
-            for key in e["fields"]:
-                if key not in CADENCE_FIELDS and key not in vocab:
-                    flags.add(f"ℹ {e['id']}: field {key!r} has no vocabulary on the preamble's Fields: line — "
-                              "not validated; declare it (cadence.md §2.12)", e["id"], key, "undeclared-field")
-        rec = {"id": e["id"], "title": e["title"], "priority": prio, "type": etype,
-               "blocked_by": [], "cross_repo": [], "pickable": True, "fields": e["fields"],
-               "_key": (rank, TYPES.index(etype), order)}
-        if e["blocked_raw"] is not None:
-            ids, who, bad = parse_blocked(e["blocked_raw"])
-            for item in bad:
-                flags.add(f"⚠ {e['id']}: cannot read Blocked by item {item!r} — "
-                          "write TD-NNN or decision (<who>)", e["id"], "blocked by", "blocked-item")
-            open_ids = []
-            for b in ids:
-                if "#" in b:
-                    x = roster.resolve(b)
-                    rec["cross_repo"].append(x)
-                    if x["state"] == "open":
-                        open_ids.append(b)
-                    elif x["state"] == "unresolved":
-                        flags.add(f"⚠ {e['id']}: cannot resolve {b} — {x['why']}; the block stays",
-                                  e["id"], "blocked by", "cross-repo")
-                        open_ids.append(b)  # unresolved: keep the block — the safe direction
-                    continue
-                bn = _num(b)
-                if bn in live_nums:
-                    open_ids.append(b)
-                elif bn not in archived:
-                    flags.add(f"⚠ {e['id']}: Blocked by {b}, which names no entry in the ledger or the archive",
-                              e["id"], "blocked by", "blocked-unknown")
-                    open_ids.append(b)  # unknown: keep the block — the safe direction
-            if not open_ids and not who and not bad:
-                flags.add(f"ℹ {e['id']}: every blocker is archived ({', '.join(ids)}) — pickable; "
-                          "the Blocked by field can go", e["id"], "blocked by", "blockers-archived")
-            else:
-                rec["blocked_by"] = open_ids + [f"decision ({w})" for w in who] + [repr(b) for b in bad]
-                rec["pickable"] = False
-        written = first_word(e["fields"].get("pickable"))
-        if written in ("yes", "no") and (written == "yes") != rec["pickable"]:
-            flags.add(f"ℹ {e['id']}: its Pickable line says {written}, the derived pickable is "
-                      f"{'yes' if rec['pickable'] else 'no'} — the line is only a field (cadence.md §2.12)",
-                      e["id"], "pickable", "pickable-disagrees")
-        (pick if rec["pickable"] else blocked).append(rec)
-    for lst in (pick, blocked):
-        lst.sort(key=lambda r: r["_key"])
-    everything = sorted(pick + blocked, key=lambda r: r["_key"])
-    for r in everything:
-        del r["_key"]
-    return {"pickable": pick, "blocked": blocked, "entries": everything, "flags": list(flags),
-            "flag_recs": flags.recs, "declared": {k: list(v) for k, v in vocab.items()}}
-
-
-EDIT_ERRORS = ("pickable-disagrees", "undeclared-field")  # information on a standing ledger, an error in a new edit
+    """ledgerboard's pickable, with this machine's roster resolving ``<repo>#TD-NNN`` items."""
+    return LB.pickable(ledger, archive, (roster or Roster()).resolve, undeclared)
 
 
 def check(ledger: str, archive: str, old: str | None = None, roster: Roster | None = None) -> list[dict]:
-    """--check's flags: {level, id, field, kind, text, standing}. ``old`` is the ledger at --since's
-    ref (None: no --since, every ⚠ is an error and nothing is standing). With it, a flag on an entry
-    whose header block is unchanged — or a Fields: flag under an unchanged declaration — is standing:
-    information, whatever it was. On a changed or new entry, EDIT_ERRORS are errors too."""
-    recs = [dict(r, standing=False) for r in pickable(ledger, archive, roster, undeclared=True)["flag_recs"]]
-    if old is None:
-        return recs
-    before = {e["id"]: e["fields"] for e in entries(old)}
-    changed = {e["id"] for e in entries(ledger) if before.get(e["id"]) != e["fields"]}
-
-    def decl(text: str) -> list[str]:
-        text = COMMENT_RE.sub("", text)
-        first = HEADING_RE.search(text)
-        return FIELDS_DECL_RE.findall(text[: first.start() if first else len(text)])
-    decl_changed = decl(old) != decl(ledger)
-    for r in recs:
-        counts = decl_changed if r["id"] is None else r["id"] in changed
-        if not counts:
-            r["standing"], r["level"] = True, "info"
-        elif r["kind"] in EDIT_ERRORS:
-            r["level"] = "error"
-        r["text"] = ("⚠" if r["level"] == "error" else "ℹ") + r["text"][1:]
-    return recs
+    """ledgerboard's check (--check's flags), with this machine's roster resolving cross-repo items."""
+    return LB.check(ledger, archive, old, (roster or Roster()).resolve)
 
 
 def _at_ref(ledger: Path, ref: str) -> tuple[str | None, str]:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/nudge_user_attention.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/nudge_user_attention.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """Due-date nudges for docs/user_attention.md items, delivered to any channel.
 
@@ -103,9 +103,50 @@ import sys
 import time
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ledgerboard import (  # noqa: E402,F401  # sibling SYNC file: the board format, defined once (ShiftLead/ledgerboard); re-exported
+    ANSWER_SPLIT_RE,
+    ANSWERS_RE,
+    ARCHIVE_AT,
+    CLOSED_ITEM_RE,
+    CLOSED_RE,
+    CONTEXT_RE,
+    DECIDED_RE,
+    DEFAULT_MARK_RE,
+    DUE_ATTEMPT_RE,
+    DUE_RE,
+    HEAD_HOST_RE,
+    HEAD_RE,
+    ITEM_RE,
+    KIND_RE,
+    KINDS,
+    LIVE_LOOK_ANSWERS,
+    REF_BRANCH_RE,
+    REF_FILE_RE,
+    REF_PR_RE,
+    REF_TD_RE,
+    REPLY_TAIL_RE,
+    BoardItem,
+    _raw_answers,
+    _trailer,
+    closed_items,
+    detail_block,
+    due_tag,
+    item_head,
+    item_key,
+    item_record,
+    item_refs,
+    parse_answers,
+    parse_board,
+    parse_decided,
+    parse_default,
+    parse_replies,
+    reply_span,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger("nudge_user_attention")
@@ -118,195 +159,30 @@ def _default_boards() -> list[Path]:
     boards.append(Path(__file__).resolve().parent.parent / "docs" / "user_attention.md")
     return boards
 
-ITEM_RE = re.compile(r"^\s*-\s*\[ \]\s+(?P<text>.+)$")
-# TD-062: the board is append-only — closing an item ticks it and appends
-#   … Closed: YYYY-MM-DD — why.
-# (board_edit.py done writes it), never deletes it; a sweep archives closed items once
-# ARCHIVE_AT of them sit on the board, in a PR of its own (cadence.md §3). Parity (§7):
-# the board's Format: lines, board_edit.py and the stranded-work skill write these.
-CLOSED_ITEM_RE = re.compile(r"^\s*-\s*\[[xX]\]\s+(?P<text>.+)$")
-CLOSED_RE = re.compile(r"(?:^|(?<=[.?!]\s))Closed:\s*(?P<date>\d{4}-\d{2}-\d{2})\b.*$")
-ARCHIVE_AT = 10
-DUE_RE = re.compile(r"\bDue:\s*(?P<due>\d{4}-\d{2}-\d{2})\b", re.IGNORECASE)
-# TD-036: two optional TRAILING fields, in this order, after Due: —
-#   … Due: YYYY-MM-DD. Answers: approve | hold. Decided: approve (YYYY-MM-DD).
-# Answers: is written by the session that raised the item (`|`-separated, `\|` for a
-# literal bar); Decided: only by a person's action, via board_edit.py. Both are anchored
-# to the end of the line, start a sentence (line start, or after `. ` / `? ` / `! `), and
-# are read only after the item's Due: when it has one — so "check Answers: yes" in an
-# item's prose, dated or not, parses as neither field.
-# Parity (cadence.md §7): the board's Format: lines and board_edit.py write these.
-DECIDED_RE = re.compile(r"(?:^|(?<=[.?!]\s))Decided:\s*(?P<text>(?:(?!\bDecided:).)+?)\s*"
-                        r"\((?P<date>\d{4}-\d{2}-\d{2})\)\.?\s*$")
-ANSWERS_RE = re.compile(r"(?:^|(?<=[.?!]\s))Answers:\s*(?P<answers>(?:(?!\bAnswers:).)*?)\.?\s*"
-                        r"(?:\bDecided:.*)?$")
-# TD-075: a reply — what the person said back on the item's own line, written by
-# `board_edit.py reply` (cadence.md §4.5): ` — <name>, YYYY-MM-DD: <words>`, after the item's
-# Due: and ahead of its trailing Answers:/Decided:/Closed: fields, any number of them in a row.
-# <name> is whoever the tool signs it as (a git user.name: `Paul`, `Paul W.`, `the person`), so
-# it is any short run with no comma or dash. Parity (cadence.md §7): board_edit.py writes it.
-REPLY_TAIL_RE = re.compile(r" — (?P<by>[^\s,—][^,—]{0,39}), (?P<date>\d{4}-\d{2}-\d{2}): ")
-ANSWER_SPLIT_RE = re.compile(r"\s*(?<!\\)\|\s*")
-# TD-053: a due date written in a shape DUE_RE cannot read (2026-9-5, 2026-02-30, "Due
-# 2026-09-05" without the colon) — once silently undated, so a typo meant never due. Only a
-# DATE-SHAPED token counts (digits with - / . separators), so prose about the field ("a
-# malformed Due: is silent") is never mistaken for one.
-DUE_ATTEMPT_RE = re.compile(r"\bDue:?\s*(?P<raw>\d{1,4}[-/.]\d{1,2}(?:[-/.]\d{1,4})?)\b", re.IGNORECASE)
 MAX_ITEM_CHARS = 200
 # TD-084: the reports print an item's detail block under it, each line clipped like the head
 # and at most this many lines — a board read from origin is text anyone who can push wrote.
 MAX_DETAIL_LINES = 20
-# TD-039: an item's KIND — one optional word before its date, `- [ ] decide 2026-09-27 (…)`.
-# decide/act/look (and an unmarked item) are the person's to-do — `look` is a live look the
-# person is asked to make (TD-082); `watch` is a session's own §6 re-check, its check-by
-# date in its Due:, and is reported apart; `fyi` never has a Due: (one is ignored and
-# flagged) and never reaches the SessionStart line. Only a word followed by a date is a
-# kind, so prose that happens to start with "act" is not. Parity (cadence.md §7): the
-# board's Format: line and cadence.md §3 write it.
-KINDS = ("decide", "act", "look", "watch", "fyi")
-KIND_RE = re.compile(r"^(?P<kind>decide|act|look|watch|fyi)\s+(?=\d{4}-\d{2}-\d{2}\b)", re.IGNORECASE)
 # TD-039: a board past this many open items is warned about (report and SessionStart line).
 BOARD_SIZE_WARN = 15
 # TD-039: an item overdue this long is ledger material, not board material — the report
 # says "ledger it" and /stranded-work proposes the move. The other trigger, an item
-# snoozed twice, needs the board's git history, so the sweep checks that one (its skill).
+# snoozed twice, needs the board's git history, so the sweep checks that one (docs/procedures/stranded-work.md).
 ESCALATE_OVERDUE_DAYS = 14
 # TD-039: the SessionStart line lists at most this many items, then says how many more.
 DUE_ONLY_LIST_CAP = 12
 
 
-def _trailer(text: str) -> str:
-    """The part of an item the trailing fields may live in: after its Due:, if any."""
-    m = DUE_RE.search(text)
-    return text[m.end():] if m else text
 
-
-# TD-066: at most one answer ends in " (default)" — the asker's recommendation, as a
-# steer's `default`. Parity (§7): the board's Format: lines write it.
-DEFAULT_MARK_RE = re.compile(r"\s*\(default\)$", re.IGNORECASE)
-# Parity (cadence.md §7): §3.5's table and the seed board write a live look's (a `look`'s) answers in exactly
-# these words (TD-074), so a tool can draw the same two buttons on every board.
-LIVE_LOOK_ANSWERS = ("Works", "Not right: <what>")
-
-
-def _raw_answers(text: str) -> list[str]:
-    m = ANSWERS_RE.search(_trailer(text))
-    if not m:
-        return []
-    parts = (a.replace("\\|", "|").strip() for a in ANSWER_SPLIT_RE.split(m.group("answers")))
-    return [a for a in parts if a]
-
-
-def parse_answers(text: str) -> list[str]:
-    """The item's `Answers:` list, in order, any ` (default)` mark stripped; [] when none."""
-    return [DEFAULT_MARK_RE.sub("", a) or a for a in _raw_answers(text)]
-
-
-def parse_default(text: str) -> str | None:
-    """The answer marked ` (default)`, its text without the mark; None when no answer is
-    marked, or more than one is (no single recommendation to show)."""
-    marked = [DEFAULT_MARK_RE.sub("", a) for a in _raw_answers(text) if DEFAULT_MARK_RE.search(a)]
-    return marked[0] if len(marked) == 1 and marked[0] else None
-
-
-def parse_decided(text: str) -> tuple[str, date] | None:
-    """The item's `Decided: <text> (YYYY-MM-DD)` field, or None (absent or a bad date)."""
-    m = DECIDED_RE.search(_trailer(text))
-    if not m:
+def escalation(item: BoardItem, today: date) -> str | None:
+    """Why this item belongs in the ledger rather than on the board (TD-039), or None.
+    Not for fyi (it has no date to miss) or a decided item (a session's work order)."""
+    if item.kind == "fyi" or item.decided is not None:
         return None
-    try:
-        return m.group("text"), datetime.strptime(m.group("date"), "%Y-%m-%d").date()  # noqa: DTZ007  # local civil date, as Due:
-    except ValueError:
-        return None
-
-
-def reply_span(text: str) -> tuple[int, int] | None:
-    """(start, end) of the item's reply tails, or None: from the first ` — <name>, <date>: `
-    after its Due: to its trailing Answers:/Decided:/Closed: fields, or the line's end. Read
-    only after the Due: — prose shaped like a reply before it (` — Merged, 2026-09-30: …`)
-    is the item's own."""
-    due = DUE_RE.search(text)  # the item's own Due: is its first, as _trailer reads it — a reply may name one
-    m = REPLY_TAIL_RE.search(text, due.end() if due else 0)
-    if m is None:
-        return None
-    ends = [f.start() for f in (r.search(text, m.end()) for r in (ANSWERS_RE, DECIDED_RE, CLOSED_RE)) if f]
-    end = min(ends) if ends else len(text)
-    return m.start(), m.start() + len(text[m.start():end].rstrip())
-
-
-def parse_replies(text: str) -> list[tuple[str, str, str]]:
-    """The item's replies in order, each (by, YYYY-MM-DD, words); [] when it has none."""
-    span = reply_span(text)
-    if span is None:
-        return []
-    tails = text[span[0]:span[1]]
-    marks = list(REPLY_TAIL_RE.finditer(tails))
-    return [(m.group("by"), m.group("date"), tails[m.end():(nxt.start() if nxt else len(tails))].strip())
-            for m, nxt in zip(marks, [*marks[1:], None])]
-
-
-@dataclass
-class BoardItem:
-    text: str
-    due: date | None
-    line: int = 0  # 1-based line in the board file; 0 when parsed from a string with no file
-    answers: list[str] = field(default_factory=list)
-    default: str | None = None  # the answer marked ` (default)` (TD-066)
-    # A decided item is NOT done (TD-036): it stays on the board, and stays due, until a
-    # session acts on it and closes it — but it is no longer the person's to-do.
-    decided: tuple[str, date] | None = None
-    bad_due: str | None = None  # the text after "Due:" when it is not a date (TD-053)
-    kind: str | None = None  # decide | act | look | watch | fyi, or None when unmarked (TD-039)
-    fyi_due: bool = False  # an fyi item that carries a Due: anyway — ignored, and flagged
-    # TD-084: the item's detail block — the lines under it indented deeper than its `-`
-    # (context, bullets, the question, caveats, the recommendation), common indent removed.
-    # No tool edits it: Due:/Answers:/Decided:/replies stay on the head line.
-    detail: list[str] = field(default_factory=list)
-
-    @property
-    def todo(self) -> bool:
-        """The person's to-do: decide, act, look (TD-082), or unmarked (TD-039)."""
-        return self.kind not in ("watch", "fyi")
-
-    def escalation(self, today: date) -> str | None:
-        """Why this item belongs in the ledger rather than on the board (TD-039), or None.
-        Not for fyi (it has no date to miss) or a decided item (a session's work order)."""
-        if self.kind == "fyi" or self.decided is not None:
-            return None
-        days = self.overdue_days(today)
-        if days is not None and days >= ESCALATE_OVERDUE_DAYS:
-            return f"overdue {days}d"
-        return None
-
-    def overdue_days(self, today: date) -> int | None:
-        """Days at-or-past due (0 = due today); None if no due date or not yet due."""
-        if self.due is None or self.due > today:
-            return None
-        return (today - self.due).days
-
-
-def item_key(line: str) -> str:
-    """An item line with what a tool may change on it taken out — the tick, the Closed:,
-    Decided: and Due: fields (board_edit.py may also end the sentence before them) and its
-    reply tails — so the open and the closed copy of one item, or a snoozed or replied-to
-    one, compare equal.
-
-    Load-bearing twice: check_cadence.py's direct-commit audit, and parse_board, where a
-    match HIDES an open item — so indentation is kept (a re-indented line is not a tool
-    edit) and a collision needs the whole `date (session …) — text` equal."""
-    line = re.sub(r"^(\s*-\s*)\[[ xX]\]", r"\1[ ]", line)
-    line = re.sub(r"\s*" + CLOSED_RE.pattern, "", line)
-    line = re.sub(r"\s*" + DECIDED_RE.pattern, "", line)
-    span = reply_span(line)
-    if span:
-        line = line[: span[0]] + line[span[1]:]
-    line = re.sub(r"\s*(?:" + DUE_RE.pattern + r")\.?", "", line, flags=re.IGNORECASE)
-    return line.rstrip(" .")
-
-
-def closed_items(content: str) -> list[str]:
-    """The board's closed (`- [x]`) item lines."""
-    return [ln for ln in content.splitlines() if CLOSED_ITEM_RE.match(ln)]
+    days = item.overdue_days(today)
+    if days is not None and days >= ESCALATE_OVERDUE_DAYS:
+        return f"overdue {days}d"
+    return None
 
 
 def archive_note(content: str) -> str | None:
@@ -332,58 +208,6 @@ def twin_note(content: str) -> str | None:
     return (f"⚠ {n} open item(s) appear twice — a merge kept both copies of a snooze or "
             "Decided:; keep the right one, drop the other (cadence.md §3)")
 
-
-def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
-    """Extract unchecked items and their optional Due: dates from board markdown.
-
-    An open item whose closed twin is also on the board (item_key equal) is closed: a
-    merge that took both sides of a close keeps both lines, and the tick wins (TD-062)."""
-    items = []
-    closed = {item_key(ln) for ln in closed_items(content)}
-    lines = content.splitlines()
-    for lineno, line in enumerate(lines, start=1):
-        m = ITEM_RE.match(line)
-        if not m or (closed and item_key(line) in closed):
-            continue
-        text = m.group("text").strip()
-        due = None
-        dm = DUE_RE.search(text)
-        if dm:
-            try:
-                due = datetime.strptime(dm.group("due"), "%Y-%m-%d").date()  # noqa: DTZ007  # local civil dates by design (TD-15: skew tolerated at the sweep comparisons)
-            except ValueError:
-                if warn:
-                    logger.warning("Unparseable Due date in item, treating as undated: %s", text[:80])
-        bad = None
-        if due is None and (am := DUE_ATTEMPT_RE.search(text)):
-            bad = am.group("raw")
-        km = KIND_RE.match(text)
-        kind = km.group("kind").lower() if km else None
-        fyi_due = kind == "fyi" and (due is not None or bad is not None)
-        if kind == "fyi":
-            due, bad = None, None  # an fyi is never due (TD-039)
-        items.append(BoardItem(text=text, due=due, line=lineno, answers=parse_answers(text),
-                               default=parse_default(text),
-                               decided=parse_decided(text), bad_due=bad,
-                               kind=kind, fyi_due=fyi_due,
-                               detail=detail_block(lines, lineno)))
-    return items
-
-
-def detail_block(lines: list[str], lineno: int) -> list[str]:
-    """TD-084: the detail block under the item on 1-based line `lineno` — the run of lines
-    right after it indented deeper than its `-`, ended by a blank line, a line no deeper than
-    the item, or another item (a checkbox in the block reads as an item of its own). Returned
-    with the block's common indent removed, so its own nesting survives."""
-    indent = len(lines[lineno - 1]) - len(lines[lineno - 1].lstrip())
-    block = []
-    for ln in lines[lineno:]:
-        if not ln.strip() or len(ln) - len(ln.lstrip()) <= indent \
-                or ITEM_RE.match(ln) or CLOSED_ITEM_RE.match(ln):
-            break
-        block.append(ln.rstrip())
-    cut = min(len(b) - len(b.lstrip()) for b in block) if block else 0
-    return [b[cut:] for b in block]
 
 
 def size_note(items: list[BoardItem]) -> str | None:
@@ -413,58 +237,6 @@ def _detail_lines(item: BoardItem) -> list[str]:
     return out
 
 
-# TD-075. Parity (cadence.md §7): the board's Format: line writes the head and Context:.
-# The head: `[kind] YYYY-MM-DD (session <name> on <host>…)`, name and host optionally backticked.
-# Boards also write `(session `ab12cd34` / `worker-2` on host, branch x)`: the session is the
-# first name, the host the first word after ` on ` anywhere inside the parentheses.
-HEAD_RE = re.compile(r"^(?:[A-Za-z]+\s+)?\d{4}-\d{2}-\d{2}\s*\(session\s+`?(?P<session>[^\s`,;)]+)`?(?P<rest>[^)]*)")
-HEAD_HOST_RE = re.compile(r"\bon\s+`?([^\s`,;)]+)")
-CONTEXT_RE = re.compile(r"\bContext:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
-REF_TD_RE = re.compile(r"(?:[\w.-]+(?:/[\w.-]+)?#)?TD-\d+")
-REF_PR_RE = re.compile(r"\bPRs?\s*#\d+(?:\s*(?:/|,|&|and)\s*#\d+)*")  # PR #12 · PRs #12/#13 · PR #12, #13
-REF_BRANCH_RE = re.compile(r"^(?P<said>branch\s+)?`?(?P<name>[A-Za-z0-9][\w./-]*)`?$")
-REF_FILE_RE = re.compile(r"\.\w{1,5}$")  # docs/plans/x.md is a path, not a branch
-
-
-def item_head(text: str) -> tuple[str | None, str | None]:
-    """(session, host) from the item's `(session <name> on <host>)` head; None for what it lacks."""
-    m = HEAD_RE.match(text)
-    if not m:
-        return None, None
-    h = HEAD_HOST_RE.search(m.group("rest"))
-
-    def named(v: str | None) -> str | None:
-        return None if v is None or v.lower() == "n/a" else v  # the Format line's `or n/a`
-    return named(m.group("session")), named(h.group(1) if h else None)
-
-
-def item_refs(text: str) -> list[str]:
-    """What `Context:` names, in order, each once: `TD-NNN` (or `<repo>#TD-NNN`), `PR #N`,
-    `branch <name>`. TD ids and PR numbers are read wherever they stand (`PRs #12/#13` and
-    `PR #12, #13` give both). A branch is best-effort: a part (`/` or `,` separated) that says
-    `branch <name>`, or that is one bare token shaped like a branch name — it has a `-`, `_`
-    or `/` and no file extension — so a word, a path to a file or a session id is not one."""
-    m = CONTEXT_RE.search(text)
-    if not m:
-        return []
-    ctx = m.group("ctx")
-    found = [(x.start(), x.group(0)) for x in REF_TD_RE.finditer(ctx)]
-    spans = [x.span() for x in REF_TD_RE.finditer(ctx)]
-    for x in REF_PR_RE.finditer(ctx):
-        spans.append(x.span())
-        found += [(x.start() + n.start(), f"PR #{n.group(1)}") for n in re.finditer(r"#(\d+)", x.group(0))]
-    for p in re.finditer(r"(?:(?!\s/\s|,).)+", ctx):
-        if any(s < p.end() and e > p.start() for s, e in spans):
-            continue
-        b = REF_BRANCH_RE.match(p.group(0).strip(" /").rstrip("."))  # the scan leaves a separator's "/ " on a part
-        if b and b.group("name").lower() != "n/a" and not REF_FILE_RE.search(b.group("name")) and (b.group("said") or re.search(r"[-_/]", b.group("name"))):
-            found.append((p.start(), f"branch {b.group('name')}"))
-    refs: list[str] = []
-    for _, ref in sorted(found):
-        if ref not in refs:
-            refs.append(ref)
-    return refs
-
 
 def _clip_keep_replies(text: str) -> str:
     """The SessionStart line's clip (TD-075): the item is cut at MAX_ITEM_CHARS as ever, but a
@@ -475,20 +247,6 @@ def _clip_keep_replies(text: str) -> str:
         return _clip(text)
     return _clip(text[: span[0]]) + text[span[0]:]
 
-
-def due_tag(item: BoardItem, today: date) -> str:
-    """4-way due tag: 'Nd overdue' / 'due today' / 'due YYYY-MM-DD' / 'no due date'.
-
-    overdue_days() alone can't produce this split (None for both future-dated
-    and undated items); the item.due disambiguation extracted here is the same
-    one build_message's weekly marker uses. Shared by nudge and report modes.
-    """
-    days = item.overdue_days(today)
-    if days is not None:
-        return "due today" if days == 0 else f"{days}d overdue"
-    if item.due is not None:
-        return f"due {item.due.isoformat()}"
-    return "no due date"
 
 
 def item_tag(item: BoardItem, today: date) -> str:
@@ -507,7 +265,7 @@ def item_tag(item: BoardItem, today: date) -> str:
                                  else "check today" if days == 0 else f"check {days}d overdue")
         else:
             base = due_tag(item, today)
-        esc = item.escalation(today)
+        esc = escalation(item, today)
         esc_tag = f" · ⚠ {esc} — ledger it and close it here" if esc else ""
         return base + rec + esc_tag
     text, on = item.decided
@@ -606,7 +364,9 @@ def _normalize_source_url(source: str) -> str | None:
 
     Always anonymous https regardless of the URL's own auth form: an ssh or
     credentialed URL would hang or fail in a cron with no agent/TTY, and the
-    check must never use (or expose) credentials.
+    check must never use (or expose) credentials. A bare ``owner/repo`` slug
+    becomes a github.com URL only because that is what the old locks that wrote
+    one meant — it is not a guess about any other remote (TD-098).
     """
     source = source.strip()
     if not source:
@@ -620,6 +380,46 @@ def _normalize_source_url(source: str) -> str | None:
     if m:
         return f"https://{m.group(1)}/{m.group(2)}"
     return None
+
+
+def origin_forge(root: Path) -> tuple[str, str | None]:
+    """Classify a repo's origin once (TD-098): ("github", "owner/repo") for github.com;
+    ("other", host) for a forge the cadence cannot read yet (GitLab, Gitea, a GitHub
+    Enterprise host — TD-097); ("none", None) for no origin, or one that names no host (a
+    local path, a bare file:// clone: what every test fixture uses) — there the caller
+    behaves as before. A detector told "other" says it could not look, never stays quiet:
+    an empty answer must mean nothing there (cadence.md §7)."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"],
+                           check=False, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return "none", None
+    raw = r.stdout.strip() if r.returncode == 0 else ""
+    # The host is read from the URL's own shape, not through _normalize_source_url, so any
+    # scheme (ssh://, git://, HTTPS://) and any user (deploy@host:a/b) names its forge.
+    m = re.fullmatch(r"([A-Za-z][A-Za-z0-9+.-]*)://(?:[^@/]*@)?([^/:]*)(?::\d*)?(/.*)?", raw)
+    if m:
+        if m.group(1).lower() == "file":
+            return "none", None
+        host, path = m.group(2).lower(), m.group(3) or ""
+    else:
+        # scp-like user@host:path; a bare owner/repo (a legacy *lock* form) or a local path
+        # has no host — it would read as github.com through the lock normalizer, so never here
+        m = re.fullmatch(r"[^/@:]+@([^/:]+):(.*)", raw)
+        if not m:
+            return "none", None
+        host, path = m.group(1).lower(), m.group(2)
+    if not host:
+        return "none", None
+    if host == "github.com":
+        slug = re.sub(r"\.git$", "", path.strip("/")).lower()
+        return ("github", slug) if re.fullmatch(r"[^/]+/[^/]+", slug) else ("none", None)
+    return "other", host
+
+
+def forge_unread_line(host: str) -> str:
+    """The one wording every detector uses for an origin it cannot read (TD-098)."""
+    return f"PRs not checked: origin is {host}, which the cadence cannot read yet (TD-097)"
 
 
 def _upstream_files_commit(url: str) -> str | None:
@@ -782,12 +582,12 @@ SWEEP_DEEP_STALE_DAYS = 30
 SWEEP_RE = re.compile(r"^Swept:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
 # `^Swept:` cannot match a `Swept-deep:` line (the colon is anchored), so the
 # two headers never shadow each other.
-# On duplicate `Swept-deep:` lines (a hand-edit or merge leftover — the skill
+# On duplicate `Swept-deep:` lines (a hand-edit or merge leftover — the procedure
 # replaces in place, so normal use never makes one) the FIRST match binds:
 # fail-safe, it can only over-warn relative to a fresher line below it.
 SWEEP_DEEP_RE = re.compile(r"^Swept-deep:\s*(?P<date>\d{4}-\d{2}-\d{2})\s*(?:\((?P<meta>[^)]*)\))?", re.MULTILINE)
-# The mode marker the skill calls load-bearing. Matched as its own comma-separated
-# token in the parenthesised meta — the skill's format is `(<host>, quick|deep)` —
+# The mode marker the stranded-work procedure calls load-bearing. Matched as its own comma-separated
+# token in the parenthesised meta — its format is `(<host>, quick|deep)` —
 # so `(kmaster, deep)` and bare `(deep)` both read. In a multi-token meta the first
 # token is the host and is never read as a mode, so `(deep-box)` and even a host
 # literally named `deep` in `(deep, <mode>)` can't satisfy the check by accident.
@@ -866,22 +666,16 @@ NO_DEEP_SWEEP = "⚠ no deep sweep on record"
 
 
 def never_hosted(root: Path) -> bool:
-    """TD-28: no Claude Code transcript for this repo — its own dir, its worktrees, or any
+    """TD-28: no session transcript for this repo — its own dir, its worktrees, or any
     subdirectory a session started in — exists on this machine, so a deep sweep would have
-    nothing of its own to scan. Uses list_sessions' munge (a §7 parity pair with Claude
-    Code's naming; never re-typed). Deliberately broad: every project dir whose name starts
-    with the repo's munged path counts, which also counts a sibling repo that shares the
-    prefix — that only ever keeps the warning, the safe direction for a line that hides one.
-    False whenever it cannot tell."""
+    nothing of its own to scan. Asked of the session adapter (agent_sessions.ever_ran,
+    TD-100), which is deliberately broad: a sibling repo sharing the path's prefix counts as
+    "ran", the safe direction for a line that hides a warning. False whenever it cannot
+    tell — a tool the repo lists that cannot be looked at keeps the warning."""
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import list_sessions
-        base = Path.home() / ".claude" / "projects"
-        if not base.is_dir():
-            return True
-        me = list_sessions.munge(root)
-        return not any(any(d.glob("*.jsonl")) for d in base.iterdir()
-                       if d.is_dir() and (d.name == me or d.name.startswith(me + "-")))
+        import agent_sessions
+        return agent_sessions.ever_ran(root) is False
     except Exception:  # noqa: BLE001 — cannot tell: keep the warning
         return False
 
@@ -892,7 +686,7 @@ def sweep_note_for(content: str, today: date, root: Path | None) -> str | None:
     history of sessions is a gap; one with none is nothing to do here."""
     note = sweep_note(content, today)
     if note and note.startswith(NO_DEEP_SWEEP) and root is not None and never_hosted(root):
-        return ("ℹ no deep sweep on record — and no Claude Code session has run in this repo on this "
+        return ("ℹ no deep sweep on record — and no session has run in this repo on this "
                 "machine, so it has no transcripts to scan (work done on it from other repos' sessions "
                 "is read by /stranded-work deep via list_sessions --roster --mentioning)")
     return note
@@ -1198,7 +992,11 @@ def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
     """TD-052: the SessionStart line's other half — this repo's open PRs older than
     PR_STALE_DAYS, a reviewed-but-unmerged one marked as such (the highest-value case:
     PR #89 sat seven days reviewed FIXED and nothing said so). One gh call, clipped to
-    what is left of the fetch budget; offline, no gh, or any failure is silence."""
+    what is left of the fetch budget; offline, no gh, or any failure is silence — but an
+    origin that is not GitHub is said, once, never silence (TD-098)."""
+    kind, host = origin_forge(root)
+    if kind == "other":
+        return [f"⚠ {forge_unread_line(host)}"]
     timeout = 5.0 if deadline is None else min(5.0, deadline - time.monotonic())
     if timeout < 0.5:
         return []
@@ -1229,9 +1027,15 @@ def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
         # This text lands in every session's context (TD-051), and titles and comments come
         # from anyone who can open a PR: a title is one line of plain words, clipped, and a
         # `cadence-review:` counts only from someone with a say in the repo.
-        verdicts = [m.group(1).upper() for c in pr.get("comments") or []
-                    if c.get("authorAssociation") in ("OWNER", "MEMBER", "COLLABORATOR")
-                    and (m := re.match(r"\s*cadence-review:\s*(SHIP|FIXED|BLOCK)\b", c.get("body") or "", re.I))]
+        # Its verdict may sit on any line, the last one counting (TD-087).
+        verdicts = []
+        for c in pr.get("comments") or []:
+            if c.get("authorAssociation") not in ("OWNER", "MEMBER", "COLLABORATOR"):
+                continue
+            hits = re.findall(r"^[ \t]*cadence-review:[ \t]*(SHIP|FIXED|BLOCK)\b",
+                              c.get("body") or "", re.I | re.M)
+            if hits:
+                verdicts.append(hits[-1].upper())
         mark = f", reviewed {verdicts[-1]} — unmerged" if verdicts else ""
         title = " ".join("".join(ch if ch.isprintable() else " " for ch in str(pr.get("title") or "")).split())
         num = pr.get("number") if isinstance(pr.get("number"), int) else "?"
@@ -1276,16 +1080,18 @@ def _no_auto_delete() -> set[str]:
 
 def settings_line(root: Path, spent: dict) -> str | None:
     """One "⚙ repo settings" line when the repo's GitHub merge settings disagree with the
-    cadence; None when they agree, the origin is not GitHub, or gh cannot answer (offline,
-    unauthenticated, a non-admin sees null) — never a guess, never a write."""
-    url = _local_origin(root)
-    m = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)", url or "")
-    if not m:
+    cadence; None when they agree, there is no origin, or gh cannot answer (offline,
+    unauthenticated, a non-admin sees null) — never a guess, never a write. An origin that
+    is not GitHub gets a "not checked" line instead, so the row never reads clean (TD-098)."""
+    kind, slug = origin_forge(root)
+    if kind == "other":
+        return f"⚙ repo settings not checked: origin is {slug}, which the cadence cannot read yet (TD-097)"
+    if kind != "github" or slug is None:
         return None
     want = dict(CADENCE_SETTINGS)
-    if m.group(1).lower() in _no_auto_delete():
+    if slug.lower() in _no_auto_delete():
         want.pop("delete_branch_on_merge")   # a repo that stacks PRs, by choice (§4)
-    rc, out, _err = _gh(["api", f"repos/{m.group(1)}"], spent)
+    rc, out, _err = _gh(["api", f"repos/{slug}"], spent)
     if rc != 0:
         return None
     try:
@@ -1391,29 +1197,8 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
 
 
 def _item_json(item: BoardItem, today: date) -> dict:
-    return {
-        "line": item.line,
-        "text": item.text,
-        "due": item.due.isoformat() if item.due else None,
-        "overdue_days": item.overdue_days(today),
-        "due_tag": due_tag(item, today),
-        "answers": item.answers,
-        "default": item.default,
-        "decided": ({"text": item.decided[0], "date": item.decided[1].isoformat()}
-                    if item.decided else None),
-        # TD-036: a decided item has stopped being the person's to-do
-        "waiting_on": "session" if item.decided else "person",
-        "due_error": item.bad_due,
-        # TD-039
-        "kind": item.kind,
-        "escalate": item.escalation(today),
-        # TD-075: who raised it and what it refers to, so no tool parses the line itself
-        **dict(zip(("session", "host"), item_head(item.text))),
-        "refs": item_refs(item.text),
-        "replies": [{"by": by, "date": d, "text": t} for by, d, t in parse_replies(item.text)],
-        # TD-084: the detail block, one string per line, common indent removed
-        "detail": item.detail,
-    }
+    """ledgerboard's item record (the board's API, TD-075/TD-084), plus this report's escalation (TD-039)."""
+    return {**item_record(item, today), "escalate": escalation(item, today)}
 
 
 def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: bool = False,
@@ -1574,7 +1359,7 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
             for item in sorted(items, key=lambda it: _report_sort_key(it, today)):
                 if not surfaces_at_start(item, today):
                     continue
-                n_escalate += item.escalation(today) is not None
+                n_escalate += escalation(item, today) is not None
                 ln = f"  • {label}{tag}: ({item_tag(item, today)}) {_clip_keep_replies(item.text)}"
                 if item.decided is not None:
                     decided_lines.append(ln)

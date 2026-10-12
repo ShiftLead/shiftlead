@@ -1,4 +1,4 @@
-<!-- SYNCED FILE — canonical copy: eyecantell/dev-cadence files/docs/adr-template.md
+<!-- SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/docs/adr-template.md
      Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one). -->
 
 # ADR <id>: <the decision, as one sentence>

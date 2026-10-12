@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/open_worktree.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/open_worktree.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Create (if needed) a worktree for a topic and open it in its own VS Code window.
 #
@@ -47,8 +47,8 @@
 # (`getcwd: cannot access parent directories`), which strands the session.
 # So teardown happens from the main checkout, after the PR merges:
 #
-#   scripts/hydrate_worktree.sh --dehydrate .claude/worktrees/<topic>
-#   git worktree remove .claude/worktrees/<topic>
+#   scripts/hydrate_worktree.sh --dehydrate <worktree-root>/<topic>
+#   git worktree remove <worktree-root>/<topic>
 #   git branch -D <topic>        # squash merges never register as merged
 #   scripts/generate_workspace.sh      # if you keep the multi-root overview
 #
@@ -77,7 +77,29 @@ if [[ ! "$TOPIC" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 
 CLONE_ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
-WT="$CLONE_ROOT/.claude/worktrees/$TOPIC"
+# Where worktrees go: the worktree-root setting (cadence.md §9.18, TD-101), default
+# .claude/worktrees. When the settings cannot be read and worktree-root is written
+# somewhere, that is an error here, never a silent default — this is the script that
+# creates the directory. A settings problem that leaves the key unwritten (another
+# key on an old Python, a broken file without it) warns and takes the default.
+WT_ROOT=".claude/worktrees"
+_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_wt_written() {
+    _v="${CADENCE_WORKTREE_ROOT:-}"; [[ -n "${_v// /}" ]] && return 0
+    grep -qsE '^[[:space:]]*"?worktree-root"?[[:space:]]*=' "$CLONE_ROOT/docs/cadence.toml" \
+        "${DEV_CADENCE_REG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/dev-cadence}/cadence.toml"
+}
+if command -v python3 >/dev/null 2>&1 && [[ -f "$_here/cadence_config.py" ]]; then
+    if ! WT_ROOT="$(python3 "$_here/cadence_config.py" get worktree-root --repo "$CLONE_ROOT")"; then
+        _wt_written && exit 2
+        echo "warning: the cadence settings could not be read (above); worktree-root is not set in them, so worktrees go to .claude/worktrees" >&2
+        WT_ROOT=".claude/worktrees"
+    fi
+elif _wt_written; then
+    echo "error: worktree-root is set, but reading it needs python3 and scripts/cadence_config.py" >&2
+    exit 2
+fi
+WT="$CLONE_ROOT/$WT_ROOT/$TOPIC"
 
 # Default branch — cadence.md §9 "Default-branch rule". Parity: this function is copied
 # verbatim into pre-push, reap_worktrees.sh, open_worktree.sh and hydrate_worktree.sh,
