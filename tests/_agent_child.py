@@ -26,7 +26,7 @@ from sessionorc.tmux import Tmux
 async def _run(socket_name: str) -> None:
     # never the person's dev-cadence roster: the home reads repo facts (`gh`, git) for every repo
     # on it (design §4.4 *Repo facts*), as conftest's `_no_real_repos_registry` says for this process
-    hosts.DEFAULT_REPOS_REGISTRY = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
+    hosts.DEV_CADENCE_ROSTER = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     if settle := os.environ.get("AO_TEST_RESTART_SETTLE"):
