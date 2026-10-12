@@ -4,6 +4,7 @@ checkout is not in a state to take that commit."""
 
 from __future__ import annotations
 
+import asyncio
 import subprocess
 from pathlib import Path
 
@@ -1029,6 +1030,12 @@ def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tm
     (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{line}"))
     (o,) = workorders.read(root, fetch=False)["orders"]
     assert o["decided"] == {"text": "At the reset", "date": "2026-10-12"} and "TD-133" in o["refs"]
+    # a field's name in the title or an answer stays words: the line still reads back its id (review of #1542)
+    odd = board.decided_line("Add a Context: field. Due: soon", "TD-9", ["Due: Friday", "No"], 0, "No", "2026-10-12")
+    assert "— Add a Context field. Due soon. Context: TD-9. Due: 2026-10-12. Answers: Due Friday (default) | No." in odd
+    (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{odd}"))
+    (o,) = workorders.read(root, fetch=False)["orders"]
+    assert o["refs"] == ["TD-9"] and o["decided"]["text"] == "No"
     for words in ("", "  ", "keep it. Decided: drop"):
         with pytest.raises(board.Refused):
             board.decided_line(LEDGER_TITLE, "TD-133", [], None, words, "2026-10-12")
@@ -1083,7 +1090,17 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         ):
             with pytest.raises(AgentError, match=why):
                 await me.call("ledger_decide", **kw)
-        got = await me.call("ledger_decide", repo=root, id="TD-133", go=True)
+        # two presses at once (two tabs): one line, the other refused (review of #1542)
+        async with LocalClient() as tab:
+            both = await asyncio.gather(
+                me.call("ledger_decide", repo=root, id="TD-133", go=True),
+                tab.call("ledger_decide", repo=root, id="TD-133", go=True),
+                return_exceptions=True,
+            )
+        refused = [x for x in both if isinstance(x, AgentError)]
+        assert len(refused) == 1 and "already" in str(refused[0])
+        got = next(x for x in both if isinstance(x, dict))
+        assert origin_board(repo).count("Context: TD-133.") == 1
         assert got["decided"] == "At the reset" and got["message"] == "shiftlead: board decide TD-133 (person)"
         line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] decide ") and "(person) — When should a team start on its own? Context:" in line

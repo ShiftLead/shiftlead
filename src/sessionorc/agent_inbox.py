@@ -769,10 +769,12 @@ class InboxMixin:
                 done = await asyncio.to_thread(board_mod.add_decided, root, line, id)
             except board_mod.Refused as err:
                 raise RpcError(str(err)) from None
+            log.info("board %s: %s", root, done["message"])
+            # held through the re-read: a second press in between would pass the decided check on
+            # the reading from before the line (review of #1542)
+            await self._reread_work_orders(root)
         finally:
             self._board_adding.discard(key)
-        log.info("board %s: %s", root, done["message"])
-        await self._reread_work_orders(root)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
 
     async def _reread_work_orders(self, root: str) -> None:

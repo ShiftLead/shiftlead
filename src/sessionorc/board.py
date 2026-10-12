@@ -53,6 +53,11 @@ NOT_RIGHT = "Not right:"
 NOT_RIGHT_FORM = re.compile(r"Not right:\s*(<[^<>]*>)?")
 # A field's name inside the person's own words would be read as the field (review of PR #861).
 FIELD_NAME_RE = re.compile(r"\b(?:Answers|Decided):")
+# Every field the reader finds in a line by its name (`nudge_user_attention.py`): in a ledger entry's
+# title or answers, written on a decided line, its colon is dropped so it stays words (review of #1542).
+ANY_FIELD_RE = re.compile(r"\b(Context|Due|Answers|Decided|Closed):")
+# The reader's `CONTEXT_RE`: the decided line's `Context:` must read back as the entry's id.
+CONTEXT_RE = re.compile(r"\bContext:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
 ANSWER_MAX = 80  # an answer in a commit subject: a *Not right:* carries a sentence
@@ -629,22 +634,24 @@ def decided_line(title: str, ref: str, answers: list[str], default: int | None, 
     `- [ ] decide <today> (person) — <title>. Context: <ref>. Due: <today>. Answers: a | b (default).
     Decided: <words> (<today>).` — so it is a work order at once (§4.4, §6 rule 6). Refused for empty
     words, words carrying a field's name, or a line the board's reader would not read back."""
-    head = " ".join(str(title or "").split()).rstrip(".") or ref
+    head = ANY_FIELD_RE.sub(r"\1", " ".join(str(title or "").split())).rstrip(".") or ref
     said = " ".join(str(words or "").split())
     if not said:
         raise Refused("a decision needs its words: one of the entry's answers, or what you typed")
     if FIELD_NAME_RE.search(said):
         raise Refused("an answer may not carry Answers: or Decided: — say it in other words")
     opts = [
-        " ".join(str(a).split()).replace("|", "\\|") + (" (default)" if i == default else "")
+        ANY_FIELD_RE.sub(r"\1", " ".join(str(a).split())).replace("|", "\\|") + (" (default)" if i == default else "")
         for i, a in enumerate(answers or ())
         if str(a).strip()
     ]
     tail = f" Answers: {' | '.join(opts)}." if opts else ""
     body = f"decide {today} (person) — {_sentence(head)} Context: {ref}. Due: {today}.{tail} Decided: {said} ({today})."
-    d = DECIDED_RE.search(body)
+    d, c = DECIDED_RE.search(body), CONTEXT_RE.search(body)
     if d is None or d.group("text") != said:
         raise Refused(f"the board's reader would not read back 'Decided: {said}': say it in other words")
+    if c is None or c.group("ctx").rstrip(".") != ref:
+        raise Refused(f"the board's reader would not read back 'Context: {ref}' on this entry's line")
     return f"- [ ] {body}\n"
 
 
