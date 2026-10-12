@@ -31,6 +31,9 @@ DOING_KEPT = 50  # the doing log's ring per team (§4.8), as the host agent keep
 # re-reading at most every `HEADS_EVERY` seconds, and a reading that matches the last one sent is not sent.
 HEADS_EVERY = 1.0
 SHAPE_KEYS = ("state", "team", "controllers", "name", "seat", "unattended")
+# what a light stream (the Focus and Inbox pages) also hears of another record: the fields their re-reads
+# draw — Focus's members' lanes and reports, the Inbox's unseen and open-work rows, a claim
+LIGHT_KEYS = ("lane", "report", "progress", "unseen", "idle_open", "out_of_work")
 WINDOWS = ("day", "week", "month")
 LEDGER_VIEWS = ("open", *WINDOWS)  # the Technical debt selector: the open entries, or a window
 PRIORITY_BARS = (("high", "High"), ("medium", "Medium"), ("low", "Low"))

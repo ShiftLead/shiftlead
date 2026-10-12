@@ -292,6 +292,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
+    LIGHT_KEYS,
     MOTION_PRIORITIES,  # noqa: F401
     PHASES,  # noqa: F401
     PRIORITY_BARS,  # noqa: F401
@@ -3381,15 +3382,19 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # whole fleet — so they ride on a delta only when it can move them (`SHAPE_KEYS`), and are
         # otherwise re-read at most every `HEADS_EVERY` seconds by `flush`; a reading equal to the
         # last one sent is not sent again (TD-572).
+        # One reading at a time, sent before the next is read (`sending`): a flush's reading is never
+        # sent after a newer delta's, and `dirty` is cleared before the read, so a delta that lands
+        # during it marks the next one.
         last: dict[str, Any] = {"key": None, "at": 0.0}
         dirty = asyncio.Event()
+        sending = asyncio.Lock()
 
-        async def fresh_heads(known, repos, doing) -> dict[str, Any]:
-            got = await heads(known, repos, doing)
-            last["at"] = time.monotonic()
+        async def fresh_heads(known, repos, doing, *, always: bool = False) -> dict[str, Any]:
             dirty.clear()
+            last["at"] = time.monotonic()
+            got = await heads(known, repos, doing)
             key = json.dumps(got, sort_keys=True)
-            if key == last["key"]:
+            if key == last["key"] and not always:
                 return {}
             last["key"] = key
             return got
@@ -3398,8 +3403,16 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             while True:
                 await dirty.wait()
                 await asyncio.sleep(max(0.0, last["at"] + HEADS_EVERY - time.monotonic()))
-                if dirty.is_set() and (got := await fresh_heads(known, repos, doing)):
-                    await ws.send_text(json.dumps({"event": "groups", **got}))
+                async with sending:
+                    if not dirty.is_set():
+                        continue
+                    try:
+                        got = await fresh_heads(known, repos, doing)
+                    except Exception:  # noqa: BLE001 — an agent that could not answer: try again next time
+                        dirty.set()
+                        continue
+                    if got:
+                        await ws.send_text(json.dumps({"event": "groups", **got}))
 
         async def gone() -> None:
             # The page never sends on this socket, so the next message is its disconnect. Without
@@ -3438,7 +3451,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     s = ev["session"]
                     was = known.get(s["id"]) or {}
                     known[s["id"]] = s
-                    shaped = not was or any(s.get(k) != was.get(k) for k in SHAPE_KEYS)
+                    reshaped = not was or any(s.get(k) != was.get(k) for k in SHAPE_KEYS)
+                    stirred = reshaped or any(s.get(k) != was.get(k) for k in LIGHT_KEYS)
                     moved = s.get("run_until") != was.get("run_until")
                     if s.get("team") and moved and s.get("run_until") != uiconf.team_until(str(s["team"])):
                         # a team's stop time stamps its members while the Save that moved it is still
@@ -3449,7 +3463,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     if light and s["id"] != focus:
                         # a light stream (the Focus and Inbox pages) hears that another record moved,
                         # not what it now looks like: they re-read what they draw (TD-572)
-                        if shaped:
+                        if stirred:
                             await ws.send_text(json.dumps({"event": "session", "id": s["id"], "state": s["state"]}))
                         continue
                     v = view(
@@ -3474,13 +3488,16 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     # `groups` rides on a delta that can move them (design §4.5a **team groups**): a
                     # badge or a `controllers` change on one record can move a card, change a lead, or
                     # turn grouping on or off for the whole page, and only the server sees the fleet.
-                    # Any other delta marks them for `flush`.
+                    # Any other delta marks them for `flush`. A reshaping delta carries them even when
+                    # a flush already sent this reading: a new card is placed by its own delta's groups.
                     delta["html"] = render_card(v)
-                    if shaped or last["key"] is None:
-                        delta.update(await fresh_heads(known, repos, doing))
+                    if reshaped or last["key"] is None:
+                        async with sending:
+                            delta.update(await fresh_heads(known, repos, doing, always=True))
+                            await ws.send_text(json.dumps(delta))
                     else:
                         dirty.set()
-                    await ws.send_text(json.dumps(delta))
+                        await ws.send_text(json.dumps(delta))
                 elif ev.get("event") in ("repos", "doing"):
                     # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
                     # member said what it is doing (§4.8 *the doing log*): kept here, passed through
@@ -3507,7 +3524,9 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         if light:
                             await ws.send_text(json.dumps(ev))
                             continue
-                        await ws.send_text(json.dumps({**ev, **await fresh_heads(known, repos, doing)}))
+                        async with sending:
+                            got = await fresh_heads(known, repos, doing, always=True)
+                            await ws.send_text(json.dumps({**ev, **got}))
                         # A card's *under* chip names another record, so the session that went
                         # is not the only card now out of date: every card listing it as a
                         # controller has to be redrawn, or it keeps naming and linking to a

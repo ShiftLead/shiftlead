@@ -2,7 +2,7 @@
 rollup, read over the whole fleet — ride on a delta only when it can move them (`SHAPE_KEYS`, or the
 stream's first), are otherwise re-read by one `groups` event at most every `HEADS_EVERY` seconds, and
 are not re-sent unchanged; a light stream (`?light=1`, the Focus and Inbox pages) carries no card markup
-and no groups, another record only when it moves, and its `focus` record whole."""
+and no groups, another record only when it moves (`SHAPE_KEYS`, `LIGHT_KEYS`), and its `focus` record whole."""
 
 from __future__ import annotations
 
@@ -90,9 +90,10 @@ def test_a_light_stream_carries_its_focus_whole_and_another_record_only_when_it_
 
 
 def test_a_light_stream_without_a_focus_hears_only_moves(tmp_path, monkeypatch):
-    """The Inbox's stream: g1's tail and claim are not moves; g2's state is."""
+    """The Inbox's stream: g1's tail is not a move; g2's state is (`SHAPE_KEYS`), and so is g1's dropped
+    claim (`LIGHT_KEYS`: a light page draws claims, lanes and reports, which move no group)."""
     evs = received(client(monkeypatch, tmp_path), "/events?light=1")
-    assert evs == [{"event": "session", "id": "g2", "state": "idle"}]
+    assert evs == [{"event": "session", "id": "g2", "state": "idle"}, {"event": "session", "id": "g1", "state": "idle"}]
 
 
 def test_the_focus_and_inbox_pages_ask_for_the_light_stream():
