@@ -1427,7 +1427,17 @@ def isec(title, count, extra="", opened=False):
     return f'''<div class="isec-h">{mark}<span>{title}</span><span class="n">{count}</span><span class="info{" on" if opened else ""}">i</span><span style="flex-grow: 1;"></span>{extra}{pop}</div>'''
 
 
-def mcard(bar, kind, name, team, age, body, controls, cls="", state=None):
+def subject_of(body, subject=None):
+    """TD-561: the row's subject — given, else the first sentence of the body's text, as the home derives one, clipped at 80."""
+    if subject is None:
+        text = re.sub(r"<[^>]+>", "", body.split('<div class="meta"')[0]).replace("&nbsp;", " ").strip()
+        m = re.match(r"(.{1,80}?[.?!])(\s|$)", text)
+        subject = (m.group(1) if m else text).strip()
+    return subject if len(subject) <= 80 else subject[:79].rsplit(" ", 1)[0] + "…"
+
+
+def mcard(bar, kind, name, team, age, body, controls, cls="", state=None, subject=None):
+    body = f'<div class="subj" title="the subject (TD-561): the entry&#39;s headline, apart from its first paragraph"><b>{subject_of(body, subject)}</b></div>' + body
     badge = f'<span class="badge">{team}</span>' if team else '<span class="badge" style="border-style: dashed;">no team</span>'
     return f'''<div class="mcard {cls}"><span class="sbar" style="background: {bar};"></span>
   <div class="who">{pill(*state) if state else f'<span class="kind">{kind}</span>'}<span class="nm">{name}</span>{badge}<span style="flex-grow: 1;"></span><span class="meta">{age}</span></div>
@@ -1453,28 +1463,28 @@ def inbox_rows():
     needs = [
         mcard(BAR["needs"], "", "tdgrind-ao-2", "ao-grind", "asked 40s ago · 4m 20s left",
               '<div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>',
-              b("Allow", "primary") + b("Deny") + gap + b(ICON["focus"] + "Open", "ghost"), cls="hover", state=("needs", "permission")),
+              b("Allow", "primary") + b("Deny") + gap + b(ICON["focus"] + "Open", "ghost"), cls="hover", state=("needs", "permission"), subject="permission · Bash · git push"),
         mcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago · about TD-079",
               '<div class="txt">TD-079: a permission answered from Focus and again from the Inbox within five seconds — <b>two trail rows, or one?</b> I will go with two unless you say otherwise; the fixture changes either way.</div>'
               + fold("details")
               + '<div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span>' + b("“Two rows — the how is the point”") + b("“One row, the later how wins”") + '</div>',
-              b("Reply", "primary") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost"), cls="focus"),
+              b("Reply", "primary") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost"), cls="focus", subject="TD-079: one trail row or two for a double answer"),
         mcard(BAR["exited"], "", "push", "", "exited 2h ago",
               '<div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>',
-              b(ICON["resume"] + "Reopen and push", "primary") + b("Resume") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), state=("exited", "exited")),
+              b(ICON["resume"] + "Reopen and push", "primary") + b("Resume") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), state=("exited", "exited"), subject="exited with unpushed work · push"),
         # TD-559: an anchor seat held off its work past the grace — the holder, the wait and the work, in the tick's words
         mcard(BAR["needs"], "seat held", "ao-grind-anchor", "ao-grind", "held 3h",
               '<div class="txt"><b>Anchor seat held 3 h by <span class="mono">shiftlead-90</span></b> (claude-code, outside shiftlead, idle) · 7 in its lane: TD-060, TD-292, TD-358 and 4 more — close it, or finish there, and the seat fills on the next tick.</div><div class="meta">on call — the checkout is yours · a session holds it: shiftlead-90</div>',
-              b("Dismiss") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
+              b("Dismiss") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), subject="anchor seat held · ao-grind"),
         mcard(BAR["needs"], "promote", "shiftlead", "", "main moved 12m ago",
               '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
-              b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
+              b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), subject="promote · shiftlead · 3 commits ahead"),
         # TD-290: a look nobody could settle is an `ask` that names screenshots — counted here; Send to reviewer hands it to the techlead seat
         mcard(BAR["needs"], "ask · look", "grinder-ao-2", "ao-grind", "12m ago · about TD-122",
               '<div class="txt"><b>Yours to judge: is the usage chip readable at a glance in the dark theme?</b> #517 is merged. I checked on a scratch home that there is one chip per account, the hover lists every window, and both themes draw it; nobody could say whether it reads well.</div>'
               + shots("2026-10-03-td122-chip-dark.png", "2026-10-03-td122-chip-hover.png")
               + '<div class="sugg"><span class="lbl">suggested by grinder-ao-2</span>' + b("Works") + b("Not right…") + '</div>',
-              b("Reply", "primary") + b("Send to reviewer") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost")),
+              b("Reply", "primary") + b("Send to reviewer") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost"), subject="look: the usage chip in the dark theme"),
         mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
