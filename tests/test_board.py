@@ -1113,3 +1113,82 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         got = await me.call("ledger_decide", repo=root, id="TD-134", words="Drop it — the cost is not worth it")
         assert "Decided: Drop it — the cost is not worth it (" in origin_board(repo).splitlines()[got["line"] - 1]
         await me.call("kill", id=w)
+
+
+async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_lands(
+    agent, repo, tmp_path, monkeypatch
+):
+    """`ledger_decide` (TD-576, the test audit of #1542): the repo named by a symlink to its checkout is
+    the registry's; an open decided line naming `Repo#id` decides it already; `answer=True` is no
+    index; the re-read after the line lands saves the registry and broadcasts one `repos` event, and a
+    read that fails — an `error` or a raise — leaves the work orders alone and the press landed."""
+    import shutil
+
+    from sessionorc import workorders
+
+    shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
+    root = str(repo)
+
+    async def held() -> None:
+        return None
+
+    monkeypatch.setattr(agent, "_refresh_repos", held)
+    real_read = workorders.read
+    events: list[dict] = []
+    real_broadcast = agent._broadcast
+
+    async def broadcast(ev: dict) -> None:
+        events.append(ev)
+        await real_broadcast(ev)
+
+    monkeypatch.setattr(agent, "_broadcast", broadcast)
+
+    def entry(id: str) -> dict:
+        return {"id": id, "title": f"Entry {id}", "for_page": "for-you", "answers": ["Yes", "No"], "default": 0}
+
+    stale = {"orders": [{"refs": ["repo#TD-7"], "decided": {"text": "Yes", "date": "2026-10-01"}}]}
+    agent._repos = {
+        root: {
+            "name": "repo", "root": root,
+            "ledger": {"entries": [entry("TD-7"), entry("TD-8"), entry("TD-9"), entry("TD-10")]},
+            "work_orders": stale,
+        }
+    }  # fmt: skip
+    link = tmp_path / "link"
+    link.symlink_to(repo)
+    async with LocalClient() as me:
+        with pytest.raises(AgentError, match="TD-7 is already decided on repo's board"):
+            await me.call("ledger_decide", repo=root, id="TD-7", go=True)
+        with pytest.raises(AgentError, match="has no answer True"):
+            await me.call("ledger_decide", repo=root, id="TD-8", answer=True)
+        # a failed re-read: the line lands, the press answers, the reading is the one before it
+        for failing in ({"error": "boom"}, RuntimeError("boom")):
+
+            def read(_root, failing=failing):
+                if isinstance(failing, Exception):
+                    raise failing
+                return failing
+
+            monkeypatch.setattr(workorders, "read", read)
+            id = "TD-8" if isinstance(failing, dict) else "TD-9"
+            got = await me.call("ledger_decide", repo=str(link), id=id, go=True)
+            assert got["repo"] == root and f"Context: {id}." in origin_board(repo)
+            assert agent._repos[root]["work_orders"] is stale and not events
+        monkeypatch.setattr(workorders, "read", real_read)
+        got = await me.call("ledger_decide", repo=str(link), id="TD-10", answer=1)
+        assert got["repo"] == root and got["decided"] == "No"
+        saved = agent.repos_store.load()[root]["work_orders"]["orders"]
+        assert {r for o in saved for r in o["refs"]} >= {"TD-8", "TD-9", "TD-10"}
+        (ev,) = [e for e in events if e.get("event") == "repos"]
+        assert ev["root"] == root and ev["repo"]["work_orders"]["orders"] == saved
+
+
+def test_ledger_decide_is_the_homes_edit():
+    """A node holds no repo facts (§4.4a, TD-565): `ledger_decide` waits for the link by the
+    home-edits rule, never served at a node as *not a repo this home reads* (TD-576)."""
+    from sessionorc import mail, modes
+
+    assert "ledger_decide" in modes.HOME_EDITS and "ledger_decide" in mail.PERSON_ONLY
+    assert "ledger_decide edits what the home owns" in modes.offline_refusal(
+        "ledger_decide", None, {}, host="laptop", home="kmaster"
+    )
