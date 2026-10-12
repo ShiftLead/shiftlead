@@ -46,7 +46,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Designed — TD-596 builds it |
 | TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Designed — TD-598 builds it |
 | TD-598 | Build TD-581: `PROMOTE_MAX_WAIT` and `ahead_since` in the promote reading; the Inbox's promote row under `auto` (FYI, *settles in m min*, **Promote now**); the build chip's *main +n* a link to it with the hover's line | Medium | Open |
-| TD-582 | Sessions of different teams cannot message each other, and nothing makes two peers' agreement bind: the mail gate has no cross-team edge and no shape for a consensus | Medium | Open |
+| TD-582 | Sessions of different teams cannot message each other, and nothing makes two peers' agreement bind: the mail gate has no cross-team edge and no shape for a consensus | Medium | Designed — TD-601 builds it |
+| TD-601 | Build TD-582: the mail gate's cross-team edge on the `project` badge, its refusal's words, `ao --skill`'s and the briefs' lines on a peer's agreement | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
@@ -701,7 +702,8 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-12 (the designer) — (1) **the edge is the project**: two sessions with the same non-empty `project` badge may message whatever their teams (option (a)), the line the person already drew in `org.yml`'s `projects:`; mail only, every bound holding, so not the general peer channel TD-039 refused; invariant 9's exception names the `project` badge beside the `team` badge; (2) **the consensus is a `steer`** to the peer — the proposer's default, a bound no shorter than `ASK_BOUND`, a lapse letting the proposer go on — or an `ask` with `--answer`s; **what binds is what is written** (the shared entry's Status, the PR, the design) citing the thread, before either acts; a disagreement goes up each side's own path (its techlead seat, else the person); (3) no copies to controllers on the project edge, since a proposal is no instruction; a same-team pair needs nothing new. §4.10 *across teams, by project* and *An agreement between peers*, §9 invariant 9. No mockup: nothing drawn changes. Built by TD-601. Was: Open.
+**Blocked by:** TD-601
 **Location:** design §4.10 *The message gate is weaker than `control`* (the four edges), *A disagreement, worked* and *A bounded exchange, counted by thread*; §9 invariant 9 (the one named exception, the team badge); §4.9 (`team` is one badge per session); `src/sessionorc/mail.py` (`message_edge`, `message_gate`); `src/shiftlead/briefs/grinder.md` and `manager.md` (*mail from anyone else is information you weigh*)
 
 **Why:** Paul, 2026-10-12, through Add entry: *There should be a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions. If there is not already a way to do this, lets set one up.* Within one team the way exists: §4.10's sideways edge lets any two sessions carrying the same `team` badge message each other, on every kind, and `ao --skill` names it. Across teams there is none. `message_edge` admits four edges — upward, downward, the shared `team` badge, a shared controlled target — and a session of one team that messages a session of another is refused with *not one of its controllers, its members, its team, or a controller of a session it controls*. The one two-team case the design has worked is TD-039's, two managers over one worker, and its exchange ends in a ruling (the first controller's `reply` binds the worker), not an agreement between equals. Two more things stand between a message and a consensus even inside a team: `team` is one string on the record, so a session is in one team only (§4.9), and every brief tells a worker that *mail from anyone else is information you weigh*, so two peers who agree have agreed on nothing that binds either — the agreement reaches no record, no ledger entry and no board line unless one of them writes it. The harm: two teams on one repo, or two grinders on one package, that have to settle a shared interface, a shared file, or which of two fixes lands, cannot talk, and the person is the only path between them.
@@ -957,6 +959,31 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** §4.5a says which of the two it is, the Inbox draws it, and the person can clear the answered rows they have read in one press.
 
 **Related:** TD-075 (step 2 built *Answered for you*), TD-079 (the Inbox as a queue, FYI's Dismiss all), TD-582 (another Add-entry draft by this seat, on cross-team mail).
+
+---
+
+## TD-601: Build TD-582: the mail gate's cross-team edge on the `project` badge, its refusal's words, `ao --skill`'s and the briefs' lines on a peer's agreement
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-582's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.10 *The message gate is weaker than `control`* (*across teams, by project*) and *An agreement between peers*, §9 invariant 9; `src/sessionorc/mail.py` (`message_edge` ~L267: a fifth edge after `team`, `if me.project and me.project == it.project: return "project"`, the docstring's list; `message_gate` ~L307: the refusal's words gain *its project*), `src/sessionorc/models.py` (`project` ~L979, read only), `src/shiftlead/skill.md` (the `ao msg` line *reaches only your controllers, your members, your team, …*: add *a session of your project*, and one line on a peer's agreement), `src/shiftlead/briefs/*.md` (the *mail from anyone else is information you weigh* line in grinder, manager, manager_on_call, anchor, designer: *a peer's agreement binds once written in the shared entry, the PR or the design — §4.10*), `docs/briefs/techlead-context.md` and the repo's brief parts under `docs/briefs/` (the same line; a held path), `src/shiftlead/ui/help.py` if it quotes the gate; `tests/test_mail.py` (the gate's tests)
+
+**Why:** TD-582: Paul, 2026-10-12 — *a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions*; a session of one team messaging a session of another is refused today, and two peers who agree have agreed on nothing that binds.
+
+**Fix:**
+1. `message_edge`: the `project` edge after `team` — both carry the same non-empty `project`; the docstring names five edges and §9 invariant 9's exception for both badges.
+2. `message_gate`'s refusal: *not one of its controllers, its members, its team, its project, or a controller of a session it controls (design §4.10)*.
+3. `ao --skill` (`src/shiftlead/skill.md`): the reach line gains *a session of your project*, and under *Mail* one bullet — *An agreement with a peer is a `steer` (your default, a bound) or an `ask` with `--answer`s; it binds once you write it in the shared entry's Status, the PR or the design, citing the thread; a disagreement goes up your own path, never the peer's (§4.10 *An agreement between peers*)*.
+4. The briefs' *mail from anyone else is information you weigh* line gains *— a peer's agreement binds once written down (§4.10)*, in each built-in brief and in `docs/briefs/` (a held path: the techlead reads it).
+5. Tests (`tests/test_mail.py`): two sessions of different teams with the same `project` may message (edge `"project"`), on every kind; two with different projects, or one with no project, are refused with the new words; an empty `project` on both is no edge; the four existing edges unchanged; no copy goes to either side's controllers on a project-edge message.
+
+**Done when** two sessions of different teams in one project can put a question to each other with `ao msg` and settle it on one thread, two of unrelated projects are still refused naming the rule, the skill and the briefs say what a peer's agreement binds, and the tests above pass.
+
+**Related:** TD-582 (the design), TD-039 (two controllers over one worker), TD-134 (the disagreement's tests), TD-462 (an `ask` to several).
 
 ---
 
