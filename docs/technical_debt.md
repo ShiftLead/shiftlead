@@ -852,10 +852,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591.
 
----
-
-<!-- Entry template:
-
 ## TD-593: Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is
 
 **Priority:** Medium
@@ -877,3 +873,7 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, the button appears when the hook reports the tool session id, and it is absent wherever the Transcript page's **VS Code** is; the tests above pass, and the builder's look (design §4.9b: Focus on a live session, the press landing the file in the editor) is named in the PR.
 
 **Related:** TD-578 (the design), TD-166 (the Transcript page), TD-525 (the Session card's editor button), TD-532 / TD-536 (a file link's two launches, which this is not).
+
+---
+
+<!-- Entry template:
