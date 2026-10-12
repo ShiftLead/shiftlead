@@ -1,6 +1,6 @@
 # ADR 2026-10-12: three repos — records holds the ledger and board formats once, dev-cadence is how a repo works, ShiftLead is how sessions are run
 
-**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); Sonnet READY after three rounds, Fable agreeing after one more (2026-10-12); awaiting Paul's acceptance.
+**Status:** proposed 2026-10-12 (Paul, in session `ao-dc-decouple`), Fable READY after four rounds (2026-10-12); Sonnet READY after three rounds; Fable's check of those changes adopted (2026-10-12), confirmation round under way; awaiting Paul's acceptance.
 **Date:** 2026-10-12
 **Supersedes:** the placement of the ledger and board formats in [ADR 2026-10-08](2026-10-08-agentorc-dev-cadence-split.md);
 the rest of that ADR stands. Its Status line gains "superseded in part by ADR 2026-10-12 (the formats'
