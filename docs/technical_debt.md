@@ -51,7 +51,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
-| TD-589 | The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default | Low | Open |
 | TD-590 | ShiftLead's own repo roster, importing dev-cadence's `repos.txt` when present | Low | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-597 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
@@ -799,26 +798,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** `commands:` is read, the test passes, and a brief filled for this repo reads as it does today.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-586, TD-587.
-
----
-
-## TD-589: The `worktree_setup:` seam, `scripts/hydrate_worktree.sh` only its default
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/sessionorc/gitinfo.py`, `src/shiftlead/repoconfig.py`
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Worktree setup runs dev-cadence's `hydrate_worktree.sh` when present and nothing otherwise.
-
-**Fix:** `worktree_setup:` in `.shiftlead.yml`, a command run in a new worktree; default `scripts/hydrate_worktree.sh` when present; unset and absent is named on the Repo page (TD-591).
-
-**Done when** a repo's configured command runs in each new worktree, with a test.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-591.
 
 ---
 
