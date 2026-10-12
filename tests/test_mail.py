@@ -2739,6 +2739,12 @@ async def test_mail_the_person_reads_carries_a_subject_given_derived_or_its_ques
             got = await tc.call("msg", reply_to=plain["entry"]["id"], kind="reply", text="yes", source="TD-075")
             fyi = next(e for e in agent.person_inbox if e.id == got["answered_for_you"])
             assert got["entry"]["subject"] == fyi.subject == "Step 3 waits."
+            # a question with none, answered to the person with a subject given: the given one stands
+            again = await wc.call("msg", to=tl, text="And step 4?", kind="ask")
+            got = await tc.call(
+                "msg", reply_to=again["entry"]["id"], kind="reply", text="no", source="x", subject="step 4"
+            )
+            assert got["entry"]["subject"] == "step 4" and got["warnings"] == []
         agent._system_note("person", "The tick wound ao-grind down. Nothing was open.")
         assert agent.person_inbox[-1].subject == "The tick wound ao-grind down."
         for sid in (w, tl):

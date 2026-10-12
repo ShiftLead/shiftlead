@@ -599,12 +599,16 @@ class MailMixin:
         warnings: list[str] = []
         question = replied if replied is not None else on_thread
         reads = PERSON in named or fyi
-        if question is not None and (question.subject or reads):
-            entry.subject = question.subject or mail.subject_of(question.text)
-        elif subject is not None and str(subject).strip():
-            entry.subject = mail.clip_subject(str(subject))
-            if len(" ".join(str(subject).split())) > mail.SUBJECT_CHARS:
+        given = str(subject).strip() if subject is not None else ""
+        if question is not None and question.subject:
+            entry.subject = question.subject
+        elif given:
+            # a question sent with none (between sessions, or before subjects): the given one stands
+            entry.subject = mail.clip_subject(given)
+            if len(" ".join(given.split())) > mail.SUBJECT_CHARS:
                 warnings.append(f'--subject past {mail.SUBJECT_CHARS} characters: clipped to "{entry.subject}"')
+        elif question is not None and reads:
+            entry.subject = mail.subject_of(question.text)  # still the thread's: its question's first sentence
         elif reads:
             entry.subject = mail.subject_of(text)
             warnings.append(f'no --subject: "{entry.subject}" stands as one')
