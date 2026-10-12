@@ -101,7 +101,7 @@
          the prompt; the hover and the press's toast say that the close is theirs #}
       <button class="btn sm link" data-act="wrapup" data-id="{{ s.id }}"
               title="{{ help_title('wrap-up') }}">Wrap up</button>
-      <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" title="a shell session in this session's directory">⌘ Open shell here</button>
+      <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">⌘ Open shell here</button>
       {% endif %}
       {# design §4.5a Focus header **Transcript** (TD-166): the Transcript page in a new tab, on any
          state; only for a record holding a tool session id — a shell has nothing to read. Always in

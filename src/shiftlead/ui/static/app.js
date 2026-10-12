@@ -389,6 +389,24 @@
     if (blank) w.location.href = `/focus/${encodeURIComponent(id)}?window=1`;
     try { w.focus(); } catch (e) { /* the browser decides */ }
   };
+  // §4.5a *Focus: Open shell here* (TD-577): the shell's Focus opens beside the page it was pressed on,
+  // never over it — a tab, or a window as Pop out opens one (`asWindow`: Shift, or pressed in a popped-out
+  // window). The tab is opened here, in the press, before the RPC: a browser allows one only inside the
+  // click. It reads *opening a shell in <dir>…* until the create answers, then goes to the shell's Focus;
+  // a refused create closes it and throws, so the press's own error path shows the refusal.
+  AO.shellHere = async function (id, dir, asWindow) {
+    const what = asWindow ? "window" : "tab";
+    const w = asWindow ? window.open("", "", AO.popFeatures(null)) : window.open("", "_blank");
+    if (!w) { AO.toast(`the browser blocked the ${what} — allow pop-ups for this page`); return null; }
+    const line = `opening a shell in ${dir || "this session's directory"}…`;
+    try { w.document.title = line; w.document.body.textContent = line; } catch (e) { /* a placeholder only */ }
+    let res;
+    try { res = await AO.act(id, "shell-here"); } catch (e) { try { w.close(); } catch (e2) { /* gone already */ } throw e; }
+    if (!res || !res.id) { try { w.close(); } catch (e) { /* gone already */ } return res; }
+    if (asWindow) w.name = AO.popName(res.id);
+    w.location.href = `/focus/${encodeURIComponent(res.id)}${asWindow ? "?window=1" : ""}`;
+    return res;
+  };
   // Which sessions this browser holds popped out: each popped window says so on a channel between
   // this browser's own tabs, and answers when a tab asks. Another browser, or a phone, knows nothing
   // and opens Focus as it does (§4.5 *Pop out*).
@@ -738,6 +756,8 @@
     // an entry closed the FYI list under the person (Paul, 2026-09-20; TD-079).
     const menu = b.closest("details.more"); if (menu) menu.open = false;
     try {
+      // §4.5a *Focus: Open shell here* (TD-577): the pressing page stays; the shell opens beside it
+      if (action === "shell-here") { await AO.shellHere(id, b.dataset.dir, ev.shiftKey || !!AO.poppedId); return; }
       let body = {};
       // The Focus header's toggle carries the mode it is drawn for (TD-096: it is re-drawn in place
       // from the pushed delta, and `.btn.on` is a style); a card's *more* entry carries `.on`.
@@ -980,7 +1000,6 @@
       }
       pressed();
       const res = await act(id, action2 || action, body);
-      if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "restart") {
         say(`restarted from its launch record, as it was started — ${res.unattended ? "unattended" : "attended"}`, true);
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
@@ -1047,7 +1066,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
