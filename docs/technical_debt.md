@@ -57,6 +57,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-597 | Build TD-578: the Focus header's **‹› VS Code** on the transcript file — the record's `transcript` path set with `adapter_id`, the Transcript page's link beside **Transcript**, hidden until the id lands, absent where that button is | Medium | Open |
 | TD-596 | Build TD-580: `person_shell(record)` beside `PERSON_ONLY` — a `shell` record, interactive, no role, no team, no controllers, passes every person-only RPC in `person_only`; the act recorded as the shell's; the list's test holds the exception | Medium | Open |
+| TD-599 | The Inbox's *Answered for you* group may repeat FYI: fold it in, or give it a **Dismiss all** of its own | Medium | Open |
 
 ---
 
@@ -953,6 +954,30 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** the person can promote main's head from the page and from `ao promote` at once while `auto` is on, the Inbox and the build chip say when the home will act, a busy main is promoted by `auto` within `PROMOTE_MAX_WAIT` of first moving ahead, the settle still batches a burst inside that, and the tests above pass; the builder's look (design §4.9b: the Inbox row and the chip under `auto`, on a scratch home with main ahead) is named in the PR.
 
 **Related:** TD-581 (the design), TD-580 / TD-596 (the person's shell may `ao promote`), TD-572 (#1544, the fix that waited), TD-132 (the promote policy), TD-539 (the build chip).
+
+---
+
+## TD-599: The Inbox's *Answered for you* group may repeat FYI: fold it in, or give it a **Dismiss all** of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a *Inbox row: answered for you*, *Inbox: the FYI count, **Dismiss all***, *team header* **answered for you** count; §4.5 screen 6 (the sections' order); §4.9b *Everything answered for the person is told to the person*; §4.10 *The Inbox is a queue*; `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS`, `_answered_of`), `src/shiftlead/ui/templates/inbox.html` (`#sec-fyi`, `#dismissall`), `src/shiftlead/ui/static/app.js` (the Dismiss all handler reads `#rows-fyi` only); mockup `docs/mockups/Inbox.dc.html`
+
+**Why:** Paul, 2026-10-12, through Add entry: *Lets evaluate if the "answered for you" section is redundant to fyi, and if so combine them. If not, lets add a "dismiss all" option on the "answered for you" section.* Both are uncounted, and an *answered for you* entry is an FYI by kind — a `note` filed from the answerer (§4.9b) — drawn in its own group under *Waiting on them* and above FYI. What it has that an FYI row has not: **Overrule** (a reply to the asker on the question's thread, with a copy to the answerer, which hands the asker an outcome debt), the question set off as a quotation with its source, and the team header's **answered for you** count, a mark since the person last opened the group. What it lacks: FYI's **Dismiss all** reads `#rows-fyi` alone, so a run of a busy techlead's answers is cleared one **Dismiss** at a time. The harm: the person either reads a second "no action needed" group beside FYI, or clears it by hand row by row.
+
+**Fix:** design it first, in §4.5a and §4.5 screen 6:
+1. **The evaluation.** Say whether the group earns its place: what the person does with an *answered for you* row that they do not do with an FYI — **Overrule** is a decision on a teammate's answer, FYI rows hold none — and whether the team header's count needs a group to be "since last opened".
+2. **If redundant:** the rows move into FYI, keeping their **Overrule**, quotation and source; the team header's count reads FYI's *new* mark or goes; `INBOX_SECTIONS` loses `answered`; the rail's *Urgency* group and the mockup follow.
+3. **If not:** the group's heading gains **Dismiss all**, FYI's own rule — one confirm with the number, the ids on screen only, never a row that arrived after the page was drawn — a row in §4.5a beside FYI's.
+4. Then the build, with tests that the chosen shape draws and that a dismiss sends only on-screen ids.
+
+**Done when** §4.5a says which of the two it is, the Inbox draws it, and the person can clear the answered rows they have read in one press.
+
+**Related:** TD-075 (step 2 built *Answered for you*), TD-079 (the Inbox as a queue, FYI's Dismiss all), TD-582 (Add entry, the same seat).
 
 ---
 
