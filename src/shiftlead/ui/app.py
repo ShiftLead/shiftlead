@@ -243,6 +243,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
     handed_rows,  # noqa: F401
+    held_for,  # noqa: F401
     held_mark,  # noqa: F401
     horizon_of,  # noqa: F401
     idle_open_mark,  # noqa: F401
@@ -266,6 +267,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     restart_mark,  # noqa: F401
     review_pr,  # noqa: F401
     row_find,  # noqa: F401
+    seat_held_mark,  # noqa: F401
     shot_bytes,  # noqa: F401
     shot_root,  # noqa: F401
     state_kind,  # noqa: F401

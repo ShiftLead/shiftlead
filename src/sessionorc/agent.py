@@ -107,6 +107,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     RESTART_WINDOW,  # noqa: F401
     RESUME_MIN,  # noqa: F401
     ROUND_LINE_CAP,  # noqa: F401
+    SEAT_HELD_GRACE,  # noqa: F401
     SEAT_IDLE_GRACE,  # noqa: F401
     SEAT_PR_WAIT,  # noqa: F401
     SEND_STALL_SECONDS,  # noqa: F401
@@ -1249,7 +1250,8 @@ class HostAgent(
             s.closer = {"by": "start", "why": "held"}
             s.lane_seen = {"at": s.created, "ids": []}
             if given.get("held_reason"):
-                s.seat_held = {"by": str(given["held_reason"]["by"]), "why": str(given["held_reason"]["why"])}
+                why = given["held_reason"]
+                s.seat_held = {"by": str(why["by"]), "why": str(why["why"]), "since": s.created}  # TD-559
         # a held seat's record keeps the mail as its fill would (§6 rule 3, TD-410): a question to the
         # last run's manager is in its inbox, so the first tick reads it as due and fills the seat
         kept = state == "closed" and bool(given.get("keep_mail")) and isinstance(holder, Session)

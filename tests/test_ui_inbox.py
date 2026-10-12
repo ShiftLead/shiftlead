@@ -3039,6 +3039,85 @@ def test_idle_open_work_is_a_row_for_a_team_with_no_manager(tmp_path, monkeypatc
     assert later["needs"] == [] and [r["sid"] for r in later["snoozed"]] == ["ao-p"]
 
 
+def _ago(**kw) -> str:
+    return (datetime.now(UTC) - timedelta(**kw)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+@pytest.mark.unit
+def test_a_held_anchor_seat_is_a_needs_you_row_past_the_grace(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: seat held** (§6 rule 3 `seat_held`, TD-559, built by TD-564): an anchor seat
+    whose fill its checkout has held off past `SEAT_HELD_GRACE` is a counted row as old as `since`,
+    naming the holder, the wait and the work in the tick's words, with Open, Dismiss and Snooze; none
+    under the grace, none for a hold with no `since`, none once `seat_held` clears."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import inbox_sections
+
+    due = {"at": _ago(hours=4), "by": "work", "ids": ["TD-060", "TD-292", "TD-358", "TD-413", "TD-460"]}
+    seat = {"seat": {"trigger": "work"}, "pane": False, "team": "ao", "seat_due": due}
+    outside = "held by shiftlead-90 (claude-code, outside shiftlead, idle)"
+    since = _ago(hours=3, minutes=5)
+    records = [
+        rec("ao-a", "closed", seat_held={"by": "shiftlead-90", "why": outside, "since": since}, **seat),
+        rec(
+            "ao-t",
+            "closed",
+            seat_held={"by": "checkout", "why": "branch td-x, 2 files uncommitted", "since": _ago(minutes=20)},
+            **seat,
+        ),  # fmt: skip
+        rec(
+            "ao-s",
+            "closed",
+            seat_held={"by": "ao-b", "why": "held by ao-b (working)", "since": _ago(hours=1)},
+            **{**seat, "seat_due": {**due, "ids": ["TD-1"]}},
+        ),  # fmt: skip
+        rec("ao-b", "working"),
+        rec(
+            "ao-g",
+            "closed",
+            seat_held={"by": "checkout", "why": "1 file uncommitted", "since": _ago(minutes=10)},
+            **seat,
+        ),  # fmt: skip — a visit to the checkout: under the grace
+        rec("ao-o", "closed", seat_held={"by": "checkout", "why": "1 file uncommitted"}, **seat),  # older than `since`
+        rec("ao-c", "closed", **seat),  # filled, or nothing due: no hold
+    ]
+    got = {r["sid"]: r for r in state_rows_of(records) if r["row"] == "seat_held"}
+    assert sorted(got) == ["ao-a", "ao-s", "ao-t"]
+    a, t, s = got["ao-a"], got["ao-t"], got["ao-s"]
+    assert a["text"] == (
+        "anchor seat held 3 h by shiftlead-90 (claude-code, outside shiftlead, idle) · 5 in its lane: "
+        "TD-060, TD-292, TD-358 and 2 more — close it, or finish there, and the seat fills on the next tick"
+    )
+    assert t["text"] == (
+        "anchor seat held 20 min: branch td-x, 2 files uncommitted · 5 in its lane: TD-060, TD-292, TD-358 "
+        "and 2 more — commit and push, or check out main, and the seat fills"
+    )
+    assert s["text"].startswith("anchor seat held 1 h by ao-b (working) · 1 in its lane: TD-1 — close it")
+    assert a["at"] == since and a["mark"] == "seat_held" and a["id"] == "ao-a:seat_held"
+    # Open: the holder's Focus where it is a record of this home, else the seat's own card
+    assert a["holder"] == "" and s["holder"] == "ao-b"
+    html = rows("needs", [a, s])
+    assert 'href="/focus/ao-a"' in html and 'href="/focus/ao-b"' in html and ">Open</a>" in html
+    assert 'data-row="seat_held" data-until="dismissed:' + since + '"' in html and ">Dismiss<" in html
+    assert 'data-act="attention_snooze" data-id="person" data-sid="ao-a" data-row="seat_held" data-when="1h"' in html
+    # counted under Needs you; Dismiss hides this `since`'s row, and a new holder's row returns
+    assert sorted(r["sid"] for r in inbox_sections([], states=list(got.values()))["needs"]) == sorted(got)
+    gone = inbox_sections([], states=[a], attention_snoozed={"ao-a|seat_held": f"dismissed:{since}"})
+    assert gone["needs"] == [] and gone["snoozed"] == []
+    dismissed = {"ao-a|seat_held": f"dismissed:{since}"}
+    back = inbox_sections([], states=[{**a, "at": _ago(hours=1)}], attention_snoozed=dismissed)
+    assert [r["sid"] for r in back["needs"]] == ["ao-a"]
+
+
+@pytest.mark.integration
+async def test_a_seat_held_rows_snooze_and_dismiss_are_kept_by_the_home(agent):
+    """The state-row store takes `seat_held` as a row kind (TD-564): Dismiss is `dismissed:<since>`."""
+    from sessionorc.client import LocalClient
+
+    async with LocalClient() as person:
+        got = await person.call("attention_snooze", id="ao-a", kind="seat_held", until="dismissed:2026-10-12T10:00:00Z")
+    assert got["snoozed_until"] == "dismissed:2026-10-12T10:00:00Z"
+
+
 def test_restart_is_on_the_restart_row_and_the_cards_menu_and_never_on_a_seat(tmp_path, monkeypatch):
     """§4.5a **Inbox row: restart** and **more ▾** → **Restart** (§6 rule 2 *A person's restart*,
     TD-250 slice 2): drawn beside Resume on the row of a supervised record that is not a seat — the

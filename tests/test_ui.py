@@ -1422,6 +1422,37 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
 
 
+def test_a_teams_header_marks_its_anchor_seat_held_past_the_grace(tmp_path, monkeypatch):
+    """design §4.5a team header **seat held** mark (TD-559, built by TD-564): *· anchor held 3 h* in
+    the warning's amber, the Inbox row's text its title — after the ✉ count unfolded and after the
+    counts folded — while a seat of the team is held past `SEAT_HELD_GRACE`; nothing otherwise."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import team_groups, templates, view
+
+    def ago(**kw):
+        return (datetime.now(UTC) - timedelta(**kw)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    def head_of(held):
+        records = [
+            {"id": "ao-g1", "name": "g1", "state": "working", "dir": str(tmp_path), "kind": "agent", "team": "ao"},
+            {"id": "ao-an", "name": "anchor", "state": "closed", "pane": False, "dir": str(tmp_path),
+             "kind": "agent", "team": "ao", "seat": {"trigger": "work"},
+             "seat_due": {"at": ago(hours=4), "by": "work", "ids": ["TD-060"]}, "seat_held": held},
+        ]  # fmt: skip
+        (g,) = team_groups([view(r, records) for r in records])
+        return g, templates.get_template("group_head.html").render(g=g)
+
+    g, head = head_of({"by": "checkout", "why": "branch td-x, 2 files uncommitted", "since": ago(hours=3, minutes=1)})
+    assert g["seat_held"]["age"] == "3 h"
+    assert head.count("· anchor held 3 h<") == 2  # its two places, one shown by the fold's state
+    assert 'class="meta seatheld atmail" title="anchor seat held 3 h: branch td-x' in head
+    assert 'class="meta seatheld foldonly"' in head
+    assert head.index("seatheld foldonly") > head.index("counts foldonly")
+    for quiet in ({"by": "checkout", "why": "1 file uncommitted", "since": ago(minutes=5)}, None):
+        g, head = head_of(quiet)
+        assert g["seat_held"] is None and "anchor held" not in head
+
+
 def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show(tmp_path, monkeypatch):
     """design §4.8 *The names* (TD-076 step 3): a role's **label** is what the page shows in place of
     the bare key — the role badge on a card, the team header's word for its manager, an Inbox row —

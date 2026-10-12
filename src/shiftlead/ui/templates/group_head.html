@@ -32,6 +32,10 @@
 {# design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, on every
    team's header, folded or not (TD-418); display only, the mail stays where it is (§4.10) #}
 {% if g.team and g.unread %}<span class="badge unread teammail" title="{{ g.unread }} unread message{{ '' if g.unread == 1 else 's' }} in this team's sessions — it stays there, and a start under the same name hands it to the new run (design §4.10); read it on the cards, unfolded">✉ {{ g.unread }}</span>{% endif %}
+{#- design §4.5a team header **seat held** mark (TD-559): the anchor seat held off its work past
+    `SEAT_HELD_GRACE`, the Inbox row's text its title — after the ✉ count unfolded, after the on-call
+    count folded; display only #}
+{% if g.seat_held %}<span class="meta seatheld atmail" title="{{ g.seat_held.title }}">· anchor held {{ g.seat_held.age }}</span>{% endif %}
 {# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
    team's sessions gave from the record since this browser last opened the Inbox's group — a
    **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
@@ -72,6 +76,7 @@
 {# the header carries no state chips while the cards that say them are shown (TD-176), and folded
    it does, last on the row (TD-194, §4.5a *team card: fold*); the session count is the fold's alone (TD-418) #}
 {% if g.team and g.counts %}<span class="meta counts foldonly">· {{ g.counts | join(' · ') }}</span>{% endif %}
+{% if g.seat_held %}<span class="meta seatheld foldonly" title="{{ g.seat_held.title }}">· anchor held {{ g.seat_held.age }}</span>{% endif %}
 {#- under the header, while the definition cannot follow its flow, the reason and the flows it could (§4.9c) #}
 {% for line in g.flow_lines %}<div class="meta flowcannot">{{ line }}</div>{% endfor %}
 {#- design §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark in its own numbers,
