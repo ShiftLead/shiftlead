@@ -42,7 +42,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-575 | #1544's events-stream changes (the `gone` path, the `repos`/`doing` mark, the dedupe, and the flush's retry) are held by no test (test audit) | Medium | Open |
 | TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Designed — TD-579 builds it |
 | TD-579 | Build TD-577: **Open shell here** opens the shell's Focus in a new tab (Shift, or a popped-out window: a window as Pop out opens one), the placeholder opened in the press and sent to `/focus/<id>` when the create answers; the pressing page stays | Medium | Open |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Open |
@@ -615,27 +614,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
 
 **Related:** TD-060, TD-552.
-
-## TD-575: #1544's events-stream changes — the `gone` path, the `repos`/`doing` mark, the dedupe, and the flush's retry — are held by no test
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1544)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`events`: `fresh_heads`, `flush`, `follow`), `tests/test_ui_events_light.py` (its fake `subscribe` yields only `session` events)
-
-**Why:** #1544 (TD-572) rewrote when the events stream sends the groups. `test_ui_events_light.py` pushes four `session` deltas and nothing else, so every branch the PR added for another event, and two more (the dedupe and the flush's retry), are held by no test. Probe: each change below, one at a time, then `pytest -q tests/test_ui_events_light.py tests/test_ui_waiting_wiring.py tests/test_ui.py tests/test_ui_stop.py tests/test_ui_teams.py` (the two `test_ui.py` model-name tests fail on a stale venv, `agentorc-0.0.1`, and are deselected): every one still passes.
-- `gone` on a light stream sends `{**ev, **groups}` instead of `ev` alone (`if light: … continue` replaced by `if False:`), so a light page gets the whole fleet's groups it was promised not to.
-- `gone`'s `fresh_heads(..., always=True)` without `always`: a `gone` whose reading equals the last one sent carries no groups, and the page keeps the card of the record that went in its team count.
-- `repos`/`doing`: `if not light: dirty.set()` removed: the flush that replaces the old per-event `groups` message never fires after a `doing` line.
-- `fresh_heads`'s dedupe (`key == last["key"]` → `False`): a reading equal to the last is sent again, which the module's own docstring says it does not.
-- `flush`'s `except … dirty.set()` without the `dirty.set()`: one failed read and the groups wait for the next delta.
-
-**Fix:** extend the fake `subscribe` of `tests/test_ui_events_light.py` (or a sibling module) with a `gone`, a `doing` and a `repos` event, a repeated reading, a `heads` that raises once; assert for each of the five what the stream sends (the full stream's groups after `gone`, none on `?light=1`, one `groups` after a `doing`, none unchanged, a retry). **Done when** each of the five probes above fails a test.
-
-**Related:** TD-572 (#1544).
 
 ## TD-577: **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window
 
