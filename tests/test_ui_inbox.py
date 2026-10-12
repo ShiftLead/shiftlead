@@ -3094,6 +3094,7 @@ def test_a_held_anchor_seat_is_a_needs_you_row_past_the_grace(tmp_path, monkeypa
         "and 2 more — commit and push, or check out main, and the seat fills"
     )
     assert s["text"].startswith("anchor seat held 1 h by ao-b (working) · 1 in its lane: TD-1 — close it")
+    assert a["subject"] == "anchor seat held · ao"  # §4.10 *A subject on every entry* (TD-566)
     assert a["at"] == since and a["mark"] == "seat_held" and a["id"] == "ao-a:seat_held"
     # Open: the holder's Focus where it is a record of this home, else the seat's own card
     assert a["holder"] == "" and s["holder"] == "ao-b"

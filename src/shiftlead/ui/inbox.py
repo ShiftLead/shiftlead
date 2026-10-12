@@ -406,7 +406,9 @@ def state_rows(
             # Dismiss (`dismissed:<since>`) hides only this one; Open goes to the holder where it is a
             # record of this home, else to the seat's card
             by = str(v["seat_held"].get("by") or "")
-            row = base(v, "seat_held", mark[1])
+            row = base(
+                v, "seat_held", mark[1], subject=kind_subject("anchor seat held", v.get("team") or v.get("name"))
+            )
             rows.append({**row, "at": mark[0], "age": "", "mark": "seat_held", "holder": by if by in names else ""})
         if mark := idle_open_mark(v, views, now):
             rows.append({**base(v, "idle_open", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
@@ -2198,6 +2200,7 @@ def ledger_for_you(
                     "kind": "ledger · yours" if owner else "ledger · your decision",
                     "name": name,
                     "title": e.get("title") or "",
+                    "subject": mail_mod.clip_subject(str(e.get("title") or "")),  # §4.10 *A subject on every entry*
                     "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
                     "held": ", ".join(held),
                     "team": team,
