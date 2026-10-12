@@ -36,6 +36,7 @@ from shiftlead.org import ANCHOR_WHEN, MANAGER_WHEN
 
 from . import uiconf
 from .common import _age, _instant, editor_file, editor_link, host_name
+from .transcript import transcript_editor
 
 # -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
 
@@ -236,6 +237,11 @@ def view(
     if d["editor"]:
         fl = uiconf.file_link()
         d["editor"] = {**d["editor"], "file": editor_file(reach), "first": fl["folder_first"], "wait": fl["wait"]}
+    # Focus header **‹› VS Code** on the transcript (§4.5a, TD-578): the Transcript page's own link, from
+    # the record's `transcript`. Drawn only for a record on this host under an `open_in:` (`drawn`), and
+    # hidden there until the hook reports the file; another host's file is not at that path here
+    d["transcript_editor"] = transcript_editor(str(s.get("transcript") or ""), here)
+    d["transcript_drawn"] = bool(here and d["editor"])
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")

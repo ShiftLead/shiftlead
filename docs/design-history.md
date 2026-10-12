@@ -78,6 +78,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-12 (TD-597, the build): `transcript` is the path the hook reports (Claude Code's `transcript_path`), not the adapter's locator, which finds no file before the conversation's first write and so had nothing to set at the first hook. Was: the adapter's `transcript_path`.
 - 2026-10-12 (TD-578, the designer): the record carries `transcript`, the tool's file path on its host, set with `adapter_id`. Built by TD-597.
 - 2026-10-12 (TD-592, ao-paul; Paul: *this session has been sitting idle since I ran the /clear, but its chip says working*): `SessionStart` with `source: clear` reports `idle`. Until this date it read `working`, as TD-155 had found for `resume`: `/clear` lands at an empty composer, no `Stop` follows, and the chip sat `working` until the next turn ended, headed for `stalled?`.
 - 2026-10-10 (TD-543, the designer; Paul: *do we leverage that and add the recent urls and files from the terminal to our list?*): the record's `links` — the http/https URLs the transcript holds in the assistant's text and tool results, read incrementally from a cursor on the tick, newest twenty, prompts and loopback hosts left out; never from the pane. Built by TD-544.
@@ -374,6 +375,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-599, the designer; Paul, 2026-10-12, through Add entry: *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`): **Inbox: *Answered for you*, Dismiss all** — the group is not redundant (each row is an answer given in the person's name that the person may Overrule; FYI holds none), so it stays apart and gains FYI's one-press clear of the rows on screen. Built by TD-602.
 - 2026-10-12 (TD-581, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td581-promote-now.png`): **Inbox row: promote** under `auto: true` is an FYI row while main is ahead — *auto on · settles in m min* / *promotes at the next tick* — with **Promote now**; the **build** chip's *main +n* links to it and its hover says when the home will act. Was: nothing drawn under `auto` but a failure. Built by TD-598.
 - 2026-10-12 (TD-580, the designer): *Focus: Open shell here* says the shell is the person's own, the person-only acts running from it. Built by TD-596.
 - 2026-10-12 (TD-578, the designer; Paul, 2026-10-12: *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others)*; mockup `Focus.dc.html`, shot `docs/mockups/reviews/2026-10-12-td578-transcript-editor-button.png`): **Focus header: ‹› VS Code** — the editor button's link on the transcript file, beside **Transcript**, one launch, the Transcript page's button's absences. Was: the file reached the editor only through the Transcript page. Built by TD-597.
@@ -1010,6 +1012,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-12 (TD-582, the designer; Paul, 2026-10-12, through Add entry: *a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions*): the gate gains **across teams, by project** — two sessions with the same `project` badge, mail only; *An agreement between peers* — a `steer` to the peer, binding once written in the shared entry, the PR or the design, a disagreement up each side's own path, no copies to controllers. Was: no edge between teams, and a peer's agreement bound nothing. Built by TD-601.
 - 2026-10-12 (TD-574, grinder-ao-2; the docs audit of #1536–#1546): *A subject on every entry*'s **Drawn** names the two rows that draw no subject line, a ledger row and a trail row, whose subject is already their first text — as TD-566 built them.
 - 2026-10-12 (TD-561, the designer; Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier*): **A subject on every entry** — `subject`, at most 80 characters, on everything the person reads: `ao msg --subject`, warned and derived from the first sentence when missing, a reply's its question's, the home's rows' given by their kind, a board row's its head line, a ledger row's its title; drawn as the row's first bold line, the message page's heading, `ao inbox`'s head line, matched by the find box. Reverses TD-127's *no summary field* as far as a headline goes; the first-paragraph rule stands. Built by TD-566.
 - 2026-10-10 (TD-530, the designer): *A file for a session* — a person's message may name a file attached in the dialog, its path text in the body; a structured `files` field set aside until the path has been used. Built by TD-531.
@@ -1125,6 +1128,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-12 (TD-589, grinder-ao-1): `worktree_setup:` built — `sessionorc.gitinfo.worktree_setup` reads it (set, defaulted to an executable `scripts/hydrate_worktree.sh`, absent); a set command runs by the shell in the new worktree in place of the default; `shiftlead.repoconfig` accepts the key.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *The seams* — `board:`, `gate:`, `worktree_setup:`, `commands:` (`test`, `lint`) and what `ledger:` requires (a ledger in ledgerboard format); *Repos* is ShiftLead's own roster importing dev-cadence's. Was: `commands:` read by nothing, the roster dev-cadence's file. Built by TD-585–TD-591.
 - 2026-10-10 (TD-060 step 2, the anchor): a repo's file is `.shiftlead.yml`; `.agentorc.yml` is read while no `.shiftlead.yml` is beside it.
 - 2026-10-10 (TD-536, the designer): `person.file_link: {folder_first, wait}` and the template's optional `file`. Built by TD-537.
@@ -1338,6 +1342,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 9. Invariants
 
+- 2026-10-12 (TD-582, the designer): invariant 9's named exception covers the `project` badge's cross-team mail edge beside the `team` badge's. Built by TD-601.
 - 2026-10-09 (TD-488, the designer): invariant 8 adds that on the installed home the tmux server runs outside the user manager's subtree, so no stop of the agent, the UI or the manager ends a session.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §9 keeps every invariant; the TD markers hung on invariants 2, 5, 11 and 14 (TD-381, TD-041, TD-036, TD-083, TD-103) left for this record; 1,364 → 1,359 words.
 - 2026-10-07 (TD-381, the designer): invariant 2 names the anchor seat as the checkout's one agent only while no person's session holds it.

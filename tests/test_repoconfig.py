@@ -428,3 +428,12 @@ def test_the_gate_is_a_command(tmp_path):
     for text in ("gate: ''\n", "gate: [a]\n", "gate: 3\n"):
         with pytest.raises(ValueError, match="must be a command"):
             repoconfig.load_text(text, tmp_path)
+
+
+def test_the_worktree_setup_is_a_command(tmp_path):
+    """TD-589, §5 *The seams*: `worktree_setup:` is accepted, a command, and refused as anything else."""
+    assert repoconfig.load_text("worktree_setup: make env\n", tmp_path).worktree_setup == "make env"
+    assert repoconfig.load_text("ledger: docs/debt.md\n", tmp_path).worktree_setup is None
+    for text in ("worktree_setup: ''\n", "worktree_setup: [a]\n", "worktree_setup: 3\n"):
+        with pytest.raises(ValueError, match="must be a command"):
+            repoconfig.load_text(text, tmp_path)

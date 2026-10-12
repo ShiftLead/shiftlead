@@ -4186,6 +4186,9 @@
       $("#adapter_id").textContent = v.adapter_id || "—";
       const tr = $("#ftranscript");
       if (tr) tr.classList.toggle("hidden", !v.adapter_id);
+      // §4.5a Focus header **‹› VS Code** (TD-578): the transcript's link lands with the hook's file
+      const te = $("#ftranscript_editor");
+      if (te) { te.classList.toggle("hidden", !v.transcript_editor); if (v.transcript_editor) te.href = v.transcript_editor.url; }
       $("#last_output").textContent = v.last_output ? fmtAge(v.last_output) + " ago" : "—";
       if (v.git) {
         // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which

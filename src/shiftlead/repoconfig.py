@@ -517,6 +517,9 @@ class RepoConfig:
     # §5 *The seams* `gate:` (TD-586): the merge gate's command, `{pr}` filled; `sessionorc.cadence` runs it
     # at the home (§6 rule 10). None: unset — the default is `scripts/check_cadence.py` where it exists
     gate: str | None = None
+    # §5 *The seams* `worktree_setup:` (TD-589): the command run in each new worktree; `sessionorc.gitinfo`
+    # runs it at the worktree's creation. None: unset — the default is `scripts/hydrate_worktree.sh` where it exists
+    worktree_setup: str | None = None
     # §4.9c (TD-309): the repo's held paths, top level — what a flow's review stage waits for. None:
     # the key is absent (a review stage then has nothing to hold); never an empty list
     held: list[str] | None = None
@@ -613,6 +616,10 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{where} must be a command, `{{pr}}` where the PR's number goes (design §5 *The seams*)")
         cfg.gate = value.strip()
+    elif key == "worktree_setup":
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{where} must be a command, run in each new worktree (design §5 *The seams*)")
+        cfg.worktree_setup = value.strip()
     elif key == "held" and isinstance(value, dict):
         sets: dict[str, list[str]] = {}
         for name, globs in value.items():

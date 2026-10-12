@@ -11,6 +11,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from sessionorc import paths
+
 
 @dataclass
 class GitInfo:
@@ -63,11 +67,34 @@ def toplevel(directory: Path | str, timeout: float = 5.0) -> str:
     return (_git(directory, "rev-parse", "--show-toplevel", timeout=timeout) or "").strip()
 
 
+HYDRATE = "scripts/hydrate_worktree.sh"
+
+
+def worktree_setup(repo: Path | str) -> tuple[str, str | None]:
+    """The checkout's worktree setup (§5 *The seams*, TD-589): `("set", command)` for its
+    `.shiftlead.yml` `worktree_setup:`, `("defaulted", HYDRATE)` when the key is unset and the checkout
+    holds an executable `scripts/hydrate_worktree.sh` (dev-cadence's), `("absent", None)` otherwise. A
+    file that cannot be read, or a key that is not a non-empty string, is the key unset: the clients
+    (`shiftlead.repoconfig`) refuse such a file by name."""
+    try:
+        doc = yaml.safe_load(paths.repo_file(repo).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        doc = None
+    got = doc.get("worktree_setup") if isinstance(doc, dict) else None
+    if isinstance(got, str) and got.strip():
+        return "set", got.strip()
+    hydrate = Path(repo) / HYDRATE
+    if hydrate.is_file() and os.access(hydrate, os.X_OK):
+        return "defaulted", HYDRATE
+    return "absent", None
+
+
 def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
-    (after a fetch) or from HEAD when there is no origin. Reused when it already exists. Runs the
-    repo's own `scripts/hydrate_worktree.sh` when present (dev-cadence repos), so the worktree
-    gets the untracked pieces git leaves out."""
+    (after a fetch) or from HEAD when there is no origin. Reused when it already exists. A new one is
+    then set up by the repo's `worktree_setup` (§5 *The seams*, TD-589): a configured command, run by
+    the shell in the new worktree with its path as `$1`, or by default the repo's own `scripts/hydrate_worktree.sh` when
+    present (dev-cadence repos), so the worktree gets the untracked pieces git leaves out."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
         raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
     path = worktree_path(repo, name)
@@ -92,14 +119,20 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     cp = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     if cp.returncode != 0:
         raise WorktreeError(f"git worktree add failed: {cp.stderr.strip() or cp.stdout.strip()}")
-    hydrate = repo / "scripts" / "hydrate_worktree.sh"
-    if hydrate.is_file() and os.access(hydrate, os.X_OK):
-        hp = subprocess.run([str(hydrate), str(path)], capture_output=True, text=True, timeout=timeout)
-        if hp.returncode != 0:
-            # The worktree exists and is usable; say what hydration left out rather than hide it.
-            raise WorktreeError(
-                f"worktree created at {path}, but hydrate_worktree.sh failed: {(hp.stderr or hp.stdout).strip()[-400:]}"
-            )
+    kind, command = worktree_setup(repo)
+    if kind == "absent" or not command:
+        return path
+    if kind == "set":
+        what, argv, cwd = command, ["sh", "-c", command, "sh", str(path)], str(path)  # the path its `$1`
+    else:
+        what, argv, cwd = "hydrate_worktree.sh", [str(repo / HYDRATE), str(path)], None
+    try:
+        hp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise WorktreeError(f"worktree created at {path}, but {what} could not run: {type(e).__name__}") from None
+    if hp.returncode != 0:
+        # The worktree exists and is usable; say what the setup left out rather than hide it.
+        raise WorktreeError(f"worktree created at {path}, but {what} failed: {(hp.stderr or hp.stdout).strip()[-400:]}")
     return path
 
 

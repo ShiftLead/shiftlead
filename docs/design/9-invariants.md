@@ -30,8 +30,10 @@
    (§4.8). A preset sets defaults at start and is a badge afterwards; `team` and `project` are
    badges from the start (§4.9), and the Org page's grouping is derived from `controllers` and
    the badge on each tick, never stored. **One named exception:** the message gate's sideways
-   edge admits a session carrying the same `team` badge (§4.10) — for a `manager: person` team
-   there is no other edge between members. It gates mail only; nothing that acts keys on `team`.
+   edge admits a session carrying the same `team` badge, and its cross-team edge one carrying the
+   same `project` badge (§4.10; TD-582) — for a `manager: person` team the first is the only edge
+   between members, and the second is the only one between teams. It gates mail only; nothing that
+   acts keys on `team` or `project`.
    **A flow is not on the record** (§4.9c): the host agent never reads a flow, the record gains
    no flow or stage field, and no rule keys on a flow or on a stage's `name` — a flow compiles,
    at a client, into fields a start already writes (`lane`, `review`, `prompt_from`), and the
