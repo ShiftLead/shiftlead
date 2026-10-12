@@ -9742,3 +9742,21 @@ This is the part of #1492 a person touches; the PR body's scratch-home UI check 
 **Related:** TD-558 (the design), TD-559 (the held seat's signal), TD-265 (the dialog), TD-361 (*In a team's lanes*), TD-381 (the anchor seat).
 
 **Resolved:** 2026-10-12 (PR #1532) — `teamrun.lanes` reads every lane the start creates (the manager's where its role has one, each member role's once, the anchor seat's), counts each by the page's kinds in the kind bar's order and names a held anchor checkout after its count; `roles` is `{n, by_kind, held}`. Held by `tests/test_cli_teams.py::test_a_start_counts_every_lane_it_creates_by_kind_the_anchor_seats_and_the_managers_too` and `tests/test_ui_teams.py::test_a_start_whose_members_lanes_are_empty_and_the_anchors_not_opens_no_dialog`; the rule is design §4.5a team card **Start** *What the lanes hold, before the start*.
+
+## TD-567: The team header flashes between *started 2m ago* and *started <datetime>*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, Paul saw it on the running ao-grind)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/templates/group_head.html` (`work_started`, `work_note`), `src/shiftlead/ui/static/app.js` (`showLocalTimes`)
+
+**Why:** the header's *started <t>* and *waiting since <t>* were `localtime` spans. The page's once-a-second tick rewrote each to a full local datetime, and every header delta drew the server's fuzzy age again, so the text flipped between the two.
+
+**Fix:** draw the age alone, with the instant on hover. **Done when** the header no longer changes form between deltas.
+
+**Related:** TD-466, TD-214.
+
+**Resolved:** 2026-10-12 (PR #1533) — both spans draw the age (*2m ago*), with the ISO instant as their title; §4.5a's *work waiting* row says so; `tests/test_ui_work_row.py::test_the_team_headers_times_stay_fuzzy` holds it.
