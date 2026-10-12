@@ -42,8 +42,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-466 | Build rule 8's member-by-member reading (TD-457): the mark for a finished member of a running team, the one-member replay, `work_start`, the row's form, `on_work: start` by default | Medium | Built — live check of #1353 |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Open |
 | TD-575 | #1544's events-stream changes (the `gone` path, the `repos`/`doing` mark, the dedupe, and the flush's retry) are held by no test (test audit) | Medium | Open |
+| TD-576 | #1542's `ledger_decide`: the resolved-path checkout match, the `Repo#id` ref, the re-read after the line lands and the node refusal are held by no test (test audit) | Medium | Open |
+| TD-577 | **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window | Medium | Open |
 
 ---
 
@@ -613,6 +614,48 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** TD-060, TD-552.
 
+## TD-575: #1544's events-stream changes — the `gone` path, the `repos`/`doing` mark, the dedupe, and the flush's retry — are held by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1544)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`events`: `fresh_heads`, `flush`, `follow`), `tests/test_ui_events_light.py` (its fake `subscribe` yields only `session` events)
+
+**Why:** #1544 (TD-572) rewrote when the events stream sends the groups. `test_ui_events_light.py` pushes four `session` deltas and nothing else, so every branch the PR added for another event, and two more (the dedupe and the flush's retry), are held by no test. Probe: each change below, one at a time, then `pytest -q tests/test_ui_events_light.py tests/test_ui_waiting_wiring.py tests/test_ui.py tests/test_ui_stop.py tests/test_ui_teams.py` (the two `test_ui.py` model-name tests fail on a stale venv, `agentorc-0.0.1`, and are deselected): every one still passes.
+- `gone` on a light stream sends `{**ev, **groups}` instead of `ev` alone (`if light: … continue` replaced by `if False:`), so a light page gets the whole fleet's groups it was promised not to.
+- `gone`'s `fresh_heads(..., always=True)` without `always`: a `gone` whose reading equals the last one sent carries no groups, and the page keeps the card of the record that went in its team count.
+- `repos`/`doing`: `if not light: dirty.set()` removed: the flush that replaces the old per-event `groups` message never fires after a `doing` line.
+- `fresh_heads`'s dedupe (`key == last["key"]` → `False`): a reading equal to the last is sent again, which the module's own docstring says it does not.
+- `flush`'s `except … dirty.set()` without the `dirty.set()`: one failed read and the groups wait for the next delta.
+
+**Fix:** extend the fake `subscribe` of `tests/test_ui_events_light.py` (or a sibling module) with a `gone`, a `doing` and a `repos` event, a repeated reading, a `heads` that raises once; assert for each of the five what the stream sends (the full stream's groups after `gone`, none on `?light=1`, one `groups` after a `doing`, none unchanged, a retry). **Done when** each of the five probes above fails a test.
+
+**Related:** TD-572 (#1544).
+
+## TD-576: #1542's `ledger_decide` — the checkout match by resolved path, the `Repo#id` ref, the re-read after the line lands and the node refusal — are held by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1542)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_inbox.py` (`rpc_ledger_decide`, `_reread_work_orders`), `src/sessionorc/modes.py` (the node-refused list), `tests/test_board.py` (`ledger_decide` tests, ~L1054), `tests/test_ui_inbox_ledger.py`
+
+**Why:** #1542 (TD-565 slice 2) has tests for the answer, Go, Reply, the person-only caller and the double press. Probe: each change below, one at a time, then `pytest -q tests/test_board.py tests/test_ui_board.py tests/test_ui_inbox_ledger.py tests/test_ui_inbox.py tests/test_workorders.py tests/test_person_only.py`: every one still passes.
+- `rpc_ledger_decide`'s `r == repo or str(Path(r).resolve()) == str(Path(repo).resolve())` → `r == repo`: the docstring says the repo is *the checkout the home's repo facts key it by*, and the resolved-path clause (a symlinked checkout) is read by no test.
+- the already-decided check's `f"{name}#{id}" in refs` removed: an entry named `samscrape#TD-9` by an open decided line is decided again; `ledger_for_you`'s twin clause is held (`test_an_entry_an_open_decided_line_names_leaves_later`), this one is not.
+- `_reread_work_orders`: `if "error" in got or root not in self._repos` → `if root not in self._repos` (a failed read raises `KeyError` on `got["orders"]` after the line has landed, so the press reports a failure for a landed decision; no test returns `{"error": …}` from the read), `self.repos_store.save(self._repos)` removed (the re-read is lost at a restart), and the `repos` broadcast removed (the page's *Later* section never leaves): all three pass. `no-reread` alone is caught; its three effects are not.
+- `modes.py`'s node-refused list without `"ledger_decide"` (and `mail.py`'s is caught): the comment says a node holds no repo facts, and no test names `ledger_decide` in `HOME_EDITS`, so a press at a node would be refused as *not a repo this home reads* instead of by the list's own rule.
+- `isinstance(answer, bool)` dropped: `answer=True` picks answer 1.
+
+**Fix:** tests in `tests/test_board.py`: a repo given by a symlink path, an open decided line naming `Repo#TD-x`, a `workorders.read` that returns `{"error": …}` and one that raises (the repo's `work_orders` unchanged, the line landed), a re-read that changes the saved registry and broadcasts one `repos` event, a node-mode agent refusing `ledger_decide`, and `answer=True` refused. **Done when** each probe above fails a test.
+
+**Related:** TD-565 (#1542), TD-575.
+
 ## TD-577: **Open shell here** replaces the page it was pressed on with the new shell's Focus; it should open in a new tab or window
 
 **Priority:** Medium
@@ -634,24 +677,3 @@ Then the build: `app.js`'s `shell-here` branch, and a test that the press no lon
 **Done when** **Open shell here** leaves the page it was pressed on in place, and the shell's Focus opens in a new tab or window, from Focus and from a card.
 
 **Related:** TD-572 (the Focus tabs' cost: more tabs are cheap since #1544).
-
-## TD-575: #1544's events-stream changes — the `gone` path, the `repos`/`doing` mark, the dedupe, and the flush's retry — are held by no test
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1544)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`events`: `fresh_heads`, `flush`, `follow`), `tests/test_ui_events_light.py` (its fake `subscribe` yields only `session` events)
-
-**Why:** #1544 (TD-572) rewrote when the events stream sends the groups. `test_ui_events_light.py` pushes four `session` deltas and nothing else, so every branch the PR added for another event, and two more (the dedupe and the flush's retry), are held by no test. Probe: each change below, one at a time, then `pytest -q tests/test_ui_events_light.py tests/test_ui_waiting_wiring.py tests/test_ui.py tests/test_ui_stop.py tests/test_ui_teams.py` (the two `test_ui.py` model-name tests fail on a stale venv, `agentorc-0.0.1`, and are deselected): every one still passes.
-- `gone` on a light stream sends `{**ev, **groups}` instead of `ev` alone (`if light: … continue` replaced by `if False:`), so a light page gets the whole fleet's groups it was promised not to.
-- `gone`'s `fresh_heads(..., always=True)` without `always`: a `gone` whose reading equals the last one sent carries no groups, and the page keeps the card of the record that went in its team count.
-- `repos`/`doing`: `if not light: dirty.set()` removed: the flush that replaces the old per-event `groups` message never fires after a `doing` line.
-- `fresh_heads`'s dedupe (`key == last["key"]` → `False`): a reading equal to the last is sent again, which the module's own docstring says it does not.
-- `flush`'s `except … dirty.set()` without the `dirty.set()`: one failed read and the groups wait for the next delta.
-
-**Fix:** extend the fake `subscribe` of `tests/test_ui_events_light.py` (or a sibling module) with a `gone`, a `doing` and a `repos` event, a repeated reading, a `heads` that raises once; assert for each of the five what the stream sends (the full stream's groups after `gone`, none on `?light=1`, one `groups` after a `doing`, none unchanged, a retry). **Done when** each of the five probes above fails a test.
-
-**Related:** TD-572 (#1544).
