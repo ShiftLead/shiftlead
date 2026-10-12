@@ -374,6 +374,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-581, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td581-promote-now.png`): **Inbox row: promote** under `auto: true` is an FYI row while main is ahead — *auto on · settles in m min* / *promotes at the next tick* — with **Promote now**; the **build** chip's *main +n* links to it and its hover says when the home will act. Was: nothing drawn under `auto` but a failure. Built by TD-598.
 - 2026-10-12 (TD-580, the designer): *Focus: Open shell here* says the shell is the person's own, the person-only acts running from it. Built by TD-596.
 - 2026-10-12 (TD-578, the designer; Paul, 2026-10-12: *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others)*; mockup `Focus.dc.html`, shot `docs/mockups/reviews/2026-10-12-td578-transcript-editor-button.png`): **Focus header: ‹› VS Code** — the editor button's link on the transcript file, beside **Transcript**, one launch, the Transcript page's button's absences. Was: the file reached the editor only through the Transcript page. Built by TD-597.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): **Repo page: missing seams** row; the **origin note** derives from the page's own two reads through `ledgerboard.py`. Built by TD-591 and TD-585.
@@ -669,6 +670,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-12 (TD-581, the designer): `ao promote` under `auto: true` promotes now, the settle and the wait skipped. Built by TD-598.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): `ao repo init` (an empty ledger), `ao board edit done|snooze` (a session's own line edit on its branch through ledgerboard's `edit_line()`), `ao doctor`'s **repos** check. Built by TD-587 and TD-591.
 - 2026-10-12 (TD-561, the designer): `ao msg --subject <line>`; a missing one on a message to the person is derived and said; `ao inbox` prints it. Built by TD-566.
 - 2026-10-10 (TD-060 step 2, the anchor): `ao migrate` — the one-time move from the old machine names.
@@ -1161,6 +1163,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-12 (TD-581, the designer; 2026-10-12: #1544, the Focus lag fix, merged at 17:39 UTC and ao-grind's merges every few minutes kept main from standing still for `PROMOTE_SETTLE`, so the fix stayed off the live copy over half an hour while the Inbox drew no row and `ao promote` was refused from every ShiftLead terminal (TD-580); Paul: *Lets also add the TD to force a promote*): *Promote* under `auto` also fires once main has been ahead for `PROMOTE_MAX_WAIT` (thirty minutes) unsettled, from the reading's `ahead_since`; the person's press stands under `auto`, skipping the settle and the wait. Was: the settle alone, a busy main holding `auto` off without limit. Built by TD-598.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): rule 10 runs the repo's `gate:`, judged by exit code, `check_cadence.py --json` its default; a repo with no gate is not checked and the review stage never merges on its own — *no gate: a person merges*. Was: no script, no reading. Built by TD-586.
 - 2026-10-12 (TD-559, the designer): rule 3's `seat_held` gains `since`, kept while the holder is the same, for the Inbox row's and the header mark's age; `SEAT_HELD_GRACE`. Built by TD-564.
 - 2026-10-10 (TD-539, the designer): the promote readings carry `live_at` and `pending` for the build chip. Built by TD-542.

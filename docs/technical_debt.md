@@ -44,7 +44,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-578 | Focus: an editor button that opens the session's current transcript file in the person's editor, beside **Transcript** | Medium | Designed — TD-597 builds it |
 | TD-580 | A shell the person opened and types into is refused the person's own acts (`ao promote`, …) because every ShiftLead pane reads as a session | Medium | Designed — TD-596 builds it |
-| TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Open |
+| TD-581 | Under `promote.auto: true` there is no press to promote now: a team's steady merges keep resetting `PROMOTE_SETTLE`, and the Inbox draws no Promote row | Medium | Designed — TD-598 builds it |
+| TD-598 | Build TD-581: `PROMOTE_MAX_WAIT` and `ahead_since` in the promote reading; the Inbox's promote row under `auto` (FYI, *settles in m min*, **Promote now**); the build chip's *main +n* a link to it with the hover's line | Medium | Open |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-585 | Vendor ledgerboard and drop ShiftLead's own ledger and board parsers (the ADR's build 4) | High | Open |
 | TD-586 | The `gate:` seam: a repo's merge gate is a command, `check_cadence.py` only its default | Medium | Open |
@@ -674,7 +675,8 @@ Then the build, with tests that a person's interactive shell may promote and an 
 **Added:** 2026-10-12 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td581-promote-now.png`) — (1) under `auto: true` the Inbox's promote row is drawn under FYI, uncounted, while main is ahead and nothing is in flight, saying when the home will act (*auto on · settles in m min*, *promotes at the next tick*, *waiting for a live reading*) with **Promote now**; the build chip's *main +n* links to the row and its hover carries the same line; (2) the press — the row's and `ao promote` — skips the settle and the wait, which are the policy's clocks and no precondition, refused on (1) and (3) in their words and through (2) as a person's press is; the failure and the rollback-hold rows replace the FYI row; (3) **yes, a cap**: `PROMOTE_MAX_WAIT` (thirty minutes) from `ahead_since`, the time main first moved past live, after which `auto` promotes at the next tick that meets the three, settled or not — the settle batches a burst, it never holds without limit. §6 *Promote*, §4.5a *Inbox row: promote* and *build* chip, §4.7 `ao promote`. Built by TD-598. Was: Open.
+**Blocked by:** TD-598
 **Location:** design §6 *Promote* (`PROMOTE_SETTLE`, `auto`), §4.5a *Inbox row: promote* (*Under `auto: true` nothing is drawn but a failure*), §4.5a *Org top bar* **build** chip, §4.7 `ao promote`; `src/sessionorc/promote.py` (`PROMOTE_SETTLE` L35, the settle ~L431); `src/shiftlead/ui/inbox.py` (the promote row)
 
 **Why:** 2026-10-12: #1544 (the Focus lag fix) merged at 17:39 UTC. ao-grind kept merging every few minutes, so main never stood still for `PROMOTE_SETTLE` (ten minutes) and the fix stayed off the live copy for more than half an hour while Paul's terminals lagged. With `auto: true` the Inbox draws no Promote row unless a promote has failed, so the page offered no press. `ao promote` was refused from every ShiftLead terminal (TD-580), so the only way to promote was a terminal outside ShiftLead. Paul: *Lets also add the TD to force a promote.*
@@ -901,6 +903,31 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** a press on Focus opens the session's current transcript file in the person's editor through the same `open_in:` as every other file link, the button appears when the hook reports the tool session id, and it is absent wherever the Transcript page's **VS Code** is; the tests above pass, and the builder's look (design §4.9b: Focus on a live session, the press landing the file in the editor) is named in the PR.
 
 **Related:** TD-578 (the design), TD-166 (the Transcript page), TD-525 (the Session card's editor button), TD-532 / TD-536 (a file link's two launches, which this is not).
+
+---
+
+## TD-598: Build TD-581: `PROMOTE_MAX_WAIT` and `ahead_since` in the promote reading; the Inbox's promote row under `auto` (FYI, *settles in m min*, **Promote now**); the build chip's *main +n* a link to it with the hover's line
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-581's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §6 *Promote*, §4.5a *Inbox row: promote* and *Org top bar* **build** chip, §4.7 `ao promote`; `src/sessionorc/promote.py` (`PROMOTE_SETTLE` ~L35: add `PROMOTE_MAX_WAIT = 1800.0`; `read_main` ~L107 and `survey` ~L494: `ahead_since` kept across readings while live stays behind, cleared when it catches up; `settled` ~L430 and the `auto` branch ~L563: `or waited(ahead_since, now)`; the reading's `settle_in` / `acts` word for the row), `src/sessionorc/agent_promote.py` (`rpc_promote` ~L103: nothing to change — a press never read the settle; confirm with a test), `src/shiftlead/ui/inbox.py` (the promote row: the `auto: true` branch that draws nothing but a failure becomes the FYI row), `src/shiftlead/ui/templates/inbox_row.html` (the row's words and **Promote now**; `id="promote-<repo>"` on the row), the build chip — `src/shiftlead/ui/templates/base.html` (~L34 `<span id="buildchip">`), `src/shiftlead/ui/static/app.js` (`drawBuildChip` ~L1232 fills it by `textContent`, so the *main +n* part becomes an anchor it builds instead), `src/shiftlead/ui/common.py` (`build_chip` ~L596: `title`, `rest`, `cls`, the `acts` line for the hover and the row's href), `src/shiftlead/ui/app.py` (`chip_build` at ~L1184, ~L1304, ~L1336) — `src/shiftlead/cli.py` (`ao promote status`: *auto on · settles in 6 min*), `src/shiftlead/ui/help.py` (the promote row's help words name Promote now under auto), `docs/mockups/gen.py` (drawn by TD-581); `tests/test_promote.py`, `tests/test_ui_inbox*.py`, `tests/test_ui_build_chip*.py`
+
+**Why:** TD-581: on 2026-10-12 the Focus lag fix (#1544) merged at 17:39 UTC and ao-grind's steady merges kept main from standing still for `PROMOTE_SETTLE`, so the fix stayed off the live copy for over half an hour while Paul's terminals lagged; under `auto: true` the Inbox drew no row and `ao promote` was refused from every ShiftLead terminal (TD-580). Paul: *Lets also add the TD to force a promote.*
+
+**Fix:**
+1. The reading: `ahead_since` — set when `ahead` first becomes positive against the current live, kept while live stays that commit, cleared when live is main's head; `PROMOTE_MAX_WAIT = 1800.0`; the `auto` branch promotes when the three hold and (`settled(moved)` or `now - ahead_since >= PROMOTE_MAX_WAIT`); the reading carries `acts: {"settles_in": s} | {"at": "next tick"} | {"waiting": "live"}` for the row and the chip.
+2. The Inbox row under `auto: true`: drawn under FYI, uncounted, while `ahead` and nothing in flight and no failure — the reading's parts, *· auto on ·* and the `acts` word; the press **Promote now** calls `promote` as the Needs-you row's **Promote** does; Snooze ▾ as the board rows; no Dismiss; the row has `id="promote-<repo>"`. A failure stays the Needs-you row.
+3. The build chip: *main +n* becomes a link to `/inbox#promote-<repo>`; the hover gains the `acts` line under `auto`.
+4. `ao promote status` prints the `acts` word; `ao promote` under `auto` is unchanged in code (it never read the settle) and its test says so.
+5. Tests: `ahead_since` set, kept and cleared; `auto` promotes at thirty minutes with `moved` four minutes old; the settle still holds the tick before that; the row drawn under FYI with the three words by reading; **Promote now** presses `promote`; the chip's link and hover; `ao promote status`'s line; the mockup regenerates unchanged.
+
+**Done when** the person can promote main's head from the page and from `ao promote` at once while `auto` is on, the Inbox and the build chip say when the home will act, a busy main is promoted by `auto` within `PROMOTE_MAX_WAIT` of first moving ahead, the settle still batches a burst inside that, and the tests above pass; the builder's look (design §4.9b: the Inbox row and the chip under `auto`, on a scratch home with main ahead) is named in the PR.
+
+**Related:** TD-581 (the design), TD-580 / TD-596 (the person's shell may `ao promote`), TD-572 (#1544, the fix that waited), TD-132 (the promote policy), TD-539 (the build chip).
 
 ---
 
