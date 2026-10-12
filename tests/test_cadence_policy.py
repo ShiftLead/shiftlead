@@ -122,6 +122,9 @@ def test_no_gate_is_said_in_place_of_a_verdict():
     assert none == {"pr": 842, "at": "t1", "sha": "", "verdict": "none", "failed": []}
     assert not cadence.untold(none) and cadence.rows([none]) == [] and cadence.clause([none]) == ""
     assert cadence.said(none) == "#842 no gate: a person merges · review recorded"
+    marked = {**cadence.record(None, 843, "aaa", True, FAIL, "t1"), "told": "t1"}
+    dropped = cadence.record(marked, 843, "aaa", True, cadence.NONE, "t2")
+    assert "row" not in dropped and "told" not in dropped and cadence.rows([dropped]) == [], "a gate dropped: no row"
 
 
 # ── the tick ────────────────────────────────────────────────────────────────────────────────────

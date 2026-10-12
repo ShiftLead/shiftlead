@@ -168,7 +168,8 @@ def record(
     once it is closed unmerged), and
     the marks. **`pass`** removes `row` and `told`. **`fail`** on a merged PR — which no re-report
     cures — or read again after the member was told (`told`, whatever was read in between but a
-    pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark.
+    pass) sets `row`, the Inbox row's mark. **`unknown`** tells nothing and changes no mark. A
+    repo's **no gate** (`NONE`) takes the marks away as a pass does: nothing failed.
     `read_by` is carried."""
     new: dict[str, Any] = {"pr": pr, "at": at, "sha": sha, "verdict": got["verdict"], "failed": list(got["failed"])}
     if merged:
@@ -178,7 +179,7 @@ def record(
     for key in ("told", "row", "read_by"):
         if old and old.get(key):
             new[key] = old[key]
-    if got["verdict"] == "pass":
+    if got["verdict"] in ("pass", NONE["verdict"]):
         new.pop("row", None)
         new.pop("told", None)  # a fail after a pass is a first fail again, and told anew
     elif got["verdict"] == "fail" and (merged or new.get("told")):
