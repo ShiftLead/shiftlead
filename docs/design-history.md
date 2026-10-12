@@ -368,6 +368,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-574, grinder-ao-2; the docs audit of #1536–#1546): the **subject** row says a ledger row and a trail row draw no line of their own — their subject is already their first text — as TD-566 built them.
 - 2026-10-12 (TD-567, ao-paul; Paul saw ao-grind's header flash between *started 2m ago* and a datetime): the team card's **work waiting** note and *started <t>* draw the age alone, the instant on hover — the page's local-time rewrite and the header's deltas had taken turns.
 - 2026-10-12 (TD-561, the designer): a **subject** row — every row's first bold line, the message page's heading, `ao inbox`'s head line. Built by TD-566.
 - 2026-10-12 (TD-560, the designer): the row **Inbox: For you in the ledger (n) fold** becomes **Inbox: Later section** and **Inbox row: ledger entry** (answers, Go with it, Reply, Open); *Not due yet* sits in *Later*; the rail's *Urgency* lists *Later* and its *Kinds* gain *ledger entries*. Built by TD-565.
@@ -993,6 +994,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-12 (TD-574, grinder-ao-2; the docs audit of #1536–#1546): *A subject on every entry*'s **Drawn** names the two rows that draw no subject line, a ledger row and a trail row, whose subject is already their first text — as TD-566 built them.
 - 2026-10-12 (TD-561, the designer; Paul, 2026-10-12: *require all inbox items to include a subject line — that makes browsing them easier*): **A subject on every entry** — `subject`, at most 80 characters, on everything the person reads: `ao msg --subject`, warned and derived from the first sentence when missing, a reply's its question's, the home's rows' given by their kind, a board row's its head line, a ledger row's its title; drawn as the row's first bold line, the message page's heading, `ao inbox`'s head line, matched by the find box. Reverses TD-127's *no summary field* as far as a headline goes; the first-paragraph rule stands. Built by TD-566.
 - 2026-10-10 (TD-530, the designer): *A file for a session* — a person's message may name a file attached in the dialog, its path text in the body; a structured `files` field set aside until the path has been used. Built by TD-531.
 - 2026-10-09 (TD-485, the designer): *A lapsed cache is started again, not rung* names the card's **restarted** chip where it said the card draws no restart note. Built by TD-487.

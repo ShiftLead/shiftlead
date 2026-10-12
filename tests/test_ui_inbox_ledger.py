@@ -124,6 +124,9 @@ def test_later_sits_after_answered_and_holds_the_ledgers_rows_counted_there_alon
     assert later.index('id="boardhorizon"') < later.index('id="ledgerforyou"')
     assert 'class="meta mono ledgerrepo">samscrape<' in later
     assert "ledgerrow" not in html[: html.index('id="sec-later"')]
+    # a ledger row's subject is its title, its first paragraph already: no line of its own (§4.5a *subject*, TD-574)
+    box = later[later.index('id="ledgerforyou"') :]
+    assert "ledgerrow" in box and 'class="subj"' not in box
     rail = html[html.index('id="rail"') : html.index("</aside>")]
     assert 'data-value="later"' in rail and 'data-value="ledger"' in rail
     line = rail[rail.index('data-value="later"') :]
