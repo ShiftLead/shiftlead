@@ -995,7 +995,7 @@ Taking control and picking a model should not be the way. **Done when** a role's
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1610–#1619)
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1610–#1619)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
