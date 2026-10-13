@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-624 | §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618) | Low | Open |
 | TD-625 | The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+* | Low | Open |
+| TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Open — design first |
 
 ---
 
@@ -1046,6 +1047,38 @@ same PR. **Done when** the card's month reads the number `issueCount` gives, and
 month of more than 1000 PRs and gets its count.
 
 **Related:** TD-176 (the two reads), TD-608 (*completed* joins `recent`), TD-611 (the PR count in the polls).
+
+---
+
+## TD-627: The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 item 4 (the side panel's **Git** card), §4.5a (*Focus side panel* rows: **recent
+files**, **diff / log / PRs**), §4.6 *A path in the pane is a link*, §5 `person.open_in` / `person.file_link`;
+`src/shiftlead/ui/templates/focus.html` (`#gitfiles`), `src/shiftlead/ui/static/app.js` (the `#gitfiles`
+redraw, `AO.recentFiles`, `AO.openFile`, `AO.fileUrl`), `src/sessionorc/gitinfo.py` (`GitInfo.files`:
+porcelain lines, repo-relative).
+
+**Why:** Paul (2026-10-13): *our git card in the focus session screen shows modified files — add links
+to those files so they can be opened in vscode/other (leverage our other open file flows).* The Git
+card draws `GitInfo.files` (up to twenty `M path` / `?? path` lines) as text, while the Session card's
+**recent files**, a terminal path and Settings' **Open file** already open a file in the person's
+editor; the Git card is open by default and the Session card folded, so the file a person sees first
+is the one they cannot open.
+
+**Fix:** design first, since a control is a §4.5a row: each path on the Git card a link by the
+recent files' form — the editor button's file template, the two launches unless *opens the folder
+first* is off, drawn only where the editor button is, text under `open_in: none` — with what a path
+that is not a regular file does (a deleted one, an untracked directory under `--untracked-files=normal`,
+a rename's old side). The build reuses `AO.openFile`; nothing is parsed from the screen. **Done when**
+a click on a changed file on the Git card opens it in the person's editor.
+
+**Related:** TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
 
 ---
 
