@@ -100,6 +100,33 @@ def test_the_fetch_read_falls_back_to_a_plain_one(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("stop", "why"),
+    [
+        (lambda argv, kw: (_ for _ in ()).throw(subprocess.TimeoutExpired(argv, kw["timeout"])), "timeout"),
+        (lambda argv, kw: subprocess.CompletedProcess(argv, 2, "", "fatal: no remote\n"), "exit 2: fatal: no remote"),
+    ],
+)
+def test_a_stopped_fetching_read_marks_the_plain_reads_boards_unreached(tmp_path, monkeypatch, stop, why):
+    """TD-626: the fetching run stopped at our bound, or failed, and the plain read that follows
+    carries *fetch skipped (<why>)* on each board, so the Inbox draws *origin could not be reached*."""
+    from shiftlead.ui.inbox import origin_note
+
+    real = subprocess.run
+
+    def run(argv, **kw):
+        return stop(argv, kw) if "--fetch" in argv else real(argv, **kw)
+
+    monkeypatch.setattr(workorders.subprocess, "run", run)
+    got = workorders.read_boards(_repo(tmp_path, DECIDED))
+    (b,) = got["boards"]
+    assert (b["source"], b["fetch_note"]) == (None, f"fetch skipped ({why})")
+    assert origin_note(b)["text"].startswith(f"origin could not be reached ({why}): showing the checkout's board")
+    plain = workorders.read_boards(_repo(tmp_path / "plain", DECIDED), fetch=False)["boards"][0]
+    assert not str(plain.get("fetch_note") or "").startswith("fetch skipped")
+
+
+@pytest.mark.unit
 def test_the_repo_reading_lists_them_on_a_full_read_and_keeps_them_between(tmp_path, monkeypatch):
     """`_read_repo` reads the board with the PRs, every `REPOS_EVERY`; a ledger-only re-read keeps
     the last orders, and a failed board read keeps them with the error beside them."""

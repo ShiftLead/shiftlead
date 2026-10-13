@@ -132,20 +132,24 @@ def head(text: str) -> str:
     return out if len(out) <= HEAD_MOST else out[: HEAD_MOST - 1].rstrip() + "…"
 
 
-def _report(argv: list[str], timeout: float) -> dict[str, Any] | None:
+def _report(argv: list[str], timeout: float) -> tuple[dict[str, Any] | None, str]:
+    """The reader's report, or None and why in a few words — *timeout* for our bound (TD-626)."""
     try:
         # no `scripts/__pycache__` for the reader's `ledgerboard` import in the repo's checkout (TD-386's gate)
         env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
         cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
-    except (OSError, subprocess.SubprocessError):
-        return None
+    except subprocess.TimeoutExpired:
+        return None, "timeout"
+    except (OSError, subprocess.SubprocessError) as e:
+        return None, type(e).__name__
     if cp.returncode != 0:
-        return None
+        last = ((cp.stderr or "").strip().splitlines() or [""])[-1][:200]
+        return None, f"exit {cp.returncode}" + (f": {last}" if last else "")
     try:
         got = json.loads(cp.stdout)
     except ValueError:
-        return None
-    return got if isinstance(got, dict) else None
+        return None, "the report is not JSON"
+    return (got, "") if isinstance(got, dict) else (None, "the report is not an object")
 
 
 def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | None = None) -> dict[str, Any]:
@@ -155,7 +159,9 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
     text, due, answers, decided, refs, session, detail, …) with its id beside it as `key`
     (`board:<key>`, *A board line's id*) — or `{error}` when the board could not be read. No board,
     or no reader in the repo, is no boards and no error. `fetch` is the reader's own `--fetch`
-    (origin's side, *Boards are read against origin*), and a plain read follows one that fails.
+    (origin's side, *Boards are read against origin*), and a plain read follows one that fails, each
+    board's `fetch_note` then *fetch skipped (<why>)* — *timeout* for our bound — so the page says
+    origin could not be reached.
 
     `board` reads that file in place of the checkout's, named as the checkout's board read from
     origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
@@ -166,9 +172,11 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
     if not path.is_file() or not script.is_file():
         return {"boards": []}
     base = [sys.executable, str(script), "--report", "--json", "--board", str(path)]
-    got = _report([*base, "--fetch"], FETCH_TIMEOUT) if fetch and board is None else None
+    fetching = fetch and board is None
+    got, why = _report([*base, "--fetch"], FETCH_TIMEOUT) if fetching else (None, "")
+    skipped = fetching and got is None
     if got is None:
-        got = _report(base, READ_TIMEOUT)
+        got, _ = _report(base, READ_TIMEOUT)
     if got is None:
         return {"error": f"{READER} --report --json could not be read"}
     item_key = _item_key(script)
@@ -188,6 +196,10 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
                 ref = ""
             items.append({**it, "key": ref})
         b = {**b, "items": items}
+        if skipped:
+            # the fetching run stopped (our bound) or failed: the plain read's board is the checkout's,
+            # said in the reader's own words for an origin it could not reach (§4.5a **origin note**, TD-626)
+            b.update(source=None, fetch_note=f"fetch skipped ({why})")
         if board is not None:
             # as the checkout's board, read from origin: the reader's *behind* case (§4.5a **origin note**)
             b.update(board=str(checkout), root=str(root), label=root.name, source="origin", fetch_note=None)
