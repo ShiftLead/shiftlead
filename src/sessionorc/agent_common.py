@@ -138,6 +138,9 @@ SEAT_PR_WAIT = timedelta(hours=2)
 # §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
 # the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
 IDLE_NUDGE = timedelta(minutes=20)
+# §4.4 *A red PR nobody holds is a work order* (TD-613): how long an open PR reads red or conflicting
+# before its idle holder is told, and again before an unheld one is a `pr:<n>` work order.
+ORPHAN_AFTER = timedelta(hours=1)
 # §6 rule 5 (TD-190): the context-bound line is typed again after this, while the member is still
 # idle and over its bound.
 CONTEXT_AGAIN = timedelta(minutes=20)

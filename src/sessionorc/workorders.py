@@ -23,16 +23,19 @@ import sys
 import threading
 import types
 from collections.abc import Callable
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 BOARD = Path("docs") / "user_attention.md"
 READER = Path("scripts") / "nudge_user_attention.py"
 PREFIX = "board:"
+PR_PREFIX = "pr:"  # a red PR nobody holds (§4.4, TD-613)
 FETCH_TIMEOUT = 45.0  # the reader's fetch is serial and its own; a read past this is a plain one
 READ_TIMEOUT = 20.0
 HEAD_MOST = 120
 _REF_RE = re.compile(r"board:[0-9a-f]{8}")
+_PR_REF_RE = re.compile(r"pr:\d{1,6}")
 # one loaded reader per file, or None for one that will not load, kept while its mtime holds
 _readers: dict[str, tuple[float, types.ModuleType | None]] = {}
 # one load at a time: a load swaps the process's `sys.path`, `sys.modules['ledgerboard']` and
@@ -42,8 +45,13 @@ NO_LINE = "no line {ref} on the board — reworded or closed"
 
 
 def is_work_order(ref: str) -> bool:
-    """Whether a reference names a work order: `board:` and eight hex digits."""
+    """Whether a reference names a board line's work order: `board:` and eight hex digits."""
     return bool(_REF_RE.fullmatch(str(ref)))
+
+
+def is_pr_order(ref: str) -> bool:
+    """Whether a reference names a red PR's work order: `pr:` and the PR's number (TD-613)."""
+    return bool(_PR_REF_RE.fullmatch(str(ref)))
 
 
 def _reader(script: Path) -> types.ModuleType | None:
@@ -277,3 +285,103 @@ def show(root: str | Path, want: str, *, fetch: bool = True) -> dict[str, Any] |
             "source": source,
         }
     return None
+
+
+# -- a red PR nobody holds (design §4.4 *A red PR nobody holds is a work order*, TD-613) -----------
+
+
+def holds_pr(record: Any, pr: dict[str, Any]) -> bool:
+    """Whether a live record holds an open PR: not `exited` or `closed`, not superseded, no
+    `out_of_work`, and either a `progress` entry names it (`pr:<n>` or its `pr`, claimed or done) or
+    its checkout's branch is the PR's head."""
+    if record.state in ("exited", "closed") or record.superseded_by or record.out_of_work:
+        return False
+    n = pr.get("number")
+    if any(e.ref == f"{PR_PREFIX}{n}" or e.pr == n for e in record.progress):
+        return True
+    branch = (record.git or {}).get("branch")
+    return bool(branch) and branch == pr.get("branch")
+
+
+def pr_note(pr: dict[str, Any]) -> str:
+    """The one line an idle holder of a red PR is told."""
+    why = ", ".join(pr.get("failing") or []) or ("conflicting with its base" if pr.get("conflicting") else "red")
+    return f"PR #{pr['number']} has been red since {pr.get('red_since')}: {why} — fix it or say why"
+
+
+def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
+    """A red PR nobody holds as the lanes and the pages read an entry: `pr:<n>`, the PR's title, High,
+    pickable, its `Context` the URL and the failing checks. `pr_order` marks it: the `anchor` lane
+    takes it, a `free-pick` lane only where it carries `free_pick` (no servicing team has an anchor
+    seat, which only the team context can tell)."""
+    failing = list(pr.get("failing") or [])
+    context = " · ".join(
+        filter(None, [str(pr.get("url") or ""), ", ".join(failing), "conflicting" * bool(pr.get("conflicting"))])
+    )
+    return {
+        "id": f"{PR_PREFIX}{pr['number']}",
+        "title": str(pr.get("title") or ""),
+        "priority": "High",
+        "owner": "",
+        "kind": "",
+        "type": "debt",
+        "blocked_by": [],
+        "pickable": "yes",
+        "for_page": "pickable",
+        "work_order": True,
+        "pr_order": True,
+        "pr": pr["number"],
+        "url": str(pr.get("url") or ""),
+        "author": str(pr.get("author") or ""),
+        "checks": pr.get("checks"),
+        "failing": failing,
+        "conflicting": bool(pr.get("conflicting")),
+        "red_since": pr.get("red_since"),
+        "context": context,
+        "refs": [],
+        "text": "",
+    }
+
+
+def red_prs(
+    open_prs: list[dict[str, Any]],
+    records: list[Any],
+    now: datetime,
+    told: dict[str, dict[str, str]],
+    after: timedelta,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, str]], list[tuple[str, dict[str, Any]]]]:
+    """A repo's red PRs read against its live records: the `pr:<n>` orders, the memory of whom was
+    told (`{n: {red_since, at}}`, one per red spell), and the notes to send now `(record id, pr)`.
+
+    A PR red or conflicting for `after` (from `red_since`) with no holder is an order. Held, and
+    every holder `idle`: each is told once, and `after` later, still red and the holders still idle,
+    they no longer count and it is an order. A holder at work keeps it off the list."""
+    orders: list[dict[str, Any]] = []
+    kept: dict[str, dict[str, str]] = {}
+    notes: list[tuple[str, dict[str, Any]]] = []
+    for pr in open_prs:
+        since = pr.get("red_since") if isinstance(pr, dict) else None
+        if not since or not isinstance(pr.get("number"), int):
+            continue
+        try:
+            red_since = datetime.fromisoformat(str(since))
+        except ValueError:
+            continue
+        key = str(pr["number"])
+        was = told.get(key) if (told.get(key) or {}).get("red_since") == since else None
+        if was:
+            kept[key] = was  # this red spell's memory stays while it lasts
+        if now - red_since < after:
+            continue
+        holders = [r for r in records if holds_pr(r, pr)]
+        if not holders:
+            orders.append(pr_order(pr))
+            continue
+        if any(r.state != "idle" for r in holders):
+            continue
+        if was is None:
+            kept[key] = {"red_since": since, "at": now.isoformat()}
+            notes.extend((r.id, pr) for r in holders)
+        elif now - datetime.fromisoformat(was["at"]) >= after:
+            orders.append(pr_order(pr))
+    return orders, kept, notes
