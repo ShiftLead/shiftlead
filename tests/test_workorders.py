@@ -124,6 +124,68 @@ def test_reading_the_reader_writes_nothing_into_the_checkout(tmp_path):
     """TD-386: the reader's `item_key` is compiled from its text, never imported, so no
     `scripts/__pycache__` lands in the repo — which the anchor's gate would read as the person's work."""
     root = _repo(tmp_path, DECIDED)
-    workorders._keys.clear()
+    workorders._readers.clear()
     assert workorders.read(root, fetch=False)["orders"]
     assert not (root / "scripts" / "__pycache__").exists()
+
+
+@pytest.mark.unit
+def test_every_line_has_an_id_that_a_snooze_a_reply_a_decide_and_a_close_keep_and_a_reword_changes(tmp_path):
+    """§4.4 *A board line's id* (TD-603, TD-607): every board line, decided or not, has its id —
+    the same before and after each tool's edit, and another after a reword. `show` finds the line by
+    it, open or closed, with the reader's detail block, and is None for an id no line holds."""
+    root = _repo(tmp_path, OPEN, "  more about the token", "  - not an item, the block's own list", DECIDED)
+    text = OPEN.removeprefix("- [ ] ")
+    key = workorders.ref(root, text)
+    assert workorders.is_work_order(key)
+    from sessionorc import board as board_mod
+
+    edits = (
+        board_mod.edit_line(OPEN, text, "snooze", "2026-10-09"),
+        board_mod.edit_line(OPEN, text, "reply", reply="soon", by="paul", today="2026-10-03"),
+        board_mod.edit_line(OPEN, text, "decide", answer="now", today="2026-10-03"),
+        board_mod.edit_line(OPEN, text, "done") + " Closed: 2026-10-04.",
+    )
+    assert {workorders.ref(root, e.split("] ", 1)[1]) for e in edits} == {key}
+    assert workorders.ref(root, text.replace("Rotate", "Revoke")) != key  # a reword is a new line
+    got = workorders.show(root, key, fetch=False)
+    assert got == {
+        "key": key,
+        "line": 7,
+        "text": text,
+        "detail": ["more about the token", "- not an item, the block's own list"],
+        "open": True,
+        "source": "checkout",
+    }
+    board = root / "docs" / "user_attention.md"
+    board.write_text(board.read_text().replace(OPEN, OPEN.replace("- [ ]", "- [x]") + " Closed: 2026-10-04."))
+    closed = workorders.show(root, key, fetch=False)
+    assert closed is not None and closed["open"] is False and closed["line"] == 7
+    assert workorders.show(root, "board:00000000", fetch=False) is None
+
+
+@pytest.mark.unit
+def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_path, monkeypatch, capsys):
+    """§4.7 `ao board show <board:key>` (TD-607): from the repo this directory is in, the line's
+    number, text and detail block — `--json` `{key, line, text, detail, open, source}` — read from
+    the checkout when there is no origin; an id no line holds is *no line … — reworded or closed*,
+    exit 1, and a word that is not an id exit 2. Read-only: the host agent is never asked."""
+    import json
+
+    from shiftlead import cli
+
+    root = _repo(tmp_path, OPEN, "  more about the token")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    monkeypatch.chdir(root)
+    monkeypatch.setattr(cli, "call_sync", lambda *a, **k: pytest.fail("ao board show asked the host agent"))
+    key = workorders.ref(root, OPEN.removeprefix("- [ ] "))
+    assert cli.main(["board", "show", key, "--json"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["key"] == key and got["line"] == 7 and got["detail"] == ["more about the token"]
+    assert got["open"] is True and got["source"] == "checkout"
+    assert cli.main(["board", "show", key]) == 0
+    out = capsys.readouterr().out
+    assert f"{key}  line 7 of docs/user_attention.md on checkout" in out and "    more about the token" in out
+    assert cli.main(["board", "show", "board:00000000"]) == 1
+    assert "no line board:00000000 on the board — reworded or closed" in capsys.readouterr().err
+    assert cli.main(["board", "show", "TD-607"]) == 2

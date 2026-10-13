@@ -3193,7 +3193,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if not board or not text or not reply:
                     raise HTTPException(400, "a board reply names the board, the item's text and the reply")
                 refs = [str(r) for r in body.get("refs") or () if str(r).strip()]
-                got = await call("board_reply", board=board, line=line, text=text, reply=reply, refs=refs)
+                # §4.4 *A board line's id* (TD-603): the row's id, by which the agent finds the line first
+                key = str(body.get("key") or "").strip()
+                got = await call("board_reply", board=board, line=line, text=text, reply=reply, refs=refs, key=key)
                 await board_items(board=board)
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what == "add":
@@ -3229,7 +3231,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if not answer or not isinstance(answers, list):
                     raise HTTPException(400, "a decide names the answer and the item's answers")
                 more = {"answer": answer, "answers": [str(a) for a in answers]}
-            got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, **more)
+            key = str(body.get("key") or "").strip()  # the row's id (§4.4 *A board line's id*, TD-603)
+            got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, key=key, **more)
             await board_items(board=board)
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "ledger":

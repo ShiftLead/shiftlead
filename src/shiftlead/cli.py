@@ -18,7 +18,7 @@ from importlib import resources
 from typing import Any
 
 from sessionorc import client as clientmod
-from sessionorc import hosts, naming, promote
+from sessionorc import hosts, naming, promote, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import settings as settings_mod
@@ -1517,6 +1517,8 @@ def _board_due(root: pathlib.Path) -> dict[str, Any]:
         for it in b.get("items") or []
         if isinstance(it, dict)
     ]
+    for it in items:  # each line's id (§4.4 *A board line's id*, TD-603), printed beside it
+        it["key"] = workorders.ref(root, str(it.get("text") or ""))
     return {"items": items}
 
 
@@ -1747,7 +1749,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
             if board.get("error"):
                 print(f"  board: could not look — {board['error']}")
             for it in board.get("items", []):
-                print(f"  due          {it.get('due_tag') or it.get('due') or ''}  {it.get('text')}")
+                key = f"{it['key']}  " if it.get("key") else ""
+                print(f"  due          {key}{it.get('due_tag') or it.get('due') or ''}  {it.get('text')}")
             for e in r.get("doing", [])[:DOING_SHOWN]:
                 print(f"  doing {_age(str(e.get('at') or '')):>4} ago  {e.get('id')}: {e.get('text')}")
             # a team over its line in this repo, last (§4.7, §6 *Balance*): what a refused member reads here
@@ -2515,6 +2518,38 @@ def _doctor_org(files: dict[str, Any], node: bool) -> list[dict[str, Any]]:
         repos_of=teamrun.repos_via(call_sync),
     )
     return doctor.org(got, files, len(org.teams), node)
+
+
+def cmd_board_show(args: argparse.Namespace) -> int:
+    """`ao board show <board:key> [--repo <name>]` (design §4.7, §4.4 *A board line's id*; TD-603,
+    built by TD-607): the line whose id it is — its line number, its whole text and its detail
+    block, from origin's board after a fetch, else the checkout's — or *no line board:<key> on the
+    board — reworded or closed*, exit 1. Read-only and the host agent's nothing: the repo's own
+    reader names the line, as the Inbox's rows and the write-back name it."""
+    want = str(args.key or "").strip()
+    if not workorders.is_work_order(want):
+        return fail(args, f"{want!r} is not a board line's id: board: and eight hex digits (design §4.4)", 2)
+    if args.repo:
+        roots = [r for r in hosts.local_host().repos() if args.repo in (pathlib.Path(r).name, r)]
+        if not roots:
+            return fail(args, f"no registered repo is named {args.repo!r}", 1)
+        root = roots[0]
+    else:
+        root = _main_checkout(os.getcwd()) or ""
+        if not root:
+            return fail(args, "this directory is not in a repo; name one with --repo", 1)
+    got = workorders.show(root, want)
+    if got is None:
+        return fail(args, workorders.NO_LINE.format(ref=want), 1)
+
+    def prose() -> None:
+        state = "" if got["open"] else " (closed)"
+        print(f"{got['key']}  line {got['line']} of {workorders.BOARD} on {got['source']}{state}")
+        print(got["text"])
+        for d in got["detail"]:
+            print(f"    {d}")
+
+    return emit(args, got, prose)
 
 
 def cmd_td_add(args: argparse.Namespace) -> int:
@@ -3675,6 +3710,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--priority")
     p.add_argument("--id", help="the session to report for (default: your own, from SHIFTLEAD_SESSION)")
     p.set_defaults(fn=cmd_finding)
+
+    p = add("board", help="a board line by its id (design §4.4 *A board line's id*, §4.7)")
+    bsub = p.add_subparsers(dest="action", required=True)
+    q = bsub.add_parser("show", help="the line whose id it is, from origin's board after a fetch, else the checkout's")
+    q.add_argument("key", metavar="board:key", help="the line's id, board: and eight hex digits")
+    q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
+    q.add_argument(
+        "--json", action="store_true", default=argparse.SUPPRESS, help="{key, line, text, detail, open, source}"
+    )
+    q.set_defaults(fn=cmd_board_show)
 
     p = add("td", help="hand the techlead an entry for the ledger (design §4.9; a person's own)")
     dsub = p.add_subparsers(dest="action", required=True)

@@ -262,21 +262,32 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
         assert len(reads) == 2  # read again at once, not at the next minute
         r = c.post(
             "/api/person/board",
-            json={"action": "snooze", "board": board, "line": "4", "text": "x", "due": "2026-09-30"},
+            json={
+                "action": "snooze",
+                "board": board,
+                "line": "4",
+                "text": "x",
+                "due": "2026-09-30",
+                "key": "board:0a1b2c3d",
+            },
         )
         assert r.status_code == 200
+        # the row's id rides along (§4.4 *A board line's id*, TD-607); a press without one sends it empty
         assert [k for _, k in calls] == [
-            {"board": board, "line": 4, "text": "x", "action": "done", "due": None},
-            {"board": board, "line": 4, "text": "x", "action": "snooze", "due": "2026-09-30"},
+            {"board": board, "line": 4, "text": "x", "action": "done", "due": None, "key": ""},
+            {"board": board, "line": 4, "text": "x", "action": "snooze", "due": "2026-09-30", "key": "board:0a1b2c3d"},
         ]
         assert all(caller is None for caller, _ in calls)  # a person is not a session
         # TD-142: Reply goes to `board_reply` with the reader's refs, and the boards are read again
         r = c.post(
             "/api/person/board",
-            json={"action": "reply", "board": board, "line": 4, "text": "x", "reply": " rebase it ", "refs": ["TD-9"]},
-        )
+            json={
+                "action": "reply", "board": board, "line": 4, "text": "x", "reply": " rebase it ", "refs": ["TD-9"],
+                "key": "board:0a1b2c3d",
+            },
+        )  # fmt: skip
         assert r.status_code == 200 and replies == [
-            {"board": board, "line": 4, "text": "x", "reply": "rebase it", "refs": ["TD-9"]}
+            {"board": board, "line": 4, "text": "x", "reply": "rebase it", "refs": ["TD-9"], "key": "board:0a1b2c3d"}
         ]
         assert len(reads) == 4
         for bad in ({"reply": ""}, {"line": "four"}, {"board": ""}):
@@ -1381,7 +1392,7 @@ def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_pat
     with TestClient(uiapp.create_app()) as c:
         r = c.post("/api/person/board", json={**base, "answer": " hold ", "answers": ["approve", "hold"]})
         assert r.status_code == 200 and r.json()["answer"] == "hold"
-        assert calls == [(None, {**base, "due": None, "answer": "hold", "answers": ["approve", "hold"]})]
+        assert calls == [(None, {**base, "due": None, "key": "", "answer": "hold", "answers": ["approve", "hold"]})]
         assert len(reads) == 1
         for bad in ({"answers": ["approve"]}, {"answer": "hold"}, {"answer": "hold", "answers": "hold"}):
             assert c.post("/api/person/board", json={**base, **bad}).status_code == 400
@@ -1812,7 +1823,7 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     (broken / "scripts").mkdir(parents=True)
     (broken / "scripts" / "nudge_user_attention.py").write_text("raise SystemExit(3)\n")
     assert workorders.ref(broken, text) == ""
-    assert workorders._keys[str(broken / "scripts" / "nudge_user_attention.py")][1] is None
+    assert workorders._readers[str(broken / "scripts" / "nudge_user_attention.py")][1] is None
 
 
 def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any_one(tmp_path):
@@ -1838,3 +1849,36 @@ def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any
     ended = {**g1, "id": "ao-g0", "name": "g0", "state": "exited"}
     for fleet in ([g1, ended], [ended, g1]):
         assert board_waiting_on(row, fleet, now) == "pickable by grind", [r["id"] for r in fleet]
+
+
+@pytest.mark.unit
+def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path, monkeypatch):
+    """§4.5a *board row: id* (§4.4 *A board line's id*, TD-603, TD-607): the row's `key` is the
+    repo's own reader's `board:<key>` for its text — the work orders' id — drawn in mono before the
+    due words as a control that copies it, and sent as `data-key` by every press on the row; a repo
+    with no reader draws none and sends it empty. The page's script puts it in every board body."""
+    import re
+
+    from sessionorc import workorders
+
+    repo(tmp_path, "samscrape")  # the reader beside the board, which names the line
+    it = decide_item()
+    rows, html = rows_html(tmp_path, monkeypatch, it)
+    key = rows[0]["key"]
+    assert workorders.is_work_order(key) and key == workorders.ref(tmp_path / "samscrape", it["text"])
+    chip = re.search(r'<button class="mono boardkey"[^>]*>([^<]*)</button>', html)
+    assert chip and chip.group(1) == key
+    assert f'data-copy="{key}"' in chip.group(0) and f'data-copied="copied {key}"' in chip.group(0)
+    assert "type it in chat or in ao board show" in chip.group(0)
+    assert html.index("boardkey") < html.index("data-slot")  # before the due words
+    presses = re.findall(r"<button[^>]*data-board=[^>]*>", html)
+    assert len(presses) >= 5 and all(
+        f'data-key="{key}"' in b for b in presses
+    )  # answers, Reply, Go with it, Snooze, Done
+    shutil.rmtree(tmp_path / "samscrape" / "scripts")
+    workorders._readers.clear()
+    rows, html = rows_html(tmp_path, monkeypatch, it)
+    assert rows[0]["key"] == "" and "boardkey" not in html and 'data-key=""' in html
+    js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
+    assert js.count('key: b.dataset.key || ""') == 3  # Snooze/Done/decide, Reply, Not right…
+    assert 'AO.toast(b.dataset.copied || "copied", true)' in js

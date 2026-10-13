@@ -29,7 +29,7 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import paths
+from sessionorc import paths, workorders
 
 BOARD = Path("docs") / "user_attention.md"
 ACTIONS = ("snooze", "done", "reply", "decide")
@@ -328,13 +328,20 @@ def _reset(t: Path, want: str) -> None:
         _git(t, "reset", "-q", "--hard", f"origin/{want}")
 
 
-def _find(lines: list[str], line: int | None, text: str) -> int | None:
-    """The index of the open item whose text is `text`, word for word: the reader's line first,
-    then the whole file — origin's lines may sit elsewhere than the checkout's (§4.4)."""
+def _find(lines: list[str], line: int | None, text: str, key: str = "", root: Path | None = None) -> int | None:
+    """The index of the open item the press is about: with a `key` (§4.4 *A board line's id*), the
+    open item whose id it is, by the repo's own reader under `root`; then the item whose text is
+    `text`, word for word — the reader's line first, then the whole file, since origin's lines may
+    sit elsewhere than the checkout's (§4.4)."""
+    if key and root is not None:
+        for i, ln in enumerate(lines):
+            m = ITEM_RE.match(ln.rstrip("\n"))
+            if m is not None and workorders.ref(root, m.group("text").strip()) == key:
+                return i
 
     def holds(ln: str) -> bool:
         m = ITEM_RE.match(ln.rstrip("\n"))
-        return m is not None and m.group("text").strip() == text.strip()
+        return m is not None and bool(text.strip()) and m.group("text").strip() == text.strip()
 
     if isinstance(line, int) and 1 <= line <= len(lines) and holds(lines[line - 1]):
         return line - 1
@@ -490,10 +497,20 @@ def _gh_quiet(t: Path, *args: str) -> None:
 
 
 def write_back(
-    root: str | Path, line: int, text: str, action: str, due: str | None = None, *, reply: str = "", answer: str = ""
+    root: str | Path,
+    line: int | None,
+    text: str,
+    action: str,
+    due: str | None = None,
+    *,
+    reply: str = "",
+    answer: str = "",
+    key: str = "",
 ) -> dict[str, Any]:
     """Make one Snooze, Done, Reply or Decide on the board on origin's head and land it there (§4.4):
     in the host agent's own tree for the repo of the checkout `root`, which is never written.
+    `key` is the line's id (`board:<key>`, §4.4 *A board line's id*), tried before the line and
+    its text, and refused in its own words when no open line holds it.
     Returns `{commit, message, pr}` — `commit` origin's head after the merge; raises `Refused`
     with nothing changed on origin."""
     root = Path(root)
@@ -501,7 +518,7 @@ def write_back(
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     with _EDIT:
         clock = _Clock()
-        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock))
+        return _twice(lambda: _write_back(root, line, text, action, due, reply, answer, clock, key))
 
 
 def _write_back(
@@ -513,8 +530,11 @@ def _write_back(
     reply: str = "",
     answer: str = "",
     clock: _Clock | None = None,
+    key: str = "",
 ) -> dict[str, Any]:
-    if not isinstance(line, int):
+    if key and not workorders.is_work_order(key):
+        raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
+    if not isinstance(line, int) and not key:
         raise Refused(MOVED)
     clock = clock or _Clock()
     if shutil.which("gh") is None:
@@ -522,9 +542,14 @@ def _write_back(
     t, want = _tree(root, clock)
     path = t / BOARD
     lines = _read_lines(path) if path.exists() else []
-    at = _find(lines, line, text)
+    at = _find(lines, line, text, key, root)
     if at is None:
-        raise Refused(NOT_ON_ORIGIN if _ahead(root, want, line, text) else MOVED)
+        if text and _ahead(root, want, line, text):
+            raise Refused(NOT_ON_ORIGIN)
+        raise Refused(workorders.NO_LINE.format(ref=key) if key else MOVED)
+    # found by its id, the line's own text is the item's — a snooze or a reply since the page drew
+    # it changes the text and never the id (§4.4 *A board line's id*)
+    text = ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
     by = author(root) if action == "reply" else ""
     lines[at] = edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
     msg = message(text, action, due, answer=answer)
@@ -533,7 +558,7 @@ def _write_back(
     def still() -> bool:
         return _find(_read_origin(t, want), None, text) is not None
 
-    return {**_land(root, t, want, msg, clock, still), "line": at + 1}
+    return {**_land(root, t, want, msg, clock, still), "line": at + 1, "text": text}
 
 
 def _ahead(root: Path, want: str, line: int | None, text: str) -> bool:
