@@ -86,7 +86,7 @@ def test_ledger_rows_a_merged_pr_put_on_main_become_findings(repo, monkeypatch):
     ledger = repo / LEDGER
     ledger.write_text(
         ledger.read_text() + "| TD-077 | capped |\n| TD-078 | found on the way |\n\n"
-        "## TD-077: capped\n\n#### TD-078: found on the way\n"
+        "## TD-077: capped\n\n## TD-078: found on the way\n"
     )
     git(repo, "add", "-A")
     git(repo, "commit", "-qm", "TD-077: cap the thing, and file TD-078 (#77)")  # a squash merge's shape

@@ -15,6 +15,7 @@ import sys
 from collections import Counter
 
 from sessionorc import ledger
+from sessionorc import ledgerboard as lb
 
 DOCS = pathlib.Path(__file__).parents[1] / "docs"
 OPEN = DOCS / "technical_debt.md"
@@ -29,8 +30,8 @@ def text(path):
 
 
 def headings(path):
-    # the reader's own regex (design §4.4 *Repo facts*, TD-176): these tests read what the page counts
-    return [tid for tid, _ in ledger.HEADING.findall(text(path))]
+    # the reader's own heading (ledgerboard's, TD-585): these tests read what the page counts
+    return [m[1] for m in lb.HEADING_RE.finditer(text(path))]
 
 
 def entries(path):

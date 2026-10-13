@@ -13,6 +13,7 @@ import pytest
 from conftest import park_ticks
 
 from sessionorc import hosts, ledger, modes, paths, reports
+from sessionorc import ledgerboard as lb
 from sessionorc.client import LocalClient
 
 LEDGER = """# Technical debt
@@ -81,7 +82,7 @@ def test_entries_read_the_header_fields_and_the_page_kind():
 def test_the_repos_own_ledger_parses_every_entry_the_heading_regex_finds():
     text = (Path(__file__).parents[1] / "docs" / "technical_debt.md").read_text()
     got = ledger.entries(text)
-    assert [e["id"] for e in got] == [t for t, _ in ledger.HEADING.findall(ledger.strip_comments(text))]
+    assert [e["id"] for e in got] == [m[1] for m in lb.HEADING_RE.finditer(ledger.strip_comments(text))]
     assert all(e["priority"] in ledger.PRIORITIES for e in got), "every entry carries a Priority the page counts"
 
 
