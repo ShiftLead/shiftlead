@@ -98,6 +98,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     PATHS_RUNS_MAX,
     PRUNE_EVERY,  # noqa: F401
     PUSH_OPEN,  # noqa: F401
+    RELAUNCH_KEPT,
     RELAUNCH_KEYS,
     REMOVED_GUARD_SECONDS,  # noqa: F401
     REPORT_EVERY,  # noqa: F401
@@ -1761,10 +1762,14 @@ class HostAgent(
     ) -> dict[str, Any]:
         """A person's Apply, one member (design §4.9c *Switching*, TD-309 slice 5): the client composed
         the member under the team's current flow and hands its launch here — `prompt`, `prompt_from`,
-        `lane`, `review` (`RELAUNCH_KEYS`), each replaced as handed and an absent one removed, the rest
-        of the launch record standing. The home writes it as the record's launch record, re-records
+        `lane`, `review` and `profile` (`RELAUNCH_KEYS`), each replaced as handed and an absent one
+        removed — `profile` kept instead (`RELAUNCH_KEPT`, TD-619) — the rest of the launch record
+        standing. A `profile` handed is refused unless the member's adapter runs a profile of that name
+        (`doctor_profiles`: the core cannot read `profiles.yml`), checked for a member of this host; a
+        node's profiles are its own. The home writes it as the record's launch record, re-records
         `brief` from the new `prompt_from` as a create does, clears `brief_changed`, and marks the record
-        `relaunch: {at, lane, review}` (the two as handed, so a client reads what the member runs next),
+        `relaunch: {at, lane, review, profile}` (the lane and review as handed, the profile the record now
+        names, so a client reads what the member runs next),
         which rule 7 reads as its second trigger (`why: flow`): every replay reads the new record, and a
         create under the name clears the mark. **A person's own**, refused to a session as
         `set_settings` is, and the home's alone (`modes.HOME_EDITS`); never an interactive session, and
@@ -1788,7 +1793,7 @@ class HostAgent(
         stray = sorted(k for k in launch if k not in RELAUNCH_KEYS)
         if stray:
             raise RpcError(f"a relaunch replaces {', '.join(RELAUNCH_KEYS)} alone, not {', '.join(stray)} {rule}")
-        kinds = {"prompt": str, "prompt_from": dict, "lane": list, "review": dict}
+        kinds = {"prompt": str, "prompt_from": dict, "lane": list, "review": dict, "profile": str}
         for k, v in launch.items():
             if v is not None and not isinstance(v, kinds[k]):
                 raise RpcError(f"a relaunch's {k} is a {kinds[k].__name__}, not {type(v).__name__} {rule}")
@@ -1805,8 +1810,11 @@ class HostAgent(
             params = self._read_launch(address)
         except RpcError:
             raise RpcError(f"{s.name} has no launch record, so there is nothing to relaunch {rule}") from None
+        if launch.get("profile") is not None and s.host == self.host:
+            await self._relaunch_profile(s, str(launch["profile"]), rule)
         for k in RELAUNCH_KEYS:
-            params.pop(k, None)
+            if k not in RELAUNCH_KEPT or launch.get(k) is not None:
+                params.pop(k, None)
         params.update({k: v for k, v in launch.items() if v is not None})
         made = params.get("prompt_from")
         # a node member's files are that host's, which rule 7 never reads here (as the replay)
@@ -1814,11 +1822,35 @@ class HostAgent(
         self._write_launch(address, s, params)
         s.brief, s.brief_changed = read, None
         self._brief_differs.pop(s.id, None)
-        s.relaunch = {"at": now_iso(), "lane": launch.get("lane"), "review": launch.get("review")}
+        s.relaunch = {
+            "at": now_iso(),
+            "lane": launch.get("lane"),
+            "review": launch.get("review"),
+            "profile": str(params.get("profile") or ""),
+        }
         self._save(s)
         await self._push_changes()
         log.info("%s relaunched by the person: its launch record replaced", address)
         return self._view(s)
+
+    async def _relaunch_profile(self, s: Session, profile: str, rule: str) -> None:
+        """A relaunch's `profile` names one the member's adapter runs (TD-619), as a create's launch
+        would find it: read through the adapter's `doctor_profiles`, since `profiles.yml` is not the
+        core's to read. Empty is the default profile; an adapter that reads no profiles checks nothing."""
+        fn = getattr(adapters.get(s.adapter), "doctor_profiles", None) if profile else None
+        if fn is None:
+            return
+        try:
+            rows = await asyncio.to_thread(fn)
+        except Exception as e:  # noqa: BLE001 — a profiles file that cannot be read refuses, in its words
+            raise RpcError(f"{s.name}'s profiles could not be read ({e}): nothing relaunched {rule}") from None
+        bad = next((r["error"] for r in rows if isinstance(r, dict) and r.get("error")), None)
+        if bad:
+            raise RpcError(f"{s.name}'s profiles could not be read ({bad}): nothing relaunched {rule}")
+        known = sorted({str(r.get("profile")) for r in rows if isinstance(r, dict) and r.get("profile")})
+        if profile not in known:
+            names = ", ".join(known) or "none"
+            raise RpcError(f"no profile {profile!r} in profiles.yml (known: {names}): nothing relaunched {rule}")
 
     async def _sit_out(self, s: Session, launch: Any, rule: str) -> dict[str, Any]:
         """`relaunch`'s sit-out form: refused, touching nothing, on a launch handed with it, an interactive

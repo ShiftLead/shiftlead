@@ -152,8 +152,11 @@ BRIEF_SETTLE = timedelta(minutes=10)
 BRIEF_CLAUSE = 'your brief changed — finish what you hold, then `ao progress restart --why "brief changed"`'
 # and its second trigger's (§4.9c *Switching*, TD-309 slice 5), to a member whose record carries `relaunch`
 FLOW_CLAUSE = 'your team\'s flow changed — finish what you hold, then `ao progress restart --why "flow changed"`'
-# What a relaunch replaces in a launch record (§4.9c): each as handed, an absent one removed; the rest stands
-RELAUNCH_KEYS = ("prompt", "prompt_from", "lane", "review")
+# What a relaunch replaces in a launch record (§4.9c): each as handed, an absent one removed; the rest stands.
+# `profile` (TD-619) is replaced as handed and **kept** when absent: a launch without one is the default
+# profile's, so a client that does not hand it yet must not move a member onto the default
+RELAUNCH_KEYS = ("prompt", "prompt_from", "lane", "review", "profile")
+RELAUNCH_KEPT = ("profile",)
 # A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
 # who did what, so it is allowed more than `doing`'s 200 characters.
 ROUND_LINE_CAP = 500
