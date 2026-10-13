@@ -59,6 +59,14 @@ const poll = async (build_chip) => {
     text: chip.appended.textContent } };
   const unlinked = await poll({ cls: "", title: "t", at: `${year}-12-31T23:59:00Z`, rest: "" });
   out.unlinked = { ...unlinked, href: chip.dataset.href, a: chip.appended };
+  // TD-611: the top bar's poll asks for the counts alone; the Inbox's pages (`full`) for the rows
+  out.urls = [];
+  global.fetch = async (u) => { out.urls.push(u); return { ok: true, json: async () => ({ needs: 0 }) }; };
+  await AO.refreshInboxCount();
+  await AO.refreshInboxCount(true);
+  document.visibilityState = "visible";
+  await AO.refreshInboxCount();
+  await AO.refreshInboxCount(true);
   console.log(JSON.stringify({ year, ...out }));
 })();
 """
@@ -112,3 +120,13 @@ def test_main_ahead_is_drawn_as_a_link_to_the_inbox_row_and_dropped_when_live_ca
     assert got["linked"]["a"] == {"href": "/inbox#promote-shiftlead", "text": "main +2"}
     assert got["unlinked"]["text"] == "live 12-31 18:59" and "href" not in got["unlinked"]
     assert "a" not in got["unlinked"]
+
+
+def test_the_top_bars_poll_asks_for_the_counts_alone_and_the_inbox_pages_for_the_rows():
+    """TD-611: every page but the Inbox reads `?counts=1`; a visible page still says it is watching."""
+    assert _probe()["urls"] == [
+        "/api/person/inbox?counts=1",
+        "/api/person/inbox",
+        "/api/person/inbox?counts=1&watching=1",
+        "/api/person/inbox?watching=1",
+    ]

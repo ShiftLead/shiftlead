@@ -431,6 +431,9 @@ def _run_reader(run: Any, argv: list[str], timeout: float) -> tuple[dict[str, An
 # -- app -------------------------------------------------------------------------------------------
 
 
+# design §4.5a Org top bar **Inbox** (TD-611): what `/api/person/inbox?counts=1` answers — the top
+# bar's numbers, the team headers' *answered for you* marks and the build chip, and nothing rendered
+INBOX_COUNTS = ("needs", "fyi_n", "overdue_n", "snoozed_n", "answered_marks", "build_chip", "agent_down")
 # design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
 # PR #282). What a one-press resume carries, and what it deliberately does not.
 RESUME_CARRIES = ("name", "dir", "adapter", "profile", "repo", "role", "team", "project", "lane", "controllers")
@@ -3034,7 +3037,12 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         (`person_states`): the Org's pushed stream is per-record and this page is per-person, so
         the simplest correct thing is one snapshot per poll — a row whose state changed in between
         is corrected by the next one, and a permission answered here leaves at once because the
-        press refreshes."""
+        press refreshes.
+
+        `?counts=1` is the top bar's read on every other page (TD-611): the same `inbox_sections`,
+        so the numbers are the page's, but nothing rendered and no entries sent — the full read is
+        megabytes of markup on the UI's one loop, which every Focus keystroke shares."""
+        counts = request.query_params.get("counts") == "1"
         try:
             fleet = await call("list")  # person_view's one list, kept for the board's *waiting on* (TD-305)
             watching = request.query_params.get("watching") == "1"  # the page is visible (§4.10, TD-319)
@@ -3089,6 +3097,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the top bar's **build** chip is drawn again on this poll (§4.5a, TD-539): a merge shows
         # within the readings' cadence without a reload
         got["build_chip"] = await chip_build(call)
+        if counts:
+            return {k: got[k] for k in INBOX_COUNTS}
         got["html"] = inbox_html(sections, page_origin(request))
         # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
         got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=page_origin(request))
