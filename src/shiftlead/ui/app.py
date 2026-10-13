@@ -287,6 +287,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
     FACETS,  # noqa: F401
+    HEADS_EVERY,  # noqa: F401
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
