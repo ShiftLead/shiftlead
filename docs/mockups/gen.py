@@ -1490,7 +1490,7 @@ def inbox_rows():
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
         # TD-304: a board `decide` item with its detail block (dev-cadence TD-084) — the fold is open because the row has answers to press
-        mcard(BAR["needs"], "board · decide", "samscrape", "", "due today · Sep 28",
+        mcard(BAR["needs"], "board · decide", "samscrape", "", '<span class="mono" style="font-size: 12px;" title="the line&#39;s id (TD-603): type it in chat or in ao board show; a click copies it">board:3f9a1c07</span> · due today · Sep 28',
               '<div class="txt"><b>Back up the notice_data share?</b></div>'
               + fold("details", open_=True, body=
                      '<ul style="margin: 0 0 0 18px; padding: 0;">'
@@ -1560,7 +1560,7 @@ def inbox(picks=False):
         kinds = [("questions", 1, False), ("steering", 2, False), ("session states", 3, False), ("board items", 3, False), ("ledger entries", 3, False), ("notes", 3, False), ("trail", 6, False)]
         b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
         later = ('<div class="isec-h" style="text-transform: none; letter-spacing: 0;"><span style="font-size: 10px;">▾</span><span>Not due yet</span><span class="n" style="background: transparent; color: #6b7280;">1</span><span class="muted" style="font-size: 12px; font-weight: 400;">not counted</span></div>'
-            + mcard("#cbd0d6", "board", "dev-cadence", "dc-grind", "due in 6 d · Oct 4",
+            + mcard("#cbd0d6", "board", "dev-cadence", "dc-grind", '<span class="mono" style="font-size: 12px;" title="the line&#39;s id (TD-603): type it in chat or in ao board show; a click copies it">board:b20e7d51</span> · due in 6 d · Oct 4',
                     '<div class="txt" style="color: #4b5563;">Decide whether the sweep reads worktrees of a repo that is not in the roster.</div>',
                     b("Reply") + b("Snooze ▾") + b("Done") + b("Open board", "ghost"))
             + '<div class="muted" style="padding: 2px 2px 8px; font-size: 12px;"><span style="font-size: 10px;">▸</span> not shown (14)</div><div class="muted" style="padding: 2px 2px 8px; font-size: 12px;">showing the next 10 board items per team · 14 not shown, the next due Oct 12 — <a href="#">show</a> · <a href="#">Settings</a></div>')

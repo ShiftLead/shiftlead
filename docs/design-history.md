@@ -154,6 +154,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-12 (TD-603, the designer; Paul, 2026-10-12: *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?*): *A board line's id* — every board line's id is the derived `board:<key>` the work orders use, stable across a tool's edits, never written; the write-back's RPCs take `key`. A written `UA-NNN` was weighed and refused: every writer would allocate from a counter none shares, and it is a new line shape. Built by TD-607.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *Board write-back* parses items through `ledgerboard.py`, its subjects ledgerboard's; the cross-repo resolver reads the home's own roster. Built by TD-585 and TD-590.
 - 2026-10-12 (TD-565 slice 2, grinder-ao-2): *Board write-back* names the person's answer to a ledger entry as an add on the second add's road (`ledger_decide`, `shiftlead: board decide TD-n (person)`), so the adds the board ever takes are three, not two.
 - 2026-10-12 (TD-560, the designer): *Repo facts* — a *for you* entry's reading carries `added`, `answers` and `detail` for the Inbox's row. Built by TD-565.
@@ -375,6 +376,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-603, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td603-board-line-id.png`): **board row: id** — `board:<key>` on every board row's head line, copied on a click, sent with every press. Built by TD-607.
 - 2026-10-12 (TD-599, the designer; Paul, 2026-10-12, through Add entry: *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`): **Inbox: *Answered for you*, Dismiss all** — the group is not redundant (each row is an answer given in the person's name that the person may Overrule; FYI holds none), so it stays apart and gains FYI's one-press clear of the rows on screen. Built by TD-602.
 - 2026-10-12 (TD-598, grinder-ao-2): TD-581 built — the promote row under `auto` drawn under FYI with the reading's `acts` word and **Promote now**, `id="promote-<repo>"` on the row, the build chip's *main +n* a link to it with the hover's *auto on · …* line; *The help text* gains **Promote now**'s paragraph.
 - 2026-10-12 (TD-581, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td581-promote-now.png`): **Inbox row: promote** under `auto: true` is an FYI row while main is ahead — *auto on · settles in m min* / *promotes at the next tick* — with **Promote now**; the **build** chip's *main +n* links to it and its hover says when the home will act. Was: nothing drawn under `auto` but a failure. Built by TD-598.
@@ -673,6 +675,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-12 (TD-603, the designer): `ao board show <board:key>`; `ao board edit --key`. Built by TD-607.
 - 2026-10-12 (TD-598, grinder-ao-2): `ao promote status` under `auto: true` prints when the home will act, in the Inbox row's words (*auto on · settles in 6 min*).
 - 2026-10-12 (TD-581, the designer): `ao promote` under `auto: true` promotes now, the settle and the wait skipped. Built by TD-598.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): `ao repo init` (an empty ledger), `ao board edit done|snooze` (a session's own line edit on its branch through ledgerboard's `edit_line()`), `ao doctor`'s **repos** check. Built by TD-587 and TD-591.
