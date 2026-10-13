@@ -57,6 +57,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
 | TD-617 | Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form) | High | Open |
 | TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
+| TD-619 | A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record | Medium | Open |
 
 ---
 
@@ -989,5 +990,24 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Related:** TD-613 (the design), #1573 (the case), TD-380 (decided lines as work orders), TD-611.
 
 ---
+
+## TD-619: A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, at Paul's report)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 *Keeping a team running* (the launch record, ~L83–94), §4.9 (roles, `profile`); `src/sessionorc/agent_tick.py` (`_write_launch`, `_read_launch`); `~/.shiftlead/launch/<address>.json`
+
+**Why:** Paul, 2026-10-12: *I have had to take control of techlead-ao-1 three times now to change it to use opus. Apparently it is defaulting back to fable on restarts?* At 16:12 that day `org.yml` moved `techlead` and `designer` from `grind-fable` to `grind`. A restart or seat fill hands `create` the launch record again and never re-reads a definition (§6, by design: the host agent does not read `org.yml`), so only a team start re-reads. The ao and samscrape techlead seats were refilled after the edit (20:04, 16:27) and each fill rewrote its record with `grind-fable`; cm-grind's techlead and the ao designer's records, written before the edit, still held it; dc-grind, started after the edit, got `grind`. Switching the model in the pane (`/model`) changes the running conversation only. The four records were repointed to `grind` by hand the same day (every record backed up first under `~/.shiftlead/backups/launch-2026-10-12-opus/`).
+
+**Fix:** design first. Choose one:
+1. **The team start's reading carries to the records.** `ao org check`, or the next tick after `org.yml` changes, names each launch record whose profile differs from its role's, and a new `ao team refresh <team>` (or the Settings page) rewrites the profile in place.
+2. **A replay takes the role's current profile.** The record keeps the role, and the profile is resolved at replay from the overlay the team start last handed (still no `org.yml` read in the host agent).
+3. At least, say so: a role change in `org.yml` prints *takes effect at the next team start; running members replay `<old>`*.
+
+Taking control and picking a model should not be the way. **Done when** a role's profile change reaches that role's next restart or fill without a team restart, or is refused/announced in words that say when it will.
 
 <!-- Entry template:
