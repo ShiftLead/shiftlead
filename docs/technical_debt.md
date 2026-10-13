@@ -55,6 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-608 | Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed* | Medium | Open |
 | TD-609 | §4.9 says the dev-cadence registry is where a repo is registered; TD-590 made ShiftLead's own roster that, with dev-cadence's imported | Low | Open |
 | TD-610 | The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two | Low | Open |
+| TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
 
 ---
 
@@ -913,6 +914,39 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** the primer's exception names both badges the mail gate reads, as invariant 9 does.
 
 **Related:** TD-582 (#1590), TD-601 (#1593), TD-606 (the same drift in §4.9 and §4.2a).
+
+---
+
+## TD-611: The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul; measured by two read-only agents on the live UI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (`refreshInboxCount` ~L1198 and the 20 s interval ~L1259 that runs it, or the Inbox's `refreshInboxPage`; Focus's `refreshMembership` ~L4370, called on a peer's event ~L4436); `src/shiftlead/ui/app.py` (`api_person_inbox` ~L3025–3105, `api_sessions` ~L2359, `events` ~L3381–3570); `src/shiftlead/ui/cards.py` (the `pr_marks` map ~L327); `src/shiftlead/ui/pty_bridge.py` (the queue ~L27, the pump ~L185)
+
+**Why:** Paul, 2026-10-12: the Focus terminal lags again, better after TD-572 (#1544) and slower by the day since. The pty bridge shares `shiftlead-ui`'s one asyncio loop with every handler, so any synchronous render holds every keystroke and output frame. Measured on the live UI (about an hour after a promote):
+- `shiftlead-ui` averages ~17% of a core. The journal shows ~540 `GET /api/person/inbox` and ~200 `GET /api/sessions` an hour, and almost nothing else.
+- `/api/person/inbox` is **2.74 MB** and costs ~0.5 s of loop CPU per call. Six concurrent calls all finish at ~2.7 s, so they serialise, and a static file went from 3 ms to 102 ms behind one. Every page polls it every 20 s (`refreshInboxCount`) only to read the top bar's counts. The handler renders every section's markup each time: *answered for you* 1.23 MB for 168 rows, *needs* 418 KB, horizon 175 KB, ledger 120 KB, and `entries` 673 KB besides. It grows with the retained person inbox (193 entries, 25–45 a day).
+- On Focus, every other-session event calls `refreshMembership`, which fetches the whole `/api/sessions`: **456 KB**, ~0.29 s, a `view()` of all 24 sessions plus `repo_facts`. That is ~200 an hour, in bursts of 6–14 a minute. 214 KB of it is `pr_marks`, a per-session map of every PR, which grows without bound.
+- The Org page's full `/events` stream runs `view()`, `compact_in` and `render_card` per delta, per connected client, inline, plus `fresh_heads` on every reshaping delta. Seven connections were open.
+- The pty bridge queues frames in an unbounded `asyncio.Queue` and sends one chunk per frame. Whenever the loop stalls, output arrives late and in a burst.
+
+Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
+
+**Fix:** in slices, each its own PR, the first alone taking the stall off Focus:
+1. **A counts-only read.** One function computes the top bar's numbers (`needs`, `fyi_n`, overdue, `answered_marks`, the build chip) without rendering anything. `/api/person/inbox?counts=1` serves it, and `refreshInboxCount` uses it on every page but the Inbox. `ao inbox --counts` prints the same numbers: no shell command counts the person inbox's sections today, and a session's `ao inbox --unread` marks what it reads.
+2. **The Inbox's own render off the loop.** Run it in `asyncio.to_thread`, or cache it keyed on the inbox's revision and the boards' reading. Add `GZipMiddleware`. Cap *answered for you* at the newest N, with a *show more*.
+3. **Focus membership without `/api/sessions`.** Read it from the `focus=` stream's fleet, or from a one-session endpoint. Trim the list view's `pr_marks` to the PRs drawn and drop `tail`.
+4. **The Org stream.** Compute heads and card renders once per delta and fan them out to the clients, or coalesce deltas to about one a second.
+5. **The bridge.** Bound the queue, and join every drained chunk into one send.
+- Tests: the counts read renders no template and equals the full read's counts; Focus issues no `/api/sessions` on a peer's delta; the bridge coalesces queued chunks.
+
+**Done when** a Focus tab sees no request above ~50 ms of loop time in steady state, `/api/person/inbox` is fetched only by the Inbox page, the UI's CPU falls well under today's ~17%, and the tests above pass. A re-measurement after the promote, journal counts and a static-file latency probe during a poll, is the live check.
+
+**Related:** TD-572 (archived: the light events stream for Focus), TD-599 / TD-602 (archived: *answered for you*'s Dismiss all; pressing it shrinks the largest section today), TD-131 (whole-file reads, a later scale).
 
 ---
 
