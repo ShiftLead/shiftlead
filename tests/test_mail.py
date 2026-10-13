@@ -699,10 +699,10 @@ async def test_every_person_inbox_write_pushes_inbox_with_a_higher_rev(agent, tm
     with it, and every write — mail landing, a person's dismiss — pushes `{event: "inbox", rev}` to
     every subscriber with a higher one, so the UI recounts once per change and polls nothing."""
 
-    async def next_inbox(sub):
-        while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5))).get("event") != "inbox":
-            pass
-        return ev["rev"]
+    async def pushed(sub, rev):  # the push that names `rev`, past any earlier one
+        while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5))).get("rev") != rev:
+            assert ev.get("event") != "inbox" or ev["rev"] < rev
+        assert ev["event"] == "inbox"
 
     async with LocalClient() as person, LocalClient() as sub:
         await sub.call("subscribe")
@@ -710,10 +710,13 @@ async def test_every_person_inbox_write_pushes_inbox_with_a_higher_rev(agent, tm
         rev0 = (await person.call("inbox"))["rev"]
         async with LocalClient(caller=w) as c:
             one = (await c.call("msg", to="person", text="one"))["entry"]["id"]
-        rev1 = await next_inbox(sub)
-        assert rev1 > rev0 and (await person.call("inbox"))["rev"] == rev1
+        rev1 = (await person.call("inbox"))["rev"]
+        assert rev1 > rev0
+        await pushed(sub, rev1)
         await person.call("inbox_dismiss", msg=one)
-        assert await next_inbox(sub) > rev1
+        rev2 = (await person.call("inbox"))["rev"]
+        assert rev2 > rev1
+        await pushed(sub, rev2)
         await person.call("kill", id=w)
 
 
