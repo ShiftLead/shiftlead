@@ -695,6 +695,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-13 (TD-616 slice 3, grinder-ao-2): `ao inbox --counts` built — the UI's readings (`Readings` in `ui/app.py`, lifted out of `create_app`) and its `counts_now`, run by `ao`, which imports the UI package for it and needs the `[ui]` extra. Was: the counting was closures of the UI's app, which `ao` could not run.
 - 2026-10-12 (TD-619, the designer): `ao team flow` prints a profile difference by member. Built by TD-620.
 - 2026-10-12 (TD-614, the designer): `ao board show` and `ao inbox --counts` read the host's readings, running no reader of their own. Built by TD-615, TD-616.
 - 2026-10-12 (TD-604, the designer): `ao repo` prints *completed this week: n*; `--json` carries `completed`. Built by TD-608.

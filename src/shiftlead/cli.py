@@ -2989,6 +2989,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
         return _thread(args)
     if args.sent:
         return _sent(args)
+    if args.counts:
+        return _counts(args)
     got = call_sync("inbox", unread=args.unread)
     # design §4.5a *Inbox row: orphaned question* (TD-216 slice 2): a person's read prints, beside an
     # orphaned entry, where an answer goes — the standing, from the leases the fleet carries
@@ -3045,6 +3047,32 @@ def cmd_inbox(args: argparse.Namespace) -> int:
     if args.unread and not got["entries"] and got["id"] != "person":
         end_the_turn_line(args)
     return rc
+
+
+def _counts(args: argparse.Namespace) -> int:
+    """`ao inbox --counts` (design §4.7, §4.4 *The Inbox's counts*, TD-616): the top bar's numbers from
+    the UI's own `counts_now` over the host agent's readings — one definition, so the two cannot
+    disagree. A person's read: it marks nothing, whoever runs it."""
+    try:
+        from shiftlead.ui import uiconf
+        from shiftlead.ui.app import Readings
+    except ImportError as e:  # the counting is the UI's: an install without the `[ui]` extra has none
+        return fail(args, f"ao inbox --counts needs the [ui] extra ({e})", 1)
+
+    async def count() -> dict[str, Any]:
+        rd = Readings()
+        with contextlib.suppress(Exception):  # the person's board horizon, as the page reads it first
+            uiconf.set_read(await rd.call("settings"))
+        return await rd.counts_now(False)
+
+    got = asyncio.run(count())
+    if got.get("agent_down"):
+        return fail(args, str(got.get("why") or "host agent unreachable"), 3)
+    line = (
+        f"needs you {got['needs']} · FYI {got['fyi_n']} · overdue {got['overdue_n']}"
+        f" · answered {len(got['answered_marks'])}"
+    )
+    return emit(args, got, lambda: print(line))
 
 
 def cmd_decide(args: argparse.Namespace) -> int:
@@ -3840,6 +3868,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--unread", action="store_true", help="only entries not yet read")
     p.add_argument("--sent", action="store_true", help="your own sent mail instead (design §4.9b)")
     p.add_argument("--thread", metavar="ID", help="a person's read of one entry's whole thread (design §4.7)")
+    p.add_argument(
+        "--counts", action="store_true", help="the top bar's numbers, as the UI counts them; marks nothing (TD-616)"
+    )
     p.set_defaults(fn=cmd_inbox)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
