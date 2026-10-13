@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Slice 1 of 2 merged — `profile` in `relaunch`; slice 2, the comparison and `ao team flow` |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
-| TD-624 | §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618) | Low | Open |
 | TD-625 | The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+* | Low | Open |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Open — design first |
 
@@ -874,7 +873,7 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Why:** TD-613: on 2026-10-12 dev-cadence's sync PR #1573 went red, its author idle in another repo and the anchor closed, and nothing noticed until Paul asked hours later; the PR reading had no checks to see it by.
 
 **Fix:**
-1. The reading: the open read's `--json` gains `statusCheckRollup,mergeStateStatus`; each open PR keeps `checks` (red if any check concluded `FAILURE`, `CANCELLED`, `TIMED_OUT` or `ACTION_REQUIRED`; pending if any is not completed; green if all passed; none with no checks), `conflicting` (`DIRTY`), and `red_since`, the first reading's time it was red or conflicting, kept by number while it stays so.
+1. The reading: the open read's `--json` gains `statusCheckRollup,mergeStateStatus`; each open PR keeps `checks` (red if any check concluded `FAILURE`, `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED` or `STARTUP_FAILURE`, or a commit status reads `FAILURE` or `ERROR`; pending if any is not completed; green if all passed; none with no checks), `conflicting` (`DIRTY`), and `red_since`, the first reading's time it was red or conflicting, kept by number while it stays so.
 2. Holding: a live record (not `exited`/`closed`, no `out_of_work`) with a `progress` entry whose `ref` is `pr:<n>` or whose `pr` is `n` (claimed or done), or whose `git.branch` is the PR's `headRefName` — a tick-side match, new code. The free-pick condition (no servicing team with an anchor seat) needs the team context `lane_matches` lacks: resolve it where `teamrun.repo_lanes` knows the teams.
 3. The nudge: a held PR red for `ORPHAN_AFTER` (3600 s) whose holder is `idle` gets one `system` note, *PR #<n> has been red since <t>: <checks> — fix it or say why*, once per red spell, spending no wake budget; a second `ORPHAN_AFTER` later with the holder still idle and the PR still red, the holder no longer counts.
 4. The order: an unheld PR red or conflicting for `ORPHAN_AFTER` is `pr:<n>` in the repo reading's work orders — title, High, *pickable*, `Context` its URL and failing checks — matched by the `anchor` lane, and by `free-pick` lanes of servicing teams with no anchor seat; `ao progress claim pr:<n>` works as `board:<key>` does; green or closed, it drops out.
@@ -991,30 +990,6 @@ with the retired brief).
 
 ---
 
-## TD-624: §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1619–#1628)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/design/4.4-host-agent.md` *Repo facts* (the `checks` sentence, ~L35) and *A red PR nobody holds is a work order* (*A live record holds it*, ~L421); `src/sessionorc/reports.py` `RED_CONCLUSIONS` and `RED_STATES`; `src/sessionorc/workorders.py` `holds_pr`
-
-**Why:** the design says what the code does not stop at, in two places, and #1620's body names the first as "left for a design touch" without a ledger line.
-- *Red.* §4.4 *Repo facts*: `checks` is "*red* when any check concluded failed, cancelled or timed out". `reports.py` has `RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})` and `RED_STATES = frozenset({"FAILURE", "ERROR"})` for a commit status's words; `fold_checks`' docstring repeats the design's three, and TD-618's *Fix* step 1 names four (`ACTION_REQUIRED`, no `STARTUP_FAILURE`). So a PR whose check needs an approval, or whose runner never started, becomes a `pr:<n>` order after `ORPHAN_AFTER`, which no line of the design says.
-- *Holds.* §4.4: a live record holds a PR "when it is not `exited` or `closed`, carries no `out_of_work`, and either…". `holds_pr` (#1620) also returns False for `record.superseded_by`. A superseded session's claim on a red PR therefore does not keep it off the list, which the design does not state.
-
-Both are behaviours the PR built and the design left unwritten; neither is a bug as far as the code goes, the design is the side that is short. (`probe`: `grep -n "ACTION_REQUIRED\|STARTUP_FAILURE\|superseded" docs/design/4.4-host-agent.md` has no hit in the PR-reading paragraphs.)
-
-**Fix:** in the same two places, say it in the present tense: *red* also on `ACTION_REQUIRED` and `STARTUP_FAILURE` and a commit status's `FAILURE`/`ERROR` (and correct `fold_checks`' docstring and TD-618's step 1 to match), and a superseded record holds nothing; one dated line in `docs/design-history.md` under §4.4 naming TD-618 slices 1–2 (#1617, #1620). Run the doc-bound tests before pushing.
-
-**Done when** §4.4's two sentences name what `RED_CONCLUSIONS`, `RED_STATES` and `holds_pr` test, and the history carries the line.
-
-**Related:** TD-618 (the build), TD-613 (the design), #1617, #1620.
-
----
-
 ## TD-625: The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+*
 
 **Priority:** Low
@@ -1081,9 +1056,3 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Related:** TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
 
 ---
-
-<!-- Entry template:
-
----
-
-<!-- Entry template:

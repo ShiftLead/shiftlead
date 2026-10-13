@@ -277,8 +277,9 @@ RED_STATES = frozenset({"FAILURE", "ERROR"})  # a commit status's (`StatusContex
 
 def fold_checks(rollup: Any) -> tuple[str, list[str]]:
     """An open PR's `statusCheckRollup` folded into one word and the failing checks' names (design
-    §4.4 *Repo facts*, TD-613): *red* when any check concluded failed, cancelled or timed out,
-    *pending* while any runs, *green* when all passed, *none* with no checks. Red outranks pending:
+    §4.4 *Repo facts*, TD-613): *red* when any check run concluded one of `RED_CONCLUSIONS` (failed,
+    cancelled, timed out, waiting on an approval, never started) or a commit status reads one of
+    `RED_STATES`, *pending* while any runs, *green* when all passed, *none* with no checks. Red outranks pending:
     one failed check is red however many still run."""
     if not isinstance(rollup, list) or not rollup:
         return "none", []

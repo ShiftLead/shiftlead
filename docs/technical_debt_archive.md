@@ -10799,3 +10799,29 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Related:** `docs/glossary.md`; ADR `docs/decisions/2026-09-13-org-teams-projects.md` (the Org/Team/Project/Role vocabulary this extends); design §4.8 (role presets, grants, *Orc-of-orcs is not a special case*), §4.9 (team definitions), §6 (policies), §9 invariants 1, 9 and 11.
 
 **Resolved:** 2026-10-09 (an anchor-side session, at Paul's request; landed 2026-10-12 by the anchor, PR #1388) — what was left, `docs/briefs/guardians-orchestrator.md`, was retired unlaunched to `docs/briefs/archive/`; guardians' team is stood up from guardians-devenv (`docs/briefs/team-setup.md`, its TD-028) in the manager / techlead / member shape, so no old word remains to rename.
+
+---
+
+## TD-624: §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1619–#1628)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done 2026-10-13 (grinder-ao-1) — both sentences of §4.4 say what the code tests, `fold_checks`' docstring and TD-618's step 1 match, the history carries the line. Was: Open.
+**Location:** `docs/design/4.4-host-agent.md` *Repo facts* (the `checks` sentence, ~L35) and *A red PR nobody holds is a work order* (*A live record holds it*, ~L421); `src/sessionorc/reports.py` `RED_CONCLUSIONS` and `RED_STATES`; `src/sessionorc/workorders.py` `holds_pr`
+
+**Why:** the design says what the code does not stop at, in two places, and #1620's body names the first as "left for a design touch" without a ledger line.
+- *Red.* §4.4 *Repo facts*: `checks` is "*red* when any check concluded failed, cancelled or timed out". `reports.py` has `RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})` and `RED_STATES = frozenset({"FAILURE", "ERROR"})` for a commit status's words; `fold_checks`' docstring repeats the design's three, and TD-618's *Fix* step 1 names four (`ACTION_REQUIRED`, no `STARTUP_FAILURE`). So a PR whose check needs an approval, or whose runner never started, becomes a `pr:<n>` order after `ORPHAN_AFTER`, which no line of the design says.
+- *Holds.* §4.4: a live record holds a PR "when it is not `exited` or `closed`, carries no `out_of_work`, and either…". `holds_pr` (#1620) also returns False for `record.superseded_by`. A superseded session's claim on a red PR therefore does not keep it off the list, which the design does not state.
+
+Both are behaviours the PR built and the design left unwritten; neither is a bug as far as the code goes, the design is the side that is short. (`probe`: `grep -n "ACTION_REQUIRED\|STARTUP_FAILURE\|superseded" docs/design/4.4-host-agent.md` has no hit in the PR-reading paragraphs.)
+
+**Fix:** in the same two places, say it in the present tense: *red* also on `ACTION_REQUIRED` and `STARTUP_FAILURE` and a commit status's `FAILURE`/`ERROR` (and correct `fold_checks`' docstring and TD-618's step 1 to match), and a superseded record holds nothing; one dated line in `docs/design-history.md` under §4.4 naming TD-618 slices 1–2 (#1617, #1620). Run the doc-bound tests before pushing.
+
+**Done when** §4.4's two sentences name what `RED_CONCLUSIONS`, `RED_STATES` and `holds_pr` test, and the history carries the line.
+
+**Related:** TD-618 (the build), TD-613 (the design), #1617, #1620.
+
+**Resolved:** 2026-10-13 (PR #1634) — §4.4 *Repo facts* names `checks`' red as a check run's `FAILURE`, `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED` or `STARTUP_FAILURE` or a commit status's `FAILURE`/`ERROR` (`reports.RED_CONCLUSIONS`, `RED_STATES`); *A live record holds it* says a superseded record holds nothing (`workorders.holds_pr`). `fold_checks`' docstring and TD-618's Fix step 1 say the same. The dated line is under §4.4 of `docs/design-history.md`. On the way: the ledger's tail carried two unclosed `<!-- Entry template:` fragments left by rebase resolutions (the template itself sits under the summary table); removed.
