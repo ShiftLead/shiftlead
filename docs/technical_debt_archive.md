@@ -10713,3 +10713,25 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Related:** TD-603 (the design), TD-380 (decided lines as work orders, the key's first use), TD-587 (`ao board edit`), TD-584 / TD-585 (ledgerboard's `item_key`).
 
 **Resolved:** 2026-10-12 (PR #1606) — `workorders.ref` is every board line's id, and `workorders.show` finds a line by it on origin's board after a fetch, else the checkout's, open or closed, with the reader's detail block. `board._find` tries the open line whose id it is first, then the line and its text. A press that names only an id is found by it, and edits the line as it is now. An id no open line holds is refused as *no line board:<key> on the board — reworded or closed*. `board_edit` and `board_reply` take `key`; the page sends it with every press on a board row and draws it on the row (`.boardkey`, a click copies it). `ao board show` and `ao repo`'s due lines print it. `ao board edit --key` waits for TD-587's verb, written on its Fix. No help-list paragraph: the row's `title` is §4.5a's words. Held by `tests/test_board.py`, `tests/test_workorders.py`, `tests/test_ui_board.py`; the scratch-home look is the PR's UI check.
+
+---
+
+## TD-621: The Inbox read's off-the-loop build and gzip (TD-611 slice 2, #1619) is in no design section and no history line
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1610–#1619)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done 2026-10-12 (grinder-ao-1) — the sentence is in §4.4 *The Inbox's counts*, the dated line under §4.4 of the history. Was: Open.
+**Location:** `src/shiftlead/ui/app.py` `api_person_inbox` (`read()` run by `asyncio.to_thread`; `Content-Encoding: gzip`, `Vary: Accept-Encoding`); read against `docs/design/4.4-host-agent.md` (the *Inbox's counts* reading, ~L462–476), `docs/design/4.5-ui.md` and `docs/design-history.md` under §4.4 / §4.5a *Org top bar | Inbox*
+
+**Why:** #1619 changed what `/api/person/inbox` does and touched no design file and no history line: its diff is `app.py`, one test, a mockup PNG and the ledger. The sections, markup and JSON are now built on a worker thread, and the body is gzipped there for a browser whose `Accept-Encoding` takes it, with `Vary: Accept-Encoding` always set; `test_the_inbox_read_is_built_off_the_loop_and_gzipped` asserts both. The design says neither: `grep -rniE "gzip|to_thread|off the loop" docs/design/ docs/design-history.md` finds nothing about the Inbox read (its only hits are §4.4a's nightly backup and the history line about it). The two neighbouring slices did write theirs: slice 1 has history line 388 and §4.5a, slice 5 has a line at `design-history.md` 665 and §4.6's *pty bridge implementation*. CLAUDE.md's rule is the design first, in the same PR, and the dated fact in the history. The only record of slice 2 is the ledger entry TD-611's *Status*.
+
+**Fix:** one present-tense sentence where the Inbox read is described (§4.4 *The Inbox's counts*, or §4.5 screen 6) — the read's body is built off the UI's one loop and gzipped for a browser that takes it, per endpoint, not as middleware — and one dated line in `docs/design-history.md` under the same section naming TD-611 slice 2 and #1619, with why (the build was half a second of the loop per full read, shared with every Focus keystroke).
+
+**Done when** the design says where the Inbox read is built and that it is compressed, and the history carries the dated line.
+
+**Related:** TD-611 (the slice), TD-614 (the design that moves the counts to the stream), TD-616 (builds the counts' owner).
+
+**Resolved:** 2026-10-12 (PR #NNNN) — §4.4 *The Inbox's counts* says the full read is built on a worker thread, off the UI's one loop, and gzipped there for a browser that takes it, with `Vary: Accept-Encoding` on every answer, the counts read the same, per endpoint and never a middleware; `docs/design-history.md` §4.4 carries the dated line naming TD-611 slice 2 and #1619 with why. Checked against `src/shiftlead/ui/app.py` `api_person_inbox`, `gzip_ok`, `json_body`, `json_answer`.
