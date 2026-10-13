@@ -533,6 +533,39 @@ def test_the_counts_read_is_the_full_reads_numbers_and_renders_nothing(client, t
 
 
 @pytest.mark.integration
+def test_the_inbox_read_is_built_off_the_loop_and_gzipped(client, tmp_path, monkeypatch):
+    """TD-611 slice 2: the sections, the markup and the JSON of `/api/person/inbox` are built on a
+    worker thread, never on the UI's one loop the Focus terminal shares, and the body is gzipped
+    there for a browser that takes it — a counts read as much as a full one."""
+    import asyncio
+
+    from shiftlead.ui import app as appmod
+
+    sender = sender_session(client, tmp_path)
+    send(sender, text="merge PR 9?", kind="ask")
+    on_loop = []
+    real = appmod.inbox_sections
+
+    def spy(*a, **k):
+        try:
+            asyncio.get_running_loop()
+            on_loop.append(True)
+        except RuntimeError:
+            on_loop.append(False)
+        return real(*a, **k)
+
+    monkeypatch.setattr(appmod, "inbox_sections", spy)
+    for url in ("/api/person/inbox", "/api/person/inbox?counts=1"):
+        got = client.get(url, headers={"Accept-Encoding": "gzip"})
+        assert got.headers["content-encoding"] == "gzip" and got.json()["needs"] == 1
+        plain = client.get(url, headers={"Accept-Encoding": "identity"})
+        assert "content-encoding" not in plain.headers and plain.json()["needs"] == 1
+        assert got.headers["vary"] == plain.headers["vary"] == "Accept-Encoding"
+        assert "content-encoding" not in client.get(url, headers={"Accept-Encoding": "gzip;q=0, br"}).headers
+    assert on_loop == [False] * 6
+
+
+@pytest.mark.integration
 def test_snooze_hides_and_uncounts_an_entry_and_now_brings_it_back(client, tmp_path):
     """§4.10 *Snooze*: `/api/person/snooze` is `inbox_snooze` caller-less; the entry leaves its
     section and the count until its time, is listed under *snoozed*, and no `until` — the snoozed
