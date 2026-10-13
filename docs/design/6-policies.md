@@ -88,7 +88,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   prompt as handed (placeholders filled) and the files and texts it was made from (`prompt_from`,
   rule 7), the lane and the fields above — and a restart is that record handed to `create` again,
   its prompt filled afresh from `prompt_from`, never the definition re-read (the host agent does not
-  read `org.yml`, §4.9). The launch record is deleted with the record on Forget and kept across a
+  read `org.yml`, §4.9). **So a definition's later edit reaches a launch record only by a person's
+  Apply** (§4.9c *Switching*): a role's `profile:`, lane, reader or stage brief changed in `org.yml`
+  shows on the team's card as *definition changed — Apply*, and Apply rewrites the record by the
+  `relaunch` RPC; until then a replay is the record as the last start or Apply wrote it (TD-619). The launch record is deleted with the record on Forget and kept across a
   supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
   live session — is not retried silently: it counts toward the ceiling as any restart does, keeping
   its `why` and carrying the error text as `error` on the entry, so an unrepairable record reaches
@@ -524,7 +527,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      of `base` (lower-case letters alone between `{` and `}`) the record's `slots` do not name is
      filled from the file beside `base` named `<base's stem>.<slot>.md` where there is one, else
      `none`, so a template that gains a slot never replays it literally (§4.9c item 5). A record
-     carrying **`relaunch: {at, lane, review}`** (§4.9c *Switching*) is restarted under this rule's
+     carrying **`relaunch: {at, lane, review, profile}`** (§4.9c *Switching*) is restarted under this rule's
      conditions as one carrying `brief_changed` is, save that a declaration of `out_of_work` does
      not hold it back. The host agent knows a file and a slot and no role, template or team, and
      never reads a definition. A file inside a checkout is read **as merged** —
