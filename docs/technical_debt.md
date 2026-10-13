@@ -56,6 +56,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-603 | Board lines have no identifier: the person quotes a line's text to refer to it in chat, a reply or a session | Medium | Open |
 | TD-604 | Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work | Medium | Open |
 | TD-605 | TD-602's Location names `help.py` for the *Answered for you* group's help words, which live in `inbox.html`'s `info` dict | Low | Open |
+| TD-606 | §4.9 and §4.2a say nothing keys on the `project` badge; §4.10 (TD-582) now keys the mail gate on it | Low | Open |
 
 ---
 
@@ -941,6 +942,26 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** TD-602's Location names the file that holds the group's help words.
 
 **Related:** TD-602, TD-599.
+
+---
+
+## TD-606: §4.9 and §4.2a say nothing keys on the `project` badge; §4.10 (TD-582) now keys the mail gate on it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1580–#1591)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.9-org-team-project.md` L205–206 and L301; `docs/design/4.2a-profiles.md` L73; `docs/design/4.10-messages.md` *across teams, by project*; `docs/design/9-invariants.md` invariant 9
+
+**Why:** #1590 designed the mail gate's cross-team edge on the `project` badge and reworded invariant 9 to *its cross-team edge one carrying the same `project` badge … It gates mail only; nothing that acts keys on `team` or `project`*. Two sections still carry the old absolute: §4.9 *`team` and `project` are badges, like `role` — nothing keys on them (§9 invariant 9)*, and §4.2a *nothing keys on a team or a project (§9 invariant 9)*. Each cites the invariant for a sentence the invariant no longer says, so a reader of §4.9 learns the badge gates nothing while §4.10 says it opens the mail gate between teams. (`team` was already such an exception under TD-134's edge; the sentence was loose before and #1590 extends it to a second badge.)
+
+**Fix:** reword both sentences to the invariant's: a badge, and nothing that acts keys on it — the mail gate reads `team` and `project` (§4.10). No behaviour change, no history line (a wording of the same fact).
+
+**Done when** §4.9 and §4.2a say what invariant 9 says, and `grep -rn "nothing keys on" docs/design/` names no badge the mail gate reads without the exception.
+
+**Related:** TD-582 (#1590), TD-601 (builds the edge).
 
 ---
 
