@@ -162,6 +162,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     with_lines,  # noqa: F401
 )
 from .counts import CountsKeeper
+from .fanout import FAILED, Fanout, Stream
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
@@ -286,7 +287,6 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
     FACETS,  # noqa: F401
-    HEADS_EVERY,
     HOLDERS_WIDTH,  # noqa: F401
     KIND_BARS,  # noqa: F401
     LEDGER_VIEWS,  # noqa: F401
@@ -3381,49 +3381,143 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     # -- live state ------------------------------------------------------------------------------
 
+    # -- the events stream: one subscriber, fanned out (§4.4 *Per-session views*, TD-617) ----------
+
+    async def fan_seed() -> SimpleNamespace:
+        # A delta carries one record, but membership is read across records (design §4.8): a card's
+        # *under* chip names its controllers, which live on other records. So the run keeps the
+        # fleet it has already been told about — seeded once, then updated by the very deltas it is
+        # rendering — rather than re-listing per event.
+        known: dict[str, dict[str, Any]] = {}
+        with contextlib.suppress(Exception):
+            known = {o["id"]: o for o in await call("list")}
+        # the repo facts and the doing log (TD-176): seeded once, then kept by their own events, so
+        # a session delta redraws the summaries without asking the agent again
+        repos, doing = await repo_facts()
+        acct_of: dict[str, str] = {}  # profile → the account chip it is drawn on (TD-122)
+        with contextlib.suppress(Exception):
+            for name, acc in usage_accounts(await call("usage")).items():
+                for p in acc["profiles"]:
+                    acct_of[p["name"]] = name
+        return SimpleNamespace(known=known, repos=repos, doing=doing, acct_of=acct_of)
+
+    async def fan_regroup(st: SimpleNamespace) -> dict[str, Any]:
+        return await heads(st.known, st.repos, st.doing)
+
+    async def card_delta(s: dict[str, Any], st: SimpleNamespace) -> dict[str, Any]:
+        """One record's delta as every stream takes it — its view, compact form and rank — computed
+        once however many pages are connected (TD-617); the full streams add its card."""
+        v = view(
+            s,
+            list(st.known.values()),
+            icons=await role_icons([s]),
+            seats=await seats_of([s]),
+            repos=st.repos,
+            waits=await h.person_waits(),
+        )
+        compact_in(v, st.known.values(), st.repos)
+        # the view's rank: unseen idle sorts above idle
+        return {"event": "session", "id": s["id"], "state": s["state"], "rank": v["rank"], "session": v}
+
+    async def fan_step(run: Any, ev: dict[str, Any]) -> None:
+        st = run.state
+        known, repos, doing, acct_of = st.known, st.repos, st.doing, st.acct_of
+        if ev.get("event") == "session":
+            s = ev["session"]
+            was = known.get(s["id"]) or {}
+            known[s["id"]] = s
+            reshaped = not was or any(s.get(k) != was.get(k) for k in SHAPE_KEYS)
+            stirred = reshaped or any(s.get(k) != was.get(k) for k in LIGHT_KEYS)
+            moved = s.get("run_until") != was.get("run_until")
+            if s.get("team") and moved and s.get("run_until") != uiconf.team_until(str(s["team"])):
+                # a team's stop time stamps its members while the Save that moved it is still in
+                # flight: read the settings again, or the compact line compares the new stamp with
+                # the old time and says it differs (TD-337)
+                with contextlib.suppress(Exception):
+                    uiconf.set_read(await call("settings"))
+            # a light stream (the Focus and Inbox pages) hears that another record moved, not what it
+            # now looks like: they re-read what they draw (TD-572)
+            if stirred:
+                run.to_all(run.light(other=s["id"]), {"event": "session", "id": s["id"], "state": s["state"]})
+            focused = run.light(focus=s["id"])
+            if not focused and not run.full:
+                return
+            delta = await card_delta(s, st)
+            run.to_all(focused, delta)
+            # `groups` ride on a delta that can move them (design §4.5a **team groups**): a badge or a
+            # `controllers` change on one record can move a card, change a lead, or turn grouping on
+            # or off for the whole page, and only the server sees the fleet. Any other delta marks
+            # them for the flush. A reshaping delta carries them even when a flush already sent this
+            # reading: a new card is placed by its own delta's groups.
+            if run.full:
+                delta["html"] = render_card(delta["session"])
+                await run.to_full(delta, always=reshaped)
+        elif ev.get("event") in ("repos", "doing"):
+            # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team member said
+            # what it is doing (§4.8 *the doing log*): kept here, passed through as the agent sent it
+            # (`repo: null` for a checkout the registry dropped), and the groups marked for the flush,
+            # so the team cards' summaries redraw (TD-176 slice 3).
+            if ev["event"] == "repos":
+                if ev.get("repo") is None:
+                    repos.pop(str(ev.get("root")), None)
+                else:
+                    repos[str(ev.get("root"))] = ev["repo"]
+            elif isinstance(ev.get("entry"), dict):
+                ring = doing.setdefault(str(ev.get("team")), [])
+                ring.append(ev["entry"])
+                del ring[:-DOING_KEPT]
+            run.to_all(run.streams, ev)
+            if run.full:
+                run.dirty.set()
+        elif ev.get("event") == "gone":
+            # only a `gone` names a session; a `usage` event carries a profile, and popping on it
+            # would one day evict a live session by coincidence
+            went = str(ev.get("id") or "")
+            known.pop(went, None)
+            run.to_all(run.light(), ev)
+            if not run.full:
+                return
+            await run.to_full(ev, always=True)
+            # A card's *under* chip names another record, so the session that went is not the only
+            # card now out of date: every card listing it as a controller has to be redrawn, or it
+            # keeps naming and linking to a session that is gone until the page is reloaded (review
+            # 2026-09-13).
+            for other in list(known.values()):
+                if went in (other.get("controllers") or []):
+                    od = await card_delta(other, st)
+                    od["html"] = render_card(od["session"])
+                    run.to_all(run.full, od)
+        elif ev.get("event") == "usage":
+            # The agent pushes a profile's reading; the page draws **one chip per account** (§4.5a
+            # **usage**, TD-122), with the lowest line among the account's profiles and each profile's
+            # sessions on hover — so the account is regrouped here from the whole reading, the gate's
+            # lines and the fleet this run already keeps. A profile that went (`usage: null`) redraws
+            # the account it was on, or takes its chip off.
+            prof = str(ev.get("profile"))
+            was_on = acct_of.pop(prof, prof)
+            readings: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                readings = await call("usage")
+            with contextlib.suppress(Exception):
+                readings = with_lines(readings, await call("gate"))
+            grouped = usage_accounts(readings, list(known.values()))
+            for name, acc in grouped.items():
+                for p in acc["profiles"]:
+                    acct_of[p["name"]] = name
+            now_on = acct_of.get(prof)
+            for name in {was_on, now_on} - {None}:
+                run.to_all(run.streams, {"event": "usage", "account": name, "usage": grouped.get(name)})
+
+    fan = Fanout(lambda: LocalClient(), fan_seed, fan_step, fan_regroup)
+
     @app.websocket("/events")
     async def events(ws: WebSocket):
         await ws.accept()
         # `?light=1` is the Focus and Inbox pages' stream: no card markup and no groups, another
         # record's delta only when it can move something (`SHAPE_KEYS`), and `focus`'s own in full —
-        # one Focus tab was otherwise as costly to the UI as an Org page (TD-572)
-        light = ws.query_params.get("light") == "1"
-        focus = ws.query_params.get("focus") or ""
-        # The groups are the costly part of a delta — every header and the rollup, read over the
-        # whole fleet — so they ride on a delta only when it can move them (`SHAPE_KEYS`), and are
-        # otherwise re-read at most every `HEADS_EVERY` seconds by `flush`; a reading equal to the
-        # last one sent is not sent again (TD-572).
-        # One reading at a time, sent before the next is read (`sending`): a flush's reading is never
-        # sent after a newer delta's, and `dirty` is cleared before the read, so a delta that lands
-        # during it marks the next one.
-        last: dict[str, Any] = {"key": None, "at": 0.0}
-        dirty = asyncio.Event()
-        sending = asyncio.Lock()
-
-        async def fresh_heads(known, repos, doing, *, always: bool = False) -> dict[str, Any]:
-            dirty.clear()
-            last["at"] = time.monotonic()
-            got = await heads(known, repos, doing)
-            key = json.dumps(got, sort_keys=True)
-            if key == last["key"] and not always:
-                return {}
-            last["key"] = key
-            return got
-
-        async def flush(known, repos, doing) -> None:
-            while True:
-                await dirty.wait()
-                await asyncio.sleep(max(0.0, last["at"] + HEADS_EVERY - time.monotonic()))
-                async with sending:
-                    if not dirty.is_set():
-                        continue
-                    try:
-                        got = await fresh_heads(known, repos, doing)
-                    except Exception:  # noqa: BLE001 — an agent that could not answer: try again next time
-                        dirty.set()
-                        continue
-                    if got:
-                        await ws.send_text(json.dumps({"event": "groups", **got}))
+        # one Focus tab was otherwise as costly to the UI as an Org page (TD-572). Every stream is fed
+        # by the one subscriber (`fan`), which computes each delta once (TD-617).
+        st = Stream(ws, light=ws.query_params.get("light") == "1", focus=ws.query_params.get("focus") or "")
 
         async def gone() -> None:
             # The page sends one thing on this socket — whether its document is visible, for the
@@ -3437,180 +3531,27 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     if isinstance(said, dict) and isinstance(said.get("visible"), bool):
                         h.counts.visible(ws, said["visible"])
 
-        async def stream(c: LocalClient) -> None:
-            # A delta carries one record, but membership is read across records (design §4.8):
-            # a card's *under* chip names its controllers, which live on other records. So the
-            # loop keeps the fleet it has already been told about — seeded once, then updated
-            # by the very deltas it is rendering — rather than re-listing per event.
-            known: dict[str, dict[str, Any]] = {}
-            with contextlib.suppress(Exception):
-                known = {o["id"]: o for o in await call("list")}
-            # the repo facts and the doing log (TD-176): seeded once, then kept by their own events,
-            # so a session delta redraws the summaries without asking the agent again
-            repos, doing = await repo_facts()
-            acct_of: dict[str, str] = {}  # profile → the account chip it is drawn on (TD-122)
-            with contextlib.suppress(Exception):
-                for name, acc in usage_accounts(await call("usage")).items():
-                    for p in acc["profiles"]:
-                        acct_of[p["name"]] = name
-            flusher = None if light else asyncio.ensure_future(flush(known, repos, doing))
-            try:
-                await follow(c, known, repos, doing, acct_of)
-            finally:
-                if flusher:
-                    flusher.cancel()
-                    await asyncio.gather(flusher, return_exceptions=True)
-
-        async def follow(c, known, repos, doing, acct_of) -> None:
-            async for ev in c.subscribe():
-                if ev.get("event") == "session":
-                    s = ev["session"]
-                    was = known.get(s["id"]) or {}
-                    known[s["id"]] = s
-                    reshaped = not was or any(s.get(k) != was.get(k) for k in SHAPE_KEYS)
-                    stirred = reshaped or any(s.get(k) != was.get(k) for k in LIGHT_KEYS)
-                    moved = s.get("run_until") != was.get("run_until")
-                    if s.get("team") and moved and s.get("run_until") != uiconf.team_until(str(s["team"])):
-                        # a team's stop time stamps its members while the Save that moved it is still
-                        # in flight: read the settings again, or the compact line compares the new
-                        # stamp with the old time and says it differs (TD-337)
-                        with contextlib.suppress(Exception):
-                            uiconf.set_read(await call("settings"))
-                    if light and s["id"] != focus:
-                        # a light stream (the Focus and Inbox pages) hears that another record moved,
-                        # not what it now looks like: they re-read what they draw (TD-572)
-                        if stirred:
-                            await ws.send_text(json.dumps({"event": "session", "id": s["id"], "state": s["state"]}))
-                        continue
-                    v = view(
-                        s,
-                        list(known.values()),
-                        icons=await role_icons([s]),
-                        seats=await seats_of([s]),
-                        repos=repos,
-                        waits=await h.person_waits(),
-                    )
-                    compact_in(v, known.values(), repos)
-                    delta = {
-                        "event": "session",
-                        "id": s["id"],
-                        "state": s["state"],
-                        "rank": v["rank"],  # the view's: unseen idle sorts above idle
-                        "session": v,
-                    }
-                    if light:
-                        await ws.send_text(json.dumps(delta))
-                        continue
-                    # `groups` rides on a delta that can move them (design §4.5a **team groups**): a
-                    # badge or a `controllers` change on one record can move a card, change a lead, or
-                    # turn grouping on or off for the whole page, and only the server sees the fleet.
-                    # Any other delta marks them for `flush`. A reshaping delta carries them even when
-                    # a flush already sent this reading: a new card is placed by its own delta's groups.
-                    delta["html"] = render_card(v)
-                    if reshaped or last["key"] is None:
-                        async with sending:
-                            delta.update(await fresh_heads(known, repos, doing, always=True))
-                            await ws.send_text(json.dumps(delta))
-                    else:
-                        dirty.set()
-                        await ws.send_text(json.dumps(delta))
-                elif ev.get("event") in ("repos", "doing"):
-                    # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team
-                    # member said what it is doing (§4.8 *the doing log*): kept here, passed through
-                    # as the agent sent it (`repo: null` for a checkout the registry dropped), and
-                    # the groups re-sent, so the team cards' summaries redraw (TD-176 slice 3).
-                    if ev["event"] == "repos":
-                        if ev.get("repo") is None:
-                            repos.pop(str(ev.get("root")), None)
-                        else:
-                            repos[str(ev.get("root"))] = ev["repo"]
-                    elif isinstance(ev.get("entry"), dict):
-                        ring = doing.setdefault(str(ev.get("team")), [])
-                        ring.append(ev["entry"])
-                        del ring[:-DOING_KEPT]
-                    await ws.send_text(json.dumps(ev))
-                    if not light:
-                        dirty.set()
-                elif ev.get("event") in ("gone", "usage"):
-                    if ev.get("event") == "gone":
-                        # only a `gone` names a session; a `usage` event carries a profile, and
-                        # popping on it would one day evict a live session by coincidence
-                        went = str(ev.get("id") or "")
-                        known.pop(went, None)
-                        if light:
-                            await ws.send_text(json.dumps(ev))
-                            continue
-                        async with sending:
-                            got = await fresh_heads(known, repos, doing, always=True)
-                            await ws.send_text(json.dumps({**ev, **got}))
-                        # A card's *under* chip names another record, so the session that went
-                        # is not the only card now out of date: every card listing it as a
-                        # controller has to be redrawn, or it keeps naming and linking to a
-                        # session that is gone until the page is reloaded (review 2026-09-13).
-                        for other in list(known.values()):
-                            if went in (other.get("controllers") or []):
-                                ov = view(
-                                    other,
-                                    list(known.values()),
-                                    icons=await role_icons([other]),
-                                    seats=await seats_of([other]),
-                                    repos=repos,
-                                    waits=await h.person_waits(),
-                                )
-                                compact_in(ov, known.values(), repos)
-                                await ws.send_text(
-                                    json.dumps(
-                                        {
-                                            "event": "session",
-                                            "id": other["id"],
-                                            "state": other["state"],
-                                            "rank": ov["rank"],
-                                            "html": render_card(ov),
-                                            "session": ov,
-                                        }
-                                    )
-                                )
-                        continue
-                    # The agent pushes a profile's reading; the page draws **one chip per account**
-                    # (§4.5a **usage**, TD-122), with the lowest line among the account's profiles and
-                    # each profile's sessions on hover — so the account is regrouped here from the
-                    # whole reading, the gate's lines and the fleet this loop already keeps. A profile
-                    # that went (`usage: null`) redraws the account it was on, or takes its chip off.
-                    prof = str(ev.get("profile"))
-                    was = acct_of.pop(prof, prof)
-                    readings: dict[str, Any] = {}
-                    with contextlib.suppress(Exception):
-                        readings = await call("usage")
-                    with contextlib.suppress(Exception):
-                        readings = with_lines(readings, await call("gate"))
-                    grouped = usage_accounts(readings, list(known.values()))
-                    for name, acc in grouped.items():
-                        for p in acc["profiles"]:
-                            acct_of[p["name"]] = name
-                    now = acct_of.get(prof)
-                    for name in {was, now} - {None}:
-                        await ws.send_text(json.dumps({"event": "usage", "account": name, "usage": grouped.get(name)}))
-
         try:
-            async with LocalClient() as c:
-                tasks = {asyncio.ensure_future(stream(c)), asyncio.ensure_future(gone())}
-                try:
-                    # every page's stream carries the Inbox's counts, light or full (§4.4, TD-616);
-                    # inside the `try`, so a stream cancelled mid-join still leaves the keeper
-                    await h.counts.join(ws)
-                    done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-                finally:
-                    for t in tasks:
-                        t.cancel()
-                    await asyncio.gather(*tasks, return_exceptions=True)
-                    await h.counts.leave(ws)
-                for t in done:
-                    t.result()  # the stream's own failure is handled below, as it always was
+            tasks = {asyncio.ensure_future(st.pump()), asyncio.ensure_future(gone())}
+            try:
+                # every page's stream carries the Inbox's counts, light or full (§4.4, TD-616); inside
+                # the `try`, so a stream cancelled mid-join still leaves the keeper
+                await h.counts.join(ws)
+                fan.join(st)
+                done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            finally:
+                fan.leave(st)
+                for t in tasks:
+                    t.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                await h.counts.leave(ws)
+            for t in done:
+                t.result()
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass
         except Exception:  # noqa: BLE001
             with contextlib.suppress(Exception):
-                await ws.send_text(json.dumps({"event": "error", "text": "events stream failed; reconnecting"}))
+                await ws.send_text(json.dumps({"event": "error", "text": FAILED}))
         finally:
             with contextlib.suppress(Exception):
                 await ws.close()
