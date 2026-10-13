@@ -18,6 +18,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import types
 from collections.abc import Callable
 from pathlib import Path
@@ -32,6 +33,9 @@ HEAD_MOST = 120
 _REF_RE = re.compile(r"board:[0-9a-f]{8}")
 # one loaded reader per file, its `item_key` or None for one that will not load, kept while its mtime holds
 _keys: dict[str, tuple[float, Callable[[str], str] | None]] = {}
+# one load at a time: a load swaps the process's `sys.path`, `sys.modules['ledgerboard']` and
+# `sys.dont_write_bytecode` and puts them back, and `read` runs on threads
+_load = threading.Lock()
 
 
 def is_work_order(ref: str) -> bool:
@@ -60,16 +64,17 @@ def _item_key(script: Path) -> Callable[[str], str] | None:
         # the reader imports its sibling `ledgerboard.py` through a `sys.path` entry of its own: write no
         # bytecode for it, leave neither that entry nor that module behind, so the next repo's reader
         # imports its own copy
-        path, sibling, nobytes = list(sys.path), sys.modules.pop("ledgerboard", None), sys.dont_write_bytecode
-        sys.dont_write_bytecode = True
-        try:
-            exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
-        finally:
-            sys.modules.pop(mod.__name__, None)
-            sys.path[:], sys.dont_write_bytecode = path, nobytes
-            sys.modules.pop("ledgerboard", None)
-            if sibling is not None:
-                sys.modules["ledgerboard"] = sibling
+        with _load:
+            path, sibling, nobytes = list(sys.path), sys.modules.pop("ledgerboard", None), sys.dont_write_bytecode
+            sys.dont_write_bytecode = True
+            try:
+                exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
+            finally:
+                sys.modules.pop(mod.__name__, None)
+                sys.path[:], sys.dont_write_bytecode = path, nobytes
+                sys.modules.pop("ledgerboard", None)
+                if sibling is not None:
+                    sys.modules["ledgerboard"] = sibling
         got = getattr(mod, "item_key", None)
     except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
         got = None

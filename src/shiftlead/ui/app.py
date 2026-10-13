@@ -413,7 +413,9 @@ def read_boards(run: Any = subprocess.run, *, fetch: bool = False, board: str = 
 def _run_reader(run: Any, argv: list[str], timeout: float) -> tuple[dict[str, Any] | None, str]:
     """One run of the board reader: its report, or None and why not, in words."""
     try:
-        done = run(argv, capture_output=True, text=True, timeout=timeout, check=False)
+        # no `scripts/__pycache__` in a repo's checkout for the reader's `ledgerboard` import (TD-386's gate)
+        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+        done = run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
     except subprocess.TimeoutExpired:
         return None, f"the reader did not finish (timeout after {timeout:g} s)"
     except OSError as e:

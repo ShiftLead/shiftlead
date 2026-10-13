@@ -1502,6 +1502,7 @@ def _board_due(root: pathlib.Path) -> dict[str, Any]:
         cp = subprocess.run(
             [sys.executable, str(script), "--report", "--due-only", "--json", "--board", str(board)],
             capture_output=True, text=True, errors="replace", timeout=20,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},  # no scripts/__pycache__ in the repo
         )  # fmt: skip
         report = json.loads(cp.stdout) if cp.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired, ValueError) as e:
