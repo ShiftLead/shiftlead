@@ -13,9 +13,14 @@ Three things from the TD-577 round (PR #1554, 2026-10-12):
 
 Later the same day (TD-584, TD-578, TD-580, TD-581; PRs #1567, #1568, #1575, #1577):
 
-- **A new ledger entry goes above the file's tail**, never appended: `docs/technical_debt.md` ends with `---` and an unclosed `<!-- Entry template:` line, so an entry written after it renders hidden. Insert before that `---`, with a `---` of its own before the `## TD-NNN` heading.
+- **A new ledger entry goes at the file's true end, after its last `---`.** On 2026-10-12 the ledger ended with an unclosed `<!-- Entry template:` line (an entry after it rendered hidden); by 2026-10-13 that tail was gone. Read the last lines before inserting, and never locate the end by a marker (below).
 - **`ao msg --shot` rides only on a steer or an ask to `person`**; to the techlead it is refused (*a look is the person's*). A design with a mockup sends its steer to the person with the shot.
 - **Re-read the highest TD on `origin/main` *and* in open PRs right before committing**, not at the start of the round: TD-593 was used twice on main (#1569 and #1568; #1574 renumbered TD-578's build to TD-597), and TD-594 was taken on main by #1570 while #1575 held it, so that build became TD-596. A renumber after a rebase is the edit script re-run on main's ledger with the new number, then the id-order test.
+
+On 2026-10-13 (TD-604, TD-627):
+
+- **A rebase's conflict script that fails must stop the rebase.** Twice a carry script asserted and exited, and the same shell line went on to `git rebase --continue`, committing main's ledger in place of the branch's edits. Run the carry, check its exit, and only then `git add` and continue — never in one `if …; fi; … --continue` chain. See [[edit-script-asserts-before-writing]].
+- **Find the ledger's tail by the file's end, never by `rindex` of a marker.** Main's trailing `<!-- Entry template:` came and went that day; when it was gone, `rindex` found the real template block at the top and the "append" cut 982 lines. Append after the last line, and assert the line count grew before writing.
 
 **Why:** each cost a failed command or an extra CI round before the merge.
 **How to apply:** options before recipients ([[ao-msg-options-before-recipients]]); `raw_decode` on every `ao … --json` read; re-run the script on main's ledger after a rebase conflict.
