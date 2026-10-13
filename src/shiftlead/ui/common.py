@@ -18,12 +18,13 @@ from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from sessionorc import build, hosts, identity, mail, paths
+from sessionorc import build, hosts, identity, mail, paths, promote
 from sessionorc.client import AgentError
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import (
@@ -601,14 +602,16 @@ def build_chip(info: dict[str, Any] | None) -> dict[str, str] | None:
     live commit — so the chip and the Inbox's Promote row agree — and otherwise main is measured
     here, on the UI's side, as `ao status -v` measures it (§4.4). The page's own `build.info()` is
     named where it differs, and each linked node marked stale. None only when the agent did not
-    answer. Runs git: call it in a thread."""
+    answer. *main +n* is a link to the Inbox's promote row (`link`, `href`) when the home's reading
+    names the repo, and under `auto` the hover says when the home will act (TD-581). Runs git: call
+    it in a thread."""
     if not info:
         return None
     b = info.get("built_from") if isinstance(info.get("built_from"), dict) else {}
-    a, more = None, {}
+    a, more, repo = None, {}, None
     source, commit = b.get("source"), b.get("commit")
     if isinstance(source, str) and commit:
-        for r in (info.get("promotes") or {}).values():
+        for name, r in (info.get("promotes") or {}).items():
             if not isinstance(r, dict) or not r.get("root") or r.get("live") != commit:
                 continue
             if Path(str(r["root"])).resolve() != Path(source).resolve() or not r.get("main"):
@@ -622,13 +625,20 @@ def build_chip(info: dict[str, Any] | None) -> dict[str, str] | None:
             else:
                 a = {"ref": build.REF, "why": f"main is at {str(r['main'])[:12]}, which it cannot count back to"}
             more = {k: r.get(k) for k in ("live_at", "pending", "pending_more", "inflight", "held")}
+            if words := promote.acts_words(r.get("acts")):
+                more["acts"] = f"auto on · {words}"
+            repo = name
             break
     links = info.get("links") if isinstance(info.get("links"), dict) else {}
     more["nodes"] = [
         (n, s.get("build")) for n, s in links.items() if isinstance(s, dict) and s.get("up") and s.get("stale")
     ]
     more["page"] = build.info()
-    return build.chip(b, str(info.get("started_at") or ""), a, **more)
+    chip = build.chip(b, str(info.get("started_at") or ""), a, **more)
+    if repo and chip.get("cls") == "behind":
+        # *main +n* links to the Inbox's promote row, the chip's one pressable part: the press is the row's (TD-581)
+        chip["link"], chip["href"] = f"main +{a['ahead']}", f"/inbox#promote-{quote(str(repo))}"
+    return chip
 
 
 def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) -> str:

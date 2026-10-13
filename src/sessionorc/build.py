@@ -145,7 +145,8 @@ def chip(build: dict[str, Any], started_at: str = "", a: dict[str, Any] | None =
     `inflight`, `held`, `unknown`, `behind` or `live`; *build unknown* without a record. On hover
     the live commit's sha and subject, `line`'s sentence, then *not live yet:* and the pending
     commits. `more` carries the home's reading where it holds this build (`live_at`, `pending`,
-    `pending_more`, `inflight`, `held`); without one (`a` None) main is measured here, against this
+    `pending_more`, `inflight`, `held`, and `acts`, the line under `auto` saying when the home will
+    act); without one (`a` None) main is measured here, against this
     checkout's `REF`, and the hover says so. `page` is the page's own build, named where it differs,
     and `nodes` `(name, build)` for each linked node marked stale."""
     if not build or not build.get("commit"):
@@ -174,6 +175,8 @@ def chip(build: dict[str, Any], started_at: str = "", a: dict[str, Any] | None =
         title += ["", "not live yet:"] + [f"{r.get('sha', '')[:7]} {r.get('subject', '')}" for r in rows]
         if extra:
             title.append(f"… and {extra} more")
+    if more.get("acts"):  # under `auto`, when the home will act: the Inbox row's words (TD-581)
+        title += ["", str(more["acts"])]
     if here:
         title += ["", f"measured from this checkout's {REF}: the home's promote reading does not hold it"]
     page = more.get("page") or {}
