@@ -10660,3 +10660,56 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Related:** TD-582 (#1590), TD-601 (#1593), TD-606 (the same drift in §4.9 and §4.2a).
 
 **Resolved:** 2026-10-12 (PR #1614) — the primer's exception now reads *the mail gate: its sideways edge admits a session that shares the `team` badge, and its cross-team edge one that shares the `project` badge (§4.10, TD-582). It gates mail only*, and the §4.10 row names *across teams by project*.
+
+---
+
+## TD-603: Board lines have no identifier: the person quotes a line's text to refer to it in chat, a reply or a session
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td603-board-line-id.png`) — **derived, not written**, against the anchor's lean: every board line's id is the `board:<key>` the work orders already use (sha256 of `item_key()`, eight hex), which survives every edit a tool makes — the tick, `Closed:`, `Decided:`, `Due:`, replies appended — the very edits the lean feared; only a reword changes it, and the write-back already refuses a reworded line as moved. A written `UA-NNN` would need a counter shared by every writer of a board (sessions by hand, the write-back, the person, dev-cadence without ShiftLead) — two sessions adding at once take one number, as TD ids collided twice on 2026-10-12 — and a new line shape: a ledgerboard major and every consumer's sync. So no format change, nothing proposed to dev-cadence or ledgerboard, every old line has one. Drawn on every board row (copied on a click), printed by `ao board show` and `ao repo`, taken as `key` by the write-back's RPCs and `ao board edit --key`. §4.4 *A board line's id*, §4.5a *board row: id*, §4.7 `ao board show`. Built by TD-607. Was: Open.
+**Location:** the board's `Format:` line (`docs/user_attention.md`; cadence §3.3's entry format, dev-cadence's; ledgerboard's once TD-584/TD-585 land); the board reader (§4.4 *Board write-back*); `board_reply` (`src/sessionorc/agent_inbox.py`) and Done / Snooze, which reach the line through `board.write_back` (`src/sessionorc/board.py`, `_find`: the line number, then the line's whole text); the Inbox's board rows and the Due strip (§4.5a)
+
+**Why:** Paul, 2026-10-12: *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?* Mail already has one (`m-6a272ca2abcd`) and a ledger entry has `TD-NNN`; a board line has only its date, its session and its words. To point a session at a line, or to ask about one in chat, the person pastes its head ("A team member must be a Claude session…"), and the line's whole text is also what a Reply, a Done or a Snooze finds the line by (`board.py` `_find`), so a session that rewords a line loses the person's reference to it and the press is refused as moved.
+
+**Fix:** design first.
+- Choose the id: written into the line at creation (a short `UA-NNN`, numbered per board like TD ids and never reused, the archive included), or derived (a short hash of date, session and the first words, which a reword changes). The anchor's lean: written, since a derived one is not stable under the edits a line gets (replies appended, *Closed:*).
+- Where it is written: the `Format:` line is cadence's (dev-cadence) and the board's parser is to be ledgerboard's (TD-584/TD-585), so the change is proposed there, and lines written before it stay valid without one.
+- Where it is drawn and accepted: the Inbox's board row and the Due strip show it; a Reply, a Done and a Snooze find the line by it before its text; `ao` and the SessionStart nudge print it; a person can type it in chat (`UA-12`) and a session can find the line by it (`grep`).
+- Mockup of the row with the id.
+
+**Done when** every new board line carries an id, the Inbox and the Due strip draw it, a reply or a close can name a line by it, and old lines without one still read.
+
+**Related:** TD-584 / TD-585 (ledgerboard), TD-126 (a board reply's outcome), TD-587 (`ao board edit`).
+
+**Resolved:** 2026-10-12 (PR #1606) — designed in TD-603's round (§4.4 *A board line's id*, §4.5a *board row: id*, §4.7 `ao board show`), built by TD-607.
+
+---
+
+## TD-607: Build TD-603: every board line's id is its derived `board:<key>` — drawn and copied on every board row, `ao board show`, `ao board edit --key`, and `key` on the write-back's RPCs
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-603's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built
+**Location:** design §4.4 *A board line's id*, §4.5a *board row: id*, §4.7 `ao board show` / `ao board edit --key`; `src/sessionorc/workorders.py` (the `board:<key>` derivation ~L27–45, `PREFIX`, `_item_key`: make it the one function every board row and RPC uses, not only decided lines), `src/shiftlead/ui/inbox.py` (each board row's `key`), `src/shiftlead/ui/templates/inbox_row.html` and the Due strip's and Repo page's board-row templates (the id in the head line, a click to copy), `src/shiftlead/ui/static/app.js` (the copy; every board press sends `key`), `src/sessionorc/agent_inbox.py` (`rpc_board_edit` ~L247, `rpc_board_reply` ~L404: an optional `key`; Decide is one of `board_edit`'s actions, no RPC of its own), `src/sessionorc/board.py` (`_find` ~L331: by key first over the open items, then line and text as today; the refusal's words), `src/shiftlead/cli.py` (`ao board show`, `ao board edit --key` once TD-587's verb exists — before it, `show` alone; `ao repo`'s board lines print the id), `src/shiftlead/ui/help.py` (the row's id); `tests/test_board.py`, `tests/test_workorders.py`, `tests/test_ui_inbox*.py`, `tests/test_cli.py`
+
+**Why:** TD-603: Paul, 2026-10-12 — *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?*
+
+**Fix:**
+1. One derivation: `workorders.key_of(line) -> "board:xxxxxxxx"` from the board reader's `item_key()` (ledgerboard's once TD-585 lands), used for every item the Inbox, the Due strip, the Repo page and `ao` read; the work orders keep using it.
+2. The rows: `key` on each board row; drawn in mono before the due words, `title` *the line's id: type it in chat or in ao board show; a click copies it*; a click copies it with the toast *copied board:…*.
+3. The write-back: `board_edit` (every action: snooze, done, decide) and `board_reply` take an optional `key`; `_find` tries the open item whose key it is first (origin's tree, then the checkout's lines, as it reads today), then the line and text; with a `key` and no match, refused *no line board:<key> on the board — reworded or closed*. The page sends `key` with every press.
+4. The CLI: `ao board show <board:key> [--repo]` prints line number, text and detail block (`--json`: `{key, line, text, detail, open, source}`), exit 1 with the refusal when none; `ao repo` prints the id on each board line it lists; `ao board edit --key` when TD-587 has built the verb.
+5. Tests: the key is the same before and after a snooze, a reply, a decide and a close; differs after a reword; the row draws it; a press with `key` finds a line that moved; a press with a stale `key` is refused with the words; `ao board show` finds and refuses; the mockup regenerates unchanged.
+
+**Done when** every board line shows its `board:<key>` on the Inbox, the Due strip and the Repo page, a click copies it, `ao board show` finds the line by it, the write-back's presses find the line by it, old lines need nothing, and the tests above pass; the builder's look (design §4.9b) is named in the PR.
+
+**Related:** TD-603 (the design), TD-380 (decided lines as work orders, the key's first use), TD-587 (`ao board edit`), TD-584 / TD-585 (ledgerboard's `item_key`).
+
+**Resolved:** 2026-10-12 (PR #1606) — `workorders.ref` is every board line's id, and `workorders.show` finds a line by it on origin's board after a fetch, else the checkout's, open or closed, with the reader's detail block. `board._find` tries the open line whose id it is first, then the line and its text. A press that names only an id is found by it, and edits the line as it is now. An id no open line holds is refused as *no line board:<key> on the board — reworded or closed*. `board_edit` and `board_reply` take `key`; the page sends it with every press on a board row and draws it on the row (`.boardkey`, a click copies it). `ao board show` and `ao repo`'s due lines print it. `ao board edit --key` waits for TD-587's verb, written on its Fix. No help-list paragraph: the row's `title` is §4.5a's words. Held by `tests/test_board.py`, `tests/test_workorders.py`, `tests/test_ui_board.py`; the scratch-home look is the PR's UI check.
