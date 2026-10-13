@@ -79,14 +79,22 @@ def _header(fields: dict[str, str], body: str) -> dict[str, str]:
 
 
 def answers_of(value: str) -> tuple[list[str], int | None]:
-    """An `**Answers:**` line read as the board's reader reads `Answers:` (cadence §3.5, ledgerboard's
-    `parse_answers`): the items split on `|` (`\\|` a literal bar), the closing full stop dropped, and
+    """An `**Answers:**` line read in the board's `Answers:` grammar (cadence §3.5), by ledgerboard's
+    split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, and
     the index of the one marked ` (default)` — None unless exactly one is (cadence §3.5, TD-066: at
-    most one, and with two there is no single recommendation), as `parse_default` gives it."""
-    line = f"Answers: {(value or '').strip()}"
-    out = lb.parse_answers(line)
-    default = lb.parse_default(line)
-    return out, out.index(default) if default is not None and default in out else None
+    most one, and with two there is no single recommendation). The value is the field alone, so a
+    `Due:` or `Decided:` in it is words, not a board item's trailing field."""
+    out: list[str] = []
+    marked: list[int] = []
+    for raw in lb.ANSWER_SPLIT_RE.split((value or "").strip().rstrip(".")):
+        words = raw.replace("\\|", "|").strip()
+        if lb.DEFAULT_MARK_RE.search(words):
+            words = lb.DEFAULT_MARK_RE.sub("", words).strip()
+            if words:
+                marked.append(len(out))
+        if words:
+            out.append(words)
+    return out, marked[0] if len(marked) == 1 else None
 
 
 def detail_of(body: str) -> list[str]:

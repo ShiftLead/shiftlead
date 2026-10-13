@@ -314,6 +314,12 @@ def test_a_for_you_entry_carries_added_answers_and_detail():
     assert mine["answers"] == ["At the reset", "A fixed | time", "Not now"]
     assert mine["default"] is None  # two marks: no single recommendation
     assert ledger.answers_of("Keep it (default) | Drop it.") == (["Keep it", "Drop it"], 0)
+    # the field alone, in ledgerboard's split and mark (TD-585): a `Due:`/`Decided:` in it is words, the
+    # default is the marked item's place, and a bare mark is no answer
+    assert ledger.answers_of("Works. Due: 2026-01-01 | x") == (["Works. Due: 2026-01-01", "x"], None)
+    assert ledger.answers_of("A | Decided: x (2026-01-01)") == (["A", "Decided: x (2026-01-01)"], None)
+    assert ledger.answers_of("A | A (default)") == (["A", "A"], 1)
+    assert ledger.answers_of("A | (default)") == (["A"], None)
     assert mine["detail"][:3] == ["**Why:** the reason,", "over two lines.", "**Fix:**"]
     assert len(mine["detail"]) == ledger.MAX_DETAIL_LINES
     assert not {"added", "answers", "default", "detail"} & set(build)
