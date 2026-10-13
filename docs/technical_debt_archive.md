@@ -10478,3 +10478,23 @@ Then the build, with tests that a person's interactive shell may promote and an 
 **Related:** TD-599 (the design), TD-075 (the group), TD-079 (FYI's Dismiss all).
 
 **Resolved:** 2026-10-12 (PR #1597) — `inbox.html`'s `#dismissanswered` on the *Answered for you* heading, `hidden` while the group holds no row and kept to the rows by the poll; `app.js`'s `dismissOnScreen` is FYI's press, now taking the group's rows and its own confirm (*Dismiss the n answers on screen? Their Overrule goes with them.*), the ids those rows on screen carry, by the same `dismiss`; the group's blurb names the press. Held by `test_the_answered_groups_dismiss_all_is_fyis_rule_on_its_own_rows` in `tests/test_ui_inbox.py`; the scratch-home look is the PR's UI check.
+
+---
+
+## TD-605: TD-602's Location names `src/shiftlead/ui/help.py` for the *Answered for you* group's help words, which live in `inbox.html`'s `info` dict
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1580–#1591)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/technical_debt.md` TD-602's **Location** line; `src/shiftlead/ui/templates/inbox.html` L21 (`'answered': '…'`), `src/shiftlead/ui/help.py`
+
+**Why:** TD-602's **Location** lists *`src/shiftlead/ui/help.py` (the group's help words)*, and #1591 rewrote the mockup's help line in `docs/mockups/gen.py` to say *Dismiss all clears the ones on screen once you have read them*. `grep -n -i "answered for you" src/shiftlead/ui/help.py` finds nothing; the words the page shows are `inbox.html` L21, `'answered': 'Questions a teammate answered for you from the record … Dismiss removes the row. Newest first.'`, drawn at `#info-answered`. A builder following the Location edits a file that holds no such text and leaves the group's help saying only *Dismiss removes the row*, which the new button makes incomplete.
+
+**Resolved:** 2026-10-12 (PR #NNNN) — overtaken by TD-602's build, #1597 (76d01f18), which wrote the group's help words where they live: `inbox.html`'s `info['answered']` gained *Dismiss all removes the ones on screen once you have read them …*. TD-602 is archived, so no open entry's Location points at `help.py` for them.
+
+**Done when** TD-602's Location names the file that holds the group's help words.
+
+**Related:** TD-602, TD-599.
