@@ -154,6 +154,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-12 (TD-613, the designer; dev-cadence's sync PR #1573 sat red on 2026-10-12 with its author idle in another repo and the anchor closed, until Paul asked hours later): the open-PR reading keeps `checks`, `conflicting` and `red_since`; *A red PR nobody holds is a work order* `pr:<n>` after `ORPHAN_AFTER` (an hour), the idle holder told once first, in the anchor seat's lane (free-pick where no anchor seat), an Inbox row for a repo no team services. Built by TD-618.
 - 2026-10-12 (TD-604, the designer): *Repo facts* keeps each closed entry's PR from the squash commit that took it out of the ledger, kept as `completed`; the archive's `Resolved:` lines were weighed and refused, since they name design PRs and slices first. Built by TD-608.
 - 2026-10-12 (TD-603, the designer; Paul, 2026-10-12: *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?*): *A board line's id* — every board line's id is the derived `board:<key>` the work orders use, stable across a tool's edits, never written; the write-back's RPCs take `key`. A written `UA-NNN` was weighed and refused: every writer would allocate from a counter none shares, and it is a new line shape. Built by TD-607.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *Board write-back* parses items through `ledgerboard.py`, its subjects ledgerboard's; the cross-repo resolver reads the home's own roster. Built by TD-585 and TD-590.
@@ -274,6 +275,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-12 (TD-613, the designer): screen 6's *Needs you* gains a red PR nobody holds in a repo no team services; screen 11's Open PRs tag a red or conflicting PR and say whose it is. Built by TD-618.
 - 2026-10-12 (TD-604, the designer; Paul, 2026-10-12: *show recently completed TDs in the repo screen and/or in the "TDs in motion" card*; mockup `RepoPage.dc.html`, shot `docs/mockups/reviews/2026-10-12-td604-recently-completed.png`): screen 11 gains **Recently completed** — the entries closed in the window, with the PR whose squash merge closed it and its author; *Doing* becomes item 5. Built by TD-608.
 - 2026-10-12 (TD-578, the designer): screen 9 says the raw file's reader is also on the Focus header. Built by TD-597.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): screen 6 reads board items in-process through `ledgerboard.py`, never `nudge_user_attention.py`; the copy-picking rule (TD-278) goes with it. Built by TD-585.
@@ -378,6 +380,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-613, the designer): **Inbox row: red PR**; the Repo facet's *Pull requests* says *· n red* with whose each is on hover. Built by TD-618.
 - 2026-10-12 (TD-611 slice 1; Paul, 2026-10-12: the Focus terminal lags again): the top bar's **Inbox** poll on every page but the Inbox's own reads the counts alone (`?counts=1`), not the full read — megabytes of rendered rows, thrown away, every 20 s, on the UI's one loop the Focus terminal shares.
 - 2026-10-12 (TD-604, the designer): the Repo facet's *closed* block links to the Repo page's *Recently completed* and lists its ids and titles on hover; the card draws no list. Built by TD-608.
 - 2026-10-12 (TD-603, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td603-board-line-id.png`): **board row: id** — `board:<key>` on every board row's head line, copied on a click, sent with every press. Built by TD-607.
@@ -1177,6 +1180,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-12 (TD-613, the designer): rule 6's work orders include `pr:<n>`, the anchor's, a free-pick lane's where no team has an anchor seat. Built by TD-618.
 - 2026-10-12 (TD-586, grinder-ao-1): rule 10's gate built — `sessionorc.cadence.gate` reads `gate:` (set, defaulted to the script, absent), a set one is run by the shell and judged by its exit code, its row naming the command filled; a repo with no gate is recorded once a PR as `verdict: none`, nothing run and nobody told, `ao status -v` printing *no gate: a person merges*; `shiftlead.repoconfig` accepts the key.
 - 2026-10-12 (TD-581, the designer; 2026-10-12: #1544, the Focus lag fix, merged at 17:39 UTC and ao-grind's merges every few minutes kept main from standing still for `PROMOTE_SETTLE`, so the fix stayed off the live copy over half an hour while the Inbox drew no row and `ao promote` was refused from every ShiftLead terminal (TD-580); Paul: *Lets also add the TD to force a promote*): *Promote* under `auto` also fires once main has been ahead for `PROMOTE_MAX_WAIT` (thirty minutes) unsettled, from the reading's `ahead_since`; the person's press stands under `auto`, skipping the settle and the wait. Was: the settle alone, a busy main holding `auto` off without limit. Built by TD-598.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): rule 10 runs the repo's `gate:`, judged by exit code, `check_cadence.py --json` its default; a repo with no gate is not checked and the review stage never merges on its own — *no gate: a person merges*. Was: no script, no reading. Built by TD-586.

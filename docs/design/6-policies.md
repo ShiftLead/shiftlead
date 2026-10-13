@@ -448,7 +448,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      live** (§4.9b *A live check is a grinder's once its build is live*) — and **every open
      decided line of the repo's board**, a work order `board:<key>` (§4.4 *Board write-back*),
      which `owner:<word>` never narrows out, since a line has no owner — and **`anchor`** every
-     pickable entry whose `Owner:` is `anchor`, of any kind, and every work order (§4.9b *The
+     pickable entry whose `Owner:` is `anchor`, of any kind, and every work order — a decided board line
+     or a red PR nobody holds, `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), which a
+     `free-pick` lane takes too where no team servicing the repo has an anchor seat (§4.9b *The
      anchor seat*: the seat's lane, and a person's own anchor session reads the same) — so an
      evaluation, a decision and a live check whose build is not live match no lane, and a ledger
      with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of
