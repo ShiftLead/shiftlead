@@ -19,9 +19,11 @@ from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 # The bridge's queue is bounded in bytes (TD-611 slice 5): past `QUEUE_HIGH` unsent the pty is no
 # longer read — tmux holds the output, as it does for any slow client — and from `QUEUE_LOW` it is
-# read again, so a stalled loop or a slow socket never grows the UI's memory without bound
+# read again, so a stalled loop or a slow socket never grows the UI's memory without bound. One read
+# joins at most `JOIN_MAX` (and one pty read past it), so no frame is a megabyte for xterm to parse
 QUEUE_HIGH = 1 << 20
 QUEUE_LOW = 1 << 18
+JOIN_MAX = 1 << 18
 
 
 class PtySession:
@@ -33,10 +35,13 @@ class PtySession:
         self._queue: asyncio.Queue[bytes | None] = asyncio.Queue()
         self._queued = 0  # bytes in the queue, not yet handed to `read`
         self._paused = False  # the pty's reader is off while the queue is past `QUEUE_HIGH`
-        self._ended = False  # the end was taken out of the queue with data before it
+        self._ended = False  # the end was taken out of the queue
+        self._closed = False
         self._loop.add_reader(self.proc.fd, self._on_readable)
 
     def _on_readable(self) -> None:
+        if self._closed:
+            return
         try:
             data = os.read(self.proc.fd, 65536)
         except OSError:
@@ -55,23 +60,26 @@ class PtySession:
                 self._loop.remove_reader(self.proc.fd)
 
     async def read(self) -> bytes | None:
-        """Everything the pty has written since the last read, joined into one chunk — a stalled loop
-        that wakes to many frames sends them as one (TD-611 slice 5) — or None when the child is gone."""
+        """What the pty has written since the last read, joined into one chunk up to `JOIN_MAX` — a
+        stalled loop that wakes to many frames sends them as one (TD-611 slice 5) — or None when the
+        child is gone."""
         if self._ended:
             return None
         first = await self._queue.get()
         if first is None:
+            self._ended = True
             return None
-        parts = [first]
-        while not self._queue.empty():
+        parts, size = [first], len(first)
+        while size < JOIN_MAX and not self._queue.empty():
             more = self._queue.get_nowait()
             if more is None:
                 self._ended = True  # the data before it goes now; the end on the next read
                 break
             parts.append(more)
+            size += len(more)
         got = b"".join(parts)
         self._queued -= len(got)
-        if self._paused and self._queued <= QUEUE_LOW:
+        if self._paused and not self._closed and self._queued <= QUEUE_LOW:
             self._paused = False
             with contextlib.suppress(Exception):
                 self._loop.add_reader(self.proc.fd, self._on_readable)
@@ -97,6 +105,7 @@ class PtySession:
         return None
 
     def close(self) -> None:
+        self._closed = True
         with contextlib.suppress(Exception):
             self._loop.remove_reader(self.proc.fd)
         with contextlib.suppress(Exception):

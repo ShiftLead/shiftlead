@@ -26,8 +26,11 @@ def test_what_queued_while_the_loop_was_busy_is_read_as_one_chunk_and_the_end_af
     async def run():
         pty = PtySession(["sh", "-c", "printf one; sleep 0.05; printf two; sleep 0.05; printf three"])
         try:
-            await asyncio.sleep(0.6)  # the loop reads the pty meanwhile; nobody takes from the queue
-            assert pty._queue.qsize() >= 3  # three writes, three reads at least, and the end
+            for _ in range(100):  # the loop reads the pty meanwhile; nobody takes from the queue
+                if pty._queue.qsize() and not pty.proc.isalive():
+                    break
+                await asyncio.sleep(0.05)
+            await asyncio.sleep(0.2)  # the end's own read
             first = await pty.read()
             rest = await _drain(pty)
         finally:
@@ -38,9 +41,33 @@ def test_what_queued_while_the_loop_was_busy_is_read_as_one_chunk_and_the_end_af
     assert first == b"onetwothree" and rest == []
 
 
+def test_a_closed_bridge_never_reads_the_pty_again_and_an_ended_one_stays_ended(monkeypatch):
+    monkeypatch.setattr(pty_bridge, "QUEUE_HIGH", 4096)
+
+    async def run():
+        ended = PtySession(["true"])
+        try:
+            got = await _drain(ended)
+            again = await asyncio.wait_for(ended.read(), 1)
+        finally:
+            ended.close()
+        pty = PtySession(["sh", "-c", "head -c 100000 /dev/zero; sleep 5"])
+        await asyncio.sleep(0.5)
+        assert pty._paused
+        pty.close()
+        added = []
+        monkeypatch.setattr(pty._loop, "add_reader", lambda *a: added.append(a))
+        await pty.read()  # drains below the low mark: a closed bridge adds no reader back
+        return added, got, again
+
+    added, got, again = asyncio.run(run())
+    assert added == [] and got == [] and again is None
+
+
 def test_past_the_high_mark_the_pty_is_not_read_until_the_queue_drains_and_nothing_is_lost(monkeypatch):
     monkeypatch.setattr(pty_bridge, "QUEUE_HIGH", 4096)
     monkeypatch.setattr(pty_bridge, "QUEUE_LOW", 1024)
+    monkeypatch.setattr(pty_bridge, "JOIN_MAX", 2048)
     n = 300_000
 
     async def run():
@@ -56,3 +83,4 @@ def test_past_the_high_mark_the_pty_is_not_read_until_the_queue_drains_and_nothi
     (paused, queued), chunks = asyncio.run(run())
     assert paused and queued < 4096 + 65536  # one read past the mark at most, never the whole output
     assert sum(len(c) for c in chunks) == n and set(b"".join(chunks)) == {0}
+    assert max(len(c) for c in chunks) < 2048 + 65536  # one read joins up to the cap, and one pty read past it
