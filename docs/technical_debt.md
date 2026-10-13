@@ -52,8 +52,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-608 | Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed* | Medium | Open |
 | TD-610 | The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two | Low | Open |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
-| TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Open |
+| TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Designed — TD-618 builds it |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Open |
+| TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
 
 ---
 
@@ -855,7 +856,8 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Added:** 2026-10-12 (ao-paul, at Paul's ask)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-12 (the designer) — **what it reads**: the open-PR read gains `statusCheckRollup` and `mergeStateStatus`, kept as `checks` (green / red / pending / none), `conflicting` and `red_since`; **who owns it**: a PR red or conflicting for `ORPHAN_AFTER` (one hour) that no live record holds (not exited or closed, no `out_of_work`, its progress naming the PR or its branch the PR's head) is a work order **`pr:<n>`**, High, in the **anchor seat's** lane (the lane word `anchor` already takes every work order, and the anchor merges syncs), in the free-pick lanes where no servicing team has an anchor seat, and an Inbox *Needs you* row where no team services the repo; a held PR whose holder is idle gets one `system` note first, and a second `ORPHAN_AFTER` later the holder no longer counts; **what the owner does**: claims `pr:<n>`, fixes on the PR's branch with a note to a live author, or closes it with a reason when superseded, by the cadence (review evidence, the techlead for held paths); sync PRs alike; **where it shows**: the facet's *· n red* with whose on hover, the Repo page's Open PRs tags. §4.4 PR reading and *A red PR nobody holds is a work order*, §6 rule 6, §4.5 screens 6 and 11, §4.5a *Inbox row: red PR* and *Repo facet*. No mockup: the marks are words on existing rows. Built by TD-618. Was: Open.
+**Blocked by:** TD-618
 **Location:** design §6 (the tick's policies), §4.9b (the anchor seat, the techlead seat), cadence §3.9 (the SessionStart nudge's *open PR older than 2 days* line, `PR_STALE_DAYS`); `src/sessionorc/reports.py` (`pr_reading`, `PR_FIELDS`: no check or mergeable status today)
 
 **Why:** On 2026-10-12, dev-cadence's sync PR #1573 (ledgerboard v1.0) went red on CI. The sync note said *each repo's own session reviews and merges its PR*, but its author (`ao-dc-decouple`) sat idle in another repo, and ShiftLead's anchor, the session that would merge a sync, was closed. Nothing noticed until Paul asked hours later. The fix turned out to be real: the reader's new `ledgerboard` import broke tests and wrote `scripts/__pycache__` into checkouts. Today a PR belongs to its author until merge (cadence: merge only on a passing check). When the author is gone, moved on, or in another repo, the only signals are the SessionStart nudge after two days and `/stranded-work` by hand. The repo reading lists every open PR every `REPOS_EVERY` but not its checks: `PR_FIELDS` has no `statusCheckRollup` or `mergeStateStatus`, so the host agent cannot see a red or conflicting PR yet. That one field is what it lacks.
@@ -899,6 +901,33 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Done when** the design names each reading's one owner and its push, and build entries exist for each slice. TD-611's slices 1 and 4 are re-pointed at them or marked as their first step.
 
 **Related:** TD-611 (the lag that found it), TD-131 (whole-file stores, a later scale), TD-384 (work orders from the board).
+
+---
+
+## TD-618: Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (the designer, TD-613's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Repo facts* (the PR reading) and *A red PR nobody holds is a work order*, §6 rule 6, §4.5 screens 6 and 11, §4.5a *Inbox row: red PR* and *Repo facet*; `src/sessionorc/reports.py` (`PR_FIELDS` ~L271 is shared by both reads through `_gh_prs` ~L274: give `_gh_prs` a fields argument so the open read alone gains `statusCheckRollup,mergeStateStatus`; `pr_reading` ~L300: `checks`, `conflicting`, `red_since` carried across readings by number), `src/sessionorc/workorders.py` (a `pr:<n>` order beside `board:<key>`; `is_work_order` ~L36 and `_REF_RE` ~L31 accepting `pr:\d+`), `src/sessionorc/agent_common.py` (`ORPHAN_AFTER = 3600.0` beside `IDLE_NUDGE`), `src/sessionorc/agent_tick.py` (the repo reading ~L2895: the orders from the PR reading and the records; the one `system` note to an idle holder, marked so it is sent once per red spell), `src/sessionorc/ledger.py` / `teamrun.py` (the lane match: `anchor` takes `pr:` orders; `free-pick` too where no servicing team has an anchor seat), `src/shiftlead/ui/inbox.py` (the *red PR* row for a repo no team services), the team card's Repo facet template and `repo_part.html` (the marks), `src/shiftlead/cli.py` (`ao repo` lists `pr:<n>` orders with the pickable rows, as `board:<key>` ones), `src/shiftlead/ui/help.py`; `tests/test_reports.py`, `tests/test_workorders.py`, `tests/test_tick*.py`, `tests/test_ui_inbox*.py`
+
+**Why:** TD-613: on 2026-10-12 dev-cadence's sync PR #1573 went red, its author idle in another repo and the anchor closed, and nothing noticed until Paul asked hours later; the PR reading had no checks to see it by.
+
+**Fix:**
+1. The reading: the open read's `--json` gains `statusCheckRollup,mergeStateStatus`; each open PR keeps `checks` (red if any check concluded `FAILURE`, `CANCELLED`, `TIMED_OUT` or `ACTION_REQUIRED`; pending if any is not completed; green if all passed; none with no checks), `conflicting` (`DIRTY`), and `red_since`, the first reading's time it was red or conflicting, kept by number while it stays so.
+2. Holding: a live record (not `exited`/`closed`, no `out_of_work`) with a `progress` entry whose `ref` is `pr:<n>` or whose `pr` is `n` (claimed or done), or whose `git.branch` is the PR's `headRefName` — a tick-side match, new code. The free-pick condition (no servicing team with an anchor seat) needs the team context `lane_matches` lacks: resolve it where `teamrun.repo_lanes` knows the teams.
+3. The nudge: a held PR red for `ORPHAN_AFTER` (3600 s) whose holder is `idle` gets one `system` note, *PR #<n> has been red since <t>: <checks> — fix it or say why*, once per red spell, spending no wake budget; a second `ORPHAN_AFTER` later with the holder still idle and the PR still red, the holder no longer counts.
+4. The order: an unheld PR red or conflicting for `ORPHAN_AFTER` is `pr:<n>` in the repo reading's work orders — title, High, *pickable*, `Context` its URL and failing checks — matched by the `anchor` lane, and by `free-pick` lanes of servicing teams with no anchor seat; `ao progress claim pr:<n>` works as `board:<key>` does; green or closed, it drops out.
+5. A repo no team services: an Inbox *Needs you* row *red PR*, Open and Snooze ▾, leaving when it is green, closed or held.
+6. The marks: the facet's *· n red* with the hover; the Repo page's Open PRs tags *red* / *conflicting*, age, whose.
+7. Tests: the rollup folds (failed, cancelled, pending, all passed, none); `red_since` kept and cleared; a red PR held by a working record is no order; held by an idle record: one note, then an order after the second bound; unheld: an order after `ORPHAN_AFTER`, not before; a green and a pending one never; the anchor lane takes it, free-pick only without an anchor seat; the Inbox row for an unserviced repo; `ao repo` lists it.
+
+**Done when** a red or conflicting PR with no live holder is a work order in a named seat's lane within `ORPHAN_AFTER`, an idle holder is told first, the facet and the Repo page show it, and the tests above pass.
+
+**Related:** TD-613 (the design), #1573 (the case), TD-380 (decided lines as work orders), TD-611.
 
 ---
 
