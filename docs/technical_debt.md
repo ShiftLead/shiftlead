@@ -61,6 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-629 | A permission answered in the terminal comes back as *needs you* when the hook's wait runs out: the timeout re-raises a pending the session has already moved past | Medium | Open |
 | TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Open |
 | TD-631 | §4.4 *Repo facts* says the UI runs a board reader for the Inbox's board counts: the UI runs no board reader since TD-615 slice 2 (#1633) | Low | Open |
+| TD-632 | §4.5a's Git card *changed files* keeps a deletion as text by its code `D`, but `GitInfo.files` also carries `MD` and `AD` for a file deleted from the worktree (TD-627) | Low | Open |
 
 ---
 
@@ -1137,5 +1138,25 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** no sentence of `docs/design/` says the UI runs a board reader, and the doc-bound tests pass.
 
 **Related:** TD-615 (the build), TD-614 (the design), #1633.
+
+---
+
+## TD-632: §4.5a's Git card *changed files* keeps a deletion as text by its code `D`, but `GitInfo.files` also carries `MD` and `AD` for a file deleted from the worktree (TD-627)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1629–#1639)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.5a-controls.md` *Focus side panel, Git card: changed files* (what is not a file stays text); `docs/technical_debt.md` TD-628 Fix step 2; `src/sessionorc/gitinfo.py` `git_info` (`1 XY …` lines, `parts[1].replace('.', '')`)
+
+**Why:** #1636 designed that a link is drawn for each path but "**a deletion (`D`)**", "since there is nothing to open", and TD-628's step 2 says "Text, with a hover, for a `D` line". `git_info` keeps the porcelain's two letters with the dots removed, so a file deleted in the worktree after an index change is not `D`. Probe, a scratch repo with `a` and `d` staged-modified/added and then removed from the tree, and `b` removed with `git rm`: `git_info(dir).files` is `['MD a', 'D b', 'AD d']` (`git status --short`: `MD a`, `D  b`, `AD d`). Two of the three are deletions with nothing to open, and a builder who reads the design's letter as the code (`code == "D"`) draws `a` and `d` as links to a path that is not there; one who reads it as "a `D` in the code" has to find that out from the porcelain, since the design names neither `MD`, `AD` nor `RD` (a rename deleted afterwards, which `2 RD …` carries with its new path).
+
+**Fix:** decide and say it in §4.5a's present tense: a path is text when the worktree side of its code is a deletion (a `D` anywhere in the code, or the file is absent), as a rule the build can test with `MD`, `AD`, `RD` and `D`; amend TD-628's step 2 and test list to match. The design only.
+
+**Done when** the row says which codes are a deletion and the TD-628 test list names `MD` and `AD`.
+
+**Related:** TD-627 (the design), TD-628 (the build), #1636.
 
 ---
