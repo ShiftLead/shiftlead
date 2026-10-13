@@ -57,6 +57,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-624 | §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618) | Low | Open |
+| TD-625 | The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+* | Low | Open |
 
 ---
 
@@ -1010,6 +1011,41 @@ Both are behaviours the PR built and the design left unwritten; neither is a bug
 **Done when** §4.4's two sentences name what `RED_CONCLUSIONS`, `RED_STATES` and `holds_pr` test, and the history carries the line.
 
 **Related:** TD-618 (the build), TD-613 (the design), #1617, #1620.
+
+---
+
+## TD-625: The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/reports.py` (`pr_reading`, its second `_gh_prs` read and `truncated`),
+`src/shiftlead/ui/org.py` (the facet's `prs`), `src/shiftlead/ui/templates/team_summary.html` (the
+*closed* block's `+`), design §4.4 *Repo facts* (**Pull requests**).
+
+**Why:** Paul (2026-10-13): *the count for PRs in the Pull Requests card seems to top out at 999 or
+1000+ — fix it to show the actual counts.* The windows come from one `gh pr list --state all --search
+updated:>=<a month ago> --limit 1000` read, and `gh pr list --search` goes through GitHub's search,
+which returns at most 1000 results whatever the limit: on 2026-10-13 that read gave 1000 PRs while
+GitHub counts 1533 (`search(query: "repo:… is:pr updated:>=2026-09-13") { issueCount }`). So the
+month's *opened* and *closed* are a floor drawn as a number (with a `+` on *closed* alone), raising
+`limit` changes nothing, and the 7-day window is complete only because the read is newest-first.
+`recent` — the month's PRs that the Repo page and TD-608's *completed* join by number — is cut the
+same way.
+
+**Fix:** take the counts from GitHub's own totals, not from a list's length: per window, one GraphQL
+`search(type: ISSUE) { issueCount }` for `is:pr created:>=<start>` and one for `is:pr closed:>=<start>`
+(a merge is a close) — six small queries per remote, on the same five-minute read; the qualifiers
+take a timestamp, so the windows stay rolling. Keep the list for `recent`, and where it must be
+whole, read it in date slices each under 1000 (or say in the reading that `recent` is the newest
+1000). Drop `truncated` and the `+` once the counts are totals, and change §4.4's sentence in the
+same PR. **Done when** the card's month reads the number `issueCount` gives, and a test feeds a
+month of more than 1000 PRs and gets its count.
+
+**Related:** TD-176 (the two reads), TD-608 (*completed* joins `recent`), TD-611 (the PR count in the polls).
 
 ---
 
