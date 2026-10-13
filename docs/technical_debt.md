@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-619 | A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record | Medium | Designed — TD-620 builds it |
 | TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Open |
 | TD-621 | The Inbox read's off-the-loop build and gzip (TD-611 slice 2, #1619) is in no design section and no history line | Low | Open |
+| TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 
 ---
 
@@ -1008,6 +1009,33 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Done when** the design says where the Inbox read is built and that it is compressed, and the history carries the dated line.
 
 **Related:** TD-611 (the slice), TD-614 (the design that moves the counts to the stream), TD-616 (builds the counts' owner).
+
+
+---
+
+## TD-622: #1563's `AO.shellHere` — the *tab* wording of the blocked-pop-up toast, the close on a create that answers without an id, and the placeholder's directory fallback — are held by no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (test-audit-ao-1, auditing #1563)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (`AO.shellHere`), `tests/test_ui_popout.py` (`SHELL_PROBE`, `test_open_shell_here_opens_beside_the_page_it_was_pressed_on`)
+
+**Why:** #1563 (TD-579) has a node probe and a source-shape test, and its docstring says *a blocked open creates nothing and says so* and that the placeholder *reads "opening a shell in <dir>…"*. Probe: each change below, one at a time, then `PYTHONPATH=$PWD/src pytest -q tests/test_ui_popout.py`: every one still passes (7 passed).
+- `const what = asWindow ? "window" : "tab";` → `const what = "window";`: the probe blocks only the window form (`AO.shellHere("a", "/repo/x", true)`), so a blocked *tab* — the plain press, the common one — saying *the browser blocked the window* is read by no test.
+- `if (!res || !res.id) { …w.close()…; return res; }` removed: a create that answers without an `id` leaves the placeholder tab open at *opening a shell in …* for good; the probe's `AO.act` returns an id or throws, never `{}`.
+- `dir || "this session's directory"` → `dir || "x"`: the probe always passes `/repo/x`, so the fallback sentence (a card whose `data-dir` is empty) is never drawn.
+The window's `w.name` assignment, by contrast, is caught.
+
+**Fix:** extend `SHELL_PROBE`: a blocked open with `asWindow` false (the toast names the tab, nothing created), an `AO.act` that answers `{}` (the placeholder closed, no `href` set), and a press with an empty `dir` (the placeholder names the session's directory). **Done when** each probe above fails a test.
+
+**Related:** TD-577, TD-579 (#1563).
+
+---
+
+<!-- Entry template:
 
 ---
 
