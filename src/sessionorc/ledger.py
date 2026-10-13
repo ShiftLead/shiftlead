@@ -4,7 +4,9 @@ A repo's ledger (`.shiftlead.yml`'s `ledger:`, default `docs/technical_debt.md`)
 entries, each `## TD-NNN: title` followed by header fields — `**Priority:**`, `**Owner:**`,
 `**Kind:**`, `**Type:**`, `**Blocked by:**`. This module is the one reader of those fields: the
 Org's Repo facet and the Repo page count what it returns, and `tests/test_ledger.py` holds the
-repo's own ledger to its rules through the same regexes. **Pickable is derived** from `Blocked by:`
+repo's own ledger to its rules through the same reader. Every line shape — a heading, a field, a
+`Blocked by` item, `Answers:` — is ledgerboard's (`sessionorc.ledgerboard`, the vendored release,
+ADR 2026-10-12, TD-585); what a field is *for* is this module's. **Pickable is derived** from `Blocked by:`
 by cadence §2.4's rule (TD-228), the rule dev-cadence's `scripts/ledger.py` applies, and
 `tests/test_ledger_derived.py` holds the two readers equal; a `**Pickable:**` line a ledger still
 writes is not read.
@@ -27,6 +29,7 @@ from typing import Any
 
 import yaml
 
+from sessionorc import ledgerboard as lb
 from sessionorc import paths
 from sessionorc.models import owner_word
 
@@ -34,19 +37,9 @@ from sessionorc.models import owner_word
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 DEFAULT = "docs/technical_debt.md"  # the `ledger:` default, as `shiftlead.repoconfig` has it
 
-HEADING = re.compile(r"^## (TD-\d+):[ \t]*(.*)$", re.M)
-SECTION = re.compile(r"^## ", re.M)  # a body ends at the next `## ` heading of any kind, as the script reads it
-# Parity (cadence §7): §2.12's header-block rule, as dev-cadence's `scripts/ledger.py` reads it.
-FIELD = re.compile(r"^\*\*([A-Za-z][^*:\n]*?):\*\*[ \t]*(.*?)[ \t]*$")  # one line, one field
-# the fields read further down the body when the header block lacks them: the script's three by their
-# exact spelling, as it reads them, and ours by any spelling
-BELOW_EXACT = ("Priority", "Type", "Blocked by")
+# the fields ShiftLead reads further down the body when the header block lacks them, by any spelling
+# (ledgerboard's `entries` reads Priority, Type and Blocked by there itself)
 BELOW = ("owner", "kind", "answers")  # `answers`: a *for you* entry's, wherever it is written (TD-565)
-COMMENT = re.compile(r"<!--.*?-->", re.S)
-ID_ITEM = re.compile(r"^TD-(\d+)$")
-XREPO_ITEM = re.compile(r"^([\w.-]+(?:/[\w.-]+)?)#(TD-\d+)$")  # cadence §2.4's `<repo>#TD-NNN`
-DECISION = re.compile(r"\bdecision\s*\(([^)]+)\)", re.I)
-WORD = re.compile(r"[^\s,;]+")
 BUILT = re.compile(r"#(\d+)")  # a `Kind: live-check #<n>` line's builds (design §4.9b, TD-323)
 SQUASH = re.compile(r"\(#(\d+)\)\s*$")  # a squash commit's subject ends `(#<n>)`
 
@@ -54,14 +47,12 @@ SQUASH = re.compile(r"\(#(\d+)\)\s*$")  # a squash commit's subject ends `(#<n>)
 KINDS = ("for-you", "blocked", "design", "live-check", "pickable", "evaluation", "other")
 LANE_KINDS = ("pickable", "design", "live-check")  # the kinds a lane word takes (§4.4 *In a team's lanes*)
 PRIORITIES = ("high", "medium", "low")
-TYPES = ("debt", "feature")  # cadence §2.11: pick order within a Priority; the first is the default
+TYPES = lb.TYPES  # cadence §2.11: pick order within a Priority; the first is the default
 # The windows every count is kept for: the last day, week and month, rolling.
 WINDOWS = {"day": timedelta(days=1), "week": timedelta(days=7), "month": timedelta(days=30)}
 # A *for you* entry's reading for its Inbox row (§4.5 screen 6 *The ledger's entries that wait on you*,
 # TD-565): its `**Answers:**` in cadence §3.5's form, and its Why and Fix clipped as a board item's
 # detail block is (dev-cadence's `MAX_DETAIL_LINES`).
-ANSWER_SPLIT = re.compile(r"(?<!\\)\|")
-DEFAULT_MARK = re.compile(r"\s*\(default\)\s*$", re.I)
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 DETAIL_FIELDS = ("Why", "Fix")
 MAX_DETAIL_LINES = 20
@@ -70,59 +61,32 @@ MAX_DETAIL_LINES = 20
 def strip_comments(text: str) -> str:
     """The file without its HTML comments: the entry template lives in one and is headed TD-001,
     which is a real id."""
-    return COMMENT.sub("", text)
+    return lb.COMMENT_RE.sub("", text)
 
 
-def _word(value: str) -> str:
-    """A field's first word, lower-cased: `**Kind:** build — …` is `build`, `**Owner:** paul (…)` is
-    `paul`. The prose after the word is the entry's, and no count reads it."""
-    m = WORD.search(value or "")
-    return m.group(0).strip("*_`").rstrip(".:").lower() if m else ""
+_word = lb.first_word  # a field's first word, lower-cased: `**Kind:** build — …` is `build`
 
 
-def _key(name: str) -> str:
-    """`Blocked by` / `blocked-by` / `BLOCKED_BY` all read as `blocked by`."""
-    return re.sub(r"[-_\s]+", " ", name.strip()).lower()
-
-
-def _header(body: str) -> dict[str, str]:
-    """Every `**Name:** value` line of the header block: after the heading's blank lines, up to the
-    next blank line; a repeated field, the first. A field the block lacks is read from further down
-    the body (the safe direction, as the script reads it)."""
-    fields: dict[str, str] = {}
-    started = False
+def _header(fields: dict[str, str], body: str) -> dict[str, str]:
+    """ledgerboard's header fields of an entry, with ShiftLead's `BELOW` fields read from further
+    down the body when the header block lacks them (the safe direction, as ledgerboard reads its
+    own three); a repeated field, the first."""
+    fields = dict(fields)
     for line in body.split("\n"):
-        if not line.strip():
-            if started:
-                break
-            continue
-        started = True
-        if m := FIELD.match(line):
-            fields.setdefault(_key(m.group(1)), m.group(2))
-    for line in body.split("\n"):
-        if not (m := FIELD.match(line)) or (k := _key(m.group(1))) in fields:
-            continue
-        if m.group(1) in BELOW_EXACT or k in BELOW:
+        if (m := lb.FIELD_RE.match(line)) and (k := lb.field_key(m.group(1))) in BELOW and k not in fields:
             fields[k] = m.group(2)
     return fields
 
 
 def answers_of(value: str) -> tuple[list[str], int | None]:
-    """An `**Answers:**` line read as the board's reader reads `Answers:` (cadence §3.5): the items
-    split on `|` (`\\|` a literal bar), the closing full stop dropped, and the index of the one
-    marked ` (default)` — None unless exactly one is (cadence §3.5, TD-066: at most one, and with
-    two there is no single recommendation), as the reader's `parse_default` gives it."""
-    out: list[str] = []
-    marked: list[int] = []
-    for raw in ANSWER_SPLIT.split((value or "").strip().rstrip(".")):
-        words = raw.replace("\\|", "|").strip()
-        if DEFAULT_MARK.search(words):
-            words = DEFAULT_MARK.sub("", words).strip()
-            if words:
-                marked.append(len(out))
-        if words:
-            out.append(words)
-    return out, marked[0] if len(marked) == 1 else None
+    """An `**Answers:**` line read as the board's reader reads `Answers:` (cadence §3.5, ledgerboard's
+    `parse_answers`): the items split on `|` (`\\|` a literal bar), the closing full stop dropped, and
+    the index of the one marked ` (default)` — None unless exactly one is (cadence §3.5, TD-066: at
+    most one, and with two there is no single recommendation), as `parse_default` gives it."""
+    line = f"Answers: {(value or '').strip()}"
+    out = lb.parse_answers(line)
+    default = lb.parse_default(line)
+    return out, out.index(default) if default is not None and default in out else None
 
 
 def detail_of(body: str) -> list[str]:
@@ -131,7 +95,7 @@ def detail_of(body: str) -> list[str]:
     lines = body.split("\n")
     out: list[str] = []
     for name in DETAIL_FIELDS:
-        at = next((i for i, ln in enumerate(lines) if ln.startswith(f"**{name}:**")), None)
+        at = next((i for i, ln in enumerate(lines) if (m := lb.FIELD_RE.match(ln)) and m.group(1) == name), None)
         if at is None:
             continue
         while at < len(lines) and lines[at].strip():
@@ -147,27 +111,12 @@ def _norm(tid: str) -> str:
 
 def ids_in(text: str | None) -> set[str]:
     """The ids with a `## TD-NNN:` heading in a ledger or an archive, comments dropped."""
-    return {_norm(m.group(1)) for m in HEADING.finditer(strip_comments(text or ""))}
+    return {f"TD-{n:03d}" for n in lb.heading_nums(text)}
 
 
-def parse_blocked(raw: str) -> tuple[list[str], list[str], list[str]]:
-    """One `**Blocked by:**` value as (ids — `TD-NNN` or `<repo>#TD-NNN` — decision holders, items it
-    cannot read), cadence §2.4's rule: the decision last, what follows it with no comma its pointer
-    and never read, an item after its comma unreadable."""
-    ids: list[str] = []
-    who: list[str] = []
-    bad: list[str] = []
-    if d := DECISION.search(raw):
-        who.append(d.group(1).strip())
-        rest = raw[d.end() :].strip()
-        if rest.startswith(","):
-            bad.append(f"after the decision: {rest[1:].strip()}")
-        raw = raw[: d.start()]
-    for item in (x.strip() for x in raw.split(",")):
-        if not item:
-            continue
-        (ids if ID_ITEM.match(item) or XREPO_ITEM.match(item) else bad).append(item)
-    return ids, who, bad
+# One `**Blocked by:**` value as (ids — `TD-NNN` or `<repo>#TD-NNN` — decision holders, items it cannot
+# read), cadence §2.4's rule: the decision last, what follows it with no comma its pointer and never read.
+parse_blocked = lb.parse_blocked
 
 
 Resolve = Callable[[str], str]  # a `<repo>#TD-NNN` item → `archived`, `open` or `unresolved`
@@ -179,7 +128,7 @@ def built(value: str) -> list[int]:
     grinder's once its build is live*, TD-323): the `#<n>` after the kind's word, one or several,
     separated by spaces or commas. Anything else after the word — prose, nothing — names none, and
     the word itself is read as before."""
-    m = WORD.search(value or "")
+    m = lb.WORD_RE.search(value or "")
     rest = [t for t in re.split(r"[\s,]+", (value or "")[m.end() :] if m else "") if t]
     nums = [BUILT.fullmatch(t) for t in rest]
     return [int(x.group(1)) for x in nums] if rest and all(nums) else []
@@ -393,13 +342,13 @@ def entries(
     `yes` when `live` says every one of them is live and `no` otherwise — no callable, no PR named
     (§4.9b, TD-323)."""
     t = strip_comments(text)
-    heads = list(HEADING.finditer(t))
+    heads = list(lb.HEADING_RE.finditer(t))
     here = {_norm(m.group(1)) for m in heads}
     archived = ids_in(archive)
     out: list[dict[str, Any]] = []
-    for m in heads:
-        nxt = SECTION.search(t, m.end())
-        fields = _header(t[m.end() : nxt.start() if nxt else len(t)])
+    for m, read in zip(heads, lb.entries(t), strict=True):
+        nxt = lb.SECTION_RE.search(t, m.end())
+        fields = _header(read["fields"], t[m.end() : nxt.start() if nxt else len(t)])
         etype = (fields.get("type") or "").split()[0].lower() if (fields.get("type") or "").split() else ""
         blocked_by: list[str] = []
         raw = fields.get("blocked by") or ""  # an empty line blocks nothing
@@ -414,7 +363,7 @@ def entries(
             blocked_by += [f"decision ({w})" for w in who] + [repr(b) for b in bad]
         e = {
             "id": m.group(1),
-            "title": m.group(2).strip(),
+            "title": read["title"],
             "priority": _word(fields.get("priority", "")),
             "owner": _word(fields.get("owner", "")),
             "kind": _word(fields.get("kind", "")),
@@ -514,7 +463,7 @@ class Registry:
         return self._read[root]
 
     def __call__(self, item: str) -> str:
-        m = XREPO_ITEM.match(item)
+        m = lb.XREPO_ITEM_RE.match(item)
         root = self._find(m.group(1)) if m else None
         got = self._repo(root) if root is not None else None
         if got is None or m is None:
@@ -587,14 +536,13 @@ def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
             m = SQUASH.search(parts[3]) if len(parts) > 3 else None
             pr = int(m.group(1)) if m else None
             continue
-        if line.startswith(("+## TD-", "-## TD-")):
-            m = HEADING.match(line[1:])
-            if not m or m.group(1) in skip:
+        if line[:1] in "+-" and (tid := lb.entry_id(line[1:])):
+            if tid in skip:
                 continue
             if line[0] == "+":
-                added[m.group(1)] = m.group(2).strip()
+                added[tid] = line[1:].partition(":")[2].strip()
             else:
-                removed.add(m.group(1))
+                removed.add(tid)
     apply(at, pr, added, removed)
     return life
 
@@ -605,8 +553,9 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
     *nothing changed*. `text` is the file as it stands, so the ids of headings that sit only in a
     comment (the entry template's) are left out. A file rewritten without a history reads as
     opened at its first commit, which is all its history says."""
-    raw = set(HEADING.findall(text))
-    skip = {tid for tid, _ in raw} - {tid for tid, _ in HEADING.findall(strip_comments(text))}
+    skip = {m.group(1) for m in lb.HEADING_RE.finditer(text)} - {
+        m.group(1) for m in lb.HEADING_RE.finditer(strip_comments(text))
+    }
     try:
         cp = subprocess.run(
             [

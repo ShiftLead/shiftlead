@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sessionorc import ledger
+from sessionorc import ledgerboard as lb
 from sessionorc.models import PR_CLOSED, FindingEntry, ProgressEntry, normalize_ref
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -28,8 +29,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # A work branch is named for its ledger reference (cadence §4: `tdNNN-<slug>`). Only that one shape
 # is read: anything looser would turn `release-2` and `ui-3-fix` into ledger references.
 BRANCH_RE = re.compile(r"^td-?(\d{1,4})(?:[-_].*)?$", re.IGNORECASE)
-# A row the ledger gained: an entry body's heading, or its row in the summary table.
-LEDGER_ROW_RE = re.compile(r"^\+(?:#{1,4}\s*(TD-\d+)|\|\s*(TD-\d+)\s*\|)", re.IGNORECASE | re.MULTILINE)
 LEDGER_DEFAULT = "docs/technical_debt.md"  # §5's `ledger:` key overrides it per record (`Session.ledger`)
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 
@@ -486,5 +485,7 @@ def _ledger_rows_on_main(directory: Path | str, pr: int, ledger: str) -> list[st
     diff = _git(directory, "show", "--format=", "-U0", sha, "--", ledger)
     if not diff:
         return []
-    rows = [normalize_ref(m[1] or m[2]) for m in LEDGER_ROW_RE.finditer(diff)]
+    # a row the ledger gained: an entry's heading, or its row in the summary table (ledgerboard's predicates)
+    added = (line[1:] for line in diff.splitlines() if line.startswith("+"))
+    rows = [normalize_ref(tid) for line in added if (tid := lb.entry_id(line) or lb.row_id(line))]
     return list(dict.fromkeys(rows))
