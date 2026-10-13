@@ -323,3 +323,52 @@ def test_a_sat_out_member_is_passed_over_by_wound_down_and_finished():
     grinder = {"id": "g", "name": "grinder-1", "unattended": True, "state": "idle", "out_of_work": out}
     gone = {**sat, "id": "d", "unattended": True, "state": "closed", "restart_wanted": out}
     assert work.finished([grinder, gone])["why"] == []  # its restart word is not read: the flow sat it out
+
+
+@pytest.mark.integration
+async def test_a_relaunch_carries_the_profile_and_one_not_handed_is_kept(agent, tmp_path, monkeypatch):
+    """TD-619 / TD-620: `profile` is a relaunch key — replaced as handed, written into the launch record
+    and the mark, so the tick's replay creates under it — and **kept** when not handed, since a launch
+    with none is the default profile's. A profile the member's adapter does not run is refused, touching
+    nothing, and so is a profiles file that cannot be read."""
+    from sessionorc import adapters
+
+    await park_ticks(agent)
+    monkeypatch.setattr(
+        adapters.get("shell"),
+        "doctor_profiles",
+        lambda: [{"profile": "grind"}, {"profile": "grind-opus"}],
+        raising=False,
+    )
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    async with LocalClient() as person:
+        params = {"name": "m", "dir": str(work_dir), "unattended": True, "supervised": True, **SHELL}
+        sid = (await person.call("create", prompt="p", lane=["TD-1"], profile="grind", **params))["id"]
+        rec = agent.sessions[sid]
+        assert rec.profile == "grind" and _launch(sid)["profile"] == "grind"
+        before = _launch(sid)
+        with pytest.raises(AgentError, match=r"no profile 'grind-fable' in profiles.yml \(known: grind, grind-opus\)"):
+            await person.call("relaunch", id=sid, launch={"prompt": "p", "profile": "grind-fable"})
+        with pytest.raises(AgentError, match="a relaunch's profile is a str"):
+            await person.call("relaunch", id=sid, launch={"profile": ["grind"]})
+        monkeypatch.setattr(adapters.get("shell"), "doctor_profiles", lambda: [{"error": "profiles.yml: bad"}])
+        with pytest.raises(AgentError, match=r"profiles could not be read \(profiles.yml: bad\)"):
+            await person.call("relaunch", id=sid, launch={"profile": "grind"})
+        assert _launch(sid) == before and rec.relaunch is None
+        monkeypatch.setattr(adapters.get("shell"), "doctor_profiles", lambda: [{"profile": "grind-opus"}])
+
+        # not handed: the record's profile stands, and the mark says which it runs next
+        view = await person.call("relaunch", id=sid, launch={"prompt": "composed", "lane": ["TD-9"]})
+        assert _launch(sid)["profile"] == "grind" and view["relaunch"]["profile"] == "grind"
+        # handed: replaced, marked, and the replay creates under it
+        view = await person.call("relaunch", id=sid, launch={"prompt": "composed", "profile": "grind-opus"})
+        assert _launch(sid)["profile"] == "grind-opus" and view["relaunch"]["profile"] == "grind-opus"
+        assert rec.profile == "grind"  # the running record is not touched: the replay brings the new launch
+        _idle(rec)
+        await agent._keep_running(datetime.now(UTC))
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["flow"]
+        assert new.profile == "grind-opus" and new.relaunch is None
+        with contextlib.suppress(Exception):
+            await person.call("kill", id=sid)
