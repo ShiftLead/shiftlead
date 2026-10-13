@@ -387,6 +387,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-13 (TD-627, the designer; Paul, 2026-10-13: *our git card in the focus session screen shows modified files — add links to those files so they can be opened in vscode/other*): **Focus side panel, Git card: changed files** — each path a link by the recent files' form; a deletion and a new directory stay text. Built by TD-628.
 - 2026-10-12 (TD-619, the designer): **flow changed — Apply** counts a profile difference. Built by TD-620.
 - 2026-10-12 (TD-614, the designer): **Org top bar | Inbox** — the count arrives on the stream as `counts`; the counts read (TD-611 slice 1) is the fallback with `since=<rev>`; the Inbox page re-reads its mail on the stream's `inbox`. Built by TD-616.
 - 2026-10-12 (TD-613, the designer): **Inbox row: red PR**; the Repo facet's *Pull requests* says *· n red* with whose each is on hover. Built by TD-618.
