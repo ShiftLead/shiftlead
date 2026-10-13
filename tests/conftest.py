@@ -68,14 +68,14 @@ def _anchor_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _no_real_repos_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """A host with no `repos_registry:` of its own reads dev-cadence's machine roster in the
-    person's home only on the default home (TD-298: any other home reads its own `repos.txt`, which
+    """A host with no `repos_registry:` of its own imports dev-cadence's machine roster in the
+    person's home only on the default home (TD-298, TD-590: every home reads its own `repos.txt`, which
     `hosts.default_repos_registry()` names) — and from TD-069 step 3 the Inbox runs the board reader
     over every repo on it. A test never reads the person's roster, even one that points
     `SHIFTLEAD_HOME` at the default: it gets an empty one unless it writes its own."""
     from sessionorc import hosts
 
-    monkeypatch.setattr(hosts, "DEFAULT_REPOS_REGISTRY", str(tmp_path / "no-roster" / "repos.txt"))
+    monkeypatch.setattr(hosts, "DEV_CADENCE_ROSTER", str(tmp_path / "no-roster" / "repos.txt"))
 
 
 CHILD = HERE / "_agent_child.py"

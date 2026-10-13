@@ -40,25 +40,52 @@ def test_scratch_home_never_reads_the_machine_roster(tmp_path, monkeypatch):
     roster = tmp_path / "machine" / "repos.txt"
     roster.parent.mkdir()
     roster.write_text("/home/p/real\n")
-    monkeypatch.setattr(hosts, "DEFAULT_REPOS_REGISTRY", str(roster))
+    monkeypatch.setattr(hosts, "DEV_CADENCE_ROSTER", str(roster))
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     monkeypatch.setenv("SHIFTLEAD_HOME", str(scratch))
     h = hosts.local_host()
-    assert h.repos_registry == scratch / "repos.txt" and h.repos() == []
+    assert h.repos_registry == scratch / "repos.txt" and h.repos_import is None and h.repos() == []
     assert hosts.Host(name="x", vscode_host="x").repos() == []  # the dataclass's default reads the home too
     (scratch / "repos.txt").write_text("/home/p/mine\n")
     assert hosts.local_host().repos() == ["/home/p/mine"]
-    # the default home (however it is spelled) keeps the machine roster
+    # the default home (however it is spelled) imports the machine roster
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.setenv("SHIFTLEAD_HOME", "~/.shiftlead")
     assert hosts.local_host().repos() == ["/home/p/real"]
     (tmp_path / ".shiftlead").mkdir()
     (tmp_path / "link").symlink_to(tmp_path / ".shiftlead")
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "link"))
-    assert hosts.default_repos_registry() == roster  # a symlink to the default home is the default home
+    assert hosts.default_repos_import() == roster  # a symlink to the default home is the default home
     monkeypatch.delenv("SHIFTLEAD_HOME")
-    assert hosts.default_repos_registry() == roster
+    assert hosts.default_repos_import() == roster
+
+
+def test_the_home_has_its_own_roster_and_imports_dev_cadences(tmp_path, monkeypatch):
+    """TD-590 (design §5 *Repos*): the default home reads `repos.txt` under itself first, then
+    dev-cadence's roster when it exists — so a host without dev-cadence lists what ShiftLead was
+    given, one with it lists both, each repo once; `repos_registry:` names one file in place of both."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("SHIFTLEAD_HOME", "~/.shiftlead")
+    home = tmp_path / ".shiftlead"
+    home.mkdir()
+    cadence = tmp_path / ".config" / "dev-cadence" / "repos.txt"
+    monkeypatch.setattr(hosts, "DEV_CADENCE_ROSTER", str(cadence))
+    assert hosts.local_host().repos() == []  # neither roster: nothing, never a crash
+    (home / "repos.txt").write_text("# given to ShiftLead\n/home/p/mine\n/home/p/both\n")
+    h = hosts.local_host()
+    assert h.repos_registry == home / "repos.txt" and h.repos_import == cadence
+    assert h.repos() == ["/home/p/mine", "/home/p/both"]  # no dev-cadence roster: what ShiftLead was given
+    cadence.parent.mkdir(parents=True)
+    cadence.write_text("/home/p/both\n/home/p/cadence\n")
+    assert hosts.local_host().repos() == ["/home/p/mine", "/home/p/both", "/home/p/cadence"]  # both, the home's first
+    (home / "repos.txt").unlink()
+    assert hosts.local_host().repos() == ["/home/p/both", "/home/p/cadence"]  # dev-cadence's alone, as before
+    other = tmp_path / "other.txt"
+    other.write_text("/home/p/other\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {other}\n")
+    h = hosts.local_host()
+    assert h.repos_import is None and h.repos() == ["/home/p/other"]  # a named file stands in for both
 
 
 def test_serve_takes_the_tmux_socket_from_the_env(tmp_path, monkeypatch):

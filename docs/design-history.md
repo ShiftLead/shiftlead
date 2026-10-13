@@ -78,6 +78,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-12 (TD-597, the build): `transcript` is the path the hook reports (Claude Code's `transcript_path`), not the adapter's locator, which finds no file before the conversation's first write and so had nothing to set at the first hook. Was: the adapter's `transcript_path`.
 - 2026-10-12 (TD-578, the designer): the record carries `transcript`, the tool's file path on its host, set with `adapter_id`. Built by TD-597.
 - 2026-10-12 (TD-592, ao-paul; Paul: *this session has been sitting idle since I ran the /clear, but its chip says working*): `SessionStart` with `source: clear` reports `idle`. Until this date it read `working`, as TD-155 had found for `resume`: `/clear` lands at an empty composer, no `Stop` follows, and the chip sat `working` until the next turn ended, headed for `stalled?`.
 - 2026-10-10 (TD-543, the designer; Paul: *do we leverage that and add the recent urls and files from the terminal to our list?*): the record's `links` — the http/https URLs the transcript holds in the assistant's text and tool results, read incrementally from a cursor on the tick, newest twenty, prompts and loopback hosts left out; never from the pane. Built by TD-544.
@@ -375,6 +376,7 @@ decisions; this file points at them rather than repeating them.
 ## 4.5a Controls
 
 - 2026-10-12 (TD-599, the designer; Paul, 2026-10-12, through Add entry: *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`): **Inbox: *Answered for you*, Dismiss all** — the group is not redundant (each row is an answer given in the person's name that the person may Overrule; FYI holds none), so it stays apart and gains FYI's one-press clear of the rows on screen. Built by TD-602.
+- 2026-10-12 (TD-598, grinder-ao-2): TD-581 built — the promote row under `auto` drawn under FYI with the reading's `acts` word and **Promote now**, `id="promote-<repo>"` on the row, the build chip's *main +n* a link to it with the hover's *auto on · …* line; *The help text* gains **Promote now**'s paragraph.
 - 2026-10-12 (TD-581, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td581-promote-now.png`): **Inbox row: promote** under `auto: true` is an FYI row while main is ahead — *auto on · settles in m min* / *promotes at the next tick* — with **Promote now**; the **build** chip's *main +n* links to it and its hover says when the home will act. Was: nothing drawn under `auto` but a failure. Built by TD-598.
 - 2026-10-12 (TD-580, the designer): *Focus: Open shell here* says the shell is the person's own, the person-only acts running from it. Built by TD-596.
 - 2026-10-12 (TD-578, the designer; Paul, 2026-10-12: *add a button on our focus screen to open the current transcript in vscode/other (should have same file-open command as others)*; mockup `Focus.dc.html`, shot `docs/mockups/reviews/2026-10-12-td578-transcript-editor-button.png`): **Focus header: ‹› VS Code** — the editor button's link on the transcript file, beside **Transcript**, one launch, the Transcript page's button's absences. Was: the file reached the editor only through the Transcript page. Built by TD-597.
@@ -671,6 +673,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-12 (TD-598, grinder-ao-2): `ao promote status` under `auto: true` prints when the home will act, in the Inbox row's words (*auto on · settles in 6 min*).
 - 2026-10-12 (TD-581, the designer): `ao promote` under `auto: true` promotes now, the settle and the wait skipped. Built by TD-598.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): `ao repo init` (an empty ledger), `ao board edit done|snooze` (a session's own line edit on its branch through ledgerboard's `edit_line()`), `ao doctor`'s **repos** check. Built by TD-587 and TD-591.
 - 2026-10-12 (TD-561, the designer): `ao msg --subject <line>`; a missing one on a message to the person is derived and said; `ao inbox` prints it. Built by TD-566.

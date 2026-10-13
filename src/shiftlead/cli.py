@@ -18,7 +18,7 @@ from importlib import resources
 from typing import Any
 
 from sessionorc import client as clientmod
-from sessionorc import hosts, naming
+from sessionorc import hosts, naming, promote
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import settings as settings_mod
@@ -32,6 +32,7 @@ from sessionorc.models import (
     FOLDED_KINDS,
     GRANTS,
     STATE_RANK,
+    Session,
     context_over,
     context_reading,
     pr_marks,
@@ -1572,8 +1573,8 @@ def _pick_key(e: dict[str, Any]) -> tuple[int, int]:
 
 def _promote_line(name: str, r: dict[str, Any]) -> str:
     """One repo's promote readings (design §4.7 `ao promote status`): *shiftlead · live 485d28b · main
-    9c1e0f2, 3 ahead · checks green · auto off*, then a run in flight, a failure, or the first
-    precondition that stands."""
+    9c1e0f2, 3 ahead · checks green · auto off*, under `auto` what the home will do (*auto on · settles
+    in 6 min*, TD-581), then a run in flight, a failure, or the first precondition that stands."""
     live = str(r.get("live") or "")[:7] or f"unknown ({r.get('live_why') or 'not read'})"
     main = str(r.get("main") or "")[:7] or f"unknown ({r.get('main_why') or 'not read'})"
     ahead = r.get("ahead")
@@ -1584,6 +1585,8 @@ def _promote_line(name: str, r: dict[str, Any]) -> str:
     if h := r.get("held"):  # §6 *The hold*: live is older than main because a person put it there
         live += f", rolled back from {str(h.get('from') or '')[:7] or 'unknown'}"
     auto = ("on" if r.get("auto") else "off") + (" · held" if r.get("held") else "")
+    if words := promote.acts_words(r.get("acts")):  # when the home will act under `auto` (TD-581)
+        auto += f" · {words}"
     line = f"{name} · live {live} · main {main} · checks {checks} · auto {auto}"
     if f := r.get("inflight"):
         what = "rolling back to" if f.get("kind") == "rollback" else "promoting"
@@ -2520,8 +2523,11 @@ def cmd_td_add(args: argparse.Namespace) -> int:
     `ask` to the techlead seat of the repo's first servicing team, carrying `entry` and marked
     `handed`. The repo defaults to the one the command is run in, and it is the **main checkout**
     that is handed, by path: a worktree's path is not in the registry. A person's only: a session is
-    refused here before its standard input is read, and by the host agent whatever this says."""
-    if sid := os.environ.get("SHIFTLEAD_SESSION"):
+    refused here before its standard input is read, and by the host agent whatever this says — but
+    the person's own shell (§4.8 *The person's own shell is the person*, TD-580), as the agent lets it by."""
+    if (sid := os.environ.get("SHIFTLEAD_SESSION")) and not mailmod.person_shell(
+        Session.from_dict(call_sync("get", id=sid))
+    ):
         raise AgentError(
             f"{sid} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
             "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"

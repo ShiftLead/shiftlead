@@ -90,6 +90,10 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
     out: dict[str, Any] = {}
     if sid := payload.get("session_id"):
         out["adapter_id"] = sid
+        # every hook payload names the file the conversation is written to (design §4.2, TD-578):
+        # the record's `transcript`, which a `/clear` moves to the new file with the new id
+        if (path := payload.get("transcript_path")) and isinstance(path, str):
+            out["transcript"] = path
     # Only SessionStart carries `model`, and not always (TD-031); PostModelSwitch is how a `/model`
     # mid-session reports itself. Read both generically: an event without one says nothing about it.
     if model := payload.get("model"):

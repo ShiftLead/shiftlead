@@ -1380,6 +1380,20 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         await person.call("remove", id=other["id"])
 
 
+async def test_the_transcript_file_comes_with_the_hook(agent, tmp_path):
+    """TD-578 (built by TD-597, design §4.2): the record's `transcript` is the file the hook reports
+    with the tool session id; an event without one leaves it, and a `/clear`'s new id brings its new file."""
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="t", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        assert (await person.call("get", id=sid))["transcript"] is None
+        await person.call("hook", session=sid, adapter_id="conv-1", transcript="/p/conv-1.jsonl", state="working")
+        assert (await person.call("get", id=sid))["transcript"] == "/p/conv-1.jsonl"
+        await person.call("hook", session=sid, state="idle")
+        assert (await person.call("get", id=sid))["transcript"] == "/p/conv-1.jsonl"
+        await person.call("hook", session=sid, adapter_id="conv-2", transcript="/p/conv-2.jsonl")
+        assert (await person.call("get", id=sid))["transcript"] == "/p/conv-2.jsonl"
+
+
 async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp_path, monkeypatch):
     """TD-031: `model` on the record — reported by the hook (SessionStart, a `/model` switch) and
     cross-checked on the tick by whatever the adapter can read. An adapter with no opinion, or a

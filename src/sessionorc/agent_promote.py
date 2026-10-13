@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import agent_common, hosts
+from sessionorc import agent_common, hosts, mail
 from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import RpcError, log
@@ -96,7 +96,7 @@ class PromoteMixin:
         return found[0]
 
     def _promote_person(self, method: str, caller: Any) -> None:
-        agent_common.person_only(caller, f"run {method}", "§6 *Promote*")
+        agent_common.person_only(caller, f"run {method}", "§6 *Promote*", self._graph())
         if self.mode != "home":
             raise RpcError(f"{method} runs at the home (design §6 Promote): this host is a node")
 
@@ -115,10 +115,11 @@ class PromoteMixin:
         `last.json`, refused under a hold; `run` started in a detached worktree at it, so neither
         (1) nor a failure standing refuses it, and the checks it reports are that commit's."""
         self._promote_person("promote", caller)
+        by = "person" if mail.is_person(caller) else str(caller)  # a person's own shell is named (§4.8, TD-580)
         if sha and back:
             raise RpcError("promote takes --sha or --back, not both")
         if sha or back:
-            return await self._rollback(repo, sha, back)
+            return await self._rollback(repo, sha, back, by)
         root = self._promote_root(repo)
         name = Path(root).name
         async with self._promote_lock:
@@ -136,6 +137,7 @@ class PromoteMixin:
             # the fresh reading replaces the held one whatever the press does next, so the Inbox row
             # a refusal leaves standing reads what was just read
             r["auto"] = self._promotes.get(name, {}).get("auto", False)
+            r["acts"] = promote_mod.acts(r, datetime.now(UTC))  # the row a refusal leaves reads `auto`'s clock too
             self._promotes[name] = r
             if (u := promote_mod.unmet(r, press=True)) is not None:
                 raise RpcError(f"promote {name} refused — {u[1]} (design §6 Promote, precondition: {u[0]})")
@@ -145,12 +147,12 @@ class PromoteMixin:
             assert block is not None  # survey read it a moment ago
             frm = None if r.get("live_why") else r.get("live")
             r["inflight"] = await asyncio.to_thread(
-                promote_mod.start, root, name, r["main"], block["run"], "person", r.get("ahead"), "promote", frm
+                promote_mod.start, root, name, r["main"], block["run"], by, r.get("ahead"), "promote", frm
             )
             u = promote_mod.unmet(r)
             r["unmet"] = {"name": u[0], "text": u[1]} if u else None
             self._promote_watch_at = float("-inf")  # the watch starts on the next tick
-        log.info("promote: %s pressed by the person at %s", name, r["main"][:12])
+        log.info("promote: %s pressed by %s at %s", name, by, r["main"][:12])
         return {
             "repo": name,
             "sha": r["main"],
@@ -162,7 +164,7 @@ class PromoteMixin:
             "checks_why": r.get("checks_why"),
         }
 
-    async def _rollback(self, repo: str, sha: str, back: bool) -> dict[str, Any]:
+    async def _rollback(self, repo: str, sha: str, back: bool, by: str) -> dict[str, Any]:
         """`promote` with a commit (§6 *A rollback*): the refusals in §6's order, each naming its
         reason, then `run` in the detached worktree. The hold is written when it concludes."""
         root = self._promote_root(repo)
@@ -211,7 +213,7 @@ class PromoteMixin:
             frm = None if r.get("live_why") else r.get("live")
             try:
                 r["inflight"] = await asyncio.to_thread(
-                    promote_mod.start, root, name, full, block["run"], "person", None, "rollback", frm
+                    promote_mod.start, root, name, full, block["run"], by, None, "rollback", frm
                 )
             except ValueError as e:
                 raise RpcError(f"promote {name} --sha failed to start — {e}") from None

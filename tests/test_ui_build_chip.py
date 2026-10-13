@@ -28,6 +28,7 @@ const year = new Date().getFullYear();
 // as the server renders it: the sentence in the host's zone, the instant in `data-at`
 const chip = { ...el(), className: "mono", title: "", textContent: "live 10-10 15:41 · main +2",
   dataset: { at: `${year}-10-10T15:41:00Z`, rest: " · main +2" } };
+chip.appendChild = (a) => { chip.appended = a; };
 const document = { documentElement: el(), body: el(), addEventListener: noop, createElement: el,
   querySelector: (s) => (s === "#buildchip" ? chip : null), querySelectorAll: () => [] };
 global.window = {}; global.document = document;
@@ -41,6 +42,7 @@ const AO = window.AO;
 const seen = () => ({ text: chip.textContent, cls: chip.className, title: chip.title, at: chip.dataset.at,
   rest: chip.dataset.rest });
 const poll = async (build_chip) => {
+  chip.appended = undefined;
   global.fetch = async () => ({ ok: true, json: async () => ({ needs: 0, build_chip }) });
   await AO.refreshInboxCount();
   return seen();
@@ -51,6 +53,12 @@ const poll = async (build_chip) => {
   out.noAt = await poll({ cls: "", title: "host agent: build unknown", text: "build unknown" });
   out.noChip = await poll(undefined);
   out.thisYear = await poll({ cls: "", title: "t", at: `${year}-12-31T23:59:00Z`, rest: "" });
+  const linked = await poll({ cls: "behind", title: "t", at: `${year}-12-31T23:59:00Z`, rest: " · main +2",
+    link: "main +2", href: "/inbox#promote-shiftlead" });
+  out.linked = { ...linked, href: chip.dataset.href, a: chip.appended && { href: chip.appended.href,
+    text: chip.appended.textContent } };
+  const unlinked = await poll({ cls: "", title: "t", at: `${year}-12-31T23:59:00Z`, rest: "" });
+  out.unlinked = { ...unlinked, href: chip.dataset.href, a: chip.appended };
   console.log(JSON.stringify({ year, ...out }));
 })();
 """
@@ -94,3 +102,13 @@ def test_a_chip_with_no_instant_keeps_its_text_and_a_poll_with_no_chip_changes_n
     got = _probe()
     assert got["noAt"] == {"text": "build unknown", "cls": "mono ", "title": "host agent: build unknown"}
     assert got["noChip"] == got["noAt"]  # the agent did not answer: the chip keeps what it showed
+
+
+def test_main_ahead_is_drawn_as_a_link_to_the_inbox_row_and_dropped_when_live_catches_up():
+    """TD-581: *main +n* is the chip's one pressable part, a link to `/inbox#promote-<repo>`; the
+    sentence before it stays text, and a later poll with no link draws plain text again."""
+    got = _probe()
+    assert got["linked"]["text"] == "live 12-31 18:59 · " and got["linked"]["href"] == "/inbox#promote-shiftlead"
+    assert got["linked"]["a"] == {"href": "/inbox#promote-shiftlead", "text": "main +2"}
+    assert got["unlinked"]["text"] == "live 12-31 18:59" and "href" not in got["unlinked"]
+    assert "a" not in got["unlinked"]

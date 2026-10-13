@@ -18,6 +18,7 @@ from conftest import park_ticks
 
 from sessionorc import hosts, promote
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import Session
 
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
 
@@ -323,6 +324,25 @@ async def test_the_press_is_a_persons_and_refused_to_a_session(agent, checkout):
             await worker.call("promote", repo="repo")
         with pytest.raises(AgentError, match="a person's own"):
             await worker.call("clear_promote", repo="repo")
+
+
+async def test_the_persons_own_shell_presses_and_the_press_is_recorded_as_the_shell(agent, checkout, monkeypatch):
+    """§4.8 *The person's own shell is the person* (TD-580): a shell the person opened — interactive,
+    no role, no team, no controller — runs `promote` as the person does, and `by` names the shell;
+    the same shell given a controller is refused on its next call."""
+    await park_ticks(agent)
+    _register(checkout)
+    main = _merge(checkout, "b")
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha: ("pending", ""))
+    shell = Session(id="ao-repo-sh", name="sh", kind="interactive", adapter="shell", dir=str(checkout))
+    agent.sessions[shell.id] = shell
+    async with LocalClient(caller=shell.id) as sh:
+        assert (await sh.call("promote", repo="repo"))["sha"] == main
+        assert agent._promotes["repo"]["inflight"]["by"] == "ao-repo-sh"
+        _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
+        shell.controllers = ["ao-repo-lead"]
+        with pytest.raises(AgentError, match="refused to every session but the person's own shell"):
+            await sh.call("clear_promote", repo="repo")
 
 
 async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(agent, checkout, monkeypatch):
@@ -692,3 +712,112 @@ def test_ao_promote_status_reads_rolled_back_and_held(monkeypatch, capsys):
     monkeypatch.setattr(cli, "call_sync", lambda m, **p: calls.append((m, p)) or {"repo": "shiftlead", "which": "held"})
     assert cli.main(["promote", "clear", "shiftlead"]) == 0
     assert calls == [("clear_promote", {"repo": "shiftlead"})] and "the hold is cleared" in capsys.readouterr().out
+
+
+# ── TD-581: the cap on the settle, when the home will act, and the press under `auto` ──────────
+
+
+def _merge_at(root: Path, name: str, when: datetime) -> str:
+    """A merge to main whose committer time is `when`, as a squash merge stamps it."""
+    (root / name).write_text(name)
+    _git(root, "add", "-A")
+    stamp = when.isoformat()
+    env = {"PATH": os.environ["PATH"], "HOME": os.environ.get("HOME", "/tmp"), **GIT_ENV}
+    env |= {"GIT_COMMITTER_DATE": stamp, "GIT_AUTHOR_DATE": stamp}
+    subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", name], check=True, capture_output=True, env=env)
+    _git(root, "push", "-q", "origin", "main")
+    return _git(root, "rev-parse", "HEAD")
+
+
+def test_ahead_since_is_when_main_first_moved_past_live_kept_and_cleared(checkout, tmp_path):
+    """§6 *Promote* (TD-581): `ahead_since`, the time main first moved past the live commit — the
+    oldest of main's commits live does not hold — kept while live stays behind, cleared at main."""
+    t0 = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=1)
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    assert readings["repo"]["ahead_since"] is None  # live is main
+    _merge_at(checkout, "b", t0)
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    assert datetime.fromisoformat(readings["repo"]["ahead_since"]) == t0
+    main = _merge_at(checkout, "c", t0 + timedelta(minutes=20))
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    r = readings["repo"]
+    assert datetime.fromisoformat(r["ahead_since"]) == t0 and r["ahead"] == 2  # kept: still the first
+    assert datetime.fromisoformat(r["moved"]) == t0 + timedelta(minutes=20)
+    (tmp_path / "live").write_text(main + "\n")  # live catches up
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {}, datetime.now(UTC))
+    assert readings["repo"]["ahead_since"] is None
+    assert promote.read_ahead_since(checkout, None, main) is None
+
+
+def test_auto_promotes_a_busy_main_at_the_max_wait_and_the_settle_holds_the_tick_before(checkout):
+    """§6 *Promote* (TD-581): under `auto` a main that never stands still for `PROMOTE_SETTLE` is
+    promoted once it has been ahead of live for `PROMOTE_MAX_WAIT` — with `moved` four minutes old."""
+    now = datetime.now(UTC).replace(microsecond=0)
+    _merge_at(checkout, "b", now - timedelta(seconds=promote.PROMOTE_MAX_WAIT - 60))
+    _merge_at(checkout, "c", now - timedelta(minutes=4))
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {"repo": True}, now)
+    r = readings["repo"]
+    assert r["inflight"] is None  # neither clock has run out: the settle batches the burst
+    assert r["acts"] == {"settles_in": 60}  # the cap's remainder, sooner than the settle's six minutes
+    assert promote.acts_words(r["acts"]) == "settles in 1 min"
+    later = now + timedelta(seconds=61)
+    readings, _, _ = promote.survey([str(checkout)], readings, True, {"repo": True}, later)
+    r = readings["repo"]
+    assert r["inflight"]["by"] == "auto" and r["inflight"]["sha"] == r["main"]
+    assert r["acts"] is None  # a run in flight: the row is the note's now
+    _wait_gone(r["inflight"]["pid"])
+
+
+def test_what_the_home_will_do_under_auto_in_the_rows_words():
+    now = datetime(2026, 10, 12, 18, 0, tzinfo=UTC)
+    base = {"auto": True, "live": "4" * 40, "main": "9" * 40, "tree": None, "checks": "green"}
+    base |= {"moved": "2026-10-12T17:56:00+00:00", "ahead_since": "2026-10-12T17:40:00+00:00"}
+    assert promote.acts(base, now) == {"settles_in": 360}  # settle: 6 min left; cap: 10 min left
+    assert promote.acts({**base, "ahead_since": "2026-10-12T17:35:00+00:00"}, now) == {"settles_in": 300}
+    assert promote.acts({**base, "moved": "2026-10-12T17:50:00+00:00"}, now) == {"at": "next tick"}
+    assert promote.acts({**base, "ahead_since": "2026-10-12T17:00:00+00:00"}, now) == {"at": "next tick"}
+    assert promote.acts({**base, "checks": "pending"}, now) == {"checks": "pending"}
+    assert promote.acts({**base, "live_why": "check exited 1"}, now) == {"waiting": "live"}
+    assert promote.acts({**base, "live": None}, now) == {"waiting": "live"}
+    for off in ({"auto": False}, {"live": "9" * 40}, {"inflight": {"sha": "9" * 40}}, {"tree": "dirty"}):
+        assert promote.acts({**base, **off}, now) is None, off
+    assert promote.acts({**base, "failed": {"sha": "9" * 40}}, now) is None
+    assert promote.acts({**base, "held": {"sha": "4" * 40}}, now) is None
+    # a failure or hold stands whatever the checks read; and no clock read is no promise (review of #1589)
+    assert promote.acts({**base, "checks": "pending", "failed": {"sha": "9" * 40}}, now) is None
+    assert promote.acts({**base, "checks": "pending", "held": {"sha": "4" * 40}}, now) is None
+    assert promote.acts({**base, "moved": None, "ahead_since": None}, now) is None
+    words = [promote.acts_words(a) for a in ({"settles_in": 360}, {"at": "next tick"}, {"checks": "failed"})]
+    assert words == ["settles in 6 min", "promotes at the next tick", "checks failed — promotes when green"]
+    assert promote.acts_words({"waiting": "live"}) == "waiting for a live reading"
+    assert promote.acts_words(None) == "" and promote.acts_words({"settles_in": 1}) == "settles in 1 min"
+
+
+def test_ao_promote_status_says_when_the_home_will_act_under_auto(monkeypatch, capsys):
+    from shiftlead import cli
+
+    reading = {"live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": True}
+    reading |= {"acts": {"settles_in": 360}}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"shiftlead": reading}})
+    assert cli.main(["promote", "status"]) == 0
+    assert capsys.readouterr().out.startswith(
+        "shiftlead · live 4444444 · main 9999999, 3 ahead · checks green · auto on · settles in 6 min"
+    )
+    reading["acts"] = None
+    assert cli.main(["promote", "status"]) == 0
+    assert capsys.readouterr().out.rstrip().endswith("checks green · auto on")
+
+
+async def test_the_press_under_auto_promotes_at_once_skipping_the_settle(agent, checkout):
+    """§6 *Promote*, §4.7 (TD-581): the settle and the wait are the policy's clocks, not
+    preconditions — a person's press under `auto: true` promotes main's head a moment after it moved."""
+    await park_ticks(agent)
+    _register(checkout)
+    main = _merge(checkout, "b")
+    agent._promotes["repo"] = {"auto": True}
+    assert not promote.settled(_git(checkout, "log", "-1", "--format=%cI"), datetime.now(UTC))
+    async with LocalClient() as person:
+        got = await person.call("promote", repo="repo")
+    assert got["sha"] == main and agent._promotes["repo"]["inflight"]["by"] == "person"
+    assert agent._promotes["repo"]["auto"] is True
+    _wait_gone(agent._promotes["repo"]["inflight"]["pid"])

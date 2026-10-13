@@ -770,7 +770,9 @@
    person's; a refusal comes back in the agent's words. **Snooze ▾** keeps the row aside by time
    alone. **Dismiss** is drawn on a failure row and on a held one (a rollback's hold, TD-226 slice
    3) and clears the home's own mark — the failure first, the hold when no failure stands. In
-   flight the row is FYI and its Promote disabled. Each control's `title` is its help paragraph's
+   flight the row is FYI and its Promote disabled. Under `auto` (TD-581) a repo main is ahead of is
+   FYI too, saying when the home will act, and its press reads **Promote now**: the same RPC, the
+   settle and the wait skipped. Each control's `title` is its help paragraph's
    first sentence (§4.5a *The help text*). #}
 {% macro promote_row(e, section) -%}
 <div class="row gap wrap mhead">
@@ -792,7 +794,11 @@
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
+  {%- if e.auto_row %}
+  <button class="btn sm primary" data-act="promote" data-id="person" data-repo="{{ e.repo }}" title="{{ help_title('promote-now') }}">Promote now</button>
+  {%- else %}
   <button class="btn sm primary" data-act="promote" data-id="person" data-repo="{{ e.repo }}"{% if e.inflight %} disabled title="a promote is in flight"{% else %} title="{{ help_title('promote') }}"{% endif %}>Promote</button>
+  {%- endif %}
   {%- if not e.inflight %}
   <details class="more"><summary class="btn sm ghost" title="{{ help_title('promote-snooze') }}">Snooze ▾</summary>
     <div class="menu">
@@ -913,7 +919,7 @@
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row %}
-<div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+<div class="mailrow staterow" tabindex="0"{% if e.row == 'promote' %} id="promote-{{ e.repo }}"{% endif %} data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {%- if e.row == 'promote' %}{{ promote_row(e, section) }}
 {%- elif e.row == 'work' %}{{ work_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
