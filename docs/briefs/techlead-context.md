@@ -78,7 +78,8 @@ person is `docs/user_attention.md`.
   **and** membership in the target's `controllers` (§9 invariant 11). Reads are never gated.
   *Create adds the creator*, and a child's grants are a subset of its creator's.
 - **Nothing keys on a role, a team or a project** (§9 invariant 9). They are badges. The one
-  exception is mail's sideways edge between sessions that share a `team` badge (§4.10). If an
+  exception is the mail gate: its sideways edge admits a session that shares the `team` badge, and
+  its cross-team edge one that shares the `project` badge (§4.10, TD-582). It gates mail only. If an
   answer would make code branch on a role's name, it is the wrong answer.
 - **Roles** (§4.8): `grinder`, `hunter`, `manager`, `techlead`, `auditor`, `plain`. `manager` was
   `lead` until 2026-09-20 and `orchestrator` before that; both old words are unknown roles now;
@@ -149,7 +150,7 @@ session it does not control. Tests run on private tmux sockets and a temporary h
 | our own mail, not Claude Code's or mcp_agent_mail | `docs/decisions/2026-09-16-agent-messaging-prior-art.md` |
 | what org, team, project and role mean | §4.9; `docs/decisions/2026-09-13-org-teams-projects.md` |
 | the names `manager` and `techlead`; `lead` retired | §4.8 *The names*; TD-076 |
-| a worker may message up, down, sideways by team, and the person | §4.10 |
+| a worker may message up, down, sideways by team, across teams by project, and the person | §4.10 |
 | what a worker does when it runs out, or wants a fresh run | §4.9a; TD-083 |
 | what the techlead may answer, and what always goes up | §4.9b |
 | who answers an identity alarm, and with what | §4.8a *An alarm's answers*, *Who answers first* |

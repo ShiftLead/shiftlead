@@ -10640,3 +10640,23 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Related:** TD-355 (the mark that outlives the Apply), TD-309 (archived: *Switching*), TD-334 (archived: rule 7's retry), TD-310 (the move that surfaced it).
 
 **Resolved:** 2026-10-12 (Paul, with ao-paul): the live check is dropped, not read. The fix is merged and tested (#1186: `_brief_restart` passes a declared member whose record carries `relaunch`; `tests/test_relaunch.py`, design §4.9c *Switching*). The guard now passes a declared member with a pending `relaunch` (`s.out_of_work and not s.relaunch`), so the case the check would watch is the case the tests hold. Separately, once a whole team has declared and that holds for `FINISHED_SETTLE` (10 min), rule 9 closes its idle, settled members as `finished` (about 18 minutes after the declaration in the one case seen), and their next start replays the current launch record. A team with one member still working closes nobody, so that path narrows the exposure but does not remove it; the tests are what the drop rests on. Causing the Apply on a scratch home would need a Claude login lent to it, which Paul judged not worth it. A recurrence gets a new entry.
+
+## TD-610: The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1592–#1599)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/briefs/techlead-context.md` L80–82 (*Nothing keys on a role, a team or a project*) and the table row L152 (*a worker may message up, down, sideways by team, and the person*); read against `docs/design/9-invariants.md` invariant 9 and `docs/design/4.10-messages.md` *across teams, by project*
+
+**Why:** The primer says *The one exception is mail's sideways edge between sessions that share a `team` badge (§4.10)*, and its §4.10 pointer row lists the edges as *up, down, sideways by team, and the person*. Since #1590/#1593 (TD-582, TD-601) the mail gate has a fifth edge, **project** (`mail.message_edge`: `if me.project and me.project == it.project: return "project"`), and invariant 9 says *its cross-team edge one carrying the same `project` badge … for a `manager: person` team the first is the only edge between members, and the second is the only one between teams*. #1593 edited the primer's §5 for the peer's agreement and left these two lines; the techlead is the seat that reads this file to decide what a teammate may ask of another team's session.
+
+**Fix:** reword L81 to the invariant's exception (the `team` and `project` badges, mail only) and the row at L152 to name the across-teams edge. A held path (`docs/briefs/**`): the techlead seat merges it.
+
+**Done when** the primer's exception names both badges the mail gate reads, as invariant 9 does.
+
+**Related:** TD-582 (#1590), TD-601 (#1593), TD-606 (the same drift in §4.9 and §4.2a).
+
+**Resolved:** 2026-10-12 (PR #1614) — the primer's exception now reads *the mail gate: its sideways edge admits a session that shares the `team` badge, and its cross-team edge one that shares the `project` badge (§4.10, TD-582). It gates mail only*, and the §4.10 row names *across teams by project*.
