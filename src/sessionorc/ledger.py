@@ -537,49 +537,55 @@ def ledger_path(root: Path | str) -> str:
 @dataclass
 class Change:
     """One entry's life in the file's history: when its section first appeared, and when it left
-    (None while it is still there)."""
+    (None while it is still there) — and `pr`, the PR whose squash merge removed it: the closing
+    commit's subject's `(#n)` (`SQUASH`), None for a commit with none, a direct push (TD-604)."""
 
     id: str
     title: str
     opened: datetime
     closed: datetime | None = None
+    pr: int | None = None
 
 
 def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
-    """The changes from `git log --reverse -p --unified=0`: a commit is a `\\x00C <sha> <iso>` line,
-    then its diff; a heading on a `+` line is in the file after that commit, on a `-` line it left.
+    """The changes from `git log --reverse -p --unified=0`: a commit is a `\\x00C <sha> <iso> <subject>`
+    line, then its diff; a heading on a `+` line is in the file after that commit, on a `-` line it left.
     A heading both removed and added in one commit (an entry moved in the file, its title edited)
     stays. An entry closed and later re-added is open again from its first opening."""
     life: dict[str, Change] = {}
     present: set[str] = set()
 
-    def apply(at: datetime | None, added: dict[str, str], removed: set[str]) -> None:
+    def apply(at: datetime | None, pr: int | None, added: dict[str, str], removed: set[str]) -> None:
         if at is None:
             return
         for tid in removed - set(added):
             if tid in present:
                 present.discard(tid)
-                life[tid].closed = at
+                life[tid].closed, life[tid].pr = at, pr
         for tid, title in added.items():
             if tid not in life:
                 life[tid] = Change(tid, title, at)
             else:
                 life[tid].title = title or life[tid].title
                 if tid not in present:
-                    life[tid].closed = None
+                    life[tid].closed, life[tid].pr = None, None
             present.add(tid)
 
     at: datetime | None = None
+    pr: int | None = None
     added: dict[str, str] = {}
     removed: set[str] = set()
     for line in out.splitlines():
         if line.startswith("\x00C "):
-            apply(at, added, removed)
+            apply(at, pr, added, removed)
             added, removed = {}, set()
+            parts = line.split(" ", 3)
             try:
-                at = datetime.fromisoformat(line.split(" ", 2)[2].strip())
+                at = datetime.fromisoformat(parts[2].strip())
             except (IndexError, ValueError):
                 at = None
+            m = SQUASH.search(parts[3]) if len(parts) > 3 else None
+            pr = int(m.group(1)) if m else None
             continue
         if line.startswith(("+## TD-", "-## TD-")):
             m = HEADING.match(line[1:])
@@ -589,7 +595,7 @@ def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
                 added[m.group(1)] = m.group(2).strip()
             else:
                 removed.add(m.group(1))
-    apply(at, added, removed)
+    apply(at, pr, added, removed)
     return life
 
 
@@ -605,7 +611,7 @@ def history(root: Path | str, rel: str, text: str = "", timeout: float = 30.0) -
         cp = subprocess.run(
             [
                 "git", "log", "--first-parent", "--diff-merges=first-parent", "--reverse", "--no-renames",
-                "--format=%x00C %H %cI", "-p", "--unified=0", "--", rel,
+                "--format=%x00C %H %cI %s", "-p", "--unified=0", "--", rel,
             ],
             capture_output=True, text=True, errors="replace", timeout=timeout, cwd=str(root),
         )  # fmt: skip
@@ -696,7 +702,41 @@ def reading(
     recent = [c for c in life.values() if c.opened > since or (c.closed and c.closed > since)]
     recent.sort(key=lambda c: max(c.opened, c.closed or c.opened), reverse=True)
     out["recent"] = [
-        {"id": c.id, "title": c.title, "opened": c.opened.isoformat(), "closed": c.closed and c.closed.isoformat()}
+        {
+            "id": c.id,
+            "title": c.title,
+            "opened": c.opened.isoformat(),
+            "closed": c.closed and c.closed.isoformat(),
+            "pr": c.pr if c.closed else None,
+        }
         for c in recent
     ]
+    return out
+
+
+def completed(recent: list[dict[str, Any]] | None, prs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """*What closed, and by which PR* (design §4.4 *Repo facts*, TD-604): the ledger reading's `recent`
+    entries that closed, newest first, each `{id, title, closed, pr, author, branch, url}` — `pr` the
+    closing commit's squash number (None: a direct push), and `author`, `branch` and `url` the month's
+    PR reading's by that number (empty where it holds none), so a view can name the session whose
+    branch it was. The archive is not read."""
+    by_number = {p.get("number"): p for p in prs or () if isinstance(p, dict)}
+    out = []
+    for e in recent or ():
+        if not isinstance(e, dict) or not e.get("closed"):
+            continue
+        pr = e.get("pr")
+        p = by_number.get(pr) if pr is not None else None
+        out.append(
+            {
+                "id": e.get("id"),
+                "title": e.get("title") or "",
+                "closed": e["closed"],
+                "pr": pr,
+                "author": str((p or {}).get("author") or ""),
+                "branch": str((p or {}).get("branch") or ""),
+                "url": str((p or {}).get("url") or ""),
+            }
+        )
+    out.sort(key=lambda c: datetime.fromisoformat(str(c["closed"])), reverse=True)  # offsets differ by committer
     return out

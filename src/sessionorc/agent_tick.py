@@ -2971,6 +2971,8 @@ class TickMixin:
             "prs": prs,
             "boards": bds,
             "work_orders": wos,
+            # what closed, and by which PR (§4.4 *Repo facts*, TD-604): the history's and the PRs' join
+            "completed": ledger_mod.completed(led.get("recent"), (prs or {}).get("recent")),
             "at": stamp if due else str(old.get("at") or stamp),
         }
 
