@@ -75,8 +75,10 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     host_volatile,  # noqa: F401
     next_act,  # noqa: F401
     pill_title,  # noqa: F401
+    pr_repo,  # noqa: F401
     prs_waiting,  # noqa: F401
     ready_to_close,  # noqa: F401
+    repo_pr_marks,
     restarted_view,  # noqa: F401
     review_wait,  # noqa: F401
     seat_held_words,  # noqa: F401
@@ -1312,19 +1314,24 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             fleet = await call("list")
         except HTTPException:  # the record we already have still renders; membership just empties
             fleet, known = [s], False  # …and Ready to close says it does not know, rather than pass
+        repos = (await repo_facts())[0]  # the PR's mark on the report line (TD-193)
+        v = view(
+            s,
+            fleet,
+            fleet_known=known,
+            icons=await role_icons([s]),
+            seats=await seats_of([s]),
+            repos=repos,
+            waits=await h.person_waits(),  # the header's *waiting* chip (§4.5a, TD-274)
+        )
         return templates.TemplateResponse(
             request,
             "focus.html",
             {
-                "s": view(
-                    s,
-                    fleet,
-                    fleet_known=known,
-                    icons=await role_icons([s]),
-                    seats=await seats_of([s]),
-                    repos=(await repo_facts())[0],  # the PR's mark on the report line (TD-193)
-                    waits=await h.person_waits(),  # the header's *waiting* chip (§4.5a, TD-274)
-                ),
+                "s": v,
+                # §4.5a **Reports**: the session's repo's PR marks, the page's first load of the per-repo
+                # map the `repos` push keeps (§4.4 *Per-session views*, TD-617)
+                "pr_marks": {v["pr_repo"]: repo_pr_marks(v["pr_repo"], repos[v["pr_repo"]])} if v["pr_repo"] else {},
                 "host": host_name(),
                 "active": "Org",
                 "usage": await chip_usage(call, fleet if known else None),
@@ -3463,6 +3470,9 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     repos.pop(str(ev.get("root")), None)
                 else:
                     repos[str(ev.get("root"))] = ev["repo"]
+                    # the repo's PR marks, once for every page (§4.4 *Per-session views*, TD-617): a
+                    # card looks its PRs up here, no session view carries them
+                    ev = {**ev, "pr_marks": repo_pr_marks(str(ev.get("root")), ev["repo"])}
             elif isinstance(ev.get("entry"), dict):
                 ring = doing.setdefault(str(ev.get("team")), [])
                 ring.append(ev["entry"])

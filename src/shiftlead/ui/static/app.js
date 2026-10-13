@@ -4290,6 +4290,9 @@
     });
     // design §4.5a **Reports** / **grants** chip (§4.8, TD-028 step 4). The lists come from the
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
+    // the per-repo PR marks (§4.4 *Per-session views*, TD-617): the page's first load, kept by `repos`
+    let prMarks = {}, reportsV = null;
+    try { prMarks = JSON.parse(($("#reportscard") || {dataset: {}}).dataset.prMarks || "{}") || {}; } catch (e) { prMarks = {}; }
     function renderReports(v) {
       const progress = v.progress || [], findings = v.findings || [];
       const card = $("#reportscard");
@@ -4297,9 +4300,11 @@
       $("#reportscount").textContent = [progress.length ? `${progress.length} progress` : "", findings.length ? `${findings.length} filed` : ""].filter(Boolean).join(" · ");
       const base = card.dataset.prBase || "", name = card.dataset.name || v.name || "this session";
       // the PR number as a link from a structured field — never from text a session wrote — and
-      // **the PR's mark** after it, *merged* or *closed*, from the view's `pr_marks` (the readings of
-      // the record's repo, §4.5a card **report line**, TD-193); an open or unknown PR has none
-      const marks = v.pr_marks || {};
+      // **the PR's mark** after it, *merged* or *closed*, from the record's repo's map (`pr_repo`), which
+      // the page's load and each `repos` push carry (§4.5a card **report line**, TD-193; §4.4, TD-617);
+      // an open or unknown PR has none
+      reportsV = v;
+      const marks = prMarks[v.pr_repo || ""] || {};
       const prLink = (n) => (base ? `<a class="ref" href="${esc(base)}/pull/${encodeURIComponent(n)}" target="_blank" rel="noopener">#${esc(n)}</a>` : `#${esc(n)}`)
         + (marks[String(n)] ? ` <span class="st prmark">${esc(marks[String(n)])}</span>` : "");
       const row = (p) => {
@@ -4463,6 +4468,10 @@
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
       } else if (ev.event === "session" || ev.event === "gone") {
         refreshMembership();  // another session changed: it may be a controller or a member of ours
+      } else if (ev.event === "repos" && ev.root) {
+        // a repo's PRs moved: its marks replace what the page held, and the Reports panel redraws (TD-617)
+        if (ev.repo) prMarks[ev.root] = ev.pr_marks || {}; else delete prMarks[ev.root];
+        if (reportsV && reportsV.pr_repo === ev.root) renderReports(reportsV);
       }
       if (ev.event === "gone" && ev.id === id) {
         // A window never closes itself: closing what a person opened is the person's act (§4.5

@@ -99,7 +99,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     assert client.post(f"/api/sessions/{sid}/wrapup").json() == {"ok": True}
     got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert got["wrapup_at"]
-    assert got["pr_marks"] == {}  # the list carries the PR's marks as the cards do (TD-193); no readings here
+    assert "pr_marks" not in got  # a PR's marks are the repo's, never a session view's (§4.4, TD-617)
     assert client.post(f"/api/sessions/{sid}/kill").json() == {"ok": True}
     wait_state(client, sid, "exited")
     r = client.post(f"/api/sessions/{sid}/allow")
