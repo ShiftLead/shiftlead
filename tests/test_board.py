@@ -1146,7 +1146,7 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
         return None
 
     monkeypatch.setattr(agent, "_refresh_repos", held)
-    real_read = workorders.read
+    real_read = workorders.read_boards
     events: list[dict] = []
     real_broadcast = agent._broadcast
 
@@ -1177,17 +1177,17 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
         # a failed re-read: the line lands, the press answers, the reading is the one before it
         for failing in ({"error": "boom"}, RuntimeError("boom")):
 
-            def read(_root, failing=failing):
+            def read(_root, failing=failing, **_):
                 if isinstance(failing, Exception):
                     raise failing
                 return failing
 
-            monkeypatch.setattr(workorders, "read", read)
+            monkeypatch.setattr(workorders, "read_boards", read)
             id = "TD-8" if isinstance(failing, dict) else "TD-9"
             got = await me.call("ledger_decide", repo=str(link), id=id, go=True)
             assert got["repo"] == root and f"Context: {id}." in origin_board(repo)
             assert agent._repos[root]["work_orders"] is stale and not events
-        monkeypatch.setattr(workorders, "read", real_read)
+        monkeypatch.setattr(workorders, "read_boards", real_read)
         got = await me.call("ledger_decide", repo=str(link), id="TD-10", answer=1)
         assert got["repo"] == root and got["decided"] == "No"
         saved = agent.repos_store.load()[root]["work_orders"]["orders"]
@@ -1215,6 +1215,8 @@ def keyed(tmp_path, forge) -> Path:
     (root / "scripts").mkdir()
     reader = Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py"
     (root / "scripts" / "nudge_user_attention.py").write_text(reader.read_text())
+    # the reader imports its sibling: without it, it loads only where an earlier test left one importable
+    (root / "scripts" / "ledgerboard.py").write_text(reader.with_name("ledgerboard.py").read_text())
     git(root, "init", "-q", "-b", "main")
     git(root, "config", "user.email", "t@example.com")
     git(root, "config", "user.name", "t")
