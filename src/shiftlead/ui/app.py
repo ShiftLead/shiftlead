@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import gzip
 import html
 import json
 import os
@@ -22,6 +23,7 @@ from typing import Annotated, Any
 from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -3073,48 +3075,66 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             }
         hz, board_note = await board_view()
         hz = with_standings(hz, fleet)
-        sections = inbox_sections(
-            got["entries"],
-            states=states,
-            trail=got.get("trail") or (),
-            attention_snoozed=got.get("attention_snoozed"),
-            handed=got.get("handed") or (),
-            boards=hz["due"] + hz["waiting"],
-            fleet=fleet,
-        )
-        h.needs_cache["rows"] = sections["needs"]  # the next delta's *asked you* lines on the Org (TD-354)
-        got["agent_down"] = False
-        got["board_note"] = board_note
-        got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
-        got["needs"] = sections["count"]
-        # §4.10 *The Inbox is a queue*: FYI's own quiet number, **never added to the first** — the
-        # first is *what needs you*. The page opens the section by itself when this is higher than
-        # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
-        got["fyi_n"] = sections["fyi_n"]
-        got["overdue_n"] = sections["overdue_n"]  # the Org rollup's *m overdue* (TD-178)
-        got["snoozed_n"] = len(sections["snoozed"])
-        # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
-        # time, and nothing it says — the browser counts those newer than it last opened the group
-        # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
-        got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
-        # the top bar's **build** chip is drawn again on this poll (§4.5a, TD-539): a merge shows
-        # within the readings' cadence without a reload
-        got["build_chip"] = await chip_build(call)
-        if counts:
-            return {k: got[k] for k in INBOX_COUNTS}
-        got["html"] = inbox_html(sections, page_origin(request))
-        # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
-        got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=page_origin(request))
-        lf = await ledger_view(fleet)
-        got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=lf, origin=page_origin(request))
-        # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its rows,
-        # so the poll brings the group's markup as it brings the rows'; the script presses the lines
-        # the URL picks and recounts every line from the rows on the page
-        rail = rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), rail_picks({}))
-        got["html"]["rail_teams"] = str(
-            templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
-        )
-        return got
+        build = await chip_build(call)
+        lf = None if counts else await ledger_view(fleet)
+        origin = page_origin(request)
+        gz = "gzip" in request.headers.get("accept-encoding", "")
+
+        def read() -> tuple[list[dict[str, Any]], bytes]:
+            """Everything after the awaits, on a worker thread (TD-611 slice 2): the sections, the
+            markup and the JSON were half a second of the UI's one loop per full read, which every
+            Focus keystroke and output frame shares. The body is encoded here, and gzipped here when
+            the browser takes it, so nothing the size of the inbox is touched on the loop."""
+            sections = inbox_sections(
+                got["entries"],
+                states=states,
+                trail=got.get("trail") or (),
+                attention_snoozed=got.get("attention_snoozed"),
+                handed=got.get("handed") or (),
+                boards=hz["due"] + hz["waiting"],
+                fleet=fleet,
+            )
+            got["agent_down"] = False
+            got["board_note"] = board_note
+            got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
+            got["needs"] = sections["count"]
+            # §4.10 *The Inbox is a queue*: FYI's own quiet number, **never added to the first** — the
+            # first is *what needs you*. The page opens the section by itself when this is higher than
+            # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
+            got["fyi_n"] = sections["fyi_n"]
+            got["overdue_n"] = sections["overdue_n"]  # the Org rollup's *m overdue* (TD-178)
+            got["snoozed_n"] = len(sections["snoozed"])
+            # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
+            # time, and nothing it says — the browser counts those newer than it last opened the group
+            # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
+            got["answered_marks"] = [
+                {"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]
+            ]
+            # the top bar's **build** chip is drawn again on this poll (§4.5a, TD-539): a merge shows
+            # within the readings' cadence without a reload
+            got["build_chip"] = build
+            if counts:
+                out: dict[str, Any] = {k: got[k] for k in INBOX_COUNTS}
+            else:
+                out = got
+                got["html"] = inbox_html(sections, origin)
+                # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
+                got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=origin)
+                got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=lf, origin=origin)
+                # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its
+                # rows, so the poll brings the group's markup as it brings the rows'; the script presses
+                # the lines the URL picks and recounts every line from the rows on the page
+                rail = rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), rail_picks({}))
+                got["html"]["rail_teams"] = str(
+                    templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
+                )
+            body = json.dumps(jsonable_encoder(out), ensure_ascii=False, separators=(",", ":")).encode()
+            return sections["needs"], gzip.compress(body, compresslevel=5) if gz else body
+
+        needs, body = await asyncio.to_thread(read)
+        h.needs_cache["rows"] = needs  # the next delta's *asked you* lines on the Org (TD-354)
+        headers = {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"} if gz else {"Vary": "Accept-Encoding"}
+        return Response(body, media_type="application/json", headers=headers)
 
     # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,
     # so each calls its RPC **caller-less** — a person is not a session, and every one of these is
