@@ -52,7 +52,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-608 | Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed* | Medium | Open |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
 | TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Designed — TD-618 builds it |
-| TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Open |
+| TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
+| TD-615 | Build TD-614 (1): the boards are the host agent's reading — `boards` on the repo reading, `BOARD_EVERY`, at once after a write-back, work orders derived from it; the UI and `ao` read it and run no reader | High | Open |
+| TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
+| TD-617 | Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form) | High | Open |
 | TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
 
 ---
@@ -818,7 +821,7 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 1. **A counts-only read.** One function computes the top bar's numbers (`needs`, `fyi_n`, overdue, `answered_marks`, the build chip) without rendering anything. `/api/person/inbox?counts=1` serves it, and `refreshInboxCount` uses it on every page but the Inbox. `ao inbox --counts` prints the same numbers: no shell command counts the person inbox's sections today, and a session's `ao inbox --unread` marks what it reads.
 2. **The Inbox's own render off the loop.** Run it in `asyncio.to_thread`, or cache it keyed on the inbox's revision and the boards' reading. Add `GZipMiddleware`. Cap *answered for you* at the newest N, with a *show more*.
 3. **Focus membership without `/api/sessions`.** Read it from the `focus=` stream's fleet, or from a one-session endpoint. Trim the list view's `pr_marks` to the PRs drawn and drop `tail`.
-4. **The Org stream.** Compute heads and card renders once per delta and fan them out to the clients, or coalesce deltas to about one a second.
+4. **The Org stream.** Compute heads and card renders once per delta and fan them out to the clients, or coalesce deltas to about one a second. *Built as TD-617 (TD-614's design), with slice 3's Focus membership and `pr_marks`; slice 1's counts read is TD-616's fallback.*
 5. **The bridge.** Bound the queue, and join every drained chunk into one send.
 - Tests: the counts read renders no template and equals the full read's counts; Focus issues no `/api/sessions` on a peer's delta; the bridge coalesces queued chunks.
 
@@ -862,8 +865,9 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Added:** 2026-10-12 (ao-paul, at Paul's ask)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** design §4.4 (*Repo facts*, *Board write-back*), §4.5 (the `/events` stream, ; the top bar, the Inbox), §4.7 (`ao inbox`, `ao board show`); `src/shiftlead/ui/app.py` (`read_boards` ~L372, `api_person_inbox`, `api_sessions`, `events`); `src/shiftlead/ui/inbox.py` (`board_argv`, `BOARD_TTL`); `src/shiftlead/cli.py` (its own board read ~L1502); `src/sessionorc/agent_tick.py` (the repo reading's `workorders.read` ~L2904, every `REPOS_EVERY`)
+**Status:** Designed 2026-10-12 (the designer) — **one owner per reading, pushed** (§4.4 *Each reading has one owner, and a client never re-derives it*): (1) **the boards are the host agent's** — `boards` on the repo reading, read every `BOARD_EVERY` (60 s) and at once after a write-back, origin fetched on `REPOS_EVERY`, the work orders derived from it, pushed with `repos`; the UI's `read_boards`/`BOARD_TTL` and `ao`'s own read go; (2) **the Inbox's counts are the UI process's, not the host agent's** — the honest answer to Paul's question: they are the Inbox's sections, classified by `shiftlead` code (state rows, the board horizon, the ledger's *for you*, review marks), and `sessionorc` never imports `shiftlead`; so the host agent pushes `inbox` with a revision on every person-inbox change, the UI recomputes the counts once per input change and pushes `counts` on every stream, the top bar polls nothing, TD-611 slice 1's counts read is the fallback (`since=<rev>` → `unchanged`), and `ao inbox --counts` runs the same template-free function; (3) per-session views once per delta for every stream, PR marks once per repo on the `repos` push, Focus's members from its stream — TD-611's slices 3–4 built in this form as TD-617; (4) said no to a revision on every record, a cache layer, and moving the Inbox's classification into `sessionorc`. No mockup: nothing drawn changes. Built by TD-615, TD-616, TD-617. Was: Open.
+**Blocked by:** TD-615, TD-616, TD-617
+**Location:** design §4.4 (*Repo facts*, *Board write-back*), §4.5 (the `/events` stream; the top bar, the Inbox), §4.7 (`ao inbox`, `ao board show`); `src/shiftlead/ui/app.py` (`read_boards` ~L372, `api_person_inbox`, `api_sessions`, `events`); `src/shiftlead/ui/inbox.py` (`board_argv`, `BOARD_TTL`); `src/shiftlead/cli.py` (its own board read ~L1502); `src/sessionorc/agent_tick.py` (the repo reading's `workorders.read` ~L2904, every `REPOS_EVERY`)
 
 **Why:** Paul, 2026-10-12, on TD-611's `ao inbox --counts`: *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?* Today three processes compute the same things on their own clocks:
 - **The board.** The host agent runs every repo's board reader every `REPOS_EVERY` (300 s) for the work orders. The UI runs it again every `BOARD_TTL` (60 s) for the Inbox's rows, and `ao` runs it a third time. That is three subprocess runs of one file, each with its own failure note.
@@ -880,6 +884,82 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Done when** the design names each reading's one owner and its push, and build entries exist for each slice. TD-611's slices 1 and 4 are re-pointed at them or marked as their first step.
 
 **Related:** TD-611 (the lag that found it), TD-131 (whole-file stores, a later scale), TD-384 (work orders from the board).
+
+---
+
+## TD-615: Build TD-614 (1): the boards are the host agent's reading — `boards` on the repo reading, `BOARD_EVERY`, at once after a write-back, work orders derived from it; the UI and `ao` read it and run no reader
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (the designer, TD-614's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Each reading has one owner* (*The boards*), §4.5 screen 6 (board items), §4.7 `ao board show`; `src/sessionorc/agent_tick.py` (the repo reading ~L2895–2910: `workorders.read` every `REPOS_EVERY` — becomes the board read, kept as `boards`, with the orders derived), `src/sessionorc/workorders.py` (`read` ~L112: return every item, the orders a filter over them), `src/sessionorc/agent_common.py` (`REPOS_EVERY` ~L269: add `BOARD_EVERY = 60.0`), `src/sessionorc/agent_inbox.py` (after a write-back, ~L786: re-read that repo's board at once and push `repos`), `src/shiftlead/ui/app.py` (`read_boards` ~L372 and its cache ~L819–840 go: the Inbox reads `boards` from the `repos` reading), `src/shiftlead/ui/inbox.py` (`board_argv` ~L644 and `BOARD_TTL` ~L496 go; the origin note derived from the reading's fields), `src/shiftlead/cli.py` (`_board_due` ~L1494, called ~L1697 for `ao repo`, which runs the repo's reader `--due-only` — goes; `ao repo`, `ao inbox` and `ao board show` read `boards`); `tests/test_workorders.py`, `tests/test_ui_inbox*.py`, `tests/test_agent*.py`
+
+**Why:** TD-614: Paul, 2026-10-12 — *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*; the board was read on three clocks by three processes, the counts rendered per page every 20 s, the card views per client. This slice is the board: the host agent's reader every `REPOS_EVERY`, the UI's every `BOARD_TTL`, and `ao`'s own, three runs of one file.
+
+**Fix:**
+1. The repo reading gains `boards`: the board reader's items (every open item with line, `board:<key>`, due, answers, decided, refs, session, detail block, the checkout's and origin's, and the origin-note facts the Inbox draws today), read every `BOARD_EVERY` (60 s) without a fetch and with one on the `REPOS_EVERY` pass; a failed read keeps the last good items with `error` and `failed_at`.
+2. The work orders are a filter over `boards` (the decided open lines), never a second read.
+3. A write-back (Snooze, Done, Decide, Reply, the add) re-reads that repo's board at once and pushes `repos`.
+4. The UI reads `boards` from the `repos` RPC and the `repos` events it already takes; `read_boards`, its cache, `board_argv` and `BOARD_TTL` go; the Inbox, the Due strip and the Repo page draw from it unchanged.
+5. `ao` reads `boards` over RPC — `ao repo` (whose `_board_due` ran the reader `--due-only`), `ao inbox` and `ao board show` — and runs no reader.
+6. Tests: the reading carries every item and the orders are its decided subset; a write-back's re-read lands in the next push; a failed read keeps the last items with the error; the UI renders the Inbox's board rows from a fixture reading with no subprocess run (a spy on `subprocess.run` sees none); `ao board show` reads the RPC.
+
+**Done when** the board reader runs only in the host agent — on its clock and after a write-back — the UI and `ao` draw the same items from its reading, a Done shows on the next push, and the tests above pass; the builder's look (design §4.9b: the Inbox's board rows and the Due strip on a scratch home, a Done landing) is named in the PR.
+
+**Related:** TD-614 (the design), TD-603 / TD-607 (the line's id), TD-584 / TD-585 (the reader becomes ledgerboard's), TD-611.
+
+---
+
+## TD-616: Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (the designer, TD-614's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Each reading has one owner* (*The person inbox*, *The Inbox's counts*), §4.5 *Live state*, §4.7 `ao inbox`; `src/sessionorc/agent_mail.py` and `agent_inbox.py` (every write to the person inbox: a revision counter on the store, `_broadcast({"event": "inbox", "rev": n})`), `src/shiftlead/ui/inbox.py` (`INBOX_COUNTS` and the counts read TD-611 slice 1 added: lift the counting into one function with no template, e.g. `inbox_counts(...)`, in a module `ao` can import without the `[ui]` extra), `src/shiftlead/ui/app.py` (`events` ~L3381–3570: a counts keeper fed by `inbox`, `repos`, shape deltas, settings and a minute's tick; a `counts` message on every stream when they change; `/api/person/inbox?counts=1&since=<rev>` → `{unchanged: true}`), `src/shiftlead/ui/static/app.js` (`refreshInboxCount` ~L1198 and the 20 s interval ~L1259: draw from the stream's `counts`, poll only while the stream is down), `src/shiftlead/cli.py` (`ao inbox --counts`); `tests/test_ui_inbox*.py`, `tests/test_mail.py`, `tests/test_cli.py`
+
+**Why:** TD-614: Paul, 2026-10-12 — *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*; the board was read on three clocks by three processes, the counts rendered per page every 20 s, the card views per client. This slice is the counts: every page fetched and rendered the whole person inbox every 20 s to draw two numbers.
+
+**Fix:**
+1. The host agent: a revision on the person inbox's store, bumped on every write (land, answer, dismiss, snooze, pause, resume, prune), and `{event: "inbox", rev}` broadcast with it.
+2. One counting function, template-free, over the person inbox, the fleet, the boards reading, the ledger's *for you* and the person's settings — the numbers `INBOX_COUNTS` holds today; the full Inbox read and the counts read both call it.
+3. The UI keeps the counts: recomputed on an `inbox` event, a `repos` event, a session delta that moves `SHAPE_KEYS` or `LIGHT_KEYS`, a settings change and once a minute; pushed as `{event: "counts", rev, …}` on every stream, light or full, only when different from the last sent.
+4. The page: the top bar draws `counts` from the stream; the 20 s poll runs only while the stream is down, sending `since=<rev>`, and the counts read answers `{unchanged: true}` when it is.
+5. `ao inbox --counts`: the same function over the host's readings, printed as the top bar reads them.
+6. Tests: a person-inbox write broadcasts `inbox` with a higher rev; the keeper pushes `counts` once per change and not on an unchanged recount; no page with a live stream fetches `/api/person/inbox` (a request spy); `since=` answers unchanged; `ao inbox --counts` equals the UI's numbers on one fixture.
+
+**Done when** the top bar updates from the stream with no poll while the stream is up, the counts are computed once per change in the UI process however many pages are open, the host pushes `inbox` on every person-inbox change, `ao inbox --counts` prints the same numbers, and the tests above pass; a re-measurement of `/api/person/inbox` requests per hour on the live UI after the promote is the live check.
+
+**Related:** TD-614 (the design), TD-611 (slice 1's counts read is this entry's fallback), TD-572 (the light stream).
+
+---
+
+## TD-617: Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form)
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (the designer, TD-614's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Each reading has one owner* (*Per-session views*), §4.5 *Live state*; `src/shiftlead/ui/app.py` (`events` ~L3381–3570: one fan-out per delta — `view()`, `compact_in`, `render_card` and `fresh_heads` computed once and handed to every connected stream, the light streams taking their parts; `api_sessions` ~L2359), `src/shiftlead/ui/cards.py` (`pr_marks` ~L327: out of the session view, into a per-repo map sent on load and with `repos`), `src/shiftlead/ui/static/app.js` (cards look PRs up by repo; Focus's `refreshMembership` ~L4370 reads its stream's fleet, no `/api/sessions`); `tests/test_ui_events*.py`, `tests/test_ui_focus*.py`
+
+**Why:** TD-614: Paul, 2026-10-12 — *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*; the board was read on three clocks by three processes, the counts rendered per page every 20 s, the card views per client. This slice is the views: every delta was rendered once per connected tab, and each session view repeated its repo's PRs.
+
+**Fix:**
+1. The stream: a single subscriber to the host agent computes, per delta, the session's view, its compact form, its rendered card and (when shaping) the heads, once, and fans the result to every connected client queue; a light stream takes `{id, state}` or its own session's whole delta from the same result.
+2. PR marks: a per-repo map `{repo: {number: mark}}` on the page's first load and on each `repos` push; the session view drops `pr_marks`; a card resolves its PRs from its repo's map.
+3. Focus: members from the `focus=` stream's fleet; no `/api/sessions` on a peer's delta.
+4. Tests: with three connected streams one delta runs `view()` once (a counter); the session view carries no `pr_marks` and the page's map does; Focus issues no `/api/sessions` on a peer's delta; the Org's cards render as before.
+
+**Done when** a delta is computed once however many pages are connected, no session view carries PR marks, Focus reads no `/api/sessions`, the UI's CPU falls with the number of tabs no longer multiplying it, and the tests above pass; a re-measurement of `shiftlead-ui`'s CPU and `/api/sessions` requests per hour after the promote is the live check.
+
+**Related:** TD-614 (the design), TD-611 (its slices 3 and 4, built here), TD-572.
 
 ---
 

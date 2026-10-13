@@ -154,6 +154,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-12 (TD-614, the designer; Paul, 2026-10-12, on TD-611's counts: *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*): *Each reading has one owner, and a client never re-derives it* — the boards become the host agent's reading (`boards` on the repo reading, `BOARD_EVERY` sixty seconds, at once after a write-back, the work orders derived from it, the UI and `ao` running no reader); the person inbox pushes `inbox` with a revision; the Inbox's counts are the UI process's, once per change, pushed as `counts`, not the host agent's, since their classification is `shiftlead`'s; per-session views once per delta, PR marks once per repo. Was: the board read three times on three clocks, the counts rendered per page every 20 s, the views per client. Built by TD-615, TD-616, TD-617.
 - 2026-10-12 (TD-613, the designer; dev-cadence's sync PR #1573 sat red on 2026-10-12 with its author idle in another repo and the anchor closed, until Paul asked hours later): the open-PR reading keeps `checks`, `conflicting` and `red_since`; *A red PR nobody holds is a work order* `pr:<n>` after `ORPHAN_AFTER` (an hour), the idle holder told once first, in the anchor seat's lane (free-pick where no anchor seat), an Inbox row for a repo no team services. Built by TD-618.
 - 2026-10-12 (TD-604, the designer): *Repo facts* keeps each closed entry's PR from the squash commit that took it out of the ledger, kept as `completed`; the archive's `Resolved:` lines were weighed and refused, since they name design PRs and slices first. Built by TD-608.
 - 2026-10-12 (TD-603, the designer; Paul, 2026-10-12: *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?*): *A board line's id* — every board line's id is the derived `board:<key>` the work orders use, stable across a tool's edits, never written; the write-back's RPCs take `key`. A written `UA-NNN` was weighed and refused: every writer would allocate from a counter none shares, and it is a new line shape. Built by TD-607.
@@ -275,6 +276,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-12 (TD-614, the designer): *Live state* — every stream carries `counts`, no page polls the person inbox for them; card views once per delta; PR marks per repo. Screen 6 reads the host's `boards`. Built by TD-616, TD-617, TD-615.
 - 2026-10-12 (TD-613, the designer): screen 6's *Needs you* gains a red PR nobody holds in a repo no team services; screen 11's Open PRs tag a red or conflicting PR and say whose it is. Built by TD-618.
 - 2026-10-12 (TD-604, the designer; Paul, 2026-10-12: *show recently completed TDs in the repo screen and/or in the "TDs in motion" card*; mockup `RepoPage.dc.html`, shot `docs/mockups/reviews/2026-10-12-td604-recently-completed.png`): screen 11 gains **Recently completed** — the entries closed in the window, with the PR whose squash merge closed it and its author; *Doing* becomes item 5. Built by TD-608.
 - 2026-10-12 (TD-578, the designer): screen 9 says the raw file's reader is also on the Focus header. Built by TD-597.
@@ -380,6 +382,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-614, the designer): **Org top bar | Inbox** — the count arrives on the stream as `counts`; the counts read (TD-611 slice 1) is the fallback with `since=<rev>`; the Inbox page re-reads its mail on the stream's `inbox`. Built by TD-616.
 - 2026-10-12 (TD-613, the designer): **Inbox row: red PR**; the Repo facet's *Pull requests* says *· n red* with whose each is on hover. Built by TD-618.
 - 2026-10-12 (TD-611 slice 1; Paul, 2026-10-12: the Focus terminal lags again): the top bar's **Inbox** poll on every page but the Inbox's own reads the counts alone (`?counts=1`), not the full read — megabytes of rendered rows, thrown away, every 20 s, on the UI's one loop the Focus terminal shares.
 - 2026-10-12 (TD-604, the designer): the Repo facet's *closed* block links to the Repo page's *Recently completed* and lists its ids and titles on hover; the card draws no list. Built by TD-608.
@@ -682,6 +685,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-12 (TD-614, the designer): `ao board show` and `ao inbox --counts` read the host's readings, running no reader of their own. Built by TD-615, TD-616.
 - 2026-10-12 (TD-604, the designer): `ao repo` prints *completed this week: n*; `--json` carries `completed`. Built by TD-608.
 - 2026-10-12 (TD-603, the designer): `ao board show <board:key>`; `ao board edit --key`. Built by TD-607.
 - 2026-10-12 (TD-598, grinder-ao-2): `ao promote status` under `auto: true` prints when the home will act, in the Inbox row's words (*auto on · settles in 6 min*).
