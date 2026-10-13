@@ -53,7 +53,9 @@ def hub() -> tuple[Fanout, asyncio.Queue, list[int], list[dict[str, Any]]]:
 
     async def step(run, ev) -> None:
         stepped.append(ev)
-        run.to_all(run.streams, ev)
+        if ev.get("bad"):
+            raise ValueError("this record does not draw")
+        run.to_all(run.live, ev)
 
     async def regroup(state) -> dict[str, Any]:
         return {"groups": []}
@@ -99,6 +101,19 @@ async def test_a_failed_run_ends_every_stream_saying_so_and_a_lost_agent_ends_th
     await events.put(ConnectionError("gone"))
     assert await wait_for(lambda: pages[0][2].done(), timeout=2.0, step=0.01)
     assert pages[0][1].sent == []
+
+
+async def test_an_event_that_fails_to_draw_is_skipped_and_every_stream_goes_on():
+    f, events, _, _ = hub()
+    pages = joined(f, 2)
+    await events.put({"event": "session", "bad": True})
+    await events.put({"event": "doing", "n": 2})
+    assert await wait_for(lambda: all(ws.sent for _, ws, _ in pages), timeout=2.0, step=0.01)
+    assert all(ws.sent == [{"event": "doing", "n": 2}] for _, ws, _ in pages)
+    assert not any(t.done() for _, _, t in pages) and f.run is not None
+    for s, _, t in pages:
+        f.leave(s)
+        t.cancel()
 
 
 async def test_a_page_too_far_behind_is_ended_to_reconnect(monkeypatch):

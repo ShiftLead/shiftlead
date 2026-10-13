@@ -39,10 +39,10 @@ class Stream:
         self.ws, self.light, self.focus = ws, light, focus
         self.heads_key: str | None = None  # the groups this page last got, as their JSON
         self._queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue()
-        self._ended = False
+        self.ended = False
 
     def put(self, text: str) -> None:
-        if self._ended:
+        if self.ended:
             return
         if self._queue.qsize() >= QUEUE_MAX:
             log.warning("an events stream fell %d messages behind; it is ended to reconnect", QUEUE_MAX)
@@ -52,8 +52,8 @@ class Stream:
 
     def end(self, error: str | None = None) -> None:
         """No more for this page: `pump` sends `error`, when there is one, and returns."""
-        if not self._ended:
-            self._ended = True
+        if not self.ended:
+            self.ended = True
             self._queue.put_nowait(("end", error))
 
     async def pump(self) -> None:
@@ -89,12 +89,16 @@ class Run:
         self.task: asyncio.Task[None] | None = None
 
     @property
+    def live(self) -> list[Stream]:
+        return [s for s in self.streams if not s.ended]
+
+    @property
     def full(self) -> list[Stream]:
-        return [s for s in self.streams if not s.light]
+        return [s for s in self.live if not s.light]
 
     def light(self, *, focus: str | None = None, other: str | None = None) -> list[Stream]:
         """The light streams — those focused on `focus`, or those not focused on `other`."""
-        out = [s for s in self.streams if s.light]
+        out = [s for s in self.live if s.light]
         if focus is not None:
             out = [s for s in out if s.focus == focus]
         if other is not None:
@@ -165,7 +169,13 @@ class Run:
                 try:
                     async for ev in c.subscribe():
                         async with self.lock:
-                            await self._step(self, ev)
+                            try:
+                                await self._step(self, ev)
+                            except (AgentUnavailable, ConnectionError):
+                                raise
+                            except Exception:  # noqa: BLE001 — one event that fails to draw costs that event,
+                                # never every page: before the fan-out it cost one page its stream
+                                log.warning("an event could not be drawn: %s", ev.get("event"), exc_info=True)
                 finally:
                     flusher.cancel()
                     await asyncio.gather(flusher, return_exceptions=True)

@@ -3466,7 +3466,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 ring = doing.setdefault(str(ev.get("team")), [])
                 ring.append(ev["entry"])
                 del ring[:-DOING_KEPT]
-            run.to_all(run.streams, ev)
+            run.to_all(run.live, ev)
             if run.full:
                 run.dirty.set()
         elif ev.get("event") == "gone":
@@ -3506,7 +3506,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     acct_of[p["name"]] = name
             now_on = acct_of.get(prof)
             for name in {was_on, now_on} - {None}:
-                run.to_all(run.streams, {"event": "usage", "account": name, "usage": grouped.get(name)})
+                run.to_all(run.live, {"event": "usage", "account": name, "usage": grouped.get(name)})
 
     fan = Fanout(lambda: LocalClient(), fan_seed, fan_step, fan_regroup)
 
