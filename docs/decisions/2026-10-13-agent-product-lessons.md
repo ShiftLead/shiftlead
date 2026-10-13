@@ -1,7 +1,7 @@
 # ADR 2026-10-13: Lessons from Grok Bot, Muse and Hermes Agent — for discussion
 
-Status: **for discussion** (2026-10-13, at Paul's request). Nothing here is designed, filed or
-approved. It gathers what the day's three surveys — [Grok Bot](2026-10-13-grok-bot.md),
+Status: **answered** (2026-10-13; Paul's answers under *Decided*). Three lessons are filed as
+design-first entries, one joins an open entry, and the rest are declined. Nothing here is designed. It gathers what the day's three surveys — [Grok Bot](2026-10-13-grok-bot.md),
 [Muse](2026-10-13-muse.md) and [Hermes Agent](2026-10-13-hermes-agent.md) — suggest shiftlead learn,
 says for each what shiftlead already has, and asks the question a discussion should settle. A lesson
 Paul picks becomes a design round and a TD entry; one he declines is marked so here.
@@ -25,6 +25,23 @@ through purchased extra-usage credits, Grok Bot and Muse not at all). shiftlead 
 So the lessons below are judged by one test: **does it make shiftlead better at running the
 person's own tools, interactively, on their own subscription?** A lesson that would need shiftlead
 to grow its own agent loop fails it.
+
+## Decided (Paul, 2026-10-13)
+
+| Lesson | Answer | Where it went |
+|---|---|---|
+| 1. Permission prompts | **Yes** — *"essentially allowing a director seat to handle them for the user"* | TD-636 (design-first) |
+| 4. Done means green | **Yes** — *"an agent should not say its done if its PR is not green"* | TD-637 (design-first) |
+| 8. Which model did what | **Yes** — the session is already a commit co-author; *"expand it to list the actual model"* | TD-638 (design-first) |
+| 9. Reach from a phone | **Not a chat app, for now** — *"we will improve the inbox ui enough for it to be used as the text interface from a phone. If we cant we might have to consider a chat integration"* | a line on TD-003 |
+| 10. New harnesses | **Gemini CLI** — *"a definite fit"*; *"I dont think running with Muse, grokbot, or hermes makes sense right now"* | a line on TD-112 (the second-adapter spike) |
+| 2, 3, 5, 6, 7 | **Declined** — *"I do not really see the usefulness of beyond what we already do (or plan to do)"*; open to pushback | — |
+
+The session's view on the declined five: they hold. Lesson 5's early warning is mostly there
+already: a role's context bound (300k by default, set by cost, §4.8) sits well below the model's
+window, and a usage window's line is set below its limit, so each line already comes before the
+wall; lesson 3 overlaps the `doing` line; 2, 6 and 7 answer problems shiftlead does not
+have at one person per home.
 
 ## The lessons
 
