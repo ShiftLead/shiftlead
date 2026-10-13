@@ -93,7 +93,9 @@ filterwarnings = [
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["scripts", "docs"]
+# the vendored ledgerboard and its fixtures are read, never formatted: its release header hashes its
+# body and a test holds it byte-equal to scripts/ledgerboard.py (ADR 2026-10-12, TD-585)
+extend-exclude = ["scripts", "docs", "src/sessionorc/ledgerboard.py", "tests/ledgerboard"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

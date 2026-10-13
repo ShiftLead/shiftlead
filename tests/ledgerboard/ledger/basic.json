@@ -1,0 +1,348 @@
+{
+ "blocked": [
+  "TD-002",
+  "TD-006",
+  "TD-004",
+  "TD-007"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-005",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-005: every blocker is archived (TD-010) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-006",
+   "kind": "blocked-unknown",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-006: Blocked by TD-099, which names no entry in the ledger or the archive"
+  },
+  {
+   "field": "type",
+   "id": "TD-007",
+   "kind": "type",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: unknown Type 'chore' — write one of debt | feature; read as debt"
+  },
+  {
+   "field": "owner",
+   "id": "TD-007",
+   "kind": "vocabulary",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: owner 'nobody' is not in the preamble's Fields: vocabulary (builder | designer)"
+  },
+  {
+   "field": "pickable",
+   "id": "TD-007",
+   "kind": "undeclared-field",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-007: field 'pickable' has no vocabulary on the preamble's Fields: line — not validated; declare it (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-007",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-NNN or decision (<who>)"
+  },
+  {
+   "field": "pickable",
+   "id": "TD-007",
+   "kind": "pickable-disagrees",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-007: its Pickable line says yes, the derived pickable is no — the line is only a field (cadence.md §2.12)"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-005",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-005: every blocker is archived (TD-010) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-006",
+   "kind": "blocked-unknown",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-006: Blocked by TD-099, which names no entry in the ledger or the archive"
+  },
+  {
+   "field": "type",
+   "id": "TD-007",
+   "kind": "type",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: unknown Type 'chore' — write one of debt | feature; read as debt"
+  },
+  {
+   "field": "owner",
+   "id": "TD-007",
+   "kind": "vocabulary",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: owner 'nobody' is not in the preamble's Fields: vocabulary (builder | designer)"
+  },
+  {
+   "field": "pickable",
+   "id": "TD-007",
+   "kind": "undeclared-field",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: field 'pickable' has no vocabulary on the preamble's Fields: line — not validated; declare it (cadence.md §2.12)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-007",
+   "kind": "blocked-item",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-NNN or decision (<who>)"
+  },
+  {
+   "field": "pickable",
+   "id": "TD-007",
+   "kind": "pickable-disagrees",
+   "level": "error",
+   "standing": false,
+   "text": "⚠ TD-007: its Pickable line says yes, the derived pickable is no — the line is only a field (cadence.md §2.12)"
+  }
+ ],
+ "declared": {
+  "kind": [
+   "build",
+   "design-first"
+  ],
+  "owner": [
+   "builder",
+   "designer"
+  ]
+ },
+ "entries": [
+  {
+   "blocked_by": [
+    "decision (the owner)"
+   ],
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-03",
+    "blocked by": "decision (the owner) — the board, 2026-01-03 item",
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-002",
+   "pickable": false,
+   "priority": "High",
+   "title": "A high entry blocked on a decision",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "other-repo#TD-020",
+    "TD-099"
+   ],
+   "cross_repo": [
+    {
+     "item": "other-repo#TD-020",
+     "state": "open",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "added": "2026-01-07",
+    "blocked by": "other-repo#TD-020, TD-099",
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-006",
+   "pickable": false,
+   "priority": "High",
+   "title": "Blocked in another repo",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-001"
+   ],
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-05",
+    "blocked by": "TD-001",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-004",
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an open entry",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-06",
+    "blocked by": "TD-010",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-005",
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an archived one",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-02",
+    "kind": "build",
+    "location": "`src/thing.py`",
+    "owner": "builder",
+    "priority": "Medium",
+    "status": "Open",
+    "type": "feature"
+   },
+   "id": "TD-001",
+   "pickable": true,
+   "priority": "Medium",
+   "title": "A medium feature",
+   "type": "feature"
+  },
+  {
+   "blocked_by": [],
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-04",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-003",
+   "pickable": true,
+   "priority": "Low",
+   "title": "Low debt first in its rank",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-001",
+    "'soon'"
+   ],
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-08",
+    "blocked by": "soon, TD-001",
+    "owner": "nobody",
+    "pickable": "yes",
+    "priority": "Low",
+    "status": "Open",
+    "type": "chore"
+   },
+   "id": "TD-007",
+   "pickable": false,
+   "priority": "Low",
+   "title": "Bad fields",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-005",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-005: every blocker is archived (TD-010) — pickable; the Blocked by field can go"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-006",
+   "kind": "blocked-unknown",
+   "level": "error",
+   "text": "⚠ TD-006: Blocked by TD-099, which names no entry in the ledger or the archive"
+  },
+  {
+   "field": "type",
+   "id": "TD-007",
+   "kind": "type",
+   "level": "error",
+   "text": "⚠ TD-007: unknown Type 'chore' — write one of debt | feature; read as debt"
+  },
+  {
+   "field": "owner",
+   "id": "TD-007",
+   "kind": "vocabulary",
+   "level": "error",
+   "text": "⚠ TD-007: owner 'nobody' is not in the preamble's Fields: vocabulary (builder | designer)"
+  },
+  {
+   "field": "blocked by",
+   "id": "TD-007",
+   "kind": "blocked-item",
+   "level": "error",
+   "text": "⚠ TD-007: cannot read Blocked by item 'soon' — write TD-NNN or decision (<who>)"
+  },
+  {
+   "field": "pickable",
+   "id": "TD-007",
+   "kind": "pickable-disagrees",
+   "level": "info",
+   "text": "ℹ TD-007: its Pickable line says yes, the derived pickable is no — the line is only a field (cadence.md §2.12)"
+  }
+ ],
+ "pickable": [
+  "TD-005",
+  "TD-001",
+  "TD-003"
+ ],
+ "rows": [
+  {
+   "id": "TD-003",
+   "priority": "Low",
+   "title": "Low debt first in its rank"
+  },
+  {
+   "id": "TD-001",
+   "priority": "Medium",
+   "title": "A medium feature"
+  },
+  {
+   "id": "TD-002",
+   "priority": "High",
+   "title": "A high entry blocked on a decision"
+  },
+  {
+   "id": "TD-004",
+   "priority": "Medium",
+   "title": "Blocked by an open entry"
+  },
+  {
+   "id": "TD-005",
+   "priority": "Medium",
+   "title": "Blocked by an archived one"
+  },
+  {
+   "id": "TD-006",
+   "priority": "High",
+   "title": "Blocked in another repo"
+  },
+  {
+   "id": "TD-007",
+   "priority": "Low",
+   "title": "Bad fields"
+  }
+ ]
+}

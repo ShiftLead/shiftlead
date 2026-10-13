@@ -1,0 +1,202 @@
+{
+  "today": "2026-01-15",
+  "edits": [
+    {
+      "name": "done-with-why",
+      "line": "- [ ] 2026-01-05 (session s-1 on h) — Ship it. Due: 2026-01-10.",
+      "action": "done",
+      "why": "merged."
+    },
+    {
+      "name": "done-unpunctuated",
+      "line": "- [ ] 2026-01-05 (session s-1) — Ship it",
+      "action": "done"
+    },
+    {
+      "name": "snooze-existing",
+      "line": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. Answers: now | later.",
+      "action": "snooze",
+      "to": "2026-01-20"
+    },
+    {
+      "name": "snooze-undated-before-answers",
+      "line": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Answers: a | b.",
+      "action": "snooze",
+      "to": "2026-01-20"
+    },
+    {
+      "name": "snooze-undated-no-fields",
+      "line": "- [ ] 2026-01-05 (session s-1) — Plain",
+      "action": "snooze",
+      "to": "2026-01-20"
+    },
+    {
+      "name": "decide-fresh",
+      "line": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b (default).",
+      "action": "decide",
+      "answer": "b"
+    },
+    {
+      "name": "decide-again-rewrites",
+      "line": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b. Decided: a (2026-01-11).",
+      "action": "decide",
+      "answer": "b"
+    },
+    {
+      "name": "reply-ahead-of-answers",
+      "line": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b.",
+      "action": "reply",
+      "reply": "leaning b, ask the team",
+      "by": "Sam"
+    },
+    {
+      "name": "reply-second",
+      "line": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. — Sam, 2026-01-12: halfway",
+      "action": "reply",
+      "reply": "all done",
+      "by": "Sam"
+    },
+    {
+      "name": "reply-refused-field",
+      "line": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10.",
+      "action": "reply",
+      "reply": "Decided: yes",
+      "by": "Sam"
+    },
+    {
+      "name": "reply-refused-due-on-undated",
+      "line": "- [ ] act 2026-01-05 (session s-1) — Rotate.",
+      "action": "reply",
+      "reply": "Due: 2026-02-01 please",
+      "by": "Sam"
+    },
+    {
+      "name": "decide-refused-empty",
+      "line": "- [ ] decide 2026-01-05 (session s-1) — Pick one.",
+      "action": "decide",
+      "answer": "  "
+    },
+    {
+      "name": "not-an-open-item",
+      "line": "- [x] 2026-01-05 (session s-1) — Done already. Closed: 2026-01-06.",
+      "action": "done"
+    }
+  ],
+  "subjects": [
+    {
+      "tool": "board_edit",
+      "action": "snooze",
+      "text": "act 2026-01-05 (session s-1 on h) — **Rotate the key** now. Context: TD-1. Due: 2026-01-10.",
+      "to": "2026-01-20"
+    },
+    {
+      "tool": "shiftlead",
+      "action": "decide",
+      "text": "decide 2026-01-05 (session `ab12` on h) — Pick a   name. Due: 2026-01-10.",
+      "answer": "beta   two"
+    },
+    {
+      "tool": "board_edit",
+      "action": "reply",
+      "text": "2026-01-05 (session s-1) — Say more. Due: 2026-01-10. — Sam, 2026-01-12: secret words"
+    },
+    {
+      "tool": "shiftlead",
+      "action": "append",
+      "text": "2026-01-05 (session `w-1` on h) — A very long item text that goes well past the sixty character limit of a head. Due: 2026-01-10.",
+      "session": "w-1"
+    },
+    {
+      "tool": "board_edit",
+      "action": "done",
+      "text": "2026-01-05 (n/a) — No session named. Due: 2026-01-10."
+    },
+    {
+      "tool": "board_edit",
+      "action": "snooze",
+      "text": "2026-01-05 (session s) — X."
+    }
+  ],
+  "subject_kinds": [
+    "board_edit: done Ship it (session s-1)",
+    "shiftlead: reply on Pick a name (session w-1)",
+    "shiftlead: append A new item (session w-1)",
+    "shiftlead: board A new item (from TD-12)",
+    "shiftlead: answer A question (from TD-12)",
+    "shiftlead: board decide TD-12 (person)",
+    "Fix the parser (#12)",
+    "board_edit: finish Ship it (session s-1)"
+  ],
+  "compose": [
+    {
+      "fn": "item_line",
+      "text": "Look at  the\tdashboard.",
+      "due": "2026-01-20",
+      "session": "w-1",
+      "host": "box-1",
+      "context": "TD-4"
+    },
+    {
+      "fn": "item_line",
+      "text": "No session",
+      "due": "2026-01-20",
+      "session": null,
+      "host": null,
+      "context": null
+    },
+    {
+      "fn": "item_line",
+      "text": "Bad date",
+      "due": "soon",
+      "session": null,
+      "host": null,
+      "context": null
+    },
+    {
+      "fn": "decided_line",
+      "title": "Choose the store. Answers: none",
+      "ref": "TD-31",
+      "answers": [
+        "files",
+        "a | db"
+      ],
+      "default": 0,
+      "words": "files"
+    },
+    {
+      "fn": "decided_line",
+      "title": "Empty words",
+      "ref": "TD-31",
+      "answers": [],
+      "default": null,
+      "words": " "
+    },
+    {
+      "fn": "decided_line",
+      "title": "Close it",
+      "ref": "TD-31",
+      "answers": [],
+      "default": null,
+      "words": "Closed: yes"
+    }
+  ],
+  "predicates": [
+    "## TD-012: A heading",
+    "| TD-012 | A row | Low | Open |",
+    "- [ ] 2026-01-05 (session s-1) — Open.",
+    "  - [x] 2026-01-05 (session s-1) — Closed.",
+    "- [ ]",
+    "Swept: 2026-01-10 (quick, 3 items)",
+    "Swept-deep: 2026-01-01 (deep)",
+    "Fields: Owner = a | b",
+    "Not a stamp: yesterday",
+    "Swept: n/a"
+  ],
+  "versions": [
+    "# Board\n\nLedgerboard: 1\n\n- [ ] 2026-01-05 (session s) — x.\n",
+    "# Board\n\nLedgerboard: 2\n\n- [ ] 2026-01-05 (session s) — x.\n",
+    "# Board\n\n- [ ] 2026-01-05 (session s) — x.\nLedgerboard: 3\n",
+    "# Board\n\n- [docs](x)\nLedgerboard: 2\n\n- [ ] 2026-01-05 (session s) — x.\n",
+    "# T\n\n## Summary\n\nLedgerboard: 2\n\n## TD-001: x\n"
+  ]
+}

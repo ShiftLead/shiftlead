@@ -1,0 +1,197 @@
+{
+ "compose": [
+  {
+   "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Look at the dashboard. Context: TD-4. Due: 2026-01-20.\n"
+  },
+  {
+   "ok": "- [ ] 2026-01-15 (n/a) — No session. Context: none. Due: 2026-01-20.\n"
+  },
+  {
+   "refused": "a board line needs a Due date as YYYY-MM-DD, not 'soon'"
+  },
+  {
+   "ok": "- [ ] decide 2026-01-15 (person) — Choose the store. Answers none. Context: TD-31. Due: 2026-01-15. Answers: files (default) | a \\| db. Decided: files (2026-01-15).\n"
+  },
+  {
+   "refused": "a decision needs its words: one of the entry's answers, or what you typed"
+  },
+  {
+   "refused": "an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words"
+  }
+ ],
+ "edits": {
+  "decide-again-rewrites": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b. Decided: b (2026-01-15)."
+  },
+  "decide-fresh": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. Answers: a | b (default). Decided: b (2026-01-15)."
+  },
+  "decide-refused-empty": {
+   "refused": "the answer is empty"
+  },
+  "done-unpunctuated": {
+   "ok": "- [x] 2026-01-05 (session s-1) — Ship it. Closed: 2026-01-15."
+  },
+  "done-with-why": {
+   "ok": "- [x] 2026-01-05 (session s-1 on h) — Ship it. Due: 2026-01-10. Closed: 2026-01-15 — merged."
+  },
+  "not-an-open-item": {
+   "refused": "the line is not an open item"
+  },
+  "reply-ahead-of-answers": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-10. — Sam, 2026-01-15: leaning b, ask the team. Answers: a | b."
+  },
+  "reply-refused-due-on-undated": {
+   "refused": "this item has no Due: date, so a reply may not carry one — the reader would take it for the item's; snooze sets its date"
+  },
+  "reply-refused-field": {
+   "refused": "a reply may not carry Context:, Answers:, Decided: or Closed: — the reader would read it as the field; say it in other words"
+  },
+  "reply-second": {
+   "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-10. — Sam, 2026-01-12: halfway — Sam, 2026-01-15: all done"
+  },
+  "snooze-existing": {
+   "ok": "- [ ] act 2026-01-05 (session s-1) — Rotate. Due: 2026-01-20. Answers: now | later."
+  },
+  "snooze-undated-before-answers": {
+   "ok": "- [ ] decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: a | b."
+  },
+  "snooze-undated-no-fields": {
+   "ok": "- [ ] 2026-01-05 (session s-1) — Plain. Due: 2026-01-20."
+  }
+ },
+ "predicates": {
+  "  - [x] 2026-01-05 (session s-1) — Closed.": {
+   "entry_id": null,
+   "is_item": true,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": null
+  },
+  "## TD-012: A heading": {
+   "entry_id": "TD-012",
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": null
+  },
+  "- [ ]": {
+   "entry_id": null,
+   "is_item": true,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": null
+  },
+  "- [ ] 2026-01-05 (session s-1) — Open.": {
+   "entry_id": null,
+   "is_item": true,
+   "is_open_item": true,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": null
+  },
+  "Fields: Owner = a | b": {
+   "entry_id": null,
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": null
+  },
+  "Not a stamp: yesterday": {
+   "entry_id": null,
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": null
+  },
+  "Swept-deep: 2026-01-01 (deep)": {
+   "entry_id": null,
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": true,
+   "is_sweep_stamp": true,
+   "row_id": null
+  },
+  "Swept: 2026-01-10 (quick, 3 items)": {
+   "entry_id": null,
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": true,
+   "is_sweep_stamp": true,
+   "row_id": null
+  },
+  "Swept: n/a": {
+   "entry_id": null,
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": true,
+   "row_id": null
+  },
+  "| TD-012 | A row | Low | Open |": {
+   "entry_id": null,
+   "is_item": false,
+   "is_open_item": false,
+   "is_stamp": false,
+   "is_sweep_stamp": false,
+   "row_id": "TD-012"
+  }
+ },
+ "subject_kinds": {
+  "Fix the parser (#12)": null,
+  "board_edit: done Ship it (session s-1)": "edit",
+  "board_edit: finish Ship it (session s-1)": null,
+  "shiftlead: answer A question (from TD-12)": "append",
+  "shiftlead: append A new item (session w-1)": "append",
+  "shiftlead: board A new item (from TD-12)": "append",
+  "shiftlead: board decide TD-12 (person)": "append",
+  "shiftlead: reply on Pick a name (session w-1)": "edit"
+ },
+ "subjects": [
+  {
+   "ok": "board_edit: snooze Rotate the key now. to 2026-01-20 (session s-1)"
+  },
+  {
+   "ok": "shiftlead: decide Pick a   name.: beta two (session `ab12`)"
+  },
+  {
+   "ok": "board_edit: reply Say more. (session s-1)"
+  },
+  {
+   "ok": "shiftlead: append A very long item text that goes well past the sixty charact… (session w-1)"
+  },
+  {
+   "ok": "board_edit: done No session named. (session n/a)"
+  },
+  {
+   "refused": "a snooze needs its date"
+  }
+ ],
+ "versions": [
+  {
+   "major": 1,
+   "problem": null
+  },
+  {
+   "major": 2,
+   "problem": "this file declares Ledgerboard: 2, newer than this ledgerboard.py reads (1) — vendor a newer release; nothing was read"
+  },
+  {
+   "major": 1,
+   "problem": null
+  },
+  {
+   "major": 2,
+   "problem": "this file declares Ledgerboard: 2, newer than this ledgerboard.py reads (1) — vendor a newer release; nothing was read"
+  },
+  {
+   "major": 2,
+   "problem": "this file declares Ledgerboard: 2, newer than this ledgerboard.py reads (1) — vendor a newer release; nothing was read"
+  }
+ ]
+}
