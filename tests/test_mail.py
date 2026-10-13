@@ -89,6 +89,44 @@ async def test_the_message_gate_reads_the_graph_and_names_its_own_rule(agent, tm
             await person.call("kill", id=sid)
 
 
+async def test_the_project_badge_is_an_edge_across_teams_and_copies_nobody(agent, tmp_path):
+    """Design §4.10 *across teams, by project* (TD-582): two sessions of different teams carrying
+    the same non-empty `project` may message each other on every kind and settle it on one thread;
+    a different project, or none, is refused naming the project among the edges; an empty badge on
+    both is no edge; and nothing on that edge is copied to either side's controllers."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        a = await mk("a", unattended=True, team="alpha", project="p")
+        b = await mk("b", unattended=True, team="beta", project="p")
+        lead_a, lead_b = await mk("la", unattended=True), await mk("lb", unattended=True)
+        await person.call("set_controllers", id=a, add=[lead_a])
+        await person.call("set_controllers", id=b, add=[lead_b])
+        other = await mk("o", unattended=True, team="gamma", project="q")
+        bare, bare2 = await mk("n", unattended=True, team="delta"), await mk("n2", unattended=True, team="eps")
+        assert mail.message_edge(agent.sessions, a, b) == "project"
+        assert mail.message_edge(agent.sessions, a, other) is None
+        async with LocalClient(caller=a) as ca, LocalClient(caller=b) as cb:
+            assert (await ca.call("msg", to=b, text="fyi"))["delivered"] == [b]
+            steer = (await ca.call("msg", to=b, text="I will do X", kind="steer", default="X"))["entry"]
+            ask = (await ca.call("msg", to=b, text="X or Y?", kind="ask", answers=["X", "Y"]))["entry"]
+            # the peer answers on the question's own thread
+            reply = (await cb.call("msg", text="X", kind="reply", reply_to=ask["id"]))["entry"]
+            assert reply["to"] == [a] and reply["root"] == ask["id"]
+            assert (await cb.call("msg", text="agreed", kind="reply", reply_to=steer["id"]))["entry"]["to"] == [a]
+            for c, to in ((ca, other), (cb, other), (ca, bare)):
+                with pytest.raises(AgentError, match=r"its team, its project, or a controller .*design §4\.10"):
+                    await c.call("msg", to=to, text="hi")
+        # an empty project on both is no edge, however alike the two are otherwise
+        async with LocalClient(caller=bare) as cn:
+            with pytest.raises(AgentError, match=r"its project"):
+                await cn.call("msg", to=bare2, text="hi")
+        # no copy to either side's controllers
+        for lead in (lead_a, lead_b):
+            assert (await person.call("get", id=lead))["unread"] == 0
+        for sid in (a, b, lead_a, lead_b, other, bare, bare2):
+            await person.call("kill", id=sid)
+
+
 async def test_a_message_reaches_an_interactive_session_and_an_act_does_not(agent, tmp_path):
     """§9 invariant 5's split: an acting RPC from a session onto a person's session is refused
     whatever the membership; a message to it lands (and, in step 1, nothing wakes anything)."""
