@@ -57,7 +57,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-625 | The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+* | Low | Open |
-| TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Open — design first |
+| TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
+| TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
 
 ---
 
@@ -1032,7 +1033,8 @@ month of more than 1000 PRs and gets its count.
 **Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-13 (the designer) — each path on the Git card is a link by the Session card's **recent files** form: the editor button's file template with the path joined to the worktree, no `:line`, the two launches unless *opens the folder first* is off, drawn only where the editor button is (text under `open_in: none` and on another host's record); the status code stays text. **Not a file stays text**: a deletion (`D`, nothing to open) and an untracked directory (`?? dir/`, a folder form would open its own window), each with a hover saying why; a rename carries its new path only (the porcelain line's) and links it; a conflict (`UU`) links as any change. §4.5a *Focus side panel, Git card: changed files*. No mockup: the card's text is unchanged but for the links. Built by TD-628. Was: Open.
+**Blocked by:** TD-628
 **Location:** design §4.5 item 4 (the side panel's **Git** card), §4.5a (*Focus side panel* rows: **recent
 files**, **diff / log / PRs**), §4.6 *A path in the pane is a link*, §5 `person.open_in` / `person.file_link`;
 `src/shiftlead/ui/templates/focus.html` (`#gitfiles`), `src/shiftlead/ui/static/app.js` (the `#gitfiles`
@@ -1054,5 +1056,29 @@ a rename's old side). The build reuses `AO.openFile`; nothing is parsed from the
 a click on a changed file on the Git card opens it in the person's editor.
 
 **Related:** TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
+
+---
+
+## TD-628: Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-627's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Focus side panel, Git card: changed files* (beside *recent files*); `src/shiftlead/ui/templates/focus.html` (`#gitfiles` ~L234: each line split into its status code and its path, the path an `<a>` as the recent files draw theirs), `src/shiftlead/ui/static/app.js` (the `#gitfiles` redraw ~L4248: the same split and link; the press through `AO.openFile`, as the recent files' is), `src/sessionorc/gitinfo.py` (`GitInfo.files` ~L26: read only — `"<code> <path>"`, a rename's new path, `?? dir/` for a new directory); `tests/test_ui_focus*.py` or `tests/test_ui.py` (the Focus page's pieces)
+
+**Why:** TD-627: Paul, 2026-10-13 — *our git card in the focus session screen shows modified files — add links to those files so they can be opened in vscode/other (leverage our other open file flows)*; the Git card is open by default and its files are plain text, while the folded Session card's recent files open.
+
+**Fix:**
+1. Split each `GitInfo.files` line at its first space into the code and the path; draw the code as text and the path as the recent files' link (`data-file` the path joined to the worktree's root — a porcelain path is relative to it, which is the record's directory or above it, as `app.js` ~L3631 resolves one for `isChanged` — the same class and handler), on first render and on the delta's redraw.
+2. Text, with a hover, for a `D` line (*deleted in the worktree*) and a path ending in `/` (*a new directory: open it from the worktree's window*).
+3. No link where the editor button is not drawn (`open_in: none`, another host's record): the lines as today.
+4. Tests: a modified, an untracked and a conflicted path are links with the joined path; a deleted one and a `dir/` are text with their hovers; under `open_in: none` every line is text; the delta's redraw draws the same as the first render.
+
+**Done when** a click on a changed file on the Focus Git card opens it in the person's editor by the same file link as the recent files, a deletion and a new directory stay text saying why, and the tests above pass; the builder's look (design §4.9b) is named in the PR.
+
+**Related:** TD-627 (the design), TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
 
 ---
