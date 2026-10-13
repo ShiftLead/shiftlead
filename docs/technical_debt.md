@@ -63,6 +63,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-633 | Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept | Medium | Open |
 | TD-634 | `ao inbox --counts` run from a session counts that session's own inbox, not the person's, and marks its unread mail read | Medium | Designed — TD-635 builds it |
 | TD-635 | Build TD-634: `ao inbox --counts` asks the UI's counts read first; the person's local count names `person`; a session with no UI answering is refused in words; a test runs it as a session | Medium | Open |
+| TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Open |
+| TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Open |
+| TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Open |
 
 ---
 
@@ -90,7 +93,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 **Added:** 2026-09-06
 **Owner:** paul
 **Kind:** build
-**Status:** **Paul, 2026-10-07:** reserved until the real connection path (how the phone reaches the home) is built. Open **Next:** Paul's (the grinder brief reserves it).
+**Status:** **Paul, 2026-10-07:** reserved until the real connection path (how the phone reaches the home) is built. **Paul, 2026-10-13 (the lessons ADR, lesson 9):** the Inbox, improved, is to be the phone's text interface; a chat integration only if it cannot be. Open **Next:** Paul's (the grinder brief reserves it).
 **Location:** `src/shiftlead/ui/static/app.css` (`@media (max-width: 720px)`), `focus.html`
 
 **Why:** Design §4.5 (phone, phase 2): Team collapses to cards with Allow / Deny, Focus gets a narrow mode with the terminal full-width and a soft-key row (↑ ↓ ← → Enter Esc Tab 1–9) so questions are still answered through the terminal. The CSS has a bare media query; there is no soft-key row and nothing has been tried on a phone.
@@ -244,7 +247,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-09-22 (the anchor session; the design review)
 **Owner:** anchor
 **Kind:** evaluation
-**Status:** **Paul, 2026-10-10 (with ao-paul): agreed, a spike, and integration tests with it.** Run as an interactive session, not a member's lane: a second tool must be installed and signed in (neither `codex` nor `gemini` is on kmaster on 2026-10-10; the sign-in is Paul's account or key), the work is judgement (which of the contract's methods are neutral), and its result is an ADR, not a merge. The lasting product is an **adapter conformance suite**: one set of tests every adapter passes against its real tool (launch, the state it reports, `send`, `composer()`, the doorbell and mail, `title()`), so neutrality is checked on every change and not once by the spike. The spike says which of those a scraped adapter can pass and which belong to Claude Code alone. Open — for evaluation. The design's stated moat is one neutral view across tools, and only one agent adapter exists. Since phase 1 the contract (§4.3) gained `composer()`, `title()`, `mail()`, a session id chosen at launch, the doorbell, the trust pre-seed and screen rules, each shaped by Claude Code. Phase 5 puts the second adapter last. Recommendation: a scraped spike now — Codex CLI or Gemini CLI, `state_source: scraped`, no hooks — to see which of the contract's methods are really neutral, what `send` and the doorbell do without a readable composer, and whether the record's fields assume a tool session id. The spike is a branch and an ADR, not a shipped adapter. **Next:** for evaluation, not scheduled.
+**Status:** **Paul, 2026-10-10 (with ao-paul): agreed, a spike, and integration tests with it.** Run as an interactive session, not a member's lane: a second tool must be installed and signed in (neither `codex` nor `gemini` is on kmaster on 2026-10-10; the sign-in is Paul's account or key), the work is judgement (which of the contract's methods are neutral), and its result is an ADR, not a merge. **Paul, 2026-10-13 (the lessons ADR, `docs/decisions/2026-10-13-agent-product-lessons.md` lesson 10):** Gemini CLI is *"a definite fit"*, so it is the spike's tool; Hermes Agent, Muse Code and Grok Bot are not wanted as tools for now. The lasting product is an **adapter conformance suite**: one set of tests every adapter passes against its real tool (launch, the state it reports, `send`, `composer()`, the doorbell and mail, `title()`), so neutrality is checked on every change and not once by the spike. The spike says which of those a scraped adapter can pass and which belong to Claude Code alone. Open — for evaluation. The design's stated moat is one neutral view across tools, and only one agent adapter exists. Since phase 1 the contract (§4.3) gained `composer()`, `title()`, `mail()`, a session id chosen at launch, the doorbell, the trust pre-seed and screen rules, each shaped by Claude Code. Phase 5 puts the second adapter last. Recommendation: a scraped spike now — Codex CLI or Gemini CLI, `state_source: scraped`, no hooks — to see which of the contract's methods are really neutral, what `send` and the doorbell do without a readable composer, and whether the record's fields assume a tool session id. The spike is a branch and an ADR, not a shipped adapter. **Next:** for evaluation, not scheduled.
 **Location:** design §4.3, §7 phase 5, `src/shiftlead/adapters/`
 
 **Why:** every Claude-shaped feature built before a second adapter exists is a feature that may have to be unbuilt, and the claim the product is sold on has not been tested.
@@ -1192,5 +1195,65 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** `ao inbox --counts` from a session prints the top bar's numbers or is refused in words, marks nothing in any inbox, and the tests above pass; TD-616's live check then reads it beside the top bar.
 
 **Related:** TD-634 (the design), TD-616 (the counts), TD-614 (one owner per reading), TD-580 / TD-596 (the person's own shell, which reads as a session here).
+
+---
+
+## TD-636: A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.2 (the permission relay, Allow/Deny), §4.8 (roles, grants), §4.9 / §4.9b (seats; the techlead seat answers asks for the person), §10 *"Allow for this session"* (decided no, 2026-09-23); `src/shiftlead/briefs/manager.md` (a manager's permission triage)
+
+**Why:** Paul, 2026-10-13: *"I like the idea of filtering permission prompts — essentially allowing a director seat to handle them for the user (we talked about a director seat at one point but have not implemented)."* Every prompt a tool does not pre-allow reaches the person, or a team's manager, which triages its members' prompts by its brief. Muse's Sentinel, Grok Bot's Auto-review rules and Hermes's `smart` approvals all put a second line in front of the person (`docs/decisions/2026-10-13-agent-product-lessons.md`). The glossary's *director* is a position in the control graph (the session whose members are managers), not a seat; no seat answers prompts for the person.
+
+**Fix:** design first. The round settles: (1) the seat — one per home or per team, its preset and brief, and how it differs from the techlead seat (which answers asks) and a manager's triage; (2) what it may answer — written allow/deny rules per role (deterministic, checked first), its own judgement for the rest, and what always reaches the person (a question or menu, anything touching `~/.shiftlead`, `~/.claude`, systemd, another worktree); (3) never an interactive session's prompt (§9 invariant 5); (4) every answer told to the person, as the techlead's are (§4.9b *Everything answered for the person is told to the person*), with the rule or reason; (5) how it squares with *Allow for this session* having been declined; (6) the grant it holds (§4.8). The design names the build entries.
+
+**Done when** the design says who answers which prompts for the person and the build entries are filed with `Blocked by` lines.
+
+**Related:** TD-637, TD-638 (the same ADR's other picks), the manager brief's triage, §4.9b.
+
+---
+
+## TD-637: `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 4)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.7 (`ao progress done <ref> --pr <n>`), §6 rule 10 (*The cadence check*, run at the home after the declaration); `scripts/check_cadence.py` `row_ci` (reads every check run on the head, not the protected branch's required set; the script is dev-cadence's)
+
+**Why:** Paul, 2026-10-13: *"I agree an agent should not say its done if its PR is not green."* Today the declaration is accepted and checked afterwards on the reports' cadence: the member is told its failing rows, and a second fail becomes an Inbox row. Hermes Agent's PR completion contract refuses a task's completion until the required checks pass on the exact head (`docs/decisions/2026-10-13-hermes-agent.md`).
+
+**Fix:** design first. The round settles: (1) `done … --pr <n>` refused, in words naming the failing or missing checks, while the PR's head is not green — or accepted as *done · checks pending* and turned into a refusal only when they fail; (2) what "green" reads — the protected branch's required checks (and rulesets) on the exact head, falling back to every run when the repo protects nothing; (3) a merged PR (already through the forge's gate) and a repo with no CI; (4) whether `check_cadence.py`'s `ci` row reads the required set too (a dev-cadence change). The design names the build entries.
+
+**Done when** the design says what `done … --pr` does on a red or pending head and the build entries are filed.
+
+**Related:** TD-636, TD-638, TD-618 (the PR `checks` mark), §6 rule 10.
+
+---
+
+## TD-638: A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 8)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `scripts/git-hooks/prepare-commit-msg` (dev-cadence's, cadence §9.9: `Co-Authored-By: $AGENT_NAME <…>` from the `AGENT_NAME` the orchestrator exports); design §4.2a (the model in use, TD-031), §4.3 (a metered profile's `Turn` carries `model`)
+
+**Why:** Paul, 2026-10-13: *"As we start using more models, recording which did what is a good idea. We get some of this by including the session name as a git contributor, but could expand it to list the actual model."* Today a squash commit carries the session's trailer (`ao-paul <ao-paul@shiftlead.placeholder>`) and, from Claude Code's own attribution, `Claude Opus 5.5`; a tool that adds no attribution of its own (Codex, Gemini CLI) leaves only the session, and a mid-run model switch or a subagent on another model is in neither.
+
+**Fix:** design first. The round settles: (1) the trailer's shape (a second `Co-Authored-By` naming the model, or a key such as `Agent-Model:`); (2) where the hook reads the model — an `AGENT_MODEL` exported at launch is stale after a switch, so perhaps the session's record (the model in use, §4.2a) through `ao`; (3) a review's model, which the `cadence-review:` line already names; (4) the hook change goes to dev-cadence (its synced file), shiftlead's part is what it exports. The design names the build entries, one of them dev-cadence's.
+
+**Done when** the design says how a commit names the model that made it and the build entries are filed.
+
+**Related:** TD-636, TD-637, TD-031, cadence §9.9.
 
 ---
