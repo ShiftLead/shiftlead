@@ -1,0 +1,169 @@
+{
+ "closed": [
+  "- [x] 2026-01-02 (session s-13) — Closed twin left open by a merge. Due: 2026-01-03. Closed: 2026-01-04 — shipped."
+ ],
+ "items": [
+  {
+   "answers": [
+    "alpha",
+    "beta"
+   ],
+   "decided": {
+    "date": "2026-01-14",
+    "text": "beta"
+   },
+   "default": "beta",
+   "detail": [],
+   "due": "2026-01-12",
+   "due_error": null,
+   "due_tag": "3d overdue",
+   "host": "box-1",
+   "kind": "decide",
+   "line": 8,
+   "overdue_days": 3,
+   "refs": [
+    "TD-004",
+    "PR #12"
+   ],
+   "replies": [],
+   "session": "ab12cd34",
+   "text": "decide 2026-01-05 (session `ab12cd34` on box-1, branch feature/x) — **Pick a name** for the tool. Context: TD-004 / PR #12. Due: 2026-01-12. Answers: alpha | beta (default). Decided: beta (2026-01-14).",
+   "waiting_on": "session"
+  },
+  {
+   "answers": [],
+   "decided": null,
+   "default": null,
+   "detail": [
+    "- the second region is still on the old key",
+    "- check after the deploy"
+   ],
+   "due": "2026-01-15",
+   "due_error": null,
+   "due_tag": "due today",
+   "host": "box-2",
+   "kind": "act",
+   "line": 9,
+   "overdue_days": 0,
+   "refs": [
+    "other-repo#TD-020",
+    "PR #30",
+    "PR #31"
+   ],
+   "replies": [
+    {
+     "by": "Sam",
+     "date": "2026-01-14",
+     "text": "done on staging only"
+    }
+   ],
+   "session": "worker-2",
+   "text": "act 2026-01-06 (session worker-2 on box-2) — Rotate the key. Context: other-repo#TD-020, PRs #30/#31. Due: 2026-01-15. — Sam, 2026-01-14: done on staging only",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [
+    "Works",
+    "Not right: <what>"
+   ],
+   "decided": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-02-01",
+   "due_error": null,
+   "due_tag": "due 2026-02-01",
+   "host": null,
+   "kind": "look",
+   "line": 12,
+   "overdue_days": null,
+   "refs": [],
+   "replies": [],
+   "session": null,
+   "text": "look 2026-01-07 (session n/a) — Does the page render? Context: none. Due: 2026-02-01. Answers: Works | Not right: <what>.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "decided": null,
+   "default": null,
+   "detail": [],
+   "due": "2026-01-01",
+   "due_error": null,
+   "due_tag": "14d overdue",
+   "host": null,
+   "kind": "watch",
+   "line": 13,
+   "overdue_days": 14,
+   "refs": [],
+   "replies": [],
+   "session": "s-9",
+   "text": "watch 2026-01-08 (session s-9) — Re-check the import after a week. Due: 2026-01-01.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "decided": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "host": null,
+   "kind": "fyi",
+   "line": 14,
+   "overdue_days": null,
+   "refs": [],
+   "replies": [],
+   "session": "s-10",
+   "text": "fyi 2026-01-09 (session s-10) — The mirror moved. Due: 2026-01-20.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "decided": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": null,
+   "due_tag": "no due date",
+   "host": null,
+   "kind": null,
+   "line": 15,
+   "overdue_days": null,
+   "refs": [],
+   "replies": [],
+   "session": "s-11",
+   "text": "2026-01-09 (session s-11) — Undated and unmarked.",
+   "waiting_on": "person"
+  },
+  {
+   "answers": [],
+   "decided": null,
+   "default": null,
+   "detail": [],
+   "due": null,
+   "due_error": "2026-1-9",
+   "due_tag": "no due date",
+   "host": null,
+   "kind": null,
+   "line": 16,
+   "overdue_days": null,
+   "refs": [],
+   "replies": [],
+   "session": "s-12",
+   "text": "2026-01-09 (session s-12) — A typo'd date. Due: 2026-1-9.",
+   "waiting_on": "person"
+  }
+ ],
+ "keys": [
+  "- [ ] decide 2026-01-05 (session `ab12cd34` on box-1, branch feature/x) — **Pick a name** for the tool. Context: TD-004 / PR #12. Answers: alpha | beta (default)",
+  "- [ ] act 2026-01-06 (session worker-2 on box-2) — Rotate the key. Context: other-repo#TD-020, PRs #30/#31",
+  "- [ ] look 2026-01-07 (session n/a) — Does the page render? Context: none. Answers: Works | Not right: <what>",
+  "- [ ] watch 2026-01-08 (session s-9) — Re-check the import after a week",
+  "- [ ] fyi 2026-01-09 (session s-10) — The mirror moved",
+  "- [ ] 2026-01-09 (session s-11) — Undated and unmarked",
+  "- [ ] 2026-01-09 (session s-12) — A typo'd date. Due: 2026-1-9",
+  "- [ ] 2026-01-02 (session s-13) — Closed twin left open by a merge",
+  "- [ ] 2026-01-02 (session s-13) — Closed twin left open by a merge"
+ ]
+}
