@@ -111,7 +111,6 @@ self-hosted. Where they part:
 Gathered with the other two surveys' lessons, for discussion, in the
 [lessons ADR](2026-10-13-agent-product-lessons.md).
 
-
 1. **A completion contract that reads the forge's own required checks.** Hermes refuses to call a PR
    task done until branch protection's required checks pass on the exact head. shiftlead's
    `check_cadence.py` reads CI too, as a detector (cadence §7); Hermes makes it the definition of done.

@@ -38,10 +38,13 @@ Size is a guess: *small* is one TD build, *medium* a design round and a build, *
 - **shiftlead now:** every prompt is relayed to the UI's Allow/Deny (§4.2); a team's manager session
   triages its members' prompts by its brief — allow what the brief plainly covers, deny anything
   touching `~/.shiftlead`, `~/.claude`, systemd or another worktree, escalate questions
-  (`src/shiftlead/briefs/manager.md`). No rule set, no policy code.
+  (`src/shiftlead/briefs/manager.md`). Some prompts never reach the hook because the tool's own
+  settings pre-allow them (the allowlist tdgrind ships, §4.2). No shiftlead-side rule set; and
+  *"Allow for this session"* was decided **no, not now** (2026-09-23, §10).
 - **How it might fit:** per-role allow/deny rules the host agent checks before a prompt reaches
   anyone — deterministic, in the role's settings (§4.8) — with the manager's triage and the person
-  behind them. A model-judge is the later, optional step.
+  behind them. Unlike the declined *Allow for this session*, these would be per role and written
+  down, not granted from a prompt. A model-judge is the later, optional step.
 - **Caution:** Hermes's own security page says its denylist *"does not sandbox a hostile or
   compromised agent"*; rules cut noise, they are not a boundary. Claude Code's own permission
   settings already do some of this per profile.
@@ -61,10 +64,11 @@ Size is a guess: *small* is one TD build, *medium* a design round and a build, *
 ### 3. Show what a session plans, not only what it did
 
 - **From:** Muse's *"audit trail showing everything Muse has done and plans to do"*.
-- **shiftlead now:** `ao progress` claims and outcomes (done, dropped, blocked, restart, none) and the
-  card's claimed row (§4.9a, §4.7); no next-steps text.
-- **How it might fit:** a claim may carry a short plan (`ao progress claim TD-123 --plan "…"`), shown
-  on the card and in Focus, replaced as the session moves on.
+- **shiftlead now:** `ao progress` claims and outcomes (done, dropped, blocked, restart, none, §4.7),
+  shown on the team card (§4.5a); and the session's own `doing` line (§4.8), drawn on the card and as
+  Focus's *Working* panel (§4.5a) — what it is doing **now**. Nothing says what comes next.
+- **How it might fit:** extend `doing` with a short *next* list, or let a claim carry a plan
+  (`ao progress claim TD-123 --plan "…"`), shown beside *Working* and replaced as the session moves on.
 - **Size:** small. **Question:** useful to you when you glance at the org view, or noise?
 
 ### 4. Done means the forge's required checks pass on the exact head
@@ -73,16 +77,21 @@ Size is a guess: *small* is one TD build, *medium* a design round and a build, *
   head before a task may complete; *"A commit or diff alone never automatically completes a task"*.
 - **shiftlead now:** Ready to close needs the PR merged (§2 goal 11); `check_cadence.py`'s `ci` row
   reads the head's check runs, as a detector (cadence §7), not the protected branch's required set;
-  `ao progress done <ref> --pr <n>` is taken on the session's word (§4.7).
-- **How it might fit:** `done … --pr <n>` is refused while the PR's required checks are red or missing,
-  and `check_cadence.py` reads the required set rather than every run.
+  `ao progress done <ref> --pr <n>` is accepted, then checked at the home on the reports' cadence
+  (§6 rule 10): the member is told its failing rows, and a second fail or a fail on a merged PR
+  becomes an Inbox row.
+- **How it might fit:** check at declaration time — refuse `done … --pr <n>` while the PR's required
+  checks are red or missing — and have `check_cadence.py` read the protected branch's required set
+  rather than every run.
 - **Size:** small to medium. **Question:** refuse, or accept and mark the claim *done · checks
   pending*?
 
 ### 5. Warn before the wall, not at it
 
 - **From:** Hermes tells a worker near 90% of its iteration budget to checkpoint or report.
-- **shiftlead now:** the context bound speaks once a session is **over** it (§6 rule 5); the usage
+- **shiftlead now:** the context bound speaks only once a session is **over** it (§6 rule 5): a
+  fixed line when it is idle, repeated after twenty minutes, and a clause on every `ao` reply while
+  it works; the usage
   gate pauses at a window's line (§6 *Usage gate*); TD-460 is reading back a 200k bound.
 - **How it might fit:** one earlier line at, say, 80% of either — *finish this entry, push, ledger;
   take nothing new* — so a session parks cleanly instead of being stopped mid-entry.
@@ -103,7 +112,7 @@ Size is a guess: *small* is one TD build, *medium* a design round and a build, *
 
 - **From:** Hermes's *"closed learning loop"* — agent-curated memory, self-improving skills.
 - **shiftlead now:** `docs/claude-memory/`, one fact per file, landed by PR (cadence §7.1–§7.3);
-  skills are static. The three ADRs agree on what is *not* wanted: memory the person cannot read.
+  skills are static. Grok Bot's ADR names memory the person cannot read as *not wanted*.
 - **How it might fit:** at wrap-up, a session proposes memory entries from what it hit, as a PR the
   person or techlead reads — the learning loop, kept in the repo.
 - **Size:** medium. **Question:** is Claude Code's own memory plus today's convention enough?
@@ -123,7 +132,10 @@ Size is a guess: *small* is one TD build, *medium* a design round and a build, *
 - **shiftlead now:** one-way Telegram: one message, with a link, for a row that stops a session or a
   team while nobody is looking (§4.10 *Told on Telegram*).
 - **How it might fit:** answer from the message — Allow/Deny, a steer's pick — through the same
-  grants as the UI (§4.8). Taking control still means the terminal.
+  grants as the UI (§4.8). Taking control still means the terminal. **It runs into a rule:** a
+  message sends no pending text, question words or `doing` line, because it leaves the machine
+  for a third party's servers (§4.10 *What a message says*); answering needs that text, or blind
+  buttons.
 - **Size:** medium. **Question:** is a link to the page enough, or do you want to answer from your
   phone?
 
@@ -139,12 +151,12 @@ Size is a guess: *small* is one TD build, *medium* a design round and a build, *
 - **Size:** medium per adapter. **Question:** confirm Codex or Gemini CLI first, Hermes and Muse
   Code later if asked?
 
-## Not wanted, across all three
+## Not wanted, from the three between them
 
-An agent loop that replaces the person's coding tool; a model or harness chosen by the vendor;
-headless workers with no terminal to take over; memory or a record the person cannot read, or that
-lives only in the vendor's product; one shared computer for every agent; training on the person's
-work by default.
+An agent loop that replaces the person's coding tool, and headless workers with no terminal to take
+over (Hermes); a model chosen by the vendor (Grok Bot, Muse); memory the person cannot read, and one
+shared computer for every agent (Grok Bot); a record that lives only in the vendor's product, and
+training on the person's work by default (Muse).
 
 ## What this ADR does not do
 
