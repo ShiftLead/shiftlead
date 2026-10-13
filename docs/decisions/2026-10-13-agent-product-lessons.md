@@ -1,7 +1,8 @@
 # ADR 2026-10-13: Lessons from Grok Bot, Muse and Hermes Agent — for discussion
 
 Status: **answered** (2026-10-13; Paul's answers under *Decided*). Three lessons are filed as
-design-first entries, one joins an open entry, and the rest are declined. Nothing here is designed. It gathers what the day's three surveys — [Grok Bot](2026-10-13-grok-bot.md),
+design-first entries, two join open entries (TD-003, TD-112), and five are declined. Nothing here
+is designed. It gathers what the day's three surveys — [Grok Bot](2026-10-13-grok-bot.md),
 [Muse](2026-10-13-muse.md) and [Hermes Agent](2026-10-13-hermes-agent.md) — suggest shiftlead learn,
 says for each what shiftlead already has, and asks the question a discussion should settle. A lesson
 Paul picks becomes a design round and a TD entry; one he declines is marked so here.
