@@ -24,7 +24,8 @@ async def test_events_handler_ends_when_the_browser_goes(agent):
     scope = {"type": "websocket", "path": "/events", "raw_path": b"/events", "query_string": b"", "headers": []}
     await inbox.put({"type": "websocket.connect"})
     handler = asyncio.ensure_future(app(scope, inbox.get, send))
-    assert await wait_for(lambda: len(agent._subscribers) == 1, timeout=5.0, step=0.05), "never subscribed"
+    # the stream's own subscription and the counts keeper's, which the first stream starts (TD-616)
+    assert await wait_for(lambda: len(agent._subscribers) == 2, timeout=5.0, step=0.05), "never subscribed"
     await inbox.put({"type": "websocket.disconnect", "code": 1001})
     # Nothing changes on the agent from here on, so no event will come to fail a send: the handler
     # has to notice the disconnect itself. Unfixed, it waited for the next change — uvicorn's

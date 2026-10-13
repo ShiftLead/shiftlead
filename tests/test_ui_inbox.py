@@ -522,7 +522,9 @@ def test_the_counts_read_is_the_full_reads_numbers_and_renders_nothing(client, t
     monkeypatch.setattr(jinja2.Environment, "get_template", lambda *a, **k: renders.append(a[1]) or real(*a, **k))
     got = client.get("/api/person/inbox?counts=1&watching=1").json()
     assert renders == []
-    assert set(got) == set(INBOX_COUNTS) and got == {k: full[k] for k in INBOX_COUNTS}
+    assert set(got) == {*INBOX_COUNTS, "rev"} and {k: got[k] for k in INBOX_COUNTS} == {
+        k: full[k] for k in INBOX_COUNTS
+    }
     assert got["needs"] == 1 and got["fyi_n"] == 1 and got["agent_down"] is False
     client.get("/api/person/inbox")
     assert "inbox_rows.html" in renders  # the spy sees the full read's renders
@@ -2455,7 +2457,7 @@ def test_the_answered_groups_dismiss_all_is_fyis_rule_on_its_own_rows(monkeypatc
     js = (UI / "static" / "app.js").read_text()
     rule = js.split("const dismissOnScreen")[1].split("AO.refreshInboxPage")[0]
     assert ".filter((r) => !r.hidden)" in rule  # on screen: what the rail hides is not sent
-    assert '$$(rows)' in rule and 'act("person", "dismiss", { msg: ids })' in rule  # the ids from the DOM, FYI's RPC
+    assert "$$(rows)" in rule and 'act("person", "dismiss", { msg: ids })' in rule  # the ids from the DOM, FYI's RPC
     assert 'dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow"' in rule
     assert 'dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow"' in rule
     assert "Their Overrule goes with them." in rule and "on screen?" in rule
