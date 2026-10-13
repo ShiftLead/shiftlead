@@ -488,6 +488,7 @@ class HostAgent(
         # The org's person inbox (design §4.10): held here, on no session record, in its own file.
         self.person_store = PersonInboxStore()
         self.person_inbox: list[MailEntry] = self.person_store.load()
+        self.person_store.on_save = self._inbox_changed
         for s in self.sessions.values():
             # `prompt` pendings (Claude's idle_prompt) stopped being an alert on 2026-09-06; a record
             # written before that would otherwise show needs-you until the next hook event.
