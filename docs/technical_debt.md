@@ -59,6 +59,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-626 | The host agent's board read after a stopped fetch carries no *fetch skipped* note: no *origin could not be reached* on the Inbox | Low | Open |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
 | TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
+| TD-629 | A permission answered in the terminal comes back as *needs you* when the hook's wait runs out: the timeout re-raises a pending the session has already moved past | Medium | Open |
+| TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Open |
 
 ---
 
@@ -1074,5 +1076,82 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Done when** a click on a changed file on the Focus Git card opens it in the person's editor by the same file link as the recent files, a deletion and a new directory stay text saying why, and the tests above pass; the builder's look (design §4.9b) is named in the PR.
 
 **Related:** TD-627 (the design), TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
+
+---
+
+## TD-629: A permission answered in the terminal comes back as *needs you* when the hook's wait runs out: the timeout re-raises a pending the session has already moved past
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-entry-4)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_hook.py` (`HookMixin._await_permission`, its `except TimeoutError`),
+`src/sessionorc/agent_tick.py` (`_apply_event`, `_permission_waiting`), `src/shiftlead/adapters/claude_code/hook.py`
+(`translate`'s `PermissionRequest` branch, `describe_tool_input`); design §4.2 *Permissions are answered
+through the hook, not through keystrokes*.
+
+**Why:** Paul (2026-10-13): *we seem to be in a bad state with our "needs you". I answered a question
+in the terminal (for dc-paul) but shiftlead does not seem to handle that properly* — screenshots
+`~/.shiftlead/attachments/ao-shiftlead-entry-4/paste-20261013-091136.png` (the Org: dc-paul *NEEDS
+YOU*, the team's *Answer needed (1)* and the Org's *1 needs you*) and `paste-20261013-091200.png`
+(dc-paul's Focus: the turn done at 9:01, the composer empty, the header still *NEEDS YOU*). dc-paul's
+transcript and record tell it: its `AskUserQuestion` went out at 14:56:25Z and reached the
+`PermissionRequest` hook, so the host agent's `_await_permission` began its 600 s wait; Paul answered
+in the terminal seconds later, the session ran on and stopped at 15:01:13Z; at 15:06:26Z — the
+question's time plus 600 s, the record's `since` — the waiter timed out and its `except TimeoutError`
+set `needs-you` with a `question` pending **unconditionally**, over the record's later `idle`. Nothing
+that happened in between ends the waiter: a later hook event clears the record's pending but leaves the
+future live, so `_permission_waiting` stays true for the full ten minutes. The harm: every permission
+or question answered in the terminal, the road §4.2 promises works beside the buttons, rings again ten
+minutes later as a false *needs you* — on the card, the team's *Answer needed*, the Org's count, and
+the Telegram notice — and it stays up until the session's next hook event, so the person learns to
+doubt the one state that means *you*. A second fault rides on it: an `AskUserQuestion` that reaches
+`PermissionRequest` is drawn by `describe_tool_input`'s JSON fallback, *AskUserQuestion: {"questions":
+[{"question": …*, where the `PreToolUse` road draws the question's text.
+
+**Fix:** a later hook event of the same session ends its waiter: a tool event, a `Stop`, a
+`UserPromptSubmit` or a `SessionEnd` arriving while a waiter is live resolves it as answered in the
+terminal (the trail's word, `_ended_by`), and the timeout sets the terminal's `question` only when the
+record's pending is still that waiter's (`tool_use_id`). `describe_tool_input` draws an
+`AskUserQuestion` by its first question's text, as `translate`'s `PreToolUse` branch does. §4.2's
+paragraph says what a terminal answer ends, in the same PR. **Done when** a test answers a permission
+by a later `PostToolUse` and `Stop` and, past the wait, the record reads `idle` with no pending and
+the trail *answered in the terminal*; a test times out a permission nobody answered and still gets
+the `question`; and an `AskUserQuestion` permission's pending text is its question.
+
+**Related:** TD-201 (a subagent's tool no longer clears `needs-you`), TD-088 and TD-308 (`_ended_by`'s
+words), TD-079 (the attention trail).
+
+---
+
+## TD-630: Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-entry-4)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a (*Add entry form* rows; the *Focus composer* and *Message and Reply dialog*
+**Attach / drop / paste** rows), §4.9 *Add an entry to the ledger*, §4.4 *Attachment drop* and *An
+attachment's life*; `src/shiftlead/ui/templates/base.html` (the form), `src/shiftlead/ui/static/app.js`,
+`src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/session`).
+
+**Why:** Paul (2026-10-13): *add a TD so that files/pics can be pasted into the "add entry" form. I had
+to open this session to give you those pics* — TD-629's two screenshots went in through this session's
+Focus composer, after the session was open, since the form's **What** takes text alone. The composer
+and the Message dialog already attach, drop and paste (TD-530); the form, the one door for a thought
+had while looking at the Org, is the place a screenshot of what is wrong is most often at hand.
+
+**Fix:** design first, since it is a §4.5a row: the composer's road on the form's **What** — **Attach**,
+a dropped file, a pasted image named `paste-<date>-<time>.<ext>`, each path inserted at the caret —
+with where a file lands before any session exists (both ways out start or fill one only at the press:
+a holding folder moved under the session's `attachments/` at **Open a session**, or under the techlead
+seat's at **Hand to the techlead**, and what an abandoned form leaves). **Done when** a screenshot
+pasted into the form reaches the drafting session as a path it can read, by either way out.
+
+**Related:** TD-180, TD-219 (the form), TD-530 (the Message dialog's attach).
 
 ---
