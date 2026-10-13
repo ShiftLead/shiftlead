@@ -3065,7 +3065,12 @@ def _counts(args: argparse.Namespace) -> int:
             uiconf.set_read(await rd.call("settings"))
         return await rd.counts_now(False)
 
-    got = asyncio.run(count())
+    from fastapi import HTTPException
+
+    try:
+        got = asyncio.run(count())
+    except HTTPException as e:  # the host agent refused a read: said, never a traceback
+        return fail(args, str(e.detail), 1)
     if got.get("agent_down"):
         return fail(args, str(got.get("why") or "host agent unreachable"), 3)
     line = (
