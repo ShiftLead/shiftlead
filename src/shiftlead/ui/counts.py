@@ -33,6 +33,7 @@ from .org import LIGHT_KEYS, SHAPE_KEYS
 COUNTS_EVERY = 5.0  # seconds between two recounts at most: a burst of deltas is one recount
 COUNTS_TICK = 60.0  # the minute's recount — what falls due, the build chip, and Looking's read
 RETRY = 5.0  # a lost subscription is tried again after this, while a stream wants it
+SEND_WAIT = 2.0  # one page's socket that takes longer than this to take a push is skipped, not waited on
 
 Count = Callable[[bool], Awaitable[dict[str, Any]]]
 
@@ -60,18 +61,21 @@ class CountsKeeper:
         """A page's stream opened: it gets the numbers held now, and the keeper runs while it is open."""
         self.streams[ws] = False
         if self._task is None or self._task.done():
+            # a reading held by a counts read while no keeper ran is not current: a recount follows
+            self.reading = None
             self._task = asyncio.ensure_future(self._run())
-        if self.reading is not None:
+        elif self.reading is not None:
             with contextlib.suppress(Exception):
-                await ws.send_text(json.dumps({"event": "counts", **self.reading}))
+                await asyncio.wait_for(ws.send_text(json.dumps({"event": "counts", **self.reading})), SEND_WAIT)
 
     async def leave(self, ws: Any) -> None:
         self.streams.pop(ws, None)
         if not self.streams and self._task is not None:
-            self._task.cancel()
-            await asyncio.gather(self._task, return_exceptions=True)
-            self._task = None
+            # detached before the await, so a stream joining meanwhile starts a keeper of its own
+            task, self._task = self._task, None
             self.reading = None  # nothing keeps it current now: the next stream starts from a recount
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
 
     def visible(self, ws: Any, shown: bool) -> None:
         """The page said whether its document is visible: becoming the first visible page is a
@@ -101,9 +105,13 @@ class CountsKeeper:
 
     async def _push(self, msg: dict[str, Any]) -> None:
         line = json.dumps(msg)
-        for ws in list(self.streams):
-            with contextlib.suppress(Exception):  # a closing page's socket: its own handler cleans up
-                await ws.send_text(line)
+
+        async def one(ws: Any) -> None:
+            # a closing page's socket, or a stalled one: its own handler cleans up, and no page waits on it
+            with contextlib.suppress(Exception):
+                await asyncio.wait_for(ws.send_text(line), SEND_WAIT)
+
+        await asyncio.gather(*(one(ws) for ws in list(self.streams)))
 
     async def recount(self) -> None:
         self._dirty.clear()
@@ -118,22 +126,24 @@ class CountsKeeper:
         held and pushed like any other when it moved; `{unchanged: true}` when the page already holds
         this `rev`."""
         got = await self._count(watching or self.watching)
-        msg = self._take(got)
-        if msg is not None:
-            await self._push(msg)
         if got.get("agent_down"):
             return got
-        assert self.reading is not None
-        if since is not None and since == str(self.rev):
-            return {"unchanged": True, "rev": self.rev}
-        return dict(self.reading)
+        msg = self._take(got)
+        held = {k: v for k, v in (msg or {"event": "counts", **(self.reading or {})}).items() if k != "event"}
+        if msg is not None:
+            await self._push(msg)
+        if since is not None and since == str(held.get("rev")):
+            return {"unchanged": True, "rev": held["rev"]}
+        return held
 
     async def _recounter(self) -> None:
         while True:
             await self._dirty.wait()
             await asyncio.sleep(max(0.0, self._at + COUNTS_EVERY - time.monotonic()))
-            with contextlib.suppress(Exception):  # an agent that could not answer: the next input retries
+            try:
                 await self.recount()
+            except Exception:  # noqa: BLE001 — an agent that could not answer: tried again after COUNTS_EVERY
+                self._dirty.set()
 
     async def _ticker(self) -> None:
         while True:

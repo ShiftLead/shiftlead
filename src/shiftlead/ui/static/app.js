@@ -1218,7 +1218,8 @@
   };
   // The top bar's numbers, from a read or from the stream's `counts` (TD-616): one drawing for both.
   AO.drawCounts = function (got) {
-    if (typeof got.rev === "number") countsRev = got.rev;
+    // a count with the host agent down holds no revision: the next read must not be `unchanged`
+    countsRev = typeof got.rev === "number" && !got.agent_down ? got.rev : null;
     // `needs: null` is *not known* — the host agent is down — and a chip that read 0 would be a
     // lie in the one place a person looks to see whether anything is waiting (TD-069).
     const chip = $("#personneeds"), n = got.needs || 0;

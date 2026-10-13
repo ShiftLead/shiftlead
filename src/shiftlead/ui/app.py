@@ -1118,6 +1118,7 @@ def create_app() -> FastAPI:
             boards=hz["due"] + hz["waiting"],
             fleet=fleet,
         )
+        needs_cache["rows"] = sections["needs"]  # the Org's *asked you* lines, as the full read keeps it (TD-354)
         return counts_of(sections, build)
 
     h = SimpleNamespace(
@@ -3688,9 +3689,10 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         try:
             async with LocalClient() as c:
                 tasks = {asyncio.ensure_future(stream(c)), asyncio.ensure_future(gone())}
-                # every page's stream carries the Inbox's counts, light or full (§4.4, TD-616)
-                await h.counts.join(ws)
                 try:
+                    # every page's stream carries the Inbox's counts, light or full (§4.4, TD-616);
+                    # inside the `try`, so a stream cancelled mid-join still leaves the keeper
+                    await h.counts.join(ws)
                     done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                 finally:
                     for t in tasks:

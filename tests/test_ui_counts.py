@@ -161,7 +161,6 @@ async def test_the_stream_carries_counts_and_looking_with_no_inbox_request(agent
     app is driven only through its socket — and a hidden one stops it (the techlead's conditions on
     the steer of 2026-10-12, m-d5e63070e1e2)."""
     from sessionorc.client import LocalClient
-
     from shiftlead.ui.app import create_app
 
     monkeypatch.setattr(counts_mod, "COUNTS_EVERY", 0.05)
@@ -213,6 +212,42 @@ def test_the_top_bar_draws_the_streams_counts_and_polls_only_while_no_stream_is_
     assert "else if (!streamsUp) AO.refreshInboxCount();" in js  # the 20 s poll, only with no stream up
     assert "if (!up) { up = true; streamsUp++; }" in js and "if (up) { up = false; streamsUp--; }" in js
     assert "since=${countsRev}" in js and "if (got.unchanged) return got;" in js
-    say = js.split("const say = ")[1].split("\n")[0]
-    assert "visible: document.visibilityState" in say
-    assert 'document.addEventListener("visibilitychange", say)' in js and "ws.onopen = () => { delay = 500; say(); }" in js
+    say = js.split("const say = () => { if (sock")[1].split("\n")[0]
+    assert "visible: document.visibilityState" in say and "sock.send(" in say
+    assert 'document.addEventListener("visibilitychange", say)' in js
+    assert "ws.onopen = () => { delay = 500; say(); }" in js
+
+
+@pytest.mark.unit
+async def test_a_stream_joining_while_the_last_one_leaves_gets_a_keeper_of_its_own(fast):
+    """A quick reload: the old page's leave awaits its keeper's end, and the new page joins in that
+    window — it must not be left with no keeper (and, its stream up, no poll either)."""
+    seen: list[bool] = []
+    k, _ = keeper({"needs": 1}, seen)
+    old, new = Sock(), Sock()
+    await k.join(old)
+    assert await wait_for(lambda: old.sent, timeout=2.0, step=0.01)
+    leaving = asyncio.ensure_future(k.leave(old))
+    await asyncio.sleep(0)  # leave is awaiting the cancelled keeper
+    await k.join(new)
+    await leaving
+    assert k._task is not None and not k._task.done()
+    assert await wait_for(lambda: new.sent, timeout=2.0, step=0.01), "the new page never got its counts"
+    await k.leave(new)
+
+
+@pytest.mark.unit
+async def test_a_stalled_socket_holds_no_other_page_back(fast, monkeypatch):
+    monkeypatch.setattr(counts_mod, "SEND_WAIT", 0.05)
+
+    class Stalled(Sock):
+        async def send_text(self, text: str) -> None:
+            await asyncio.sleep(3600)
+
+    k, _ = keeper({"needs": 1}, [])
+    stuck, ok = Stalled(), Sock()
+    await k.join(stuck)
+    await k.join(ok)
+    assert await wait_for(lambda: ok.sent, timeout=2.0, step=0.01)
+    await k.leave(stuck)
+    await k.leave(ok)
