@@ -12,7 +12,9 @@ never work orders; a line whose `Decided:` is gone leaves on the next reading.""
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import io
 import json
 import os
 import re
@@ -31,11 +33,12 @@ FETCH_TIMEOUT = 45.0  # the reader's fetch is serial and its own; a read past th
 READ_TIMEOUT = 20.0
 HEAD_MOST = 120
 _REF_RE = re.compile(r"board:[0-9a-f]{8}")
-# one loaded reader per file, its `item_key` or None for one that will not load, kept while its mtime holds
-_keys: dict[str, tuple[float, Callable[[str], str] | None]] = {}
+# one loaded reader per file, or None for one that will not load, kept while its mtime holds
+_readers: dict[str, tuple[float, types.ModuleType | None]] = {}
 # one load at a time: a load swaps the process's `sys.path`, `sys.modules['ledgerboard']` and
 # `sys.dont_write_bytecode` and puts them back, and `read` runs on threads
 _load = threading.Lock()
+NO_LINE = "no line {ref} on the board — reworded or closed"
 
 
 def is_work_order(ref: str) -> bool:
@@ -43,17 +46,17 @@ def is_work_order(ref: str) -> bool:
     return bool(_REF_RE.fullmatch(str(ref)))
 
 
-def _item_key(script: Path) -> Callable[[str], str] | None:
-    """The reader's own `item_key`, loaded from that file and kept while its mtime holds — a reader
-    that will not load is kept as None too, so a page asking per row never runs it again (TD-384)."""
+def _reader(script: Path) -> types.ModuleType | None:
+    """The repo's own reader, loaded from that file and kept while its mtime holds — a reader that
+    will not load is kept as None too, so a page asking per row never runs it again (TD-384)."""
     try:
         stamp = script.stat().st_mtime
     except OSError:
         return None
-    held = _keys.get(str(script))
+    held = _readers.get(str(script))
     if held is not None and held[0] == stamp:
         return held[1]
-    got: Callable[[str], str] | None = None
+    got: types.ModuleType | None = None
     # compiled from its text, never imported: an import writes `scripts/__pycache__` into the repo's
     # checkout, which reads as the person's uncommitted work to everything that asks (TD-386's gate)
     mod = types.ModuleType(f"_ao_board_reader_{abs(hash(str(script)))}")
@@ -68,19 +71,26 @@ def _item_key(script: Path) -> Callable[[str], str] | None:
             path, sibling, nobytes = list(sys.path), sys.modules.pop("ledgerboard", None), sys.dont_write_bytecode
             sys.dont_write_bytecode = True
             try:
-                exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
+                # whatever it prints at load is not the caller's: `ao repo --json` prints to the same stdout
+                with contextlib.redirect_stdout(io.StringIO()):
+                    exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
             finally:
                 sys.modules.pop(mod.__name__, None)
                 sys.path[:], sys.dont_write_bytecode = path, nobytes
                 sys.modules.pop("ledgerboard", None)
                 if sibling is not None:
                     sys.modules["ledgerboard"] = sibling
-        got = getattr(mod, "item_key", None)
+        got = mod
     except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
         got = None
-    got = got if callable(got) else None
-    _keys[str(script)] = (stamp, got)
+    _readers[str(script)] = (stamp, got)
     return got
+
+
+def _item_key(script: Path) -> Callable[[str], str] | None:
+    """The reader's own `item_key`, or None where the repo's reader will not load or has none."""
+    got = getattr(_reader(script), "item_key", None)
+    return got if callable(got) else None
 
 
 def key(text: str, item_key: Callable[[str], str]) -> str:
@@ -89,9 +99,10 @@ def key(text: str, item_key: Callable[[str], str]) -> str:
 
 
 def ref(root: str | Path, text: str) -> str:
-    """`board:<key>` for an open line of the board under `root`, by that repo's own reader — what a
-    page that holds the line but not the reading names it by (§4.5 screen 6, TD-384) — or empty
-    where the repo has no reader or its key cannot take the line."""
+    """`board:<key>` for a line of the board under `root`, by that repo's own reader — **every board
+    line's id** (design §4.4 *A board line's id*, TD-603): the one derivation the Inbox's board rows,
+    the write-back's presses, `ao board show`, `ao repo` and the work orders all use — or empty where
+    the repo has no reader or its key cannot take the line. `text` is the item less its tick."""
     item_key = _item_key(Path(root) / READER) if root and text else None
     if item_key is None:
         return ""
@@ -191,3 +202,78 @@ def entry(order: dict[str, Any]) -> dict[str, Any]:
         "line": order.get("line"),
         "text": order.get("text") or "",
     }
+
+
+def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str]:
+    """The board under the checkout `root` as lines, and where they were read: origin's default
+    branch after a fetch (`origin/<branch>`), else the checkout's file (`checkout`) — design §4.7
+    `ao board show`. No board is `([], "")`."""
+    root = Path(root)
+    if fetch:
+        try:
+            # a fetch that failed leaves origin's ref as stale as the checkout: the checkout it is
+            fetched = subprocess.run(
+                ["git", "-C", str(root), "fetch", "-q", "origin"], capture_output=True, timeout=FETCH_TIMEOUT
+            )
+            cp = subprocess.run(
+                ["git", "-C", str(root), "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"],
+                capture_output=True, text=True, timeout=READ_TIMEOUT,
+            )  # fmt: skip
+            heads = [cp.stdout.strip()] if cp.stdout.strip() else ["origin/main", "origin/master"]
+            for head in heads if fetched.returncode == 0 else ():
+                cp = subprocess.run(
+                    ["git", "-C", str(root), "show", f"{head}:{BOARD.as_posix()}"],
+                    capture_output=True, text=True, errors="replace", timeout=READ_TIMEOUT,
+                )  # fmt: skip
+                if cp.returncode == 0:
+                    return cp.stdout.splitlines(), head
+        except (OSError, subprocess.SubprocessError):
+            pass
+    try:
+        return (root / BOARD).read_text(encoding="utf-8").splitlines(), "checkout"
+    except OSError:
+        return [], ""
+
+
+def can_name(root: str | Path) -> bool:
+    """Whether the repo under `root` has a reader whose `item_key` can name its board's lines."""
+    return _item_key(Path(root) / READER) is not None
+
+
+def show(root: str | Path, want: str, *, fetch: bool = True) -> dict[str, Any] | None:
+    """The line of the board under `root` whose id is `want` (design §4.7 `ao board show`): `{key,
+    line, text, detail, open, source}` — `text` the whole line less its tick, `detail` the reader's
+    detail block under it — open or closed, the first that holds it; None when no line does."""
+    root = Path(root)
+    mod = _reader(root / READER)
+    item_key = getattr(mod, "item_key", None)
+    # the line shapes are the reader's own, open and closed (design §8): none is written here
+    shapes = [getattr(mod, name, None) for name in ("ITEM_RE", "CLOSED_ITEM_RE")]
+    if not callable(item_key) or not all(isinstance(r, re.Pattern) for r in shapes):
+        return None
+    opened, closed = shapes
+    lines, source = board_lines(root, fetch=fetch)
+    for n, ln in enumerate(lines, 1):
+        m = opened.match(ln) or closed.match(ln)
+        if m is None:
+            continue
+        try:
+            got = key(m.group("text"), item_key)
+        except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no id
+            continue
+        if got != want:
+            continue
+        block = getattr(mod, "detail_block", None)
+        try:
+            detail = [str(d) for d in block(lines, n)] if callable(block) else []
+        except Exception:  # noqa: BLE001 — the line is found; a block the reader cannot give is none
+            detail = []
+        return {
+            "key": got,
+            "line": n,
+            "text": m.group("text").strip(),
+            "detail": detail,
+            "open": m.re is opened,
+            "source": source,
+        }
+    return None

@@ -254,6 +254,7 @@ class InboxMixin:
         entry: str | None = None,
         answer: str = "",
         answers: list[str] | None = None,
+        key: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Snooze**, **Done** or **Decide** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
@@ -261,7 +262,10 @@ class InboxMixin:
         message and landed by its own PR (`board.write_back`); the checkout is never written.
         `board` must be the board of a checkout this host's repos registry names;
         `line` and `text` are what dev-cadence's reader gave the Inbox, and the edit is refused
-        unless the line still holds that text. A person's only, as every act on the Inbox is.
+        unless the line still holds that text. `key` is the line's id (`board:<key>`, §4.4 *A board
+        line's id*, TD-603): the open line whose id it is is found first, wherever it now sits and
+        whatever a snooze or a reply has added to it, and refused in its own words when none is.
+        A person's only, as every act on the Inbox is.
 
         `action: add` is **Put on the board** (§4.5a, TD-140): `entry` an FYI row of the person's
         Inbox — a `note`, a closed question, a trail row, never an open `ask` or `steer` — and
@@ -280,17 +284,19 @@ class InboxMixin:
             raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
         if action == "add":
             return await self._board_add(root, want, text, due, entry, caller)
-        if line is None:
-            raise RpcError(f"a board {action or 'edit'} names the item's line (design §4.4)")
+        if line is None and not key:
+            raise RpcError(f"a board {action or 'edit'} names the item's line or its id (design §4.4)")
         try:
             said = self._board_answer(action, answer, answers)
-            done = await asyncio.to_thread(board_mod.write_back, root, line, text, action, due, answer=said)
+            done = await asyncio.to_thread(
+                board_mod.write_back, root, line, text, action, due, answer=said, key=str(key or "")
+            )
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
         return {
             "board": str(want),
-            "line": line,
+            "line": done.get("line", line),
             "action": action,
             "due": due,
             **({"answer": said} if said else {}),
@@ -408,12 +414,14 @@ class InboxMixin:
         text: str = "",
         reply: str = "",
         refs: list[str] | None = None,
+        key: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Reply** on a board row (design §4.4 *Board write-back*, §4.5a *Due strip / Inbox board
         row → Reply*; TD-142 slice 1): the person's words appended to the item's own line as
         ` — <name>, <date>: <reply>` and committed as `shiftlead: reply on <head> (session <name>)`,
-        refused as `board_edit` refuses. The line stays open and counted: a reply is not Done.
+        refused as `board_edit` refuses, and found by `key` as it finds one. The line stays open and
+        counted: a reply is not Done.
 
         Then the mail half (TD-142 slice 2): each live record holding an unexpired declared lease
         on one of the line's `refs` (the reader's, handed in by the page) gets one `note` from the
@@ -424,13 +432,24 @@ class InboxMixin:
         ref}]`, `session` the holder's name."""
         agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         root, want = self._board_root(board)
+        if line is None and not key:
+            raise RpcError("a board reply names the item's line or its id (design §4.4)")
         try:
-            done = await asyncio.to_thread(board_mod.write_back, root, int(line), text, "reply", None, reply=reply)
+            try:
+                at: int | None = int(line) if line is not None else None
+            except (TypeError, ValueError):
+                if not key:
+                    raise
+                at = None  # a line it cannot read, and the line's id: found by the id
+            done = await asyncio.to_thread(
+                board_mod.write_back, root, at, text, "reply", None, reply=reply, key=str(key or "")
+            )
         except (TypeError, ValueError):
             raise RpcError("a board reply names the item's line (design §4.4)") from None
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
+        text = str(done.get("text") or text)  # the line found, by its id where the press named one
         h = board_mod.HEAD_RE.search(text)
         head = " ".join((h.group("head") if h else text).split())
         by = await asyncio.to_thread(board_mod.author, root)
@@ -439,7 +458,7 @@ class InboxMixin:
         note = reply_note(sent, refused)
         return {
             "board": str(want),
-            "line": int(line),
+            "line": done.get("line", at),
             "action": "reply",
             **done,
             "sent": sent,

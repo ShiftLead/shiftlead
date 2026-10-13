@@ -1332,7 +1332,7 @@ def _board_order(r: Mapping[str, Any]) -> str:
     decided line that is not `fyi` is one."""
     if not r.get("decided") or r.get("kind") == "fyi" or not r.get("root"):
         return ""
-    return workorders_mod.ref(str(r["root"]), str(r.get("text") or ""))
+    return str(r.get("key") or "") or workorders_mod.ref(str(r["root"]), str(r.get("text") or ""))
 
 
 def _order_teams(r: Mapping[str, Any], order: str, records: Collection[Mapping[str, Any]]) -> dict[str, bool]:
@@ -1478,6 +1478,9 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                 {
                     "row": "board",
                     "id": f"board:{root}:{line}",
+                    # §4.4 *A board line's id* (TD-603): `board:<key>` by the repo's own reader, drawn
+                    # on the row and sent as `key` with every press; empty where the repo has no reader
+                    "key": workorders_mod.ref(root, text) if root else "",
                     "repo": label,
                     "root": root,
                     "board": board,

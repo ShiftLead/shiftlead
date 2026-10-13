@@ -713,7 +713,7 @@
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
-    if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
+    if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast(b.dataset.copied || "copied", true)); return; }
     const id = b.dataset.id, action = b.dataset.act;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
@@ -879,7 +879,8 @@
       // step 3): the host agent's one-line edit, committed in that repo. The row sends back what the
       // reader gave it — board, line, text — so the agent can refuse a line that has moved on.
       if (action === "board") {
-        body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text };
+        // …and its id (§4.4 *A board line's id*, TD-603), by which the agent finds the line first
+        body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, key: b.dataset.key || "" };
         if (body.action === "snooze") {
           const due = boardDue(b.dataset.when, b.dataset.due);
           if (!due) return;
@@ -922,7 +923,7 @@
         try { refs = JSON.parse(b.dataset.refs || "[]"); } catch (_) { refs = []; }
         pressed();
         const res = await act("person", "board", {
-          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, reply: m.text, refs,
+          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, key: b.dataset.key || "", reply: m.text, refs,
         });
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
         say(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
@@ -942,7 +943,7 @@
         const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
         pressed();
         await act("person", "board", {
-          action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text,
+          action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, key: b.dataset.key || "",
           answer, answers: JSON.parse(b.dataset.answers || "[]"),
         });
         let handed = "", refused = false;

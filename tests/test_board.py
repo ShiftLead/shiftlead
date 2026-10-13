@@ -1205,3 +1205,88 @@ def test_ledger_decide_is_the_homes_edit():
     assert "ledger_decide edits what the home owns" in modes.offline_refusal(
         "ledger_decide", None, {}, host="laptop", home="kmaster"
     )
+
+
+@pytest.fixture
+def keyed(tmp_path, forge) -> Path:
+    """The `repo` fixture's board with the repo's own reader beside it, which a line's id needs."""
+    root = tmp_path / "keyed"
+    (root / "docs").mkdir(parents=True)
+    (root / "scripts").mkdir()
+    reader = Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py"
+    (root / "scripts" / "nudge_user_attention.py").write_text(reader.read_text())
+    git(root, "init", "-q", "-b", "main")
+    git(root, "config", "user.email", "t@example.com")
+    git(root, "config", "user.name", "t")
+    (root / board.BOARD).write_text(BOARD_TEXT)
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", "init")
+    forge(root)
+    return root
+
+
+def test_a_press_with_the_lines_id_finds_it_moved_and_snoozed_and_a_stale_id_is_refused(keyed):
+    """§4.4 *A board line's id* (TD-603, TD-607): with `key`, the write-back finds the open line whose
+    id it is before the line and its text — on another line, its `Due:` moved since the page drew it —
+    and edits the line as it is now; an id no open line holds is refused in its words, nothing landed."""
+    from sessionorc import workorders
+
+    key = workorders.ref(keyed, ITEM)
+    assert workorders.is_work_order(key)
+    moved = ITEM.replace("2026-09-22", "2026-09-30")
+    (keyed / board.BOARD).write_text(BOARD_TEXT.replace(f"- [ ] {ITEM}", f"- [ ] new.\n- [ ] {moved}"))
+    git(keyed, "commit", "-qam", "a line above, and the item snoozed")
+    git(keyed, "push", "-q", "origin", "main")
+    assert workorders.ref(keyed, moved) == key  # a snooze never changes the id
+    got = board.write_back(keyed, 7, ITEM, "reply", reply="still on it", key=key)  # the page's stale line and text
+    assert got["line"] == 8 and got["text"] == moved
+    line = origin_board(keyed).splitlines()[7]
+    assert "Due: 2026-09-30" in line and "still on it" in line
+    before = on_origin(keyed, "rev-parse", "origin/main")
+    with pytest.raises(board.Refused, match="no line board:00000000 on the board — reworded or closed"):
+        board.write_back(keyed, None, "", "done", key="board:00000000")
+    with pytest.raises(board.Refused, match="not a board line's id"):
+        board.write_back(keyed, None, "", "done", key="TD-607")
+    board.write_back(keyed, None, "", "done", key=key)  # by its id alone
+    with pytest.raises(board.Refused, match=f"no line {key} on the board"):
+        board.write_back(keyed, None, "", "done", key=key)  # closed: no open line holds it
+    assert on_origin(keyed, "rev-parse", "origin/main") != before
+
+
+async def test_board_edit_and_board_reply_find_the_line_by_its_id_alone(agent, keyed, tmp_path):
+    """§4.4 *A board line's id* (TD-607): the RPCs take `key` in place of the line and its text —
+    the reply's head is the found line's — and refuse an id no open line holds in its words."""
+    from sessionorc import workorders
+
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{keyed}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    path = str(keyed / board.BOARD)
+    key = workorders.ref(keyed, ITEM)
+    async with LocalClient() as me:
+        got = await me.call("board_reply", board=path, reply="on it", key=key)
+        assert got["line"] == 7 and "the doorbell" in got["message"]
+        got = await me.call("board_edit", board=path, action="snooze", due="2026-10-01", key=key)
+        assert got["line"] == 7 and got["action"] == "snooze"
+        with pytest.raises(AgentError, match="no line board:00000000 on the board — reworded or closed"):
+            await me.call("board_edit", board=path, action="done", key="board:00000000")
+        with pytest.raises(AgentError, match="names the item's line or its id"):
+            await me.call("board_edit", board=path, action="done")
+    line = origin_board(keyed).splitlines()[6]
+    assert "on it" in line and "Due: 2026-10-01" in line
+
+
+def test_of_two_open_lines_sharing_an_id_the_one_shown_word_for_word_is_found(keyed):
+    """Review of #1606: two open lines share an id only when date, session and words do — a `Due:`
+    or a reply tail apart. With the id, the line whose text is the one the person was shown is
+    found before the first; with a text neither holds, the first."""
+    from sessionorc import workorders
+
+    other = ITEM.replace("2026-09-22", "2026-09-29")
+    lines = [f"- [ ] {ITEM}\n", f"- [ ] {other}\n"]
+    key = workorders.ref(keyed, ITEM)
+    assert workorders.ref(keyed, other) == key
+    assert board._find(lines, None, other, key, keyed) == 1
+    assert board._find(lines, None, ITEM, key, keyed) == 0
+    assert board._find(lines, None, "", key, keyed) == 0
