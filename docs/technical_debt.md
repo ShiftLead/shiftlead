@@ -60,6 +60,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
 | TD-629 | A permission answered in the terminal comes back as *needs you* when the hook's wait runs out: the timeout re-raises a pending the session has already moved past | Medium | Open |
 | TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Open |
+| TD-631 | §4.4 *Repo facts* says the UI runs a board reader for the Inbox's board counts: the UI runs no board reader since TD-615 slice 2 (#1633) | Low | Open |
 
 ---
 
@@ -1116,5 +1117,25 @@ seat's at **Hand to the techlead**, and what an abandoned form leaves). **Done w
 pasted into the form reaches the drafting session as a path it can read, by either way out.
 
 **Related:** TD-180, TD-219 (the form), TD-530 (the Message dialog's attach).
+
+---
+
+## TD-631: §4.4 *Repo facts* says the UI runs a board reader for the Inbox's board counts: the UI runs no board reader since TD-615 slice 2 (#1633)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1629–#1639)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.4-host-agent.md` *Repo facts* (the doing-log paragraph, ~L155–156); `src/shiftlead/ui/app.py` (`board_all`, `board_items`)
+
+**Why:** #1633 (TD-615 slice 2) changed the readers: §4.4 *Each reading has one owner*, *The boards* now says "**the UI runs no board reader**, and `ao` none either" (~L465) and the history line says the UI's `read_boards`, its cache, `board_argv` and `BOARD_TTL` are gone. The sentence under *Repo facts* still reads: "Board counts are not here: the UI has them from the board reader it already runs for the Inbox (`board_items`, per team)." `grep -n "board reader it already runs" docs/design/4.4-host-agent.md` finds it at ~L155–156. `board_items` is now a filter over `board_all`, whose docstring says "the page runs no reader" and which takes its rows from `call("repos")`'s `boards` (`src/shiftlead/ui/app.py:768–787`). Two sentences of one section say opposite things about who runs the reader; the PR changed §4.4's and §4.5's reader paragraphs and not this one.
+
+**Fix:** reword the sentence in the present tense: the UI has the board counts from the host agent's `boards` reading (the `repos` RPC), per team, as `board_items` filters it (§4.4 *The boards*). The design change only; no history line is owed beyond a one-line touch under §4.4 naming #1633. Run the doc-bound tests before pushing.
+
+**Done when** no sentence of `docs/design/` says the UI runs a board reader, and the doc-bound tests pass.
+
+**Related:** TD-615 (the build), TD-614 (the design), #1633.
 
 ---
