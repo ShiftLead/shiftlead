@@ -58,9 +58,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
 | TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
 | TD-629 | A permission answered in the terminal comes back as *needs you* when the hook's wait runs out: the timeout re-raises a pending the session has already moved past | Medium | Open |
-| TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Open |
+| TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Designed — TD-633 builds it |
 | TD-631 | §4.4 *Repo facts* says the UI runs a board reader for the Inbox's board counts: the UI runs no board reader since TD-615 slice 2 (#1633) | Low | Open |
 | TD-632 | §4.5a's Git card *changed files* keeps a deletion as text by its code `D`, but `GitInfo.files` also carries `MD` and `AD` for a file deleted from the worktree (TD-627) | Low | Open |
+| TD-633 | Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept | Medium | Open |
 
 ---
 
@@ -1077,7 +1078,8 @@ words), TD-079 (the attention trail).
 **Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-entry-4)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-13 (the designer; mockup `AddEntry.dc.html`, shot `docs/mockups/reviews/2026-10-13-td630-add-entry-attach.png`) — the composer's road on the form's **What** (Attach, drop, paste; pieces, bound, names, progress); **where a file lands before a session exists**: a **draft folder** at the home, `~/.shiftlead/attachments/<draft>/`, its token minted by the host agent on the form's first file (`attach` takes `draft` in place of a session id), **the path inserted final** — neither way out moves a file, since the person's words name it; **at the press** the draft is claimed: *Open a session* hands it to the create and the folder lives as that session's files do; *Hand to the techlead* carries it on the `ask` and the folder is kept `runs_keep_days` from the hand; **an abandoned form** leaves an unclaimed draft the hourly sweep removes an hour after its last write, as a stale `.part`. A node-hosted team's form refuses it in place. §4.5a *Add entry form: Attach / drop / paste*, §4.4 *The Add entry form's draft* (the claim a `claimed.json` in the folder), §4.10 *An entry handed to a seat* (`draft` on `entry_add`), §4.6 *Run-log retention*, §4.9. Built by TD-633. Was: Open.
+**Blocked by:** TD-633
 **Location:** design §4.5a (*Add entry form* rows; the *Focus composer* and *Message and Reply dialog*
 **Attach / drop / paste** rows), §4.9 *Add an entry to the ledger*, §4.4 *Attachment drop* and *An
 attachment's life*; `src/shiftlead/ui/templates/base.html` (the form), `src/shiftlead/ui/static/app.js`,
@@ -1137,5 +1139,31 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the row says which codes are a deletion and the TD-628 test list names `MD` and `AD`.
 
 **Related:** TD-627 (the design), TD-628 (the build), #1636.
+
+---
+
+## TD-633: Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-630's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Add entry form: Attach / drop / paste*, §4.4 *The Add entry form's draft*, §4.9 *Add an entry to the ledger*; `src/sessionorc/agent.py` (`rpc_attach` ~L2206: `draft` in place of `id` — `""` mints `draft-<8 hex>`, a known draft appends to its folder; the same pieces, names and bound; person-only as today), `src/sessionorc/paths.py` (the attachments root), the hourly sweep (`src/sessionorc/agent_tick.py` `_prune_runs` ~L3060–3120: a draft rule **before** its `keep <= 0` and `live_ids is None` returns — no `claimed.json` and older than `ATTACH_PART_IDLE_S` removed; a session's claim treated as that session's folder, its id among the live ones; a hand's claim removed `runs_keep_days` after `at`), the create (`draft` handed with *Open a session*: `claimed.json` `{by: <id>, at}`), the hand (`src/sessionorc/agent_inbox.py` `entry_add` ~L354 gains `draft` and writes `claimed.json` `{by: hand:<ask id>, at}`; `/api/entry/hand` ~L2008 passes it), `/api/entry/plan` (the team's host, for the node refusal), `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/session`, a `POST /api/entry/attach` beside `/api/sessions/<id>/attach`), `src/shiftlead/ui/templates/base.html` (the form: **Attach** under **What**, the drop and paste handlers), `src/shiftlead/ui/static/app.js` (the composer's attach code reused on the form's textarea, the draft token kept on the open form), `docs/mockups/gen.py` (drawn by TD-630); `tests/test_attach*.py`, `tests/test_ui_entry*.py`
+
+**Why:** TD-630: Paul, 2026-10-13 — *add a TD so that files/pics can be pasted into the "add entry" form. I had to open this session to give you those pics*; the form's **What** takes text alone.
+
+**Fix:**
+1. `attach` with `draft`: `""` on the first piece of a form's first file mints `draft-<8 hex>` (returned with the path); a later call names it; files land in `~/.shiftlead/attachments/<draft>/`; everything else (pieces, `.part`, names made safe, `-2`, the bound) as for a session.
+2. The form: **Attach** under **What**, a drop on the box, a pasted image named `paste-<date>-<time>.<ext>`; each path inserted at the caret; the progress line and **✕** as the composer's; the draft token held while the form is open.
+3. The claim: `claimed.json` `{by, at}` in the draft folder — *Open a session* hands `draft` to the create, which writes `by` the new session's id; *Hand to the techlead* hands it to `entry_add`, which writes `by: hand:<ask id>` and carries `draft` in the envelope beside `entry`. No record gains a field.
+4. The sweep: the draft rule runs before `_prune_runs`'s early returns — a folder with no `claimed.json` and no write for `ATTACH_PART_IDLE_S` is removed; one claimed by a session is kept while that session's record is live and swept as its folder after; one claimed by a hand is removed `runs_keep_days` after `at` (kept under `0`).
+5. A repo whose servicing team runs on a node: **Attach** refused in place in the existing words, *this call does not cross the link*, the page reading the team's host from `/api/entry/plan`.
+6. Tests: a first file mints a draft and later files share it; the inserted path is the file's; *Open a session* claims it (`claimed.json` names the session) and the folder lives with the session; a hand claims it through `entry_add` and it is kept `runs_keep_days`; the sweep's draft rule runs with `runs_keep_days` at `0`; an unclaimed draft is swept after an hour and a claimed one is not; a node team's form refuses.
+
+**Done when** a screenshot pasted into the Add entry form reaches the drafting session, by either way out, as a path it can read, an abandoned form leaves nothing past the hour, and the tests above pass; the builder's look (design §4.9b: the form with a pasted image, each way out) is named in the PR.
+
+**Related:** TD-630 (the design), TD-180 / TD-219 (the form), TD-530 (the Message dialog's attach), TD-478 (the pieces), TD-419 (an attachment's life).
 
 ---
