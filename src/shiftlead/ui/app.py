@@ -13,7 +13,6 @@ import html
 import json
 import os
 import re
-import subprocess
 import time
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
@@ -166,13 +165,8 @@ from .counts import CountsKeeper
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
-    BOARD_FETCH_TIMEOUT,  # noqa: F401
     BOARD_FIELDS,  # noqa: F401
     BOARD_FILE,  # noqa: F401
-    BOARD_SCRIPT,  # noqa: F401
-    BOARD_SOURCE,  # noqa: F401
-    BOARD_TIMEOUT,  # noqa: F401
-    BOARD_TTL,  # noqa: F401
     BOARD_WAIT_DAYS,  # noqa: F401
     CONTEXT_RE,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
@@ -198,7 +192,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     SHOTS_MAX,  # noqa: F401
     STATE_SUBJECTS,  # noqa: F401
     SUBHEAD_RE,  # noqa: F401
-    SYNC_LOCK,  # noqa: F401
     WORK_IDS,  # noqa: F401
     WORKS,  # noqa: F401
     _added_words,  # noqa: F401
@@ -225,12 +218,9 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _shot_on_host,  # noqa: F401
     _shot_on_origin,  # noqa: F401
     _shot_seen,  # noqa: F401
-    _synced,  # noqa: F401
     _trail_rows,  # noqa: F401
     _with_subject,  # noqa: F401
-    as_written_back,
     board_answered,  # noqa: F401
-    board_argv,  # noqa: F401
     board_body,  # noqa: F401
     board_choices,  # noqa: F401
     board_detail,  # noqa: F401
@@ -238,7 +228,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_head,  # noqa: F401
     board_horizon,  # noqa: F401
     board_line,  # noqa: F401
-    board_reader,  # noqa: F401
+    board_reading,
     board_rows,  # noqa: F401
     board_standing,  # noqa: F401
     board_standings,  # noqa: F401
@@ -283,7 +273,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     state_kind,  # noqa: F401
     state_rows,  # noqa: F401
     unclosed_mark,  # noqa: F401
-    unreached,
     with_standings,
     work_finished,  # noqa: F401
     work_held,  # noqa: F401
@@ -292,7 +281,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     work_questions,  # noqa: F401
     work_rows,  # noqa: F401
     work_started,  # noqa: F401
-    written_back_argv,
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     DOER_WIDTH,  # noqa: F401
@@ -370,67 +358,6 @@ def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
                 if path:
                     out.setdefault(str(Path(path).expanduser().resolve()), tname)
     return out
-
-
-def read_boards(run: Any = subprocess.run, *, fetch: bool = False, board: str = "") -> tuple[list[dict[str, Any]], str]:
-    """The open board items of the repos this host knows, as Inbox rows — each saying whether it is
-    due now (`due_now`, TD-220) — and a note when they could
-    not be read — a reader that failed is said in words, never shown as an empty board (§4.5 *no
-    silent failure path*). On a node the org is the home's (§4.4a), so a node reads none.
-
-    `fetch` reads against origin (§4.5 screen 6 *Boards are read against origin*, TD-221): the
-    reader's `--fetch`, stopped at `BOARD_FETCH_TIMEOUT`; a fetching read that is stopped or fails is
-    followed at once by a plain read, each board's `fetch_note` then *fetch skipped (<why>)* — the
-    reader's own phrase for an origin it could not reach — so a dead remote costs the origin view
-    and never the board. `board` reads that one board alone (the read after a press)."""
-    if hosts.is_node():
-        return [], ""
-    argv, note = board_argv(hosts.local_host().repos(), fetch=fetch, only=board)
-    if argv is None:
-        return [], note
-    report, why = None, ""
-    if fetch:
-        report, why = _run_reader(run, argv, BOARD_FETCH_TIMEOUT)
-        # the read after a press, stopped — by our bound, or by the reader's own (*fetch skipped*): the
-        # board as the write-back left it on origin, where the host agent's tree still holds it
-        # (§4.5 screen 6 (3), TD-264), before the checkout's
-        if board and unreached(report) and (back := written_back_argv(board)) is not None:
-            got, _ = _run_reader(run, back, BOARD_TIMEOUT)
-            report = as_written_back(got, board) if got is not None else report
-        if report is None:
-            argv = [a for a in argv if a != "--fetch"]
-    if report is None:
-        report, note = _run_reader(run, argv, BOARD_TIMEOUT)
-        if report is None:
-            return [], f"board items are not shown: {note}"
-        if fetch:
-            for b in report.get("boards") or ():
-                if isinstance(b, dict):
-                    # the reader's words for a fetch it stopped: *fetch skipped (timeout)*
-                    b.update(source=None, fetch_note=f"fetch skipped ({'timeout' if 'timeout' in why else why})")
-    org, _ = org_here()
-    script = next((a for a in argv if a.endswith(".py")), "")
-    return board_rows(report, repo_teams(org, host_name())), reader_lacks(report, script)
-
-
-def _run_reader(run: Any, argv: list[str], timeout: float) -> tuple[dict[str, Any] | None, str]:
-    """One run of the board reader: its report, or None and why not, in words."""
-    try:
-        # no `scripts/__pycache__` in a repo's checkout for the reader's `ledgerboard` import (TD-386's gate)
-        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
-        done = run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
-    except subprocess.TimeoutExpired:
-        return None, f"the reader did not finish (timeout after {timeout:g} s)"
-    except OSError as e:
-        return None, f"the reader did not finish ({e})"
-    if done.returncode != 0:
-        tail = (done.stderr or "").strip().splitlines()
-        return None, f"the reader exited {done.returncode}" + (f" — {tail[-1]}" if tail else "")
-    try:
-        report = json.loads(done.stdout)
-    except ValueError:
-        return None, "the reader's output is not JSON"
-    return (report, "") if isinstance(report, dict) else (None, "the reader's output is not JSON")
 
 
 # -- app -------------------------------------------------------------------------------------------
@@ -822,8 +749,6 @@ def create_app() -> FastAPI:
                 identity_cache.update(at=now, info={})
         return identity_cache["info"] or {}
 
-    board_cache: dict[str, Any] = {"at": None, "rows": [], "all": [], "note": "", "task": None, "pressed": {}}
-
     pull_cache: dict[str, Any] = {"at": float("-inf")}
 
     async def pull_marks() -> None:
@@ -840,68 +765,35 @@ def create_app() -> FastAPI:
         inbox_mod.PULLS.clear()
         inbox_mod.PULLS.update(got)
 
-    def board_store(rows: list[dict[str, Any]], note: str) -> None:
-        board_cache.update(rows=[r for r in rows if r.get("due_now", True)], all=rows, note=note)
-
-    async def board_fetch() -> None:
-        """One fetching read (§4.5 screen 6 *Boards are read against origin*, TD-221), off the loop.
-        A board pressed while it ran keeps the rows its own read after the press gave it: this read
-        began before the edit and would put the answered row back until the next one."""
-        began = time.monotonic()
-        try:
-            try:
-                rows, note = await asyncio.to_thread(read_boards, fetch=True)
-            except Exception as e:  # never a silent retry every poll: said, and backed off for the TTL
-                board_cache.update(note=f"board items could not be read again: {e}", at=time.monotonic())
-                return
-            pressed = {b for b, at in board_cache["pressed"].items() if at >= began}
-            if pressed:
-                rows = [r for r in rows if r.get("board") not in pressed] + [
-                    r for r in board_cache["all"] if r.get("board") in pressed
-                ]
-            board_store(rows, note)
-            board_cache["at"] = time.monotonic()
-        finally:
-            board_cache["task"] = None
-
-    async def board_items(fresh: bool = False, board: str = "") -> tuple[list[dict[str, Any]], str]:
-        """The Inbox's **due** board rows and the note beside them (TD-069 step 3), read off the event
-        loop: the reader is a subprocess over every board on the host, and the page and the top bar
-        both poll every few seconds. Every open row, the ones not yet due too, stays in the cache as
-        `all` for the board's horizon (TD-220): what is counted is what is due, under every mode.
-
-        **One read at a time, and the last reading drawn while it runs** (§4.5 screen 6 *Boards are
-        read against origin*, TD-221): the first request reads plainly and waits for it, since there
-        is nothing to draw yet; from then a request that finds the reading older than `BOARD_TTL`
-        starts a fetching read if none is running and is answered from the last reading. `board` is
-        the read after a press — Snooze, Done, Reply, Put on the board: a **fetching** read of that
-        one board (TD-264: the edit landed on origin, and the checkout has it only once pulled),
-        bounded as any and plain when stopped, laid over the last reading so the other repos' rows do
-        not move. `fresh` reads everything plainly now."""
+    async def board_all() -> tuple[list[dict[str, Any]], str]:
+        """Every open board row of this host's repos and the note beside them (TD-069 step 3), from the
+        host agent's `boards` reading on the `repos` RPC (§4.4 *Each reading has one owner*, *The
+        boards*, TD-615): the page runs no reader, and a press's write-back is in the reading before its
+        RPC answers. Every open row, the ones not yet due too, for the board's horizon (TD-220). On a
+        node the org is the home's (§4.4a), so a node draws none; an agent that cannot answer is said."""
+        if hosts.is_node():
+            return [], ""
         await pull_marks()
-        now = time.monotonic()
-        if board and board_cache["at"] is not None:
-            rows, note = await asyncio.to_thread(read_boards, board=board, fetch=True)
-            board_cache["pressed"][board] = time.monotonic()
-            # the answered row is never left drawn as if nothing happened: a failed read of the
-            # pressed board drops its rows and says why
-            board_store([r for r in board_cache["all"] if r.get("board") != board] + rows, note or board_cache["note"])
-        elif fresh or board or board_cache["at"] is None:
-            rows, note = await asyncio.to_thread(read_boards)
-            board_store(rows, note)
-            board_cache["at"] = now
-        elif now - board_cache["at"] > BOARD_TTL and board_cache["task"] is None:
-            board_cache["task"] = asyncio.create_task(board_fetch())
-        return board_cache["rows"], board_cache["note"]
+        try:
+            repos = await call("repos")
+        except Exception as e:  # noqa: BLE001 — said in words, never an empty board
+            return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
+        return board_reading(repos if isinstance(repos, dict) else {}, repo_teams(await defs(), host_name()))
 
-    async def board_view(fresh: bool = False) -> tuple[dict[str, Any], str]:
-        """The board's horizon (§4.5 screen 6, TD-220) over every open row the cache holds, sorted by
-        the person's `inbox.board_show`, and the reader's note: `due` is `board_items`' rows, `ahead`
-        *Board, coming up*, `hidden` the *not shown* fold, and `line` the words that say the mode —
-        None when no board was read (a reader that failed says so in its note instead)."""
-        _, note = await board_items(fresh)
-        h = board_horizon(board_cache["all"], uiconf.board_show())
-        h["line"] = board_line(h) if board_cache["all"] or (not note and board_choices()) else None
+    async def board_items() -> tuple[list[dict[str, Any]], str]:
+        """The Inbox's **due** board rows and the note beside them: what is counted is what is due,
+        under every mode (TD-220)."""
+        rows, note = await board_all()
+        return [r for r in rows if r.get("due_now", True)], note
+
+    async def board_view() -> tuple[dict[str, Any], str]:
+        """The board's horizon (§4.5 screen 6, TD-220) over every open row, sorted by the person's
+        `inbox.board_show`, and the note: `due` is `board_items`' rows, `ahead` *Board, coming up*,
+        `hidden` the *not shown* fold, and `line` the words that say the mode — None when no board
+        was read (a reading that failed says so in its note instead)."""
+        rows, note = await board_all()
+        h = board_horizon(rows, uiconf.board_show())
+        h["line"] = board_line(h) if rows or (not note and board_choices()) else None
         return h, note
 
     async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2956,7 +2848,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
 def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The person's Inbox: the page, its payload and its controls (design §4.10, §4.5a)."""
-    call, person_view, inbox_html, board_items = h.call, h.person_view, h.inbox_html, h.board_items
+    call, person_view, inbox_html = h.call, h.person_view, h.inbox_html
     board_view = h.board_view
 
     async def ledger_view(fleet: list[dict[str, Any]]) -> dict[str, Any]:
@@ -3279,7 +3171,6 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # §4.4 *A board line's id* (TD-603): the row's id, by which the agent finds the line first
                 key = str(body.get("key") or "").strip()
                 got = await call("board_reply", board=board, line=line, text=text, reply=reply, refs=refs, key=key)
-                await board_items(board=board)
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what == "add":
                 # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board, text and
@@ -3290,7 +3181,6 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 if not ref or not board or not text or not due:
                     raise HTTPException(400, "Put on the board names the entry, the board, the text and a Due date")
                 got = await call("board_edit", board=board, action="add", text=text, due=due, entry=ref)
-                await board_items(board=board)
                 return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what not in BOARD_ACTS:
                 raise HTTPException(400, f"a board row's act is {', '.join(BOARD_ACTS)}, not {what!r}")
@@ -3316,7 +3206,6 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 more = {"answer": answer, "answers": [str(a) for a in answers]}
             key = str(body.get("key") or "").strip()  # the row's id (§4.4 *A board line's id*, TD-603)
             got = await call("board_edit", board=board, line=line, text=text, action=what, due=due, key=key, **more)
-            await board_items(board=board)
             return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "ledger":
             # design §4.5a **Inbox row: ledger entry** (§4.5 screen 6, TD-565): an answer by its index,

@@ -167,9 +167,10 @@ def test_every_line_has_an_id_that_a_snooze_a_reply_a_decide_and_a_close_keep_an
 @pytest.mark.unit
 def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_path, monkeypatch, capsys):
     """§4.7 `ao board show <board:key>` (TD-607): from the repo this directory is in, the line's
-    number, text and detail block — `--json` `{key, line, text, detail, open, source}` — read from
-    the checkout when there is no origin; an id no line holds is *no line … — reworded or closed*,
-    exit 1, and a word that is not an id exit 2. Read-only: the host agent is never asked."""
+    number, text and detail block — `--json` `{key, line, text, detail, open, source}` — from the
+    host agent's `boards` reading (§4.4 *The boards*, TD-615), else the checkout's file, where a
+    closed line is; an id no line holds is *no line … — reworded or closed*, exit 1, and a word that
+    is not an id exit 2. Read-only: `ao` runs no reader and fetches nothing."""
     import json
 
     from shiftlead import cli
@@ -177,7 +178,15 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     root = _repo(tmp_path, OPEN, "  more about the token")
     subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
     monkeypatch.chdir(root)
-    monkeypatch.setattr(cli, "call_sync", lambda *a, **k: pytest.fail("ao board show asked the host agent"))
+    repos = {str(root): {"root": str(root), "boards": workorders.read_boards(root, fetch=False)}}
+    monkeypatch.setattr(cli, "call_sync", lambda method, **k: repos if method == "repos" else pytest.fail(method))
+    real_run = subprocess.run
+
+    def run(argv, *a, **k):  # git finds the checkout; neither the reader nor a fetch is run
+        assert not any("nudge_user_attention" in str(x) or x == "fetch" for x in argv), argv
+        return real_run(argv, *a, **k)
+
+    monkeypatch.setattr(subprocess, "run", run)
     key = workorders.ref(root, OPEN.removeprefix("- [ ] "))
     assert cli.main(["board", "show", key, "--json"]) == 0
     got = json.loads(capsys.readouterr().out)
@@ -188,6 +197,17 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     assert f"{key}  line 7 of docs/user_attention.md on checkout" in out and "    more about the token" in out
     assert cli.main(["board", "show", "board:00000000"]) == 1
     assert "no line board:00000000 on the board — reworded or closed" in capsys.readouterr().err
+    # read from origin, the reading says so
+    repos[str(root)]["boards"]["boards"][0]["source"] = "origin"
+    assert cli.main(["board", "show", key, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["source"] == "origin"
+    # a line the reading does not hold — closed since — is the checkout's
+    repos[str(root)]["boards"] = {"boards": []}
+    board = root / "docs" / "user_attention.md"
+    board.write_text(board.read_text().replace(OPEN, OPEN.replace("- [ ]", "- [x]") + " Closed: 2026-10-04."))
+    assert cli.main(["board", "show", key, "--json"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["open"] is False and got["line"] == 7 and got["source"] == "checkout"
     assert cli.main(["board", "show", "TD-607"]) == 2
     (root / "scripts" / "nudge_user_attention.py").unlink()  # no reader: said, never *reworded or closed*
     assert cli.main(["board", "show", key]) == 1

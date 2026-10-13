@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import functools
 import re
-import sys
 import time
 from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -479,32 +478,20 @@ def state_rows(
 
 
 # design §4.5 screen 6 / §4.4 (TD-069 step 3): **board items** in the Inbox. The board is each
-# repo's `docs/user_attention.md`, in dev-cadence's format, and its reader is dev-cadence's own
-# `nudge_user_attention.py --report --json` — never a second parser here (§4.4: the items, with the
-# board line each sits on, come from that report). It is run over the boards of the repos this host
-# knows, with the copy `board_reader` picks (TD-278: synced copies differ while a repo lags), at most
-# once every `BOARD_TTL` seconds, since the page and the top bar poll every few.
+# repo's `docs/user_attention.md`, in dev-cadence's format, read by the repo's own reader
+# (`nudge_user_attention.py --report --json`) — never a second parser here — and the reading is the
+# host agent's (§4.4 *Each reading has one owner*, *The boards*, TD-615): every open item, on the
+# repo reading as `boards`, which the page reads from the `repos` RPC and runs no reader of its own.
 BOARD_FILE = Path("docs") / "user_attention.md"
-BOARD_SCRIPT = Path("scripts") / "nudge_user_attention.py"
-# dev-cadence's own source of the reader, in its registered checkout (TD-278): what every synced copy
-# is made from, so preferred over any copy; else the copy whose repo synced last (`cadence-sync.lock`)
-BOARD_SOURCE = Path("files") / "scripts" / "nudge_user_attention.py"
-SYNC_LOCK = Path("docs") / "cadence-sync.lock"
 # the fields of a board item the Inbox draws that a reader older than them does not give: a copy
 # that lacks one is named on the page rather than drawn as if the board had nothing there (TD-278)
 BOARD_FIELDS = {"answers": "dev-cadence TD-036"}
-BOARD_TTL = 60.0
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
 BOARD_ACTS = ("snooze", "done", "decide")
 # the kinds a live look is written as: `look` since dev-cadence TD-082, `watch` before it (TD-292)
 LOOK_KINDS = ("look", "watch")
 WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is `board.NOT_RIGHT`'s form)
-BOARD_TIMEOUT = 20.0
-# §4.5 screen 6 *Boards are read against origin* (TD-221): the read passes the reader's own `--fetch`,
-# which fetches each repo's origin serially (30 s a repo, no aggregate bound once `--due-only` went,
-# TD-220), so a fetching read has a bound of its own; stopped or failed, a plain read follows at once
-BOARD_FETCH_TIMEOUT = 45.0
 
 # §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note** (TD-221 slice 3): which case the
 # reader's fetch found, read from the fixed phrases of its `fetch_note` — the reader gives the cases no
@@ -597,29 +584,6 @@ def origin_firsts(rows: Collection[Mapping[str, Any]]) -> set[str]:
 templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts)
 
 
-def _synced(root: Path) -> str:
-    """When a repo last took dev-cadence's files, `synced:` off its `cadence-sync.lock` (an ISO
-    instant, compared as text), or "" when it has none or it cannot be read."""
-    try:
-        text = (root / SYNC_LOCK).read_text()
-    except OSError:
-        return ""
-    return next((ln.split(":", 1)[1].strip() for ln in text.splitlines() if ln.startswith("synced:")), "")
-
-
-def board_reader(roots: Collection[Path]) -> Path | None:
-    """Which copy of dev-cadence's board reader the Inbox runs (§4.5 screen 6, TD-278): picked by
-    what it can do, never by the registry's order — synced copies are the same only while every
-    repo is synced at once, which they are not (samscrape's was two weeks behind and drew no row's
-    answers). dev-cadence's own source when its checkout is registered; else the copy whose repo
-    synced last, the registry's order deciding a tie; None when no repo carries one."""
-    for r in roots:
-        if (r / BOARD_SOURCE).is_file():
-            return r / BOARD_SOURCE
-    copies = [r for r in roots if (r / BOARD_SCRIPT).is_file()]
-    return max(copies, key=_synced) / BOARD_SCRIPT if copies else None
-
-
 def reader_lacks(report: Any, script: str = "") -> str:
     """The page's note when the reader run gives no field the Inbox draws (TD-278): its items carry
     no `answers`, say, so no row would draw its answers and nothing would say why. "" when every
@@ -641,74 +605,35 @@ def reader_lacks(report: Any, script: str = "") -> str:
     return f"board rows are drawn without {since}: {whose} predates it — sync dev-cadence's files into that repo"
 
 
-def board_argv(roots: Collection[str | Path], *, fetch: bool = False, only: str = "") -> tuple[list[str] | None, str]:
-    """The command that reads every open item of these repos' boards — not `--due-only` since TD-220
-    (§4.5 screen 6 *The board's horizon*): the page sorts what is due from what comes up — or None
-    and a note saying why nothing is read. No board anywhere is not a fault and has no note; boards with no reader do,
-    since the Inbox would otherwise look clear when it is not (§4.5 *no silent failure path*).
-
-    `fetch` passes the reader's own `--fetch` (§4.5 screen 6 *Boards are read against origin*,
-    TD-221): it fetches each repo's origin and reads a board that is merely behind from
-    `origin/<default>` — the fetch is the reader's, never a second one of ours. `only` reads that one
-    board alone, as the read after a press does."""
-    rs = [Path(r).expanduser() for r in roots]
-    boards = [str(r / BOARD_FILE) for r in rs if (r / BOARD_FILE).is_file()]
-    if only:
-        boards = [b for b in boards if b == only] or ([only] if Path(only).is_file() else [])
-    if not boards:
-        return None, ""
-    script = board_reader(rs)
-    if script is None:
-        return None, f"board items are not shown: no repo here carries {BOARD_SCRIPT}, dev-cadence's reader"
-    argv = [sys.executable, str(script), "--report", "--json"] + (["--fetch"] if fetch else [])
-    for b in boards:
-        argv += ["--board", b]
-    return argv, ""
-
-
-def unreached(report: Any) -> bool:
-    """Whether a fetching read did not reach origin: stopped or failed (no report), or each board it
-    read says *fetch skipped* — the reader's own bound on its fetch (§4.5 screen 6)."""
-    boards = report.get("boards") if isinstance(report, dict) else None
-    if not isinstance(boards, list):
-        return True
-    return bool(boards) and all(
-        isinstance(b, dict) and origin_case(str(b.get("source") or ""), str(b.get("fetch_note") or "")) == "unreached"
-        for b in boards
-    )
-
-
-def written_back_argv(board: str) -> list[str] | None:
-    """The plain read of one board as the write-back left it (§4.5 screen 6 (3), TD-264): the board in
-    the host agent's own tree (`board.tree_dir`), which a press resets to origin's head once its PR
-    has merged — read in place of the checkout's when the fetching read after that press is stopped,
-    so the row is drawn as the press left it and not as the checkout held it before. None when there
-    is no such tree here, or its board is the checkout's word for word (the plain read is then the same)."""
-    path = Path(board)
-    if path.parts[-len(BOARD_FILE.parts) :] != BOARD_FILE.parts:
-        return None
-    root = Path(*path.parts[: -len(BOARD_FILE.parts)])
-    tree = board_mod.tree_dir(root) / BOARD_FILE
-    try:
-        if not tree.is_file() or tree.read_bytes() == path.read_bytes():
-            return None
-    except OSError:
-        return None
-    script = board_reader([root])
-    if script is None:
-        return None
-    return [sys.executable, str(script), "--report", "--json", "--board", str(tree)]
-
-
-def as_written_back(report: dict[str, Any], board: str) -> dict[str, Any]:
-    """`report`, read from the write-back's tree, named as the checkout's board it stands for: its
-    board, root and label the checkout's, and read from origin — the tree is origin's head after the
-    press — so the row carries the *behind* note until the checkout pulls (§4.5a **origin note**)."""
-    root = Path(*Path(board).parts[: -len(BOARD_FILE.parts)])
-    for b in report.get("boards") or ():
-        if isinstance(b, dict):
-            b.update(board=board, root=str(root), label=root.name, source="origin", fetch_note=None)
-    return report
+def board_reading(
+    repos: Mapping[str, Any] | None, teams: Mapping[str, str] | None = None
+) -> tuple[list[dict[str, Any]], str]:
+    """The Inbox's board rows (`board_rows`) from the host agent's repo readings — the `repos` RPC,
+    each checkout's `boards` (§4.4 *Each reading has one owner*, *The boards*, TD-615) — and a note
+    saying what could not be read, never drawn as an empty board (§4.5 *no silent failure path*): a
+    reading the host agent could not take again keeps its last items and says since when; a board
+    with no reader in its repo, and a reader that predates a field the rows draw (TD-278), are said."""
+    rows: list[dict[str, Any]] = []
+    notes: list[str] = []
+    for root, r in sorted((repos or {}).items()):
+        if not isinstance(r, dict):
+            continue
+        name = str(r.get("name") or Path(str(root)).name)
+        got = r.get("boards")
+        if not isinstance(got, dict):
+            continue
+        own = board_rows(got, teams)
+        if got.get("error"):
+            since = f" since {got['failed_at']}" if got.get("failed_at") else ""
+            shown = "its rows are the last reading" if own else "no row is shown"
+            notes.append(f"the board of {name} could not be read{since} ({got['error']}): {shown}")
+        elif not got.get("boards") and (Path(str(root)) / BOARD_FILE).is_file():
+            if not (Path(str(root)) / workorders_mod.READER).is_file():
+                notes.append(f"the board of {name} is not shown: its repo carries no {workorders_mod.READER}")
+        rows += own
+        if lacks := reader_lacks(got, str(Path(str(root)) / workorders_mod.READER)):
+            notes.append(lacks)
+    return rows, "; ".join(notes)
 
 
 def _same_ref(a: Any, b: Any) -> bool:
@@ -1478,9 +1403,9 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                 {
                     "row": "board",
                     "id": f"board:{root}:{line}",
-                    # §4.4 *A board line's id* (TD-603): `board:<key>` by the repo's own reader, drawn
-                    # on the row and sent as `key` with every press; empty where the repo has no reader
-                    "key": workorders_mod.ref(root, text) if root else "",
+                    # §4.4 *A board line's id* (TD-603): `board:<key>`, the host agent's reading's own
+                    # (TD-615), drawn on the row and sent as `key` with every press; empty where none
+                    "key": str(it.get("key") or ""),
                     "repo": label,
                     "root": root,
                     "board": board,

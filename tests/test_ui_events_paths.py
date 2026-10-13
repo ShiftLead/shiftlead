@@ -61,7 +61,6 @@ def client(monkeypatch, tmp_path, pushed, *, wait=1.6):
     from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
-    monkeypatch.setattr(ui, "read_boards", lambda *a, **k: ([], ""))
     return TestClient(ui.create_app())
 
 
