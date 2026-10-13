@@ -43,6 +43,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-13: OpenAI's Agents API surveyed and added ([ADR](decisions/2026-09-13-openai-agents-api.md)).
 - 2026-09-16: agent messaging surveyed (Claude Code cross-session messaging and agent teams, mcp_agent_mail, muster / agent-mux / muxcode) ([ADR](decisions/2026-09-16-agent-messaging-prior-art.md)).
 - 2026-09-20 (TD-059): session desks and supervisors surveyed (agentboss, agent-director, multi-agent-shogun, claude-code-orchestrator, tmux_claude_codex_dashboard, orchardist) ([ADR](decisions/2026-09-20-session-desk-neighbours.md)).
+- 2026-10-13 (Paul): Grok Bot surveyed ([ADR](decisions/2026-10-13-grok-bot.md)): it takes the "org of agents" concept for office work on a vendor cloud, with the model routed by the vendor (Claude Opus 5.5 among them, announced 2026-10-07, no picker, not bring-your-own-key); not the job of driving the person's own coding agents in their repos.
 
 ## 4. Architecture
 
