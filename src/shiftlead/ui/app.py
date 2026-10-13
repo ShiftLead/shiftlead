@@ -1823,7 +1823,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # design §4.5a New session **Project** picker (§4.9 "Home and reach"): the same block
         # `ao new --project` puts in front of the brief, from the same function — each of the
         # project's repos on this host and which one is home. A one-repo project adds nothing, and
-        # a name with no definition still badges the session: nothing keys on the badge.
+        # a name with no definition still badges the session: the badge grants nothing (§9 invariant 9).
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own
         # `review:` wins, else the team's reader, as `ao new --team` fills it. The Controllers
         # picker was ticked with the team's live manager when the team was picked.

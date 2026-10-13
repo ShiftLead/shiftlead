@@ -33,8 +33,8 @@ in the teams of every checkout in the host's registry, the org file winning a na
 repo's reads *shadowed*) and a name two repos define refused in both, and says where each of a
 repo's teams lands (`landing`: the org file's `place:`, else this host). The file is read by the
 clients (`ao team`, `ao new`, the UI) on every use and cached nowhere; the host agent never reads
-it — it stores `team` and `project` as two plain strings on the record and nothing keys on them
-(§9 invariant 9). With no file the org is empty.
+it — it stores `team` and `project` as two plain strings on the record; nothing that acts keys on them but
+a team's own settings and the mail gate (§4.10, §9 invariant 9). With no file the org is empty.
 """
 
 from __future__ import annotations

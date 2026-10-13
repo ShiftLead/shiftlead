@@ -247,8 +247,8 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
     form's **Project** picker (design §4.9 "Home and reach"): the same block a team member gets,
     with home taken to be whichever of the project's repos `here` is. Returns `(block, note)`.
 
-    An undefined project name is not a refusal: the badge is a plain string and nothing keys on it
-    (§9 invariant 9), so the session is still badged and the note says there is no reach to
+    An undefined project name is not a refusal: the badge is a plain string and nothing that acts keys
+    on it but the mail gate (§9 invariant 9), so the session is still badged and the note says there is no reach to
     describe. A one-repo project has no block either — there is nothing to name."""
     if not project:
         return "", ""
