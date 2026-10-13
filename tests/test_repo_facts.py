@@ -425,13 +425,11 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
         {"id": "x", "team": "u", "repo": "/elsewhere"},
     ]
     inbox = {"entries": [{"kind": "ask", "pr": 9, "at": (now - timedelta(minutes=40)).isoformat()}]}
-    (repo / "docs").mkdir(exist_ok=True)
-    (repo / "docs" / "user_attention.md").write_text("## Needs the user\n")
-    (repo / "scripts").mkdir()
-    (repo / "scripts" / "nudge_user_attention.py").write_text(
-        "import json\n"
-        "print(json.dumps({'boards': [{'items': [{'text': 'decide TD-283', 'due_tag': '3d overdue'}]}]}))\n"
-    )
+    # the board is the host agent's reading (§4.4 *The boards*, TD-615): `ao repo` runs no reader,
+    # and prints the items due now with their ids
+    due = {"text": "decide TD-283", "due_tag": "3d overdue", "overdue_days": 3, "key": "board:0123abcd"}
+    later = {"text": "look next week", "due_tag": "due in 7 d", "overdue_days": None, "key": "board:4567cdef"}
+    reading[str(repo)]["boards"] = {"boards": [{"items": [due, later]}], "error": "the reader exited 2"}
     log = {
         "t": [
             {"team": "t", "id": "g1", "text": "reading the ledger", "at": (now - timedelta(minutes=5)).isoformat()},
@@ -457,7 +455,8 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert out.index("pickable     TD-014") < out.index("pickable     TD-015") < out.index("pickable     TD-013")
     # slice 6: the reader's standing on each open PR, what members hold, the board items due
     assert "waiting on tl · 40m" in out and "holds        TD-010 → #9  g1" in out
-    assert "due          3d overdue  decide TD-283" in out
+    assert "due          board:0123abcd  3d overdue  decide TD-283" in out and "look next week" not in out
+    assert "board: could not look — the reader exited 2" in out
     # the servicing team's doing log, newest first; another team's is not this repo's
     assert out.index("g1: pushing TD-010") < out.index("g1: reading the ledger") and "not this repo's" not in out
     # a team over its line in this repo is the last line, in the card's words (§6 *Balance*, TD-239)

@@ -272,7 +272,6 @@ def test_the_page_and_its_poll_draw_the_fold_from_the_home_repo_facts(tmp_path, 
             return got.get(method, {})
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
-    monkeypatch.setattr(ui, "read_boards", lambda *a, **k: ([], ""))
     c = TestClient(ui.create_app())
     page = c.get("/inbox").text
     assert 'href="/repo/agentorc#TD-156"' in page

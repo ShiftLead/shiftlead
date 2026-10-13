@@ -82,7 +82,6 @@ def test_the_form_defaults_to_the_senders_repos_board_and_the_page_carries_it(tm
     host(tmp_path, monkeypatch, repos=[a])
     from shiftlead.ui import app as uiapp
 
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([], ""))
     board = str(a.resolve() / "docs/user_attention.md")
     Fake.fleet = [rec("ao-w1", "idle", repo=str(a)), rec("ao-w2", "idle", repo="/elsewhere")]
     Fake.inbox = {
@@ -113,7 +112,6 @@ def test_a_host_with_no_board_says_so_in_the_form(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
 
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: ([], ""))
     Fake.fleet, Fake.inbox = [], {"entries": [], "trail": []}
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
     with TestClient(uiapp.create_app()) as c:
@@ -122,15 +120,14 @@ def test_a_host_with_no_board_says_so_in_the_form(tmp_path, monkeypatch):
 
 
 @pytest.mark.unit
-def test_put_it_on_goes_to_the_write_backs_one_add_and_the_boards_are_read_again(tmp_path, monkeypatch):
+def test_put_it_on_goes_to_the_write_backs_one_add(tmp_path, monkeypatch):
     """The route hands the form's board, text and Due and the entry's id to `board_edit` with
-    `action: add`, caller-less — the person's own act — and reads the boards again at once, so the
-    new item is a row the moment it is due. What the form must name is refused before the agent."""
+    `action: add`, caller-less — the person's own act; the host agent re-reads the board before it
+    answers (§4.4 *The boards*, TD-615), so the new item is a row the moment it is due. What the
+    form must name is refused before the agent."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
 
-    reads = []
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
     Fake.calls, Fake.fleet, Fake.inbox = [], [], {"entries": [], "trail": []}
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
     board = str(tmp_path / "r/docs/user_attention.md")
@@ -139,7 +136,6 @@ def test_put_it_on_goes_to_the_write_backs_one_add_and_the_boards_are_read_again
         c.get("/api/person/inbox")
         r = c.post("/api/person/board", json=good)
         assert r.status_code == 200 and r.json()["commit"] == "abc123" and r.json()["dismissed"] == ["m-1"]
-        assert len(reads) == 2
         for k in ("msg", "board", "text", "due"):
             assert c.post("/api/person/board", json={**good, k: ""}).status_code == 400
     assert Fake.calls == [

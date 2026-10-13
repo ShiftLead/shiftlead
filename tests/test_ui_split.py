@@ -15,7 +15,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 # patched by the suite as `shiftlead.ui.app.X`
-PATCHED = {"LocalClient", "read_boards", "rpc", "PtySession", "repo_teams"}
+PATCHED = {"LocalClient", "board_reading", "rpc", "PtySession", "repo_teams"}
 # the modules moved out of app.py (TD-196), in the order they were split
 SPLIT = ("common", "cards", "inbox", "org", "repo")
 

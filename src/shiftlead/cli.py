@@ -1487,39 +1487,33 @@ def _repo_line(r: dict[str, Any]) -> str:
 
 
 DOING_SHOWN = 10  # `ao repo`'s doing lines; `--json` carries the whole log of the servicing teams
-BOARD_SCRIPT = pathlib.Path("scripts") / "nudge_user_attention.py"  # dev-cadence's reader, as the Inbox runs it
-BOARD_FILE = pathlib.Path("docs") / "user_attention.md"
 
 
-def _board_due(root: pathlib.Path) -> dict[str, Any]:
-    """The repo's board items due today or overdue, read by dev-cadence's reader as the Inbox reads
-    them (§4.5 screen 6): `{items}`, `{error}` when the reader could not say, `{}` with no board."""
-    board, script = root / BOARD_FILE, root / BOARD_SCRIPT
-    if not board.is_file():
+def _due_now(it: dict[str, Any]) -> bool:
+    """Whether a board item is **due now**, the Inbox's own predicate (`ui.inbox.board_due_now`, §4.5
+    screen 6 *The board's horizon*): decided whatever its date, a date that could not be read, due
+    today or earlier; an undecided `fyi` item never."""
+    if it.get("kind") == "fyi" and not it.get("decided"):
+        return False
+    return bool(it.get("decided")) or bool(it.get("due_error")) or it.get("overdue_days") is not None
+
+
+def _board_due(r: dict[str, Any]) -> dict[str, Any]:
+    """The repo's board items due today or overdue, from the host agent's `boards` reading (§4.4
+    *Each reading has one owner*, *The boards*, TD-615) — `ao` runs no reader: `{items}`, each with
+    its `key`, and `error` beside them when the last read failed (its items the last good ones),
+    `{}` with no reading."""
+    got = r.get("boards")
+    if not isinstance(got, dict):
         return {}
-    if not script.is_file():
-        return {"error": f"no {BOARD_SCRIPT} in the repo to read it"}
-    try:
-        cp = subprocess.run(
-            [sys.executable, str(script), "--report", "--due-only", "--json", "--board", str(board)],
-            capture_output=True, text=True, errors="replace", timeout=20,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},  # no scripts/__pycache__ in the repo
-        )  # fmt: skip
-        report = json.loads(cp.stdout) if cp.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired, ValueError) as e:
-        return {"error": f"the board reader did not answer ({type(e).__name__})"}
-    if not isinstance(report, dict):
-        return {"error": f"the board reader exited {cp.returncode}"}
     items = [
         it
-        for b in report.get("boards") or []
+        for b in got.get("boards") or []
         if isinstance(b, dict)
         for it in b.get("items") or []
-        if isinstance(it, dict)
+        if isinstance(it, dict) and _due_now(it)
     ]
-    for it in items:  # each line's id (§4.4 *A board line's id*, TD-603), printed beside it
-        it["key"] = workorders.ref(root, str(it.get("text") or ""))
-    return {"items": items}
+    return {"items": items, **({"error": str(got["error"])} if got.get("error") else {})}
 
 
 def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
@@ -1697,7 +1691,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 if isinstance(p, dict) and p.get("status") == "claimed"
             ]
             r["standing"] = _pr_standing(members)
-            r["board"] = _board_due(root)
+            r["board"] = _board_due(r)
             # the board's decided lines are in the lanes beside the entries (§4.4 *Board write-back*, TD-384)
             r["lanes"] = teamrun.repo_lanes(teamrun.lane_entries(r), root, fleet)
 
@@ -2520,12 +2514,35 @@ def _doctor_org(files: dict[str, Any], node: bool) -> list[dict[str, Any]]:
     return doctor.org(got, files, len(org.teams), node)
 
 
+def _board_line(repos: Any, root: str, want: str) -> dict[str, Any] | None:
+    """The open line `want` in the host agent's `boards` reading of the checkout `root` (§4.4 *The
+    boards*), as `ao board show` gives it — `{key, line, text, detail, open, source}`, `source` the
+    side it was read from (`origin`, or `checkout`) — or None when the reading holds no such line."""
+    here = str(pathlib.Path(root).resolve())
+    for r in (repos or {}).values() if isinstance(repos, dict) else ():
+        if not isinstance(r, dict) or str(pathlib.Path(str(r.get("root") or "")).resolve()) != here:
+            continue
+        got = r.get("boards") if isinstance(r.get("boards"), dict) else {}
+        for b in got.get("boards") or []:
+            for it in (b.get("items") or []) if isinstance(b, dict) else []:
+                if isinstance(it, dict) and it.get("key") == want:
+                    return {
+                        "key": want,
+                        "line": it.get("line"),
+                        "text": str(it.get("text") or "").strip(),
+                        "detail": [str(d) for d in it.get("detail") or []],
+                        "open": True,
+                        "source": str(b.get("source") or "checkout"),
+                    }
+    return None
+
+
 def cmd_board_show(args: argparse.Namespace) -> int:
     """`ao board show <board:key> [--repo <name>]` (design §4.7, §4.4 *A board line's id*; TD-603,
     built by TD-607): the line whose id it is — its line number, its whole text and its detail
-    block, from origin's board after a fetch, else the checkout's — or *no line board:<key> on the
-    board — reworded or closed*, exit 1. Read-only and the host agent's nothing: the repo's own
-    reader names the line, as the Inbox's rows and the write-back name it."""
+    block, from the host agent's `boards` reading (§4.4 *Each reading has one owner*, TD-615), else
+    the checkout's file, where a closed line is — or *no line board:<key> on the board — reworded or
+    closed*, exit 1. Read-only; `ao` runs no reader and fetches nothing."""
     want = str(args.key or "").strip()
     if not workorders.is_work_order(want):
         return fail(args, f"{want!r} is not a board line's id: board: and eight hex digits (design §4.4)", 2)
@@ -2538,9 +2555,15 @@ def cmd_board_show(args: argparse.Namespace) -> int:
         root = _main_checkout(os.getcwd()) or ""
         if not root:
             return fail(args, "this directory is not in a repo; name one with --repo", 1)
-    if not workorders.can_name(root):
+    try:
+        repos = call_sync("repos")
+    except (AgentError, AgentUnavailable, OSError):  # a read: the checkout's file answers without the agent
+        repos = None
+    got = _board_line(repos, root, want)
+    if got is None and not workorders.can_name(root):
         return fail(args, f"{root} has no board reader ({workorders.READER}) to name its lines by", 1)
-    got = workorders.show(root, want)
+    if got is None:
+        got = workorders.show(root, want, fetch=False)
     if got is None:
         return fail(args, workorders.NO_LINE.format(ref=want), 1)
 
@@ -3715,7 +3738,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("board", help="a board line by its id (design §4.4 *A board line's id*, §4.7)")
     bsub = p.add_subparsers(dest="action", required=True)
-    q = bsub.add_parser("show", help="the line whose id it is, from origin's board after a fetch, else the checkout's")
+    q = bsub.add_parser("show", help="the line whose id it is, from the host agent's reading, else the checkout's")
     q.add_argument("key", metavar="board:key", help="the line's id, board: and eight hex digits")
     q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
     q.add_argument(

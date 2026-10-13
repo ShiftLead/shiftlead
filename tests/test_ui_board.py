@@ -62,48 +62,44 @@ def item(line, text, due, tag):
     return {"line": line, "text": text, "due": due, "overdue_days": 1, "due_tag": tag, "answers": []}
 
 
-@pytest.mark.unit
-def test_the_reader_runs_over_every_board_here_with_the_first_script_found(tmp_path):
-    from shiftlead.ui.app import board_argv
-
-    assert board_argv([]) == (None, "")
-    bare = repo(tmp_path, "bare", reader=False)
-    assert board_argv([bare]) == (None, "")  # no board anywhere is not a fault: nothing to say
-    unread = repo(tmp_path, "unread", "- [ ] x. Due: 2026-09-01.\n", reader=False)
-    argv, note = board_argv([unread])
-    assert argv is None and "nudge_user_attention.py" in note  # a board nobody can read is said
-    a = repo(tmp_path, "a", "- [ ] x\n", reader=False)
-    b = repo(tmp_path, "b", "- [ ] y\n")
-    argv, note = board_argv([a, bare, b])
-    assert note == "" and argv[1] == str(b / "scripts" / "nudge_user_attention.py")
-    assert argv[2:4] == ["--report", "--json"]  # every open item: the page sorts what is due (TD-220)
-    assert argv[4:] == ["--board", str(a / "docs/user_attention.md"), "--board", str(b / "docs/user_attention.md")]
+def reading(*reports, error=None):
+    """The host agent's `repos` reading (§4.4 *The boards*, TD-615) carrying each report as one
+    checkout's `boards`, keyed by its root; `error` marks every one's last read as failed."""
+    out = {}
+    for rep in reports:
+        root = rep["boards"][0]["root"]
+        bds = {**rep, **({"error": error, "failed_at": "2026-09-22T10:00:00+00:00"} if error else {})}
+        out[root] = {"name": pathlib.Path(root).name, "root": root, "boards": bds}
+    return out
 
 
 @pytest.mark.unit
-def test_the_reader_is_picked_by_what_it_can_do_never_by_registry_order(tmp_path):
-    """TD-278, §4.5 screen 6: dev-cadence's own source when its checkout is registered; else the copy
-    whose repo synced last (`docs/cadence-sync.lock`), the registry's order deciding a tie — samscrape,
-    first in the registry and two weeks behind, ran for every board and drew no row's answers."""
-    from shiftlead.ui.app import board_argv, board_reader
+def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_is_said(tmp_path):
+    """§4.4 *Each reading has one owner*, *The boards* (TD-615): the page's board rows are the
+    `boards` of the host agent's repo readings — every repo's, each row its reading's id — and the
+    page runs no reader. What could not be read is said (§4.5 *no silent failure path*): a failed
+    read keeps its last items, and a board in a repo with no reader is named."""
+    from shiftlead.ui.app import board_reading
 
-    def lock(root, when):
-        (root / "docs" / "cadence-sync.lock").write_text(f"source: x\ncommit: abc\nsynced: {when}\n")
-
-    old = repo(tmp_path, "samscrape", "- [ ] x\n")
-    new = repo(tmp_path, "shiftlead", "- [ ] y\n")
-    lock(old, "2026-09-17T10:00:00Z")
-    lock(new, "2026-10-01T23:06:28Z")
-    assert board_reader([old, new]) == new / "scripts" / "nudge_user_attention.py"
-    assert board_argv([old, new])[0][1] == str(new / "scripts" / "nudge_user_attention.py")
-    bare = repo(tmp_path, "nolock", "- [ ] z\n")  # no lock: never newer than one that has it
-    assert board_reader([bare, old]) == old / "scripts" / "nudge_user_attention.py"
-    assert board_reader([bare]) == bare / "scripts" / "nudge_user_attention.py"  # the only copy
-    dc = repo(tmp_path, "dev-cadence", reader=False)
-    (dc / "files" / "scripts").mkdir(parents=True)
-    shutil.copy(READER, dc / "files" / "scripts" / "nudge_user_attention.py")
-    shutil.copy(LEDGERBOARD, dc / "files" / "scripts" / "ledgerboard.py")
-    assert board_reader([old, new, dc]) == dc / "files" / "scripts" / "nudge_user_attention.py"
+    assert board_reading({}) == ([], "") and board_reading(None) == ([], "")
+    a, b = repo(tmp_path, "a", "- [ ] x\n"), repo(tmp_path, "b", "- [ ] y\n")
+    one = {**item(3, "x. Due: 2026-09-20.", "2026-09-20", "2d overdue"), "key": "board:0123abcd"}
+    rows, note = board_reading(reading(report(a, one), report(b, item(4, "y.", "2026-09-21", "1d overdue"))))
+    assert [(r["repo"], r["line"], r["key"]) for r in rows] == [("a", 3, "board:0123abcd"), ("b", 4, "")]
+    assert note == ""
+    rows, note = board_reading(reading(report(a, one), error="the reader exited 2"))
+    assert len(rows) == 1 and note == (
+        "the board of a could not be read since 2026-09-22T10:00:00+00:00 (the reader exited 2): "
+        "its rows are the last reading"
+    )
+    assert "no row is shown" in board_reading(reading(report(a), error="x"))[1]
+    unread = repo(tmp_path, "unread", "- [ ] z. Due: 2026-09-01.\n", reader=False)
+    rows, note = board_reading({str(unread): {"name": "unread", "root": str(unread), "boards": {"boards": []}}})
+    assert rows == [] and "unread" in note and "nudge_user_attention.py" in note
+    # a reading taken before its first board read: said, not drawn as an empty board
+    assert board_reading({str(a): {"name": "a", "root": str(a)}}) == ([], "the board of a has not been read yet")
+    bare = repo(tmp_path, "bare", reader=False)  # no board anywhere is not a fault: nothing to say
+    assert board_reading({str(bare): {"root": str(bare), "boards": {"boards": []}}, "x": "junk"}) == ([], "")
 
 
 @pytest.mark.unit
@@ -118,17 +114,11 @@ def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypat
     assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)") and "/r/scripts" in note
     assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue")), "/x") == ""
     assert reader_lacks(report(root), "/x") == "" and reader_lacks("junk") == ""
-    # through the read: the rows drawn, the note beside them
-    real = repo(tmp_path, "proj", "# Board\n")
-    host(tmp_path, monkeypatch, [real])
-    from shiftlead.ui import app as uiapp
+    # through the reading: the rows drawn, the note beside them, naming the repo's own reader
+    from shiftlead.ui.app import board_reading
 
-    class Done:
-        returncode, stderr = 0, ""
-        stdout = __import__("json").dumps(stale)
-
-    rows, note = uiapp.read_boards(run=lambda argv, **kw: Done())
-    assert len(rows) == 1 and "without `answers`" in note
+    rows, note = board_reading(reading(stale))
+    assert len(rows) == 1 and "without `answers`" in note and str(root / "scripts") in note
 
 
 @pytest.mark.unit
@@ -223,15 +213,15 @@ def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_
 
 
 @pytest.mark.unit
-def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_again(tmp_path, monkeypatch):
+def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_page_reads_no_board(tmp_path, monkeypatch):
     """The route (§4.4, TD-069 step 3) hands the row's board, line and text to `board_edit`,
-    caller-less — the person's own act — and reads the boards again at once, so the answered row is
-    gone from the next refresh. What it cannot know is refused before the agent is asked."""
+    caller-less — the person's own act. The host agent re-reads the board before it answers (§4.4
+    *The boards*, TD-615), so the press reads nothing itself: the next draw takes the agent's
+    reading. What it cannot know is refused before the agent is asked."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
 
     reads, calls, replies = [], [], []
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
 
     class Fake:
         def __init__(self, *a, **k):
@@ -244,6 +234,8 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
             return False
 
         async def call(self, method, **kw):
+            if method == "repos":
+                reads.append(1)
             if method == "board_edit":
                 calls.append((self.kw.get("caller"), kw))
                 return {"commit": "abc123", "message": "shiftlead: done x (session n/a)"}
@@ -256,10 +248,11 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
     board = str(tmp_path / "r/docs/user_attention.md")
     with TestClient(uiapp.create_app()) as c:
         c.get("/api/person/inbox")
-        assert len(reads) == 1
+        drawn = len(reads)
+        assert drawn  # the page drew its board rows from the agent's reading
         r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 4, "text": "x"})
         assert r.status_code == 200 and r.json()["commit"] == "abc123"
-        assert len(reads) == 2  # read again at once, not at the next minute
+        assert len(reads) == drawn  # the agent's re-read is in its reading: the press reads nothing
         r = c.post(
             "/api/person/board",
             json={
@@ -278,7 +271,7 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
             {"board": board, "line": 4, "text": "x", "action": "snooze", "due": "2026-09-30", "key": "board:0a1b2c3d"},
         ]
         assert all(caller is None for caller, _ in calls)  # a person is not a session
-        # TD-142: Reply goes to `board_reply` with the reader's refs, and the boards are read again
+        # TD-142: Reply goes to `board_reply` with the reader's refs
         r = c.post(
             "/api/person/board",
             json={
@@ -289,7 +282,7 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
         assert r.status_code == 200 and replies == [
             {"board": board, "line": 4, "text": "x", "reply": "rebase it", "refs": ["TD-9"], "key": "board:0a1b2c3d"}
         ]
-        assert len(reads) == 4
+        assert len(reads) == drawn
         for bad in ({"reply": ""}, {"line": "four"}, {"board": ""}):
             body = {"action": "reply", "board": board, "line": 4, "text": "x", "reply": "y", **bad}
             assert c.post("/api/person/board", json=body).status_code == 400
@@ -305,10 +298,11 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
 
 
 @pytest.mark.unit
-def test_read_boards_runs_dev_cadences_reader_and_says_when_it_cannot(tmp_path, monkeypatch):
-    """End to end over a real board and the real reader: an overdue item and one due today are
-    due-now rows, an undated one and one due next week are rows not yet due (TD-220); the team
-    comes from the org's projects."""
+def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monkeypatch):
+    """End to end over a real board, the real reader and the host agent's reading of it
+    (`workorders.read_boards`, TD-615): an overdue item and one due today are due-now rows, an
+    undated one and one due next week are rows not yet due (TD-220); the team comes from the org's
+    projects, and each row's id is the reading's."""
     past = (date.today() - timedelta(days=3)).isoformat()
     later = (date.today() + timedelta(days=7)).isoformat()
     board = (
@@ -325,10 +319,13 @@ def test_read_boards_runs_dev_cadences_reader_and_says_when_it_cannot(tmp_path, 
         f"projects:\n  proj:\n    repos:\n      proj: {{kmaster: {root}}}\n"
         "teams:\n  proj-grind:\n    projects: [proj]\n    manager: {role: manager}\n"
     )
+    from sessionorc import workorders
     from shiftlead.ui import app as uiapp
 
-    rows, note = uiapp.read_boards()
+    got = {str(root): {"name": "proj", "root": str(root), "boards": workorders.read_boards(root, fetch=False)}}
+    rows, note = uiapp.board_reading(got, uiapp.repo_teams(uiapp.org_here()[0], uiapp.host_name()))
     assert note == ""
+    assert all(r["key"] == workorders.ref(root, r["text"]) and r["key"].startswith("board:") for r in rows)
     # every open item is read (TD-220), the ones due now marked; the closed one is not an item
     assert [(r["text"].split(".")[0], r["due_now"]) for r in rows] == [
         ("overdue thing", True),
@@ -344,43 +341,22 @@ def test_read_boards_runs_dev_cadences_reader_and_says_when_it_cannot(tmp_path, 
     assert rows[0]["line"] == 3 and rows[0]["repo"] == "proj" and rows[0]["team"] == "proj-grind"
     assert "overdue" in rows[0]["due_tag"]
 
-    class Done:
-        returncode, stdout, stderr = 2, "", "Traceback…\nValueError: boom\n"
-
-    rows, note = uiapp.read_boards(run=lambda *a, **k: Done())
-    assert rows == [] and "exited 2" in note and "boom" in note
-    Done.returncode, Done.stdout = 0, "not json"
-    assert uiapp.read_boards(run=lambda *a, **k: Done()) == (
-        [],
-        "board items are not shown: the reader's output is not JSON",
-    )
-
-    def slow(*a, **k):
-        import subprocess
-
-        raise subprocess.TimeoutExpired(a[0], 20)
-
-    rows, note = uiapp.read_boards(run=slow)
-    assert rows == [] and "did not finish" in note
-
 
 @pytest.mark.unit
 def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp_path, monkeypatch):
     """One count in three places (§4.5a **Inbox page**): the board rows join the page, the poll and
-    the Org's top bar through the same `inbox_sections`; the reader's note is drawn and polled."""
+    the Org's top bar through the same `inbox_sections`; the reading's note is drawn and polled. The
+    rows are the host agent's reading (§4.4 *The boards*, TD-615): no surface runs a reader — a spy
+    on `subprocess.run` sees none."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
 
     root = tmp_path / "proj"
     later = {**item(4, "look next week", "2026-09-30", "due 2026-09-30"), "overdue_days": None}
-    rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue"), later))
+    rep = report(root, item(3, "decide the thing", "2026-09-20", "2d overdue"), later)
+    rows = uiapp.board_rows(rep)
     calls = []
-
-    def fake(run=None):
-        calls.append(1)
-        return rows, "a note from the reader"
-
-    monkeypatch.setattr(uiapp, "read_boards", fake)
+    monkeypatch.setattr("subprocess.run", lambda *a, **k: calls.append(a) or pytest.fail(f"a reader was run: {a}"))
 
     class Fake:
         def __init__(self, *a, **k):
@@ -400,6 +376,7 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
                 "gate": {},
                 "host": {"name": "kmaster", "mode": "home"},
                 "identity": {},
+                "repos": reading(rep, error="a note from the reader"),
             }.get(method, {})
 
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
@@ -411,9 +388,12 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
         assert "a note from the reader" in page and 'id="boardnote"' in page
         got = c.get("/api/person/inbox").json()
         assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
-        assert got["board_note"] == "a note from the reader" and "decide the thing" in got["html"]["needs"]
+        assert (
+            "(a note from the reader): its rows are the last reading" in got["board_note"]
+            and "decide the thing" in got["html"]["needs"]
+        )
         assert 'id="personneeds">1</span>' in c.get("/").text
-    assert len(calls) == 1  # read once for all three: the page and the top bar poll every few seconds
+    assert calls == []
 
 
 @pytest.mark.unit
@@ -426,7 +406,7 @@ def test_with_the_host_agent_down_no_surface_counts_the_board(tmp_path, monkeypa
 
     root = tmp_path / "proj"
     rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue")))
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (rows, ""))
+    monkeypatch.setattr(uiapp, "board_reading", lambda *a, **k: (rows, ""))
 
     class Down:
         def __init__(self, *a, **k):
@@ -618,7 +598,7 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
     items = [item(3, "decide the thing", "2026-09-20", "2d overdue")]
     items += [ahead(10 + i, f"later item {i}", f"2026-10-{i + 1:02d}") for i in range(12)]
     rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (rows, ""))
+    monkeypatch.setattr(uiapp, "board_reading", lambda *a, **k: (rows, ""))
 
     class Fake:
         def __init__(self, *a, **k):
@@ -698,7 +678,7 @@ def test_a_row_coming_up_snoozes_from_its_own_date_and_show_draws_forty_days_out
 
     items = [ahead(10, "next week's item", "2026-10-04"), ahead(11, "forty days out", "2026-11-07")]
     rows = uiapp.board_rows({**report(root, *items), "today": "2026-09-28"})
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (rows, ""))
+    monkeypatch.setattr(uiapp, "board_reading", lambda *a, **k: (rows, ""))
     calls = []
 
     class Fake:
@@ -753,9 +733,9 @@ def _git(*args, cwd):
 
 @pytest.mark.unit
 def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_path, monkeypatch):
-    """A clone one commit behind its origin: the fetching read shows the line merged on origin, the
-    row says it was read from origin (`source`) and keeps the reader's `fetch_note`; the plain read
-    does not see it. Real git, the real reader."""
+    """A clone one commit behind its origin: the host agent's fetching read (§4.4 *The boards*,
+    TD-615) shows the line merged on origin, the row says it was read from origin (`source`) and
+    keeps the reader's `fetch_note`; the plain read does not see it. Real git, the real reader."""
     due = date.today().isoformat()
     origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "proj"
     _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
@@ -776,174 +756,20 @@ def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_p
     _git("commit", "-q", "-am", "a line", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
     host(tmp_path, monkeypatch, [clone])
+    from sessionorc import workorders
     from shiftlead.ui import app as uiapp
 
-    rows, note = uiapp.read_boards()
+    def read(fetch):
+        return uiapp.board_reading(
+            {str(clone): {"root": str(clone), "boards": workorders.read_boards(clone, fetch=fetch)}}
+        )
+
+    rows, note = read(False)
     assert note == "" and [r["text"].split(".")[0] for r in rows] == ["the old line"]
     assert rows[0]["source"] == "" and rows[0]["fetch_note"] == ""
-    rows, note = uiapp.read_boards(fetch=True)
+    rows, note = read(True)
     assert note == "" and [r["text"].split(".")[0] for r in rows] == ["the old line", "the line only on origin"]
     assert all(r["source"] for r in rows) and rows[0]["fetch_note"].startswith("fetched; local clone is behind")
-
-
-@pytest.mark.unit
-def test_a_fetch_that_is_stopped_or_fails_is_followed_by_a_plain_read(tmp_path, monkeypatch):
-    """A dead remote costs the origin view and never the board: the fetching read stopped at its
-    bound (or failed) is followed at once by a plain read, and each board says *fetch skipped*."""
-    import subprocess
-
-    root = repo(tmp_path, "proj", "# Board\n")
-    host(tmp_path, monkeypatch, [root])
-    from shiftlead.ui import app as uiapp
-
-    seen = []
-
-    class Done:
-        returncode, stderr = 0, ""
-        stdout = __import__("json").dumps(report(root, item(3, "a thing. Due: 2026-09-20.", "2026-09-20", "overdue")))
-
-    def run(argv, **kw):
-        seen.append(("--fetch" in argv, kw["timeout"]))
-        if "--fetch" in argv:
-            raise subprocess.TimeoutExpired(argv, kw["timeout"])
-        return Done()
-
-    rows, note = uiapp.read_boards(run=run, fetch=True)
-    assert seen == [(True, uiapp.BOARD_FETCH_TIMEOUT), (False, uiapp.BOARD_TIMEOUT)]
-    assert note == "" and len(rows) == 1
-    assert rows[0]["source"] == "" and rows[0]["fetch_note"] == "fetch skipped (timeout)"
-
-    class Failed:
-        returncode, stdout, stderr = 1, "", "boom\n"
-
-    rows, _ = uiapp.read_boards(run=lambda argv, **kw: Failed() if "--fetch" in argv else Done(), fetch=True)
-    assert rows[0]["fetch_note"] == "fetch skipped (the reader exited 1 — boom)"
-
-
-@pytest.mark.unit
-def test_the_read_after_a_press_stopped_draws_the_board_as_the_write_back_left_it(tmp_path, monkeypatch):
-    """§4.5 screen 6 (3), TD-264: a fetching read after a press that is stopped reads the board in the
-    host agent's own tree — origin's head once the press merged — named as the checkout's board and
-    read from origin, so the snoozed row is drawn snoozed; never for a whole read, and the checkout's
-    plain read when the tree holds the same board. The real reader."""
-    import subprocess
-
-    due = date.today().isoformat()
-    root = repo(tmp_path, "proj", f"# Board\n\n- [ ] the line. Due: {due}.\n")
-    host(tmp_path, monkeypatch, [root])
-    from sessionorc import board as board_mod
-    from shiftlead.ui import app as uiapp
-
-    tree = board_mod.tree_dir(root) / "docs" / "user_attention.md"
-    tree.parent.mkdir(parents=True)
-    tree.write_text("# Board\n\n- [ ] the line. Due: 2099-01-01.\n")
-    board = str(root / "docs" / "user_attention.md")
-
-    def run(argv, **kw):
-        if "--fetch" in argv:
-            raise subprocess.TimeoutExpired(argv, kw["timeout"])
-        return subprocess.run(argv, **kw)
-
-    rows, note = uiapp.read_boards(run=run, fetch=True, board=board)
-    assert note == "" and [(r["board"], r["root"], r["repo"], r["due"]) for r in rows] == [
-        (board, str(root), "proj", "2099-01-01")
-    ]
-    assert rows[0]["source"] == "origin" and not rows[0]["due_now"]
-    assert uiapp.origin_note(rows[0])["text"].startswith("read from origin: this checkout has not pulled it yet")
-    # the reader's own bound on its fetch (*fetch skipped*, its report whole) is the same stop
-    import json
-
-    def skipped(argv, **kw):
-        done = subprocess.run([a for a in argv if a != "--fetch"], **kw)
-        got = json.loads(done.stdout)
-        for b in got["boards"]:
-            b["fetch_note"] = "fetch skipped (timeout)"
-        return subprocess.CompletedProcess(argv, 0, json.dumps(got), "")
-
-    rows, _ = uiapp.read_boards(run=skipped, fetch=True, board=board)
-    assert [(r["due"], r["source"]) for r in rows] == [("2099-01-01", "origin")]
-    # a whole read is not a press's: the checkout's, said as skipped
-    rows, _ = uiapp.read_boards(run=run, fetch=True)
-    assert rows[0]["due"] == due and rows[0]["fetch_note"] == "fetch skipped (timeout)"
-    # the tree holds the checkout's board: the plain read, as before
-    tree.write_text((root / "docs" / "user_attention.md").read_text())
-    rows, _ = uiapp.read_boards(run=run, fetch=True, board=board)
-    assert rows[0]["due"] == due and rows[0]["source"] == "" and rows[0]["fetch_note"] == "fetch skipped (timeout)"
-
-
-@pytest.mark.unit
-def test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it(tmp_path, monkeypatch):
-    """The first request reads plainly; from then a stale reading starts one fetching read, however
-    many requests find it stale, and each is answered from the last reading meanwhile; a press
-    reads its own board with a fetch of its own (TD-264: the edit is on origin), laid over the last
-    reading, and does not wait on the other fetch. A fetch that began before the press does not
-    put the answered row back."""
-    import threading
-
-    host(tmp_path, monkeypatch)
-    from shiftlead.ui import app as uiapp
-
-    board = str(tmp_path / "r/docs/user_attention.md")
-    other = str(tmp_path / "s/docs/user_attention.md")
-
-    def row(b, text):
-        return {
-            "row": "board",
-            "id": f"board:{b}:{text}",
-            "board": b,
-            "text": text,
-            "due_now": True,
-            "at": "2026-09-01",
-        }
-
-    gate, started, reads, board_ = threading.Event(), threading.Event(), [], board
-
-    def fake(run=None, *, fetch=False, board=""):
-        reads.append(board or ("fetch" if fetch else "plain"))
-        if fetch and not board:
-            started.set()
-            assert gate.wait(10)
-            return [row(board_, "answered"), row(other, "from origin")], ""
-        if board:
-            return [], ""  # the answered row is gone from its board
-        return [row(board_, "answered"), row(other, "old")], ""
-
-    monkeypatch.setattr(uiapp, "read_boards", fake)
-    monkeypatch.setattr(uiapp, "BOARD_TTL", -1.0)
-
-    class Fake:
-        def __init__(self, *a, **k):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def call(self, method, **kw):
-            if method == "board_edit":
-                return {"commit": "abc"}
-            return {"list": [], "inbox": {"entries": [], "trail": []}}.get(method, {})
-
-    monkeypatch.setattr(uiapp, "LocalClient", Fake)
-    with TestClient(uiapp.create_app()) as c:
-        assert c.get("/api/person/inbox").json()["needs"] == 2 and reads == ["plain"]
-        c.get("/api/person/inbox")
-        c.get("/api/person/inbox")
-        # the fetch is a task on the app's loop, so it may not have reached its thread yet (TD-463)
-        assert started.wait(10)
-        assert reads == ["plain", "fetch"]  # one fetching read, the requests answered meanwhile
-        r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 3, "text": "answered"})
-        assert r.status_code == 200 and reads == ["plain", "fetch", board]
-        assert c.get("/api/person/inbox").json()["needs"] == 1  # the press's read, laid over
-        gate.set()
-        for _ in range(50):
-            got = c.get("/api/person/inbox").json()
-            if "from origin" in got["html"]["needs"]:
-                break
-            threading.Event().wait(0.05)
-        assert "from origin" in got["html"]["needs"] and "answered" not in got["html"]["needs"]
 
 
 def _reader_phrases():
@@ -1060,20 +886,14 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_live(tmp_pa
 @pytest.mark.unit
 def test_a_press_on_a_board_read_from_origin_goes_to_the_write_back(tmp_path, monkeypatch):
     """TD-264 (§4.4, §4.5 screen 6): a row read from origin is pressable — the write-back works on
-    origin's line, so the press goes to `board_edit` or `board_reply` as any row's does — and the
-    read after it is a fetching read of that one board."""
+    origin's line, so the press goes to `board_edit` or `board_reply` as any row's does; the re-read
+    after it is the host agent's (§4.4 *The boards*, TD-615)."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
 
     board = str(tmp_path / "r/docs/user_attention.md")
     row = {"row": "board", "id": f"board:{board}:3", "board": board, "text": "x", "due_now": True, "at": "2026-09-01"}
-    reads = []
-
-    def fake(run=None, *, fetch=False, board=""):
-        reads.append((board, fetch))
-        return [dict(row, line=3, source="origin/main")], ""
-
-    monkeypatch.setattr(uiapp, "read_boards", fake)
+    monkeypatch.setattr(uiapp, "board_reading", lambda *a, **k: ([dict(row, line=3, source="origin/main")], ""))
     calls = []
 
     class Fake:
@@ -1103,7 +923,6 @@ def test_a_press_on_a_board_read_from_origin_goes_to_the_write_back(tmp_path, mo
             r = c.post("/api/person/board", json=body)
             assert r.status_code == 200, r.text
         assert calls == [("board_edit", "done"), ("board_edit", "snooze"), ("board_reply", None)]
-        assert reads[-1] == (board, True)  # the read after the press fetches
 
 
 def _behind_clone(tmp_path):
@@ -1135,16 +954,19 @@ def _behind_clone(tmp_path):
 
 @pytest.mark.unit
 def test_after_a_pull_the_row_is_pressable_and_a_two_sided_board_warns(tmp_path, monkeypatch):
-    """Real git, the real reader (TD-221 slice 4): behind, the row only on origin is drawn under the
-    *behind* note, pressable (TD-264); after a pull no note is drawn; a local board
-    edit against a new line on origin shows the checkout's rows under the warning note."""
+    """Real git, the real reader, the host agent's fetching read (TD-221 slice 4, TD-615): behind,
+    the row only on origin is drawn under the *behind* note, pressable (TD-264); after a pull no
+    note is drawn; a local board edit against a new line on origin shows the checkout's rows under
+    the warning note."""
     clone, due = _behind_clone(tmp_path)
     host(tmp_path, monkeypatch, [clone])
+    from sessionorc import workorders
     from shiftlead.ui import app as uiapp
     from shiftlead.ui.app import templates
 
     def page():
-        rows, note = uiapp.read_boards(fetch=True)
+        got = workorders.read_boards(clone, fetch=True)
+        rows, note = uiapp.board_reading({str(clone): {"root": str(clone), "boards": got}})
         assert note == ""
         return rows, templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
 
@@ -1362,13 +1184,12 @@ def test_a_row_read_from_origin_draws_its_answers_and_go_with_it_live(tmp_path, 
 @pytest.mark.unit
 def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_path, monkeypatch):
     """The route (§4.4 *Decide*): `board_edit {action: decide, answer, answers}`, caller-less, and
-    the boards read again at once so the row re-reads *decided*; a decide naming no answer or no
+    the host agent's re-read is in its reading before it answers (TD-615); a decide naming no answer or no
     list is refused before the agent is asked, and the other acts carry neither field."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui import app as uiapp
 
-    reads, calls = [], []
-    monkeypatch.setattr(uiapp, "read_boards", lambda run=None, **k: (reads.append(1), ([], ""))[1])
+    calls = []
 
     class Fake:
         def __init__(self, *a, **k):
@@ -1393,7 +1214,6 @@ def test_a_press_hands_the_answer_and_the_readers_list_to_the_write_back(tmp_pat
         r = c.post("/api/person/board", json={**base, "answer": " hold ", "answers": ["approve", "hold"]})
         assert r.status_code == 200 and r.json()["answer"] == "hold"
         assert calls == [(None, {**base, "due": None, "key": "", "answer": "hold", "answers": ["approve", "hold"]})]
-        assert len(reads) == 1
         for bad in ({"answers": ["approve"]}, {"answer": "hold"}, {"answer": "hold", "answers": "hold"}):
             assert c.post("/api/person/board", json={**base, **bad}).status_code == 400
         assert len(calls) == 1
@@ -1854,15 +1674,17 @@ def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any
 @pytest.mark.unit
 def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path, monkeypatch):
     """§4.5a *board row: id* (§4.4 *A board line's id*, TD-603, TD-607): the row's `key` is the
-    repo's own reader's `board:<key>` for its text — the work orders' id — drawn in mono before the
-    due words as a control that copies it, and sent as `data-key` by every press on the row; a repo
-    with no reader draws none and sends it empty. The page's script puts it in every board body."""
+    host agent's reading's `board:<key>` for its text (TD-615) — the work orders' id — drawn in mono
+    before the due words as a control that copies it, and sent as `data-key` by every press on the
+    row; an item the reading gave none draws none and sends it empty. The page's script puts it in
+    every board body."""
     import re
 
     from sessionorc import workorders
 
     repo(tmp_path, "samscrape")  # the reader beside the board, which names the line
     it = decide_item()
+    it["key"] = workorders.ref(tmp_path / "samscrape", it["text"])  # as the host agent's reading gives it
     rows, html = rows_html(tmp_path, monkeypatch, it)
     key = rows[0]["key"]
     assert workorders.is_work_order(key) and key == workorders.ref(tmp_path / "samscrape", it["text"])
@@ -1875,9 +1697,7 @@ def test_every_board_row_draws_its_id_and_every_press_on_it_carries_it(tmp_path,
     assert len(presses) >= 5 and all(
         f'data-key="{key}"' in b for b in presses
     )  # answers, Reply, Go with it, Snooze, Done
-    shutil.rmtree(tmp_path / "samscrape" / "scripts")
-    workorders._readers.clear()
-    rows, html = rows_html(tmp_path, monkeypatch, it)
+    rows, html = rows_html(tmp_path, monkeypatch, {**it, "key": ""})
     assert rows[0]["key"] == "" and "boardkey" not in html and 'data-key=""' in html
     js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     assert js.count('key: b.dataset.key || ""') == 3  # Snooze/Done/decide, Reply, Not right…
