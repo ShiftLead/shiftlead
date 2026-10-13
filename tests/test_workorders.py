@@ -283,7 +283,7 @@ async def test_the_home_tells_an_idle_holder_and_lists_an_unheld_red_pr(agent, t
 
     await park_ticks(agent)
     root = str(tmp_path / "repo")
-    holder = _rec("ao-holder", git={"branch": "b1"}, repo=root)
+    holder = _rec("ao-holder", git={"branch": "b1"}, repo=root, host=agent.host)
     elsewhere = _rec("ao-other", state="working", git={"branch": "b2"}, repo=str(tmp_path / "other"))
     agent.sessions[holder.id] = holder
     agent.sessions[elsewhere.id] = elsewhere
@@ -300,3 +300,17 @@ async def test_the_home_tells_an_idle_holder_and_lists_an_unheld_red_pr(agent, t
     from sessionorc.agent_tick import _orders
 
     assert [o["id"] for o in _orders(agent._repos[root])] == ["pr:2"]
+
+
+async def test_an_idle_holder_on_a_node_is_told_at_its_address(agent, tmp_path):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    node = _rec("ao-far", git={"branch": "b1"}, repo=root, host="far")
+    agent.remote["far"] = {node.id: node}
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": [_red(1, branch="b1")]}}
+    await agent._red_prs(T0 + HOUR)
+    assert agent._repos[root]["pr_orders"]["orders"] == []
+    (note,) = [e for e in node.inbox if e.from_ == "system"]
+    assert note.to == ["ao-far@far"] and note.text.startswith("PR #1 has been red")

@@ -2682,14 +2682,17 @@ class TickMixin:
                 old = r.get("pr_orders") or {}
                 mine = [x for x in records if x.repo == root]
                 orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)
+                by_id = {x.id: x for x in mine}
                 for sid, pr in notes:
-                    rec = self.sessions.get(sid) or self._graph().get(sid)
-                    self._system_note(sid, workorders.pr_note(pr), wake="uncharged", team=getattr(rec, "team", None))
+                    rec = by_id[sid]  # addressed as mail is: a node's record as `<id>@<host>`
+                    self._system_note(self._address(rec), workorders.pr_note(pr), wake="uncharged", team=rec.team)
                     log.info("%s: told PR #%s is red with it idle", sid, pr["number"])
                 new = {"orders": orders, "told": told}
                 if new == {"orders": old.get("orders") or [], "told": old.get("told") or {}}:
                     continue
-                self._repos[root] = {**r, "pr_orders": new}
+                if (cur := self._repos.get(root)) is None:
+                    continue  # dropped from the registry while this pass ran
+                self._repos[root] = {**cur, "pr_orders": new}  # never the snapshot: a re-read may have landed
                 self.repos_store.save(self._repos)
                 await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
             except Exception:  # noqa: BLE001 — one repo's surprise is a log line; the next tick reads again
