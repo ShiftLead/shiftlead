@@ -50,7 +50,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-604 | Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work | Medium | Designed — TD-608 builds it |
 | TD-607 | Build TD-603: every board line's id is its derived `board:<key>` — drawn and copied on every board row, `ao board show`, `ao board edit --key`, and `key` on the write-back's RPCs | Medium | Open |
 | TD-608 | Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed* | Medium | Open |
-| TD-610 | The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two | Low | Open |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
 | TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Open |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Open |
@@ -792,26 +791,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** the Repo page lists the entries closed in the chosen window with their PRs and who opened them, the team card's *closed* block links there with the titles on hover, `ao repo` says how many closed this week, and the tests above pass; the builder's look (design §4.9b: the page's section on a scratch home) is named in the PR.
 
 **Related:** TD-604 (the design), TD-591 (the Repo page's missing seams), TD-071 (Org page ideas).
-
----
-
-## TD-610: The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1592–#1599)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/briefs/techlead-context.md` L80–82 (*Nothing keys on a role, a team or a project*) and the table row L152 (*a worker may message up, down, sideways by team, and the person*); read against `docs/design/9-invariants.md` invariant 9 and `docs/design/4.10-messages.md` *across teams, by project*
-
-**Why:** The primer says *The one exception is mail's sideways edge between sessions that share a `team` badge (§4.10)*, and its §4.10 pointer row lists the edges as *up, down, sideways by team, and the person*. Since #1590/#1593 (TD-582, TD-601) the mail gate has a fifth edge, **project** (`mail.message_edge`: `if me.project and me.project == it.project: return "project"`), and invariant 9 says *its cross-team edge one carrying the same `project` badge … for a `manager: person` team the first is the only edge between members, and the second is the only one between teams*. #1593 edited the primer's §5 for the peer's agreement and left these two lines; the techlead is the seat that reads this file to decide what a teammate may ask of another team's session.
-
-**Fix:** reword L81 to the invariant's exception (the `team` and `project` badges, mail only) and the row at L152 to name the across-teams edge. A held path (`docs/briefs/**`): the techlead seat merges it.
-
-**Done when** the primer's exception names both badges the mail gate reads, as invariant 9 does.
-
-**Related:** TD-582 (#1590), TD-601 (#1593), TD-606 (the same drift in §4.9 and §4.2a).
 
 ---
 
