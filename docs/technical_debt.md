@@ -939,20 +939,21 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Location:** design §6 (the tick's policies), §4.9b (the anchor seat, the techlead seat), cadence §3 (the SessionStart nudge's *open PR older than 2 days* line); `src/sessionorc/agent_tick.py` (the repo reading's PRs, `reports.pr_reading`)
+**Location:** design §6 (the tick's policies), §4.9b (the anchor seat, the techlead seat), cadence §3.9 (the SessionStart nudge's *open PR older than 2 days* line, `PR_STALE_DAYS`); `src/sessionorc/reports.py` (`pr_reading`, `PR_FIELDS`: no check or mergeable status today)
 
-**Why:** On 2026-10-12, dev-cadence's sync PR #1573 (ledgerboard v1.0) went red on CI. The sync note said *each repo's own session reviews and merges its PR*, but its author (`ao-dc-decouple`) sat idle in another repo, and ShiftLead's anchor, the session that would merge a sync, was closed. Nothing noticed until Paul asked hours later. The fix turned out to be real: the reader's new `ledgerboard` import broke tests and wrote `scripts/__pycache__` into checkouts. Today a PR belongs to its author until merge (cadence: merge only on a passing check). When the author is gone, moved on, or in another repo, the only signals are the SessionStart nudge after two days and `/stranded-work` by hand. The repo reading already holds every open PR's checks every `REPOS_EVERY`, so the host agent can see a red PR with no live author.
+**Why:** On 2026-10-12, dev-cadence's sync PR #1573 (ledgerboard v1.0) went red on CI. The sync note said *each repo's own session reviews and merges its PR*, but its author (`ao-dc-decouple`) sat idle in another repo, and ShiftLead's anchor, the session that would merge a sync, was closed. Nothing noticed until Paul asked hours later. The fix turned out to be real: the reader's new `ledgerboard` import broke tests and wrote `scripts/__pycache__` into checkouts. Today a PR belongs to its author until merge (cadence: merge only on a passing check). When the author is gone, moved on, or in another repo, the only signals are the SessionStart nudge after two days and `/stranded-work` by hand. The repo reading lists every open PR every `REPOS_EVERY` but not its checks: `PR_FIELDS` has no `statusCheckRollup` or `mergeStateStatus`, so the host agent cannot see a red or conflicting PR yet. That one field is what it lacks.
 
 **Fix:** design first.
+- What it reads: `statusCheckRollup` and `mergeStateStatus` added to the repo reading's PRs (`PR_FIELDS`), kept as *green*, *red*, *pending* or *conflicting* per PR.
 - Who owns it: a PR whose checks are red (or conflicting) for longer than a bound, and whose author holds no live lease on it, goes to a lane. The candidates: the team's anchor seat, since it merges syncs; the techlead seat for held paths; or a free-pick `fix-pr` item a grinder takes. Say which, and what the bound is.
 - What the owner does: fix it on the PR's branch, with an `ao msg` note to the author when it is live; or close it with a reason when it is superseded. Either way it goes through the usual cadence: review evidence, and the techlead for held paths.
 - A sync PR from dev-cadence or ledgerboard falls under the same rule. Its owner is never *nobody*.
-- Where it shows: the team card's *PRs in motion* and the Repo page mark a red PR with no owner.
+- Where it shows: the team card's *Pull requests* facet and the Repo page mark a red PR with no owner.
 - Tests: a red PR with a live author is left alone; one with none is given to the lane after the bound; a green one never is.
 
 **Done when** a red or conflicting PR with no live author is picked up by a named seat within the bound, the card shows it, and the tests above pass.
 
-**Related:** #1573 (the case), TD-106 in dev-cadence (the sync), TD-611 (found the same afternoon).
+**Related:** #1573 (the case), dev-cadence's TD-106 (the sync), TD-611 (found the same afternoon).
 
 ---
 
@@ -964,7 +965,7 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Location:** design §4.4 (*Repo facts*, *Board write-back*, the events stream), §4.5 (the top bar, the Inbox), §4.7 (`ao inbox`, `ao board show`); `src/shiftlead/ui/app.py` (`read_boards` ~L372, `api_person_inbox`, `api_sessions`, `events`); `src/shiftlead/ui/inbox.py` (`board_argv`, `BOARD_TTL`); `src/shiftlead/cli.py` (its own board read ~L1502); `src/sessionorc/agent_tick.py` (the repo reading's `workorders.read` ~L2904, every `REPOS_EVERY`)
+**Location:** design §4.4 (*Repo facts*, *Board write-back*), §4.5 (the `/events` stream, ; the top bar, the Inbox), §4.7 (`ao inbox`, `ao board show`); `src/shiftlead/ui/app.py` (`read_boards` ~L372, `api_person_inbox`, `api_sessions`, `events`); `src/shiftlead/ui/inbox.py` (`board_argv`, `BOARD_TTL`); `src/shiftlead/cli.py` (its own board read ~L1502); `src/sessionorc/agent_tick.py` (the repo reading's `workorders.read` ~L2904, every `REPOS_EVERY`)
 
 **Why:** Paul, 2026-10-12, on TD-611's `ao inbox --counts`: *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?* Today three processes compute the same things on their own clocks:
 - **The board.** The host agent runs every repo's board reader every `REPOS_EVERY` (300 s) for the work orders. The UI runs it again every `BOARD_TTL` (60 s) for the Inbox's rows, and `ao` runs it a third time. That is three subprocess runs of one file, each with its own failure note.
