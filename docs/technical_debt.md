@@ -56,6 +56,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Open |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
+| TD-624 | §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618) | Low | Open |
 
 ---
 
@@ -985,6 +986,30 @@ brief written for it.
 
 **Related:** TD-299, guardians-devenv TD-028 and `docs/briefs/team-setup.md`, TD-055 (archived
 with the retired brief).
+
+---
+
+## TD-624: §4.4's *red* and *holds* definitions are narrower than the code's: five failed conclusions and a commit status's `FAILURE`/`ERROR` read red, and a superseded record holds nothing (TD-618)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1619–#1628)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.4-host-agent.md` *Repo facts* (the `checks` sentence, ~L35) and *A red PR nobody holds is a work order* (*A live record holds it*, ~L421); `src/sessionorc/reports.py` `RED_CONCLUSIONS` and `RED_STATES`; `src/sessionorc/workorders.py` `holds_pr`
+
+**Why:** the design says what the code does not stop at, in two places, and #1620's body names the first as "left for a design touch" without a ledger line.
+- *Red.* §4.4 *Repo facts*: `checks` is "*red* when any check concluded failed, cancelled or timed out". `reports.py` has `RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})` and `RED_STATES = frozenset({"FAILURE", "ERROR"})` for a commit status's words; `fold_checks`' docstring repeats the design's three, and TD-618's *Fix* step 1 names four (`ACTION_REQUIRED`, no `STARTUP_FAILURE`). So a PR whose check needs an approval, or whose runner never started, becomes a `pr:<n>` order after `ORPHAN_AFTER`, which no line of the design says.
+- *Holds.* §4.4: a live record holds a PR "when it is not `exited` or `closed`, carries no `out_of_work`, and either…". `holds_pr` (#1620) also returns False for `record.superseded_by`. A superseded session's claim on a red PR therefore does not keep it off the list, which the design does not state.
+
+Both are behaviours the PR built and the design left unwritten; neither is a bug as far as the code goes, the design is the side that is short. (`probe`: `grep -n "ACTION_REQUIRED\|STARTUP_FAILURE\|superseded" docs/design/4.4-host-agent.md` has no hit in the PR-reading paragraphs.)
+
+**Fix:** in the same two places, say it in the present tense: *red* also on `ACTION_REQUIRED` and `STARTUP_FAILURE` and a commit status's `FAILURE`/`ERROR` (and correct `fold_checks`' docstring and TD-618's step 1 to match), and a superseded record holds nothing; one dated line in `docs/design-history.md` under §4.4 naming TD-618 slices 1–2 (#1617, #1620). Run the doc-bound tests before pushing.
+
+**Done when** §4.4's two sentences name what `RED_CONCLUSIONS`, `RED_STATES` and `holds_pr` test, and the history carries the line.
+
+**Related:** TD-618 (the build), TD-613 (the design), #1617, #1620.
 
 ---
 
