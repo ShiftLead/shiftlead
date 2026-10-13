@@ -103,7 +103,8 @@ carries it, so hooks inside find the right agent). Profiles: `~/.shiftlead/profi
 `local: true` when the UI runs on the machine you sit at (`vscode://file/…` links). Without the
 file the machine's hostname is used, which is rarely what VS Code can resolve. The same entry
 takes `volatile: true` (a laptop: an unreachable agent is asleep, not an alert), `repos_registry`
-(default `~/.config/dev-cadence/repos.txt`; its repos head the New session directory list) and
+(one file in place of the default: `~/.shiftlead/repos.txt`, then dev-cadence's
+`~/.config/dev-cadence/repos.txt` when it exists; their repos head the New session directory list) and
 `runs_keep_days` (default 30; run logs of exited/closed sessions older than that are deleted on
 the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`. A top-level `home: <host>` makes this
 host agent a *node* of that home (design §4.4a); leave it out on a single machine.

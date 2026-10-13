@@ -9,7 +9,9 @@ local:
   vscode_host: kmaster     # the ssh alias VS Code Remote-SSH resolves (your ~/.ssh/config)
   local: false             # true → vscode://file/… links (the UI runs on the machine you sit at)
   volatile: false          # true → a laptop: an unreachable agent is expected (asleep), not an alert
-  repos_registry: ~/.config/dev-cadence/repos.txt   # one main-checkout path per line; `#` comments
+  repos_registry: ~/my-repos.txt   # one main-checkout path per line, `#` comments, in place of both rosters;
+                                   # unset: `repos.txt` under the home, then dev-cadence's
+                                   # ~/.config/dev-cadence/repos.txt imported on the default home (§5)
   runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 keeps all
 ```
 
@@ -45,17 +47,23 @@ import yaml
 
 from sessionorc import paths
 
-DEFAULT_REPOS_REGISTRY = "~/.config/dev-cadence/repos.txt"
+DEV_CADENCE_ROSTER = "~/.config/dev-cadence/repos.txt"
 DEFAULT_RUNS_KEEP_DAYS = 30
 
 
 def default_repos_registry() -> Path:
-    """Where a host with no `repos_registry:` reads its repos (design §5): dev-cadence's machine roster
-    for the default home, and `repos.txt` under any other home (TD-298) — a scratch home (a look, a
-    test) never reads, pulls or promotes this machine's real checkouts by default."""
-    if paths.home().resolve() == paths.DEFAULT_HOME.expanduser().resolve():  # a symlink to it is the default
-        return Path(DEFAULT_REPOS_REGISTRY).expanduser()
+    """Where a host with no `repos_registry:` reads its repos first (design §5 *Repos*, TD-590):
+    ShiftLead's own roster, `repos.txt` under the home."""
     return paths.home() / "repos.txt"
+
+
+def default_repos_import() -> Path | None:
+    """The roster imported after the home's own when no `repos_registry:` is set (design §5 *Repos*,
+    TD-590): dev-cadence's machine roster, on the default home only — any other home (a look, a
+    test) never reads, pulls or promotes this machine's real checkouts by default (TD-298)."""
+    if paths.home().resolve() == paths.DEFAULT_HOME.expanduser().resolve():  # a symlink to it is the default
+        return Path(DEV_CADENCE_ROSTER).expanduser()
+    return None
 
 
 @dataclass
@@ -65,6 +73,8 @@ class Host:
     local: bool = False
     volatile: bool = False
     repos_registry: Path = field(default_factory=default_repos_registry)
+    # read after `repos_registry`, a missing file adding nothing; None when `repos_registry:` is set
+    repos_import: Path | None = field(default_factory=default_repos_import)
     runs_keep_days: int = DEFAULT_RUNS_KEEP_DAYS
     # design §4.8a: `off | observe | enforce`, read by `sessionorc.identity.mode_of` ('' = the default)
     identity: str = ""
@@ -72,16 +82,18 @@ class Host:
     person: bool = True
 
     def repos(self) -> list[str]:
-        """The registry's main-checkout paths, in file order; a missing file is an empty list."""
-        try:
-            lines = self.repos_registry.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            return []
+        """The main-checkout paths of the registry and then the imported roster, in file order, each
+        once; a missing file adds nothing."""
         out: list[str] = []
-        for line in lines:
-            line = line.strip()
-            if line and not line.startswith("#") and line not in out:
-                out.append(line)
+        for f in (self.repos_registry, self.repos_import):
+            try:
+                lines = f.read_text(encoding="utf-8").splitlines() if f else []
+            except OSError:
+                continue
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith("#") and line not in out:
+                    out.append(line)
         return out
 
 
@@ -218,6 +230,7 @@ def local_host() -> Host:
         local=_flag(data.get("local")),
         volatile=_flag(data.get("volatile")),
         repos_registry=Path(str(registry)).expanduser() if registry else default_repos_registry(),
+        repos_import=None if registry else default_repos_import(),
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
         identity=str(data.get("identity") or ""),
         person=data.get("person") is not False,

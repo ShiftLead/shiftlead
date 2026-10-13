@@ -1606,7 +1606,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         host: str = "",
     ):
         profs, default = profiles_mod.load()
-        # registered repos (design §5: the dev-cadence registry, `repos_registry` in hosts.yml) first,
+        # registered repos (design §5 *Repos*: the home's roster and dev-cadence's, or `repos_registry`) first,
         # then recent directories; phase 1 reads the local host's file directly
         repos = hosts.local_host().repos()
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
