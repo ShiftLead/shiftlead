@@ -154,6 +154,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-12 (TD-604, the designer): *Repo facts* keeps each closed entry's PR from the squash commit that took it out of the ledger, kept as `completed`; the archive's `Resolved:` lines were weighed and refused, since they name design PRs and slices first. Built by TD-608.
 - 2026-10-12 (TD-603, the designer; Paul, 2026-10-12: *should we add identifiers to the user attention items — that way I don't have to quote it to reference it?*): *A board line's id* — every board line's id is the derived `board:<key>` the work orders use, stable across a tool's edits, never written; the write-back's RPCs take `key`. A written `UA-NNN` was weighed and refused: every writer would allocate from a counter none shares, and it is a new line shape. Built by TD-607.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *Board write-back* parses items through `ledgerboard.py`, its subjects ledgerboard's; the cross-repo resolver reads the home's own roster. Built by TD-585 and TD-590.
 - 2026-10-12 (TD-565 slice 2, grinder-ao-2): *Board write-back* names the person's answer to a ledger entry as an add on the second add's road (`ledger_decide`, `shiftlead: board decide TD-n (person)`), so the adds the board ever takes are three, not two.
@@ -273,6 +274,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-12 (TD-604, the designer; Paul, 2026-10-12: *show recently completed TDs in the repo screen and/or in the "TDs in motion" card*; mockup `RepoPage.dc.html`, shot `docs/mockups/reviews/2026-10-12-td604-recently-completed.png`): screen 11 gains **Recently completed** — the entries closed in the window, with the PR whose squash merge closed it and its author; *Doing* becomes item 5. Built by TD-608.
 - 2026-10-12 (TD-578, the designer): screen 9 says the raw file's reader is also on the Focus header. Built by TD-597.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): screen 6 reads board items in-process through `ledgerboard.py`, never `nudge_user_attention.py`; the copy-picking rule (TD-278) goes with it. Built by TD-585.
 - 2026-10-12 (TD-577, the designer): screen 1's **+ New ▾** text says **Open shell here** opens the shell's Focus in a new tab or a window, never in place of the pressing page. Built by TD-579.
@@ -376,6 +378,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-604, the designer): the Repo facet's *closed* block links to the Repo page's *Recently completed* and lists its ids and titles on hover; the card draws no list. Built by TD-608.
 - 2026-10-12 (TD-603, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td603-board-line-id.png`): **board row: id** — `board:<key>` on every board row's head line, copied on a click, sent with every press. Built by TD-607.
 - 2026-10-12 (TD-599, the designer; Paul, 2026-10-12, through Add entry: *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`): **Inbox: *Answered for you*, Dismiss all** — the group is not redundant (each row is an answer given in the person's name that the person may Overrule; FYI holds none), so it stays apart and gains FYI's one-press clear of the rows on screen. Built by TD-602.
 - 2026-10-12 (TD-598, grinder-ao-2): TD-581 built — the promote row under `auto` drawn under FYI with the reading's `acts` word and **Promote now**, `id="promote-<repo>"` on the row, the build chip's *main +n* a link to it with the hover's *auto on · …* line; *The help text* gains **Promote now**'s paragraph.
@@ -675,6 +678,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-12 (TD-604, the designer): `ao repo` prints *completed this week: n*; `--json` carries `completed`. Built by TD-608.
 - 2026-10-12 (TD-603, the designer): `ao board show <board:key>`; `ao board edit --key`. Built by TD-607.
 - 2026-10-12 (TD-598, grinder-ao-2): `ao promote status` under `auto: true` prints when the home will act, in the Inbox row's words (*auto on · settles in 6 min*).
 - 2026-10-12 (TD-581, the designer): `ao promote` under `auto: true` promotes now, the settle and the wait skipped. Built by TD-598.
