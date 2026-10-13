@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/cadence_hooks.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/cadence_hooks.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 #
 # The one SessionStart entry point for dev-cadence's hooks (cadence §3, 2026-09-11).
@@ -11,7 +11,7 @@
 # permissions), so every hook that used to be its own settings line cost one hand-edited
 # PR per consumer and silently missed every worktree whose branch predated the edit. Now
 # settings.json carries ONE stable line that calls this script, and a hook is added HERE —
-# in a synced file — never as a new settings line again. agentorc's launch layer carries
+# in a synced file — never as a new settings line again. ShiftLead's launch layer carries
 # the same line for the sessions it starts (design §4.2), so an ao session runs it even in a
 # worktree whose settings.json predates the line. Since 2026-09-25 (TD-055 b) the line runs
 # the MAIN checkout's copy of this runner — it resolves the main worktree through
@@ -20,7 +20,14 @@
 # outside a repo — so every worktree runs the current child list whatever its branch, and
 # $CLAUDE_PROJECT_DIR (the worktree) is still the repo each child judges. A worktree whose
 # settings.json carries the OLD line keeps running its own branch's runner until its branch
-# carries this one (sync.sh WARNs; agentorc's layer skips a directory that is already wired).
+# carries this one (sync.sh WARNs; ShiftLead's layer skips a directory that is already wired).
+#
+# ANY TOOL (TD-092)
+# The settings line is Claude Code's wiring. A tool with no SessionStart hook runs
+# `scripts/cadence_hooks.sh --session-start` itself, first thing — the seeded AGENTS.md says
+# so — from the repo's root, or anywhere inside the checkout by its path: no $CLAUDE_PROJECT_DIR is needed (each child finds
+# its repo from the cwd, and the own-board path falls back to `git rev-parse --show-toplevel`),
+# a terminal stdin is never read, and a stdin pipe that stays open is given up after 2 s.
 #
 # CONTRACT
 #   - children run in the order below; each is skipped unless present AND executable, so
@@ -40,20 +47,20 @@
 #
 # THE ATTENTION LINE'S SCOPE (TD-077)
 # The attention child reports every roster repo's due items, fetched — the line a person
-# wants at a session start. An UNATTENDED session (an agentorc worker nobody is driving)
+# wants at a session start. An UNATTENDED session (a ShiftLead worker nobody is driving)
 # can act on none of the other repos' items and paid for them at every start and restart
 # (71 items, ~4,200 tokens on one machine), so it gets its own repo's board only, with no
 # fetch: `--report --due-only --board <project>/docs/user_attention.md`, and nothing at all
 # when that repo has no board. No fetch also means no open-PR line (TD-052 rides the fetch):
-# such a session's brief has it list PRs itself. Unattended is, in order: CADENCE_ATTENTION_SCOPE=own
-# (=machine forces the full line; any launcher can set either), else AGENTORC_SESSION
-# set and `ao status --json` saying that session's record is `"unattended": true` (5 s
-# bound). Anything else — no ao, an error, an interactive ao session, a person's
-# terminal — is the machine-wide line: when in doubt the hook says more, never less.
+# such a session's brief has it list PRs itself. Unattended is CADENCE_ATTENTION_SCOPE=own
+# and nothing else (=machine forces the full line; any launcher can set either — ShiftLead
+# sets it on every launch, `own` for an unattended session, since its PR #1306). Unset or
+# any other value — a person's terminal, an older launcher — is the machine-wide line:
+# when in doubt the hook says more, never less. No `ao` is asked (TD-088).
 # `/attention` is the machine-wide view either way. `--list` prints the machine form.
 #
 # The seeded line (byte-identical in dev-cadence files/.claude/settings.json and in
-# agentorc's CADENCE_HOOK_LINE — a parity pair):
+# ShiftLead's CADENCE_HOOK_LINE — a parity pair):
 #   r=$(git -C "${CLAUDE_PROJECT_DIR:-.}" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi
 set -u
 
@@ -131,23 +138,7 @@ run_child() {
 }
 
 attention_scope() {
-    case "${CADENCE_ATTENTION_SCOPE:-}" in own|machine) echo "$CADENCE_ATTENTION_SCOPE"; return ;; esac
-    if [ -n "${AGENTORC_SESSION:-}" ] && command -v ao >/dev/null 2>&1 && command -v python3 >/dev/null 2>&1; then
-        local st
-        if [ "$have_timeout" = 1 ]; then st="$(timeout 5 ao status --json 2>/dev/null </dev/null)"; else st="$(ao status --json 2>/dev/null </dev/null)"; fi
-        if printf '%s' "$st" | python3 -c '
-import json, os, sys
-try:
-    recs = json.load(sys.stdin)
-    me = [r for r in recs if isinstance(r, dict) and r.get("id") == os.environ["AGENTORC_SESSION"]]
-    sys.exit(0 if len(me) == 1 and me[0].get("unattended") is True else 1)
-except Exception:
-    sys.exit(1)
-' 2>/dev/null; then
-            echo own; return
-        fi
-    fi
-    echo machine
+    case "${CADENCE_ATTENTION_SCOPE:-}" in own) echo own ;; *) echo machine ;; esac
 }
 
 case "${1:-}" in
@@ -156,7 +147,8 @@ case "${1:-}" in
         run_child scripts/check_anchor.py --hook
         run_child scripts/hydrate_worktree.sh --hook
         if [ "$(attention_scope)" = own ]; then
-            own_board="${CLAUDE_PROJECT_DIR:-.}/docs/user_attention.md"
+            # the session's repo: Claude Code names it; any other tool runs this from inside it (TD-092)
+            own_board="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || echo .)}/docs/user_attention.md"
             # no board, nothing due: an explicit --board that is missing would print a row
             [ -f "$own_board" ] && run_child scripts/nudge_user_attention.py --report --due-only --board "$own_board"
         else

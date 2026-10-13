@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from test_ui_inbox import needs_line
 
 READER = pathlib.Path(__file__).parents[1] / "scripts" / "nudge_user_attention.py"
+LEDGERBOARD = READER.with_name("ledgerboard.py")  # the reader imports it from beside itself
 
 
 def host(tmp_path, monkeypatch, repos=()):
@@ -37,6 +38,7 @@ def repo(tmp_path, name, board=None, *, reader=True):
     if reader:
         (root / "scripts").mkdir()
         shutil.copy(READER, root / "scripts" / "nudge_user_attention.py")
+        shutil.copy(LEDGERBOARD, root / "scripts" / "ledgerboard.py")
     return root
 
 
@@ -100,6 +102,7 @@ def test_the_reader_is_picked_by_what_it_can_do_never_by_registry_order(tmp_path
     dc = repo(tmp_path, "dev-cadence", reader=False)
     (dc / "files" / "scripts").mkdir(parents=True)
     shutil.copy(READER, dc / "files" / "scripts" / "nudge_user_attention.py")
+    shutil.copy(LEDGERBOARD, dc / "files" / "scripts" / "ledgerboard.py")
     assert board_reader([old, new, dc]) == dc / "files" / "scripts" / "nudge_user_attention.py"
 
 
@@ -752,6 +755,7 @@ def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_p
     (seed / "docs" / "user_attention.md").write_text(f"# Board\n\n- [ ] the old line. Due: {due}.\n")
     (seed / "scripts").mkdir()
     shutil.copy(READER, seed / "scripts" / "nudge_user_attention.py")
+    shutil.copy(LEDGERBOARD, seed / "scripts" / "ledgerboard.py")
     _git("add", "-A", cwd=seed)
     _git("commit", "-q", "-m", "board", cwd=seed)
     _git("push", "-q", "origin", "main", cwd=seed)
@@ -1101,6 +1105,7 @@ def _behind_clone(tmp_path):
     (seed / "docs" / "user_attention.md").write_text(f"# Board\n\n- [ ] the old line. Due: {due}.\n")
     (seed / "scripts").mkdir()
     shutil.copy(READER, seed / "scripts" / "nudge_user_attention.py")
+    shutil.copy(LEDGERBOARD, seed / "scripts" / "ledgerboard.py")
     for d in (seed,):
         for k, v in (("user.email", "t@t"), ("user.name", "t")):
             _git("config", k, v, cwd=d)
@@ -1778,6 +1783,7 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     shutil.copy2(
         pathlib.Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts"
     )
+    shutil.copy2(LEDGERBOARD, root / "scripts")
     text = (
         "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
         " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."
@@ -1819,6 +1825,7 @@ def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any
     shutil.copy2(
         pathlib.Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts"
     )
+    shutil.copy2(LEDGERBOARD, root / "scripts")
     text = (
         "decide 2026-10-01 (session gone-1 on kmaster) — **Keep the nightly backup?** Context: TD-777."
         " Due: 2026-10-02. Answers: keep | drop. Decided: keep (2026-10-03)."

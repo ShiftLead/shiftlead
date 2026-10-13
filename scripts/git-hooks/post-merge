@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/git-hooks/post-merge
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/git-hooks/post-merge
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Fires after `git merge` — including the fast-forward of `git pull --ff-only`,
 # which is exactly what the anchor runs right after merging a PR. That is the

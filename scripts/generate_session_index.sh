@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/generate_session_index.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/generate_session_index.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Materialize the Claude Code session index (docs/cadence.md §1) to a file.
 #

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/git-hooks/prepare-commit-msg
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/git-hooks/prepare-commit-msg
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Adds the working agent as a co-author of the commit (cadence.md §9 "Agent co-author",
 # TD-067): `Co-Authored-By: $AGENT_NAME <$AGENT_NAME@<domain>>`. Tool-neutral — every

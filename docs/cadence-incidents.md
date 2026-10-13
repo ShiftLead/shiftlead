@@ -1,4 +1,4 @@
-<!-- SYNCED FILE — canonical copy: eyecantell/dev-cadence files/docs/cadence-incidents.md
+<!-- SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/docs/cadence-incidents.md
      Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one). -->
 
 # Working Cadence — incidents

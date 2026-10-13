@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/check_base.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/check_base.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """What a session resumed on a topic branch should know about its own base (TD-061).
 

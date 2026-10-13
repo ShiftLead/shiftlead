@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/check_cadence.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/check_cadence.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """The cadence check: did a PR follow cadence.md §1–§5? One row per rule, read from git and gh.
 
 A DETECTOR, never a gate (cadence.md §7): it is not wired into a hook and blocks
 nothing. Three callers run the same code — the working session before it merges
-(the /cadence skill), an orchestrator after a worker reports a PR done, and the
+(docs/procedures/cadence.md, the /cadence skill), an orchestrator after a worker reports a PR done, and the
 weekly /stranded-work sweep over the window (`--since 7d`), which is the backstop
 for the two that were skipped.
 
@@ -36,7 +36,7 @@ never a fake pass):
               comment, and a late BLOCK is a plain fail, never acknowledged. A caller that acts on a repeated
               fail skips an acknowledged one (cadence §4.9).
               A tool-made board PR (cadence §4.5, TD-083) passes with no comment:
-              its title is board_edit.py's fixed message (BOARD_EDIT_MSG_RE), it
+              its title is a board edit's fixed message (ledgerboard's subject_kind), it
               touches the board alone, and its one commit — merged, a single-parent
               squash whose subject ends `(#n)`; open, the only commit past the default
               branch — is the one-item edit the direct audit's board-edit class
@@ -97,7 +97,7 @@ suffix, not the root — classified as
     stamp         only Swept:/Swept-deep: lines on docs/user_attention.md
     board-append  whole `- [ ]` items with a Due:, under a `## Needs…` heading, nothing removed
     board-edit    one item's tick (+ Closed:), Due:, Decided: or reply tails changed, under board_edit.py's fixed
-                  message (BOARD_EDIT_MSG_RE — a parity pair with board_edit.py, cadence §7)
+                  message (ledgerboard's subject() writes it and subject_kind() reads it)
     fail          anything else: landed without review (the files it touched are named)
 
 A fail there fails the run (exit 1); a window with direct commits and no PRs is not
@@ -111,12 +111,14 @@ still running, check runs or comments unreadable, a `--since` window truncated) 
 LOOK before merging, it is not a pass. `unknown` rows never turn a 0 into a 1, and
 never leave it a 0 either: a caller that merges on exit 0 must not merge on no evidence.
 
-The review comment (writer: the /cadence skill; reader: REVIEW_RE below — a parity
-pair, cadence §7) has a machine-readable first line:
+The review comment (writer: docs/procedures/cadence.md; reader: REVIEW_RE below — a parity
+pair, cadence §7) has a machine-readable line, written first:
 
     cadence-review: SHIP | FIXED | BLOCK · <reviewer model> · <code|docs> · <n> findings
 
-and the findings in prose after it. SHIP: nothing to change; FIXED: findings were
+and the findings in prose after it. The check reads that line on any line of the
+comment, the last one if there are several, so a report that ends with its verdict
+counts (TD-087). SHIP: nothing to change; FIXED: findings were
 fixed before merge; BLOCK: do not merge. Posted with `gh pr comment` by the session,
 never edited afterwards (an edit after the merge fails the row). A review done after
 the merge is posted the same way, and says so: it acknowledges the fail, it never
@@ -205,6 +207,24 @@ def repo_root():
     return top.strip() if top else None
 
 
+def forge_unread(root) -> str | None:
+    """TD-098: the "PRs not checked" line when origin is a forge the cadence cannot read
+    yet (not GitHub), else None. The classifier is nudge_user_attention.origin_forge,
+    installed beside this script — one copy, never re-typed; if it cannot be imported the
+    check goes on as before (gh then answers or fails on its own)."""
+    if not root:
+        return None
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from pathlib import Path
+
+        from nudge_user_attention import forge_unread_line, origin_forge
+    except Exception:  # noqa: BLE001 — no classifier: behave as before
+        return None
+    kind, host = origin_forge(Path(root))
+    return forge_unread_line(host) if kind == "other" and host else None
+
+
 # --- rows -------------------------------------------------------------------------
 
 
@@ -257,8 +277,16 @@ def row_review(pr):
         )
     found = []
     for c in comments:
-        first = (c.get("body") or "").strip().splitlines()[:1]
-        m = REVIEW_RE.match(first[0]) if first else None
+        # Any line of the body, the last if several: a report that ends with its verdict
+        # is a review, not none (TD-087, ShiftLead PRs #138/#139).
+        m = next(
+            (
+                hit
+                for line in reversed((c.get("body") or "").splitlines())
+                if (hit := REVIEW_RE.match(line))
+            ),
+            None,
+        )
         if m:
             found.append(
                 (
@@ -286,7 +314,7 @@ def row_review(pr):
             # Nothing a session does now can turn this row green: the merge went out
             # unreviewed. But the late review IS what an honest author does next, and a
             # caller counting "a second fail on the same PR" must be able to tell that
-            # author from one who did nothing (TD-076, agentorc PR #128).
+            # author from one who did nothing (TD-076, ShiftLead PR #128).
             out = row(
                 "review",
                 "fail",
@@ -875,11 +903,19 @@ def row_deploy(pr, root):
 # touches, and anything outside the carve-outs is a fail ("landed without review").
 BOARD = "docs/user_attention.md"
 PR_SUBJECT_RE = re.compile(r"\(#\d+\)$|^Merge pull request #\d+ ")
-# board_edit.py's fixed message (cadence §4, tool-made board edits) — a parity pair (§7)
-BOARD_EDIT_MSG_RE = re.compile(r"^\S+: (?:snooze|done|decide|reply) .+ \(session [^)]+\)$")
-STAMP_LINE_RE = re.compile(r"^(?:Swept|Swept-deep):\s")
-OPEN_ITEM_RE = re.compile(r"^\s*-\s*\[ \]\s+\S")
-ANY_ITEM_RE = re.compile(r"^(\s*-\s*)\[[ xX]\]")
+SWEEP_STAMPS = ("Swept", "Swept-deep")  # the stamp lines a sweep writes (cadence §3); their shape is ledgerboard's
+
+
+def _lb():
+    """The board format, defined once: the sibling SYNC file ledgerboard.py (ShiftLead/ledgerboard),
+    imported when a board is read — as this script imports its other siblings — so the rows that
+    read no board run without it."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import ledgerboard  # sibling SYNC file
+
+    return ledgerboard
 HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
 _PR_MERGE_SHAS = set()  # merge commits of the PRs the --since listing returned
 
@@ -922,13 +958,8 @@ def _board_diff(root, sha):
 
 
 def _edit_key(line):
-    """An item line with what a tool-made edit may change taken out: the tick, the
-    Closed:, Due: and Decided: fields and the reply tails — the board reader's own item_key (cadence §7),
-    imported, never re-typed."""
-    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    import nudge_user_attention as N  # sibling SYNC script, as board_edit.py imports it
-
-    return N.item_key(line)
+    """An item line with what a tool-made edit may change taken out: ledgerboard's item_key."""
+    return _lb().item_key(line)
 
 
 def classify_direct(root, sha, subject, files):
@@ -941,10 +972,10 @@ def classify_direct(root, sha, subject, files):
     removed, added = diff
     new = [a for _, a in added]
     changed = [x for x in removed + new if x.strip()]  # a stamp's first write brings a blank line
-    if changed and all(STAMP_LINE_RE.match(x) for x in changed):
+    if changed and all(_lb().is_stamp(x, SWEEP_STAMPS) for x in changed):
         return "stamp", "only the Swept:/Swept-deep: stamp lines"
     items = [(n, a) for n, a in added if a.strip()]  # blank lines may come with an append
-    if not removed and items and all(OPEN_ITEM_RE.match(a) and "Due:" in a for _, a in items):
+    if not removed and items and all(_lb().is_open_item(a) and "Due:" in a for _, a in items):
         post = (git(["show", f"{sha}:{BOARD}"], cwd=root) or "").splitlines()
         heads = []
         for n, _ in items:
@@ -953,9 +984,9 @@ def classify_direct(root, sha, subject, files):
         if all(h.startswith("## Needs") for h in heads):
             return "board-append", f"{len(items)} whole item line(s) appended under {heads[0]}"
         return "fail", "appended items outside the ## Needs section"
-    if len(removed) == 1 and len(new) == 1 and OPEN_ITEM_RE.match(removed[0]) \
-            and ANY_ITEM_RE.match(new[0]) and _edit_key(removed[0]) == _edit_key(new[0]):
-        if BOARD_EDIT_MSG_RE.match(subject):
+    if len(removed) == 1 and len(new) == 1 and _lb().is_open_item(removed[0]) \
+            and _lb().is_item(new[0]) and _edit_key(removed[0]) == _edit_key(new[0]):
+        if _lb().subject_kind(subject) == "edit":
             return "board-edit", "one item's Due:/tick/Closed:/Decided:/reply, under board_edit.py's message"
         return "fail", "a one-item board edit without board_edit.py's fixed message"
     return "fail", f"board change outside the carve-outs (-{len(removed)} +{len(new)} lines)"
@@ -970,7 +1001,7 @@ def row_board_edit_pr(pr, root):
     ends `(#n)` (a rebase merge's last commit carries no such suffix, and its earlier ones
     would go unread); open, the one commit between the default branch and the head. None
     when it is not one, or its commit is not in this clone: the ordinary review row decides."""
-    if not root or not BOARD_EDIT_MSG_RE.match(pr.get("title") or ""):
+    if not root or _lb().subject_kind(pr.get("title") or "") != "edit":
         return None
     if [f["path"] for f in pr.get("files") or []] != [BOARD]:
         return None
@@ -1181,10 +1212,14 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
 
+    root = repo_root()
+    unread = forge_unread(root)
+    if unread:  # before the gh check: gh is not the reason a GitLab origin cannot be read
+        print(f"CANNOT CHECK: {unread}", file=sys.stderr)
+        return 2
     if shutil.which("gh") is None:
         print("CANNOT CHECK: gh is not installed", file=sys.stderr)
         return 2
-    root = repo_root()
     if args.since:
         try:
             since_date(args.since)

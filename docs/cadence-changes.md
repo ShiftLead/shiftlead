@@ -1,4 +1,4 @@
-<!-- SYNCED FILE — canonical copy: eyecantell/dev-cadence files/docs/cadence-changes.md
+<!-- SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/docs/cadence-changes.md
      Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one). -->
 
 # Cadence changes — what a session must now do differently
@@ -9,8 +9,56 @@ would be invisible). Each entry is at most three lines — the hook prints it in
 context once per worktree — and says what to *do*, then where the rule lives.
 
 Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators relaying to
-sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
+sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
+
+## 2026-10-12 — the ledger and board formats are `scripts/ledgerboard.py`'s, vendored from ShiftLead/ledgerboard
+Do: sync before running a newer `ledger.py`, `nudge_user_attention.py` or `board_edit.py` by hand — they import it. Never add a regex for a ledger or board line elsewhere; call the module (its `SPEC.md` is the format).
+See: cadence.md §2.12, §7; TD-106.
+
+## 2026-10-12 — the worktree root is a setting: `worktree-root` in `docs/cadence.toml`
+Do: to put worktrees somewhere other than `.claude/worktrees`, set `worktree-root = "<dir>"` (relative to the clone root) — never edit a synced script; `open_worktree.sh`, the anchor guard, the hydrate scan, the workspace generator and sync's `.gitignore` line follow it. Existing worktrees are not moved.
+See: cadence.md §1.1, §9.18; TD-101.
+
+## 2026-10-12 — memory is `docs/claude-memory/` for every tool; the memory guard's Claude checks follow `agents`
+Do: tell a non-Claude session where memory lives — add the seed `AGENTS.md`'s *Durable knowledge goes in `docs/claude-memory/`* line to your map. A repo whose `agents` setting leaves out `claude` no longer gets the guard's `autoMemoryDirectory` and fallback warnings.
+See: cadence.md §7.1, §7.2, §9.18; TD-095.
+
+## 2026-10-12 — the sweep, the cadence check and the attention report are procedures in `docs/procedures/`
+Do: run them by following `docs/procedures/stranded-work.md`, `cadence.md` and `attention.md` from any tool; Claude Code's `/stranded-work`, `/cadence` and `/attention` now only point there. List them in `AGENTS.md`'s map.
+See: cadence.md §7.4, §3.11, §4.9; TD-093.
+
+## 2026-10-12 — the safety nets say "cannot see" for a tool they cannot read; list the repo's tools in `agents`
+Do: if this repo is worked by a tool besides Claude Code, add `agents = "claude, <tool>"` to `docs/cadence.toml`. Then read the anchor guard's, the reaper's and the session index's `cannot see <tool> …` as *not looked*, never as *nobody here*. Every tool other than Claude is reported that way until it has a backend.
+See: cadence.md §1.13, §9.18; TD-100, TD-102.
+
+## 2026-10-12 — `AGENTS.md` is the repo's map; a tool with no SessionStart hook runs `scripts/cadence_hooks.sh --session-start` itself
+Do: keep the map in `AGENTS.md` (seeded with that instruction first; keep it first) and make `CLAUDE.md` the one line `@AGENTS.md`; a repo that already had an `AGENTS.md` copies the seed's *First, every session* section to its top. Claude Code's settings line is unchanged.
+See: cadence.md §3.8, §7.6, Adoption checklist steps 3 and 5; TD-092.
+
+## 2026-10-12 — the opt-outs move into `docs/cadence.toml`; `cadence-local.conf` is deprecated
+Do: write `[not-adopted]` `"§4" = "<ADR>"` / `[skip-seed]` `"<path>" = "<ADR>"` in `docs/cadence.toml`, then delete `docs/cadence-local.conf` — it is still read, with a WARN on every sync, and no longer seeded; `sync.sh --verify` now WARNs on a settings key or value `cadence_config.py --check` cannot use.
+See: cadence.md Adoption checklist step 9, §9.18; TD-096.
+
+## 2026-10-12 — the review model is a setting: `docs/cadence.toml`, read through `cadence_config.py`
+Do: take the reviewer's (§4.8) and the deep sweep's model from `python3 scripts/cadence_config.py get review-model` / `sweep-model` (default `sonnet`) instead of assuming Sonnet; change one with a hand-written line in `docs/cadence.toml`, never an edit to a synced file. No tool rewrites that file.
+See: cadence.md §9.18, §4.8; TD-096.
+
+## 2026-10-12 — off GitHub, the PR detectors say they cannot see instead of going quiet
+Do: in a repo whose origin is not github.com, read `PRs not checked: origin is <host> … (TD-097)` (SessionStart, `check_cadence.py` exit 2, the `/attention` settings row, `/stranded-work`) as *not looked*, never as *no open PRs* — check that forge's PRs by hand.
+See: cadence.md §3.9; TD-098.
+
+## 2026-10-11 — agentorc is ShiftLead: the synced docs and scripts say so
+Do: nothing changes in behaviour; a repo whose orchestrator file is still `.agentorc.yml` renames it `.shiftlead.yml` (ShiftLead reads the old name only as a fallback, until its TD-553). Older entries below keep the name agentorc.
+See: dev-cadence TD-091.
+
+## 2026-10-09 — the SessionStart attention scope is `CADENCE_ATTENTION_SCOPE` alone; `ao` is no longer asked
+Do: a launcher that wants its unattended sessions on their own board sets `CADENCE_ATTENTION_SCOPE=own` (agentorc does on every launch since its PR #1306); unset, `AGENTORC_SESSION` alone or any other value now gets the machine-wide line.
+See: cadence.md §3.9; cadence_hooks.sh header, *The attention line's scope*; TD-088.
+
+## 2026-10-09 — a review comment's verdict counts on any line, the last if several
+Do: still write `cadence-review: …` as the comment's first line; a report that ends with it is no longer read as *no review*. A comment quoting an old verdict on a line of its own now counts it — quote it inline instead.
+See: cadence.md §4.9; check_cadence.py `row_review`, nudge_user_attention.py `open_pr_lines`, the stranded-work skill's AWAITING REVIEW jq; TD-087.
 
 ## 2026-10-04 — a board item explains itself: a plain-English detail block under its line
 Do: keep the item's line a short headline with its fields; under it, indented two spaces, sub-bullets `**Context:**` (a few sentences, nested bullets where clearer), `**Question:**`, `**Caveats:**`, `**Recommended:** <default> — why. **Otherwise:** …`. Always on a `decide`; regroom your own open items, never another session's.

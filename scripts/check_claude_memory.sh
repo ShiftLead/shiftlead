@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/check_claude_memory.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/check_claude_memory.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # check_claude_memory.sh — guard against silently losing Claude Code auto-memory.
 #
@@ -18,12 +18,15 @@
 #   4. The memory directory isn't version-controlled at all (autoMemoryDirectory
 #      points outside any git repo) → memory is machine-local and dies with it.
 #
+# 1 (and the setting checks, #0) is Claude Code's alone: it runs only while `claude` is
+# in the `agents` setting (TD-095, cadence.md §7.2). 2–4 and #6 run for every tool.
+#
 # The directory checked is whatever `autoMemoryDirectory` names (project-local
 # settings first, then user settings), falling back to docs/claude-memory when
 # unset — checking a hardcoded path would let this guard report OK about a
 # directory Claude Code never writes to.
 #
-# PARITY (cadence.md §7): the stranded-work skill's memory check resolves the
+# PARITY (cadence.md §7): the stranded-work procedure's memory step (docs/procedures/stranded-work.md) resolves the
 # SAME setting in the SAME order, for the same reason. Change them together —
 # when this resolution landed here and not there, the sweep scanned a
 # nonexistent docs/claude-memory and reported 0 memories clean while 34 sat in
@@ -46,7 +49,7 @@
 # path (see check #6's ORDER comment) and bound any git/network calls it adds
 # in the AGGREGATE per run (see check #6's GIT_BUDGET and check_anchor.py's
 # OCCUPANCY_GIT_BUDGET) — a declared timeout only the worst case ever hits is
-# a backstop, not a budget.
+# a backstop, not a budget. TD-095 added one python spawn (the `agents` read, ~60ms).
 set -uo pipefail
 
 HOOK_MODE=0
@@ -150,22 +153,40 @@ MEM_DIR="${mem_setting:-$DEFAULT_MEM_DIR}"
 # The sed is exact only for printable ASCII up to 200 characters: Claude Code
 # counts UTF-16 code units (one '-' per accented letter, two per emoji — sed's
 # count depends on the locale) and cuts a longer name with a hash suffix (TD-11).
-# Any other path goes to munge() itself, the one full implementation.
+# Any other path goes to munge() itself, the one full implementation (the session
+# adapter's Claude backend, agent_sessions.py — TD-100).
 ENCODED=$(printf '%s' "$REPO_ROOT" | sed 's/[^a-zA-Z0-9]/-/g')
 if [ "${#ENCODED}" -gt 200 ] || ! printf '%s' "$REPO_ROOT" | LC_ALL=C grep -q '^[ -~]*$'; then
   _ls_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
-  if command -v python3 >/dev/null 2>&1 && [ -f "$_ls_dir/list_sessions.py" ]; then
-    ENCODED=$(PYTHONPATH="$_ls_dir" python3 -c 'import sys, list_sessions; print(list_sessions.munge(sys.argv[1]))' "$REPO_ROOT" 2>/dev/null) \
+  if command -v python3 >/dev/null 2>&1 && [ -f "$_ls_dir/agent_sessions.py" ]; then
+    ENCODED=$(PYTHONPATH="$_ls_dir" python3 -c 'import sys, agent_sessions; print(agent_sessions.munge(sys.argv[1]))' "$REPO_ROOT" 2>/dev/null) \
       || ENCODED=$(printf '%s' "$REPO_ROOT" | sed 's/[^a-zA-Z0-9]/-/g')
   fi
 fi
 FALLBACK="$HOME/.claude/projects/${ENCODED}/memory"
+
+# Is Claude Code one of this repo's tools (TD-095)? The setting checks (#0 and the
+# warnings after it) and the fallback strays (#2) guard Claude Code's auto-memory, and
+# under another tool they check something that cannot happen. The tools are the
+# `agents` setting (TD-100, default "claude"), read through the session adapter's
+# wanted() — the one reader. Fail-safe: no python3, no adapter, or an unreadable
+# setting ("!" entry) all mean Claude is listed, so the guard never goes quiet by error.
+CLAUDE_LISTED=1
+_as_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+if command -v python3 >/dev/null 2>&1 && [ -f "$_as_dir/agent_sessions.py" ]; then
+  _agents=$(PYTHONPATH="$_as_dir" python3 -c 'import sys, agent_sessions as A; print(",".join(A.wanted(sys.argv[1])))' "$REPO_ROOT" 2>/dev/null) || _agents=claude
+  case ",$_agents," in *,claude,*|*,!*|,,) ;; *) CLAUDE_LISTED=0 ;; esac
+fi
+# Without Claude Code, its setting decides nothing: memory is docs/claude-memory (§7.1),
+# so a stale or relative autoMemoryDirectory never sends the checks below elsewhere.
+if [ "$CLAUDE_LISTED" = 0 ]; then MEM_DIR="$DEFAULT_MEM_DIR"; mem_setting_src=""; fi
 
 warns=()
 
 # 0) Could the setting be read at all? A present-but-unparsable value means this
 #    guard is checking the DEFAULT path while Claude writes somewhere else — the
 #    one outcome worse than no guard, so it is loud rather than silent.
+if [ "$CLAUDE_LISTED" = 1 ]; then
 if [ -n "$mem_setting_badjson" ]; then
   # Which directory is really in play depends on whether any loadable file
   # further down the precedence order supplied a value. Both branches are loud;
@@ -216,14 +237,17 @@ case "$MEM_DIR" in
       # path nothing uses. Check #2 is what catches the resulting strays.
       MEM_DIR="$DEFAULT_MEM_DIR"; mem_setting_src="" ;;
 esac
+fi  # CLAUDE_LISTED: #0 and the setting warnings
 
 # 1) Memory index present? (absence ⇒ setting likely misconfigured)
-if [ ! -f "$MEM_DIR/MEMORY.md" ]; then
+if [ ! -f "$MEM_DIR/MEMORY.md" ] && [ "$CLAUDE_LISTED" = 0 ]; then
+  warns+=("Memory index missing: $MEM_DIR/MEMORY.md — the memory directory has no index (cadence.md §7.1).")
+elif [ ! -f "$MEM_DIR/MEMORY.md" ]; then
   warns+=("Memory index missing: $MEM_DIR/MEMORY.md${mem_setting_src:+ (autoMemoryDirectory from $mem_setting_src)} — autoMemoryDirectory may be misconfigured, so memory could be writing to the default location instead.")
 fi
 
 # 2) Stray memories in the default fallback (written when the setting wasn't active)?
-if [ -d "$FALLBACK" ]; then
+if [ "$CLAUDE_LISTED" = 1 ] && [ -d "$FALLBACK" ]; then
   stray=$(find "$FALLBACK" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
   if [ "$stray" -gt 0 ]; then
     warns+=("$stray memory file(s) in the default fallback $FALLBACK are NOT in the repo. autoMemoryDirectory likely isn't active here (restart the session, or set it in .claude/settings.local.json). Migrate: mv \"$FALLBACK\"/*.md \"$MEM_DIR\"/ && commit.")
@@ -445,7 +469,9 @@ fi
 if [ "${#warns[@]}" -eq 0 ]; then
   if [ "$HOOK_MODE" -eq 0 ]; then
     n=$(find "$MEM_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
-    echo "OK: $n memory files tracked in $MEM_DIR${mem_setting_src:+ (autoMemoryDirectory from $mem_setting_src)}; no strays in fallback; clean working tree; per-clone guards enabled."
+    fallback_ok="no strays in fallback"
+    [ "$CLAUDE_LISTED" = 0 ] && fallback_ok="no fallback check (Claude Code is not in agents)"
+    echo "OK: $n memory files tracked in $MEM_DIR${mem_setting_src:+ (autoMemoryDirectory from $mem_setting_src)}; $fallback_ok; clean working tree; per-clone guards enabled."
   fi
   exit 0
 fi

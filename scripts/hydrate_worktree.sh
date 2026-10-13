@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/hydrate_worktree.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/hydrate_worktree.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Bring a worktree's UNTRACKED dependencies into it — and take them back out
 # before it is removed.
@@ -823,11 +823,17 @@ hydrate_nested() {
 # node_modules is never pruned and the scan walks the whole dependency tree —
 # written that way first, and the test caught it reporting node_modules/somedep
 # as a candidate sibling. The checkout's own .git is excluded by pruning
-# $COMMON instead, and .claude/worktrees is pruned so the worktrees themselves
-# are not mistaken for nested repos.
+# $COMMON instead, and the worktree root (the worktree-root setting, TD-101) is pruned
+# so the worktrees themselves are not mistaken for nested repos — and Claude Code's own
+# .claude/worktrees with it, since `claude --worktree` puts them there whatever the setting.
 detect_nested() {
+    local wt_root=".claude/worktrees" here
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if command -v python3 >/dev/null 2>&1 && [[ -f "$here/cadence_config.py" ]]; then
+        wt_root="$(python3 "$here/cadence_config.py" get worktree-root --repo "$CLONE_ROOT" 2>/dev/null)" || wt_root=".claude/worktrees"
+    fi
     find "$CLONE_ROOT" -maxdepth 3 \
-        \( -name node_modules -o -path "$COMMON" -o -path "$CLONE_ROOT/.claude/worktrees" \) -prune -o \
+        \( -name node_modules -o -path "$COMMON" -o -path "$CLONE_ROOT/$wt_root" -o -path "$CLONE_ROOT/.claude/worktrees" \) -prune -o \
         -name .git -print 2>/dev/null |
         sed -e 's:/\.git$::' -e "s:^$CLONE_ROOT/*::" | grep -v '^$' | sort
 }

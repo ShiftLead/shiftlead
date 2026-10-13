@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/cadence_changes.py
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/cadence_changes.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 """Tell a session which cadence conventions changed since this worktree last heard.
 

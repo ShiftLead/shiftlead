@@ -145,6 +145,7 @@ def write_fixtures(home: Path) -> Path:
     # the Inbox runs the board reader a registered repo carries: this checkout's copy
     (repo / "scripts").mkdir()
     shutil.copy2(ROOT / "scripts" / "nudge_user_attention.py", repo / "scripts" / "nudge_user_attention.py")
+    shutil.copy2(ROOT / "scripts" / "ledgerboard.py", repo / "scripts" / "ledgerboard.py")  # the reader imports it
     git = ["git", "-C", str(repo), "-c", "user.name=look", "-c", "user.email=look@localhost"]
     subprocess.run([*git, "init", "-q", "-b", "main"], check=True)
     subprocess.run([*git, "add", "-A"], check=True)

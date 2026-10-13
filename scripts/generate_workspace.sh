@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/generate_workspace.sh
+# SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/generate_workspace.sh
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
 # Regenerate the multi-root VS Code workspace file from `git worktree list`.
 #
@@ -111,6 +111,14 @@ esac
 CLONE_ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
 REPO_NAME="$(basename "$CLONE_ROOT")"
 OUT="$CLONE_ROOT/$REPO_NAME.code-workspace"
+# Where open_worktree.sh puts worktrees: the worktree-root setting (TD-101). It is
+# read here, never re-typed, so the explorer exclude and the prune rule below follow
+# it; one that cannot be read leaves the default, since this only draws a view.
+WT_ROOT=".claude/worktrees"
+_here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "$_here/cadence_config.py" ]]; then
+    WT_ROOT="$(python3 "$_here/cadence_config.py" get worktree-root --repo "$CLONE_ROOT" 2>/dev/null)" || WT_ROOT=".claude/worktrees"
+fi
 
 if [[ "$MODE" == topic ]]; then
     TOPIC="$(basename "$TOPIC_PATH")"
@@ -130,7 +138,7 @@ fi
 git worktree list --porcelain | python3 -c '
 import json, os, sys
 
-clone_root, repo_name, mode, topic_path = sys.argv[1:5]
+clone_root, repo_name, mode, topic_path, wt_root = sys.argv[1:6]
 
 paths = [line.split(" ", 1)[1].strip()
          for line in sys.stdin if line.startswith("worktree ")]
@@ -206,7 +214,8 @@ for p in extra:
 exclude = {
     # The worktrees are also nested inside the main root; hiding them there
     # stops every one showing up twice in the explorer.
-    "**/.claude/worktrees": True,
+    "**/" + wt_root: True,
+    "**/.claude/worktrees": True,   # Claude Code puts its own there whatever the setting
 }
 # Same duplication, one level down: a sibling repo is a root of its own AND a
 # subdirectory of the root that contains it. These patterns filter INSIDE each
@@ -216,7 +225,7 @@ for entry in {os.path.basename(p) for p in nested(clone_root)}:
     exclude[entry] = True
 
 print(json.dumps({"folders": folders, "settings": {"files.exclude": exclude}}, indent=2))
-' "$CLONE_ROOT" "$REPO_NAME" "$MODE" "$TOPIC_PATH" > "$OUT.tmp"
+' "$CLONE_ROOT" "$REPO_NAME" "$MODE" "$TOPIC_PATH" "$WT_ROOT" > "$OUT.tmp"
 
 # An empty temp file means the python block chose to write nothing: --topic on a
 # worktree with no siblings. Leave any previous file alone and say nothing on
@@ -232,13 +241,13 @@ mv "$OUT.tmp" "$OUT"
 # TD-031: the overview run also prunes per-topic files whose worktree is gone. They live
 # at the clone root, outside the tree, so a hand `git worktree remove` leaves them (the
 # reaper deletes its own), gitignored and pointing at dead paths. A file is only ours to
-# delete when its FIRST root is exactly <clone>/.claude/worktrees/<topic>, <topic> being
+# delete when its FIRST root is exactly <clone>/<worktree-root>/<topic>, <topic> being
 # its own name (minus a `+topic` suffix) -- the shape --topic writes -- and that path no
 # longer exists. Any other .code-workspace at the root is a person's, and never touched.
 if [[ "$MODE" != topic ]]; then
     git worktree list --porcelain | python3 -c '
 import glob, json, os, sys
-clone_root, overview = sys.argv[1], sys.argv[2]
+clone_root, overview, wt_root = sys.argv[1], sys.argv[2], sys.argv[3]
 # a REGISTERED worktree whose directory is merely unreachable (an unmounted volume) is
 # not gone: its file stays until git itself forgets the worktree
 registered = {os.path.realpath(line.split(" ", 1)[1].strip())
@@ -248,21 +257,22 @@ for f in sorted(glob.glob(os.path.join(clone_root, "*.code-workspace"))):
         continue
     topic = os.path.basename(f)[: -len(".code-workspace")]
     topic = topic[: -len("+topic")] if topic.endswith("+topic") else topic
-    expect = os.path.realpath(os.path.join(clone_root, ".claude", "worktrees", topic))
+    # under the set root, or the Claude Code root (claude --worktree uses it whatever the setting)
+    expects = {os.path.realpath(os.path.join(clone_root, d, topic)) for d in (wt_root, ".claude/worktrees")}
     try:
         first = json.load(open(f, encoding="utf-8"))["folders"][0]["path"]
     except Exception:
         continue            # not ours to judge: unreadable, or not a workspace we wrote
     # a relative root resolves against the workspace file, as the editor resolves it
     first = os.path.realpath(os.path.join(os.path.dirname(f), first))
-    if first != expect or os.path.exists(expect) or expect in registered:
+    if first not in expects or os.path.exists(first) or first in registered:
         continue
     try:
         os.remove(f)
         print("pruned %s (its worktree is gone)" % f)
     except OSError as e:     # never fail the overview run over a stale file
         print("could not prune %s: %s" % (f, e))
-' "$CLONE_ROOT" "$OUT"
+' "$CLONE_ROOT" "$OUT" "$WT_ROOT"
 fi
 
 # --topic is machine-readable: the path on stdout, the summary on stderr.

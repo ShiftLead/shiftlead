@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+import threading
 import types
 from collections.abc import Callable
 from pathlib import Path
@@ -31,6 +33,9 @@ HEAD_MOST = 120
 _REF_RE = re.compile(r"board:[0-9a-f]{8}")
 # one loaded reader per file, its `item_key` or None for one that will not load, kept while its mtime holds
 _keys: dict[str, tuple[float, Callable[[str], str] | None]] = {}
+# one load at a time: a load swaps the process's `sys.path`, `sys.modules['ledgerboard']` and
+# `sys.dont_write_bytecode` and puts them back, and `read` runs on threads
+_load = threading.Lock()
 
 
 def is_work_order(ref: str) -> bool:
@@ -56,10 +61,20 @@ def _item_key(script: Path) -> Callable[[str], str] | None:
     try:
         code = compile(script.read_text(encoding="utf-8"), str(script), "exec")
         sys.modules[mod.__name__] = mod  # a dataclass in the reader looks its module up by name
-        try:
-            exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
-        finally:
-            sys.modules.pop(mod.__name__, None)
+        # the reader imports its sibling `ledgerboard.py` through a `sys.path` entry of its own: write no
+        # bytecode for it, leave neither that entry nor that module behind, so the next repo's reader
+        # imports its own copy
+        with _load:
+            path, sibling, nobytes = list(sys.path), sys.modules.pop("ledgerboard", None), sys.dont_write_bytecode
+            sys.dont_write_bytecode = True
+            try:
+                exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
+            finally:
+                sys.modules.pop(mod.__name__, None)
+                sys.path[:], sys.dont_write_bytecode = path, nobytes
+                sys.modules.pop("ledgerboard", None)
+                if sibling is not None:
+                    sys.modules["ledgerboard"] = sibling
         got = getattr(mod, "item_key", None)
     except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
         got = None
@@ -97,7 +112,9 @@ def head(text: str) -> str:
 
 def _report(argv: list[str], timeout: float) -> dict[str, Any] | None:
     try:
-        cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
+        # no `scripts/__pycache__` for the reader's `ledgerboard` import in the repo's checkout (TD-386's gate)
+        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+        cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
     except (OSError, subprocess.SubprocessError):
         return None
     if cp.returncode != 0:
