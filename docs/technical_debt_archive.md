@@ -10426,3 +10426,55 @@ Then the build, with tests that a person's interactive shell may promote and an 
 **Related:** TD-039 (two controllers over one worker, archived: its exchange is a ruling, not a consensus), TD-052 (mail), TD-462 (`conflict` folded into an `ask` to several), TD-134 (the disagreement's tests), design §4.9b (a team's questions go through its techlead).
 
 **Resolved:** 2026-10-12 (the designer; archived with its build TD-601, PR #1593) — two sessions with the same non-empty `project` badge may message whatever their teams, mail only (design §4.10 *across teams, by project*, §9 invariant 9); a peer's agreement is a `steer` or an `ask` with `--answer`s and binds once written in the shared entry, the PR or the design; a disagreement goes up each side's own path (§4.10 *An agreement between peers*). A same-team pair needed nothing new: the `team` edge already held.
+
+---
+
+## TD-599: The Inbox's *Answered for you* group may repeat FYI: fold it in, or give it a **Dismiss all** of its own
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-12 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`) — **not redundant**: every *answered for you* row is an answer a session gave in the person's name, which the person may **Overrule** (a decision still theirs; no FYI row holds one), and folding a handful of them into FYI's twelve hours of system notes and closed mail would bury them; the team header's mark needs no group of its own, but the Overrule does. So the group stays, uncounted, and its heading gains **Dismiss all** by FYI's rule — one confirm with the number, the group's ids on screen only, never a row that arrived after the page was drawn, drawn only while the group holds a row. §4.5a *Inbox: Answered for you, Dismiss all*. Built by TD-602. Was: Open.
+**Location:** design §4.5a *Inbox row: answered for you*, *Inbox: the FYI count, **Dismiss all***, *team header* **answered for you** count; §4.5 screen 6 (the sections' order); §4.9b *Everything answered for the person is told to the person*; §4.10 *The Inbox is a queue*; `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS`, `_answered_of`), `src/shiftlead/ui/templates/inbox.html` (`#sec-fyi`, `#dismissall`), `src/shiftlead/ui/static/app.js` (the Dismiss all handler reads `#rows-fyi` only); mockup `docs/mockups/Inbox.dc.html`
+
+**Why:** Paul, 2026-10-12, through Add entry: *Lets evaluate if the "answered for you" section is redundant to fyi, and if so combine them. If not, lets add a "dismiss all" option on the "answered for you" section.* Both are uncounted, and an *answered for you* entry is an FYI by kind — a `note` filed from the answerer (§4.9b) — drawn in its own group after *Waiting on them*, with *Later* between it and FYI. What it has that an FYI row has not: **Overrule** (a reply to the asker on the question's thread, with a copy to the answerer, which hands the asker an outcome debt), the question set off as a quotation with its source, and the team header's **answered for you** count, a mark since the person last opened the group. What it lacks: FYI's **Dismiss all** reads `#rows-fyi` alone, so a run of a busy techlead's answers is cleared one **Dismiss** at a time. The harm: the person either reads a second "no action needed" group beside FYI, or clears it by hand row by row.
+
+**Fix:** design it first, in §4.5a and §4.5 screen 6:
+1. **The evaluation.** Say whether the group earns its place: what the person does with an *answered for you* row that they do not do with an FYI — **Overrule** is a decision on a teammate's answer, FYI rows hold none — and whether the team header's count needs a group to be "since last opened".
+2. **If redundant:** the rows move into FYI, keeping their **Overrule**, quotation and source; the team header's count reads FYI's *new* mark or goes; `INBOX_SECTIONS` loses `answered`; the rail's *Urgency* group and the mockup follow.
+3. **If not:** the group's heading gains **Dismiss all**, FYI's own rule — one confirm with the number, the ids on screen only, never a row that arrived after the page was drawn — a row in §4.5a beside FYI's.
+4. Then the build, with tests that the chosen shape draws and that a dismiss sends only on-screen ids.
+
+**Done when** §4.5a says which of the two it is, the Inbox draws it, and the person can clear the answered rows they have read in one press.
+
+**Related:** TD-075 (step 2 built *Answered for you*), TD-079 (the Inbox as a queue, FYI's Dismiss all), TD-582 (another Add-entry draft by this seat, on cross-team mail).
+
+**Resolved:** 2026-10-12 (PR #1597) — designed in the round of TD-599 (§4.5a *Inbox: Answered for you, **Dismiss all***), built by TD-602.
+
+---
+
+## TD-602: Build TD-599: **Dismiss all** on the Inbox's *Answered for you* heading — FYI's rule, the ids on screen in the group, one confirm with the number
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-599's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built
+**Location:** design §4.5a *Inbox: Answered for you, **Dismiss all*** (beside *Inbox: the FYI count, Dismiss all*); `src/shiftlead/ui/templates/inbox.html` (`#sec-answered` ~L92, its `<summary>` heading ~L93 takes the button; FYI's `#dismissall` ~L124 is the model), the press calling `dismiss` (`rpc_inbox_dismiss`, `src/sessionorc/agent_inbox.py` ~L151) with the ids as FYI's does, `src/shiftlead/ui/static/app.js` (FYI's handler ~L2149 reads `#rows-fyi .mailrow` on screen and dismisses by id: make it take the section, or add a twin for the answered rows), `src/shiftlead/ui/inbox.py` (`INBOX_SECTIONS` ~L49 keeps `answered`; nothing to change unless the heading needs a count), `src/shiftlead/ui/help.py` (the group's help words), `docs/mockups/gen.py` (drawn by TD-599); `tests/test_ui_inbox*.py`
+
+**Why:** TD-599: Paul, 2026-10-12 — *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*. The design keeps the group (each row may be overruled) and gives it FYI's one-press clear; today a busy techlead's answers are cleared one **Dismiss** at a time.
+
+**Fix:**
+1. The heading: a **Dismiss all** button at the right of the *Answered for you* group's heading, as FYI's, drawn only while the group holds a row; its `title` *dismiss the answers on screen — never one that arrived after the page was drawn*.
+2. The press: confirm once — *Dismiss the n answers on screen? Their Overrule goes with them.* — then dismiss the ids of the group's rows not hidden by the rail, by the same RPC FYI's Dismiss all uses; rows that arrive later stay.
+3. Nothing else: the team header's mark is the browser's and falls with the rows; no new RPC.
+4. Tests: the button drawn with rows and absent without; the press sends only the on-screen ids of the group (a row hidden by the rail, and one added after render, are not sent); FYI's Dismiss all unchanged; the mockup regenerates unchanged.
+
+**Done when** the person can clear the *answered for you* rows they have read in one press, only those on screen, the group still stands apart from FYI with its Overrule, and the tests above pass; the builder's look (design §4.9b: the heading with rows, the confirm) is named in the PR.
+
+**Related:** TD-599 (the design), TD-075 (the group), TD-079 (FYI's Dismiss all).
+
+**Resolved:** 2026-10-12 (PR #1597) — `inbox.html`'s `#dismissanswered` on the *Answered for you* heading, `hidden` while the group holds no row and kept to the rows by the poll; `app.js`'s `dismissOnScreen` is FYI's press, now taking the group's rows and its own confirm (*Dismiss the n answers on screen? Their Overrule goes with them.*), the ids those rows on screen carry, by the same `dismiss`; the group's blurb names the press. Held by `test_the_answered_groups_dismiss_all_is_fyis_rule_on_its_own_rows` in `tests/test_ui_inbox.py`; the scratch-home look is the PR's UI check.
