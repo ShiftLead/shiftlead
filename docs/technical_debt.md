@@ -55,6 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-602 | Build TD-599: **Dismiss all** on the Inbox's *Answered for you* heading — FYI's rule, the ids on screen in the group, one confirm with the number | Medium | Open |
 | TD-603 | Board lines have no identifier: the person quotes a line's text to refer to it in chat, a reply or a session | Medium | Open |
 | TD-604 | Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work | Medium | Open |
+| TD-605 | TD-602's Location names `help.py` for the *Answered for you* group's help words, which live in `inbox.html`'s `info` dict | Low | Open |
 
 ---
 
@@ -920,6 +921,26 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** the person can see, from the Repo page and/or the team card, which entries closed in the chosen window, with their PRs, and the design and mockups say so.
 
 **Related:** TD-591 (the Repo page), TD-071 (Org page ideas).
+
+---
+
+## TD-605: TD-602's Location names `src/shiftlead/ui/help.py` for the *Answered for you* group's help words, which live in `inbox.html`'s `info` dict
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-12 (docs-audit-ao-1, the auditor, covering #1580–#1591)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md` TD-602's **Location** line; `src/shiftlead/ui/templates/inbox.html` L21 (`'answered': '…'`), `src/shiftlead/ui/help.py`
+
+**Why:** TD-602's **Location** lists *`src/shiftlead/ui/help.py` (the group's help words)*, and #1591 rewrote the mockup's help line in `docs/mockups/gen.py` to say *Dismiss all clears the ones on screen once you have read them*. `grep -n -i "answered for you" src/shiftlead/ui/help.py` finds nothing; the words the page shows are `inbox.html` L21, `'answered': 'Questions a teammate answered for you from the record … Dismiss removes the row. Newest first.'`, drawn at `#info-answered`. A builder following the Location edits a file that holds no such text and leaves the group's help saying only *Dismiss removes the row*, which the new button makes incomplete.
+
+**Fix:** correct TD-602's Location to name `inbox.html`'s `info['answered']` (and drop `help.py`), and add to its step 1 that the help line gains the button's sentence; the ledger line only, TD-602 is still open.
+
+**Done when** TD-602's Location names the file that holds the group's help words.
+
+**Related:** TD-602, TD-599.
 
 ---
 
