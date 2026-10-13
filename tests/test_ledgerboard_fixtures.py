@@ -55,6 +55,9 @@ def test_the_release_header_is_intact_and_names_the_manifests_tag():
 def test_every_vendored_file_is_as_vendored():
     _, files = _manifest()
     assert "src/sessionorc/ledgerboard.py" in files and any(f.startswith("tests/ledgerboard/") for f in files)
+    on_disk = {str(f.relative_to(ROOT)) for f in FIXTURES.rglob("*") if f.is_file() and f != MANIFEST}
+    on_disk -= {f for f in on_disk if "__pycache__" in f}
+    assert on_disk == {f for f in files if f.startswith("tests/ledgerboard/")}, "a fixture the MANIFEST does not list"
     drift = [f for f, h in files.items() if hashlib.sha256((ROOT / f).read_bytes()).hexdigest() != h]
     assert not drift, f"edited since vendored (scripts/vendor_ledgerboard.sh owns them): {drift}"
 
