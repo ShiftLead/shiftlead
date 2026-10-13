@@ -75,6 +75,19 @@ class InboxMixin:
     # Each is refused to every session exactly as `inbox_delete` is, and each acts on the org's
     # person inbox: a snooze, a pause and a *Go with it* are the person's, and no session has them.
 
+    def _inbox_changed(self, rev: int) -> None:
+        """The person inbox was written (design §4.4 *Each reading has one owner*, TD-616): push
+        `{event: "inbox", rev}` to every subscriber, so the UI recounts the Inbox once per change
+        instead of polling it. Called by the store's every save, sync or not; with no loop running
+        (a test's direct call) there is nobody subscribed to tell."""
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        task = asyncio.ensure_future(self._broadcast({"event": "inbox", "rev": rev}))
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+
     def _person_entry(self, msg: str, caller: Any, what: str) -> MailEntry:
         agent_common.person_only(caller, f"{what} mail", "§4.10", self._graph())
         held = [e for e in self.person_inbox if e.id == msg]

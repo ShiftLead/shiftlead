@@ -1099,6 +1099,7 @@ class MailMixin:
                     "threads": {},
                     "sends": [],
                     "unread": sum(1 for e in self.person_inbox if not e.read_at),
+                    "rev": self.person_store.rev,  # the revision the `inbox` push names (§4.4, TD-616)
                     # design §4.10 *The Inbox is a queue* (TD-079): the endings of the state rows
                     # the Inbox showed, newest first, and the person's *not now* on a state row.
                     # Neither is mail and both belong to the home, so the person's read carries

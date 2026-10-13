@@ -694,6 +694,29 @@ async def test_the_person_inbox_is_ungated_persisted_and_read_without_marking(ag
             await person.call("kill", id=sid)
 
 
+async def test_every_person_inbox_write_pushes_inbox_with_a_higher_rev(agent, tmp_path):
+    """Design §4.4 *Each reading has one owner* (TD-616): the person inbox carries a revision, read
+    with it, and every write — mail landing, a person's dismiss — pushes `{event: "inbox", rev}` to
+    every subscriber with a higher one, so the UI recounts once per change and polls nothing."""
+
+    async def next_inbox(sub):
+        while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5))).get("event") != "inbox":
+            pass
+        return ev["rev"]
+
+    async with LocalClient() as person, LocalClient() as sub:
+        await sub.call("subscribe")
+        w = await _mk(person, tmp_path)("w", unattended=True)
+        rev0 = (await person.call("inbox"))["rev"]
+        async with LocalClient(caller=w) as c:
+            one = (await c.call("msg", to="person", text="one"))["entry"]["id"]
+        rev1 = await next_inbox(sub)
+        assert rev1 > rev0 and (await person.call("inbox"))["rev"] == rev1
+        await person.call("inbox_dismiss", msg=one)
+        assert await next_inbox(sub) > rev1
+        await person.call("kill", id=w)
+
+
 async def test_a_person_deletes_from_the_person_inbox_and_no_session_may(agent, tmp_path):
     """Design §4.10 lifecycle and §4.5a's top-bar **person inbox** delete: `inbox_delete` naming no
     session (or `person`) removes one entry from the org's person inbox, persisted; the sender's

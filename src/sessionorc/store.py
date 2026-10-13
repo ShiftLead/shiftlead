@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -63,11 +65,18 @@ class SessionStore:
 
 class PersonInboxStore:
     """The person inbox's file (design §4.10): a list of entries, written whole on every change and
-    reloaded on restart. A missing or unreadable file is an empty inbox, never a crash."""
+    reloaded on restart. A missing or unreadable file is an empty inbox, never a crash.
+
+    `rev` is the inbox's revision (design §4.4 *Each reading has one owner*, TD-616): bumped by every
+    save, and `on_save` told it, which is how the host agent pushes `inbox` on every change without
+    each writer remembering to. It starts at the clock's milliseconds, so a restart never hands a
+    reader a revision it already holds for other contents."""
 
     def __init__(self, path: Path | None = None):
         self.path = path or paths.person_inbox_file()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.rev = time.time_ns() // 1_000_000
+        self.on_save: Callable[[int], None] | None = None
 
     def load(self) -> list[MailEntry]:
         try:
@@ -78,6 +87,9 @@ class PersonInboxStore:
 
     def save(self, entries: list[MailEntry]) -> None:
         _atomic_write(self.path, json.dumps({"entries": [e.to_dict() for e in entries]}, indent=1))
+        self.rev += 1
+        if self.on_save is not None:
+            self.on_save(self.rev)
 
 
 class AttentionStore:
