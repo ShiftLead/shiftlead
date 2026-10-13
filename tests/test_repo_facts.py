@@ -837,9 +837,9 @@ async def test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_on
     handed = []
     real = agent._read_repos
 
-    def spy(todo, prev, full, roots=None, live=None):
+    def spy(todo, prev, full, roots=None, live=None, *rest):
         handed.append(live)
-        return real(todo, prev, full, roots, live)
+        return real(todo, prev, full, roots, live, *rest)
 
     monkeypatch.setattr(agent, "_read_repos", spy)
     agent._promotes, agent._promotes_read = {"r": {"live": "abc"}}, False
@@ -949,3 +949,29 @@ def test_a_commit_status_folds_and_an_unknown_merge_state_keeps_the_last_word(tm
     # never conflicting before, UNKNOWN is not conflicting
     fresh = reports.pr_reading(tmp_path, t0)
     assert not fresh["open"][0]["conflicting"] and "red_since" not in fresh["open"][0]
+
+
+async def test_a_ticks_read_that_began_before_a_board_press_keeps_the_presss_reading(agent, repo, monkeypatch):
+    """TD-615: a write-back re-reads its board at once (`_reread_board`); a tick's pass that began
+    before it would put the board from before the press back, so that pass keeps the press's reading."""
+    import time
+
+    await park_ticks(agent)
+    _register(repo)
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    root = str(repo)
+    pressed = {"boards": [{"items": [{"text": "pressed"}]}], "at": "now"}
+    real = agent._read_repos
+
+    def press_meanwhile(*args):
+        got = real(*args)
+        agent._repos[root] = {**agent._repos[root], "boards": pressed, "work_orders": {"orders": []}}
+        agent._boards_pressed[root] = time.monotonic()
+        return got
+
+    monkeypatch.setattr(agent, "_read_repos", press_meanwhile)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    assert agent._repos[root]["boards"] == pressed

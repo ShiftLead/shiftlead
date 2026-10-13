@@ -7,6 +7,7 @@ dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgen
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,6 @@ from sessionorc import (
     agent_common,
     hosts,
     mail,
-    workorders,
 )
 from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
@@ -307,6 +307,7 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
+        await self._reread_board(root)
         return {
             "board": str(want),
             "line": done.get("line", line),
@@ -462,6 +463,7 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
+        await self._reread_board(root)
         text = str(done.get("text") or text)  # the line found, by its id where the press named one
         h = board_mod.HEAD_RE.search(text)
         head = " ".join((h.group("head") if h else text).split())
@@ -599,6 +601,7 @@ class InboxMixin:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
+        await self._reread_board(root)
         out: dict[str, Any] = {"board": str(board), "action": "add", "due": due, **done}
         try:
             out["dismissed"] = (await self.rpc_inbox_dismiss(msg=[entry], caller=caller))["dismissed"]
@@ -805,24 +808,36 @@ class InboxMixin:
             log.info("board %s: %s", root, done["message"])
             # held through the re-read: a second press in between would pass the decided check on
             # the reading from before the line (review of #1542)
-            await self._reread_work_orders(root)
+            await self._reread_board(root)
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
 
-    async def _reread_work_orders(self, root: str) -> None:
-        """The repo's work orders read again now (§4.4 *Repo facts*), so a ledger entry answered on the
-        board leaves *Later* on the page's next poll rather than at the next `REPOS_EVERY`. A failed
-        read changes nothing: the next full reading lists the line."""
+    async def _reread_board(self, root: str | Path) -> None:
+        """The repo's board read again at once after a write-back the host agent made (§4.4 *Each
+        reading has one owner*, *The boards*, TD-615), so a Snooze, a Done, a Decide, a Reply or an
+        add is in the next `repos` push and not a minute later, and a ledger entry answered on the
+        board leaves *Later* with it. It reads the write-back's own tree — origin's head, the press
+        landed — as the checkout's board read from origin, and fetches where there is no tree. A
+        failed read changes nothing: the next reading lists the line. The press is marked, so a
+        tick's read that began before it does not put the old board back."""
+        root = str(root)
+        self._boards_pressed[root] = time.monotonic()
+        old = self._repos.get(root)
+        if old is None:
+            return
+        tree = board_mod.tree_dir(Path(root)) / board_mod.BOARD
+        here = tree if tree.is_file() else None
         try:
-            got = await asyncio.to_thread(workorders.read, root)
+            bds, wos = await asyncio.to_thread(self._read_boards, root, old, here is None, False, now_iso(), tree=here)
         except Exception:  # noqa: BLE001 — the line is landed; the reading catches up on its own
-            log.exception("re-reading the work orders of %s failed", root)
+            log.exception("re-reading the board of %s failed", root)
             return
-        if "error" in got or root not in self._repos:
+        if "error" in bds or root not in self._repos:
             return
-        orders = {"orders": [workorders.entry(o) for o in got["orders"]], "at": now_iso()}
-        self._repos[root] = {**self._repos[root], "work_orders": orders}
+        self._repos[root] = {**self._repos[root], "boards": bds, "work_orders": wos}
+        # marked again as it lands: a tick's pass that began while this read ran is older too (review of TD-615)
+        self._boards_pressed[root] = time.monotonic()
         self.repos_store.save(self._repos)
         await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
 

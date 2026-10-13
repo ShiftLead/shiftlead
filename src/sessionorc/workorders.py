@@ -8,7 +8,10 @@ The board is dev-cadence's file and its reader is dev-cadence's own `nudge_user_
 --report --json` (never a second parser here, as the Inbox's §4.4 rule says): the repo's copy is run
 with its own `--fetch`, so a board merely behind origin is read from origin, as the Inbox reads it,
 and `item_key` is that same file's function, loaded from it. A `fyi` line and a closed line are
-never work orders; a line whose `Decided:` is gone leaves on the next reading."""
+never work orders; a line whose `Decided:` is gone leaves on the next reading.
+
+The board itself is read once, into the repo reading's `boards` (`read_boards`, design §4.4 *Each
+reading has one owner*, TD-615), and the orders are a filter over that reading (`orders`)."""
 
 from __future__ import annotations
 
@@ -145,16 +148,25 @@ def _report(argv: list[str], timeout: float) -> dict[str, Any] | None:
     return got if isinstance(got, dict) else None
 
 
-def read(root: str | Path, *, fetch: bool = True) -> dict[str, Any]:
-    """The repo's work orders: `{orders: [...], at_origin}` — each `{id, title, text, line, decided:
-    {text, date}, refs, session, kind}` — or `{error}` when the board could not be read. No board,
-    or no reader in the repo, is no work orders and no error."""
+def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | None = None) -> dict[str, Any]:
+    """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
+    boards*, TD-615): `{boards: [...], today}` — the reader's report, each board `{label, board,
+    root, source, fetch_note, fetch_case, …, items}` and each open item as the reader gives it (line,
+    text, due, answers, decided, refs, session, detail, …) with its id beside it as `key`
+    (`board:<key>`, *A board line's id*) — or `{error}` when the board could not be read. No board,
+    or no reader in the repo, is no boards and no error. `fetch` is the reader's own `--fetch`
+    (origin's side, *Boards are read against origin*), and a plain read follows one that fails.
+
+    `board` reads that file in place of the checkout's, named as the checkout's board read from
+    origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
+    with the press landed, so the press is in the reading before the checkout pulls it."""
     root = Path(root)
-    board, script = root / BOARD, root / READER
-    if not board.is_file() or not script.is_file():
-        return {"orders": []}
-    base = [sys.executable, str(script), "--report", "--json", "--board", str(board)]
-    got = _report([*base, "--fetch"], FETCH_TIMEOUT) if fetch else None
+    checkout, script = root / BOARD, root / READER
+    path = Path(board) if board is not None else checkout
+    if not path.is_file() or not script.is_file():
+        return {"boards": []}
+    base = [sys.executable, str(script), "--report", "--json", "--board", str(path)]
+    got = _report([*base, "--fetch"], FETCH_TIMEOUT) if fetch and board is None else None
     if got is None:
         got = _report(base, READ_TIMEOUT)
     if got is None:
@@ -162,23 +174,43 @@ def read(root: str | Path, *, fetch: bool = True) -> dict[str, Any]:
     item_key = _item_key(script)
     if item_key is None:
         return {"error": f"{READER} has no item_key to name a line by"}
-    orders: list[dict[str, Any]] = []
+    boards: list[dict[str, Any]] = []
     for b in got.get("boards") or []:
+        if not isinstance(b, dict):
+            continue
+        items: list[dict[str, Any]] = []
+        for it in b.get("items") or []:
+            if not isinstance(it, dict) or not it.get("text"):
+                continue
+            try:
+                ref = key(str(it["text"]), item_key)
+            except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no id
+                ref = ""
+            items.append({**it, "key": ref})
+        b = {**b, "items": items}
+        if board is not None:
+            # as the checkout's board, read from origin: the reader's *behind* case (§4.5a **origin note**)
+            b.update(board=str(checkout), root=str(root), label=root.name, source="origin", fetch_note=None)
+        boards.append(b)
+    return {"boards": boards, "today": got.get("today")}
+
+
+def orders(reading: dict[str, Any]) -> list[dict[str, Any]]:
+    """The work orders of a `read_boards` reading — its open decided lines that are not `fyi`, each
+    `{id, title, text, line, decided: {text, date}, refs, session, kind}` — a filter over the one
+    reading, never a second read of the board (§4.4 *The boards*)."""
+    out: list[dict[str, Any]] = []
+    for b in reading.get("boards") or []:
         for it in (b.get("items") or []) if isinstance(b, dict) else []:
             if not isinstance(it, dict) or not isinstance(it.get("decided"), dict) or it.get("kind") == "fyi":
                 continue
-            text = str(it.get("text") or "")
-            if not text:
+            if not it.get("key") or not it.get("text"):
                 continue
-            try:
-                ref = key(text, item_key)
-            except Exception:  # noqa: BLE001 — a line the reader's own key cannot take is skipped, not fatal
-                continue
-            orders.append(
+            out.append(
                 {
-                    "id": ref,
-                    "title": head(text),
-                    "text": text,
+                    "id": it["key"],
+                    "title": head(str(it["text"])),
+                    "text": str(it["text"]),
                     "line": it.get("line"),
                     "decided": {"text": str(it["decided"].get("text") or ""), "date": it["decided"].get("date")},
                     "refs": [str(r) for r in it.get("refs") or []],
@@ -186,7 +218,14 @@ def read(root: str | Path, *, fetch: bool = True) -> dict[str, Any]:
                     "kind": it.get("kind"),
                 }
             )
-    return {"orders": orders}
+    return out
+
+
+def read(root: str | Path, *, fetch: bool = True) -> dict[str, Any]:
+    """The repo's work orders: `{orders: [...]}` (`orders`), or `{error}` when the board could not be
+    read — `read_boards` and its filter, for a caller that wants the orders alone."""
+    got = read_boards(root, fetch=fetch)
+    return got if "error" in got else {"orders": orders(got)}
 
 
 def entry(order: dict[str, Any]) -> dict[str, Any]:

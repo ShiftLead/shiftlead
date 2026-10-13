@@ -56,6 +56,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     ACT_TIMEOUT,  # noqa: F401
     BACKUP_KEEP,  # noqa: F401
     BACKUP_MEMBERS,  # noqa: F401
+    BOARD_EVERY,  # noqa: F401
     BRIEF_CLAUSE,  # noqa: F401
     BRIEF_SETTLE,  # noqa: F401
     CACHE_FLOOR,  # noqa: F401
@@ -646,6 +647,10 @@ class HostAgent(
         self.repos_store = RepoStore()
         self._repos: dict[str, dict[str, Any]] = self.repos_store.load()
         self._repos_read_at = float("-inf")  # monotonic: the first tick reads
+        self._boards_read_at = float("-inf")  # monotonic: the boards' own clock, `BOARD_EVERY`
+        # monotonic, by root: when a write-back last re-read that board (`_reread_board`), so a tick's
+        # read that began before it does not put the board from before the press back
+        self._boards_pressed: dict[str, float] = {}
         self._ledger_mtime: dict[str, float | None] = {}
         self._repos_task: asyncio.Task[None] | None = None
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.

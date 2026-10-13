@@ -35,6 +35,7 @@ from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
+    BOARD_EVERY,
     BRIEF_SETTLE,
     COMPOSER_LINES,
     CONTEXT_AGAIN,
@@ -2630,31 +2631,41 @@ class TickMixin:
     async def _refresh_repos(self) -> None:
         """The repo facts (design §4.4 *Repo facts*, TD-176): for every checkout the repos registry
         lists, the PRs and the ledger with its history every `REPOS_EVERY`, and the ledger alone on
-        any tick its file's mtime moved. The PRs are read once per remote, so two checkouts of one
+        any tick its file's mtime moved, and the board on its own clock, `BOARD_EVERY` (§4.4 *The
+        boards*, TD-615). The PRs are read once per remote, so two checkouts of one
         repo are one `gh` read. A read that failed keeps the last reading with `error` and
         `failed_at` beside it — an outage is never zero PRs. A changed reading is saved and pushed
         as a `repos` event; a checkout the registry no longer lists is dropped with `repo: null`."""
         try:
             due = time.monotonic() - self._repos_read_at >= REPOS_EVERY
+            boards = due or time.monotonic() - self._boards_read_at >= BOARD_EVERY
             roots = hosts.local_host().repos()
             mtimes = await asyncio.to_thread(self._ledger_mtimes, roots)
-            todo = [r for r in roots if due or mtimes.get(r) != self._ledger_mtime.get(r) or r not in self._repos]
+            ledgers = {r for r in roots if due or mtimes.get(r) != self._ledger_mtime.get(r) or r not in self._repos}
+            todo = [r for r in roots if boards or r in ledgers]
             gone = [r for r in self._repos if r not in roots]
             if not (todo or gone):
                 return
             prev = {r: self._repos.get(r) or {} for r in todo}
+            began = time.monotonic()
             # a checkout read for the first time gets the whole reading at once, not in five minutes
             full = {r for r in todo if due or r not in self._repos}
             live = self._live_commits() if self._promotes_read else None  # None: unknown (TD-516)
-            got = await asyncio.to_thread(self._read_repos, todo, prev, full, roots, live) if todo else {}
+            read = self._read_repos
+            got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards) if todo else {}
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
+            if boards:
+                self._boards_read_at = time.monotonic()
             for root in todo:
                 self._ledger_mtime[root] = mtimes.get(root)
             for r, v in got.items():
                 # the red PRs' orders and memory are the tick's (`_red_prs`), never the read's: carried
                 if (po := (self._repos.get(r) or {}).get("pr_orders")) is not None:
                     v.setdefault("pr_orders", po)
+                # a write-back re-read this board while the pass ran: its reading is the newer (`_reread_board`)
+                if self._boards_pressed.get(r, float("-inf")) >= began and r in self._repos:
+                    v.update({k: self._repos[r][k] for k in ("boards", "work_orders") if k in self._repos[r]})
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r in gone:
                 self._repos.pop(r, None)
@@ -2869,11 +2880,15 @@ class TickMixin:
         full: set[str],
         registry: list[str] | None = None,
         live: dict[str, str] | None = None,
+        ledgers: set[str] | None = None,
+        boards: bool = False,
     ) -> dict[str, dict[str, Any]]:
         """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
         the rest carried from `prev`. One checkout's read that raises keeps its last reading with
-        the error beside it and never costs the others theirs. `live` is `_live_commits`: a live
+        the error beside it and never costs the others theirs. `ledgers`, where given, are the roots
+        whose ledger is read — the others keep their last ledger, read again for the board alone —
+        and `boards` is the board's own clock, `BOARD_EVERY` (`_read_repo`). `live` is `_live_commits`: a live
         check's build is read against its repo's (§4.9b). `None` — no promote reading since the
         host agent started — is unknown, not *not live*: each live check keeps the `live` its last
         reading gave it (§6 rule 6, TD-516), so a restart never takes one out of a lane and brings
@@ -2890,7 +2905,10 @@ class TickMixin:
             old = prev.get(root) or {}
             try:
                 reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
-                out[root] = TickMixin._read_repo(root, old, root in full, now, by_remote, resolve, reader)
+                led = ledgers is None or root in ledgers or "ledger" not in old
+                out[root] = TickMixin._read_repo(
+                    root, old, root in full, now, by_remote, resolve, reader, ledger=led, boards=boards
+                )
                 if live is None:  # no promote reading yet since the start: unknown is not *not live* (TD-516)
                     _carry_live(out[root], old)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
@@ -2915,15 +2933,21 @@ class TickMixin:
         by_remote: dict[str, dict[str, Any]],
         resolve: ledger_mod.Resolve | None = None,
         live: ledger_mod.Live | None = None,
+        *,
+        ledger: bool = True,
+        boards: bool = False,
     ) -> dict[str, Any]:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
-        pass, so two checkouts of one remote are one `gh` read."""
+        pass, so two checkouts of one remote are one `gh` read. `ledger` False keeps the last
+        ledger as it stands (a pass for the board alone); `boards` is the board's clock (`_read_boards`)."""
         stamp = now.isoformat()
         remote = reports._git(root, "remote", "get-url", "origin") if due else None
         remote = (remote or "").strip() if due else str(old.get("remote") or "")
-        led = ledger_mod.reading(root, now, with_history=due, resolve=resolve, live=live)
         old_led = old.get("ledger") or {}
-        if "error" in led:
+        led = ledger_mod.reading(root, now, with_history=due, resolve=resolve, live=live) if ledger else old_led
+        if not ledger:
+            led = dict(old_led)  # a pass for the board alone
+        elif "error" in led:
             led = {**old_led, "error": led["error"], "failed_at": stamp}
         elif not due:
             led.update({k: old_led[k] for k in ("windows", "recent", "history_error") if k in old_led})
@@ -2938,24 +2962,56 @@ class TickMixin:
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
-        # the board's open decided lines, the lanes' work orders (§4.4 *Board write-back*, TD-384): read
-        # with the PRs, every `REPOS_EVERY`; a failed read keeps the last orders with the error beside them
-        wos = old.get("work_orders")
-        if due:
-            got = workorders.read(root)
-            if "error" in got:
-                wos = {**(wos or {"orders": []}), "error": got["error"], "failed_at": stamp}
-            else:
-                wos = {"orders": [workorders.entry(o) for o in got["orders"]], "at": stamp}
+        bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
         return {
             "name": Path(root).name,
             "root": root,
             "remote": remote,
             "ledger": led,
             "prs": prs,
-            "work_orders": wos or {"orders": []},
+            "boards": bds,
+            "work_orders": wos,
             "at": stamp if due else str(old.get("at") or stamp),
         }
+
+    @staticmethod
+    def _read_boards(
+        root: str, old: dict[str, Any], due: bool, clock: bool, stamp: str, *, tree: Path | None = None
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """The checkout's board and the work orders derived from it (§4.4 *Each reading has one owner*,
+        *The boards*, TD-615): `boards` — `workorders.read_boards`' reading, with `file` the checkout's
+        board as last read (its mtime and size), `today` the reader's day and `at` — and the lanes'
+        `work_orders`, its decided open lines (TD-384), never a second read.
+
+        `due` (the `REPOS_EVERY` pass) reads against origin with the reader's own `--fetch`; `clock`
+        (`BOARD_EVERY`) reads the checkout plainly, and only when its board's file or the day moved
+        since the last reading, so a board read from origin stays so until the checkout pulls; `tree`
+        reads that file — the write-back's tree — as the checkout's board read from origin. A failed
+        read keeps the last boards and orders with `error` and `failed_at` beside them."""
+        bds, wos = old.get("boards"), old.get("work_orders")
+        try:
+            st = (Path(root) / workorders.BOARD).stat()
+            file: list[int] | None = [st.st_mtime_ns, st.st_size]
+        except OSError:
+            file = None
+        today = datetime.now().date().isoformat()  # the reader's own day, local
+        new_day = bds is not None and bds.get("today") != today
+        moved = bds is None or "error" in bds or bds.get("file") != file or new_day
+        if not (due or tree is not None or (clock and moved)):
+            return bds or {"boards": []}, wos or {"orders": []}
+        # a new day re-reads a board last read from origin against origin: the checkout's would bring
+        # back a press it has not pulled (review of TD-615)
+        from_origin = new_day and any(isinstance(b, dict) and b.get("source") for b in bds.get("boards") or ())
+        got = workorders.read_boards(root, fetch=due or from_origin, board=tree)
+        if "error" in got:
+            # the same error again is the same reading: no save and no push every `BOARD_EVERY`
+            same = bds is not None and bds.get("error") == got["error"] and bds.get("failed_at")
+            at = str(same) if same else stamp
+            bds = {**(bds or {"boards": []}), "error": got["error"], "failed_at": at}
+            wos = {**(wos or {"orders": []}), "error": got["error"], "failed_at": at}
+            return bds, wos
+        bds = {"boards": got["boards"], "today": got.get("today") or today, "file": file, "at": stamp}
+        return bds, {"orders": [workorders.entry(o) for o in workorders.orders(bds)], "at": stamp}
 
     async def _count_seats(self, records: list[Session]) -> None:
         """`seat_count` for every supervised `prs:` seat (§6 rule 3): the PRs merged to the seat's repo

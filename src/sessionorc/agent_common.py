@@ -270,6 +270,10 @@ USAGE_ONLY_EVERY = 3600.0
 # checkout's PRs through `gh` and its ledger's git history, in a thread. The ledger itself is
 # re-read on any tick its file's mtime moved, since that read is a local file.
 REPOS_EVERY = 300.0
+# Seconds between reads of each registered checkout's attention board (design §4.4 *Each reading has
+# one owner*, *The boards*, TD-615): a plain read, and only of a board whose file or day moved since
+# the last; origin's side is read on the `REPOS_EVERY` pass, and at once after a write-back.
+BOARD_EVERY = 60.0
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
 

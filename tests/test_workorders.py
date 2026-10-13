@@ -113,7 +113,7 @@ def test_the_repo_reading_lists_them_on_a_full_read_and_keeps_them_between(tmp_p
     assert o["work_order"] and o["title"] == "Keep the nightly backup?"
     again = TickMixin._read_repos([str(root)], {str(root): full}, set())[str(root)]
     assert again["work_orders"] == full["work_orders"]
-    monkeypatch.setattr(workorders, "read", lambda root, fetch=True: {"error": "the reader failed"})
+    monkeypatch.setattr(workorders, "read_boards", lambda root, **kw: {"error": "the reader failed"})
     failed = TickMixin._read_repos([str(root)], {str(root): full}, {str(root)})[str(root)]
     assert failed["work_orders"]["orders"] == full["work_orders"]["orders"]
     assert failed["work_orders"]["error"] == "the reader failed"
@@ -314,3 +314,99 @@ async def test_an_idle_holder_on_a_node_is_told_at_its_address(agent, tmp_path):
     assert agent._repos[root]["pr_orders"]["orders"] == []
     (note,) = [e for e in node.inbox if e.from_ == "system"]
     assert note.to == ["ao-far@far"] and note.text.startswith("PR #1 has been red")
+
+
+# -- the boards are the host agent's reading (§4.4 *Each reading has one owner*, TD-615) ---------------
+
+
+@pytest.mark.unit
+def test_the_board_reading_carries_every_item_with_its_id_and_the_orders_are_its_decided_subset(tmp_path):
+    root = _repo(tmp_path, DECIDED, OPEN, FYI)
+    got = workorders.read_boards(root, fetch=False)
+    (b,) = got["boards"]
+    assert b["board"] == str(root / workorders.BOARD) and got["today"]
+    assert len(b["items"]) == 3 and all(workorders.is_work_order(it["key"]) for it in b["items"])
+    assert all(it["detail"] == [] and "due" in it for it in b["items"])  # the reader's own fields, kept
+    (o,) = workorders.orders(got)
+    assert o["id"] == b["items"][0]["key"] and o["title"] == "Keep the nightly backup?"
+    assert workorders.read(root, fetch=False) == {"orders": [o]}
+
+
+@pytest.mark.unit
+def test_a_write_backs_tree_is_read_as_the_checkouts_board_from_origin(tmp_path):
+    """After a press the host agent reads its own tree — origin's head, the press landed — named as
+    the checkout's board read from origin, so the Inbox draws the press and the *behind* note."""
+    root = _repo(tmp_path, DECIDED, OPEN)
+    tree = tmp_path / "tree" / "user_attention.md"
+    tree.parent.mkdir()
+    tree.write_text((root / workorders.BOARD).read_text().replace(DECIDED + "\n", ""), encoding="utf-8")
+    (b,) = workorders.read_boards(root, fetch=False, board=tree)["boards"]
+    assert (b["board"], b["root"], b["label"]) == (str(root / workorders.BOARD), str(root), "repo")
+    assert b["source"] == "origin"
+    assert [it["text"] for it in b["items"]] == [OPEN.removeprefix("- [ ] ")]
+
+
+@pytest.mark.unit
+def test_the_boards_clock_rereads_only_a_moved_board_and_the_full_pass_fetches(tmp_path, monkeypatch):
+    """`BOARD_EVERY` reads the checkout plainly, and only when its board's file or the day moved; the
+    `REPOS_EVERY` pass reads with the reader's `--fetch`; a failed read keeps the last items and orders
+    with the error and its time beside them, and the next tick of the clock reads again."""
+    from sessionorc.agent_tick import TickMixin
+
+    root = _repo(tmp_path, DECIDED, OPEN)
+    real = workorders.read_boards
+    calls: list[bool] = []
+
+    def spy(r, *, fetch=True, board=None):
+        calls.append(fetch)
+        return real(r, fetch=False, board=board)
+
+    monkeypatch.setattr(workorders, "read_boards", spy)
+    bds, wos = TickMixin._read_boards(str(root), {}, False, True, "t1")
+    assert calls == [False] and len(bds["boards"][0]["items"]) == 2 and len(wos["orders"]) == 1
+    old = {"boards": bds, "work_orders": wos}
+    assert TickMixin._read_boards(str(root), old, False, True, "t2") == (bds, wos) and calls == [False]
+    assert TickMixin._read_boards(str(root), old, False, False, "t2") == (bds, wos) and calls == [False]
+    TickMixin._read_boards(str(root), old, True, False, "t3")
+    assert calls == [False, True]  # the full pass, against origin
+    board = root / workorders.BOARD
+    board.write_text(board.read_text().replace(OPEN + "\n", ""), encoding="utf-8")
+    moved, _ = TickMixin._read_boards(str(root), old, False, True, "t4")
+    assert calls == [False, True, False] and len(moved["boards"][0]["items"]) == 1
+
+    monkeypatch.setattr(workorders, "read_boards", lambda r, **kw: {"error": "the reader failed"})
+    failed, fwos = TickMixin._read_boards(str(root), {"boards": moved, "work_orders": wos}, True, False, "t5")
+    assert failed["boards"] == moved["boards"] and (failed["error"], failed["failed_at"]) == ("the reader failed", "t5")
+    assert fwos["orders"] == wos["orders"] and fwos["error"] == "the reader failed"
+    # the same error on the next tick is the same reading: nothing saved, nothing pushed
+    old_failed = {"boards": failed, "work_orders": fwos}
+    assert TickMixin._read_boards(str(root), old_failed, False, True, "t5b") == (failed, fwos)
+    monkeypatch.setattr(workorders, "read_boards", spy)
+    again, _ = TickMixin._read_boards(str(root), {"boards": failed, "work_orders": fwos}, False, True, "t6")
+    assert "error" not in again and calls[-1] is False
+
+    # a new day re-reads; a board last read from origin is read against origin again, not the checkout
+    yesterday = {**again, "today": "2000-01-01"}
+    TickMixin._read_boards(str(root), {"boards": yesterday, "work_orders": wos}, False, True, "t7")
+    assert calls[-1] is False
+    pulled_not = {**yesterday, "boards": [{**yesterday["boards"][0], "source": "origin"}]}
+    TickMixin._read_boards(str(root), {"boards": pulled_not, "work_orders": wos}, False, True, "t8")
+    assert calls[-1] is True
+
+
+@pytest.mark.unit
+def test_a_pass_for_the_board_alone_keeps_the_ledger_unread(tmp_path, monkeypatch):
+    """`_read_repos` with the board's clock and no ledger due reads the board and leaves the ledger
+    as the last reading had it — the 200k-token file is not parsed every minute."""
+    from sessionorc import reports
+    from sessionorc.agent_tick import TickMixin
+
+    monkeypatch.setattr(reports, "pr_reading", lambda root, now, **kw: {"open": []})
+    root = _repo(tmp_path, DECIDED)
+    full = TickMixin._read_repos([str(root)], {}, {str(root)})[str(root)]
+    assert full["boards"]["boards"][0]["items"]
+    monkeypatch.setattr(ledger_mod, "reading", lambda *a, **kw: pytest.fail("the ledger was read"))
+    (root / workorders.BOARD).write_text((root / workorders.BOARD).read_text().replace(DECIDED + "\n", ""))
+    alone = TickMixin._read_repos([str(root)], {str(root): full}, set(), None, None, set(), True)[str(root)]
+    assert alone["ledger"] == full["ledger"]
+    assert alone["boards"]["boards"][0]["items"] == [] and alone["work_orders"]["orders"] == []
