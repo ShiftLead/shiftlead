@@ -47,6 +47,7 @@ from sessionorc.agent_common import (
     LAUNCH_KEYS,
     LEASE_TTL,
     MODEL_EVERY,
+    ORPHAN_AFTER,
     OWED_NAMED,
     PRUNE_EVERY,
     REMOVED_GUARD_SECONDS,
@@ -132,6 +133,13 @@ def _carry_live(reading: dict[str, Any], old: dict[str, Any]) -> None:
             e["live"] = was[str(e.get("id"))]
 
 
+def _orders(r: dict[str, Any] | None) -> list[Any]:
+    """A repo reading's work orders: the board's decided lines (TD-384), then its red PRs nobody holds
+    (`pr_orders`, TD-613)."""
+    r = r or {}
+    return [*((r.get("work_orders") or {}).get("orders") or []), *((r.get("pr_orders") or {}).get("orders") or [])]
+
+
 class TickMixin:
     # -- reconcile -------------------------------------------------------------------------------
     #
@@ -184,6 +192,7 @@ class TickMixin:
             self._repos_task = asyncio.create_task(self._refresh_repos())
         if self.mode == "home":
             await self._balance_marks(snapshot_at)
+            await self._red_prs(snapshot_at)
         if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
             # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
             self._promote_task = asyncio.create_task(self._refresh_promotes())
@@ -1353,8 +1362,7 @@ class TickMixin:
         ledger_ids = matching(led["entries"])
         # the board's decided lines are work in the lane too (§6 rule 6, TD-384): never in the first
         # `lane_seen`, so one that sat unclaimed while its member declared is told on the next tick
-        wos = (self._repos.get(s.repo or "") or {}).get("work_orders") or {}
-        order_ids = [i for i in matching(wos.get("orders") or []) if i not in ledger_ids]
+        order_ids = [i for i in matching(_orders(self._repos.get(s.repo or ""))) if i not in ledger_ids]
         ids = ledger_ids + order_ids
         if s.lane_seen is None:
             seen, read = list(ledger_ids), "the reading at this tick"
@@ -1409,7 +1417,7 @@ class TickMixin:
             # and on: an entry merged since the declaration is told on this tick
         # the lane's memory, never the ledger's (§6 rule 6, TD-407): an id the lane no longer takes
         # leaves it, written for a gone member as for a live one, so an entry that comes back is news
-        pruned, new = work_mod.reread(s, [*led["entries"], *(wos.get("orders") or [])])
+        pruned, new = work_mod.reread(s, [*led["entries"], *_orders(self._repos.get(s.repo or ""))])
         if pruned is not s.lane_seen:
             s.lane_seen = pruned
             self._save(s)
@@ -1580,7 +1588,7 @@ class TickMixin:
                 continue
             ids = news.setdefault(str(r.repo), {}).setdefault(r.name, [])
             # the repo's work orders count as entries do (§6 rule 8, TD-384): a decided line starts its team
-            orders = ((self._repos.get(r.repo or "") or {}).get("work_orders") or {}).get("orders") or []
+            orders = _orders(self._repos.get(r.repo or ""))
             ids.extend(i for i in work_mod.gained(r, [*led["entries"], *orders]) if i not in ids)
         news = {repo: {m: ids for m, ids in ms.items() if ids} for repo, ms in news.items()}
         news = {repo: ms for repo, ms in news.items() if ms}
@@ -2398,7 +2406,7 @@ class TickMixin:
         led = r.get("ledger") or {}
         if "error" in led or not isinstance(led.get("entries"), list):
             return None
-        return [*led["entries"], *((r.get("work_orders") or {}).get("orders") or [])]
+        return [*led["entries"], *_orders(r)]
 
     @staticmethod
     def _seat_lane_word(s: Session) -> list[str]:
@@ -2643,6 +2651,10 @@ class TickMixin:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             for root in todo:
                 self._ledger_mtime[root] = mtimes.get(root)
+            for r, v in got.items():
+                # the red PRs' orders and memory are the tick's (`_red_prs`), never the read's: carried
+                if (po := (self._repos.get(r) or {}).get("pr_orders")) is not None:
+                    v.setdefault("pr_orders", po)
             changed = {r: v for r, v in got.items() if v != self._repos.get(r)}
             for r in gone:
                 self._repos.pop(r, None)
@@ -2656,6 +2668,35 @@ class TickMixin:
                 await self._broadcast({"event": "repos", "root": r, "repo": None})
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("reading the repo facts failed")
+
+    async def _red_prs(self, now: datetime) -> None:
+        """Design §4.4 *A red PR nobody holds is a work order* (TD-613): on every tick at the home, each
+        repo's open PRs that have read red or conflicting for `ORPHAN_AFTER` are read against the live
+        records of that repo — an unheld one is a `pr:<n>` order under the reading's `pr_orders`, an
+        idle holder is told once per red spell (a `system` note, outside the wake budget), and `after`
+        that, still idle, no longer holds it. A change is saved and pushed as a `repos` event."""
+        records = [r for r in self._graph().values() if r.repo]
+        for root, r in list(self._repos.items()):
+            try:
+                prs = (r.get("prs") or {}).get("open") or []
+                old = r.get("pr_orders") or {}
+                mine = [x for x in records if x.repo == root]
+                orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)
+                by_id = {x.id: x for x in mine}
+                for sid, pr in notes:
+                    rec = by_id[sid]  # addressed as mail is: a node's record as `<id>@<host>`
+                    self._system_note(self._address(rec), workorders.pr_note(pr), wake="uncharged", team=rec.team)
+                    log.info("%s: told PR #%s is red with it idle", sid, pr["number"])
+                new = {"orders": orders, "told": told}
+                if new == {"orders": old.get("orders") or [], "told": old.get("told") or {}}:
+                    continue
+                if (cur := self._repos.get(root)) is None:
+                    continue  # dropped from the registry while this pass ran
+                self._repos[root] = {**cur, "pr_orders": new}  # never the snapshot: a re-read may have landed
+                self.repos_store.save(self._repos)
+                await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
+            except Exception:  # noqa: BLE001 — one repo's surprise is a log line; the next tick reads again
+                log.exception("reading the red PRs of %s failed", root)
 
     def _repo_view(self, root: str) -> dict[str, Any] | None:
         """A checkout's reading as the `repos` RPC and event serve it: the reading, and under

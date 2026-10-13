@@ -192,3 +192,125 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     (root / "scripts" / "nudge_user_attention.py").unlink()  # no reader: said, never *reworded or closed*
     assert cli.main(["board", "show", key]) == 1
     assert "has no board reader (scripts/nudge_user_attention.py)" in capsys.readouterr().err
+
+
+# -- a red PR nobody holds (design §4.4, TD-613) ---------------------------------------------------
+
+from datetime import UTC, datetime, timedelta  # noqa: E402
+
+from sessionorc.models import ProgressEntry  # noqa: E402
+
+HOUR = timedelta(hours=1)
+T0 = datetime(2026, 10, 12, 12, 0, tzinfo=UTC)
+
+
+def _red(n=1573, since=T0, **kw):
+    pr = {"number": n, "title": "sync dev-cadence", "url": f"https://github.com/o/r/pull/{n}", "branch": f"b{n}"}
+    return {**pr, "author": "a", "checks": "red", "failing": ["test (3.13)"], "red_since": since.isoformat(), **kw}
+
+
+def _rec(sid="ao-g1", state="idle", **kw):
+    return Session(id=sid, name=sid, kind="interactive", adapter="shell", dir="/tmp", state=state, **kw)
+
+
+@pytest.mark.unit
+def test_an_unheld_red_pr_is_an_order_after_orphan_after_and_not_before():
+    prs = [_red(), {"number": 9, "branch": "b9", "checks": "green"}, {"number": 8, "checks": "pending"}]
+    assert workorders.red_prs(prs, [], T0 + HOUR - timedelta(seconds=1), {}, HOUR) == ([], {}, [])
+    orders, told, notes = workorders.red_prs(prs, [], T0 + HOUR, {}, HOUR)
+    (o,) = orders
+    assert (o["id"], o["priority"], o["pickable"], o["work_order"], o["pr_order"]) == (
+        "pr:1573",
+        "High",
+        "yes",
+        True,
+        True,
+    )
+    assert o["title"] == "sync dev-cadence"
+    assert o["context"] == "https://github.com/o/r/pull/1573 · test (3.13)"
+    assert (told, notes) == ({}, [])
+    assert workorders.is_pr_order("pr:1573") and not workorders.is_pr_order("pr:x")
+    assert not workorders.is_work_order("pr:1573")  # a board line's id is still `board:` alone
+    # a conflicting one names it in its context
+    (c,) = workorders.red_prs([_red(failing=[], checks="green", conflicting=True)], [], T0 + HOUR, {}, HOUR)[0]
+    assert c["context"].endswith(" · conflicting")
+
+
+@pytest.mark.unit
+def test_a_red_pr_held_by_a_working_record_is_no_order_and_nobody_is_told():
+    by_branch = _rec(state="working", git={"branch": "b1573"})
+    by_claim = _rec("ao-a", state="working", progress=[ProgressEntry(ref="pr:1573")])
+    by_pr = _rec("ao-b", state="working", progress=[ProgressEntry(ref="TD-613", pr=1573, status="done")])
+    for r in (by_branch, by_claim, by_pr):
+        assert workorders.red_prs([_red()], [r], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    # a holder that is gone, closed or out of work holds nothing
+    for gone in (_rec(state="exited", git={"branch": "b1573"}), _rec(git={"branch": "b1573"}, out_of_work={"at": "x"})):
+        assert workorders.red_prs([_red()], [gone], T0 + HOUR, {}, HOUR)[0]
+
+
+@pytest.mark.unit
+def test_an_idle_holder_is_told_once_then_after_a_second_bound_the_pr_is_an_order():
+    holder = _rec(git={"branch": "b1573"})
+    orders, told, notes = workorders.red_prs([_red()], [holder], T0 + HOUR, {}, HOUR)
+    assert orders == [] and [(sid, p["number"]) for sid, p in notes] == [("ao-g1", 1573)]
+    assert told == {"1573": {"red_since": T0.isoformat(), "at": (T0 + HOUR).isoformat()}}
+    assert "PR #1573 has been red since" in workorders.pr_note(notes[0][1])
+    assert "test (3.13) — fix it or say why" in workorders.pr_note(notes[0][1])
+    # told: no second note, no order before the second bound
+    later = workorders.red_prs([_red()], [holder], T0 + 2 * HOUR - timedelta(seconds=1), told, HOUR)
+    assert later == ([], told, [])
+    orders, kept, notes = workorders.red_prs([_red()], [holder], T0 + 2 * HOUR, told, HOUR)
+    assert [o["id"] for o in orders] == ["pr:1573"] and kept == told and notes == []
+    # a new red spell (another red_since) starts over: told again
+    again = workorders.red_prs([_red(since=T0 + 3 * HOUR)], [holder], T0 + 4 * HOUR, told, HOUR)
+    assert again[0] == [] and len(again[2]) == 1
+    # green: the memory goes with it
+    assert workorders.red_prs([{"number": 1573, "checks": "green"}], [holder], T0 + 2 * HOUR, told, HOUR)[1] == {}
+
+
+@pytest.mark.unit
+def test_a_red_pr_order_is_the_anchor_lanes_and_free_picks_only_with_free_pick():
+    o = workorders.pr_order(_red())
+    assert ledger_mod.lane_matches(["anchor"], o)
+    assert not ledger_mod.lane_matches(["free-pick"], o)
+    assert not ledger_mod.lane_matches(["free-pick", "owner:grinder"], o)
+    assert ledger_mod.lane_matches(["free-pick"], {**o, "free_pick": True})
+    assert not ledger_mod.lane_matches(["design-first"], o)
+
+
+async def test_the_home_tells_an_idle_holder_and_lists_an_unheld_red_pr(agent, tmp_path):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    holder = _rec("ao-holder", git={"branch": "b1"}, repo=root, host=agent.host)
+    elsewhere = _rec("ao-other", state="working", git={"branch": "b2"}, repo=str(tmp_path / "other"))
+    agent.sessions[holder.id] = holder
+    agent.sessions[elsewhere.id] = elsewhere
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": [_red(1, branch="b1"), _red(2, branch="b2")]}}
+    now = T0 + HOUR
+    await agent._red_prs(now)
+    po = agent._repos[root]["pr_orders"]
+    # PR 2's head is a branch of a session in another repo: it holds nothing here
+    assert [o["id"] for o in po["orders"]] == ["pr:2"] and set(po["told"]) == {"1"}
+    (note,) = [e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]
+    assert note.text.startswith("PR #1 has been red since") and note.uncharged
+    await agent._red_prs(now + timedelta(minutes=5))  # once per red spell
+    assert len([e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]) == 1
+    from sessionorc.agent_tick import _orders
+
+    assert [o["id"] for o in _orders(agent._repos[root])] == ["pr:2"]
+
+
+async def test_an_idle_holder_on_a_node_is_told_at_its_address(agent, tmp_path):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    node = _rec("ao-far", git={"branch": "b1"}, repo=root, host="far")
+    agent.remote["far"] = {node.id: node}
+    agent._repos[root] = {"name": "repo", "root": root, "prs": {"open": [_red(1, branch="b1")]}}
+    await agent._red_prs(T0 + HOUR)
+    assert agent._repos[root]["pr_orders"]["orders"] == []
+    (note,) = [e for e in node.inbox if e.from_ == "system"]
+    assert note.to == ["ao-far@far"] and note.text.startswith("PR #1 has been red")
