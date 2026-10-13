@@ -45,6 +45,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-20 (TD-059): session desks and supervisors surveyed (agentboss, agent-director, multi-agent-shogun, claude-code-orchestrator, tmux_claude_codex_dashboard, orchardist) ([ADR](decisions/2026-09-20-session-desk-neighbours.md)).
 - 2026-10-13 (Paul): Grok Bot surveyed ([ADR](decisions/2026-10-13-grok-bot.md)): it takes the "org of agents" concept for office work on a vendor cloud, with the model routed by the vendor (Claude Opus 5.5 among them, announced 2026-10-07, no picker, not bring-your-own-key); not the job of driving the person's own coding agents in their repos.
 - 2026-10-13 (Paul): Muse surveyed ([ADR](decisions/2026-10-13-muse.md)): Meta's consumer agent on Meta's cloud and models, which shares only the works-while-away, asks-for-approval loop; its sibling Muse Code is a harness shiftlead could run, not a rival. The Grok Bot ADR gained *Can it run with shiftlead?*: no inbound API, and a Bot driving `ao` or the UI would act as the person.
+- 2026-10-13 (Paul): Hermes Agent surveyed ([ADR](decisions/2026-10-13-hermes-agent.md)): the nearest of the day's three — open source, self-hosted and model-neutral, with a Kanban board of workers that review, use worktrees and complete on a PR's required checks; it differs in being its own harness (headless workers, one host, Claude Max only through extra usage), so shiftlead could run it as a tool rather than be replaced by it.
 
 ## 4. Architecture
 

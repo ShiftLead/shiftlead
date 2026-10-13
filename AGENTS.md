@@ -160,6 +160,7 @@ header belong to dev-cadence: edit them there, never here.
 | What is settable, where each setting lives, and why the Settings page and the one settings file are shaped as they are | [docs/decisions/2026-09-25-settings-audit.md](docs/decisions/2026-09-25-settings-audit.md) |
 | Whether Grok Bot (SpaceXAI's "AI teammates", Cursor-billed) takes shiftlead's ground, and what its Claude routing is | [docs/decisions/2026-10-13-grok-bot.md](docs/decisions/2026-10-13-grok-bot.md) |
 | Whether Meta's Muse (a consumer personal agent) takes shiftlead's ground, who each is for, and Muse Code as a harness to run | [docs/decisions/2026-10-13-muse.md](docs/decisions/2026-10-13-muse.md) |
+| Whether Nous Research's Hermes Agent (open-source, self-hosted, with a Kanban board of workers) takes shiftlead's ground, and how shiftlead could run it | [docs/decisions/2026-10-13-hermes-agent.md](docs/decisions/2026-10-13-hermes-agent.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | [docs/cadence.md](docs/cadence.md) |
 | Known issues and deferred work | [docs/technical_debt.md](docs/technical_debt.md) |
