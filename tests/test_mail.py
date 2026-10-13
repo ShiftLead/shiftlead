@@ -1327,7 +1327,8 @@ async def test_a_create_under_the_askers_name_adopts_its_orphaned_questions(agen
         w = await mk("w", unattended=True)
         async with LocalClient(caller=w) as s:
             ask = (await s.call("msg", to="person", text="which?", kind="ask", about="TD-149"))["entry"]["id"]
-            sent = await s.call("msg", to="person", text="or?", kind="steer", default="the x", about="TD-7", bound=1)
+            # a bound no runner's close and create outlast (TD-612): the sweep lapses it by the clock it is handed
+            sent = await s.call("msg", to="person", text="or?", kind="steer", default="the x", about="TD-7", bound=600)
             steer = sent["entry"]["id"]
         await person.call("close", id=w)
         w2 = await mk("w", unattended=True)
@@ -1337,8 +1338,7 @@ async def test_a_create_under_the_askers_name_adopts_its_orphaned_questions(agen
         assert entries[steer]["orphaned"] is None and entries[steer]["closed_reason"] is None
         rep = await person.call("msg", text="the first", kind="reply", reply_to=ask)
         assert rep["delivered"] == [w2]
-        await asyncio.sleep(1.1)
-        await agent._sweep_mail(datetime.now(UTC))
+        await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=601))
         told = [e["text"] for e in (await person.call("inbox", id=w2))["entries"] if e["from"] == "system"]
         assert told == [f'steer {steer} about TD-7 lapsed: the default was "the x"']
 
