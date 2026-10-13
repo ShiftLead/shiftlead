@@ -226,14 +226,33 @@ def _pr(n: int, state: str, created: datetime, closed: datetime | None = None, *
     }
 
 
-def _fake_gh(monkeypatch, open_prs, all_prs, fail=None):
+def _gh_count(all_prs, field):
+    """GitHub's `issueCount` for one `-F key=repo:… is:pr created|closed:>TS` search over `all_prs`."""
+    key, q = field.split("=", 1)
+    word, start = q.rsplit(" ", 1)[1].split(":>", 1)
+    start = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    stamp = ("createdAt",) if word == "created" else ("mergedAt", "closedAt")
+    n = 0
+    for p in all_prs:
+        t = next((p[k] for k in stamp if p.get(k)), None)
+        n += bool(t and datetime.fromisoformat(t.replace("Z", "+00:00")) > start)
+    return key, {"issueCount": n}
+
+
+def _fake_gh(monkeypatch, open_prs, all_prs, fail=None, count_fail=None):
     calls = []
 
     def run(argv, **kw):
         calls.append(argv)
         if fail:
             return subprocess.CompletedProcess(argv, 1, "", fail)
-        body = open_prs if "open" in argv else all_prs
+        if argv[1] == "api":  # the windows' counts (TD-625), from every PR, never a list's cut
+            if count_fail:
+                return subprocess.CompletedProcess(argv, 1, "", count_fail)
+            fields = [argv[i + 1] for i, a in enumerate(argv) if a == "-F"]
+            data = dict(_gh_count(all_prs, f) for f in fields)
+            return subprocess.CompletedProcess(argv, 0, json.dumps({"data": data}), "")
+        body = open_prs if "open" in argv else all_prs[: int(argv[argv.index("--limit") + 1])]
         return subprocess.CompletedProcess(argv, 0, json.dumps(body), "")
 
     monkeypatch.setattr(reports.subprocess, "run", run)
@@ -258,8 +277,31 @@ def test_pr_reading_counts_openings_and_closes_per_window(tmp_path, monkeypatch)
         "month": {"opened": 3, "closed": 2},
     }
     assert [p["number"] for p in r["recent"]] == [4, 2, 3]
-    assert "truncated" not in r
+    assert "recent_cut" not in r
     assert any("updated:>=" in " ".join(c) for c in calls)
+
+
+def test_a_month_past_the_search_cap_counts_every_pr_and_says_recent_is_cut(tmp_path, monkeypatch):
+    """TD-625: `gh pr list --search` stops at 1000 results, so a month of 1500 PRs read 1000. The
+    counts are GitHub's `issueCount`; `recent` is the newest `limit`, and the reading says so."""
+    now = datetime.now(UTC)
+    day = timedelta(days=1)
+    month = [_pr(n, "merged", now - 20 * day - timedelta(minutes=n), now - 19 * day) for n in range(1500)]
+    calls = _fake_gh(monkeypatch, [], month)
+    r = reports.pr_reading(tmp_path, now)
+    assert r["windows"]["month"] == {"opened": 1500, "closed": 1500}
+    assert r["windows"]["week"] == {"opened": 0, "closed": 0}
+    assert len(r["recent"]) == 1000 and r["recent_cut"] is True
+    graphql = next(c for c in calls if c[1] == "api")
+    assert sum(a == "-F" for a in graphql) == 6
+    assert all("repo:{owner}/{repo} is:pr " in graphql[i + 1] for i, a in enumerate(graphql) if a == "-F")
+
+
+def test_a_count_that_could_not_be_read_is_an_error_never_the_lists_length(tmp_path, monkeypatch):
+    now = datetime.now(UTC)
+    merged = _pr(2, "merged", now - timedelta(days=2), now - timedelta(hours=3))
+    _fake_gh(monkeypatch, [], [merged], count_fail="HTTP 502")
+    assert reports.pr_reading(tmp_path, now) == {"error": "HTTP 502"}
 
 
 def test_pr_reading_that_failed_is_an_error_never_zero(tmp_path, monkeypatch):
@@ -919,7 +961,7 @@ def test_the_open_read_asks_for_checks_and_merge_state_and_the_all_read_does_not
     now = datetime.now(UTC)
     calls = _fake_gh(monkeypatch, [_pr(1, "open", now - timedelta(hours=2))], [])
     r = reports.pr_reading(tmp_path, now)
-    fields = {("open" in c): c[c.index("--json") + 1] for c in calls}
+    fields = {("open" in c): c[c.index("--json") + 1] for c in calls if c[1] == "pr"}
     assert "statusCheckRollup" in fields[True] and "mergeStateStatus" in fields[True]
     assert "statusCheckRollup" not in fields[False]
     assert (r["open"][0]["checks"], r["open"][0]["conflicting"]) == ("none", False)

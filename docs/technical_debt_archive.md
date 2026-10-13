@@ -10853,3 +10853,38 @@ Both are behaviours the PR built and the design left unwritten; neither is a bug
 **Related:** TD-614 (the design), TD-603 / TD-607 (the line's id), TD-584 / TD-585 (the reader becomes ledgerboard's), TD-611.
 
 **Resolved:** 2026-10-13 (grinder-ao-2, PR #1633) — the board reader runs only in the host agent (#1624); the Inbox's board rows, the Due strip and the Repo page draw `boards` from the `repos` RPC, `ao repo` and `ao board show` read it, and a press is in the reading before its RPC answers. The builder's look on a scratch home with a bare origin and the fake forge: 5 rows with their ids from the reading, a Done landed and the next draw showed 4, *Needs you* 3 → 2 on the Inbox and the Org top bar (the PR's *UI check*). Found on the way: TD-626 (a stopped fetch's plain read carries no *fetch skipped* note).
+
+## TD-625: The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/reports.py` (`pr_reading`, its second `_gh_prs` read and `truncated`),
+`src/shiftlead/ui/org.py` (the facet's `prs`), `src/shiftlead/ui/templates/team_summary.html` (the
+*closed* block's `+`), design §4.4 *Repo facts* (**Pull requests**).
+
+**Why:** Paul (2026-10-13): *the count for PRs in the Pull Requests card seems to top out at 999 or
+1000+ — fix it to show the actual counts.* The windows come from one `gh pr list --state all --search
+updated:>=<a month ago> --limit 1000` read, and `gh pr list --search` goes through GitHub's search,
+which returns at most 1000 results whatever the limit: on 2026-10-13 that read gave 1000 PRs while
+GitHub counts 1533 (`search(query: "repo:… is:pr updated:>=2026-09-13") { issueCount }`). So the
+month's *opened* and *closed* are a floor drawn as a number (with a `+` on *closed* alone), raising
+`limit` changes nothing, and the 7-day window is complete only because the read is newest-first.
+`recent` — the month's PRs that the Repo page and TD-608's *completed* join by number — is cut the
+same way.
+
+**Fix:** take the counts from GitHub's own totals, not from a list's length: per window, one GraphQL
+`search(type: ISSUE) { issueCount }` for `is:pr created:>=<start>` and one for `is:pr closed:>=<start>`
+(a merge is a close) — six small queries per remote, on the same five-minute read; the qualifiers
+take a timestamp, so the windows stay rolling. Keep the list for `recent`, and where it must be
+whole, read it in date slices each under 1000 (or say in the reading that `recent` is the newest
+1000). Drop `truncated` and the `+` once the counts are totals, and change §4.4's sentence in the
+same PR. **Done when** the card's month reads the number `issueCount` gives, and a test feeds a
+month of more than 1000 PRs and gets its count.
+
+**Related:** TD-176 (the two reads), TD-608 (*completed* joins `recent`), TD-611 (the PR count in the polls).
+
+**Resolved:** 2026-10-13 (PR #1637) — `reports._gh_counts` reads the six window counts as GitHub's `issueCount` in one `gh api graphql` request; a count that could not be read is the reading's `error`; the month's list stays for `recent`, which says `recent_cut` when it fills its 1000; `truncated` and the facet's `+` are gone; §4.4 *Repo facts* says so. `tests/test_repo_facts.py::test_a_month_past_the_search_cap_counts_every_pr_and_says_recent_is_cut` feeds 1500.

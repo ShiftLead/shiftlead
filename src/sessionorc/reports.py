@@ -15,7 +15,7 @@ import os
 import re
 import subprocess
 from collections.abc import Iterable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -349,6 +349,44 @@ def _gh_prs(
     return prs
 
 
+def _gh_counts(directory: Path | str, now: datetime, timeout: float) -> dict[str, dict[str, int]] | str:
+    """Each window's PRs *opened* (`created` in it) and *closed* (`closed` in it, a merge being one)
+    as GitHub counts them — `issueCount` of one search per window and word, six in one GraphQL
+    request, the repo the checkout's (`{owner}/{repo}`, which `gh api` fills in) — or why it could not
+    be read (TD-625). A count, not a list: `gh pr list --search` stops at 1000 results, so a busy
+    month's list is a floor."""
+    keys = {f"{w}_{word}": (w, word) for w in PR_WINDOWS for word in ("opened", "closed")}
+    query = "query({}){{{}}}".format(
+        ",".join(f"${k}:String!" for k in keys),
+        " ".join(f"{k}:search(query:${k},type:ISSUE){{issueCount}}" for k in keys),
+    )
+    fields: list[str] = []
+    for k, (w, word) in keys.items():
+        start = (now - PR_WINDOWS[w]).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        qualifier = "created" if word == "opened" else "closed"
+        fields += ["-F", f"{k}=repo:{{owner}}/{{repo}} is:pr {qualifier}:>{start}"]
+    try:
+        cp = subprocess.run(
+            ["gh", "api", "graphql", "-f", f"query={query}", *fields],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh api graphql failed"])[-1][:200]
+    try:
+        data = (json.loads(cp.stdout or "{}") or {}).get("data") or {}
+    except (json.JSONDecodeError, AttributeError):
+        return "gh api graphql printed something that is not JSON"
+    windows: dict[str, dict[str, int]] = {w: {} for w in PR_WINDOWS}
+    for k, (w, word) in keys.items():
+        n = (data.get(k) or {}).get("issueCount") if isinstance(data, dict) else None
+        if not isinstance(n, int):
+            return f"gh api graphql gave no count for {k}"
+        windows[w][word] = n
+    return windows
+
+
 def pr_reading(
     directory: Path | str,
     now: datetime,
@@ -356,12 +394,13 @@ def pr_reading(
     timeout: float = 30.0,
     old: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): two
-    `gh` reads — the open PRs, and every PR updated in the longest window — kept as `open` (oldest
+    """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): three
+    `gh` reads — the open PRs, every PR updated in the longest window, and the windows' counts — kept as `open` (oldest
     first), `windows` (`{day|week|month: {opened, closed}}`: `createdAt` in the window is an
     opening, `closedAt` or `mergedAt` a close, a merge being one) and `recent` (every PR opened or
-    closed in the longest window, newest first); `truncated` when the second read filled its
-    `limit`, so the month's counts are a floor. **A read that could not be made is `{"error":
+    closed in the longest window, newest first, at most `limit` of them: `recent_cut` when the read
+    filled it). The window counts are GitHub's own totals (`_gh_counts`), never the list's length:
+    its search stops at 1000 results whatever the limit (TD-625). **A read that could not be made is `{"error":
     why}`**, never an empty reading: for a count, *no PRs* and *could not look* must not read the
     same — `merged_prs`'s rule, not `_prs`'s. Each open PR carries `checks`, `failing`, `conflicting`
     and, while it is red or conflicting, `red_since`: the first reading that saw it so, taken from
@@ -383,18 +422,14 @@ def pr_reading(
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):
         return {"error": prs}
-    windows: dict[str, dict[str, int]] = {}
-    for w, span in PR_WINDOWS.items():
-        start = now - span
-        windows[w] = {
-            "opened": sum(1 for p in prs if (t := _when(p["created"])) and t > start),
-            "closed": sum(1 for p in prs if (t := _when(p["closed"])) and t > start),
-        }
+    windows = _gh_counts(directory, now, timeout)
+    if isinstance(windows, str):
+        return {"error": windows}
     recent = [p for p in prs if ((t := _when(p["created"])) and t > since) or ((c := _when(p["closed"])) and c > since)]
     recent.sort(key=lambda p: max(filter(None, (_when(p["created"]), _when(p["closed"])))), reverse=True)
     open_.sort(key=lambda p: p["created"] or "")
     out = {"open": open_, "windows": windows, "recent": recent, "at": now.isoformat()}
-    return {**out, "truncated": True} if len(prs) >= limit else out
+    return {**out, "recent_cut": True} if len(prs) >= limit else out
 
 
 def _prs_for_head(directory: Path | str, branch: str, timeout: float = 10.0) -> list[dict[str, Any]] | None:
