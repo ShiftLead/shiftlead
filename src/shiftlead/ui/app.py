@@ -3054,7 +3054,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # **poll** answered a bare 503, which the client could only drop on the floor — the
             # rows would sit there looking current (design §4.5 *there is no silent failure path*,
             # TD-069's leftover). So the poll says it in a shape the page can render: no entries,
-            # no counts claimed, and the reason in words.
+            # no counts claimed, and the reason in words — on a `counts` read too, whose
+            # `agent_down` and `why` are the same here and the rest is empty.
             return {
                 "entries": [],
                 "sections": {k: [] for k in INBOX_SECTIONS},

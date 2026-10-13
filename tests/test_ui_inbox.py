@@ -526,6 +526,10 @@ def test_the_counts_read_is_the_full_reads_numbers_and_renders_nothing(client, t
     assert got["needs"] == 1 and got["fyi_n"] == 1 and got["agent_down"] is False
     client.get("/api/person/inbox")
     assert "inbox_rows.html" in renders  # the spy sees the full read's renders
+    # the two pages that redraw their rows from the poll ask for the full read (review of #1610)
+    js = (UI / "static" / "app.js").read_text()
+    assert "const got = await AO.refreshInboxCount(true);" in js.split("async function refreshInbox()")[1][:200]
+    assert "const got = await AO.refreshInboxCount(true);" in js.split("AO.refreshInboxPage = async")[1][:200]
 
 
 @pytest.mark.integration
