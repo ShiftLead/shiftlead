@@ -2893,7 +2893,7 @@ class TickMixin:
             if remote and remote in by_remote:
                 prs = by_remote[remote]
             else:
-                fresh = reports.pr_reading(root, now)
+                fresh = reports.pr_reading(root, now, old=prs)
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
