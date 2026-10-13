@@ -929,3 +929,23 @@ async def test_the_home_hands_each_pr_read_the_last_reading_so_red_since_is_kept
     await agent._refresh_repos()
     assert olds[0] is None and olds[1]["open"][0]["number"] == 9
     assert agent._repos[str(repo)]["prs"]["open"][0]["red_since"] == first
+
+
+def test_a_commit_status_folds_and_an_unknown_merge_state_keeps_the_last_word(tmp_path, monkeypatch):
+    assert reports.fold_checks([_status("ci/x", "FAILURE")]) == ("red", ["ci/x"])
+    assert reports.fold_checks([_status("ci/x", "EXPECTED")]) == ("pending", [])
+    assert reports.fold_checks([_run("a", "WAITING", "")]) == ("pending", [])
+    t0 = datetime.now(UTC)
+    dirty = _pr(6, "open", t0 - timedelta(days=1), statusCheckRollup=[_run("a")], mergeStateStatus="DIRTY")
+    _fake_gh(monkeypatch, [dirty], [])
+    first = reports.pr_reading(tmp_path, t0)
+    assert "merge_state" not in first["open"][0]
+    # gh recomputing after a push: UNKNOWN keeps the PR conflicting and its clock; a failed read
+    # in between (the tick keeps the last `open` beside the error) carries it too
+    kept = {**first, "error": "gh: offline", "failed_at": t0.isoformat()}
+    _fake_gh(monkeypatch, [{**dirty, "mergeStateStatus": "UNKNOWN"}], [])
+    second = reports.pr_reading(tmp_path, t0 + timedelta(minutes=10), old=kept)
+    assert second["open"][0]["conflicting"] and second["open"][0]["red_since"] == t0.isoformat()
+    # never conflicting before, UNKNOWN is not conflicting
+    fresh = reports.pr_reading(tmp_path, t0)
+    assert not fresh["open"][0]["conflicting"] and "red_since" not in fresh["open"][0]

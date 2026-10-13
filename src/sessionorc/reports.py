@@ -342,7 +342,8 @@ def _gh_prs(
         }
         if fields == OPEN_PR_FIELDS:
             row["checks"], row["failing"] = fold_checks(p.get("statusCheckRollup"))
-            row["conflicting"] = str(p.get("mergeStateStatus") or "").upper() == "DIRTY"
+            row["merge_state"] = str(p.get("mergeStateStatus") or "").upper()
+            row["conflicting"] = row["merge_state"] == "DIRTY"
         prs.append(row)
     return prs
 
@@ -370,10 +371,13 @@ def pr_reading(
     open_ = _gh_prs(directory, ["--state", "open", "--limit", "200"], timeout, OPEN_PR_FIELDS)
     if isinstance(open_, str):
         return {"error": open_}
-    was = {p.get("number"): p.get("red_since") for p in (old or {}).get("open") or [] if isinstance(p, dict)}
+    olds = {p.get("number"): p for p in (old or {}).get("open") or [] if isinstance(p, dict)}
     for p in open_:
+        # gh says UNKNOWN while it recomputes the merge state (just after a push): keep the last word
+        if p.pop("merge_state", "") == "UNKNOWN" and olds.get(p["number"], {}).get("conflicting"):
+            p["conflicting"] = True
         if p["checks"] == "red" or p["conflicting"]:
-            p["red_since"] = was.get(p["number"]) or now.isoformat()
+            p["red_since"] = olds.get(p["number"], {}).get("red_since") or now.isoformat()
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):
