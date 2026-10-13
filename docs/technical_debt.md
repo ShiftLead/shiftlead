@@ -55,6 +55,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-608 | Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed* | Medium | Open |
 | TD-610 | The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two | Low | Open |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
+| TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Open |
+| TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Open |
 
 ---
 
@@ -926,6 +928,59 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Done when** a Focus tab sees no request above ~50 ms of loop time in steady state, `/api/person/inbox` is fetched only by the Inbox page, the UI's CPU falls well under today's ~17%, and the tests above pass. A re-measurement after the promote, journal counts and a static-file latency probe during a poll, is the live check.
 
 **Related:** TD-572 (archived: the light events stream for Focus), TD-599 / TD-602 (archived: *answered for you*'s Dismiss all; pressing it shrinks the largest section today), TD-131 (whole-file reads, a later scale).
+
+---
+
+## TD-613: A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 (the tick's policies), §4.9b (the anchor seat, the techlead seat), cadence §3 (the SessionStart nudge's *open PR older than 2 days* line); `src/sessionorc/agent_tick.py` (the repo reading's PRs, `reports.pr_reading`)
+
+**Why:** On 2026-10-12, dev-cadence's sync PR #1573 (ledgerboard v1.0) went red on CI. The sync note said *each repo's own session reviews and merges its PR*, but its author (`ao-dc-decouple`) sat idle in another repo, and ShiftLead's anchor, the session that would merge a sync, was closed. Nothing noticed until Paul asked hours later. The fix turned out to be real: the reader's new `ledgerboard` import broke tests and wrote `scripts/__pycache__` into checkouts. Today a PR belongs to its author until merge (cadence: merge only on a passing check). When the author is gone, moved on, or in another repo, the only signals are the SessionStart nudge after two days and `/stranded-work` by hand. The repo reading already holds every open PR's checks every `REPOS_EVERY`, so the host agent can see a red PR with no live author.
+
+**Fix:** design first.
+- Who owns it: a PR whose checks are red (or conflicting) for longer than a bound, and whose author holds no live lease on it, goes to a lane. The candidates: the team's anchor seat, since it merges syncs; the techlead seat for held paths; or a free-pick `fix-pr` item a grinder takes. Say which, and what the bound is.
+- What the owner does: fix it on the PR's branch, with an `ao msg` note to the author when it is live; or close it with a reason when it is superseded. Either way it goes through the usual cadence: review evidence, and the techlead for held paths.
+- A sync PR from dev-cadence or ledgerboard falls under the same rule. Its owner is never *nobody*.
+- Where it shows: the team card's *PRs in motion* and the Repo page mark a red PR with no owner.
+- Tests: a red PR with a live author is left alone; one with none is given to the lane after the bound; a green one never is.
+
+**Done when** a red or conflicting PR with no live author is picked up by a named seat within the bound, the card shows it, and the tests above pass.
+
+**Related:** #1573 (the case), TD-106 in dev-cadence (the sync), TD-611 (found the same afternoon).
+
+---
+
+## TD-614: The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.4 (*Repo facts*, *Board write-back*, the events stream), §4.5 (the top bar, the Inbox), §4.7 (`ao inbox`, `ao board show`); `src/shiftlead/ui/app.py` (`read_boards` ~L372, `api_person_inbox`, `api_sessions`, `events`); `src/shiftlead/ui/inbox.py` (`board_argv`, `BOARD_TTL`); `src/shiftlead/cli.py` (its own board read ~L1502); `src/sessionorc/agent_tick.py` (the repo reading's `workorders.read` ~L2904, every `REPOS_EVERY`)
+
+**Why:** Paul, 2026-10-12, on TD-611's `ao inbox --counts`: *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?* Today three processes compute the same things on their own clocks:
+- **The board.** The host agent runs every repo's board reader every `REPOS_EVERY` (300 s) for the work orders. The UI runs it again every `BOARD_TTL` (60 s) for the Inbox's rows, and `ao` runs it a third time. That is three subprocess runs of one file, each with its own failure note.
+- **The person inbox's counts.** The host agent holds the person inbox, but the UI computes *needs*, FYI, overdue and *answered* by fetching and rendering all of it (TD-611), on every page every 20 s.
+- **Per-session views.** `/api/sessions` and the Org stream rebuild `view()` for every session on every request or delta, per client. `pr_marks` repeats one repo's PRs once per session.
+
+**Fix:** design first. One principle: **the host agent keeps each reading once and pushes changes; clients read the reading, never re-derive it.**
+1. **One board reading** in the host agent: every board's items, read by the reader on the repo reading's clock and at once after a write-back, with the work orders derived from it. The UI's Inbox rows and `ao board show` read it over RPC, so the UI stops running the reader.
+2. **Inbox counts kept by the host agent:** recomputed whenever the person inbox, a board reading or the fleet changes, and pushed on the events stream as an `inbox` delta. The top bar updates from the stream with no poll. `ao inbox --counts` (TD-611 slice 1) reads the same numbers. TD-611's counts endpoint becomes the fallback for a client with no stream.
+3. **Per-session views computed once per delta** and fanned out to every client (TD-611 slice 4 in this form), with `pr_marks` sent once per repo, not once per session.
+4. Weigh, and say no where it does not pay: a revision number on each reading so a client can ask *changed since n?*; the PR and ledger readings are already central (*Repo facts*).
+- Mockups: none, since nothing drawn changes. §4.4 says which readings exist and who reads them.
+
+**Done when** the design names each reading's one owner and its push, and build entries exist for each slice. TD-611's slices 1 and 4 are re-pointed at them or marked as their first step.
+
+**Related:** TD-611 (the lag that found it), TD-131 (whole-file stores, a later scale), TD-384 (work orders from the board).
 
 ---
 
