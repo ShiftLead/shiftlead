@@ -392,6 +392,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-13 (TD-632, the designer; docs-audit-ao-1 found `MD` and `AD` drawn as links): **Focus side panel, Git card: changed files** — a deletion is a code whose last letter is `D` (`D`, `MD`, `AD`, `RD`); a file deleted and made again lists as `D` and `??`, text and a link.
 - 2026-10-13 (TD-630, the designer; mockup `AddEntry.dc.html`, shot `docs/mockups/reviews/2026-10-13-td630-add-entry-attach.png`): **Add entry form: Attach / drop / paste** — the composer's road on **What**. Built by TD-633.
 - 2026-10-13 (TD-627, the designer; Paul, 2026-10-13: *our git card in the focus session screen shows modified files — add links to those files so they can be opened in vscode/other*): **Focus side panel, Git card: changed files** — each path a link by the recent files' form; a deletion and a new directory stay text. Built by TD-628.
 - 2026-10-12 (TD-619, the designer): **flow changed — Apply** counts a profile difference. Built by TD-620.
