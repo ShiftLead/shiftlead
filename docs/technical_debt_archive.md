@@ -10927,4 +10927,4 @@ month of more than 1000 PRs and gets its count.
 
 **Related:** TD-627 (the design), TD-628 (the build), #1636.
 
-**Resolved:** 2026-10-13 (the designer, PR #1648) — §4.5a *Focus side panel, Git card: changed files* says a deletion is a code whose last letter is `D` (`D`, `MD`, `AD`, `RD`) and a `DM` links; TD-628's step 2 and tests name them.
+**Resolved:** 2026-10-13 (the designer, PR #1648) — §4.5a *Focus side panel, Git card: changed files* says a deletion is a code whose last letter is `D` (`D`, `MD`, `AD`, `RD`), a file deleted and made again listing as `D` and `??`; TD-628's step 2 and tests name them.

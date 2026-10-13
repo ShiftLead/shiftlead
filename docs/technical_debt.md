@@ -1013,9 +1013,9 @@ a click on a changed file on the Git card opens it in the person's editor.
 
 **Fix:**
 1. Split each `GitInfo.files` line at its first space into the code and the path; draw the code as text and the path as the recent files' link (`data-file` the path joined to the worktree's root — a porcelain path is relative to it, which is the record's directory or above it, as `app.js` ~L3631 resolves one for `isChanged` — the same class and handler), on first render and on the delta's redraw.
-2. Text, with a hover, for a line whose code ends in `D` — `D`, `MD`, `AD`, `RD` (*deleted in the worktree*; TD-632) — and a path ending in `/` (*a new directory: open it from the worktree's window*); a `DM` links.
+2. Text, with a hover, for a line whose code ends in `D` — `D`, `MD`, `AD`, `RD` (*deleted in the worktree*; TD-632) — and a path ending in `/` (*a new directory: open it from the worktree's window*); a file deleted and made again lists as `D` (text) and `??` (a link).
 3. No link where the editor button is not drawn (`open_in: none`, another host's record): the lines as today.
-4. Tests: a modified, an untracked and a conflicted path are links with the joined path; `D`, `MD`, `AD` and `RD` lines are text with the deletion's hover, a `DM` line a link, and a `dir/` text with its hover; under `open_in: none` every line is text; the delta's redraw draws the same as the first render.
+4. Tests: a modified, an untracked and a conflicted path are links with the joined path; `D`, `MD`, `AD` and `RD` lines are text with the deletion's hover, a `D c` with a `?? c` beside it draws the first as text and the second as a link, and a `dir/` text with its hover; under `open_in: none` every line is text; the delta's redraw draws the same as the first render.
 
 **Done when** a click on a changed file on the Focus Git card opens it in the person's editor by the same file link as the recent files, a deletion and a new directory stay text saying why, and the tests above pass; the builder's look (design §4.9b) is named in the PR.
 
