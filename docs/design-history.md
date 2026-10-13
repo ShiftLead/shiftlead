@@ -378,6 +378,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-12 (TD-611 slice 1; Paul, 2026-10-12: the Focus terminal lags again): the top bar's **Inbox** poll on every page but the Inbox's own reads the counts alone (`?counts=1`), not the full read — megabytes of rendered rows, thrown away, every 20 s, on the UI's one loop the Focus terminal shares.
 - 2026-10-12 (TD-604, the designer): the Repo facet's *closed* block links to the Repo page's *Recently completed* and lists its ids and titles on hover; the card draws no list. Built by TD-608.
 - 2026-10-12 (TD-603, the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td603-board-line-id.png`): **board row: id** — `board:<key>` on every board row's head line, copied on a click, sent with every press. Built by TD-607.
 - 2026-10-12 (TD-599, the designer; Paul, 2026-10-12, through Add entry: *evaluate if the "answered for you" section is redundant to fyi, and if so combine them; if not, add a "dismiss all" option*; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-12-td599-answered-dismiss-all.png`): **Inbox: *Answered for you*, Dismiss all** — the group is not redundant (each row is an answer given in the person's name that the person may Overrule; FYI holds none), so it stays apart and gains FYI's one-press clear of the rows on screen. Built by TD-602.

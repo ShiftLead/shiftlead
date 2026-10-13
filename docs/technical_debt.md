@@ -853,7 +853,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-paul; measured by two read-only agents on the live UI)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1's page half in PR #1610 (2026-10-12, grinder-ao-2): `/api/person/inbox?counts=1` answers the top bar's numbers from `inbox_sections` with nothing rendered, and every page but the Inbox page and a message page polls it. Left of slice 1: `ao inbox --counts` — the counts are the UI's (state rows, the board horizon), not the host agent's, so a shell read needs either the UI's endpoint or a home read of the board; its own slice. Slices 2–5 untouched.
 **Location:** `src/shiftlead/ui/static/app.js` (`refreshInboxCount` ~L1198 and the 20 s interval ~L1259 that runs it, or the Inbox's `refreshInboxPage`; Focus's `refreshMembership` ~L4370, called on a peer's event ~L4436); `src/shiftlead/ui/app.py` (`api_person_inbox` ~L3025–3105, `api_sessions` ~L2359, `events` ~L3381–3570); `src/shiftlead/ui/cards.py` (the `pr_marks` map ~L327); `src/shiftlead/ui/pty_bridge.py` (the queue ~L27, the pump ~L185)
 
 **Why:** Paul, 2026-10-12: the Focus terminal lags again, better after TD-572 (#1544) and slower by the day since. The pty bridge shares `shiftlead-ui`'s one asyncio loop with every handler, so any synchronous render holds every keystroke and output frame. Measured on the live UI (about an hour after a promote):

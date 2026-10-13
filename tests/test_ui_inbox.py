@@ -505,6 +505,34 @@ def test_the_page_the_count_and_the_poll_agree_and_reading_marks_nothing(client,
 
 
 @pytest.mark.integration
+def test_the_counts_read_is_the_full_reads_numbers_and_renders_nothing(client, tmp_path, monkeypatch):
+    """§4.5a Org top bar **Inbox** (TD-611): every page but the Inbox polls `?counts=1` — the same
+    `inbox_sections`, so the same numbers, but no template rendered and no entries sent, since the
+    full read is megabytes of markup on the loop the Focus terminal shares."""
+    import jinja2
+
+    from shiftlead.ui.app import INBOX_COUNTS
+
+    sender = sender_session(client, tmp_path)
+    send(sender, text="merge PR 9?", kind="ask")
+    send(sender, text="for your information", kind="note")
+    full = client.get("/api/person/inbox").json()
+    renders = []
+    real = jinja2.Environment.get_template
+    monkeypatch.setattr(jinja2.Environment, "get_template", lambda *a, **k: renders.append(a[1]) or real(*a, **k))
+    got = client.get("/api/person/inbox?counts=1&watching=1").json()
+    assert renders == []
+    assert set(got) == set(INBOX_COUNTS) and got == {k: full[k] for k in INBOX_COUNTS}
+    assert got["needs"] == 1 and got["fyi_n"] == 1 and got["agent_down"] is False
+    client.get("/api/person/inbox")
+    assert "inbox_rows.html" in renders  # the spy sees the full read's renders
+    # the two pages that redraw their rows from the poll ask for the full read (review of #1610)
+    js = (UI / "static" / "app.js").read_text()
+    assert "const got = await AO.refreshInboxCount(true);" in js.split("async function refreshInbox()")[1][:200]
+    assert "const got = await AO.refreshInboxCount(true);" in js.split("AO.refreshInboxPage = async")[1][:200]
+
+
+@pytest.mark.integration
 def test_snooze_hides_and_uncounts_an_entry_and_now_brings_it_back(client, tmp_path):
     """§4.10 *Snooze*: `/api/person/snooze` is `inbox_snooze` caller-less; the entry leaves its
     section and the count until its time, is listed under *snoozed*, and no `until` — the snoozed

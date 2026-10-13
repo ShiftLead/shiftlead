@@ -1195,11 +1195,14 @@
     });
   }
   let overdueN = null;  // the Needs you board items past their date, from the last poll (TD-178)
-  AO.refreshInboxCount = async function () {
+  // `full`: the Inbox's own pages, which redraw their rows from the read; every other page asks for
+  // the counts alone (TD-611), never the megabytes of rows it would throw away
+  AO.refreshInboxCount = async function (full) {
     let got;
     try {
       // a visible page says so (§4.10 *Told on Telegram*, *Looking*): a row on a screen is not told
-      const r = await fetch(document.visibilityState === "visible" ? "/api/person/inbox?watching=1" : "/api/person/inbox");
+      const q = [full ? "" : "counts=1", document.visibilityState === "visible" ? "watching=1" : ""].filter(Boolean);
+      const r = await fetch("/api/person/inbox" + (q.length ? `?${q.join("&")}` : ""));
       if (!r.ok) return null;
       got = await r.json();
     } catch (e) { return null; }
@@ -2363,7 +2366,7 @@
 
   let inboxDownWait = null, inboxDownLong = false;  // the grace's retry pending; it has fired (TD-372)
   async function refreshInbox() {
-    const got = await AO.refreshInboxCount();
+    const got = await AO.refreshInboxCount(true);
     const down = $("#agentdown");
     if (down) {
       // the banner the page renders at load, turned on and off by the poll: a host agent that goes
@@ -2720,7 +2723,7 @@
     let answered = false;
     document.addEventListener("click", (e) => { if (e.target.closest(".msgentry [data-act]")) answered = true; }, true);
     AO.refreshInboxPage = async () => {
-      const got = await AO.refreshInboxCount();
+      const got = await AO.refreshInboxCount(true);
       if (!answered || document.querySelector("dialog[open]")) return;
       answered = false;
       const still = got && got.sections && (got.sections[sec] || []).includes(page.dataset.msg);
