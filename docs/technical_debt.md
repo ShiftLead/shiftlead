@@ -53,6 +53,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-604 | Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work | Medium | Open |
 | TD-607 | Build TD-603: every board line's id is its derived `board:<key>` — drawn and copied on every board row, `ao board show`, `ao board edit --key`, and `key` on the write-back's RPCs | Medium | Open |
 | TD-609 | §4.9 says the dev-cadence registry is where a repo is registered; TD-590 made ShiftLead's own roster that, with dev-cadence's imported | Low | Open |
+| TD-610 | The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two | Low | Open |
 
 ---
 
@@ -865,6 +866,26 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** §4.9's sentence names the roster §5 *Repos* names, and `grep -rn "dev-cadence registry" docs/design/` finds none that is the only roster.
 
 **Related:** TD-590 (#1592), TD-584 (the design).
+
+---
+
+## TD-610: The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1592–#1599)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/briefs/techlead-context.md` L80–82 (*Nothing keys on a role, a team or a project*) and the table row L152 (*a worker may message up, down, sideways by team, and the person*); read against `docs/design/9-invariants.md` invariant 9 and `docs/design/4.10-messages.md` *across teams, by project*
+
+**Why:** The primer says *The one exception is mail's sideways edge between sessions that share a `team` badge (§4.10)*, and its §4.10 pointer row lists the edges as *up, down, sideways by team, and the person*. Since #1590/#1593 (TD-582, TD-601) the mail gate has a fifth edge, **project** (`mail.message_edge`: `if me.project and me.project == it.project: return "project"`), and invariant 9 says *its cross-team edge one carrying the same `project` badge … for a `manager: person` team the first is the only edge between members, and the second is the only one between teams*. #1593 edited the primer's §5 for the peer's agreement and left these two lines; the techlead is the seat that reads this file to decide what a teammate may ask of another team's session.
+
+**Fix:** reword L81 to the invariant's exception (the `team` and `project` badges, mail only) and the row at L152 to name the across-teams edge. A held path (`docs/briefs/**`): the techlead seat merges it.
+
+**Done when** the primer's exception names both badges the mail gate reads, as invariant 9 does.
+
+**Related:** TD-582 (#1590), TD-601 (#1593), TD-606 (the same drift in §4.9 and §4.2a).
 
 ---
 
