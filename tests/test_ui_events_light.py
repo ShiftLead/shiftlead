@@ -17,7 +17,7 @@ from test_ui_waiting_wiring import NOW, member, reading
 pytestmark = pytest.mark.unit
 
 
-def client(monkeypatch, tmp_path):
+def client(monkeypatch, tmp_path, hold=0.0):
     """g1 holds TD-301, g2 works. The agent pushes: g1's tail moves, g2 goes idle, g1's tail moves
     again, g1 drops its claim (no shape field: the groups wait for the flush) — and stays open long
     enough for one."""
@@ -49,6 +49,7 @@ def client(monkeypatch, tmp_path):
             return replies.get(method, {})
 
         async def subscribe(self):
+            await asyncio.sleep(hold)  # for the pages that join the one subscription before it pushes
             for s in pushed:
                 yield {"event": "session", "session": s}
             await asyncio.sleep(1.6)  # one HEADS_EVERY and some: the flush's turn
@@ -96,6 +97,59 @@ def test_a_light_stream_without_a_focus_hears_only_moves(tmp_path, monkeypatch):
     claim (`LIGHT_KEYS`: a light page draws claims, lanes and reports, which move no group)."""
     evs = received(client(monkeypatch, tmp_path), "/events?light=1")
     assert evs == [{"event": "session", "id": "g2", "state": "idle"}, {"event": "session", "id": "g1", "state": "idle"}]
+
+
+def test_three_pages_share_one_subscription_and_each_delta_is_computed_once(tmp_path, monkeypatch):
+    """§4.4 *Per-session views* (TD-617): one subscriber per UI process computes a delta's view, compact
+    form and card once, and every connected stream takes its part of that one result — two Org pages
+    get what a lone one gets, and a Focus page its record whole, with the deltas computed once."""
+    import threading
+
+    from shiftlead.ui import app as ui
+
+    c = client(monkeypatch, tmp_path, hold=0.5)
+    subscribed, computed = [], []
+    real_compact = ui.compact_in
+    monkeypatch.setattr(ui, "compact_in", lambda *a, **k: computed.append(1) or real_compact(*a, **k))
+    Fake = ui.LocalClient
+    real_sub = Fake.subscribe
+
+    def counting(self):
+        subscribed.append(1)
+        return real_sub(self)
+
+    monkeypatch.setattr(Fake, "subscribe", counting)
+    got: dict[str, list] = {}
+
+    def drain(ws, key):
+        got[key] = []
+        try:
+            while True:
+                if (ev := json.loads(ws.receive_text())).get("event") != "counts":
+                    got[key].append(ev)
+        except WebSocketDisconnect:
+            pass
+
+    with (
+        c,
+        c.websocket_connect("/events") as a,
+        c.websocket_connect("/events") as b,
+        c.websocket_connect("/events?light=1&focus=g1") as f,
+    ):
+        ts = [threading.Thread(target=drain, args=(w, k)) for w, k in ((a, "a"), (b, "b"), (f, "f"))]
+        for t in ts:
+            t.start()
+        for t in ts:
+            t.join(10)
+    # two: the events stream's one, and the counts keeper's (TD-616) — never one per page
+    assert subscribed == [1, 1], "every page made a subscription of its own"
+    assert len(computed) == 4, f"{len(computed)} views computed for 4 deltas and 3 pages"
+    assert got["a"] == got["b"] and [e["id"] for e in got["a"] if e["event"] == "session"] == ["g1", "g2", "g1", "g1"]
+    assert [e["id"] for e in got["f"]] == ["g1", "g2", "g1", "g1"] and "session" in got["f"][0]
+    full_alone = received(client(monkeypatch, tmp_path), "/events")
+    assert [(e["event"], e.get("id"), "groups" in e) for e in got["a"]] == [
+        (e["event"], e.get("id"), "groups" in e) for e in full_alone
+    ]
 
 
 def test_the_focus_and_inbox_pages_ask_for_the_light_stream():
