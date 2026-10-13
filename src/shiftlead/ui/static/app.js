@@ -2157,18 +2157,25 @@
     // *everything FYI holds now*: mail that arrived after the page was drawn is what must not go
     // unseen. The confirm says the number it is about, and the ids come off the DOM for that
     // reason. It sits in FYI's `<summary>`, so its press must not also fold the section.
-    const all = $("#dismissall");
-    if (all) all.addEventListener("click", async (e) => {
-      e.preventDefault(); e.stopPropagation();
-      const ids = [...$$("#rows-fyi .mailrow")].filter((r) => !r.hidden).map((r) => r.dataset.msg).filter(Boolean);  // on screen: a row the rail hides is not
-      if (!ids.length) return AO.toast("nothing in FYI to dismiss", true);
-      if (!confirm(`Dismiss ${ids.length} FYI ${ids.length === 1 ? "entry" : "entries"}? Only the ones on screen now — anything that arrives after this is untouched.`)) return;
-      try {
-        await act("person", "dismiss", { msg: ids });
-        AO.toast(`dismissed ${ids.length} — the sender is told where one was owed`, true);
-      } catch (err) { AO.toast(`dismiss failed: ${err.message}`); }
-      refreshInbox();
-    });
+    // §4.5a *Inbox: Answered for you, Dismiss all* (TD-599) is the same press on that group's rows,
+    // with its own words: an answer dismissed takes its Overrule with it.
+    const dismissOnScreen = (btn, rows, empty, ask) => {
+      if (btn) btn.addEventListener("click", async (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const ids = [...$$(rows)].filter((r) => !r.hidden).map((r) => r.dataset.msg).filter(Boolean);  // on screen: a row the rail hides is not
+        if (!ids.length) return AO.toast(empty, true);
+        if (!confirm(ask(ids.length))) return;
+        try {
+          await act("person", "dismiss", { msg: ids });
+          AO.toast(`dismissed ${ids.length} — the sender is told where one was owed`, true);
+        } catch (err) { AO.toast(`dismiss failed: ${err.message}`); }
+        refreshInbox();
+      });
+    };
+    dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow", "nothing in FYI to dismiss",
+      (n) => `Dismiss ${n} FYI ${n === 1 ? "entry" : "entries"}? Only the ones on screen now — anything that arrives after this is untouched.`);
+    dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow", "no answers on screen to dismiss",
+      (n) => `Dismiss the ${n} ${n === 1 ? "answer" : "answers"} on screen? Their Overrule goes with them.`);
     AO.refreshInboxPage = refreshInbox;
     inboxFilter();
     // back from an entry's page: the list rings the row it came from (`#<id>`)
@@ -2436,6 +2443,9 @@
     // there would be a section that is never anything
     const a = $("#sec-answered");
     if (a) a.classList.toggle("hidden", !(got.sections && (got.sections.answered || []).length) && !rail.sec.includes("answered"));
+    // its **Dismiss all** is drawn only while the group holds a row — a rail pick draws the heading alone
+    const da = $("#dismissanswered");
+    if (da) da.hidden = !$$("#rows-answered .mailrow").length;
     // the rail's *Teams* lines come with the rows: a team appears or goes with its mail
     const rt = $("#railteams");
     if (rt && typeof got.html.rail_teams === "string" && !rt.contains(document.activeElement)) rt.innerHTML = got.html.rail_teams;

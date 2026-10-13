@@ -2364,6 +2364,44 @@ def test_the_page_draws_the_group_only_when_it_holds_something_and_the_poll_swap
     assert '$("#sec-answered")' in js and "got.sections.answered" in js
 
 
+@pytest.mark.unit
+def test_the_answered_groups_dismiss_all_is_fyis_rule_on_its_own_rows(monkeypatch, tmp_path):
+    """§4.5a *Inbox: Answered for you, Dismiss all* (TD-599, TD-602): one button on the group's
+    heading, drawn only while the group holds a row; its press confirms once with the number and
+    dismisses the ids of the group's rows on screen — a row the rail hides is not, and nothing that
+    arrived after the page was drawn — by the RPC FYI's **Dismiss all** uses. FYI's is unchanged."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from shiftlead.ui.app import templates
+
+    def page(entries):
+        got = sections_of(entries)
+        return templates.get_template("inbox.html").render(
+            sections=got, person_needs=got["count"], person_fyi=got["fyi_n"], host="kmaster", active="Inbox",
+            agent_down=False, volatile=False, usage={},
+        )  # fmt: skip
+
+    def button(html):
+        return re.search(r'<button[^>]*id="dismissanswered"[^>]*>', html).group(0)
+
+    held = page([answered_fyi("m-1"), entry("m-2", "note")])
+    b = button(held)
+    assert " hidden" not in b and "never one that arrived after the page was drawn" in b
+    summary = held.split('id="sec-answered"')[1].split("</summary>")[0]
+    assert 'id="dismissanswered"' in summary  # on the group's heading, not on a row
+    assert " hidden" in button(page([entry("m-2", "note")]))  # no row, no button
+    assert 'id="dismissall"' in held  # FYI's own is still there
+    js = (UI / "static" / "app.js").read_text()
+    rule = js.split("const dismissOnScreen")[1].split("AO.refreshInboxPage")[0]
+    assert ".filter((r) => !r.hidden)" in rule  # on screen: what the rail hides is not sent
+    assert '$$(rows)' in rule and 'act("person", "dismiss", { msg: ids })' in rule  # the ids from the DOM, FYI's RPC
+    assert 'dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow"' in rule
+    assert 'dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow"' in rule
+    assert "Their Overrule goes with them." in rule and "on screen?" in rule
+    # the poll keeps the button to the rows: a rail pick can draw the heading with none
+    assert 'da.hidden = !$$("#rows-answered .mailrow").length' in js
+
+
 @pytest.mark.integration
 def test_an_answer_from_the_record_is_a_row_and_overrule_reaches_the_asker(client, tmp_path):
     """End to end (§4.9b): a teammate's reply with `source` lands under *Answered for you* on the
