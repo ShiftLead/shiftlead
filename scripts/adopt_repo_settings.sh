@@ -55,8 +55,10 @@ for a in "$@"; do
     esac
 done
 
-if ! command -v gh >/dev/null 2>&1; then
-    echo "cannot verify: gh not installed" >&2; exit 2
+# Every forge call goes through forge.py beside this script (TD-103).
+FORGE="$(dirname "$0")/forge.py"
+if ! why="$(python3 -B "$FORGE" has-cli "${REPO:-github.com/-/-}" 2>&1)"; then
+    echo "cannot verify: ${why:-forge.py failed}" >&2; exit 2
 fi
 if [ -z "$REPO" ]; then
     url="$(git remote get-url origin 2>/dev/null)" || url=""
@@ -79,27 +81,23 @@ WANT=(
 [ "$NO_AUTO_DELETE" = 1 ] || WANT+=("delete_branch_on_merge=true")
 
 read_settings() {  # -> one "name=value" line per setting, or non-zero
-    gh api "repos/$REPO" --jq '
-        "allow_squash_merge=\(.allow_squash_merge)",
-        "allow_merge_commit=\(.allow_merge_commit)",
-        "allow_rebase_merge=\(.allow_rebase_merge)",
-        "delete_branch_on_merge=\(.delete_branch_on_merge)"' 2>/dev/null
+    python3 -B "$FORGE" repo-settings "$REPO" 2>/dev/null
 }
 
-compare() {  # prints the table from $1 (the read_settings output); sets DRIFT (array of -F args)
-    DRIFT=()
+compare() {  # prints the table from $1 (the read_settings output); sets DRIFT (names) and PAIRS (name=value)
+    DRIFT=(); PAIRS=()
     for w in "${WANT[@]}"; do
         name="${w%%=*}"; want="${w#*=}"
         have="$(printf '%s\n' "$1" | sed -n "s/^$name=//p")"
         if [ "$have" = "$want" ]; then mark="ok"
-        else mark="DRIFT"; DRIFT+=("-F" "$name=$want"); fi
+        else mark="DRIFT"; DRIFT+=("$name"); PAIRS+=("$name=$want"); fi
         printf '  %-6s %-24s %-6s (cadence: %s)\n' "$mark" "$name" "${have:-?}" "$want"
     done
 }
 
 current="$(read_settings)"
 if [ -z "$current" ]; then
-    echo "cannot verify: gh api repos/$REPO failed (not authenticated, offline, or not a GitHub repo)" >&2; exit 2
+    echo "cannot verify: reading repos/$REPO's settings failed (not authenticated, offline, or not a GitHub repo)" >&2; exit 2
 fi
 unreadable="$(printf '%s\n' "$current" | sed -n 's/=null$//p' | tr '\n' ' ')"
 if [ -n "$unreadable" ]; then
@@ -128,9 +126,9 @@ if [ "$YES" = 0 ]; then
         *) echo "not applied: nothing changed"; exit 1 ;;
     esac
 fi
-echo "applying: gh api -X PATCH repos/$REPO ${DRIFT[*]}"
-if ! gh api -X PATCH "repos/$REPO" "${DRIFT[@]}" >/dev/null; then
-    echo "apply failed: gh api PATCH repos/$REPO returned non-zero (need admin on the repo?)" >&2; exit 2
+echo "applying to $REPO: ${PAIRS[*]}"
+if ! python3 -B "$FORGE" patch-settings "$REPO" "${PAIRS[@]}" >/dev/null; then
+    echo "apply failed: the PATCH of $REPO's settings returned non-zero (need admin on the repo?)" >&2; exit 2
 fi
 # GitHub's read can lag its write: on a repo created minutes earlier the re-read right
 # after a PATCH that worked still showed the old values (TD-107). So read again, a few

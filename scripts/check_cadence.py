@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/scripts/check_cadence.py
 # Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
-"""The cadence check: did a PR follow cadence.md §1–§5? One row per rule, read from git and gh.
+"""The cadence check: did a PR follow cadence.md §1–§5? One row per rule, read from git and the forge (scripts/forge.py).
 
 A DETECTOR, never a gate (cadence.md §7): it is not wired into a hook and blocks
 nothing. Three callers run the same code — the working session before it merges
@@ -15,6 +15,9 @@ for the two that were skipped.
     --json                           machine form: {"prs": [{"pr", "url", "rows", "verdict"}], "verdict"}
                                      (run verdict pass | fail | unknown | none — one per exit
                                      code 0 | 1 | 3 | 2; none = an empty --since window)
+
+With `forge = "none"` (no PR API, TD-105) there are no PRs: --pr and --branch exit 2 saying
+so, and --since audits every commit on the default branch, the review line read from its body.
 
 Rows (status pass | fail | na | unknown — `unknown` is evidence gh could not give,
 never a fake pass):
@@ -98,6 +101,9 @@ suffix, not the root — classified as
     board-append  whole `- [ ]` items with a Due:, under a `## Needs…` heading, nothing removed
     board-edit    one item's tick (+ Closed:), Due:, Decided: or reply tails changed, under board_edit.py's fixed
                   message (ledgerboard's subject() writes it and subject_kind() reads it)
+    reviewed      forge = "none" only (TD-105): the commit's body carries a cadence-review:
+                  line (REVIEW_RE's grammar, the last if several) — there are no PRs, so the
+                  squash commit holds the §4.9 evidence; a BLOCK there is a fail
     fail          anything else: landed without review (the files it touched are named)
 
 A fail there fails the run (exit 1); a window with direct commits and no PRs is not
@@ -119,7 +125,7 @@ pair, cadence §7) has a machine-readable line, written first:
 and the findings in prose after it. The check reads that line on any line of the
 comment, the last one if there are several, so a report that ends with its verdict
 counts (TD-087). SHIP: nothing to change; FIXED: findings were
-fixed before merge; BLOCK: do not merge. Posted with `gh pr comment` by the session,
+fixed before merge; BLOCK: do not merge. Posted on the PR by the session (docs/procedures/cadence.md gives the command),
 never edited afterwards (an edit after the merge fails the row). A review done after
 the merge is posted the same way, and says so: it acknowledges the fail, it never
 clears it.
@@ -139,7 +145,6 @@ import datetime as dt
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from typing import Any
@@ -175,8 +180,10 @@ def run(cmd, cwd=None, env=None):
     return p.stdout
 
 
-def gh_json(args):
-    return json.loads(run(["gh", *args]))
+# The forge adapter (TD-103): every question to the forge goes through scripts/forge.py,
+# installed beside this script. Imported in main(), so a missing copy is "cannot check".
+F: Any = None
+FORGE: Any = None   # the backend for this run
 
 
 def parse_ts(s):
@@ -207,22 +214,23 @@ def repo_root():
     return top.strip() if top else None
 
 
-def forge_unread(root) -> str | None:
-    """TD-098: the "PRs not checked" line when origin is a forge the cadence cannot read
-    yet (not GitHub), else None. The classifier is nudge_user_attention.origin_forge,
-    installed beside this script — one copy, never re-typed; if it cannot be imported the
-    check goes on as before (gh then answers or fails on its own)."""
-    if not root:
-        return None
+def load_forge(root):
+    """The backend for root, or the reason there is none: the TD-098 "PRs not checked"
+    line for a forge the cadence cannot read yet, or forge.py missing beside this script."""
+    global F, FORGE
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from pathlib import Path
-
-        from nudge_user_attention import forge_unread_line, origin_forge
-    except Exception:  # noqa: BLE001 — no classifier: behave as before
+        import forge as F
+    except Exception as e:  # noqa: BLE001 — no adapter, no PR reads
+        return f"PRs not checked: scripts/forge.py could not be imported ({type(e).__name__}: {e})"
+    if F.setting(root or ".") == "none":   # TD-105: no PRs; --since reads the commit log
+        FORGE = F.NoForge()
         return None
-    kind, host = origin_forge(Path(root))
-    return forge_unread_line(host) if kind == "other" and host else None
+    try:
+        FORGE = F.backend(root or ".")
+    except F.ForgeUnreadable as e:
+        return str(e)
+    return None
 
 
 # --- rows -------------------------------------------------------------------------
@@ -234,46 +242,50 @@ def row(rule, status, detail) -> dict[str, Any]:
     return {"rule": rule, "status": status, "detail": detail}
 
 
-def row_pr(pr):
-    if pr["state"] == "CLOSED":
-        return row("pr", "na", f"PR #{pr['number']} was closed without merging")
-    if pr["state"] != "MERGED":
-        return row("pr", "pass", f"open PR #{pr['number']} from {pr['headRefName']}")
-    sha = (pr.get("mergeCommit") or {}).get("oid")
+def merge_parents(sha, root):
+    """How many parents the merge commit has: from git when this clone holds the commit
+    (TD-103 — git already knows), else from the forge. Zero from git is never believed: a
+    shallow clone's boundary commit lists none, and a squash is never a root commit."""
+    if root:
+        fetch_once(root)
+        got = git(["rev-list", "--parents", "-n", "1", sha], cwd=root)
+        if got and got.split()[0].startswith(sha) and len(got.split()) > 1:
+            return len(got.split()) - 1
+    return FORGE.commit_parents(sha)
+
+
+def row_pr(pr, root=None):
+    if pr["state"] == "closed":
+        return row("pr", "na", f"PR {pr['ref']} was closed without merging")
+    if pr["state"] != "merged":
+        return row("pr", "pass", f"open PR {pr['ref']} from {pr['head']}")
+    sha = pr.get("merge_sha")
     if not sha:
-        return row("pr", "unknown", "merged but gh gave no merge commit")
+        return row("pr", "unknown", f"merged but {FORGE.cli} gave no merge commit")
     try:
-        parents = gh_json(["api", f"repos/{{owner}}/{{repo}}/commits/{sha}"]).get(
-            "parents", []
-        )
-    except GhError as e:
+        parents = merge_parents(sha, root)
+    except F.ForgeUnreadable as e:
         return row("pr", "unknown", f"merge commit unreadable: {e}")
-    if len(parents) == 1:
+    if parents == 1:
         return row("pr", "pass", f"merged {sha[:7]}, one parent (squash inferred)")
     return row(
         "pr",
         "fail",
-        f"merge commit {sha[:7]} has {len(parents)} parents — not a squash",
+        f"merge commit {sha[:7]} has {parents} parents — not a squash",
     )
 
 
 def row_review(pr):
     try:
-        comments = gh_json(
-            [
-                "api",
-                "--paginate",
-                f"repos/{{owner}}/{{repo}}/issues/{pr['number']}/comments",
-            ]
-        )
-    except GhError as e:
+        comments = FORGE.comments(pr["number"])
+    except F.ForgeUnreadable as e:
         return row("review", "unknown", f"comments unreadable: {e}")
-    merged_at = parse_ts(pr.get("mergedAt"))
-    if pr["state"] == "MERGED" and merged_at is None:
+    merged_at = parse_ts(pr.get("merged_at"))
+    if pr["state"] == "merged" and merged_at is None:
         return row(
             "review",
             "unknown",
-            "merged but gh gave no mergedAt — cannot place the review before the merge",
+            f"merged but {FORGE.cli} gave no mergedAt — cannot place the review before the merge",
         )
     found = []
     for c in comments:
@@ -363,22 +375,10 @@ CI_REGISTER_GRACE = 120
 
 def _ci_coming(pr, sha):
     """Why an open PR's empty check-run list is not yet "no CI", or None. Two pieces of
-    evidence, each one gh call; a call that fails is no evidence, and the row stays na."""
+    evidence, each one forge call; a call that fails is no evidence, and the row stays na."""
     try:
-        wr = [
-            json.loads(line)
-            for line in run(
-                [
-                    "gh",
-                    "api",
-                    f"repos/{{owner}}/{{repo}}/actions/runs?head_sha={sha}&per_page=20",
-                    "--jq",
-                    ".workflow_runs[] | {status, conclusion}",
-                ]
-            ).splitlines()
-            if line.strip()
-        ]
-    except (GhError, ValueError):
+        wr = FORGE.ci_runs_registered(sha)
+    except (F.ForgeUnreadable, ValueError):
         wr = []
     if wr:
         live = [w for w in wr if w.get("status") != "completed"]
@@ -392,26 +392,15 @@ def _ci_coming(pr, sha):
             f"{len(wr)} workflow run(s) for {sha[:7]} ended ({ends}) without a check run — "
             "look at the run: a workflow that fails to start reads this way"
         )
-    updated = parse_ts(pr.get("updatedAt"))
+    updated = parse_ts(pr.get("updated_at"))
     if updated is None:
         return None
     age = (dt.datetime.now(dt.timezone.utc) - updated).total_seconds()
     if age >= CI_REGISTER_GRACE:
         return None
     try:
-        active = int(
-            run(
-                [
-                    "gh",
-                    "api",
-                    "repos/{owner}/{repo}/actions/workflows",
-                    "--jq",
-                    '[.workflows[] | select(.state == "active")] | length',
-                ]
-            ).strip()
-            or 0
-        )
-    except (GhError, ValueError):
+        active = FORGE.ci_active_workflows()
+    except (F.ForgeUnreadable, ValueError):
         return None
     if not active:
         return None
@@ -423,30 +412,19 @@ def _ci_coming(pr, sha):
 
 
 def row_ci(pr):
-    sha = pr.get("headRefOid")
+    sha = pr.get("head_sha")
     if not sha:
         return row("ci", "unknown", "no head sha")
     try:
-        # object-shaped endpoint: --paginate walks the pages, --jq flattens each page's runs to one object per line
-        out = run(
-            [
-                "gh",
-                "api",
-                "--paginate",
-                f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100",
-                "--jq",
-                ".check_runs[]",
-            ]
-        )
-        runs = [json.loads(line) for line in out.splitlines() if line.strip()]
-    except GhError as e:
+        runs = FORGE.check_runs(sha)
+    except F.ForgeUnreadable as e:
         return row(
             "ci",
             "unknown",
             f"check runs for {sha[:7]} unreadable ({e}) — a deleted head reads this way",
         )
     if not runs:
-        coming = _ci_coming(pr, sha) if pr["state"] == "OPEN" else None
+        coming = _ci_coming(pr, sha) if pr["state"] == "open" else None
         if coming:
             return row("ci", "unknown", coming)
         return row("ci", "na", "no check runs on the head commit")
@@ -493,10 +471,10 @@ def row_ci(pr):
 
 
 def row_base(pr, root):
-    base = pr.get("baseRefName")
+    base = pr.get("base")
     if not base:
-        return row("base", "unknown", "gh gave no base branch")
-    if pr["state"] == "CLOSED":
+        return row("base", "unknown", f"{FORGE.cli} gave no base branch")
+    if pr["state"] == "closed":
         return row("base", "na", "closed unmerged")
     if not root:
         return row("base", "na", "no clone here — the default branch is read from origin")
@@ -516,7 +494,7 @@ def row_base(pr, root):
             f"stacked on {base} on purpose ({why or 'no reason given'}) — its work reaches "
             f"{default} only when {base} lands (§1)",
         )
-    if pr["state"] == "MERGED":
+    if pr["state"] == "merged":
         return row(
             "base",
             "fail",
@@ -526,7 +504,7 @@ def row_base(pr, root):
     return row(
         "base",
         "fail",
-        f"base is {base}, not {default} (§1) — `gh pr edit {pr['number']} --base {default}`, "
+        f"base is {base}, not {default} (§1) — {FORGE.retarget_hint(pr['number'], default)}, "
         "or mark a deliberate stack with a `cadence-stack:` line in the PR body",
     )
 
@@ -536,16 +514,16 @@ def ledger_edit_check(pr, root):
     errors is a list of flag texts that fail the row, note a clause for the row's detail
     ("" when there is nothing to say). Reads commits, never the working tree — the check
     may run from the anchor, from another worktree, or a week later in a --since sweep."""
-    if not root or LEDGER_FILES[0] not in {f["path"] for f in pr.get("files") or []}:
+    if not root or LEDGER_FILES[0] not in set(pr.get("files") or []):
         return [], ""
-    if pr["state"] == "MERGED":
-        new = (pr.get("mergeCommit") or {}).get("oid")
+    if pr["state"] == "merged":
+        new = pr.get("merge_sha")
         old = f"{new}^" if new else None
     else:
-        new = pr.get("headRefOid")
+        new = pr.get("head_sha")
         old = None
     if not new:
-        return [], "ledger fields not checked: gh gave no commit"
+        return [], f"ledger fields not checked: {FORGE.cli} gave no commit"
     if git(["cat-file", "-e", f"{new}^{{commit}}"], cwd=root) is None:
         fetch_once(root)
         if git(["cat-file", "-e", f"{new}^{{commit}}"], cwd=root) is None:
@@ -590,7 +568,7 @@ def row_ledger(pr, root=None):
     tds = sorted({f"TD-{int(n):03d}" for n in TD_RE.findall(pr.get("title") or "")})
     if not tds:
         return row("ledger", "na", f"no TD named in the title{note}")
-    paths = {f["path"] for f in pr.get("files") or []}
+    paths = set(pr.get("files") or [])
     touched = [p for p in LEDGER_FILES if p in paths]
     if touched:
         return row(
@@ -747,14 +725,14 @@ def landed_since_edited(root, branch, squash=None):
 
 
 def row_worktree(pr, root):
-    if pr["state"] != "MERGED":
+    if pr["state"] != "merged":
         why = "closed unmerged"
-        if pr["state"] != "CLOSED":
+        if pr["state"] != "closed":
             why = "open PR — the worktree is in use"
         return row("worktree", "na", why)
     if not root:
         return row("worktree", "na", "no clone here")
-    branch = pr["headRefName"]
+    branch = pr["head"]
     wts = worktrees(root)
     if branch not in wts and (
         git(["rev-parse", "--verify", "-q", f"refs/heads/{branch}"], cwd=root) is None
@@ -785,7 +763,7 @@ def row_worktree(pr, root):
             "pass",
             f"{wt} is clean and landed (reapable; the anchor's next pull removes it)",
         )
-    since = landed_since_edited(root, branch, (pr.get("mergeCommit") or {}).get("oid"))
+    since = landed_since_edited(root, branch, pr.get("merge_sha"))
     if since == "yes":
         return row(
             "worktree",
@@ -806,11 +784,11 @@ def row_worktree(pr, root):
 
 
 def row_pushed(pr, root):
-    if pr["state"] in ("MERGED", "CLOSED"):
-        return row("pushed", "na", pr["state"].lower())
+    if pr["state"] in ("merged", "closed"):
+        return row("pushed", "na", pr["state"])
     if not root:
         return row("pushed", "na", "no clone here")
-    branch = pr["headRefName"]
+    branch = pr["head"]
     if git(["rev-parse", "--verify", "-q", f"refs/heads/{branch}"], cwd=root) is None:
         return row("pushed", "na", f"{branch} is not a local branch here")
     if (
@@ -873,7 +851,7 @@ def row_deploy(pr, root):
         return row(
             "deploy", "na", f"no executable {DEPLOY_HOOK} (cadence §5, adapt per repo)"
         )
-    sha = ((pr.get("mergeCommit") or {}).get("oid")) or pr.get("headRefOid") or ""
+    sha = pr.get("merge_sha") or pr.get("head_sha") or ""
     try:
         p = subprocess.run(
             [hook, str(pr["number"]), sha],
@@ -902,7 +880,6 @@ def row_deploy(pr, root):
 # first-parent commit in the --since window that no PR made is classified by what it
 # touches, and anything outside the carve-outs is a fail ("landed without review").
 BOARD = "docs/user_attention.md"
-PR_SUBJECT_RE = re.compile(r"\(#\d+\)$|^Merge pull request #\d+ ")
 SWEEP_STAMPS = ("Swept", "Swept-deep")  # the stamp lines a sweep writes (cadence §3); their shape is ledgerboard's
 
 
@@ -1003,9 +980,9 @@ def row_board_edit_pr(pr, root):
     when it is not one, or its commit is not in this clone: the ordinary review row decides."""
     if not root or _lb().subject_kind(pr.get("title") or "") != "edit":
         return None
-    if [f["path"] for f in pr.get("files") or []] != [BOARD]:
+    if list(pr.get("files") or []) != [BOARD]:
         return None
-    sha = (pr.get("mergeCommit") or {}).get("oid") if pr["state"] == "MERGED" else pr.get("headRefOid")
+    sha = pr.get("merge_sha") if pr["state"] == "merged" else pr.get("head_sha")
     if not sha:
         return None
     fetch_once(root)
@@ -1013,8 +990,8 @@ def row_board_edit_pr(pr, root):
     parents, _, subject = (head or "").strip("\n").partition("\0")
     if len(parents.split()) != 1:
         return None  # unreadable, the root, or a merge commit
-    if pr["state"] == "MERGED":
-        if not subject.endswith(f"(#{pr['number']})"):
+    if pr["state"] == "merged":
+        if not subject.endswith(f"({pr['ref']})"):
             return None
     elif (git(["rev-list", "--count", f"{default_ref(root)}..{sha}"], cwd=root) or "").strip() != "1":
         return None
@@ -1053,32 +1030,52 @@ def direct_commits(root, when):
     commits = []
     for line in log.splitlines():
         sha, parents, subject = (line.split("\0") + ["", ""])[:3]
-        if not parents or PR_SUBJECT_RE.search(subject) or sha in _PR_MERGE_SHAS:
+        # a PR's merge: in the forge's merged list, or (the list's offline fallback, which
+        # also covers a merge past its limit) a subject carrying the backend's PR marker
+        if not parents or (FORGE or F.GitHub).subject_re.search(subject) or sha in _PR_MERGE_SHAS:
             continue  # a root commit, or a PR's merge
+        review = body_review(root, sha) if FORGE is not None and FORGE.name == "none" else None
         if len(parents.split()) > 1:
             cls, detail = "fail", "a merge commit no PR made"
+        elif review:
+            verdict_, rest = review
+            if verdict_ == "BLOCK":
+                cls, detail = "fail", f"its cadence-review: line says BLOCK{rest}"
+            else:
+                cls, detail = "reviewed", f"cadence-review: {verdict_}{rest} in the commit body (no forge, §4.9)"
         else:
             names = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", sha], cwd=root)
             if names is None:
                 cls, detail = "fail", "files unreadable"
             else:
                 cls, detail = classify_direct(root, sha, subject, [f for f in names.split("\0") if f])
+                if cls == "fail" and FORGE is not None and FORGE.name == "none":
+                    detail += "; no cadence-review: line in its body (no forge, §4.9)"
         commits.append({"sha": sha[:7], "subject": subject, "class": cls,
                         "status": "fail" if cls == "fail" else "pass", "detail": detail})
     status = "fail" if any(c["status"] == "fail" for c in commits) else "pass"
-    return {"ref": ref, "status": status, "detail": f"{len(commits)} direct commit(s)", "commits": commits}
+    detail = f"{len(commits)} direct commit(s)"
+    if FORGE is not None and FORGE.name == "none":
+        detail += " — no forge, so each carries its cadence-review: line in its body or is a carve-out (TD-105)"
+    return {"ref": ref, "status": status, "detail": detail, "commits": commits}
 
 
-PR_FIELDS = (
-    "number,url,state,title,body,baseRefName,headRefName,headRefOid,mergedAt,mergeCommit,files,updatedAt"
-)
+def body_review(root, sha):
+    """(VERDICT, rest) of the last cadence-review: line in a commit's body, or None — the
+    review evidence where there is no forge to hold a PR comment (TD-105; the grammar is
+    REVIEW_RE's, any line, the last if several, as for a comment: TD-087)."""
+    body = git(["log", "-1", "--format=%b", sha], cwd=root) or ""
+    hits = [m for line in body.splitlines() if (m := REVIEW_RE.match(line))]
+    if not hits:
+        return None
+    return hits[-1].group("verdict").upper(), hits[-1].group("rest").strip(" ·-")
 
 
 def check_pr(number, root):
-    pr = gh_json(["pr", "view", str(number), "--json", PR_FIELDS])
+    pr = FORGE.pr(number)
     rows = []
     for rule, fn in (
-        ("pr", lambda: row_pr(pr)),
+        ("pr", lambda: row_pr(pr, root)),
         ("review", lambda: board_edit_or_review(pr, root)),
         ("ci", lambda: row_ci(pr)),
         ("base", lambda: row_base(pr, root)),
@@ -1095,7 +1092,7 @@ def check_pr(number, root):
         "pr": pr["number"],
         "url": pr["url"],
         "title": pr["title"],
-        "state": pr["state"],
+        "state": pr["state"].upper(),   # the JSON's form since before TD-103: OPEN | MERGED | CLOSED
         "rows": rows,
         "verdict": verdict(rows),
     }
@@ -1126,7 +1123,7 @@ def since_date(spec):
     return spec
 
 
-# gh pr list --limit for --since; a list that comes back full is reported as truncated
+# the forge's list limit for --since; a list that comes back full is reported as truncated
 SINCE_LIMIT = 200
 
 
@@ -1134,40 +1131,14 @@ def select_prs(args):
     if args.pr:
         return [args.pr]
     if args.branch:
-        prs = gh_json(
-            [
-                "pr",
-                "list",
-                "--head",
-                args.branch,
-                "--state",
-                "all",
-                "--limit",
-                "5",
-                "--json",
-                "number,state",
-            ]
-        )
+        prs = FORGE.prs_for_branch(args.branch)
         if not prs:
-            raise GhError(f"no PR with head {args.branch}")
-        prs.sort(key=lambda p: (p["state"] != "OPEN", -p["number"]))
+            raise F.ForgeUnreadable(f"no PR with head {args.branch}")
+        prs.sort(key=lambda p: (p["state"] != "open", -p["number"]))
         return [prs[0]["number"]]
     when = since_date(args.since)
-    prs = gh_json(
-        [
-            "pr",
-            "list",
-            "--state",
-            "merged",
-            "--search",
-            f"merged:>={when}",
-            "--limit",
-            str(SINCE_LIMIT),
-            "--json",
-            "number,mergeCommit",
-        ]
-    )
-    _PR_MERGE_SHAS.update((p.get("mergeCommit") or {}).get("oid", "") for p in prs)
+    prs = FORGE.merged_since(when, SINCE_LIMIT)
+    _PR_MERGE_SHAS.update(p.get("merge_sha") or "" for p in prs)
     return [p["number"] for p in prs]
 
 
@@ -1213,12 +1184,13 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     root = repo_root()
-    unread = forge_unread(root)
-    if unread:  # before the gh check: gh is not the reason a GitLab origin cannot be read
+    unread = load_forge(root)
+    if unread:  # before the CLI check: gh is not the reason a GitLab origin cannot be read
         print(f"CANNOT CHECK: {unread}", file=sys.stderr)
         return 2
-    if shutil.which("gh") is None:
-        print("CANNOT CHECK: gh is not installed", file=sys.stderr)
+    gone = FORGE.missing()
+    if gone:
+        print(f"CANNOT CHECK: {gone}", file=sys.stderr)
         return 2
     if args.since:
         try:
@@ -1229,7 +1201,7 @@ def main(argv=None):
     try:
         numbers = select_prs(args)
         results = [check_pr(n, root) for n in numbers]
-    except GhError as e:
+    except (GhError, F.ForgeUnreadable) as e:
         print(f"CANNOT CHECK: {e}", file=sys.stderr)
         return 2
     except (

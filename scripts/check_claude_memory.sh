@@ -314,7 +314,7 @@ esac
 # there. It gets one line about what differs instead, printed even when all is well.
 cloud_note=""
 if [ "${CLAUDE_CODE_REMOTE:-}" = "true" ]; then
-  cloud_note="cloud session (CLAUDE_CODE_REMOTE): the pre-push guard does not apply here (the harness pushes only this session's branch). gh may be missing or limited — its GitHub proxy serves only a pinned set of GraphQL operations — so if /cadence or check_cadence.py fails here, run /cadence <n> on your PR from a machine with gh. Your PR is the one signal the org sees — open it early, and say in its body what waits on whom (cadence.md §4)."
+  cloud_note="cloud session (CLAUDE_CODE_REMOTE): the pre-push guard does not apply here (the harness pushes only this session's branch). gh may be missing or limited — claude.ai/code's GitHub proxy serves only a pinned set of GraphQL operations — so if /cadence or check_cadence.py fails here, run /cadence <n> on your PR from a machine with the forge's CLI (gh; GitLab: glab). Your PR is the one signal the org sees — open it early, and say in its body what waits on whom (cadence.md §4)."
 elif [ -f "$REPO_ROOT/$HOOKS_REL/pre-push" ]; then
   installer="${HOOKS_REL%/git-hooks}/install_git_hooks.sh"
   hookspath=$(git -C "$REPO_ROOT" config core.hooksPath 2>/dev/null || true)
