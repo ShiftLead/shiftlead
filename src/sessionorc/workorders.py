@@ -4,47 +4,44 @@ as **`board:<key>`** — the first eight hex digits of a sha256 of the line's `i
 snooze, a reply and the decide itself leave unchanged — pickable, High, in every `free-pick` lane
 of a team servicing the repo, and counted by rule 8, until a session closes the line.
 
-The board is dev-cadence's file and its reader is dev-cadence's own `nudge_user_attention.py
---report --json` (never a second parser here, as the Inbox's §4.4 rule says): the repo's copy is run
-with its own `--fetch`, so a board merely behind origin is read from origin, as the Inbox reads it,
-and `item_key` is that same file's function, loaded from it. A `fyi` line and a closed line are
-never work orders; a line whose `Decided:` is gone leaves on the next reading.
+The board is read in-process through the vendored `ledgerboard.py` (design §8 *Which side a thing
+lives on*, ADR 2026-10-12, TD-585): its `parse_board`, `item_record`, `item_key` and line shapes,
+never a second parser here and no dev-cadence script, so a repo with a board needs no dev-cadence.
+Origin's side is this module's own fetch (`_against_origin`, §4.5 screen 6 *Boards are read against
+origin*): a board merely behind origin is read from origin. A `fyi` line and a closed line are never
+work orders; a line whose `Decided:` is gone leaves on the next reading.
 
 The board itself is read once, into the repo reading's `boards` (`read_boards`, design §4.4 *Each
 reading has one owner*, TD-615), and the orders are a filter over that reading (`orders`)."""
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
-import io
-import json
 import os
 import re
+import signal
 import subprocess
-import sys
-import threading
-import types
-from collections.abc import Callable
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from sessionorc import ledgerboard
+
 BOARD = Path("docs") / "user_attention.md"
-READER = Path("scripts") / "nudge_user_attention.py"
 PREFIX = "board:"
 PR_PREFIX = "pr:"  # a red PR nobody holds (§4.4, TD-613)
-FETCH_TIMEOUT = 45.0  # the reader's fetch is serial and its own; a read past this is a plain one
+FETCH_TIMEOUT = 45.0  # the fetch's bound; a fetch past it is a plain read, *fetch skipped (timeout)*
 READ_TIMEOUT = 20.0
+TERM_GRACE = 2.0  # a fetch past its bound is sent SIGTERM, then SIGKILL after this
 HEAD_MOST = 120
 _REF_RE = re.compile(r"board:[0-9a-f]{8}")
 _PR_REF_RE = re.compile(r"pr:\d{1,6}")
-# one loaded reader per file, or None for one that will not load, kept while its mtime holds
-_readers: dict[str, tuple[float, types.ModuleType | None]] = {}
-# one load at a time: a load swaps the process's `sys.path`, `sys.modules['ledgerboard']` and
-# `sys.dont_write_bytecode` and puts them back, and `read` runs on threads
-_load = threading.Lock()
 NO_LINE = "no line {ref} on the board — reworded or closed"
+# what a read against origin found (§4.5 screen 6): skipped — no comparison (`why` says why) · none —
+# origin has no board · matches · behind — only origin moved, its copy is read · local — only this
+# checkout moved · both — both moved, or no common history to tell
+FETCH_CASES = ("skipped", "none", "matches", "behind", "local", "both")
 
 
 def is_work_order(ref: str) -> bool:
@@ -57,69 +54,21 @@ def is_pr_order(ref: str) -> bool:
     return bool(_PR_REF_RE.fullmatch(str(ref)))
 
 
-def _reader(script: Path) -> types.ModuleType | None:
-    """The repo's own reader, loaded from that file and kept while its mtime holds — a reader that
-    will not load is kept as None too, so a page asking per row never runs it again (TD-384)."""
-    try:
-        stamp = script.stat().st_mtime
-    except OSError:
-        return None
-    held = _readers.get(str(script))
-    if held is not None and held[0] == stamp:
-        return held[1]
-    got: types.ModuleType | None = None
-    # compiled from its text, never imported: an import writes `scripts/__pycache__` into the repo's
-    # checkout, which reads as the person's uncommitted work to everything that asks (TD-386's gate)
-    mod = types.ModuleType(f"_ao_board_reader_{abs(hash(str(script)))}")
-    mod.__file__ = str(script)
-    try:
-        code = compile(script.read_text(encoding="utf-8"), str(script), "exec")
-        sys.modules[mod.__name__] = mod  # a dataclass in the reader looks its module up by name
-        # the reader imports its sibling `ledgerboard.py` through a `sys.path` entry of its own: write no
-        # bytecode for it, leave neither that entry nor that module behind, so the next repo's reader
-        # imports its own copy
-        with _load:
-            path, sibling, nobytes = list(sys.path), sys.modules.pop("ledgerboard", None), sys.dont_write_bytecode
-            sys.dont_write_bytecode = True
-            try:
-                # whatever it prints at load is not the caller's: `ao repo --json` prints to the same stdout
-                with contextlib.redirect_stdout(io.StringIO()):
-                    exec(code, mod.__dict__)  # noqa: S102 — the repo's own reader, as `read` runs it
-            finally:
-                sys.modules.pop(mod.__name__, None)
-                sys.path[:], sys.dont_write_bytecode = path, nobytes
-                sys.modules.pop("ledgerboard", None)
-                if sibling is not None:
-                    sys.modules["ledgerboard"] = sibling
-        got = mod
-    except (Exception, SystemExit):  # noqa: BLE001 — a reader that will not load lists no work orders
-        got = None
-    _readers[str(script)] = (stamp, got)
-    return got
-
-
-def _item_key(script: Path) -> Callable[[str], str] | None:
-    """The reader's own `item_key`, or None where the repo's reader will not load or has none."""
-    got = getattr(_reader(script), "item_key", None)
-    return got if callable(got) else None
-
-
-def key(text: str, item_key: Callable[[str], str]) -> str:
-    """`board:<key>` for an open item's text as the report gives it — its line less the open tick."""
-    return PREFIX + hashlib.sha256(item_key(f"- [ ] {text}").encode("utf-8")).hexdigest()[:8]
+def key(text: str) -> str:
+    """`board:<key>` for an open item's text as the reading gives it — its line less the open tick."""
+    return PREFIX + hashlib.sha256(ledgerboard.item_key(f"- [ ] {text}").encode("utf-8")).hexdigest()[:8]
 
 
 def ref(root: str | Path, text: str) -> str:
-    """`board:<key>` for a line of the board under `root`, by that repo's own reader — **every board
-    line's id** (design §4.4 *A board line's id*, TD-603): the one derivation the Inbox's board rows,
-    the write-back's presses, `ao board show`, `ao repo` and the work orders all use — or empty where
-    the repo has no reader or its key cannot take the line. `text` is the item less its tick."""
-    item_key = _item_key(Path(root) / READER) if root and text else None
-    if item_key is None:
+    """`board:<key>` for a line of the board under `root` — **every board line's id** (design §4.4
+    *A board line's id*, TD-603): the one derivation the Inbox's board rows, the write-back's presses,
+    `ao board show`, `ao repo` and the work orders all use, ledgerboard's `item_key` in every repo —
+    or empty for no text. `text` is the item less its tick."""
+    if not text:
         return ""
     try:
-        return key(text, item_key)
-    except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no reference
+        return key(text)
+    except Exception:  # noqa: BLE001 — a line the key cannot take has no reference
         return ""
 
 
@@ -132,79 +81,152 @@ def head(text: str) -> str:
     return out if len(out) <= HEAD_MOST else out[: HEAD_MOST - 1].rstrip() + "…"
 
 
-def _report(argv: list[str], timeout: float) -> tuple[dict[str, Any] | None, str]:
-    """The reader's report, or None and why in a few words — *timeout* for our bound (TD-626)."""
+@dataclass
+class Origin:
+    """What one board's read against origin found: `case` (`FETCH_CASES`), `note` — the sentence for
+    people, in the phrases the Inbox's origin note reads (§4.5a **origin note**) — `why` for a skip,
+    and `content`/`source` when origin's copy is the one to read (*behind*)."""
+
+    case: str
+    note: str
+    why: str | None = None
+    content: str | None = None
+    source: str | None = None
+
+
+def _git(root: Path, args: list[str], timeout: float) -> subprocess.CompletedProcess[bytes]:
+    """One git call under `root`, bounded: never a prompt, ssh in batch mode; past `timeout` its
+    process group — git and the ssh or helper it started, which hold the pipes — is sent SIGTERM,
+    then SIGKILL, and `TimeoutExpired` raised."""
+    env = {
+        **os.environ,
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o ConnectTimeout=5",
+    }
+    argv = ["git", "-C", str(root), *args]
+    with subprocess.Popen(
+        argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        start_new_session=True,
+    ) as p:  # fmt: skip
+        try:
+            out, err = p.communicate(timeout=max(timeout, 0.0))
+        except subprocess.TimeoutExpired:
+            for sig in (signal.SIGTERM, signal.SIGKILL):
+                try:
+                    os.killpg(p.pid, sig)  # the group this call started, and nothing else
+                except (ProcessLookupError, PermissionError):
+                    break
+                try:
+                    p.wait(timeout=TERM_GRACE)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+            raise subprocess.TimeoutExpired(argv, timeout) from None
+        return subprocess.CompletedProcess(argv, p.returncode, out, err)
+
+
+def default_branch(root: Path) -> str:
+    """The repo's default branch: origin/HEAD's target, else `main` or `master` where origin has
+    it, else `main`."""
+    got = _git(root, ["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"], READ_TIMEOUT)
+    named = got.stdout.decode().strip().removeprefix("origin/") if got.returncode == 0 else ""
+    for b in (named, "main", "master"):
+        if b and _git(root, ["rev-parse", "--verify", "-q", f"refs/remotes/origin/{b}"], READ_TIMEOUT).returncode == 0:
+            return b
+    return "main"
+
+
+def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT) -> Origin:
+    """The checkout's board against `origin/<default>` (§4.5 screen 6 *Boards are read against
+    origin*), never raising: one fetch of the default branch alone — never `--prune`, no local
+    branch or working file moved — then the three-way compare of the checkout's file, origin's and
+    their merge-base's. Merely behind (the checkout's untouched since the merge-base) reads origin's
+    copy; anything else reads the checkout's and says which way it differs."""
+
+    def blob(at: str, rel: str) -> str | None:
+        got = _git(root, ["show", f"{at}:{rel}"], READ_TIMEOUT)
+        return got.stdout.decode("utf-8", errors="replace") if got.returncode == 0 else None
+
     try:
-        # no `scripts/__pycache__` for the reader's `ledgerboard` import in the repo's checkout (TD-386's gate)
-        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
-        cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False, env=env)
+        branch = default_branch(root)
+        have = _git(root, ["rev-parse", "--verify", "-q", f"refs/remotes/origin/{branch}"], READ_TIMEOUT)
+        # an explicit refspec: `fetch origin <branch>` moves only FETCH_HEAD where remote.origin.fetch is narrowed
+        spec = [f"+refs/heads/{branch}:refs/remotes/origin/{branch}"] if have.returncode == 0 else []
+        got = _git(root, ["fetch", "-q", "--no-prune", "origin", *spec], timeout)
+        if got.returncode != 0:
+            err = got.stderr.decode("utf-8", errors="replace").strip().splitlines()
+            why = err[-1] if err else "git fetch failed"
+            return Origin("skipped", f"fetch skipped ({why})", why=why)
+        at = f"origin/{branch}"
+        rel = (board.relative_to(root) if board.is_relative_to(root) else BOARD).as_posix()
+        theirs = blob(at, rel)
+        if theirs is None:
+            return Origin("none", f"fetched; no board at {at}")
+        ours = board.read_text(encoding="utf-8", errors="replace") if board.is_file() else ""
+        if theirs == ours:
+            return Origin("matches", f"fetched; board matches {at}")
+        mb = _git(root, ["merge-base", "HEAD", at], READ_TIMEOUT)
+        if mb.returncode != 0:
+            return Origin("both", f"fetched; board DIFFERS from {at} (no common history to compare) — showing local")
+        base = blob(mb.stdout.decode().strip(), rel) or ""
+        if ours == base:
+            return Origin("behind", f"fetched; local clone is behind — showing {at}'s board", content=theirs, source=at)
+        if theirs == base:
+            return Origin("local", f"fetched; board DIFFERS from {at} (local edits not pushed)")
+        return Origin("both", f"fetched; board DIFFERS from {at} (both sides changed) — showing local")
     except subprocess.TimeoutExpired:
-        return None, "timeout"
-    except (OSError, subprocess.SubprocessError) as e:
-        return None, type(e).__name__
-    if cp.returncode != 0:
-        last = ((cp.stderr or "").strip().splitlines() or [""])[-1][:200]
-        return None, f"exit {cp.returncode}" + (f": {last}" if last else "")
-    try:
-        got = json.loads(cp.stdout)
-    except ValueError:
-        return None, "the report is not JSON"
-    return (got, "") if isinstance(got, dict) else (None, "the report is not an object")
+        return Origin("skipped", "fetch skipped (timeout)", why="timeout")
+    except Exception as e:  # noqa: BLE001 — a board read without origin beats no board
+        return Origin("skipped", f"fetch skipped ({e})", why=str(e))
+
+
+def board_items(content: str, today: date) -> list[dict[str, Any]]:
+    """The open items of a board's text, each ledgerboard's `item_record` with its id as `key`."""
+    out: list[dict[str, Any]] = []
+    for it in ledgerboard.parse_board(content, warn=False):
+        out.append({**ledgerboard.item_record(it, today), "key": ref("", it.text)})
+    return out
 
 
 def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | None = None) -> dict[str, Any]:
     """The repo's board as the host agent keeps it (design §4.4 *Each reading has one owner*, *The
-    boards*, TD-615): `{boards: [...], today}` — the reader's report, each board `{label, board,
-    root, source, fetch_note, fetch_case, …, items}` and each open item as the reader gives it (line,
-    text, due, answers, decided, refs, session, detail, …) with its id beside it as `key`
-    (`board:<key>`, *A board line's id*) — or `{error}` when the board could not be read. No board,
-    or no reader in the repo, is no boards and no error. `fetch` is the reader's own `--fetch`
-    (origin's side, *Boards are read against origin*), and a plain read follows one that fails, each
-    board's `fetch_note` then *fetch skipped (<why>)* — *timeout* for our bound — so the page says
-    origin could not be reached.
+    boards*, TD-615), read in-process through ledgerboard (TD-585): `{boards: [...], today}`, each
+    board `{label, board, root, source, fetch_note, fetch_case, fetch_why, items}` and each open item
+    ledgerboard's record of it (line, text, due, answers, decided, refs, session, detail, …) with its
+    id beside it as `key` (`board:<key>`, *A board line's id*) — or `{error}` when the board could
+    not be read. No board is no boards and no error. `fetch` reads against origin (`_against_origin`,
+    *Boards are read against origin*); a fetch that fails or passes its bound reads the checkout's
+    file, its `fetch_note` *fetch skipped (<why>)*, so the page says origin could not be reached.
 
     `board` reads that file in place of the checkout's, named as the checkout's board read from
     origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
     with the press landed, so the press is in the reading before the checkout pulls it."""
     root = Path(root)
-    checkout, script = root / BOARD, root / READER
+    checkout = root / BOARD
     path = Path(board) if board is not None else checkout
-    if not path.is_file() or not script.is_file():
+    if not path.is_file():
         return {"boards": []}
-    base = [sys.executable, str(script), "--report", "--json", "--board", str(path)]
-    fetching = fetch and board is None
-    got, why = _report([*base, "--fetch"], FETCH_TIMEOUT) if fetching else (None, "")
-    skipped = fetching and got is None
-    if got is None:
-        got, _ = _report(base, READ_TIMEOUT)
-    if got is None:
-        return {"error": f"{READER} --report --json could not be read"}
-    item_key = _item_key(script)
-    if item_key is None:
-        return {"error": f"{READER} has no item_key to name a line by"}
-    boards: list[dict[str, Any]] = []
-    for b in got.get("boards") or []:
-        if not isinstance(b, dict):
-            continue
-        items: list[dict[str, Any]] = []
-        for it in b.get("items") or []:
-            if not isinstance(it, dict) or not it.get("text"):
-                continue
-            try:
-                ref = key(str(it["text"]), item_key)
-            except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no id
-                ref = ""
-            items.append({**it, "key": ref})
-        b = {**b, "items": items}
-        if skipped:
-            # the fetching run stopped (our bound) or failed: the plain read's board is the checkout's,
-            # said in the reader's own words for an origin it could not reach (§4.5a **origin note**, TD-626)
-            b.update(source=None, fetch_note=f"fetch skipped ({why})")
-        if board is not None:
-            # as the checkout's board, read from origin: the reader's *behind* case (§4.5a **origin note**)
-            b.update(board=str(checkout), root=str(root), label=root.name, source="origin", fetch_note=None)
-        boards.append(b)
-    return {"boards": boards, "today": got.get("today")}
+    today = datetime.now().date()  # the board's dates are civil dates, local
+    found = _against_origin(root, checkout) if fetch and board is None else None
+    try:
+        content = found.content if found is not None and found.content is not None else path.read_text(encoding="utf-8")
+        items = board_items(content, today)
+    except (OSError, UnicodeDecodeError) as e:
+        return {"error": f"{path} could not be read ({type(e).__name__})"}
+    b: dict[str, Any] = {
+        "label": root.name,
+        "board": str(checkout),
+        "root": str(root),
+        "source": found.source if found is not None else None,
+        "fetch_note": found.note if found is not None else None,
+        "fetch_case": found.case if found is not None else None,
+        "fetch_why": found.why if found is not None else None,
+        "items": items,
+    }
+    if board is not None:
+        # as the checkout's board, read from origin: the *behind* case (§4.5a **origin note**)
+        b.update(source="origin", fetch_case="behind")
+    return {"boards": [b], "today": today.isoformat()}
 
 
 def orders(reading: dict[str, Any]) -> list[dict[str, Any]]:
@@ -294,45 +316,22 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
         return [], ""
 
 
-def can_name(root: str | Path) -> bool:
-    """Whether the repo under `root` has a reader whose `item_key` can name its board's lines."""
-    return _item_key(Path(root) / READER) is not None
-
-
 def show(root: str | Path, want: str, *, fetch: bool = True) -> dict[str, Any] | None:
     """The line of the board under `root` whose id is `want` (design §4.7 `ao board show`): `{key,
-    line, text, detail, open, source}` — `text` the whole line less its tick, `detail` the reader's
-    detail block under it — open or closed, the first that holds it; None when no line does."""
-    root = Path(root)
-    mod = _reader(root / READER)
-    item_key = getattr(mod, "item_key", None)
-    # the line shapes are the reader's own, open and closed (design §8): none is written here
-    shapes = [getattr(mod, name, None) for name in ("ITEM_RE", "CLOSED_ITEM_RE")]
-    if not callable(item_key) or not all(isinstance(r, re.Pattern) for r in shapes):
-        return None
-    opened, closed = shapes
-    lines, source = board_lines(root, fetch=fetch)
+    line, text, detail, open, source}` — `text` the whole line less its tick, `detail` its detail
+    block — open or closed, the first that holds it; None when no line does. The line shapes are
+    ledgerboard's (design §8): none is written here."""
+    lines, source = board_lines(Path(root), fetch=fetch)
     for n, ln in enumerate(lines, 1):
-        m = opened.match(ln) or closed.match(ln)
-        if m is None:
+        m = ledgerboard.ITEM_RE.match(ln) or ledgerboard.CLOSED_ITEM_RE.match(ln)
+        if m is None or ref(root, m.group("text")) != want:
             continue
-        try:
-            got = key(m.group("text"), item_key)
-        except Exception:  # noqa: BLE001 — a line the reader's own key cannot take has no id
-            continue
-        if got != want:
-            continue
-        block = getattr(mod, "detail_block", None)
-        try:
-            detail = [str(d) for d in block(lines, n)] if callable(block) else []
-        except Exception:  # noqa: BLE001 — the line is found; a block the reader cannot give is none
-            detail = []
         return {
-            "key": got,
+            "key": want,
             "line": n,
             "text": m.group("text").strip(),
-            "detail": detail,
-            "open": m.re is opened,
+            "detail": ledgerboard.detail_block(lines, n),
+            "open": m.re is ledgerboard.ITEM_RE,
             "source": source,
         }
     return None

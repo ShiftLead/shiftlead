@@ -478,10 +478,10 @@ def state_rows(
 
 
 # design §4.5 screen 6 / §4.4 (TD-069 step 3): **board items** in the Inbox. The board is each
-# repo's `docs/user_attention.md`, in dev-cadence's format, read by the repo's own reader
-# (`nudge_user_attention.py --report --json`) — never a second parser here — and the reading is the
-# host agent's (§4.4 *Each reading has one owner*, *The boards*, TD-615): every open item, on the
-# repo reading as `boards`, which the page reads from the `repos` RPC and runs no reader of its own.
+# repo's `docs/user_attention.md`, in ledgerboard's format, read in-process through ledgerboard
+# (TD-585) — never a second parser here — and the reading is the host agent's (§4.4 *Each reading
+# has one owner*, *The boards*, TD-615): every open item, on the repo reading as `boards`, which the
+# page reads from the `repos` RPC and runs no reader of its own.
 BOARD_FILE = Path("docs") / "user_attention.md"
 # the fields of a board item the Inbox draws that a reader older than them does not give: a copy
 # that lacks one is named on the page rather than drawn as if the board had nothing there (TD-278)
@@ -611,8 +611,8 @@ def board_reading(
     """The Inbox's board rows (`board_rows`) from the host agent's repo readings — the `repos` RPC,
     each checkout's `boards` (§4.4 *Each reading has one owner*, *The boards*, TD-615) — and a note
     saying what could not be read, never drawn as an empty board (§4.5 *no silent failure path*): a
-    reading the host agent could not take again keeps its last items and says since when; a board
-    with no reader in its repo, and a reader that predates a field the rows draw (TD-278), are said."""
+    reading the host agent could not take again keeps its last items and says since when; a reading
+    that predates a field the rows draw (TD-278) is said."""
     rows: list[dict[str, Any]] = []
     notes: list[str] = []
     for root, r in sorted((repos or {}).items()):
@@ -629,11 +629,8 @@ def board_reading(
             since = f" since {got['failed_at']}" if got.get("failed_at") else ""
             shown = "its rows are the last reading" if own else "no row is shown"
             notes.append(f"the board of {name} could not be read{since} ({got['error']}): {shown}")
-        elif not got.get("boards") and (Path(str(root)) / BOARD_FILE).is_file():
-            if not (Path(str(root)) / workorders_mod.READER).is_file():
-                notes.append(f"the board of {name} is not shown: its repo carries no {workorders_mod.READER}")
         rows += own
-        if lacks := reader_lacks(got, str(Path(str(root)) / workorders_mod.READER)):
+        if lacks := reader_lacks(got):
             notes.append(lacks)
     return rows, "; ".join(notes)
 

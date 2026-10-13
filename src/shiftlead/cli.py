@@ -2560,8 +2560,6 @@ def cmd_board_show(args: argparse.Namespace) -> int:
     except (AgentError, AgentUnavailable, OSError):  # a read: the checkout's file answers without the agent
         repos = None
     got = _board_line(repos, root, want)
-    if got is None and not workorders.can_name(root):
-        return fail(args, f"{root} has no board reader ({workorders.READER}) to name its lines by", 1)
     if got is None:
         got = workorders.show(root, want, fetch=False)
     if got is None:
