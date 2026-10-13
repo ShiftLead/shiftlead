@@ -31,6 +31,7 @@ def _repo(tmp_path: Path, *lines: str) -> Path:
     (root / "docs").mkdir(parents=True)
     (root / "scripts").mkdir()
     shutil.copy2(READER, root / "scripts" / "nudge_user_attention.py")
+    shutil.copy2(READER.with_name("ledgerboard.py"), root / "scripts" / "ledgerboard.py")  # the reader imports it
     board = ["# User Attention Board", "", FORMAT, "", "## Needs the user", "", *lines, ""]
     (root / "docs" / "user_attention.md").write_text("\n".join(board), encoding="utf-8")
     return root

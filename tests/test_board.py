@@ -1027,6 +1027,7 @@ def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tm
     (root / "docs").mkdir(parents=True)
     (root / "scripts").mkdir()
     shutil.copy2(Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py", root / "scripts")
+    shutil.copy2(Path(__file__).resolve().parent.parent / "scripts" / "ledgerboard.py", root / "scripts")
     (root / board.BOARD).write_text(BOARD_TEXT.replace("## Needs the user\n\n", f"## Needs the user\n\n{line}"))
     (o,) = workorders.read(root, fetch=False)["orders"]
     assert o["decided"] == {"text": "At the reset", "date": "2026-10-12"} and "TD-133" in o["refs"]
