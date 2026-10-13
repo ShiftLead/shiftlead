@@ -96,6 +96,8 @@ def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_i
     unread = repo(tmp_path, "unread", "- [ ] z. Due: 2026-09-01.\n", reader=False)
     rows, note = board_reading({str(unread): {"name": "unread", "root": str(unread), "boards": {"boards": []}}})
     assert rows == [] and "unread" in note and "nudge_user_attention.py" in note
+    # a reading taken before its first board read: said, not drawn as an empty board
+    assert board_reading({str(a): {"name": "a", "root": str(a)}}) == ([], "the board of a has not been read yet")
     bare = repo(tmp_path, "bare", reader=False)  # no board anywhere is not a fault: nothing to say
     assert board_reading({str(bare): {"root": str(bare), "boards": {"boards": []}}, "x": "junk"}) == ([], "")
 

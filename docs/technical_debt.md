@@ -48,7 +48,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
 | TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Designed — TD-618 builds it |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
-| TD-615 | Build TD-614 (1): the boards are the host agent's reading — `boards` on the repo reading, `BOARD_EVERY`, at once after a write-back, work orders derived from it; the UI and `ao` read it and run no reader | High | Slice 1 of 2 merged — the host agent's half; slice 2, the UI and `ao` |
 | TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
 | TD-617 | Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form) | High | Open |
 | TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
@@ -57,6 +56,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-625 | The Pull requests card's month counts stop at 1000: GitHub's search returns at most 1000 results, so a month of ~1500 PRs reads *999* or *1000+* | Low | Open |
+| TD-626 | The host agent's board read after a stopped fetch carries no *fetch skipped* note: no *origin could not be reached* on the Inbox | Low | Open |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
 | TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
 
@@ -784,32 +784,6 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 
 ---
 
-## TD-615: Build TD-614 (1): the boards are the host agent's reading — `boards` on the repo reading, `BOARD_EVERY`, at once after a write-back, work orders derived from it; the UI and `ao` read it and run no reader
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-12 (the designer, TD-614's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 of 2 (grinder-ao-1, 2026-10-12): fix steps 1–3 and their tests, the host agent's half (`src/sessionorc/**`) — `boards` on the repo reading (`workorders.read_boards`, each item with its `key`), `BOARD_EVERY` reading a board only when its file or the day moved and the ledger left unread on that pass, the `REPOS_EVERY` pass fetching, `_reread_board` after every write-back reading the write-back's tree as origin's board, the work orders `workorders.orders` over it. Left: slice 2, steps 4–5 and their tests (`src/shiftlead/**`: `read_boards`, `board_argv`, `BOARD_TTL`, `_board_due` go; the Inbox, `ao repo`, `ao inbox` and `ao board show` read `boards` — each item's `key` is the id the row now derives with `workorders.ref`). Was: Open.
-**Location:** design §4.4 *Each reading has one owner* (*The boards*), §4.5 screen 6 (board items), §4.7 `ao board show`; `src/sessionorc/agent_tick.py` (the repo reading ~L2895–2910: `workorders.read` every `REPOS_EVERY` — becomes the board read, kept as `boards`, with the orders derived), `src/sessionorc/workorders.py` (`read` ~L112: return every item, the orders a filter over them), `src/sessionorc/agent_common.py` (`REPOS_EVERY` ~L269: add `BOARD_EVERY = 60.0`), `src/sessionorc/agent_inbox.py` (after a write-back, ~L786: re-read that repo's board at once and push `repos`), `src/shiftlead/ui/app.py` (`read_boards` ~L372 and its cache ~L819–840 go: the Inbox reads `boards` from the `repos` reading), `src/shiftlead/ui/inbox.py` (`board_argv` ~L644 and `BOARD_TTL` ~L496 go; the origin note derived from the reading's fields), `src/shiftlead/cli.py` (`_board_due` ~L1494, called ~L1697 for `ao repo`, which runs the repo's reader `--due-only` — goes; `ao repo`, `ao inbox` and `ao board show` read `boards`); `tests/test_workorders.py`, `tests/test_ui_inbox*.py`, `tests/test_agent*.py`
-
-**Why:** TD-614: Paul, 2026-10-12 — *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*; the board was read on three clocks by three processes, the counts rendered per page every 20 s, the card views per client. This slice is the board: the host agent's reader every `REPOS_EVERY`, the UI's every `BOARD_TTL`, and `ao`'s own, three runs of one file.
-
-**Fix:**
-1. The repo reading gains `boards`: the board reader's items (every open item with line, `board:<key>`, due, answers, decided, refs, session, detail block, the checkout's and origin's, and the origin-note facts the Inbox draws today), read every `BOARD_EVERY` (60 s) without a fetch and with one on the `REPOS_EVERY` pass; a failed read keeps the last good items with `error` and `failed_at`.
-2. The work orders are a filter over `boards` (the decided open lines), never a second read.
-3. A write-back (Snooze, Done, Decide, Reply, the add) re-reads that repo's board at once and pushes `repos`.
-4. The UI reads `boards` from the `repos` RPC and the `repos` events it already takes; `read_boards`, its cache, `board_argv` and `BOARD_TTL` go; the Inbox, the Due strip and the Repo page draw from it unchanged.
-5. `ao` reads `boards` over RPC — `ao repo` (whose `_board_due` ran the reader `--due-only`), `ao inbox` and `ao board show` — and runs no reader.
-6. Tests: the reading carries every item and the orders are its decided subset; a write-back's re-read lands in the next push; a failed read keeps the last items with the error; the UI renders the Inbox's board rows from a fixture reading with no subprocess run (a spy on `subprocess.run` sees none); `ao board show` reads the RPC.
-
-**Done when** the board reader runs only in the host agent — on its clock and after a write-back — the UI and `ao` draw the same items from its reading, a Done shows on the next push, and the tests above pass; the builder's look (design §4.9b: the Inbox's board rows and the Due strip on a scratch home, a Done landing) is named in the PR.
-
-**Related:** TD-614 (the design), TD-603 / TD-607 (the line's id), TD-584 / TD-585 (the reader becomes ledgerboard's), TD-611.
-
----
-
 ## TD-616: Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function
 
 **Priority:** High
@@ -1023,6 +997,26 @@ same PR. **Done when** the card's month reads the number `issueCount` gives, and
 month of more than 1000 PRs and gets its count.
 
 **Related:** TD-176 (the two reads), TD-608 (*completed* joins `recent`), TD-611 (the PR count in the polls).
+
+---
+
+## TD-626: The host agent's board read after a stopped fetch carries no *fetch skipped* note, so the Inbox draws no *origin could not be reached*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2, found building TD-615 slice 2)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open.
+**Location:** `src/sessionorc/workorders.py` `read_boards` (the `--fetch` run at `FETCH_TIMEOUT`, then the plain `_report`); design §4.5 screen 6 *Boards are read against origin* (the *unreached* note)
+
+**Why:** until TD-615 the UI's own read marked each board of the plain read that followed a stopped or failed fetching run with `fetch_note` *fetch skipped (<why>)*, so the row carried the note *origin could not be reached (…): showing the checkout's board as of its last pull*. The host agent's `read_boards` falls back to the plain read the same way but leaves `fetch_note` as the plain read gives it (none), so a dead remote past our 45 s bound is drawn as if the board matched origin. The reader's own bound on its fetch still says *fetch skipped*; only ours is silent.
+
+**Fix:** in `read_boards`, when the `--fetch` run gave no report and the plain one did, set each board's `source` to None and `fetch_note` to `fetch skipped (<why>)` — *timeout* for our bound, else the run's failure in words — as the UI's `read_boards` did; a test that a stopped fetching run's boards carry it and that `ui.inbox.origin_note` draws *origin could not be reached* from them.
+
+**Done when** a fetching read stopped at its bound yields boards whose rows draw the *unreached* note, and the test above passes.
+
+**Related:** TD-615 (where the UI's own read went), TD-221 (the origin notes).
 
 ---
 

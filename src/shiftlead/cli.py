@@ -2555,7 +2555,11 @@ def cmd_board_show(args: argparse.Namespace) -> int:
         root = _main_checkout(os.getcwd()) or ""
         if not root:
             return fail(args, "this directory is not in a repo; name one with --repo", 1)
-    got = _board_line(call_sync("repos"), root, want)
+    try:
+        repos = call_sync("repos")
+    except (AgentError, AgentUnavailable, OSError):  # a read: the checkout's file answers without the agent
+        repos = None
+    got = _board_line(repos, root, want)
     if got is None and not workorders.can_name(root):
         return fail(args, f"{root} has no board reader ({workorders.READER}) to name its lines by", 1)
     if got is None:

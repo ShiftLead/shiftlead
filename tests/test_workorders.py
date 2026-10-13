@@ -208,6 +208,15 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     assert cli.main(["board", "show", key, "--json"]) == 0
     got = json.loads(capsys.readouterr().out)
     assert got["open"] is False and got["line"] == 7 and got["source"] == "checkout"
+    # the host agent down: the checkout's file still answers (a read is most wanted then)
+    from sessionorc.client import AgentUnavailable
+
+    def down(method, **k):
+        raise AgentUnavailable("no agent")
+
+    monkeypatch.setattr(cli, "call_sync", down)
+    assert cli.main(["board", "show", key, "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["line"] == 7
     assert cli.main(["board", "show", "TD-607"]) == 2
     (root / "scripts" / "nudge_user_attention.py").unlink()  # no reader: said, never *reworded or closed*
     assert cli.main(["board", "show", key]) == 1

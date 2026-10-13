@@ -1,8 +1,8 @@
 """The Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10): its sections, the state rows,
-the board rows and their reader's argv, the promote rows, what is owed, and the rail and Find.
+the board rows from the host agent's reading, the promote rows, what is owed, and the rail and Find.
 Moved out of `shiftlead.ui.app` unchanged (TD-196) and re-exported from it, so a route, a template or
-a test reads each name from the app as before. `read_boards` and `repo_teams` stay in the app: the
-suite patches both there.
+a test reads each name from the app as before. `repo_teams` stays in the app, and `board_reading` is
+read through it: the suite patches both there.
 """
 
 from __future__ import annotations
@@ -621,6 +621,8 @@ def board_reading(
         name = str(r.get("name") or Path(str(root)).name)
         got = r.get("boards")
         if not isinstance(got, dict):
+            if (Path(str(root)) / BOARD_FILE).is_file():  # a reading from before its first board read
+                notes.append(f"the board of {name} has not been read yet")
             continue
         own = board_rows(got, teams)
         if got.get("error"):
