@@ -55,7 +55,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Slice 1 of 2 merged — `profile` in `relaunch`; slice 2, the comparison and `ao team flow` |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
-| TD-626 | The host agent's board read after a stopped fetch carries no *fetch skipped* note: no *origin could not be reached* on the Inbox | Low | Open |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
 | TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
 | TD-629 | A permission answered in the terminal comes back as *needs you* when the hook's wait runs out: the timeout re-raises a pending the session has already moved past | Medium | Open |
@@ -964,26 +963,6 @@ brief written for it.
 
 **Related:** TD-299, guardians-devenv TD-028 and `docs/briefs/team-setup.md`, TD-055 (archived
 with the retired brief).
-
----
-
-## TD-626: The host agent's board read after a stopped fetch carries no *fetch skipped* note, so the Inbox draws no *origin could not be reached*
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (grinder-ao-2, found building TD-615 slice 2)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/sessionorc/workorders.py` `read_boards` (the `--fetch` run at `FETCH_TIMEOUT`, then the plain `_report`); design §4.5 screen 6 *Boards are read against origin* (the *unreached* note)
-
-**Why:** until TD-615 the UI's own read marked each board of the plain read that followed a stopped or failed fetching run with `fetch_note` *fetch skipped (<why>)*, so the row carried the note *origin could not be reached (…): showing the checkout's board as of its last pull*. The host agent's `read_boards` falls back to the plain read the same way but leaves `fetch_note` as the plain read gives it (none), so a dead remote past our 45 s bound is drawn as if the board matched origin. The reader's own bound on its fetch still says *fetch skipped*; only ours is silent.
-
-**Fix:** in `read_boards`, when the `--fetch` run gave no report and the plain one did, set each board's `source` to None and `fetch_note` to `fetch skipped (<why>)` — *timeout* for our bound, else the run's failure in words — as the UI's `read_boards` did; a test that a stopped fetching run's boards carry it and that `ui.inbox.origin_note` draws *origin could not be reached* from them.
-
-**Done when** a fetching read stopped at its bound yields boards whose rows draw the *unreached* note, and the test above passes.
-
-**Related:** TD-615 (where the UI's own read went), TD-221 (the origin notes).
 
 ---
 
