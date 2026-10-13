@@ -53,7 +53,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-604 | Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work | Medium | Designed — TD-608 builds it |
 | TD-607 | Build TD-603: every board line's id is its derived `board:<key>` — drawn and copied on every board row, `ao board show`, `ao board edit --key`, and `key` on the write-back's RPCs | Medium | Open |
 | TD-608 | Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed* | Medium | Open |
-| TD-609 | §4.9 says the dev-cadence registry is where a repo is registered; TD-590 made ShiftLead's own roster that, with dev-cadence's imported | Low | Open |
 | TD-610 | The techlead primer names mail's *sideways by team* edge as the one exception to *nothing keys on a team or a project*; #1593 made it two | Low | Open |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
 
@@ -874,26 +873,6 @@ Then the build, with tests that the press promotes under `auto` inside the settl
 **Done when** the Repo page lists the entries closed in the chosen window with their PRs and who opened them, the team card's *closed* block links there with the titles on hover, `ao repo` says how many closed this week, and the tests above pass; the builder's look (design §4.9b: the page's section on a scratch home) is named in the PR.
 
 **Related:** TD-604 (the design), TD-591 (the Repo page's missing seams), TD-071 (Org page ideas).
-
----
-
-## TD-609: §4.9 says the dev-cadence registry is where a repo is registered; TD-590 made ShiftLead's own roster that, with dev-cadence's imported
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1592–#1599)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/design/4.9-org-team-project.md` L130–131 (*Projects*, the paragraph after the Project block); read against `docs/design/5-configuration.md` L119–123 *Repos*
-
-**Why:** PR #1592 (TD-590) made `repos.txt` under the home the roster ShiftLead reads first and dev-cadence's `~/.config/dev-cadence/repos.txt` an import, and reworded §4.9 L32 and §4 L12 to say so. L130–131 of §4.9 still reads *A project is a grouping over checkouts that exist, not a place to register a repo — the dev-cadence registry stays that*, while §5 *Repos* now says **ShiftLead's own roster** is read first and a host without dev-cadence lists only what ShiftLead was given. A reader of §4.9 is sent to a registry the host may not have, for where to register a repo.
-
-**Fix:** reword the clause to §5 *Repos*: a project is not a place to register a repo — the roster is (`repos.txt` under the home, dev-cadence's imported). A wording of the same fact: no history line.
-
-**Done when** §4.9's sentence names the roster §5 *Repos* names, and `grep -rn "dev-cadence registry" docs/design/` finds none that is the only roster.
-
-**Related:** TD-590 (#1592), TD-584 (the design).
 
 ---
 

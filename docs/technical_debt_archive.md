@@ -10520,3 +10520,23 @@ Then the build, with tests that a person's interactive shell may promote and an 
 **Related:** TD-582 (#1590), TD-601 (builds the edge).
 
 **Resolved:** 2026-10-12 (PR #1600) — §4.9 *Home and reach* and §4.2a's rejected budget now say what invariant 9 says: nothing that acts keys on `team` or `project` but a team's own settings (§5 `teams.<team>`) and the mail gate (§4.10). `ui/app.py`'s comment on a project with no definition likewise. §4.9's CLI line, `shiftlead/org.py`'s docstring and `teams.project_block`'s say the same. No behaviour change, no history line.
+
+---
+
+## TD-609: §4.9 says the dev-cadence registry is where a repo is registered; TD-590 made ShiftLead's own roster that, with dev-cadence's imported
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1592–#1599)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `docs/design/4.9-org-team-project.md` L130–131 (*Projects*, the paragraph after the Project block); read against `docs/design/5-configuration.md` L119–123 *Repos*
+
+**Why:** PR #1592 (TD-590) made `repos.txt` under the home the roster ShiftLead reads first and dev-cadence's `~/.config/dev-cadence/repos.txt` an import, and reworded §4.9 L32 and §4 L12 to say so. L130–131 of §4.9 still reads *A project is a grouping over checkouts that exist, not a place to register a repo — the dev-cadence registry stays that*, while §5 *Repos* now says **ShiftLead's own roster** is read first and a host without dev-cadence lists only what ShiftLead was given. A reader of §4.9 is sent to a registry the host may not have, for where to register a repo.
+
+**Resolved:** 2026-10-12 (PR #1604) — §4.9's *Projects* paragraph now reads *not a place to register a repo — the roster is (§5 *Repos*: `repos.txt` under the home, dev-cadence's imported)*.
+
+**Done when** §4.9's sentence names the roster §5 *Repos* names, and `grep -rn "dev-cadence registry" docs/design/` finds none that is the only roster.
+
+**Related:** TD-590 (#1592), TD-584 (the design).
