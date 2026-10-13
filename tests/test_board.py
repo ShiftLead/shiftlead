@@ -1275,3 +1275,18 @@ async def test_board_edit_and_board_reply_find_the_line_by_its_id_alone(agent, k
             await me.call("board_edit", board=path, action="done")
     line = origin_board(keyed).splitlines()[6]
     assert "on it" in line and "Due: 2026-10-01" in line
+
+
+def test_of_two_open_lines_sharing_an_id_the_one_shown_word_for_word_is_found(keyed):
+    """Review of #1606: two open lines share an id only when date, session and words do — a `Due:`
+    or a reply tail apart. With the id, the line whose text is the one the person was shown is
+    found before the first; with a text neither holds, the first."""
+    from sessionorc import workorders
+
+    other = ITEM.replace("2026-09-22", "2026-09-29")
+    lines = [f"- [ ] {ITEM}\n", f"- [ ] {other}\n"]
+    key = workorders.ref(keyed, ITEM)
+    assert workorders.ref(keyed, other) == key
+    assert board._find(lines, None, other, key, keyed) == 1
+    assert board._find(lines, None, ITEM, key, keyed) == 0
+    assert board._find(lines, None, "", key, keyed) == 0

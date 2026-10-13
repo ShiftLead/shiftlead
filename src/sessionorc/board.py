@@ -334,10 +334,16 @@ def _find(lines: list[str], line: int | None, text: str, key: str = "", root: Pa
     `text`, word for word — the reader's line first, then the whole file, since origin's lines may
     sit elsewhere than the checkout's (§4.4)."""
     if key and root is not None:
+        found = []
         for i, ln in enumerate(lines):
             m = ITEM_RE.match(ln.rstrip("\n"))
             if m is not None and workorders.ref(root, m.group("text").strip()) == key:
-                return i
+                found.append((i, m.group("text").strip()))
+        # two open lines share an id only when their date, session and words do: the one the
+        # person was shown, word for word, before the first (review of #1606)
+        same = [i for i, t in found if text.strip() and t == text.strip()]
+        if same or found:
+            return (same or [found[0][0]])[0]
 
     def holds(ln: str) -> bool:
         m = ITEM_RE.match(ln.rstrip("\n"))

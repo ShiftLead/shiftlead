@@ -2538,6 +2538,8 @@ def cmd_board_show(args: argparse.Namespace) -> int:
         root = _main_checkout(os.getcwd()) or ""
         if not root:
             return fail(args, "this directory is not in a repo; name one with --repo", 1)
+    if not workorders.can_name(root):
+        return fail(args, f"{root} has no board reader ({workorders.READER}) to name its lines by", 1)
     got = workorders.show(root, want)
     if got is None:
         return fail(args, workorders.NO_LINE.format(ref=want), 1)

@@ -189,3 +189,6 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     assert cli.main(["board", "show", "board:00000000"]) == 1
     assert "no line board:00000000 on the board — reworded or closed" in capsys.readouterr().err
     assert cli.main(["board", "show", "TD-607"]) == 2
+    (root / "scripts" / "nudge_user_attention.py").unlink()  # no reader: said, never *reworded or closed*
+    assert cli.main(["board", "show", key]) == 1
+    assert "has no board reader (scripts/nudge_user_attention.py)" in capsys.readouterr().err

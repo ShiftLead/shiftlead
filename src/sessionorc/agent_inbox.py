@@ -432,8 +432,15 @@ class InboxMixin:
         ref}]`, `session` the holder's name."""
         agent_common.person_only(caller, "reply on the board", "§4.4", self._graph())
         root, want = self._board_root(board)
+        if line is None and not key:
+            raise RpcError("a board reply names the item's line or its id (design §4.4)")
         try:
-            at = int(line) if line is not None or not key else None
+            try:
+                at: int | None = int(line) if line is not None else None
+            except (TypeError, ValueError):
+                if not key:
+                    raise
+                at = None  # a line it cannot read, and the line's id: found by the id
             done = await asyncio.to_thread(
                 board_mod.write_back, root, at, text, "reply", None, reply=reply, key=str(key or "")
             )

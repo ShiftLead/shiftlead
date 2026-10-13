@@ -211,26 +211,33 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
     root = Path(root)
     if fetch:
         try:
-            subprocess.run(
+            # a fetch that failed leaves origin's ref as stale as the checkout: the checkout it is
+            fetched = subprocess.run(
                 ["git", "-C", str(root), "fetch", "-q", "origin"], capture_output=True, timeout=FETCH_TIMEOUT
             )
             cp = subprocess.run(
                 ["git", "-C", str(root), "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"],
                 capture_output=True, text=True, timeout=READ_TIMEOUT,
             )  # fmt: skip
-            head = cp.stdout.strip() or "origin/main"
-            cp = subprocess.run(
-                ["git", "-C", str(root), "show", f"{head}:{BOARD.as_posix()}"],
-                capture_output=True, text=True, errors="replace", timeout=READ_TIMEOUT,
-            )  # fmt: skip
-            if cp.returncode == 0:
-                return cp.stdout.splitlines(), head
+            heads = [cp.stdout.strip()] if cp.stdout.strip() else ["origin/main", "origin/master"]
+            for head in heads if fetched.returncode == 0 else ():
+                cp = subprocess.run(
+                    ["git", "-C", str(root), "show", f"{head}:{BOARD.as_posix()}"],
+                    capture_output=True, text=True, errors="replace", timeout=READ_TIMEOUT,
+                )  # fmt: skip
+                if cp.returncode == 0:
+                    return cp.stdout.splitlines(), head
         except (OSError, subprocess.SubprocessError):
             pass
     try:
         return (root / BOARD).read_text(encoding="utf-8").splitlines(), "checkout"
     except OSError:
         return [], ""
+
+
+def can_name(root: str | Path) -> bool:
+    """Whether the repo under `root` has a reader whose `item_key` can name its board's lines."""
+    return _item_key(Path(root) / READER) is not None
 
 
 def show(root: str | Path, want: str, *, fetch: bool = True) -> dict[str, Any] | None:
