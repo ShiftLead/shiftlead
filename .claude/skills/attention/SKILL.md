@@ -1,6 +1,6 @@
 ---
 name: attention
-description: Machine-wide "what needs my attention?" — every registered repo's user-attention board in one due-date-ordered report. Pass "fetch" to also compare each board against its origin (pushed cross-machine state). Pass "remote" for the everything view: fetch plus GitHub discovery of boards in repos not present on this machine.
+description: Machine-wide "what needs my attention?" — every registered repo's user-attention board in one due-date-ordered report. Pass "fetch" to also compare each board against its origin (pushed cross-machine state). Pass "remote" for the everything view: fetch plus GitHub discovery (GitHub only, TD-104) of boards in repos not present on this machine.
 ---
 
 <!-- SYNCED FILE — canonical copy: ShiftLead/dev-cadence files/.claude/skills/attention/SKILL.md

@@ -12,6 +12,13 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-12 — `forge = "none"`: the review line goes in the squash commit's body
+Do: in a repo with no PR API (a bare repo over ssh), set `forge = "none"` in `docs/cadence.toml`, put the `cadence-review:` line in each squash commit's body, and audit with `check_cadence.py --since 7d`; the nudge says "no forge" once instead of "PRs not checked".
+See: cadence.md §4.9, §9.18; TD-105.
+
+## 2026-10-12 — every PR reader asks through `scripts/forge.py`; a `forge` setting; `host/owner/repo` lines
+Do: never run `gh` from a script — add the operation to `scripts/forge.py`. A GitHub under another host sets `forge = "github"` in `docs/cadence.toml`, or the cadence check, the nudge and `sync-all.sh` read it as "PRs not checked". `remote_repos.txt`/`no_auto_delete.txt` may say `host/owner/repo`.
+See: cadence.md §4.6, §9.5, §9.6, §9.18; TD-103.
 ## 2026-10-12 — the ledger and board formats are `scripts/ledgerboard.py`'s, vendored from ShiftLead/ledgerboard
 Do: sync before running a newer `ledger.py`, `nudge_user_attention.py` or `board_edit.py` by hand — they import it. Never add a regex for a ledger or board line elsewhere; call the module (its `SPEC.md` is the format).
 See: cadence.md §2.12, §7; TD-106.

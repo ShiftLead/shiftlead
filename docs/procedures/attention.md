@@ -26,11 +26,12 @@ cadence-staleness line when a repo's synced copy lags dev-cadence upstream — s
 repo names itself in the fetch view.
 
 For *remote*, add `--remote` instead (it implies `--fetch`): after the local
-sections, a labeled remote tier lists boards discovered on GitHub (gh CLI) in repos no
+sections, a labeled remote tier lists boards discovered on GitHub (gh CLI; discovery is GitHub's
+alone until a GitLab backend exists, TD-104) in repos no
 local row covers — repos living only on other machines. Pushed state only; archived
 repos are skipped; discovery scans the authenticated user + orgs unless
-`remote_repos.txt` in the machine-scope directory (`$DEV_CADENCE_REG_DIR`, else `${XDG_CONFIG_HOME:-~/.config}/dev-cadence`) narrows it (one `owner` or
-`owner/repo` per line; empty/missing = scan all). Every failure mode (gh missing,
+`remote_repos.txt` in the machine-scope directory (`$DEV_CADENCE_REG_DIR`, else `${XDG_CONFIG_HOME:-~/.config}/dev-cadence`) narrows it (one `owner`,
+`owner/repo` or `host/owner/repo` per line, cadence.md §9.5; empty/missing = scan all). Every failure mode (gh missing,
 unauthenticated, per-repo 403/5xx, truncated listing, budget exhaustion) degrades to a
 ⚠ note in the tier — surface those notes; absence of a note is the coverage claim.
 

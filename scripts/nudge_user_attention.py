@@ -382,44 +382,33 @@ def _normalize_source_url(source: str) -> str | None:
     return None
 
 
-def origin_forge(root: Path) -> tuple[str, str | None]:
-    """Classify a repo's origin once (TD-098): ("github", "owner/repo") for github.com;
-    ("other", host) for a forge the cadence cannot read yet (GitLab, Gitea, a GitHub
-    Enterprise host — TD-097); ("none", None) for no origin, or one that names no host (a
-    local path, a bare file:// clone: what every test fixture uses) — there the caller
-    behaves as before. A detector told "other" says it could not look, never stays quiet:
-    an empty answer must mean nothing there (cadence.md §7)."""
+# The forge adapter (TD-103): origin_forge() and forge_unread_line() live in forge.py, beside
+# this script, with every forge call the open-PR line, the settings line and the remote tier
+# make. Without it (a partial install) each of those says it could not look.
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import forge as F
+    origin_forge = F.origin_forge            # re-exported: callers and tests read them here
+    forge_unread_line = F.forge_unread_line
+except Exception as _e:  # noqa: BLE001
+    F = None
+    _FORGE_GONE = f"PRs not checked: scripts/forge.py could not be imported ({type(_e).__name__}: {_e})"
+
+    def origin_forge(root: Path) -> tuple[str, str | None]:
+        return "other", None
+
+    def forge_unread_line(host: str) -> str:
+        return _FORGE_GONE
+
+
+def _forge(root: Path | None = None, **kw):
+    """The backend for root, or None when there is none (no forge.py, an unsupported forge)."""
+    if F is None:
+        return None
     try:
-        r = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"],
-                           check=False, capture_output=True, text=True, timeout=10)
-    except (OSError, subprocess.SubprocessError):
-        return "none", None
-    raw = r.stdout.strip() if r.returncode == 0 else ""
-    # The host is read from the URL's own shape, not through _normalize_source_url, so any
-    # scheme (ssh://, git://, HTTPS://) and any user (deploy@host:a/b) names its forge.
-    m = re.fullmatch(r"([A-Za-z][A-Za-z0-9+.-]*)://(?:[^@/]*@)?([^/:]*)(?::\d*)?(/.*)?", raw)
-    if m:
-        if m.group(1).lower() == "file":
-            return "none", None
-        host, path = m.group(2).lower(), m.group(3) or ""
-    else:
-        # scp-like user@host:path; a bare owner/repo (a legacy *lock* form) or a local path
-        # has no host — it would read as github.com through the lock normalizer, so never here
-        m = re.fullmatch(r"[^/@:]+@([^/:]+):(.*)", raw)
-        if not m:
-            return "none", None
-        host, path = m.group(1).lower(), m.group(2)
-    if not host:
-        return "none", None
-    if host == "github.com":
-        slug = re.sub(r"\.git$", "", path.strip("/")).lower()
-        return ("github", slug) if re.fullmatch(r"[^/]+/[^/]+", slug) else ("none", None)
-    return "other", host
-
-
-def forge_unread_line(host: str) -> str:
-    """The one wording every detector uses for an origin it cannot read (TD-098)."""
-    return f"PRs not checked: origin is {host}, which the cadence cannot read yet (TD-097)"
+        return F.backend(root or Path("."), **kw)
+    except F.ForgeUnreadable:
+        return None
 
 
 def _upstream_files_commit(url: str) -> str | None:
@@ -943,8 +932,10 @@ def _remote_filter_path() -> Path:
     return machine_dir() / "remote_repos.txt"
 
 
-def _read_remote_filter() -> tuple[list[str], list[str]]:
-    """(owners, owner/repo entries) from the optional machine-local filter.
+def _read_remote_filter() -> tuple[list[str], list[str], list[str]]:
+    """(owners, owner/repo entries, entries on a host the tier cannot read) from the
+    optional machine-local filter. A repo line is `host/owner/repo` or the older
+    `owner/repo`, which reads as github.com (TD-103).
 
     Missing file OR a file with no entries both mean "no filter" (D1 as
     amended 2026-08-13): full discovery, user + orgs. Same comment/blank
@@ -952,37 +943,25 @@ def _read_remote_filter() -> tuple[list[str], list[str]]:
     """
     f = _remote_filter_path()
     if not f.is_file():
-        return [], []
+        return [], [], []
     owners: list[str] = []
     repos: list[str] = []
+    elsewhere: list[str] = []
     for raw in f.read_text(encoding="utf-8", errors="replace").splitlines():
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
-        (repos if "/" in line else owners).append(line)
-    return owners, repos
-
-
-def _gh(args: list[str], spent: dict) -> tuple[int, str, str]:
-    """One budgeted gh call. Returns (rc, stdout, stderr); rc -1 = timeout,
-    rc -2 = budget already exhausted (call not attempted), rc -3 = gh missing.
-    Books elapsed time into spent["t"] in a finally so timeouts count too."""
-    remaining = GH_BUDGET - spent["t"]
-    if remaining <= 0:
-        spent["hit"] = True
-        return -2, "", "remote-tier budget exhausted"
-    cap = min(GH_TIMEOUT, remaining)   # the budget may truncate below GH_TIMEOUT
-    t0 = time.monotonic()
-    try:
-        r = subprocess.run(["gh", *args], check=False, capture_output=True,
-                           text=True, timeout=cap)
-        return r.returncode, r.stdout, r.stderr
-    except FileNotFoundError:
-        return -3, "", "gh not installed"
-    except subprocess.TimeoutExpired:
-        return -1, "", f"timeout after {cap:g}s"
-    finally:
-        spent["t"] += time.monotonic() - t0
+        if "/" not in line:
+            owners.append(line)
+            continue
+        key = F.repo_key(line) if F is not None else None
+        if key and key[0] == "github.com":
+            repos.append(key[1] if line.count("/") == 2 else line)
+        elif key:
+            elsewhere.append(line)
+        else:
+            repos.append(line)   # as before: the forge says what it makes of it
+    return owners, repos, elsewhere
 
 
 PR_STALE_DAYS = 2  # an open PR older than this is named at SessionStart (TD-052)
@@ -995,30 +974,27 @@ def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
     what is left of the fetch budget; offline, no gh, or any failure is silence — but an
     origin that is not GitHub is said, once, never silence (TD-098)."""
     kind, host = origin_forge(root)
+    if (kind, host) == ("other", "none"):   # TD-105: said once, not a warning — nothing is unread
+        return [forge_unread_line("none")]
     if kind == "other":
-        return [f"⚠ {forge_unread_line(host)}"]
+        return [f"⚠ {forge_unread_line(host or '?')}"]
     timeout = 5.0 if deadline is None else min(5.0, deadline - time.monotonic())
     if timeout < 0.5:
         return []
+    forge = _forge(root, cwd=root)
+    if forge is None:
+        return []
     try:
-        # oldest first, so the limit can never drop the stalest PR — the one this is for
-        r = subprocess.run(["gh", "pr", "list", "--state", "open", "--limit", "30",
-                            "--search", "sort:created-asc",
-                            "--json", "number,title,createdAt,isDraft,comments"],
-                           cwd=root, check=False, capture_output=True, text=True, timeout=timeout,
-                           env={**os.environ, "GH_PROMPT_DISABLED": "1"})
-        if r.returncode != 0:
-            return []
-        prs = json.loads(r.stdout or "[]")
-    except (OSError, subprocess.SubprocessError, ValueError):
+        prs = forge.open_prs(30, timeout)
+    except (F.ForgeUnreadable, OSError, ValueError, TypeError):
         return []
     now = datetime.now(timezone.utc)
     old = []
     for pr in prs:
-        if pr.get("isDraft"):
+        if pr.get("draft"):
             continue            # a draft is work in progress, not parked work
         try:
-            created = datetime.fromisoformat(pr["createdAt"].replace("Z", "+00:00"))
+            created = datetime.fromisoformat(pr["created_at"].replace("Z", "+00:00"))
         except (KeyError, ValueError, AttributeError):
             continue
         age = (now - created).days
@@ -1030,7 +1006,7 @@ def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
         # Its verdict may sit on any line, the last one counting (TD-087).
         verdicts = []
         for c in pr.get("comments") or []:
-            if c.get("authorAssociation") not in ("OWNER", "MEMBER", "COLLABORATOR"):
+            if not c.get("trusted"):
                 continue
             hits = re.findall(r"^[ \t]*cadence-review:[ \t]*(SHIP|FIXED|BLOCK)\b",
                               c.get("body") or "", re.I | re.M)
@@ -1062,20 +1038,28 @@ def _local_origin(root: Path) -> str | None:
 
 # TD-034 tier 2: the merge settings cadence.md §4 assumes. adopt_repo_settings.sh checks and
 # applies them one repo at a time; this only REPORTS, in the --fetch report, so drift is seen
-# without anyone remembering to run it. Same values as that script's WANT (a parity pair).
-CADENCE_SETTINGS = {"allow_squash_merge": True, "allow_merge_commit": False,
-                    "allow_rebase_merge": False, "delete_branch_on_merge": True}
+# without anyone remembering to run it. Same values as that script's WANT (a parity pair);
+# the one copy is the GitHub backend's (TD-103).
+CADENCE_SETTINGS = dict(F.GitHub.settings_wanted) if F is not None else {}
 
 
 def _no_auto_delete() -> set[str]:
     """owner/repo names (lowercased) listed in the machine-scope no_auto_delete.txt: repos
     that keep "Automatically delete head branches" off on purpose (they stack PRs, §4), so
-    the settings line never nags about it. Same format as remote_repos.txt."""
+    the settings line never nags about it. Same format as remote_repos.txt: a
+    `host/owner/repo` line names that host's repo, an older `owner/repo` one github.com's."""
     try:
         lines = (machine_dir() / "no_auto_delete.txt").read_text(encoding="utf-8").splitlines()
     except OSError:
         return set()
-    return {ln.split("#", 1)[0].strip().lower() for ln in lines if ln.split("#", 1)[0].strip()}
+    out = set()
+    for ln in lines:
+        ln = ln.split("#", 1)[0].strip().lower()
+        if not ln:
+            continue
+        key = F.repo_key(ln) if F is not None else None
+        out.add(key[1] if key and key[0] == "github.com" else ln)
+    return out
 
 
 def settings_line(root: Path, spent: dict) -> str | None:
@@ -1084,14 +1068,18 @@ def settings_line(root: Path, spent: dict) -> str | None:
     unauthenticated, a non-admin sees null) — never a guess, never a write. An origin that
     is not GitHub gets a "not checked" line instead, so the row never reads clean (TD-098)."""
     kind, slug = origin_forge(root)
+    if (kind, slug) == ("other", "none"):
+        return None   # no forge, no merge settings to compare (TD-105)
     if kind == "other":
-        return f"⚙ repo settings not checked: origin is {slug}, which the cadence cannot read yet (TD-097)"
-    if kind != "github" or slug is None:
+        why = forge_unread_line(slug or "?").removeprefix("PRs not checked: ")
+        return f"⚙ repo settings not checked: {why}"
+    forge = _forge(root, spent=spent, per_call=GH_TIMEOUT, total=GH_BUDGET)
+    if kind != "github" or slug is None or forge is None:
         return None
-    want = dict(CADENCE_SETTINGS)
+    want = dict(forge.settings_wanted)
     if slug.lower() in _no_auto_delete():
-        want.pop("delete_branch_on_merge")   # a repo that stacks PRs, by choice (§4)
-    rc, out, _err = _gh(["api", f"repos/{slug}"], spent)
+        want.pop(forge.auto_delete)   # a repo that stacks PRs, by choice (§4)
+    rc, out, _err = forge.repo_settings(slug)
     if rc != 0:
         return None
     try:
@@ -1120,15 +1108,22 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
     lines: list[str] = ["-- Remote tier (GitHub, pushed state only) --"]
     spent = spent if spent is not None else {"t": 0.0, "hit": False}
 
-    owners, direct = _read_remote_filter()
-    if not owners and not direct:
-        rc, out, err = _gh(["api", "user", "--jq", ".login"], spent)
+    if F is None:
+        lines.append(f"⚠ remote tier unavailable ({forge_unread_line('?')})")
+        return lines
+    forge = F.GitHub(spent=spent, per_call=GH_TIMEOUT, total=GH_BUDGET)
+    owners, direct, elsewhere = _read_remote_filter()
+    if elsewhere:
+        lines.append(f"⚠ {len(elsewhere)} remote_repos.txt line(s) on a host the remote tier cannot "
+                     f"read yet, not covered (first: {elsewhere[0]}; TD-104)")
+    if not owners and not direct and not elsewhere:   # a filter naming only other hosts is still a filter
+        rc, out, err = forge.whoami()
         if rc != 0:
-            reason = "gh not installed" if rc == -3 else (err.strip().splitlines() or ["gh api user failed"])[-1]
+            reason = "gh not installed" if rc == -3 else (err.strip().splitlines() or [f"{forge.cli} could not name the user"])[-1]
             lines.append(f"⚠ remote tier unavailable ({reason})")
             return lines
         owners = [out.strip()]
-        rc, out, err = _gh(["api", "user/orgs", "--jq", ".[].login"], spent)
+        rc, out, err = forge.owners()
         if rc == 0:
             owners += [o for o in out.split() if o]
         else:
@@ -1137,8 +1132,7 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
 
     candidates: list[str] = list(direct)
     for owner in owners:
-        rc, out, err = _gh(["repo", "list", owner, "--json", "nameWithOwner,isArchived",
-                            "--limit", str(GH_LIST_LIMIT)], spent)
+        rc, out, err = forge.list_repos(owner, GH_LIST_LIMIT)
         if rc != 0:
             reason = "budget exhausted" if rc == -2 else (err.strip().splitlines() or ["repo list failed"])[-1]
             lines.append(f"⚠ repo list failed for {owner} ({reason}) — that owner not covered")
@@ -1150,7 +1144,7 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
             continue
         if len(listed) >= GH_LIST_LIMIT:
             lines.append(f"⚠ repo list truncated at {GH_LIST_LIMIT} for {owner} — remote coverage incomplete")
-        candidates += [r["nameWithOwner"] for r in listed if not r.get("isArchived")]
+        candidates += [r["name"] for r in listed if not r.get("archived")]
 
     local = {u for u in (_local_origin(r) for r in local_roots) if u}
     seen: set[str] = set()
@@ -1162,14 +1156,13 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
     unprobeable: list[tuple[str, str]] = []
     probed = 0
     for name in sorted(probes):
-        rc, out, err = _gh(["api", f"repos/{name}/contents/docs/user_attention.md",
-                            "-H", "Accept: application/vnd.github.raw"], spent)
+        rc, out, err = forge.read_file(name, "docs/user_attention.md")
         if rc == -2:
             break
         probed += 1
         if rc == 0:
             boards.append((name, out))
-        elif "HTTP 404" in err:
+        elif rc == F.NOT_FOUND:
             continue                                # no board — silent by design
         else:
             reason = "gh not installed" if rc == -3 else (err.strip().splitlines() or ["probe failed"])[-1]

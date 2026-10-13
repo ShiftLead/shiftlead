@@ -60,6 +60,7 @@ KEYS = {
     "review-model": ("sonnet", "the independent reviewer's model (§4.8): a cheaper model than the author's, never the same"),
     "sweep-model": ("sonnet", "the model the deep sweep's agents run on (/stranded-work deep)"),
     "agents": ("claude", "the agent tools whose sessions the safety nets must see, comma-separated (TD-100); without claude, the memory guard skips its Claude checks (TD-095)"),
+    "forge": ("auto", "where the PRs live: auto (from origin's host), github, gitlab or none (TD-103)"),
     "worktree-root": (".claude/worktrees", "where open_worktree.sh puts worktrees, a path relative to the clone root (TD-101)"),
 }
 

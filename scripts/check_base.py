@@ -25,9 +25,9 @@ up to four facts in this order, and nothing when the branch is current and unlan
 
 OFFLINE by design: it reads origin/<default> as the last fetch left it and never fetches —
 the attention hook, which runs just before it in the runner, fetched this repo under its
-own budget when the repo is on the roster; the `fetch` line says when nothing did. No gh:
-naming the PR is left to `gh pr list --head <branch> --state merged`, which the landed
-line prints. Silent on the default branch, on a detached HEAD, outside a repo, and when
+own budget when the repo is on the roster; the `fetch` line says when nothing did. No forge
+call: naming the PR is left to the forge's own command for it (forge.py's landed_pr_hint),
+which the landed line prints. Silent on the default branch, on a detached HEAD, outside a repo, and when
 origin/<default> does not exist. Always exits 0 — a detector, never a gate (cadence §7).
 """
 
@@ -43,6 +43,15 @@ from check_cadence import default_branch, git, landed, landed_since_edited  # no
 
 BEHIND_WARN = 20          # commits on origin/<default> past the fork point
 FETCH_STALE_HOURS = 24
+
+
+def _its_pr(root, branch):
+    """" Its PR: <the forge's command>", or "" when the forge here has no backend (TD-103)."""
+    try:
+        import forge  # sibling SYNC script
+        return f" Its PR: {forge.backend(root).landed_pr_hint(branch)}"
+    except Exception:  # noqa: BLE001 — the advice is optional, the warning is not
+        return ""
 
 
 def facts(root):
@@ -64,7 +73,7 @@ def facts(root):
         out.append(
             f"⚠ this branch ({branch}) has LANDED on {ref} ({how}) — its work is done; start new "
             f"work on a fresh branch off {ref}, and never merge or rebase this one onto main "
-            f"(cadence §1). Its PR: gh pr list --head {branch} --state merged"
+            f"(cadence §1).{_its_pr(root, branch)}"
         )
     elif since == "reverted":
         out.append(

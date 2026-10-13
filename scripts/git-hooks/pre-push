@@ -4,13 +4,14 @@
 # Block direct pushes to main (docs/cadence.md §4 — all changes go through PRs).
 #
 # Server-side branch protection is paywalled for private repos on GitHub's free
-# plan, so this client-side hook is the seatbelt on the machine all pushes
+# plan (GitLab Free has protected branches, which do it server-side), so this
+# client-side hook is the seatbelt on the machine all pushes
 # originate from. Enabled per-clone by scripts/install_git_hooks.sh (sync.sh runs
 # it): a shim in the clone's shared .git/hooks execs the MAIN checkout's copy of
 # this file, so every worktree runs the same hook whatever its branch — one on a
 # branch without scripts/git-hooks/ and one whose branch edits this file alike
 # (TD-055; the older relative core.hooksPath ran each worktree's own branch's copy,
-# or none). PR merges happen server-side via `gh pr merge` and are unaffected.
+# or none). PR merges happen server-side (`gh pr merge`, `glab mr merge`) and are unaffected.
 #
 # Guarded: the repo's default branch (the §9 rule below, TD-042) AND `main` always —
 # a gate errs toward blocking, and a clone whose origin/HEAD is unset must not lose
