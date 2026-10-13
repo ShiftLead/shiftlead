@@ -43,7 +43,7 @@
     {% else %}
     {% if p.windows %}{% for w in ('day', 'week', 'month') %}{% set b = p.windows[w] %}
     <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
-      <div class="blocks"><a class="blk opened" href="{{ r.url }}#prs-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}#prs-closed" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed{% if p.truncated and w == 'month' %}+{% endif %}</a></div>
+      <div class="blocks"><a class="blk opened" href="{{ r.url }}#prs-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}#prs-closed" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
     </div>
     {% endfor %}{% endif %}
     <div class="meta{% if p.error %} dim{% endif %}"{% if p.error %} title="the last read failed: {{ p.error }}"{% endif %}>{% if p.oldest %}oldest {{ p.oldest }} · {% endif %}{% if p.waiting %}{{ p.waiting.n }} waiting on review · {% endif %}{% if p.error %}could not look — {% endif %}read {{ r.read }} ago</div>

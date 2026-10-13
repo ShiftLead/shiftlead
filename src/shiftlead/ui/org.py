@@ -194,7 +194,6 @@ def repo_facet(
             "windows": {w: _blocks((prs.get("windows") or {}).get(w)) for w in WINDOWS} if prs.get("windows") else None,
             "oldest": oldest,
             "waiting": waiting,
-            "truncated": bool(prs.get("truncated")),
         },
         "read": _age(r.get("at"), now),
     }
