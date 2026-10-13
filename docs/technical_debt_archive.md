@@ -10493,7 +10493,7 @@ Then the build, with tests that a person's interactive shell may promote and an 
 
 **Why:** TD-602's **Location** lists *`src/shiftlead/ui/help.py` (the group's help words)*, and #1591 rewrote the mockup's help line in `docs/mockups/gen.py` to say *Dismiss all clears the ones on screen once you have read them*. `grep -n -i "answered for you" src/shiftlead/ui/help.py` finds nothing; the words the page shows are `inbox.html` L21, `'answered': 'Questions a teammate answered for you from the record … Dismiss removes the row. Newest first.'`, drawn at `#info-answered`. A builder following the Location edits a file that holds no such text and leaves the group's help saying only *Dismiss removes the row*, which the new button makes incomplete.
 
-**Resolved:** 2026-10-12 (PR #NNNN) — overtaken by TD-602's build, #1597 (76d01f18), which wrote the group's help words where they live: `inbox.html`'s `info['answered']` gained *Dismiss all removes the ones on screen once you have read them …*. TD-602 is archived, so no open entry's Location points at `help.py` for them.
+**Resolved:** 2026-10-12 (PR #1599) — overtaken by TD-602's build, #1597 (76d01f18), which wrote the group's help words where they live: `inbox.html`'s `info['answered']` gained *Dismiss all removes the ones on screen once you have read them …*. TD-602 is archived, so no open entry's Location points at `help.py` for them.
 
 **Done when** TD-602's Location names the file that holds the group's help words.
 
