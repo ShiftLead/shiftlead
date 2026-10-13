@@ -81,7 +81,7 @@ self-hosted. Where they part:
 
 ## Can it run with shiftlead?
 
-- **shiftlead running Hermes: yes, and it is the useful pairing.** `hermes` is a terminal program,
+- **shiftlead running Hermes: possible, but few would want it.** `hermes` is a terminal program,
   so it runs today under the `shell` adapter, scraped (§4.3). A hook-fed adapter looks feasible:
   Hermes has *"four hook systems"*, one of them shell hooks set in a profile's `config.yaml`, running in
   the CLI, gateway and TUI, where *"a shell `pre_tool_call` hook can block or fail closed"*; the event catalogue
@@ -92,7 +92,10 @@ self-hosted. Where they part:
   which is for hosts *"that want fine-grained control of sessions, slash commands, approvals, and
   streaming events"* ([programmatic integration](https://hermes-agent.nousresearch.com/docs/developer-guide/programmatic-integration)).
   Which events reach a shell hook, as opposed to a plugin hook, was not checked. Running Hermes this
-  way gives a team a non-Anthropic worker with its own memory, under shiftlead's rules.
+  way would give a team a non-Anthropic worker with its own memory, under shiftlead's rules. Paul's
+  read (2026-10-13): *"someone would use either Hermes or ShiftLead — both would be a bit
+  cumbersome"*; Hermes's users want its loop and its board, not shiftlead's. So it is a weak adapter
+  candidate, behind Codex and Gemini CLI.
 - **Hermes running shiftlead's tools: no.** It cannot run Claude Code as a worker or a provider (the
   closed PR above), and its Kanban workers are Hermes profiles. Its Codex runtime is the one
   exception, and it embeds Codex rather than handing over a session.
@@ -105,6 +108,9 @@ self-hosted. Where they part:
 
 ## What to learn
 
+Gathered with the other two surveys' lessons, for discussion, in the
+[lessons ADR](2026-10-13-agent-product-lessons.md).
+
 1. **A completion contract that reads the forge's own required checks.** Hermes refuses to call a PR
    task done until branch protection's required checks pass on the exact head. shiftlead's
    `check_cadence.py` reads CI too, as a detector (cadence §7); Hermes makes it the definition of done.
@@ -112,7 +118,7 @@ self-hosted. Where they part:
 2. **A budget warning before the cap.** A worker is told near 90% of its iteration budget to report or
    checkpoint. shiftlead's analogue is context and usage; a nudge to write the ledger before a session
    runs out is the same idea. *A note, not filed.*
-3. **Hermes as a worker tool.** An adapter row in §4.3's table, hook-fed if the shell hooks carry
+3. **Hermes as a worker tool,** weakly (Paul's either/or, above). An adapter row in §4.3's table, hook-fed if the shell hooks carry
    the events above, would make shiftlead the place a team mixes Claude Code with an open,
    model-neutral agent. *A note, not filed.*
 
