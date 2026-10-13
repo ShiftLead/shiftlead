@@ -162,6 +162,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     vscode_url,  # noqa: F401
     with_lines,  # noqa: F401
 )
+from .counts import CountsKeeper
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
@@ -438,6 +439,54 @@ def _run_reader(run: Any, argv: list[str], timeout: float) -> tuple[dict[str, An
 # design §4.5a Org top bar **Inbox** (TD-611): what `/api/person/inbox?counts=1` answers — the top
 # bar's numbers, the team headers' *answered for you* marks and the build chip, and nothing rendered
 INBOX_COUNTS = ("needs", "fyi_n", "overdue_n", "snoozed_n", "answered_marks", "build_chip", "agent_down")
+# The counts with the host agent down: not zero — nothing is *known* to be waiting, which is not
+# *nothing is* — and the team headers and the rollup keep what they showed (TD-069, TD-178).
+COUNTS_DOWN: dict[str, Any] = {k: None for k in INBOX_COUNTS} | {"snoozed_n": 0, "agent_down": True}
+
+
+def gzip_ok(request: Request) -> bool:
+    """The browser takes a gzipped body: `gzip` among its encodings, not `gzip;q=0`, which says no."""
+    return any(
+        t.split(";")[0].strip() == "gzip"
+        and t.replace(" ", "").partition(";q=")[2] not in ("0", "0.0", "0.00", "0.000")
+        for t in request.headers.get("accept-encoding", "").split(",")
+    )
+
+
+def json_body(obj: Any, gz: bool) -> bytes:
+    """`obj` as FastAPI encodes a returned dict, gzipped when `gz` — called on a worker thread for a
+    body the size of the inbox (TD-611 slice 2), since the loop is the Focus terminal's too."""
+    body = json.dumps(jsonable_encoder(obj), ensure_ascii=False, separators=(",", ":")).encode()
+    return gzip.compress(body, compresslevel=5) if gz else body
+
+
+def json_answer(body: bytes, gz: bool) -> Response:
+    headers = {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"} if gz else {"Vary": "Accept-Encoding"}
+    return Response(body, media_type="application/json", headers=headers)
+
+
+def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
+    """`INBOX_COUNTS` from the Inbox's sections (`inbox_sections`): the one place the top bar's
+    numbers are taken from, by the full read, the counts read and the counts keeper alike."""
+    return {
+        "needs": sections["count"],
+        # §4.10 *The Inbox is a queue*: FYI's own quiet number, **never added to the first** — the
+        # first is *what needs you*. The page opens the section by itself when this is higher than
+        # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
+        "fyi_n": sections["fyi_n"],
+        "overdue_n": sections["overdue_n"],  # the Org rollup's *m overdue* (TD-178)
+        "snoozed_n": len(sections["snoozed"]),
+        # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
+        # time, and nothing it says — the browser counts those newer than it last opened the group
+        # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
+        "answered_marks": [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]],
+        # the top bar's **build** chip is drawn again with the counts (§4.5a, TD-539): a merge shows
+        # within the readings' cadence without a reload
+        "build_chip": build,
+        "agent_down": False,
+    }
+
+
 # design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
 # PR #282). What a one-press resume carries, and what it deliberately does not.
 RESUME_CARRIES = ("name", "dir", "adapter", "profile", "repo", "role", "team", "project", "lane", "controllers")
@@ -1044,6 +1093,33 @@ def create_app() -> FastAPI:
         rows = templates.get_template("inbox_rows.html")
         return {k: rows.render(rows=sections[k], section=k, origin=origin) for k in INBOX_SECTIONS}
 
+    async def counts_now(watching: bool) -> dict[str, Any]:
+        """The top bar's numbers (`INBOX_COUNTS`) from the Inbox's own sections, nothing rendered
+        (TD-611 slice 1), the classification on a worker thread (slice 2): what `counts` holds and
+        pushes (§4.4 *The Inbox's counts*, TD-616). With the host agent down, the shape that says so —
+        no number claimed, the reason in words."""
+        try:
+            fleet = await call("list")
+            got, states = await person_inbox(fleet, watching=watching), await person_states(fleet)
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            return {**COUNTS_DOWN, "why": str(e.detail)}
+        hz, _ = await board_view()
+        hz = with_standings(hz, fleet)
+        build = await chip_build(call)
+        sections = await asyncio.to_thread(
+            inbox_sections,
+            got["entries"],
+            states=states,
+            trail=got.get("trail") or (),
+            attention_snoozed=got.get("attention_snoozed"),
+            handed=got.get("handed") or (),
+            boards=hz["due"] + hz["waiting"],
+            fleet=fleet,
+        )
+        return counts_of(sections, build)
+
     h = SimpleNamespace(
         call=call,
         render_card=render_card,
@@ -1065,6 +1141,8 @@ def create_app() -> FastAPI:
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
         needs_cache=needs_cache,  # the Inbox's needs rows for the Org's *asked you* lines (TD-354)
+        # the Inbox's counts, kept once and pushed (§4.4, TD-616); `LocalClient` read when it connects
+        counts=CountsKeeper(counts_now, client=lambda: LocalClient()),
     )
     for register in (
         _pages_routes,
@@ -2693,6 +2771,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     def answer(got: Any) -> JSONResponse:
         h.settings_at["at"] = 0.0  # the next page reads the person's settings again (TD-174)
+        h.counts.stir()  # the board's horizon is the person's setting: the counts move with it (TD-616)
         return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
 
     @app.post("/api/settings/usage")
@@ -3046,10 +3125,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `?counts=1` is the top bar's read on every other page (TD-611): the same `inbox_sections`,
         so the numbers are the page's, but nothing rendered and no entries sent — the full read is
         megabytes of markup on the UI's one loop, which every Focus keystroke shares."""
-        counts = request.query_params.get("counts") == "1"
+        watching = request.query_params.get("watching") == "1"  # the page is visible (§4.10, TD-319)
+        if request.query_params.get("counts") == "1":
+            # the keeper's numbers, counted fresh for this page's `watching`; `since=<rev>` it already
+            # holds answers `{unchanged: true}` (§4.4 *The Inbox's counts*, TD-616)
+            gz = gzip_ok(request)
+            return json_answer(json_body(await h.counts.read(watching, request.query_params.get("since")), gz), gz)
         try:
             fleet = await call("list")  # person_view's one list, kept for the board's *waiting on* (TD-305)
-            watching = request.query_params.get("watching") == "1"  # the page is visible (§4.10, TD-319)
             got, states = await h.person_inbox(fleet, watching=watching), await h.person_states(fleet)
         except HTTPException as e:
             if e.status_code != 503:
@@ -3076,13 +3159,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         hz, board_note = await board_view()
         hz = with_standings(hz, fleet)
         build = await chip_build(call)
-        lf = None if counts else await ledger_view(fleet)
+        lf = await ledger_view(fleet)
         origin = page_origin(request)
-        gz = any(  # `gzip`, not `gzip;q=0`, which says no
-            t.split(";")[0].strip() == "gzip"
-            and t.replace(" ", "").partition(";q=")[2] not in ("0", "0.0", "0.00", "0.000")
-            for t in request.headers.get("accept-encoding", "").split(",")
-        )
+        gz = gzip_ok(request)
 
         def read() -> tuple[list[dict[str, Any]], bytes]:
             """Everything after the awaits, on a worker thread (TD-611 slice 2): the sections, the
@@ -3098,47 +3177,25 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 boards=hz["due"] + hz["waiting"],
                 fleet=fleet,
             )
-            got["agent_down"] = False
             got["board_note"] = board_note
             got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
-            got["needs"] = sections["count"]
-            # §4.10 *The Inbox is a queue*: FYI's own quiet number, **never added to the first** — the
-            # first is *what needs you*. The page opens the section by itself when this is higher than
-            # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
-            got["fyi_n"] = sections["fyi_n"]
-            got["overdue_n"] = sections["overdue_n"]  # the Org rollup's *m overdue* (TD-178)
-            got["snoozed_n"] = len(sections["snoozed"])
-            # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
-            # time, and nothing it says — the browser counts those newer than it last opened the group
-            # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
-            got["answered_marks"] = [
-                {"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]
-            ]
-            # the top bar's **build** chip is drawn again on this poll (§4.5a, TD-539): a merge shows
-            # within the readings' cadence without a reload
-            got["build_chip"] = build
-            if counts:
-                out: dict[str, Any] = {k: got[k] for k in INBOX_COUNTS}
-            else:
-                out = got
-                got["html"] = inbox_html(sections, origin)
-                # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
-                got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=origin)
-                got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=lf, origin=origin)
-                # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its
-                # rows, so the poll brings the group's markup as it brings the rows'; the script presses
-                # the lines the URL picks and recounts every line from the rows on the page
-                rail = rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), rail_picks({}))
-                got["html"]["rail_teams"] = str(
-                    templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
-                )
-            body = json.dumps(jsonable_encoder(out), ensure_ascii=False, separators=(",", ":")).encode()
-            return sections["needs"], gzip.compress(body, compresslevel=5) if gz else body
+            got.update(counts_of(sections, build))
+            got["html"] = inbox_html(sections, origin)
+            # the board's horizon (TD-220): coming up, the fold and the line, put back whole by the poll
+            got["html"]["horizon"] = templates.get_template("board_horizon.html").render(hz=hz, origin=origin)
+            got["html"]["ledger"] = templates.get_template("ledger_for_you.html").render(lf=lf, origin=origin)
+            # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its
+            # rows, so the poll brings the group's markup as it brings the rows'; the script presses
+            # the lines the URL picks and recounts every line from the rows on the page
+            rail = rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), rail_picks({}))
+            got["html"]["rail_teams"] = str(
+                templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
+            )
+            return sections["needs"], json_body(got, gz)
 
         needs, body = await asyncio.to_thread(read)
         h.needs_cache["rows"] = needs  # the next delta's *asked you* lines on the Org (TD-354)
-        headers = {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"} if gz else {"Vary": "Accept-Encoding"}
-        return Response(body, media_type="application/json", headers=headers)
+        return json_answer(body, gz)
 
     # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,
     # so each calls its RPC **caller-less** — a person is not a session, and every one of these is
@@ -3162,6 +3219,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(400, "person: send {terminal: {copy_on_select: true|false}}")
         got = await call("set_settings", person={"terminal": term})
         h.settings_at["at"] = 0.0  # read it again before the next page is drawn
+        h.counts.stir()  # the counts move with the person's settings (TD-616)
         return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
 
     @app.post("/api/person/{action}")
@@ -3462,11 +3520,16 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         await ws.send_text(json.dumps({"event": "groups", **got}))
 
         async def gone() -> None:
-            # The page never sends on this socket, so the next message is its disconnect. Without
-            # this watch the handler noticed a closed tab only when the next event's send failed —
-            # and uvicorn's shutdown waits on the handler, which is the UI's 40 s stop (TD-058).
-            while (await ws.receive()).get("type") != "websocket.disconnect":
-                pass
+            # The page sends one thing on this socket — whether its document is visible, for the
+            # counts keeper's Looking (§4.10, TD-616) — so anything else that arrives is its
+            # disconnect. Without this watch the handler noticed a closed tab only when the next
+            # event's send failed — and uvicorn's shutdown waits on the handler, which is the UI's
+            # 40 s stop (TD-058).
+            while (got := await ws.receive()).get("type") != "websocket.disconnect":
+                with contextlib.suppress(ValueError, TypeError, AttributeError):
+                    said = json.loads(got.get("text") or "")
+                    if isinstance(said, dict) and isinstance(said.get("visible"), bool):
+                        h.counts.visible(ws, said["visible"])
 
         async def stream(c: LocalClient) -> None:
             # A delta carries one record, but membership is read across records (design §4.8):
@@ -3625,12 +3688,15 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         try:
             async with LocalClient() as c:
                 tasks = {asyncio.ensure_future(stream(c)), asyncio.ensure_future(gone())}
+                # every page's stream carries the Inbox's counts, light or full (§4.4, TD-616)
+                await h.counts.join(ws)
                 try:
                     done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
                 finally:
                     for t in tasks:
                         t.cancel()
                     await asyncio.gather(*tasks, return_exceptions=True)
+                    await h.counts.leave(ws)
                 for t in done:
                     t.result()  # the stream's own failure is handled below, as it always was
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):

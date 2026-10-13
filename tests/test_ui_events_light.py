@@ -61,11 +61,14 @@ def client(monkeypatch, tmp_path):
 
 
 def received(c, path):
+    """Every event the stream sent but the Inbox's `counts`, which the keeper pushes on every stream
+    on its own clock (TD-616, `test_ui_counts.py`)."""
     got = []
     with c.websocket_connect(path) as ws:
         try:
             while True:
-                got.append(json.loads(ws.receive_text()))
+                if (ev := json.loads(ws.receive_text())).get("event") != "counts":
+                    got.append(ev)
         except WebSocketDisconnect:
             pass
     return got

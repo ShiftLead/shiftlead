@@ -1198,15 +1198,27 @@
   let overdueN = null;  // the Needs you board items past their date, from the last poll (TD-178)
   // `full`: the Inbox's own pages, which redraw their rows from the read; every other page asks for
   // the counts alone (TD-611), never the megabytes of rows it would throw away
+  // The counts' `rev` this page last drew (§4.4 *The Inbox's counts*, TD-616): a counts read sends it
+  // as `since`, and one the server still holds answers `{unchanged: true}` with nothing to redraw.
+  let countsRev = null;
   AO.refreshInboxCount = async function (full) {
     let got;
     try {
       // a visible page says so (§4.10 *Told on Telegram*, *Looking*): a row on a screen is not told
-      const q = [full ? "" : "counts=1", document.visibilityState === "visible" ? "watching=1" : ""].filter(Boolean);
+      const q = [
+        full ? "" : "counts=1", !full && countsRev !== null ? `since=${countsRev}` : "",
+        document.visibilityState === "visible" ? "watching=1" : "",
+      ].filter(Boolean);
       const r = await fetch("/api/person/inbox" + (q.length ? `?${q.join("&")}` : ""));
       if (!r.ok) return null;
       got = await r.json();
     } catch (e) { return null; }
+    if (got.unchanged) return got;
+    return AO.drawCounts(got);
+  };
+  // The top bar's numbers, from a read or from the stream's `counts` (TD-616): one drawing for both.
+  AO.drawCounts = function (got) {
+    if (typeof got.rev === "number") countsRev = got.rev;
     // `needs: null` is *not known* — the host agent is down — and a chip that read 0 would be a
     // lie in the one place a person looks to see whether anything is waiting (TD-069).
     const chip = $("#personneeds"), n = got.needs || 0;
@@ -1222,6 +1234,9 @@
     if (got.build_chip) drawBuildChip(got.build_chip);
     return got;
   };
+  // A page whose `/events` stream is up draws the counts it pushes and polls nothing (§4.4, TD-616);
+  // the poll below runs only while no stream is — a page with none, or one that dropped.
+  let streamsUp = 0;
   // §4.5a top bar **build** chip (TD-539): *live <MM-DD HH:MM>* in the browser's zone — the year in
   // front only when it is not this one — from `data-at`, then `data-rest`. Drawn at load and again
   // from each Inbox poll's `build_chip`, so a merge shows without a reload. *main +n* is a link to
@@ -1260,7 +1275,7 @@
     // The Org reads it at load too: its number is server-rendered, but the team headers' *answered
     // for you* marks are counted in the browser (§4.9b) and would otherwise wait a whole poll.
     if (location.pathname !== "/inbox") AO.refreshInboxCount();
-    setInterval(() => (AO.refreshInboxPage || AO.refreshInboxCount)(), 20000);
+    setInterval(() => { if (AO.refreshInboxPage) AO.refreshInboxPage(); else if (!streamsUp) AO.refreshInboxCount(); }, 20000);
   }
 
   $("#theme") && $("#theme").addEventListener("click", () => {
@@ -1361,15 +1376,24 @@
     let delay = 500, reconnected = false, leaving = false;
     window.addEventListener("pagehide", () => { leaving = true; });
     window.addEventListener("pageshow", () => { leaving = false; });
+    // the one thing the page says on its stream: whether it is visible, which the counts keeper
+    // hands the home as Looking (§4.10 *Told on Telegram*, TD-616)
+    let sock = null, up = false;
+    const say = () => { if (sock && sock.readyState === 1) sock.send(JSON.stringify({ visible: document.visibilityState === "visible" })); };
+    document.addEventListener("visibilitychange", say);
     function open() {
-      const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events${query ? `?${query}` : ""}`);
+      const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events${query ? `?${query}` : ""}`);
       // The handshake succeeds even when the agent is down (the server accepts, then closes), so
       // "connected" means the first message, not onopen — otherwise a down agent reload-loops.
-      ws.onopen = () => { delay = 500; };
-      ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; } const ev = JSON.parse(m.data); if (ev.event === "usage") onUsage(ev); else onEvent(ev); };
+      ws.onopen = () => { delay = 500; say(); };
+      ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; }
+        if (!up) { up = true; streamsUp++; }
+        const ev = JSON.parse(m.data);
+        if (ev.event === "usage") onUsage(ev); else if (ev.event === "counts") AO.drawCounts(ev); else onEvent(ev);
+      };
       // a close the page caused by leaving is no outage (TD-372); the reconnect stays, so a page
       // restored from the back-forward cache reconnects and reloads as after any other close
-      ws.onclose = () => { if (!leaving) setDown(true); reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
+      ws.onclose = () => { if (!leaving) setDown(true); if (up) { up = false; streamsUp--; } reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
       ws.onerror = () => ws.close();
     }
     open();
