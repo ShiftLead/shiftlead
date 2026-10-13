@@ -76,7 +76,7 @@ self-hosted. Where they part:
 | Hosts | Kanban on one host; the agent's commands on seven backends | the person's machines and container nodes under one home (§4.4a) |
 | The person intervenes by | chat (TUI or a messaging app), the board, approval prompts | attaching to the terminal, Allow/Deny relayed to the UI (§4.2), mail (§4.10) |
 | Consent | smart/manual/off approvals; an auxiliary model judges risk | the tool's own permission prompts, relayed; grants on every act of control (§4.8) |
-| Repo rules | a PR completion contract per task | branch → PR → review → squash merge as the repo's cadence, with its ledger and board (§4.9) |
+| Repo rules | a PR completion contract per task | branch → PR → review → squash merge as the repo's cadence, with its ledger and board (cadence §2–§4) |
 | Learning | self-written skills and agent-curated memory | the repo's memory files, briefs and ledger, read by any tool |
 
 ## Can it run with shiftlead?
@@ -84,7 +84,7 @@ self-hosted. Where they part:
 - **shiftlead running Hermes: yes, and it is the useful pairing.** `hermes` is a terminal program,
   so it runs today under the `shell` adapter, scraped (§4.3). A hook-fed adapter looks feasible:
   Hermes has *"four hook systems"*, one of them shell hooks set in a profile's `config.yaml`, running in
-  the CLI and TUI, where *"a shell `pre_tool_call` hook can block or fail closed"*; the event catalogue
+  the CLI, gateway and TUI, where *"a shell `pre_tool_call` hook can block or fail closed"*; the event catalogue
   includes `on_session_start`, `on_session_end`, `pre_tool_call`, `pre_approval_request` and
   `subagent_stop` ([hooks](https://hermes-agent.nousresearch.com/docs/user-guide/features/hooks)).
   `pre_approval_request` is an observer (*"return ignored"*), so the hook could show a question in
@@ -129,8 +129,8 @@ PR completion contracts, *never automatically completes*, single-host); hooks (f
 hooks, `pre_tool_call` blocking, the event names, `pre_approval_request` as an observer); security
 (approval modes, timeout, per-mode defaults, *does not sandbox*); worktrees; the Codex runtime; Bot
 Mode; programmatic integration (ACP, TUI gateway, API server, no `--mode rpc`). From GitHub: the
-repository's creation date, stars and latest release, and issue #48320 closed as a duplicate pointing
-at PR #40528, closed unmerged. Not used: coverage of funding and launch dates (search summaries only).
+repository's creation date, stars and latest release, and issue #48320 closed as a duplicate of #33462,
+whose implementing PR #40528 was closed unmerged. Not used: coverage of funding and launch dates (search summaries only).
 
 ## What this ADR does not do
 
