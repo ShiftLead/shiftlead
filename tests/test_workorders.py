@@ -106,7 +106,7 @@ def test_the_repo_reading_lists_them_on_a_full_read_and_keeps_them_between(tmp_p
     from sessionorc import reports
     from sessionorc.agent_tick import TickMixin
 
-    monkeypatch.setattr(reports, "pr_reading", lambda root, now: {"open": []})
+    monkeypatch.setattr(reports, "pr_reading", lambda root, now, **kw: {"open": []})
     root = _repo(tmp_path, DECIDED, OPEN)
     full = TickMixin._read_repos([str(root)], {}, {str(root)})[str(root)]
     (o,) = full["work_orders"]["orders"]

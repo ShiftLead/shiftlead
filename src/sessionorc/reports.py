@@ -269,13 +269,48 @@ def _when(v: Any) -> datetime | None:
 
 
 PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft"
+OPEN_PR_FIELDS = f"{PR_FIELDS},statusCheckRollup,mergeStateStatus"  # the open read alone (TD-613)
+
+RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})
+RED_STATES = frozenset({"FAILURE", "ERROR"})  # a commit status's (`StatusContext`) words for red
 
 
-def _gh_prs(directory: Path | str, args: list[str], timeout: float) -> list[dict[str, Any]] | str:
-    """One `gh pr list` read as the PR rows `pr_reading` keeps, or why it could not be made."""
+def fold_checks(rollup: Any) -> tuple[str, list[str]]:
+    """An open PR's `statusCheckRollup` folded into one word and the failing checks' names (design
+    §4.4 *Repo facts*, TD-613): *red* when any check concluded failed, cancelled or timed out,
+    *pending* while any runs, *green* when all passed, *none* with no checks. Red outranks pending:
+    one failed check is red however many still run."""
+    if not isinstance(rollup, list) or not rollup:
+        return "none", []
+    failing: list[str] = []
+    pending = False
+    for c in rollup:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("name") or c.get("context") or "")
+        kind = c.get("__typename") or ("CheckRun" if "status" in c or "conclusion" in c else "StatusContext")
+        if kind == "CheckRun":
+            if str(c.get("status") or "COMPLETED").upper() != "COMPLETED":
+                pending = True
+            elif str(c.get("conclusion") or "").upper() in RED_CONCLUSIONS:
+                failing.append(name)
+        else:  # a commit status (`StatusContext`)
+            state = str(c.get("state") or "").upper()
+            if state in RED_STATES:
+                failing.append(name)
+            elif state != "SUCCESS":
+                pending = True
+    return ("red" if failing else "pending" if pending else "green"), failing
+
+
+def _gh_prs(
+    directory: Path | str, args: list[str], timeout: float, fields: str = PR_FIELDS
+) -> list[dict[str, Any]] | str:
+    """One `gh pr list` read as the PR rows `pr_reading` keeps, or why it could not be made. Read
+    with `OPEN_PR_FIELDS`, each row also carries `checks`, `failing` and `conflicting` (TD-613)."""
     try:
         cp = subprocess.run(
-            ["gh", "pr", "list", *args, "--json", PR_FIELDS],
+            ["gh", "pr", "list", *args, "--json", fields],
             capture_output=True, text=True, timeout=timeout, cwd=str(directory),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -293,24 +328,32 @@ def _gh_prs(directory: Path | str, args: list[str], timeout: float) -> list[dict
         if not isinstance(p, dict) or not isinstance(p.get("number"), int):
             continue
         author = p.get("author")
-        prs.append(
-            {
-                "number": p["number"],
-                "title": str(p.get("title") or ""),
-                "url": str(p.get("url") or ""),
-                "state": str(p.get("state") or "").lower(),  # open · closed · merged
-                "branch": str(p.get("headRefName") or ""),
-                "head": str(p.get("headRefOid") or ""),  # rule 10 reads an open PR's head here (TD-332)
-                "author": str(author.get("login") or "") if isinstance(author, dict) else "",
-                "draft": bool(p.get("isDraft")),
-                "created": p.get("createdAt") or None,
-                "closed": p.get("mergedAt") or p.get("closedAt") or None,
-            }
-        )
+        row = {
+            "number": p["number"],
+            "title": str(p.get("title") or ""),
+            "url": str(p.get("url") or ""),
+            "state": str(p.get("state") or "").lower(),  # open · closed · merged
+            "branch": str(p.get("headRefName") or ""),
+            "head": str(p.get("headRefOid") or ""),  # rule 10 reads an open PR's head here (TD-332)
+            "author": str(author.get("login") or "") if isinstance(author, dict) else "",
+            "draft": bool(p.get("isDraft")),
+            "created": p.get("createdAt") or None,
+            "closed": p.get("mergedAt") or p.get("closedAt") or None,
+        }
+        if fields == OPEN_PR_FIELDS:
+            row["checks"], row["failing"] = fold_checks(p.get("statusCheckRollup"))
+            row["conflicting"] = str(p.get("mergeStateStatus") or "").upper() == "DIRTY"
+        prs.append(row)
     return prs
 
 
-def pr_reading(directory: Path | str, now: datetime, limit: int = 1000, timeout: float = 30.0) -> dict[str, Any]:
+def pr_reading(
+    directory: Path | str,
+    now: datetime,
+    limit: int = 1000,
+    timeout: float = 30.0,
+    old: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): two
     `gh` reads — the open PRs, and every PR updated in the longest window — kept as `open` (oldest
     first), `windows` (`{day|week|month: {opened, closed}}`: `createdAt` in the window is an
@@ -318,13 +361,19 @@ def pr_reading(directory: Path | str, now: datetime, limit: int = 1000, timeout:
     closed in the longest window, newest first); `truncated` when the second read filled its
     `limit`, so the month's counts are a floor. **A read that could not be made is `{"error":
     why}`**, never an empty reading: for a count, *no PRs* and *could not look* must not read the
-    same — `merged_prs`'s rule, not `_prs`'s."""
+    same — `merged_prs`'s rule, not `_prs`'s. Each open PR carries `checks`, `failing`, `conflicting`
+    and, while it is red or conflicting, `red_since`: the first reading that saw it so, taken from
+    `old` (the last reading) by number and dropped the reading it is neither (TD-613)."""
     if not Path(directory).is_dir():
         return {"error": f"{directory} is not a directory here"}
     since = now - PR_WINDOWS["month"]
-    open_ = _gh_prs(directory, ["--state", "open", "--limit", "200"], timeout)
+    open_ = _gh_prs(directory, ["--state", "open", "--limit", "200"], timeout, OPEN_PR_FIELDS)
     if isinstance(open_, str):
         return {"error": open_}
+    was = {p.get("number"): p.get("red_since") for p in (old or {}).get("open") or [] if isinstance(p, dict)}
+    for p in open_:
+        if p["checks"] == "red" or p["conflicting"]:
+            p["red_since"] = was.get(p["number"]) or now.isoformat()
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):

@@ -848,3 +848,84 @@ async def test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_on
     agent._promotes_read, agent._repos_read_at = True, float("-inf")
     await agent._refresh_repos()
     assert handed == [None, {"r": "abc"}]
+
+
+# -- an open PR's checks (TD-613) ----------------------------------------------------------------
+
+
+def _run(name, status="COMPLETED", conclusion="SUCCESS"):
+    return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion}
+
+
+def _status(context, state):
+    return {"__typename": "StatusContext", "context": context, "state": state}
+
+
+def test_the_rollup_folds_to_red_pending_green_or_none():
+    assert reports.fold_checks(None) == ("none", [])
+    assert reports.fold_checks([]) == ("none", [])
+    assert reports.fold_checks([_run("a"), _status("b", "SUCCESS")]) == ("green", [])
+    assert reports.fold_checks([_run("a"), _run("b", "IN_PROGRESS", "")]) == ("pending", [])
+    assert reports.fold_checks([_status("b", "PENDING")]) == ("pending", [])
+    for bad in ("FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED"):
+        assert reports.fold_checks([_run("a"), _run("t", conclusion=bad)]) == ("red", ["t"])
+    assert reports.fold_checks([_status("ci/x", "ERROR")]) == ("red", ["ci/x"])
+    # one failed check is red however many still run
+    assert reports.fold_checks([_run("t", conclusion="FAILURE"), _run("u", "QUEUED", "")]) == ("red", ["t"])
+    assert reports.fold_checks([_run("s", conclusion="SKIPPED"), _run("n", conclusion="NEUTRAL")]) == ("green", [])
+
+
+def test_the_open_read_asks_for_checks_and_merge_state_and_the_all_read_does_not(tmp_path, monkeypatch):
+    now = datetime.now(UTC)
+    calls = _fake_gh(monkeypatch, [_pr(1, "open", now - timedelta(hours=2))], [])
+    r = reports.pr_reading(tmp_path, now)
+    fields = {("open" in c): c[c.index("--json") + 1] for c in calls}
+    assert "statusCheckRollup" in fields[True] and "mergeStateStatus" in fields[True]
+    assert "statusCheckRollup" not in fields[False]
+    assert (r["open"][0]["checks"], r["open"][0]["conflicting"]) == ("none", False)
+    assert "red_since" not in r["open"][0]
+
+
+def test_red_since_is_the_first_reading_that_saw_it_red_kept_while_it_stays_so(tmp_path, monkeypatch):
+    t0 = datetime.now(UTC)
+    red = _pr(5, "open", t0 - timedelta(days=1), statusCheckRollup=[_run("test (3.13)", conclusion="FAILURE")])
+    dirty = _pr(6, "open", t0 - timedelta(days=1), statusCheckRollup=[_run("a")], mergeStateStatus="DIRTY")
+    green = _pr(7, "open", t0 - timedelta(days=1), statusCheckRollup=[_run("a")], mergeStateStatus="CLEAN")
+    _fake_gh(monkeypatch, [red, dirty, green], [])
+    first = reports.pr_reading(tmp_path, t0)
+    by = {p["number"]: p for p in first["open"]}
+    assert (by[5]["checks"], by[5]["failing"], by[5]["red_since"]) == ("red", ["test (3.13)"], t0.isoformat())
+    assert by[6]["conflicting"] and by[6]["checks"] == "green" and by[6]["red_since"] == t0.isoformat()
+    assert "red_since" not in by[7]
+
+    # a later reading keeps the first time; a PR that turned green loses it, and red again starts over
+    t1 = t0 + timedelta(minutes=10)
+    _fake_gh(monkeypatch, [red, {**dirty, "mergeStateStatus": "CLEAN"}, green], [])
+    second = reports.pr_reading(tmp_path, t1, old=first)
+    by = {p["number"]: p for p in second["open"]}
+    assert by[5]["red_since"] == t0.isoformat()
+    assert "red_since" not in by[6]
+    t2 = t1 + timedelta(minutes=10)
+    _fake_gh(monkeypatch, [red, dirty, green], [])
+    third = reports.pr_reading(tmp_path, t2, old=second)
+    by = {p["number"]: p for p in third["open"]}
+    assert (by[5]["red_since"], by[6]["red_since"]) == (t0.isoformat(), t2.isoformat())
+
+
+async def test_the_home_hands_each_pr_read_the_last_reading_so_red_since_is_kept(agent, repo, monkeypatch):
+    await park_ticks(agent)
+    _register(repo)
+    olds = []
+
+    def read(d, now, old=None, **kw):
+        olds.append(old)
+        since = ((old or {}).get("open") or [{}])[0].get("red_since") or now.isoformat()
+        return {"open": [{"number": 9, "checks": "red", "red_since": since}], "at": now.isoformat()}
+
+    monkeypatch.setattr(reports, "pr_reading", read)
+    await agent._refresh_repos()
+    first = agent._repos[str(repo)]["prs"]["open"][0]["red_since"]
+    agent._repos_read_at = 0.0  # the next pass is due
+    await agent._refresh_repos()
+    assert olds[0] is None and olds[1]["open"][0]["number"] == 9
+    assert agent._repos[str(repo)]["prs"]["open"][0]["red_since"] == first
