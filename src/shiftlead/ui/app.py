@@ -599,19 +599,293 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
     ]
 
 
+async def agent_call(method: str, **params: Any) -> Any:
+    """One host-agent RPC as the page makes it: down is a 503, a refusal a 400."""
+    try:
+        async with LocalClient() as c:
+            return await c.call(method, **params)
+    except AgentUnavailable as e:
+        raise HTTPException(503, f"host agent unreachable: {e}") from e
+    except AgentError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+class Readings:
+    """The readings the Inbox is counted from (design §4.4 *Each reading has one owner*, *The Inbox's
+    counts*; TD-616): the person inbox, the state rows, the board's horizon and the build chip, each
+    over the host agent's RPCs, cached as the page reads them. The UI's `create_app` holds one, and
+    `ao inbox --counts` makes its own, so both count with the one `counts_now`."""
+
+    def __init__(self, call: Any = None) -> None:
+        self.call = call or agent_call
+        self.defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
+        self.identity_cache: dict[str, Any] = {"at": 0.0, "info": None}
+        self.pull_cache: dict[str, Any] = {"at": float("-inf")}
+        self.needs_cache: dict[str, Any] = {"rows": []}
+        self.waits_cache: dict[str, Any] = {"at": 0.0, "waits": None}
+
+    async def defs(self) -> orgmod.Org:
+        """The team definitions, read at most once in `DEFS_TTL` seconds: the events stream
+        re-renders every header on every delta — a definition edited by hand shows within that."""
+        now = time.monotonic()
+        if self.defs_cache["org"] is None or now - self.defs_cache["at"] > DEFS_TTL:
+            # off the loop: every open page shares it, and the read is a file per registered repo
+            self.defs_cache.update(at=now, org=(await asyncio.to_thread(org_here))[0])
+        return self.defs_cache["org"]
+
+    async def seats_of(self, fleet: list[dict[str, Any]]) -> dict[str, str]:
+        """The ids in `fleet` a team definition names as a seat — what `view()` draws *on call*
+        while nobody is in one (TD-097). Every page that draws a pill asks, so they agree."""
+        return teamrun.seat_ids(await self.defs(), fleet)
+
+    async def repo_facts(self) -> tuple[dict[str, Any], dict[str, Any]]:
+        """The home's repo facts and doing log (§4.4 *Repo facts*, TD-176), each `{}` when the agent
+        cannot give it — an older agent, a node whose link is down: the facets then read *no repo
+        here* and an empty feed rather than taking the page down."""
+        repos: dict[str, Any] = {}
+        doing: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            repos = await self.call("repos")
+        with contextlib.suppress(Exception):
+            doing = await self.call("doing_log")
+        return repos, doing
+
+    async def identity_info(self) -> dict[str, Any]:
+        """This host's identity mode (design §4.8a), for the Org's one-line note. The `identity`
+        RPC is a never-gated read, and it is read at most once every `DEFS_TTL` seconds — the same
+        idiom as the team definitions, so a page under a delta storm never asks per render. An
+        agent that is down or too old to answer leaves the note off rather than the page."""
+        now = time.monotonic()
+        if self.identity_cache["info"] is None or now - self.identity_cache["at"] > DEFS_TTL:
+            try:
+                self.identity_cache.update(at=now, info=await self.call("identity"))
+            except HTTPException:
+                self.identity_cache.update(at=now, info={})
+        return self.identity_cache["info"] or {}
+
+    async def pull_marks(self) -> None:
+        """The home's pull readings (`host`'s `pulls`, §6 *Pull*) into `inbox.PULLS`, which the
+        *behind* origin note's tail reads (TD-263); at most once in `DEFS_TTL`, `work_marks`' idiom.
+        An agent that cannot give them — an older one, a node — leaves the note without a tail."""
+        now = time.monotonic()
+        if now - self.pull_cache["at"] <= DEFS_TTL:
+            return
+        self.pull_cache["at"] = now
+        got: dict[str, Any] = {}
+        with contextlib.suppress(Exception):
+            got = dict((await self.call("host")).get("pulls") or {})
+        inbox_mod.PULLS.clear()
+        inbox_mod.PULLS.update(got)
+
+    async def board_all(self) -> tuple[list[dict[str, Any]], str]:
+        """Every open board row of this host's repos and the note beside them (TD-069 step 3), from the
+        host agent's `boards` reading on the `repos` RPC (§4.4 *Each reading has one owner*, *The
+        boards*, TD-615): the page runs no reader, and a press's write-back is in the reading before its
+        RPC answers. Every open row, the ones not yet due too, for the board's horizon (TD-220). On a
+        node the org is the home's (§4.4a), so a node draws none; an agent that cannot answer is said."""
+        if hosts.is_node():
+            return [], ""
+        await self.pull_marks()
+        try:
+            repos = await self.call("repos")
+        except Exception as e:  # noqa: BLE001 — said in words, never an empty board
+            return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
+        return board_reading(repos if isinstance(repos, dict) else {}, repo_teams(await self.defs(), host_name()))
+
+    async def board_items(self) -> tuple[list[dict[str, Any]], str]:
+        """The Inbox's **due** board rows and the note beside them: what is counted is what is due,
+        under every mode (TD-220)."""
+        rows, note = await self.board_all()
+        return [r for r in rows if r.get("due_now", True)], note
+
+    async def board_view(self) -> tuple[dict[str, Any], str]:
+        """The board's horizon (§4.5 screen 6, TD-220) over every open row, sorted by the person's
+        `inbox.board_show`, and the note: `due` is `board_items`' rows, `ahead` *Board, coming up*,
+        `hidden` the *not shown* fold, and `line` the words that say the mode — None when no board
+        was read (a reading that failed says so in its note instead)."""
+        rows, note = await self.board_all()
+        h = board_horizon(rows, uiconf.board_show())
+        h["line"] = board_line(h) if rows or (not note and board_choices()) else None
+        return h, note
+
+    async def person_states(self, fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
+        fleet the request already read. Every host the home knows, exactly as the Org shows them —
+        the same records and the same `view()` — plus this host's own identity alarms (§4.8a).
+
+        Rendered server-side on the page's load *and* on its poll: a state that changed between
+        polls is corrected by the next one, and nothing here has to ride the pushed stream to be
+        no more than a few seconds behind the Org."""
+        icons = await role_icons(fleet)
+        seats = await self.seats_of(fleet)
+        # what each waits on (§4.2 *Waiting*, TD-428), so a row's pill is the Org card's
+        waits, repos = await self.person_waits(), (await self.repo_facts())[0]
+        views = [view(s, fleet, icons=icons, seats=seats, repos=repos, waits=waits) for s in fleet]
+        info = await self.identity_info()
+        rows = state_rows(
+            views,
+            host_alarms=alarm_view(info.get("alarms")),
+            host=str(info.get("host") or host_name()),
+            identity_mode=str(info.get("mode") or ""),
+        )
+        # §4.5a *Inbox row: promote* (TD-132 slice 3): the home's readings; a node has none
+        home = await self.call("host")
+        # §4.5a *Inbox row: team start* (§6 rule 8, TD-227): the home's `work_waiting` marks, each
+        # with the card's own *wound down* instant
+        work = home.get("work") or {}
+        return (
+            rows
+            + promote_rows(home.get("promotes"))
+            + work_rows(work, self.wound_of(fleet) if work else None, records=fleet)
+        )
+
+    def wound_of(self, fleet: list[dict[str, Any]]) -> dict[str, Any]:
+        """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
+        return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
+
+    async def person_waits(self) -> dict[str, Any]:
+        """What each session waits on, from the person inbox (`waits_of`, §4.5a **waiting** mark,
+        TD-274), for the surfaces that do not read the inbox themselves — the events stream, Focus,
+        the sessions list — read at most once in `DEFS_TTL` seconds, `work_marks`' idiom; `{}` when
+        the inbox cannot be read (a node's link down), and no card then says it waits."""
+        now = time.monotonic()
+        if self.waits_cache["waits"] is None or now - self.waits_cache["at"] > DEFS_TTL:
+            got: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                got = dict(await self.call("inbox"))
+            self.waits_cache.update(at=now, waits=waits_of(got.get("entries") or []))
+        return self.waits_cache["waits"] or {}
+
+    async def person_inbox(self, fleet: list[dict[str, Any]], watching: bool = False) -> dict[str, Any]:
+        """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
+        caller and no id — **a person's read, which sets no `read_at`**, because a person is not
+        the session. That is what lets the Inbox page poll it every few seconds without marking
+        anything read and without freeing a depth slot an unanswered question still holds; it is
+        the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
+        sender gets the name it is known by, and `from_open` the id **Open** goes to while that
+        record still exists (§4.5 screen 6: a row opens the session that needs the person).
+        `watching`: the read is from a visible page, which the home keeps (§4.10 *Looking*, TD-319)."""
+        got = await self.call("inbox", watching=True) if watching else await self.call("inbox")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        records = {o.get("id"): o for o in fleet}
+        # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board is the sender's
+        # repo's, when this host knows that repo and it carries one; else the person picks
+        boards_of = {c["root"]: c["board"] for c in board_choices()}
+
+        def board_of(sid: Any) -> str:
+            repo = str((records.get(sid) or {}).get("repo") or "")
+            return boards_of.get(str(Path(repo).expanduser().resolve()), "") if repo else ""
+
+        for t in got.get("trail") or ():
+            if isinstance(t, dict):
+                t["board_default"] = board_of(t.get("sid"))
+        at = datetime.now(UTC)
+        here = host_name()
+        handed_by = {str(h.get("id")): h for h in got.get("handed") or () if isinstance(h, dict) and h.get("id")}
+        for e in got["entries"]:
+            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            e["from_open"] = e["from"] if e["from"] in names else ""
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does,
+            # but on a handed entry's thread, where it fills a seat on call as an ask does (TD-218)
+            rw = (records.get(e["from"]) or {}).get("read_when") or {}
+            e["reply_when"] = str((e.get("on_handed") and rw.get("refill")) or rw.get("note") or "")
+            e["board_default"] = board_of(e["from"])
+            # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): its screenshots, served
+            # from the sender's record's repo — read off the loop, as each is a git read once a minute
+            # (TD-300: from the sender's own host where that is not this one, through the home)
+            if e.get("shots"):
+                sender = records.get(e["from"]) or {}
+                repo = str(sender.get("repo") or "")
+                e["look_shots"] = await asyncio.to_thread(
+                    look_shots, e["shots"], Path(repo).name if repo else "", str(sender.get("host") or "")
+                )
+                # §4.5a **Send to reviewer** (TD-292 slice 4b): the seat is the sender's team's
+                # techlead as this page reads it from `org.yml`; a look already with one reads so
+                t = (await self.defs()).teams.get(str(e.get("team") or ""))
+                seat = teams.seat_id(await self.defs(), t, t.host or here, here) if t is not None else ""
+                look_review(e, seat, t.techlead.name if seat and t and t.techlead else "", handed_by)
+            if isinstance(lb := e.get("looked_by"), dict) and lb.get("seat"):
+                # the seat's reading names it by the name it is known by, as a sender is (§4.5a)
+                e["looked_by"] = {**lb, "name": names.get(str(lb["seat"]), str(lb["seat"]))}
+            if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
+                sender = records.get(e["from"]) or {}
+                e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
+            _owing(e, records.get(e["from"]), at)
+            # §4.5a *Inbox row: orphaned question* (TD-216 slice 2): its asker is gone, so the row
+            # is under the name it asked by, opens nothing, and says where an answer goes — the
+            # standing, from the leases the fleet this page read carries
+            if standing := mail.orphan_standing(e, fleet, at):
+                e["from_name"] = str((e.get("orphaned") or {}).get("name") or e["from_name"])
+                e["from_open"] = ""
+                e["standing"] = standing
+            e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
+            # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
+            # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
+            # whose row upgrades to the browser's own clock once the script runs.
+            e["left"] = _left(e.get("bound"), at)
+            e["until_words"] = _left(e.get("snoozed_until"), at)
+            # §4.9b (TD-075 step 3): a question **passed up** is the asker's own entry, and the
+            # passer — whose recommendation and suggested answers it carries — is named as a sender is
+            rec = e.get("recommend")
+            if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
+                e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+            # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
+            # to — by the name it is known by, and opens it while it is here
+            asker = str(_answered_of(e).get("asker") or "")
+            if asker:
+                e["asker_name"] = names.get(asker, asker)
+                # Overrule writes to the asker, so its dialog's line is the asker's (TD-168)
+                e["asker_when"] = str(((records.get(asker) or {}).get("read_when") or {}).get("note") or "")
+                e["asker_open"] = asker if asker in names else ""
+        # §4.10 *An entry handed to a seat* (TD-219): the holder's copy of each entry the person
+        # handed, drawn under *Waiting on them* (or *Needs you*, once `blocked`) by its id
+        got["handed"] = handed_rows(got.get("handed") or (), records, at)
+        return got
+
+    async def counts_now(self, watching: bool) -> dict[str, Any]:
+        """The top bar's numbers (`INBOX_COUNTS`) from the Inbox's own sections, nothing rendered
+        (TD-611 slice 1), the classification on a worker thread (slice 2): what `counts` holds and
+        pushes (§4.4 *The Inbox's counts*, TD-616). With the host agent down, the shape that says so —
+        no number claimed, the reason in words."""
+        try:
+            fleet = await self.call("list")
+            got, states = await self.person_inbox(fleet, watching=watching), await self.person_states(fleet)
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            return {**COUNTS_DOWN, "why": str(e.detail)}
+        hz, _ = await self.board_view()
+        hz = with_standings(hz, fleet)
+        build = await chip_build(self.call)
+        sections = await asyncio.to_thread(
+            inbox_sections,
+            got["entries"],
+            states=states,
+            trail=got.get("trail") or (),
+            attention_snoozed=got.get("attention_snoozed"),
+            handed=got.get("handed") or (),
+            boards=hz["due"] + hz["waiting"],
+            fleet=fleet,
+        )
+        self.needs_cache["rows"] = sections["needs"]  # the Org's *asked you* lines, as the full read keeps it (TD-354)
+        return counts_of(sections, build)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="shiftlead")
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
     app.add_middleware(_WsAttemptLog)
 
-    async def call(method: str, **params: Any) -> Any:
-        try:
-            async with LocalClient() as c:
-                return await c.call(method, **params)
-        except AgentUnavailable as e:
-            raise HTTPException(503, f"host agent unreachable: {e}") from e
-        except AgentError as e:
-            raise HTTPException(400, str(e)) from e
+    rd = Readings()
+    call = rd.call
+    defs, seats_of, repo_facts, identity_info = rd.defs, rd.seats_of, rd.repo_facts, rd.identity_info
+    board_items, board_view, person_states = rd.board_items, rd.board_view, rd.person_states
+    person_waits, person_inbox, counts_now, needs_cache = (
+        rd.person_waits,
+        rd.person_inbox,
+        rd.counts_now,
+        rd.needs_cache,
+    )
 
     def render_card(v: dict[str, Any]) -> str:
         return templates.get_template("card.html").render(s=v)
@@ -632,37 +906,9 @@ def create_app() -> FastAPI:
                 log.debug("the settings read failed; the last person: stands", exc_info=True)
         return await call_next(request)
 
-    defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
-
-    async def defs() -> orgmod.Org:
-        """The team definitions, read at most once in `DEFS_TTL` seconds: the events stream
-        re-renders every header on every delta — a definition edited by hand shows within that."""
-        now = time.monotonic()
-        if defs_cache["org"] is None or now - defs_cache["at"] > DEFS_TTL:
-            # off the loop: every open page shares it, and the read is a file per registered repo
-            defs_cache.update(at=now, org=(await asyncio.to_thread(org_here))[0])
-        return defs_cache["org"]
-
     async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The definitions' rows for a delta's headers."""
         return _aged(teamrun.rows(await defs(), sessions, await home_waiting()))
-
-    async def seats_of(fleet: list[dict[str, Any]]) -> dict[str, str]:
-        """The ids in `fleet` a team definition names as a seat — what `view()` draws *on call*
-        while nobody is in one (TD-097). Every page that draws a pill asks, so they agree."""
-        return teamrun.seat_ids(await defs(), fleet)
-
-    async def repo_facts() -> tuple[dict[str, Any], dict[str, Any]]:
-        """The home's repo facts and doing log (§4.4 *Repo facts*, TD-176), each `{}` when the agent
-        cannot give it — an older agent, a node whose link is down: the facets then read *no repo
-        here* and an empty feed rather than taking the page down."""
-        repos: dict[str, Any] = {}
-        doing: dict[str, Any] = {}
-        with contextlib.suppress(Exception):
-            repos = await call("repos")
-        with contextlib.suppress(Exception):
-            doing = await call("doing_log")
-        return repos, doing
 
     flow_cache: dict[str, Any] = {"flows": {}}
 
@@ -734,108 +980,7 @@ def create_app() -> FastAPI:
         ro = templates.get_template("rollup.html").render(ro=rollup(groups))
         return {"groups": render_heads(groups), "rollup": ro}
 
-    identity_cache: dict[str, Any] = {"at": 0.0, "info": None}
-
-    async def identity_info() -> dict[str, Any]:
-        """This host's identity mode (design §4.8a), for the Org's one-line note. The `identity`
-        RPC is a never-gated read, and it is read at most once every `DEFS_TTL` seconds — the same
-        idiom as the team definitions, so a page under a delta storm never asks per render. An
-        agent that is down or too old to answer leaves the note off rather than the page."""
-        now = time.monotonic()
-        if identity_cache["info"] is None or now - identity_cache["at"] > DEFS_TTL:
-            try:
-                identity_cache.update(at=now, info=await call("identity"))
-            except HTTPException:
-                identity_cache.update(at=now, info={})
-        return identity_cache["info"] or {}
-
-    pull_cache: dict[str, Any] = {"at": float("-inf")}
-
-    async def pull_marks() -> None:
-        """The home's pull readings (`host`'s `pulls`, §6 *Pull*) into `inbox.PULLS`, which the
-        *behind* origin note's tail reads (TD-263); at most once in `DEFS_TTL`, `work_marks`' idiom.
-        An agent that cannot give them — an older one, a node — leaves the note without a tail."""
-        now = time.monotonic()
-        if now - pull_cache["at"] <= DEFS_TTL:
-            return
-        pull_cache["at"] = now
-        got: dict[str, Any] = {}
-        with contextlib.suppress(Exception):
-            got = dict((await call("host")).get("pulls") or {})
-        inbox_mod.PULLS.clear()
-        inbox_mod.PULLS.update(got)
-
-    async def board_all() -> tuple[list[dict[str, Any]], str]:
-        """Every open board row of this host's repos and the note beside them (TD-069 step 3), from the
-        host agent's `boards` reading on the `repos` RPC (§4.4 *Each reading has one owner*, *The
-        boards*, TD-615): the page runs no reader, and a press's write-back is in the reading before its
-        RPC answers. Every open row, the ones not yet due too, for the board's horizon (TD-220). On a
-        node the org is the home's (§4.4a), so a node draws none; an agent that cannot answer is said."""
-        if hosts.is_node():
-            return [], ""
-        await pull_marks()
-        try:
-            repos = await call("repos")
-        except Exception as e:  # noqa: BLE001 — said in words, never an empty board
-            return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
-        return board_reading(repos if isinstance(repos, dict) else {}, repo_teams(await defs(), host_name()))
-
-    async def board_items() -> tuple[list[dict[str, Any]], str]:
-        """The Inbox's **due** board rows and the note beside them: what is counted is what is due,
-        under every mode (TD-220)."""
-        rows, note = await board_all()
-        return [r for r in rows if r.get("due_now", True)], note
-
-    async def board_view() -> tuple[dict[str, Any], str]:
-        """The board's horizon (§4.5 screen 6, TD-220) over every open row, sorted by the person's
-        `inbox.board_show`, and the note: `due` is `board_items`' rows, `ahead` *Board, coming up*,
-        `hidden` the *not shown* fold, and `line` the words that say the mode — None when no board
-        was read (a reading that failed says so in its note instead)."""
-        rows, note = await board_all()
-        h = board_horizon(rows, uiconf.board_show())
-        h["line"] = board_line(h) if rows or (not note and board_choices()) else None
-        return h, note
-
-    async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
-        fleet the request already read. Every host the home knows, exactly as the Org shows them —
-        the same records and the same `view()` — plus this host's own identity alarms (§4.8a).
-
-        Rendered server-side on the page's load *and* on its poll: a state that changed between
-        polls is corrected by the next one, and nothing here has to ride the pushed stream to be
-        no more than a few seconds behind the Org."""
-        icons = await role_icons(fleet)
-        seats = await seats_of(fleet)
-        # what each waits on (§4.2 *Waiting*, TD-428), so a row's pill is the Org card's
-        waits, repos = await person_waits(), (await repo_facts())[0]
-        views = [view(s, fleet, icons=icons, seats=seats, repos=repos, waits=waits) for s in fleet]
-        info = await identity_info()
-        rows = state_rows(
-            views,
-            host_alarms=alarm_view(info.get("alarms")),
-            host=str(info.get("host") or host_name()),
-            identity_mode=str(info.get("mode") or ""),
-        )
-        # §4.5a *Inbox row: promote* (TD-132 slice 3): the home's readings; a node has none
-        home = await call("host")
-        # §4.5a *Inbox row: team start* (§6 rule 8, TD-227): the home's `work_waiting` marks, each
-        # with the card's own *wound down* instant
-        work = home.get("work") or {}
-        return (
-            rows
-            + promote_rows(home.get("promotes"))
-            + work_rows(work, wound_of(fleet) if work else None, records=fleet)
-        )
-
-    def wound_of(fleet: list[dict[str, Any]]) -> dict[str, Any]:
-        """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
-        return {r["name"]: r["wound_down"] for r in teams_view(fleet)["teams"] if r.get("wound_down")}
-
     work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None, "balance": None}
-    # the Inbox's *Needs you* rows as the last Org page or person-inbox poll composed them: what a
-    # delta's team summaries read for a member's open `ask` (§4.5a *asked you*, TD-354), so the
-    # page and its deltas draw the same line without a mailbox read per delta
-    needs_cache: dict[str, Any] = {"rows": []}
 
     async def home_reading(fresh: bool = False) -> None:
         now = time.monotonic()
@@ -860,21 +1005,6 @@ def create_app() -> FastAPI:
         await home_reading(fresh)
         return work_cache["waiting"] or {}
 
-    waits_cache: dict[str, Any] = {"at": 0.0, "waits": None}
-
-    async def person_waits() -> dict[str, Any]:
-        """What each session waits on, from the person inbox (`waits_of`, §4.5a **waiting** mark,
-        TD-274), for the surfaces that do not read the inbox themselves — the events stream, Focus,
-        the sessions list — read at most once in `DEFS_TTL` seconds, `work_marks`' idiom; `{}` when
-        the inbox cannot be read (a node's link down), and no card then says it waits."""
-        now = time.monotonic()
-        if waits_cache["waits"] is None or now - waits_cache["at"] > DEFS_TTL:
-            got: dict[str, Any] = {}
-            with contextlib.suppress(Exception):
-                got = dict(await call("inbox"))
-            waits_cache.update(at=now, waits=waits_of(got.get("entries") or []))
-        return waits_cache["waits"] or {}
-
     async def work_marks() -> dict[str, Any]:
         """The home's `work_waiting` marks by team (`host`'s `work`, §6 rule 8), `{}` when the agent
         cannot give them — an older agent, a node: the card then carries no note. Read at most once
@@ -890,92 +1020,6 @@ def create_app() -> FastAPI:
         fleet = await call("list")
         return await person_inbox(fleet), await person_states(fleet)
 
-    async def person_inbox(fleet: list[dict[str, Any]], watching: bool = False) -> dict[str, Any]:
-        """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
-        caller and no id — **a person's read, which sets no `read_at`**, because a person is not
-        the session. That is what lets the Inbox page poll it every few seconds without marking
-        anything read and without freeing a depth slot an unanswered question still holds; it is
-        the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
-        sender gets the name it is known by, and `from_open` the id **Open** goes to while that
-        record still exists (§4.5 screen 6: a row opens the session that needs the person).
-        `watching`: the read is from a visible page, which the home keeps (§4.10 *Looking*, TD-319)."""
-        got = await call("inbox", watching=True) if watching else await call("inbox")
-        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
-        records = {o.get("id"): o for o in fleet}
-        # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board is the sender's
-        # repo's, when this host knows that repo and it carries one; else the person picks
-        boards_of = {c["root"]: c["board"] for c in board_choices()}
-
-        def board_of(sid: Any) -> str:
-            repo = str((records.get(sid) or {}).get("repo") or "")
-            return boards_of.get(str(Path(repo).expanduser().resolve()), "") if repo else ""
-
-        for t in got.get("trail") or ():
-            if isinstance(t, dict):
-                t["board_default"] = board_of(t.get("sid"))
-        at = datetime.now(UTC)
-        here = host_name()
-        handed_by = {str(h.get("id")): h for h in got.get("handed") or () if isinstance(h, dict) and h.get("id")}
-        for e in got["entries"]:
-            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
-            e["from_open"] = e["from"] if e["from"] in names else ""
-            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does,
-            # but on a handed entry's thread, where it fills a seat on call as an ask does (TD-218)
-            rw = (records.get(e["from"]) or {}).get("read_when") or {}
-            e["reply_when"] = str((e.get("on_handed") and rw.get("refill")) or rw.get("note") or "")
-            e["board_default"] = board_of(e["from"])
-            # §4.5a **Inbox row: a look** (§4.10 *A look*, TD-292 slice 3): its screenshots, served
-            # from the sender's record's repo — read off the loop, as each is a git read once a minute
-            # (TD-300: from the sender's own host where that is not this one, through the home)
-            if e.get("shots"):
-                sender = records.get(e["from"]) or {}
-                repo = str(sender.get("repo") or "")
-                e["look_shots"] = await asyncio.to_thread(
-                    look_shots, e["shots"], Path(repo).name if repo else "", str(sender.get("host") or "")
-                )
-                # §4.5a **Send to reviewer** (TD-292 slice 4b): the seat is the sender's team's
-                # techlead as this page reads it from `org.yml`; a look already with one reads so
-                t = (await defs()).teams.get(str(e.get("team") or ""))
-                seat = teams.seat_id(await defs(), t, t.host or here, here) if t is not None else ""
-                look_review(e, seat, t.techlead.name if seat and t and t.techlead else "", handed_by)
-            if isinstance(lb := e.get("looked_by"), dict) and lb.get("seat"):
-                # the seat's reading names it by the name it is known by, as a sender is (§4.5a)
-                e["looked_by"] = {**lb, "name": names.get(str(lb["seat"]), str(lb["seat"]))}
-            if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
-                sender = records.get(e["from"]) or {}
-                e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
-            _owing(e, records.get(e["from"]), at)
-            # §4.5a *Inbox row: orphaned question* (TD-216 slice 2): its asker is gone, so the row
-            # is under the name it asked by, opens nothing, and says where an answer goes — the
-            # standing, from the leases the fleet this page read carries
-            if standing := mail.orphan_standing(e, fleet, at):
-                e["from_name"] = str((e.get("orphaned") or {}).get("name") or e["from_name"])
-                e["from_open"] = ""
-                e["standing"] = standing
-            e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
-            # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
-            # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
-            # whose row upgrades to the browser's own clock once the script runs.
-            e["left"] = _left(e.get("bound"), at)
-            e["until_words"] = _left(e.get("snoozed_until"), at)
-            # §4.9b (TD-075 step 3): a question **passed up** is the asker's own entry, and the
-            # passer — whose recommendation and suggested answers it carries — is named as a sender is
-            rec = e.get("recommend")
-            if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
-                e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
-            # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
-            # to — by the name it is known by, and opens it while it is here
-            asker = str(_answered_of(e).get("asker") or "")
-            if asker:
-                e["asker_name"] = names.get(asker, asker)
-                # Overrule writes to the asker, so its dialog's line is the asker's (TD-168)
-                e["asker_when"] = str(((records.get(asker) or {}).get("read_when") or {}).get("note") or "")
-                e["asker_open"] = asker if asker in names else ""
-        # §4.10 *An entry handed to a seat* (TD-219): the holder's copy of each entry the person
-        # handed, drawn under *Waiting on them* (or *Needs you*, once `blocked`) by its id
-        got["handed"] = handed_rows(got.get("handed") or (), records, at)
-        return got
-
     def inbox_html(sections: dict[str, Any], origin: str = "") -> dict[str, str]:
         """Each section's rows, rendered by the one template the page itself renders them with, so
         a poll replaces a section without the client composing any markup — the shape the events
@@ -984,34 +1028,6 @@ def create_app() -> FastAPI:
         text and nothing else (TD-071 item 8, TD-138)."""
         rows = templates.get_template("inbox_rows.html")
         return {k: rows.render(rows=sections[k], section=k, origin=origin) for k in INBOX_SECTIONS}
-
-    async def counts_now(watching: bool) -> dict[str, Any]:
-        """The top bar's numbers (`INBOX_COUNTS`) from the Inbox's own sections, nothing rendered
-        (TD-611 slice 1), the classification on a worker thread (slice 2): what `counts` holds and
-        pushes (§4.4 *The Inbox's counts*, TD-616). With the host agent down, the shape that says so —
-        no number claimed, the reason in words."""
-        try:
-            fleet = await call("list")
-            got, states = await person_inbox(fleet, watching=watching), await person_states(fleet)
-        except HTTPException as e:
-            if e.status_code != 503:
-                raise
-            return {**COUNTS_DOWN, "why": str(e.detail)}
-        hz, _ = await board_view()
-        hz = with_standings(hz, fleet)
-        build = await chip_build(call)
-        sections = await asyncio.to_thread(
-            inbox_sections,
-            got["entries"],
-            states=states,
-            trail=got.get("trail") or (),
-            attention_snoozed=got.get("attention_snoozed"),
-            handed=got.get("handed") or (),
-            boards=hz["due"] + hz["waiting"],
-            fleet=fleet,
-        )
-        needs_cache["rows"] = sections["needs"]  # the Org's *asked you* lines, as the full read keeps it (TD-354)
-        return counts_of(sections, build)
 
     h = SimpleNamespace(
         call=call,

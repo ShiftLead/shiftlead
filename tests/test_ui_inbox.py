@@ -535,6 +535,28 @@ def test_the_counts_read_is_the_full_reads_numbers_and_renders_nothing(client, t
 
 
 @pytest.mark.integration
+def test_ao_inbox_counts_prints_the_top_bars_numbers_and_marks_nothing(client, tmp_path, monkeypatch, capsys):
+    """§4.7 `ao inbox --counts` (TD-616): the UI's own `counts_now`, run by `ao` over the host agent's
+    readings — the same numbers the counts read answers, and a read that marks nothing."""
+    from shiftlead import cli
+    from shiftlead.ui.app import INBOX_COUNTS
+
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    sender = sender_session(client, tmp_path)
+    send(sender, text="merge PR 9?", kind="ask")
+    send(sender, text="for your information", kind="note")
+    ui = client.get("/api/person/inbox?counts=1").json()
+    capsys.readouterr()
+    assert cli.main(["--json", "inbox", "--counts"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert {k: got[k] for k in INBOX_COUNTS} == {k: ui[k] for k in INBOX_COUNTS}
+    assert got["needs"] == 1 and got["fyi_n"] == 1
+    assert cli.main(["inbox", "--counts"]) == 0
+    assert capsys.readouterr().out.strip() == "needs you 1 · FYI 1 · overdue 0 · answered 0"
+    assert all(e["read_at"] is None for e in client.get("/api/person/inbox").json()["entries"])
+
+
+@pytest.mark.integration
 def test_the_inbox_read_is_built_off_the_loop_and_gzipped(client, tmp_path, monkeypatch):
     """TD-611 slice 2: the sections, the markup and the JSON of `/api/person/inbox` are built on a
     worker thread, never on the UI's one loop the Focus terminal shares, and the body is gzipped
