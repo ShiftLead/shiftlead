@@ -560,7 +560,9 @@ def test_the_inbox_read_is_built_off_the_loop_and_gzipped(client, tmp_path, monk
         assert got.headers["content-encoding"] == "gzip" and got.json()["needs"] == 1
         plain = client.get(url, headers={"Accept-Encoding": "identity"})
         assert "content-encoding" not in plain.headers and plain.json()["needs"] == 1
-    assert on_loop == [False] * 4
+        assert got.headers["vary"] == plain.headers["vary"] == "Accept-Encoding"
+        assert "content-encoding" not in client.get(url, headers={"Accept-Encoding": "gzip;q=0, br"}).headers
+    assert on_loop == [False] * 6
 
 
 @pytest.mark.integration

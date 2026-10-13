@@ -3078,7 +3078,11 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         build = await chip_build(call)
         lf = None if counts else await ledger_view(fleet)
         origin = page_origin(request)
-        gz = "gzip" in request.headers.get("accept-encoding", "")
+        gz = any(  # `gzip`, not `gzip;q=0`, which says no
+            t.split(";")[0].strip() == "gzip"
+            and t.replace(" ", "").partition(";q=")[2] not in ("0", "0.0", "0.00", "0.000")
+            for t in request.headers.get("accept-encoding", "").split(",")
+        )
 
         def read() -> tuple[list[dict[str, Any]], bytes]:
             """Everything after the awaits, on a worker thread (TD-611 slice 2): the sections, the
