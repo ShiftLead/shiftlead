@@ -106,12 +106,12 @@ def _path_env() -> dict[str, str]:
     return {"PATH": os.environ["PATH"], "HOME": os.environ.get("HOME", "/tmp")}
 
 
-def _commit(root: Path, text: str, when: datetime) -> None:
+def _commit(root: Path, text: str, when: datetime, subject: str = "ledger") -> None:
     f = root / "docs" / "technical_debt.md"
     f.parent.mkdir(exist_ok=True)
     f.write_text(text)
     _git(root, "add", "-A")
-    _git(root, "commit", "-q", "-m", "ledger", when=when)
+    _git(root, "commit", "-q", "-m", subject, when=when)
 
 
 def _entry(tid: str, title: str) -> str:
@@ -151,6 +151,47 @@ def test_history_opens_at_the_first_commit_holding_a_section_and_closes_at_the_f
     assert [e["id"] for e in r["recent"]][0] == "TD-005"
     assert {e["id"] for e in r["recent"]} == {"TD-005", "TD-004", "TD-002"}
     assert r["by_kind"] == dict.fromkeys(ledger.KINDS, 0) | {"live-check": 3}  # the seven kinds (TD-418)
+
+
+def test_an_entry_closed_by_a_squash_merge_reads_its_pr_and_a_direct_push_none(repo):
+    """TD-604 / TD-608: the commit that removes an entry's heading names the PR that closed it by its
+    subject's `(#n)`; a direct push names none; a multi-slice entry is closed by its last PR, never by
+    the first slice's; an entry closed and re-added has no PR until it closes again. `completed` joins
+    the closed ones to the month's PR reading by number, newest first."""
+    now = datetime.now(UTC)
+    t = [now - timedelta(hours=h) for h in (10, 9, 8, 7, 6, 5)]
+    a, b, c, d = (_entry(f"TD-00{n}", f"t{n}") for n in (1, 2, 3, 4))
+    _commit(repo, a + b + c + d, t[0], "TD-001 slice 1: half of it (#1288)")  # a slice: nothing leaves
+    _commit(repo, b + c + d, t[1], "TD-001 slice 2: the rest (#1290)")
+    _commit(repo, c + d, t[2], "archive TD-002 by hand")  # a direct push
+    _commit(repo, d, t[3], "TD-003: done (#1301)")
+    _commit(repo, c + d, t[4], "TD-003 reopened (#1302)")  # re-added: open again, no PR
+    life = ledger.history(repo, "docs/technical_debt.md", (repo / "docs/technical_debt.md").read_text())
+    assert life is not None
+    assert (life["TD-001"].pr, life["TD-002"].pr) == (1290, None)
+    assert (life["TD-003"].closed, life["TD-003"].pr) == (None, None)
+    assert life["TD-004"].pr is None and life["TD-004"].closed is None
+
+    r = ledger.reading(repo, now)
+    assert {e["id"]: e["pr"] for e in r["recent"]} == {"TD-001": 1290, "TD-002": None, "TD-003": None, "TD-004": None}
+    prs = [
+        {"number": 1290, "author": "eyecantell", "branch": "td001-rest", "url": "https://x/pull/1290"},
+        {"number": 1301, "author": "someone", "branch": "td003", "url": "https://x/pull/1301"},
+    ]
+    got = ledger.completed(r["recent"], prs)
+    assert [c["id"] for c in got] == ["TD-002", "TD-001"]  # newest close first; TD-003 is open again
+    assert got[1] == {
+        "id": "TD-001",
+        "title": "t1",
+        "closed": r["recent"][[e["id"] for e in r["recent"]].index("TD-001")]["closed"],
+        "pr": 1290,
+        "author": "eyecantell",
+        "branch": "td001-rest",
+        "url": "https://x/pull/1290",
+    }
+    assert (got[0]["pr"], got[0]["author"], got[0]["url"]) == (None, "", "")
+    assert ledger.completed(r["recent"], None)[1]["author"] == ""  # no PR reading: the number alone
+    assert ledger.completed(None, prs) == []
 
 
 def test_history_is_none_when_git_cannot_be_asked(tmp_path):
@@ -975,3 +1016,21 @@ async def test_a_ticks_read_that_began_before_a_board_press_keeps_the_presss_rea
     agent._repos_read_at = float("-inf")
     await agent._refresh_repos()
     assert agent._repos[root]["boards"] == pressed
+
+
+def test_the_repo_reading_keeps_completed_from_the_history_and_the_prs(repo, monkeypatch):
+    """TD-608: the repo reading carries `completed`, the closed entries joined to the month's PRs,
+    on the full pass and on a ledger-only re-read alike."""
+    from sessionorc.agent_tick import TickMixin
+
+    now = datetime.now(UTC)
+    _commit(repo, _entry("TD-001", "a") + _entry("TD-002", "b"), now - timedelta(hours=3))
+    _commit(repo, _entry("TD-002", "b"), now - timedelta(hours=2), "TD-001: done (#7)")
+    pr = {"number": 7, "author": "eyecantell", "branch": "td001", "url": "u", "created": None, "closed": None}
+    monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "recent": [pr]})
+    root = str(repo)
+    full = TickMixin._read_repos([root], {}, {root})[root]
+    (c,) = full["completed"]
+    assert (c["id"], c["pr"], c["author"], c["branch"]) == ("TD-001", 7, "eyecantell", "td001")
+    again = TickMixin._read_repos([root], {root: full}, set())[root]
+    assert again["completed"] == full["completed"]
