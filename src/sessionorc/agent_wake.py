@@ -123,6 +123,8 @@ class WakeMixin:
             return "not hook-confirmed idle"  # never a scraped idle or `stalled?` (a takeover)
         if self._first_prompt_due(s):
             return "its brief is not typed yet"  # the first prompt is the brief, never the doorbell's line
+        if not adapters.has_agent(s.adapter):
+            return "no agent"  # a shell's line would run as a command (§4.3 *A record with no agent*)
         if not mail.mail_wakes(s):
             return "a person's session"  # invariant 5: the chip and the line, nothing typed
         if s.doorbell_held:

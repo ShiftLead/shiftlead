@@ -53,6 +53,9 @@ class ServeMixin:
         address as `id`, and while that host's link is down reads `unreachable` — an overlay on the
         view, never a state on the record."""
         v = s.view(bookkeeping=bookkeeping)
+        # §4.3 *A record with no agent* (TD-665): derived here from the adapter, a node's own
+        # records included, never stored — every reader keys on it, never on an adapter's name
+        v["agent"] = adapters.has_agent(s.adapter)
         # design §4.8a *An alarm's answers* (TD-077 b): **who answers for this record** — its
         # first live controller, read from the control graph and never from a badge (§9 invariant
         # 9). The page draws **Log TD** only where this is non-null and says *no session answers

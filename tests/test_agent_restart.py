@@ -47,7 +47,7 @@ async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
     try:
         first, task = await start(tmux)
         async with LocalClient() as c:
-            sh = await c.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            sh = await c.call("create", name="sh", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
             cmd = await c.call(
                 "create", name="cmd", dir=str(tmp_path), adapter="command", kind="command", argv=["sleep", "30"]
             )
@@ -58,7 +58,7 @@ async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
 
         # a pre-2026-09-06 record: pending prompt shown as needs-you
         store = SessionStore(paths.sessions_dir())
-        old = Session(id="ao-old-prompt", name="old", kind="interactive", adapter="shell", dir=str(tmp_path))
+        old = Session(id="ao-old-prompt", name="old", kind="interactive", adapter="agentshell", dir=str(tmp_path))
         old.set_state("needs-you", confidence="hook", pending=Pending(kind="prompt", text="waiting"))
         store.save(old)
 

@@ -57,7 +57,7 @@ class SettingsMixin:
         a node keyed its session's profile by, or the one this host keys it by. The account key it
         merged under, or None for a session that is no live tool session, a metered profile, or
         no windows."""
-        if s.adapter == "shell" or s.state in ("exited", "closed") or not cleaned:
+        if not adapters.has_agent(s.adapter) or s.state in ("exited", "closed") or not cleaned:
             return None
         ad = adapters.get(s.adapter)
         # `_metered` is read from this host's profile files, and a node's profile of the same name

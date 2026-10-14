@@ -92,7 +92,7 @@ async def test_the_msg_reply_and_the_records_view_carry_the_sentence(agent, tmp_
     async with LocalClient() as person:
         w = (
             await person.call(
-                "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+                "create", name="w", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"], unattended=True
             )
         )["id"]
         await person.call("kill", id=w)

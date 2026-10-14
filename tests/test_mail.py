@@ -19,7 +19,9 @@ pytestmark = pytest.mark.integration
 
 def _mk(person, tmp_path):
     async def mk(n: str, **kw):
-        return (await person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw))[
+        d = tmp_path / n  # one directory each: a stand-in for an agent keeps the anchor rule (§9 invariant 2)
+        d.mkdir(exist_ok=True)
+        return (await person.call("create", name=n, dir=str(d), adapter="agentshell", argv=["bash", "--norc"], **kw))[
             "id"
         ]
 
@@ -390,7 +392,9 @@ async def test_resume_carries_mail_forward_and_the_old_id_forwards(agent, hookst
     async with LocalClient() as person:
         for d in ("l", "w", "w2"):
             (tmp_path / d).mkdir()
-        lead = (await person.call("create", name="lead", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        lead = (await person.call("create", name="lead", dir=str(tmp_path / "l"), adapter="agentshell", argv=["bash"]))[
+            "id"
+        ]
         w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
             "id"
         ]
@@ -1298,7 +1302,7 @@ async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
                 ref,
                 name,
                 "ao-grind",
-                str(tmp_path),
+                str(tmp_path / name),
             )
             assert o["host"] == agent.host and o["at"]
         assert (await held(steer))["paused_at"] is None  # a pause is a hold on a session that is gone
@@ -1375,10 +1379,11 @@ async def test_a_cancelled_start_orphans_its_question_and_the_sweep_adopts_for_a
     from sessionorc.models import MailEntry, now_iso
 
     async with LocalClient() as person:
+        (tmp_path / "w").mkdir()
         v = await person.call(
             "create",
             name="w",
-            dir=str(tmp_path),
+            dir=str(tmp_path / "w"),
             adapter="shell",
             argv=["bash", "--norc"],
             unattended=True,
@@ -1711,7 +1716,9 @@ async def test_a_resume_under_the_same_name_keeps_its_mail(agent, hookstub, tmp_
     async with LocalClient() as person:
         for d in ("l", "w"):
             (tmp_path / d).mkdir()
-        lead = (await person.call("create", name="lead", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        lead = (await person.call("create", name="lead", dir=str(tmp_path / "l"), adapter="agentshell", argv=["bash"]))[
+            "id"
+        ]
         w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
             "id"
         ]
@@ -2353,7 +2360,7 @@ async def test_keep_mail_fills_a_seat_without_forgetting_the_questions_that_caus
             said = (await tc.call("msg", to=w, text="looking"))["entry"]
         await person.call("kill", id=tl)
         await wait_state(person, tl, "exited")
-        seat = {"name": "tl", "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"]}
+        seat = {"name": "tl", "dir": str(tmp_path / "tl"), "adapter": "agentshell", "argv": ["bash", "--norc"]}
         seat.update(team="ao-grind", unattended=True, controllers=[mgr])
         async with LocalClient(caller=other) as oc:
             with pytest.raises(AgentError, match="not a controller of"):
@@ -2673,7 +2680,7 @@ async def test_a_start_under_a_closed_members_name_keeps_its_mail_only_when_aske
         await person.call("close", id=w)
         await asyncio.sleep(0.3)
         await agent._sweep_mail(datetime.now(UTC))
-        again = {"name": "w", "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"]}
+        again = {"name": "w", "dir": str(tmp_path / "w"), "adapter": "agentshell", "argv": ["bash", "--norc"]}
         again.update(unattended=True, team="ao-grind")
         w2 = (await person.call("create", keep_mail=True, **again))["id"]
         texts = [e["text"] for e in (await person.call("inbox", id=w2))["entries"]]

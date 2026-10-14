@@ -16,7 +16,7 @@ pytestmark = pytest.mark.integration
 
 
 def _rec(**kw) -> Session:
-    s = Session(id="ao-x", name="x", kind="agent", adapter="shell", dir="/tmp/x")
+    s = Session(id="ao-x", name="x", kind="agent", adapter="agentshell", dir="/tmp/x")
     for k, v in kw.items():
         setattr(s, k, v)
     return s
@@ -150,7 +150,7 @@ async def test_dismissing_an_answered_question_ends_the_debt_and_tells_the_asker
     need to hear back — and the asker is told by a `system` note.* The two halves of step 1 meet
     here: dismissing is rule 3's, the debt is *Outcomes*'."""
     async with LocalClient() as person:
-        s = await person.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        s = await person.call("create", name="w", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])
         sid = s["id"]
         async with LocalClient(caller=sid) as w:
             asked = (await w.call("msg", to="person", text="rebase or merge?", kind="ask"))["entry"]

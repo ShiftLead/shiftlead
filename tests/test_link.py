@@ -17,6 +17,14 @@ from sessionorc.agent import HostAgent
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.tmux import Tmux
 
+
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 # -- the multiplexer, over a real socket pair ----------------------------------------------------------
 
 
@@ -962,7 +970,7 @@ async def test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on
         sock = home.dir / "agent.sock"
         async with LocalClient(sock=sock) as person:
             lead = await person.call(
-                "create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+                "create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"], unattended=True
             )
             await person.call("set_grants", id=lead["id"], add=["control"])
             await person.call("set_controllers", id=address, add=[lead["id"]])
@@ -1040,7 +1048,7 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
             w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
         await until(home, f"{w['id']}@laptop", lambda v: v is not None and v["state"] != "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as at_home:
-            lead = await at_home.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash"])
+            lead = await at_home.call("create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash"])
         async with LocalClient() as person_at_laptop:
             for rpc, extra in (
                 ("set_controllers", {"add": ["ao-anyone"]}),
@@ -1070,7 +1078,7 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
             gone = await person_at_laptop.call("inbox_delete", msg=sent["entry"]["id"])
             assert gone["deleted"] == sent["entry"]["id"]
             with pytest.raises(AgentError, match="acts on its own sessions only"):  # refused at the node itself
-                await person_at_laptop.call("create", name="x", dir=str(tmp_path), adapter="shell", host="kmaster")
+                await person_at_laptop.call("create", name="x", dir=str(tmp_path), adapter="agentshell", host="kmaster")
             # nor may a person at the node read the home's files through it (4b.3: `host_files`)
             with pytest.raises(AgentError, match="is a node of kmaster"):
                 await person_at_laptop.call("host_files", host="kmaster", dir=str(tmp_path), paths=["x"])
@@ -1928,8 +1936,8 @@ async def test_log_td_on_a_nodes_record_clears_the_alarm_where_it_lives(home, ho
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         acts = Acts(node, monkeypatch)
         async with LocalClient() as c:
-            lead = await c.call("create", name="l", dir=str(tmp_path), adapter="shell", argv=["bash"])
-            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+            lead = await c.call("create", name="l", dir=_own(tmp_path, "l"), adapter="agentshell", argv=["bash"])
+            w = await c.call("create", name="w", dir=_own(tmp_path, "w"), adapter=hookstub.name, unattended=True)
         address = f"{w['id']}@laptop"
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as person:
@@ -1970,8 +1978,8 @@ async def test_log_td_says_the_nodes_mode_is_the_homes_act_at_a_node_and_sends_n
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         node.identity_mode = node_mode
         async with LocalClient() as c:
-            lead = await c.call("create", name="l", dir=str(tmp_path), adapter="shell", argv=["bash"])
-            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+            lead = await c.call("create", name="l", dir=_own(tmp_path, "l"), adapter="agentshell", argv=["bash"])
+            w = await c.call("create", name="w", dir=_own(tmp_path, "w"), adapter=hookstub.name, unattended=True)
         address, lead_addr = f"{w['id']}@laptop", f"{lead['id']}@laptop"
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as person:

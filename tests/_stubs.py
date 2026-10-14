@@ -1,7 +1,16 @@
 """Test-only adapters. Imported by conftest (in-process agents) and by `_agent_child.py` (the
 subprocess agent registers them at startup, since a monkeypatch cannot reach another process)."""
 
-from sessionorc.adapters import LaunchSpec
+from sessionorc.adapters import LaunchSpec, ShellAdapter
+
+
+class AgentShellStub(ShellAdapter):
+    """A shell standing in for an agent: scraped as a shell is, but `agent` (design §4.3 *A record
+    with no agent*, TD-665), so what the host agent types only into an agent — mail, the wrap-up,
+    a policy's line, a derived claim — reaches it. A test that means a shell names `shell`."""
+
+    name = "agentshell"
+    agent = True
 
 
 class HookFedStub:

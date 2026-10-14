@@ -1060,7 +1060,7 @@ class HostAgent(
                 # one create per conversation at a time, whatever the directory: two concurrent
                 # resumes of one id would otherwise both pass the holder check below (TD-012)
                 await locks.enter_async_context(self._dir_locks[f"conversation:{resume}"])
-            if kind == "interactive" and adapter != "shell" and not held:
+            if kind == "interactive" and adapters.has_agent(adapter) and not held:
                 for who in await asyncio.to_thread(self.occupants, directory):
                     if starting is not None and who.split(" ", 1)[0] == starting.id:
                         continue  # the scheduled record holds the slot for exactly this start
@@ -1590,7 +1590,7 @@ class HostAgent(
         def holds(s: Session) -> bool:
             return (
                 s.kind == "interactive"
-                and s.adapter != "shell"
+                and adapters.has_agent(s.adapter)
                 and s.state not in ("exited", "closed")
                 and Path(s.dir).resolve() == directory
             )
@@ -1901,8 +1901,8 @@ class HostAgent(
             raise RpcError(f"{s.name} is scheduled and has not started: Cancel it instead {rule}")
         if s.sit_out or work_mod.sat_out(s):
             return self._view(s)
-        if s.state not in ("exited", "closed"):
-            try:
+        if s.state not in ("exited", "closed") and adapters.has_agent(s.adapter):
+            try:  # a record with no agent is typed nothing: the sit-out's close stops it (§4.3)
                 if s.host == self.host:
                     await self.rpc_send(s.id, WRAPUP_PROMPT, wrapup=True)
                 else:
@@ -2028,6 +2028,8 @@ class HostAgent(
         self._refuse_gone(s)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
+        if wrapup and not adapters.has_agent(s.adapter):
+            raise RpcError(f"{s.name}: a shell runs no turns: there is nothing to wrap up — Close it (design §4.3)")
         s.wrapup_at = now_iso() if wrapup else None
         entry = self._record_send(s, caller, text)
         if mail.is_person(caller):
@@ -2357,7 +2359,7 @@ class HostAgent(
             s = self._get(id)
             adapter, adapter_id, dir, profile = s.adapter, s.adapter_id or "", s.dir, s.profile
             if not adapter_id:
-                why = "a shell has no transcript" if adapter in ("shell", "command") else "its hook never reported one"
+                why = "a shell has no transcript" if not adapters.has_agent(adapter) else "its hook never reported one"
                 raise RpcError(f"{id} carries no tool session id: {why} (design §4.5 screen 9)")
         elif not (adapter and adapter_id and dir):
             raise RpcError("transcript needs id, or adapter, adapter_id and dir (design §4.7)")
@@ -2409,6 +2411,11 @@ class HostAgent(
         ride `set_stop` (design §6, TD-100): a session made unattended after its create would
         otherwise be gated with nothing to type. Given only when set; an empty one clears it."""
         s = self._find(id)  # the home's own copy of another host's record too (4a)
+        if unattended and not adapters.has_agent(s.adapter):
+            raise RpcError(
+                f"{s.name} runs no agent: a shell is the person's and stays interactive "
+                f"(design §4.3 A record with no agent, §4.8)"
+            )
         if s.state == "scheduled" and not unattended:
             # the tick would start it from its launch record, unattended: the switch silently undone
             # and a policy's act on a session the person made interactive (§6 *Start time*, TD-328)

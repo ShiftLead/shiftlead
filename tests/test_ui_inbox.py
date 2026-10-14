@@ -25,6 +25,13 @@ from fastapi.testclient import TestClient
 UI = pathlib.Path(__file__).parents[1] / "src" / "shiftlead" / "ui"
 
 
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 def iso(dt: datetime) -> str:
     return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -467,7 +474,9 @@ def client(subprocess_agent):
 
 
 def sender_session(client, tmp_path, name="asker"):
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": name}, follow_redirects=False)
+    # an agent stand-in: a reply lands in its inbox, and nothing reads a shell's (design §4.3)
+    data = {"dir": str(tmp_path), "name": name, "adapter": "agentshell"}
+    r = client.post("/new", data=data, follow_redirects=False)
     return r.headers["location"].rsplit("/", 1)[-1]
 
 
@@ -2630,7 +2639,7 @@ def test_an_answer_from_the_record_is_a_row_and_overrule_reaches_the_asker(clien
             ids = []
             for n in ("askr", "answr"):
                 got = await person.call(
-                    "create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="ao-t"
+                    "create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"], team="ao-t"
                 )
                 ids.append(got["id"])
         w, tl = ids
@@ -2718,7 +2727,7 @@ def test_a_question_passed_up_reaches_the_page_as_the_askers_with_the_passers_re
             ids = []
             for n in ("askr2", "passr"):
                 got = await person.call(
-                    "create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="ao-t2"
+                    "create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"], team="ao-t2"
                 )
                 ids.append(got["id"])
         w, tl = ids
@@ -2809,7 +2818,7 @@ def test_the_poll_carries_each_answered_rows_team_and_time_and_nothing_it_says(c
             ids = []
             for n in ("askr3", "answr3"):
                 got = await person.call(
-                    "create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="ao-t3"
+                    "create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"], team="ao-t3"
                 )
                 ids.append(got["id"])
         w, tl = ids
@@ -3529,7 +3538,7 @@ def test_the_org_draws_a_members_open_ask_as_its_teams_asked_you_line(client, tm
                     "create",
                     name="askr350",
                     dir=str(tmp_path),
-                    adapter="shell",
+                    adapter="agentshell",
                     argv=["bash", "--norc"],
                     team="ao-t350",
                     unattended=True,  # a worker, so the team is live and the rollup sums it

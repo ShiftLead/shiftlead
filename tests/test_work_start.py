@@ -31,7 +31,7 @@ def _e(id: str) -> dict:
 
 def _rec(name: str, **kw) -> Session:
     base = dict(
-        id=f"ao-t-{name}", name=name, kind="interactive", adapter="shell", dir="/tmp/x", state="closed",
+        id=f"ao-t-{name}", name=name, kind="interactive", adapter="agentshell", dir="/tmp/x", state="closed",
         team="g", unattended=True, supervised=True, out_of_work=DECLARED, lane=["free-pick"],
         lane_seen={"at": "x", "ids": ["TD-001"]}, profile="grind",
     )  # fmt: skip
@@ -241,7 +241,7 @@ async def test_a_start_by_the_rule_writes_its_seats_held_and_the_first_tick_fill
     question, and leaves the one with nothing due."""
     await park_ticks(agent)
     settings_mod.save({"teams": {"g": {"on_work": "start"}}})
-    shell = {"adapter": "shell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True, "supervised": True}
+    shell = {"adapter": "agentshell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True, "supervised": True}
     async with LocalClient() as person:
         made = {}
         for name, kw in (

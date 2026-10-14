@@ -95,11 +95,19 @@ def test_pages_and_shell_flow(client, tmp_path):
         time.sleep(0.1)
     else:
         raise AssertionError("composer text never reached the pane")
-    # Wrap up is marked as one, which holds the doorbell off (design §4.10); a plain send clears it
-    assert client.post(f"/api/sessions/{sid}/wrapup").json() == {"ok": True}
-    got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    # Wrap up is an agent's: a shell runs no turns, so it is refused in words (design §4.3)
+    r = client.post(f"/api/sessions/{sid}/wrapup")
+    assert r.status_code == 400 and "a shell runs no turns" in r.json()["detail"]
+    # …and on an agent it is marked as one, which holds the doorbell off (design §4.10)
+    r = client.post("/new", data={"dir": str(tmp_path), "name": "ag", "adapter": "agentshell"}, follow_redirects=False)
+    assert r.status_code == 303, r.text
+    aid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, aid, "idle")
+    assert client.post(f"/api/sessions/{aid}/wrapup").json() == {"ok": True}
+    got = next(x for x in client.get("/api/sessions").json() if x["id"] == aid)
     assert got["wrapup_at"]
     assert "pr_marks" not in got  # a PR's marks are the repo's, never a session view's (§4.4, TD-617)
+    assert client.post(f"/api/sessions/{aid}/kill").json() == {"ok": True}
     assert client.post(f"/api/sessions/{sid}/kill").json() == {"ok": True}
     wait_state(client, sid, "exited")
     r = client.post(f"/api/sessions/{sid}/allow")
@@ -666,7 +674,10 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
     in its first frame and drops every key frame — the rule is the server's, so a devtools console
     cannot undo it — while the wheel still reaches tmux, which scrolls its history with it. The
     header toggle is named for what it does, and after **Take over** the next attach takes keys."""
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "watch"}, follow_redirects=False)
+    # an agent stand-in: a shell is the person's and is never made unattended (design §4.3)
+    r = client.post(
+        "/new", data={"dir": str(tmp_path), "name": "watch", "adapter": "agentshell"}, follow_redirects=False
+    )
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
     tmux = Tmux(socket_name=subprocess_agent.sock_name)
@@ -725,7 +736,10 @@ def test_hand_back_clears_a_stop_time_that_passed_while_the_person_held_it(clien
     assert view({"id": "a", "state": "idle", "unattended": False})["mode_act"] == "Switch to unattended"
     assert view({"id": "a", "state": "idle", "unattended": True})["mode_act"] == "Take over"
 
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "handback"}, follow_redirects=False)
+    # an agent stand-in: a shell is the person's and is never made unattended (design §4.3)
+    r = client.post(
+        "/new", data={"dir": str(tmp_path), "name": "handback", "adapter": "agentshell"}, follow_redirects=False
+    )
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
 
@@ -1111,7 +1125,7 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     from shiftlead.ui.app import templates, view
 
     base = {
-        "id": "ao-x", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
+        "id": "ao-x", "name": "w", "kind": "agent", "adapter": "agentshell", "dir": str(tmp_path),
         "state": "idle", "since": "2026-09-12T10:00:00Z", "confidence": "hook", "tail": [],
     }  # fmt: skip
     card = templates.get_template("card.html")
@@ -1120,8 +1134,10 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     assert 'class="badge unread" href="/focus/ao-x#inbox"' in one and "✉ 1" in one
     assert 'data-act="message"' in one  # **Message…** in the card's more ▾
 
-    def mk(name):
-        r = client.post("/shell", data={"dir": str(tmp_path), "name": name}, follow_redirects=False)
+    def mk(name):  # an agent stand-in, one directory each: mail is an agent's, and the anchor rule (§4.3, §9)
+        (tmp_path / name).mkdir()
+        data = {"dir": str(tmp_path / name), "name": name, "adapter": "agentshell"}
+        r = client.post("/new", data=data, follow_redirects=False)
         return r.headers["location"].rsplit("/", 1)[-1]
 
     lead, worker = mk("mlead"), mk("mworker")
@@ -1193,7 +1209,10 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
 
     from sessionorc.client import LocalClient
 
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "asker"}, follow_redirects=False)
+    # an agent stand-in: a reply lands in its inbox, and nothing reads a shell's (design §4.3)
+    r = client.post(
+        "/new", data={"dir": str(tmp_path), "name": "asker", "adapter": "agentshell"}, follow_redirects=False
+    )
     sender = r.headers["location"].rsplit("/", 1)[-1]
     assert 'class="badge needs hidden" id="personneeds"></span>' in client.get("/").text  # nothing at zero
 

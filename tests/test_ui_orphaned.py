@@ -150,7 +150,7 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
     (home / "repos.txt").write_text(f"{repo}\n")
     (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
 
-    w = call_sync("create", name="asker", dir=str(repo), adapter="shell", argv=["bash", "--norc"])["id"]
+    w = call_sync("create", name="asker", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"])["id"]
     q = call_sync("msg", caller=w, to="person", text="Which fetcher first?", about="TD-149", kind="ask")["entry"]["id"]
     call_sync("close", id=w)
     try:
@@ -173,7 +173,7 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
         _git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up by the pull
         assert ": the DIU one. Context: TD-149." in (repo / "docs" / "user_attention.md").read_text()
         # `ao msg --reply-to` by a person takes the same road, and says where the answer went
-        w = call_sync("create", name="asker", dir=str(repo), adapter="shell", argv=["bash", "--norc"])["id"]
+        w = call_sync("create", name="asker", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"])["id"]
         q2 = call_sync("msg", caller=w, to="person", text="Drop it?", about="#702", kind="ask")["entry"]["id"]
         call_sync("close", id=w)
         assert cli.main(["msg", "--reply-to", q2, "drop it"]) == 0

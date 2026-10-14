@@ -15,6 +15,13 @@ from sessionorc.models import Pending
 NOW = datetime(2026, 9, 22, 12, 0, tzinfo=UTC)
 
 
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 def _iso(t: datetime) -> str:
     return t.isoformat().replace("+00:00", "Z")
 
@@ -254,8 +261,8 @@ async def _worker(person, tmp_path, name="w", **kw):
         await person.call(
             "create",
             name=name,
-            dir=str(tmp_path),
-            adapter="shell",
+            dir=_own(tmp_path, name),
+            adapter="agentshell",
             argv=["bash", "--norc", "--noprofile"],
             unattended=True,
             pause_prompt="echo PAUSE-NOW",
@@ -428,7 +435,9 @@ async def test_a_session_made_unattended_later_can_carry_the_two_texts(agent, tm
     unattended after its create is not gated with nothing to type (review of TD-100 slice 2)."""
     await park_ticks(agent)
     async with LocalClient() as person:
-        sid = (await person.call("create", name="i", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        sid = (await person.call("create", name="i", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
         assert agent.sessions[sid].pause_prompt is None
         got = await person.call("set_mode", id=sid, unattended=True, pause_prompt="p", resume_prompt="r")
         assert (got["unattended"], got["pause_prompt"], got["resume_prompt"]) == (True, "p", "r")

@@ -11,6 +11,13 @@ from sessionorc.models import normalize_review, review_links
 from shiftlead import repoconfig, teams
 
 
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 def test_a_review_setting_is_checked_and_filled_in():
     assert normalize_review(None) is None
     assert normalize_review({"reader": "techlead"}) == {"reader": "techlead", "held": ["**"], "bound": "2h"}
@@ -106,7 +113,7 @@ async def test_review_rides_the_record_and_pr_rides_an_ask(agent, tmp_path):
     async with LocalClient() as person:
 
         async def mk(n: str, **kw):
-            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            params = {"name": n, "dir": _own(tmp_path, n), "adapter": "agentshell", "argv": ["bash", "--norc"], **kw}
             return (await person.call("create", **params))["id"]
 
         w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
@@ -161,7 +168,7 @@ async def test_a_second_ask_is_a_reply_to_the_readers_findings_and_the_queue_hol
     async with LocalClient() as person:
 
         async def mk(n: str, **kw):
-            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            params = {"name": n, "dir": _own(tmp_path, n), "adapter": "agentshell", "argv": ["bash", "--norc"], **kw}
             return (await person.call("create", **params))["id"]
 
         w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
@@ -196,7 +203,7 @@ async def test_a_verdict_rides_only_on_a_reply_to_a_prs_ask_and_the_person_needs
     async with LocalClient() as person:
 
         async def mk(n: str, **kw):
-            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            params = {"name": n, "dir": _own(tmp_path, n), "adapter": "agentshell", "argv": ["bash", "--norc"], **kw}
             return (await person.call("create", **params))["id"]
 
         w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})
@@ -224,7 +231,7 @@ async def test_pr_reads_says_where_each_ask_stands_to_its_author_its_readers_and
     async with LocalClient() as person:
 
         async def mk(n: str, **kw):
-            params = {"name": n, "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"], **kw}
+            params = {"name": n, "dir": _own(tmp_path, n), "adapter": "agentshell", "argv": ["bash", "--norc"], **kw}
             return (await person.call("create", **params))["id"]
 
         w = await mk("w", team="t", unattended=True, review={"reader": "techlead"})

@@ -135,7 +135,7 @@ def test_only_the_record_holding_a_directory_is_credited_with_what_is_checked_ou
 
     def rec(sid, directory, state, created):
         return Session(
-            id=sid, name=sid, kind="agent", adapter="shell", dir=str(directory), state=state, created=created
+            id=sid, name=sid, kind="agent", adapter="agentshell", dir=str(directory), state=state, created=created
         )
 
     other = tmp_path / "other"

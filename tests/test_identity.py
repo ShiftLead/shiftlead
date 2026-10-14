@@ -883,7 +883,7 @@ async def test_log_td_hands_an_alarm_to_the_session_that_answers_for_it(agent, h
     async with LocalClient() as person, LocalClient() as feeder:
         lead = (
             await person.call(
-                "create", name="l", dir=str(tmp_path / "l"), adapter="shell", role="worker", argv=["bash"]
+                "create", name="l", dir=str(tmp_path / "l"), adapter="agentshell", role="worker", argv=["bash"]
             )
         )["id"]
         w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
@@ -941,7 +941,9 @@ async def test_a_handed_debt_is_not_deleted_away(agent, hookstub, tmp_path):
     for d in ("l", "w"):
         (tmp_path / d).mkdir()
     async with LocalClient() as person, LocalClient() as feeder:
-        lead = (await person.call("create", name="l", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        lead = (await person.call("create", name="l", dir=str(tmp_path / "l"), adapter="agentshell", argv=["bash"]))[
+            "id"
+        ]
         w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
             "id"
         ]

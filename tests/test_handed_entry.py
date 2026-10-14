@@ -90,7 +90,7 @@ async def test_the_seat_is_filled_for_a_handed_entry_and_waits_on_its_own_questi
                 "create",
                 name="tl",
                 dir=str(tmp_path),
-                adapter="shell",
+                adapter="agentshell",
                 argv=["bash", "--norc", "--noprofile"],
                 unattended=True,
                 supervised=True,
@@ -133,7 +133,7 @@ async def test_a_reply_on_the_thread_that_closes_no_question_of_the_seats_reads_
                 "create",
                 name="tl",
                 dir=str(tmp_path),
-                adapter="shell",
+                adapter="agentshell",
                 argv=["bash", "--norc", "--noprofile"],
                 unattended=True,
                 supervised=True,
@@ -174,7 +174,7 @@ async def _seat_session(person, tmp_path) -> str:
             "create",
             name="tl",
             dir=str(tmp_path),
-            adapter="shell",
+            adapter="agentshell",
             argv=["bash", "--norc", "--noprofile"],
             unattended=True,
             supervised=True,
@@ -258,7 +258,7 @@ async def _seat_with_entry(person, agent, tmp_path) -> str:
             "create",
             name="tl",
             dir=str(tmp_path),
-            adapter="shell",
+            adapter="agentshell",
             argv=["bash", "--norc", "--noprofile"],
             unattended=True,
             supervised=True,
@@ -341,7 +341,10 @@ SHOT = "docs/mockups/reviews/2026-10-03-td292-row.png"
 
 async def _look(person, tmp_path, *, kind: str = "ask") -> tuple[str, str, str]:
     async def mk(n: str, **kw) -> str:
-        return (await person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw))[
+        # one directory each: the anchor rule (§9 invariant 2); named for both, as an id is (§4.1)
+        d = tmp_path / f"{tmp_path.name}-{n}"
+        d.mkdir(exist_ok=True)
+        return (await person.call("create", name=n, dir=str(d), adapter="agentshell", argv=["bash", "--norc"], **kw))[
             "id"
         ]
 

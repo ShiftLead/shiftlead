@@ -342,7 +342,7 @@ class SpendMixin:
         if seen is not None and time.monotonic() - seen[0] < BILLING_KEEP:
             return seen[1]
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
-        pairs = {(r.adapter, r.profile) for r in records if r.profile == profile and r.adapter != "shell"}
+        pairs = {(r.adapter, r.profile) for r in records if r.profile == profile and adapters.has_agent(r.adapter)}
         metered = bool(_metered_of(pairs))
         self._billing_seen[profile] = (time.monotonic(), metered)
         return metered
@@ -366,7 +366,7 @@ class SpendMixin:
         keeps the billing it gives it. The gate is unchanged: a node's sessions are judged at the node,
         whose own adapters know the profile."""
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
-        names = sorted({r.adapter for r in records if r.profile == profile and r.adapter != "shell"})
+        names = sorted({r.adapter for r in records if r.profile == profile and adapters.has_agent(r.adapter)})
         known = False  # an adapter here resolved the profile: its word stands over any node's
         for name in names or adapters.names():
             try:

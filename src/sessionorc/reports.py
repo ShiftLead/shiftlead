@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from sessionorc import ledger
+from sessionorc import adapters, ledger
 from sessionorc import ledgerboard as lb
 from sessionorc.models import PR_CLOSED, FindingEntry, ProgressEntry, normalize_ref
 
@@ -55,7 +55,7 @@ def holds_directory(sessions: Iterable[Session]) -> set[str]:
     """
     by_dir: dict[str, list[Session]] = {}
     for s in sessions:
-        if s.dir and s.state != "closed":
+        if s.dir and s.state != "closed" and adapters.has_agent(s.adapter):
             by_dir.setdefault(os.path.normpath(s.dir), []).append(s)
     holders: set[str] = set()
     for group in by_dir.values():

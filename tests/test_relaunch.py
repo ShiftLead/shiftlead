@@ -239,7 +239,7 @@ async def test_a_relaunched_member_is_told_on_its_replies_and_its_restart_is_nev
 @pytest.mark.integration
 async def test_a_sit_out_sends_the_wrap_up_and_the_tick_closes_and_marks_it_once_settled(agent, tmp_path):
     await park_ticks(agent)
-    params = {"dir": str(tmp_path), **SHELL}
+    params = {"dir": str(tmp_path), **SHELL, "adapter": "agentshell"}  # the wrap-up is typed only into an agent
     async with LocalClient() as person:
         sid = (await person.call("create", name="d", unattended=True, supervised=True, prompt="p", **params))["id"]
         rec = agent.sessions[sid]
@@ -291,11 +291,20 @@ async def test_a_sit_out_is_refused_touching_nothing(agent, tmp_path):
     from sessionorc.models import Pending
 
     await park_ticks(agent)
-    params = {"dir": str(tmp_path), **SHELL}
+    params = {**SHELL, "adapter": "agentshell"}  # the wrap-up is typed only into an agent (§4.3)
+
+    def own(n: str) -> str:  # one directory each: the anchor rule (§9 invariant 2)
+        (tmp_path / n).mkdir()
+        return str(tmp_path / n)
+
     async with LocalClient() as person:
-        sid = (await person.call("create", name="a", unattended=True, supervised=True, prompt="p", **params))["id"]
-        mine = (await person.call("create", name="c", supervised=True, prompt="p", **params))["id"]
-        seat = (await person.call("create", name="t", unattended=True, supervised=True, prompt="p", **params))["id"]
+        sid = (
+            await person.call("create", name="a", dir=own("a"), unattended=True, supervised=True, prompt="p", **params)
+        )["id"]
+        mine = (await person.call("create", name="c", dir=own("c"), supervised=True, prompt="p", **params))["id"]
+        seat = (
+            await person.call("create", name="t", dir=own("t"), unattended=True, supervised=True, prompt="p", **params)
+        )["id"]
         agent.sessions[seat].seat = {"trigger": "asks"}
         refusals = [
             ({"id": sid, "launch": {"prompt": "x"}}, "takes no launch"),

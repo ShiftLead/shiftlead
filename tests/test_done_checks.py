@@ -141,7 +141,12 @@ async def worker(agent, tmp_path, monkeypatch):
     await park_ticks(agent)
     views: dict[int, dict | str] = {}
     monkeypatch.setattr(reports, "pr_view", lambda root, pr, timeout=30.0: views.get(pr, "no such PR"))
-    made = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True}
+    made = {
+        "dir": str(tmp_path),
+        "adapter": "agentshell",
+        "argv": ["bash", "--norc", "--noprofile"],
+        "unattended": True,
+    }
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", **made))["id"]
         rec = agent.sessions[sid]
