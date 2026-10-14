@@ -116,6 +116,11 @@ def test_always_the_person(tmp_path, monkeypatch):
     assert atp("curl -o/etc/x http://x") and atp("tar -xf/etc/x") and atp("echo x >/etc/x")
     assert atp("curl file:///etc/passwd")
     assert atp("cat $XDG_CONFIG_HOME/x")
+    assert atp("echo hi>~/.claude/x") and atp("cat x>>/etc/y")
+    assert atp("FOO=~/.claude cmd") and atp("dd if=/etc/x of=y")
+    assert atp("bash -c 'cat ~/.claude/x'") and atp("eval 'cat /etc/x'")
+    assert atp("cat ./.claude/hooks/x")
+    assert atp("echo 'a b' > out.txt") is None
     # another member's worktree, the git directory, a permission setting
     (repo / ".claude" / "worktrees" / "other").mkdir()
     assert atp(f"cat {repo}/.claude/worktrees/other/x")

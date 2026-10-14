@@ -7,7 +7,9 @@ same function — while a *deny* stands.
 Tool-agnostic: it reads the strings a prompt touches — the adapter's `prompt_strings(tool, input)`
 says which (its command lines and paths, never a file's content), and with no such method every
 string of the input is read — as shell words, never by a tool's name. Conservative on purpose: a
-word it cannot place (a variable in a path, a `cd` it cannot follow) is the person's.
+word it cannot place (a variable in a path, a `cd` it cannot follow) is the person's. A quoted
+command is read as one (`bash -c '…'`); code an interpreter runs (`python -c`, `node -e`) is not,
+so a rule allowing one is the person's own risk.
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ _HOME_VAR = re.compile(r"\$\{?HOME\}?(?![\w])")
 _UNIT = re.compile(r"\.(service|timer|socket|target|mount|path|slice)$")
 _SYSTEMD_WORDS = {"systemctl", "journalctl", "loginctl", "systemd-run"}
 _JOINERS = {"&&", "||", ";", "|", "&", "(", ")", "{", "}"}
+_ASSIGNED = re.compile(r"^[\w.-]+=")  # `VAR=/x`, `if=/x`: the value is a word of its own
 # a stream, never a file anyone touches: writing to one is not a path outside the worktree
 _HARMLESS = {"/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty"}
 _WALK_CAP = 200  # strings read from one input; a prompt is a command line or a few fields
@@ -51,7 +54,7 @@ def all_strings(value: Any, out: list[str] | None = None) -> list[str]:
 
 def _words(text: str) -> list[str]:
     try:
-        lex = shlex.shlex(text, posix=True, punctuation_chars=";&|()")
+        lex = shlex.shlex(text, posix=True, punctuation_chars=";&|()<>")
         lex.whitespace_split = True
         return list(lex)
     except ValueError:  # an unbalanced quote: split on blanks, which can only find more paths
@@ -86,8 +89,8 @@ class _Place:
                 return f"it names {word}, the repo's own git directory"
             if rel[:2] == (".claude", "worktrees") and not mine:
                 return f"it names {word}, another member's worktree"
-            if rel[:1] == (".claude",) and len(rel) == 2 and rel[1].startswith("settings"):
-                return f"it names {word}, a permission setting"
+            if rel[:1] == (".claude",) and len(rel) >= 2 and (rel[1].startswith("settings") or rel[1] == "hooks"):
+                return f"it names {word}, the tool's own settings or hooks"
         return None
 
 
@@ -112,7 +115,13 @@ def _one(text: str, place: _Place) -> str | None:
             if after_cd:
                 return "it changes directory to home"
             continue
+        if raw and set(raw) <= set("<>&"):
+            continue  # a redirection on its own: the next word is its target
+        if any(c.isspace() for c in raw) and (why := _one(raw, place)):
+            return why  # a quoted command (`bash -c '…'`, `eval '…'`) is read as one
         word = raw
+        if _ASSIGNED.match(word):
+            word = word.split("=", 1)[1]
         if word in _SYSTEMD_WORDS or _UNIT.search(word):
             return "it names a systemd unit"
         word = _REDIRECT.sub("", word)
