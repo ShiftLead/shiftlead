@@ -25,8 +25,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import link, mail, paths
-from sessionorc.gitinfo import toplevel
+from sessionorc import adapters, link, mail, paths
+from sessionorc.gitinfo import absolute_git_dir, toplevel
 from sessionorc.models import (
     GRANTS,
     HOME_OWNED,
@@ -327,6 +327,33 @@ def draft_folder(draft: Any, act: str) -> Path:
     if (folder / paths.DRAFT_CLAIM).exists():
         raise RpcError(f"{act}: draft {token} is already claimed")
     return folder
+
+
+MODEL_FILE = "shiftlead-agent-model"
+
+
+def model_env(adapter: str, model: str | None, directory: Path) -> dict[str, str]:
+    """`AGENT_MODEL` (`<adapter>/<the profile's alias>`, absent where the profile names none) and
+    `AGENT_MODEL_FILE` (the session's git directory's `shiftlead-agent-model`, absent outside a git
+    tree), for a commit hook's `Agent-Model:` trailer (design §4.2 *And the model*, TD-638). A record
+    with no agent gets neither. No file yet: the full id is the tool's to report."""
+    if not adapters.has_agent(adapter):
+        return {}
+    env = {"AGENT_MODEL": f"{adapter}/{model}"} if model else {}
+    if git_dir := absolute_git_dir(directory):
+        env["AGENT_MODEL_FILE"] = str(Path(git_dir) / MODEL_FILE)
+    return env
+
+
+def write_model_file(s: Session) -> None:
+    """`<adapter>/<model>` into the record's `AGENT_MODEL_FILE`, called where `model` is set or changes
+    (§4.2, TD-638). A write that fails is logged, never the caller's."""
+    if not (s.model_file and s.model):
+        return
+    try:
+        Path(s.model_file).write_text(f"{s.adapter}/{s.model}\n")
+    except OSError as e:
+        log.warning("%s: could not write %s: %s", s.id, s.model_file, e)
 
 
 def claim_draft(folder: Path, by: str, now: datetime) -> None:

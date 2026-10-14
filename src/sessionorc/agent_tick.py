@@ -3309,6 +3309,7 @@ class TickMixin:
                 continue
             if live.model != result:
                 live.model = str(result)
+                agent_common.write_model_file(live)  # the commit hook's trailer follows it (§4.2, TD-638)
                 self.store.save(live)
 
     async def _refresh_context(self, now: datetime) -> None:
@@ -3868,8 +3869,9 @@ class TickMixin:
             s.adapter_id = aid
         if (path := event.get("transcript")) and isinstance(path, str):
             s.transcript = path  # the tool's file for this run, pushed with the id (§4.2, TD-578)
-        if model := event.get("model"):
+        if (model := event.get("model")) and str(model) != s.model:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
+            agent_common.write_model_file(s)  # the commit hook's trailer follows it (§4.2, TD-638)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):

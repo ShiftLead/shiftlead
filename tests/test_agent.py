@@ -1,10 +1,12 @@
 """End-to-end: an in-process host agent on a private tmux server and a temp SHIFTLEAD_HOME."""
 
 import asyncio
+import dataclasses
 import json
 import subprocess
 import time
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from conftest import FAST_TICK, derived, park_ticks, wait_for, wait_state
@@ -2235,6 +2237,58 @@ async def test_a_launch_tells_the_start_hook_whose_board_to_nudge_from(agent, tm
                 await asyncio.sleep(0.1)
             assert out.read_text().strip() == want
             await c.call("kill", id=s["id"])
+
+
+async def test_the_model_rides_the_env_and_its_file_follows_the_model_in_use(agent, tmp_path, monkeypatch):
+    """TD-644, design §4.2 *And the model*: `AGENT_MODEL` is `<adapter>/<the profile's alias>` and
+    `AGENT_MODEL_FILE` the session's git directory's `shiftlead-agent-model`, absolute from a
+    subdirectory; no file until the tool reports a model, then `<adapter>/<model>` written at
+    SessionStart, rewritten by a switch and by the tick's read. A shell gets neither."""
+    repo = tmp_path / "repo"
+    (repo / "sub").mkdir(parents=True)
+    (repo / "plain").mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    stub = adapters.get("agentshell")
+    launch = stub.launch
+    monkeypatch.setattr(stub, "launch", lambda **kw: dataclasses.replace(launch(**kw), model="opus"), raising=False)
+    out = tmp_path / "env.txt"
+    want_file = (repo / ".git" / "shiftlead-agent-model").resolve()
+    async with LocalClient() as c:
+        sid = (
+            await c.call(
+                "create",
+                name="m",
+                dir=str(repo / "sub"),
+                adapter="agentshell",
+                argv=["bash", "-c", f'echo "$AGENT_MODEL|$AGENT_MODEL_FILE" > {out}; sleep 30'],
+            )
+        )["id"]
+        assert await wait_for(lambda: out.exists() and out.read_text().strip())
+        model, path = out.read_text().strip().split("|")
+        assert model == "agentshell/opus" and Path(path).resolve() == want_file
+        assert not want_file.exists()  # the full id is the tool's to report
+        await c.call("hook", session=sid, adapter_id="conv-1", model="claude-opus-5-5", state="working")
+        assert want_file.read_text() == "agentshell/claude-opus-5-5\n"
+        await c.call("hook", session=sid, model="claude-sonnet-5-5")  # a `/model` switch
+        assert want_file.read_text() == "agentshell/claude-sonnet-5-5\n"
+        monkeypatch.setattr(stub, "model_in_use", lambda session_id, cwd, profile="": "claude-fable-5-1", raising=False)
+        agent._model_checked.clear()
+        await agent.tick()
+        assert want_file.read_text() == "agentshell/claude-fable-5-1\n"
+
+        shout = tmp_path / "shell-env.txt"
+        shell = await c.call(
+            "create",
+            name="sh",
+            dir=str(repo / "plain"),
+            adapter="shell",
+            argv=["bash", "-c", f'echo "[$AGENT_MODEL|$AGENT_MODEL_FILE]" > {shout}; sleep 30'],
+        )
+        assert await wait_for(lambda: shout.exists() and shout.read_text().strip())
+        assert shout.read_text().strip() == "[|]"
+        assert shell["model_file"] is None
+        await c.call("kill", id=sid)
+        await c.call("kill", id=shell["id"])
 
 
 async def test_a_session_started_without_a_name_exports_the_one_it_was_given(agent, tmp_path):

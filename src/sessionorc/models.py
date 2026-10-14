@@ -158,7 +158,7 @@ HOME_OWNED = frozenset(
 )
 IDENTITY = frozenset({
     "id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "transcript", "created",
-    "host", "start_context",
+    "host", "start_context", "model_file",
 })  # fmt: skip
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
@@ -995,6 +995,10 @@ class Session:
     # The model actually in use, when the adapter can tell (TD-031): observed, never the profile's
     # declared model — that is an intent (§4.2a), and a display says so when it falls back to it.
     model: str | None = None
+    # `AGENT_MODEL_FILE`: the session's git directory's `shiftlead-agent-model`, which the host agent
+    # writes with `<adapter>/<model>` whenever `model` is set or changes, for a commit hook's
+    # `Agent-Model:` trailer (design §4.2 *And the model*, TD-638); None outside a git tree or with no agent.
+    model_file: str | None = None
     # `{tokens, at, window}`: how much context the session's last turn sent, when the adapter can
     # tell (design §4.3 `context`, §6 rule 5, TD-190) — `at` the turn's own time, `window` the
     # model's, kept beside the tokens because the model may change mid-run. Observed like `model`:

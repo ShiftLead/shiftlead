@@ -67,6 +67,11 @@ def toplevel(directory: Path | str, timeout: float = 5.0) -> str:
     return (_git(directory, "rev-parse", "--show-toplevel", timeout=timeout) or "").strip()
 
 
+def absolute_git_dir(directory: Path | str, timeout: float = 5.0) -> str:
+    """`git rev-parse --absolute-git-dir` in `directory` — a worktree's own — or "" outside a git tree."""
+    return (_git(directory, "rev-parse", "--absolute-git-dir", timeout=timeout) or "").strip()
+
+
 HYDRATE = "scripts/hydrate_worktree.sh"
 
 

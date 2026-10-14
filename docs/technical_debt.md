@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Slice 1 in #1697; slice 2 (the pages) left |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
-| TD-644 | Build TD-638 (ShiftLead): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE`; the host writes the model in use to the file whenever it is set or changes | Low | Open |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
 | TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
@@ -1001,30 +1000,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** an unattended member's prompt no rule covers is answered by the director seat with a reason told to the person, or passed up in words, never touching an interactive session or the always-the-person prompts, and the tests above pass.
 
 **Related:** TD-636 (the design), TD-641 (the rules), TD-151 (the techlead seat), §6 rule 3.
-
----
-
-## TD-644: Build TD-638 (ShiftLead): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE`; the host writes the model in use to the file whenever it is set or changes
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-13 (the designer, TD-638's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.2 (*And the model*), §4.2a, §8; `src/sessionorc/agent.py` (the launch env ~L1120, beside `AGENT_NAME`: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (`profiles.py` ~L44 keeps an alias, not a full id), `AGENT_MODEL_FILE` = `git rev-parse --absolute-git-dir` in the session's directory joined with `shiftlead-agent-model`), both places the record's `model` is set — the hook apply `agent_tick.py` ~L3840 (SessionStart, `PostModelSwitch`) and the transcript read ~L3278 — writing the file with `<adapter>/<s.model>` when the value changes (`s.model` is the full id; `short_model`, `adapters.py` ~L214, is display only); `tests/test_agent*.py`, `tests/test_hook*.py`
-
-**Why:** TD-638: Paul, 2026-10-13 — *recording which did what is a good idea … could expand it to list the actual model*; a commit names the session, and only Claude Code's own attribution names a model, never after a `/model` switch.
-
-**Fix:**
-1. At create: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (absent where the profile names none), `AGENT_MODEL_FILE` = `<absolute git-dir>/shiftlead-agent-model` (absent outside a git tree); no file yet — the full id is unknown until the tool reports it.
-2. Whenever the record's `model` is set or changes, at either set-site: write the file with `<adapter>/<s.model>`; a write that fails is logged, never the hook's or the tick's.
-3. A `shell` session: no `AGENT_MODEL`, no file.
-4. Tests: the launch env carries both, `AGENT_MODEL` the alias; the file is written at SessionStart's model and rewritten by a `PostModelSwitch`, and by the tick's transcript read when no hook gave one; the path is absolute from a subdirectory; a shell gets neither.
-
-**Done when** every agent session's environment names `AGENT_MODEL` and `AGENT_MODEL_FILE`, the file holds the model in use and follows a switch, and the tests above pass.
-
-**Related:** TD-638 (the design), TD-645 (the hook), TD-031 (the model in use), TD-185 (`AGENT_NAME`).
 
 ---
 

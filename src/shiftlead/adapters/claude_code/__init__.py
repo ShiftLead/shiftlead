@@ -554,7 +554,7 @@ class ClaudeCodeAdapter:
         elif prof.metered:
             env[CACHE_TTL_ENV] = "1h"
         # the prompt is typed at the composer by the host agent at the first idle, never passed (TD-339)
-        return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None)
+        return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None, model=prof.model)
 
     def rule_matches(
         self, rule: str, tool: str, tool_input: Any, *, cwd: Path | None = None, deny: bool = False
