@@ -43,7 +43,7 @@ from sessionorc.models import (
     tokens_short,
 )
 from sessionorc.tmux import attach_argv
-from shiftlead import connect, doctor, orgcheck, repoconfig, service, teamrun, teams
+from shiftlead import connect, doctor, orgcheck, repoconfig, repoinit, service, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead.ending import closer_words, exit_words, restart_words, waiting_words
 
@@ -1445,6 +1445,36 @@ def _main_checkout(start: str) -> str | None:
     return str(pathlib.Path(common).resolve().parent) if common else None
 
 
+def cmd_repo_init(args: argparse.Namespace) -> int:
+    """`ao repo init [--repo <name>]` (design §4.7, §5 *The seams*, TD-591): an empty ledger in
+    ledgerboard format at the repo's `ledger:` path and the archive beside it, in this directory's
+    checkout — or the registered repo `--repo` names — committing nothing; refused when either file
+    is there. A client write: no host agent is asked."""
+    if args.all:
+        raise AgentError("ao repo init writes one repo's ledger: name it with --repo, not --all")
+    if args.repo:
+        regs = hosts.local_host().repos()
+        root = next((r for r in regs if args.repo in (pathlib.Path(r).name, r)), None)
+        if root is None:
+            raise AgentError(f"no registered repo is named {args.repo!r}; ao repo --all lists them")
+    else:
+        try:
+            cp = subprocess.run(
+                ["git", "-C", os.getcwd(), "rev-parse", "--show-toplevel"], capture_output=True, text=True, timeout=10
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            raise AgentError(f"ao repo init: git did not answer ({e})") from e
+        root = cp.stdout.strip() if cp.returncode == 0 else ""
+        if not root:
+            raise AgentError("this directory is not in a git repo; run ao repo init in one, or name one with --repo")
+    try:
+        wrote = repoinit.init(root)
+    except (ValueError, OSError) as e:
+        raise AgentError(f"ao repo init: {e}") from e
+    got = {"root": root, "wrote": wrote}
+    return emit(args, got, lambda: print(f"wrote {' and '.join(wrote)} in {root} — nothing committed"))
+
+
 def _repo_line(r: dict[str, Any]) -> str:
     """One repo's numbers on a line (design §4.7 `ao repo`): its PRs and its ledger, each *could not
     look* when its last read failed, with the reading's age."""
@@ -1676,7 +1706,12 @@ def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs with their
     ages and the reader's standing, the window counts, the pickable and design entries, what
-    the servicing team's members hold and say, and the board items due. A read, never a write."""
+    the servicing team's members hold and say, and the board items due. A read, never a write;
+    `ao repo init` is the one word that writes (`cmd_repo_init`)."""
+    if args.name == "init":
+        return cmd_repo_init(args)
+    if args.repo:
+        raise AgentError("--repo is `ao repo init`'s: ao repo init --repo <name>")
     got: dict[str, dict[str, Any]] = call_sync("repos")
     if args.all:
         picked = list(got.values())
@@ -2386,7 +2421,7 @@ def cmd_identity(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    """`ao doctor [<check>…]` (design §4.7 **`ao doctor`**, TD-465 slice 2, TD-648): the eight checks, in
+    """`ao doctor [<check>…]` (design §4.7 **`ao doctor`**, TD-465 slice 2, TD-648): the nine checks, in
     order, a line each in `ao org check`'s verdict words, every lack naming its cure; then the count,
     exit 1 on a lack. The host-side readings are the never-gated `doctor` RPC's; the build line and
     the org are the client's own reads, as `ao promote status` and `ao org check` are. It writes
@@ -2436,6 +2471,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             rows += doctor.nodes(reading["nodes"], node)
         elif check == "route":
             rows += connect.route_line(_reach(), node=node)
+        elif check == "repos":
+            rows += doctor.repos(_doctor_repos(node))
         else:
             rows += _doctor_org(reading["files"], node)
     got = doctor.summary(rows)
@@ -2447,6 +2484,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     emit(args, {k: v for k, v in got.items() if k != "line"}, prose)
     return 0 if got["ok"] else 1
+
+
+def _doctor_repos(node: bool) -> dict[str, Any]:
+    """The repo facts the **repos** line draws (§4.7): the home's `repos` reading, on a node cut to the
+    node's own checkouts. Nothing is read from a checkout here."""
+    got: dict[str, Any] = call_sync("repos")
+    if not node:
+        return got
+    mine = {str(pathlib.Path(r).resolve()) for r in hosts.local_host().repos()}
+    return {root: v for root, v in got.items() if str(pathlib.Path(root).resolve()) in mine}
 
 
 def _reach() -> dict[str, Any] | None:
@@ -3843,8 +3890,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_until)
 
     p = add("repo", help="a registered repo's numbers: open PRs, the window counts, the ledger by kind (design §4.7)")
-    p.add_argument("name", nargs="?", help="the repo's name or its checkout's path. None: the repo of this directory")
+    p.add_argument(
+        "name", nargs="?", help="the repo's name or its checkout's path, or `init`. None: the repo of this directory"
+    )
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
+    p.add_argument("--repo", help="after `init`: the registered repo to write an empty ledger in (design §4.7)")
     p.set_defaults(fn=cmd_repo)
 
     p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")

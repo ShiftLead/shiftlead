@@ -172,7 +172,7 @@ def test_identity_alarms_warn_and_org_and_files_lack():
 @pytest.fixture
 def agent(monkeypatch):
     """The host agent answering `host` and `doctor` with whatever the test puts in `state`."""
-    state = {"host": {"mode": "home", "promotes": {}, "built_from": {}}, "doctor": reading()}
+    state = {"host": {"mode": "home", "promotes": {}, "built_from": {}}, "doctor": reading(), "repos": {}}
 
     def fake(method, **params):
         if method not in state:
@@ -192,7 +192,7 @@ def agent(monkeypatch):
     return state
 
 
-def test_the_eight_checks_in_order_then_the_count(agent, capsys):
+def test_the_nine_checks_in_order_then_the_count(agent, capsys):
     assert cli.main(["doctor"]) == 0
     out = capsys.readouterr().out.splitlines()
     assert [line.split(" — ")[0] for line in out[:-1]] == [
@@ -203,9 +203,10 @@ def test_the_eight_checks_in_order_then_the_count(agent, capsys):
         "ok: profile grind",
         "ok: nodes",
         "ok: org",
+        "ok: repos",
         "ok: route",
     ]
-    assert out[-1] == "ok: 8 checks"
+    assert out[-1] == "ok: 9 checks"
 
 
 def test_a_seeded_lack_exits_1_and_json_carries_the_raw_reading(agent, capsys):

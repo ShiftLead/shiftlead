@@ -7,6 +7,8 @@
   {% if teams %}<span class="meta">serviced by {% for t in teams %}<a href="/?team={{ t }}" data-team-link="{{ t }}">{{ t }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>
   {% else %}<span class="meta">no team services this repo</span>{% endif %}
 </div>
+{# missing seams (§4.5a, TD-591): one line per seam the repo leaves unset with no default file, display only #}
+{% if seams and seams.lines %}<div class="seams meta" id="seams">{% for ln in seams.lines %}<div class="seamline">{{ ln }}</div>{% endfor %}</div>{% endif %}
 {% include "team_summary.html" %}
 
 {# (1) Open PRs — every open PR on the remote, newest last; a PR is GitHub's: no control #}
@@ -25,7 +27,11 @@
   </div>
 </section>
 
-{# (2) Technical debt — the ledger's open entries in seven lists, one per kind; an entry is edited in its file #}
+{# (2) Technical debt — the ledger's open entries in seven lists, one per kind; an entry is edited in its file.
+   A ledger that is not there, or does not parse, is one warning line in its place (§4.5a *missing seams*) #}
+{% if seams and seams.ledger %}
+<section class="rsec" id="debt"><div class="warn" id="noledger">{{ seams.ledger }}</div></section>
+{% else %}
 <section class="rsec" id="debt">
   <div class="row gap rsh"><span class="h2">Technical debt</span>
     <span class="meta">{% for l in lists %}{{ l.rows | length }} {{ l.label }}{{ ' · ' if not loop.last }}{% endfor %}</span>
@@ -52,6 +58,7 @@
   {% endif %}{% endfor %}
   </div>
 </section>
+{% endif %}
 
 {# (3) Recently completed — the window's closed entries, newest first, each with the PR that closed it and
    who opened that PR (§4.5 screen 11, TD-604); one list per window, the page's one picker shows one #}
