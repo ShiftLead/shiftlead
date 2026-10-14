@@ -103,12 +103,15 @@ def test_a_read_only_pump_leaves_nothing_and_writes_nothing():
     assert _kinds(log) == ["scroll"]
 
 
-def test_a_slow_or_failed_leave_is_bounded_and_the_key_written_anyway(monkeypatch):
+def test_a_slow_or_failed_leave_is_bounded_logged_and_the_key_written_anyway(monkeypatch, caplog):
     monkeypatch.setattr(pty_bridge, "LEAVE_WITHIN", 0.05)
-    log = asyncio.run(_run([{"scroll": "up"}, "x"], leave_takes=5))
-    assert _kinds(log) == ["scroll", "write"]  # the leave never finished; the key went all the same
-    log = asyncio.run(_run([{"scroll": "up"}, "x"], leave_fails=True))
-    assert _kinds(log) == ["scroll", "write"]
+    with caplog.at_level("WARNING", logger=pty_bridge.__name__):
+        log = asyncio.run(_run([{"scroll": "up"}, "x"], leave_takes=5))
+        assert _kinds(log) == ["scroll", "write"]  # the leave never finished; the key went all the same
+        log = asyncio.run(_run([{"scroll": "up"}, "x"], leave_fails=True))
+        assert _kinds(log) == ["scroll", "write"]
+    found = [r.getMessage() for r in caplog.records if "leaving copy mode" in r.getMessage()]
+    assert len(found) == 2 and "TimeoutError" in found[0] and "RuntimeError" in found[1]
 
 
 def test_the_leave_argv():
