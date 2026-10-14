@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc.models import stop_note
+from sessionorc.models import pr_marks, stop_note
 from sessionorc.reports import branch_ref
 from shiftlead import teamrun
 
@@ -529,10 +529,11 @@ def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
     }
 
 
-def compact_line(v: dict[str, Any]) -> str:
+def compact_line(v: dict[str, Any], repos: Mapping[str, Any] | None = None) -> str:
     """A compact card's one line of its own (§4.5a *card: compact*): the seat's *last came*, an
     ending, a flow's mark (*sits out under build*), the role and its claim with the PR, what it says
-    it is doing, or the role alone."""
+    it is doing, or the role alone. The claim's PR takes its mark from `repos`, the home's repo facts
+    (the view carries no marks, TD-617)."""
     role = str(v.get("role_label") or v.get("role") or ("interactive" if not v.get("unattended") else ""))
     slot = v.get("slot") or {}
     if v.get("seat"):
@@ -549,7 +550,7 @@ def compact_line(v: dict[str, Any]) -> str:
         doing = (v.get("doing") or {}).get("text") if isinstance(v.get("doing"), dict) else ""
         if claims:
             pr = claims[0].get("pr") or claims[0].get("review_pr")
-            mark = (v.get("pr_marks") or {}).get(str(pr), "") if pr else ""
+            mark = pr_marks(v, repos).get(int(pr), "") if pr and str(pr).isdigit() else ""
             what = f"{claims[0]['ref']} → #{pr}{' ' + mark if mark else ''}" if pr else str(claims[0]["ref"])
         elif doing:
             what = str(doing)

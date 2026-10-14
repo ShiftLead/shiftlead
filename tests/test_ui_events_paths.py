@@ -7,6 +7,7 @@ a flush whose reading failed tries again on its next turn."""
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -100,6 +101,27 @@ def test_a_repos_reading_is_passed_through_and_marks_the_groups_for_the_flush(tm
     evs = received(client(monkeypatch, tmp_path, pushed), "/events")
     assert [e["event"] for e in evs] == ["session", "repos", "groups"]
     assert evs[2]["groups"] != evs[0]["groups"]
+    assert "pr_marks" not in evs[0]["session"]  # no session view carries them (TD-617)
+
+
+def test_a_repos_push_carries_the_repos_pr_marks_once_for_every_stream(tmp_path, monkeypatch):
+    """§4.4 *Per-session views* (TD-617 fix 2): a PR's marks are the repo's — the `repos` push carries
+    the repo's map, computed once, to a full stream and a light one alike."""
+    from shiftlead.ui import app as ui
+
+    real, calls = ui.repo_pr_marks, []
+    monkeypatch.setattr(ui, "repo_pr_marks", lambda root, r: calls.append(root) or real(root, r))
+
+    def pushed(g1, g2):
+        root = g1["repo"]
+        merged = {**reading(root), "prs": {"open": [], "recent": [{"number": 811, "state": "merged"}]}}
+        return first_then({"event": "repos", "root": root, "repo": merged})(g1, g2)
+
+    evs = received(client(monkeypatch, tmp_path, pushed), "/events")
+    (rep,) = [e for e in evs if e["event"] == "repos"]
+    assert rep["pr_marks"] == {"811": "merged"} and calls == [rep["root"]]  # once for the push
+    light = received(client(monkeypatch, tmp_path, pushed), "/events?light=1")
+    assert [e["pr_marks"] for e in light if e["event"] == "repos"] == [{"811": "merged"}]
 
 
 def test_a_reading_equal_to_the_last_one_sent_is_not_sent_again(tmp_path, monkeypatch):
@@ -139,3 +161,29 @@ def test_a_flush_whose_reading_failed_tries_again_on_its_next_turn(tmp_path, mon
     evs = received(client(monkeypatch, tmp_path, pushed, wait=2.8), "/events")
     assert len(calls) == 3
     assert [e["event"] for e in evs] == ["session", "session", "groups"]
+
+
+def test_focus_loads_its_repos_pr_marks_and_the_view_carries_none(tmp_path, monkeypatch):
+    """§4.4 *Per-session views* (TD-617 fix 2): the Focus page's first load carries its repo's PR marks
+    for the Reports panel, keyed as the view's `pr_repo` names the repo; the view carries no marks."""
+    from shiftlead.ui import app as ui
+
+    c = client(monkeypatch, tmp_path, lambda g1, g2: [], wait=0)
+    root = str(tmp_path / "samscrape")
+    g1 = {**member("g1", root, progress=[{"ref": "TD-301", "status": "done", "at": NOW, "pr": 811}]), "created": NOW}
+    merged = {**reading(root), "prs": {"open": [], "recent": [{"number": 811, "state": "merged"}]}}
+    real = ui.LocalClient.call
+
+    async def call(self, method, **kw):
+        return {"seen": g1, "get": g1, "list": [g1], "repos": {root: merged}}.get(method) or await real(
+            self, method, **kw
+        )
+
+    monkeypatch.setattr(ui.LocalClient, "call", call)
+    html = c.get("/focus/g1").text
+    card = html[html.index('id="reportscard"') :]
+    marks = json.loads(card[card.index("data-pr-marks='") + len("data-pr-marks='") :].split("'", 1)[0])
+    assert marks == {root: {"811": "merged"}}
+    focus = html[html.index("<script>AO.focus(") + len("<script>AO.focus(") :]
+    s = json.loads(focus[: focus.index("</script>")].rsplit(", ", 1)[0])
+    assert "pr_marks" not in s and s["pr_repo"] == root and s["report"].startswith("TD-301 → #811 merged")

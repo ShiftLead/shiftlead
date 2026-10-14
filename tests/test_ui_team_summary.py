@@ -553,18 +553,23 @@ def test_an_ended_member_keeps_its_last_reference_with_the_prs_mark():
     m = member("g1", state="exited", progress=[claim("TD-066", 158, status="done")], role_label="Grinder")
     m.update(rank=1, slot={"text": "exited · code 0", "caption": ""}, place="kmaster / samscrape")
     v = ui.view(m, [m], repos=readings)
-    assert v["report"] == "TD-066 → #158 merged · 1/1 done" and v["pr_marks"] == {"158": "merged"}
+    # the marks are the repo's, sent once (§4.4 *Per-session views*, TD-617): the view names its repo's map
+    assert v["report"] == "TD-066 → #158 merged · 1/1 done" and "pr_marks" not in v
+    assert v["pr_repo"] == "/r/samscrape" and ui.repo_pr_marks("/r/samscrape", readings["/r/samscrape"]) == {
+        "158": "merged"
+    }
     v.update(role_label="Grinder", slot={"text": "exited · code 0", "caption": ""})  # what the view derives live
     (g,) = ui.team_groups([v], (), readings, {})
     assert g["members"][0]["compact_line"] == "Grinder · exited · code 0 · TD-066 → #158 merged"
     # no readings: nothing is guessed
     bare = ui.view(m, [m])
-    assert bare["report"] == "TD-066 → #158 · 1/1 done" and bare["pr_marks"] == {}
+    assert bare["report"] == "TD-066 → #158 · 1/1 done" and bare["pr_repo"] == ""
     # a live claim in review carries the mark too, once its PR has merged under it
     live = member("g2", progress=[claim("TD-067", 158)], role_label="Grinder")
     live.update(rank=1, slot={}, place="x")
     lv = {**ui.view(live, [live], repos=readings), "role_label": "Grinder"}
-    assert ui.compact_line(lv) == "Grinder · TD-067 → #158 merged"
+    assert ui.compact_line(lv, readings) == "Grinder · TD-067 → #158 merged"
+    assert ui.compact_line(lv) == "Grinder · TD-067 → #158"  # no readings: nothing guessed
     # the lead's Members list says the same
     lead = {**member("m", role_label="Manager"), "rank": 1}
     kid = {**m, "controllers": ["m"]}

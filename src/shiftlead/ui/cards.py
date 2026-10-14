@@ -141,6 +141,25 @@ def host_volatile(name: str) -> bool:
     return hosts._flag(hosts.nodes().get(name, {}).get("volatile"))
 
 
+def pr_repo(s: Mapping[str, Any], repos: Mapping[str, Any] | None) -> str:
+    """The root of `repos` that is the record's repo, as the repo facts name it — the key of the per-repo
+    map of PR marks a page looks the record's PRs up in (§4.4 *Per-session views*, TD-617); "" with no
+    reading of it."""
+    if not repos or not s.get("repo"):
+        return ""
+    want = str(Path(str(s["repo"])).resolve())
+    return next(
+        (str(root) for root, r in repos.items() if isinstance(r, dict) and str(Path(str(root)).resolve()) == want), ""
+    )
+
+
+def repo_pr_marks(root: str, reading: Any) -> dict[str, str]:
+    """One repo's PRs that are no longer open, by number, as *merged* or *closed* — the per-repo map a
+    page takes on its first load and with each `repos` push (§4.4 *Per-session views*, TD-617), read as
+    `pr_marks` reads it for a record of that repo."""
+    return {str(n): w for n, w in pr_marks({"repo": root}, {root: reading}).items()}
+
+
 def view(
     s: dict[str, Any],
     fleet: list[dict[str, Any]] | None = None,
@@ -324,9 +343,10 @@ def view(
     findings = s.get("findings") or []
     head = report_head(s)
     # **the PR's mark** (§4.5a card **report line**, TD-193): from the readings of the record's own
-    # repo, `repos` — none passed, none marked; `pr_marks` rides for the Reports panel's links
+    # repo, `repos` — none passed, none marked. The marks themselves are the repo's, sent once per
+    # repo (§4.4 *Per-session views*, TD-617): the view names which repo's map is its, `pr_repo`
     marks = pr_marks(s, repos)
-    d["pr_marks"] = {str(n): w for n, w in marks.items()}
+    d["pr_repo"] = pr_repo(s, repos)
     d["report"] = report_line(s, marks)
     d["report_ref"] = report_ref(s, marks)
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")

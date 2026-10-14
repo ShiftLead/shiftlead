@@ -185,7 +185,7 @@ def compact_in(
     (TD-192). The full card stays on *No team*. With `repos`, the home's repo facts, it carries **the
     lane's count** (TD-428) as `team_groups` gives it, read from the same lanes reading over `fleet`."""
     if v.get("team"):
-        v["compact"], v["compact_line"] = True, compact_line(v)
+        v["compact"], v["compact_line"] = True, compact_line(v, repos)
         if repos is not None and v.get("lane"):
             fleet = list(fleet)
             r = team_repo([s for s in fleet if s.get("team") == v["team"]], repos)
@@ -361,7 +361,7 @@ def team_groups(
         if summary:
             lanes = ((summary.get("repo") or {}).get("ledger") or {}).get("lanes")
             for m in members:
-                m["compact"], m["compact_line"] = True, compact_line(m)
+                m["compact"], m["compact_line"] = True, compact_line(m, repos)
                 m["lane_count"] = lane_count(m, lanes)  # the member's own count, in its pill (TD-428)
             if not live:  # a team with nothing live draws only the facets that hold something (TD-418)
                 summary["drawn"] = drawn_facets(summary)

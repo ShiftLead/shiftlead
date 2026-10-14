@@ -237,7 +237,7 @@
        in progress, in review (a claim with a PR), done, dropped — so a claim in review never reads as
        one not started. The explanation is the heading's **i** mark, read before a press; **Drop**
        sits behind the panel's **more ▾**, on in-progress claims only, its confirm naming the cost. #}
-    <details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-name="{{ s.name }}" open>
+    <details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-pr-marks='{{ (pr_marks or {}) | tojson }}' data-name="{{ s.name }}" open>
       <summary class="row gap"><span class="h2">Reports</span><span class="meta" id="reportscount"></span>
         <button class="imark" type="button" id="i-reports" aria-controls="info-reports" aria-expanded="false" aria-describedby="info-reports" aria-label="About Reports" title="What the session declared, and what the agent derived from its branch and PRs (dashed), grouped by state. A claim with a PR is in review, not in progress. Drop, under more ▾, lets go of a claim that has no PR yet.">i</button>
       </summary>
