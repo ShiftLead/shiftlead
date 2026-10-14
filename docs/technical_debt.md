@@ -1048,7 +1048,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (ao-connect, TD-646's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — two slices; slice 1 is what Paul's phone waits on (Fable review, 2026-10-13). The Cloudflare token check moved to TD-656.
+**Status:** Slice 1 built (grinder-ao-2, 2026-10-14): `shiftlead.ui.listener` — the `Gate` layer on each listener, both `uvicorn.Server`s on one loop with one pair of signal handlers (uvicorn's own `capture_signals` overridden to nothing, so no bound on uvicorn is taken: the one-SIGTERM test holds it), the route port's socket bound by the layer and retried each minute; `settings.reach`/`parse_reach`; `--route-port`/`--allow-host` on `ao ui`, `shiftlead-ui` and `ao service install`; `look_home.py` runs `--route-port 0`. **Left: slice 2** (open websockets follow the setting). Its live look waits for the promote, at a keyboard (*Done when*). The Cloudflare token check moved to TD-656.
 **Location:** design §4.5b *The route port*; `src/shiftlead/ui/app.py` (`main`, the middleware), `src/shiftlead/ui/pty_bridge.py` (the websocket upgrade), `src/shiftlead/service.py` (`DEFAULT_BIND`, `unit_text`), `src/shiftlead/cli.py` (`ao ui`, `ao service install`), `src/shiftlead/ui/templates/refused.html` (new), `src/sessionorc/settings.py` (the `reach:` reader), `README.md` (one line)
 
 **Why:** TD-646: `tailscale serve` reaches the UI from loopback, as a local browser does, so the identity check needs a port of its own on which an absent identity is a refusal.

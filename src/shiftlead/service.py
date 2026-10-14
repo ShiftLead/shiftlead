@@ -40,6 +40,9 @@ LEGACY_SYSTEM_UNITS = ("agentorc-tmux.service", "agentorc-watch.timer", "agentor
 # and `ao service install` default to (TD-149 (7)); the unit carries whatever the install was given.
 DEFAULT_BIND = "127.0.0.1"
 DEFAULT_PORT = 8765
+# The route port a route's proxy is pointed at, always `127.0.0.1` (design §4.5b, TD-647). The unit
+# names it only when its install was given one, so a later install picks up this default.
+DEFAULT_ROUTE_PORT = 8766
 
 
 def _bin(name: str) -> str:
@@ -64,7 +67,15 @@ def _path_env(home: str | None = None) -> str:
     return ":".join(dict.fromkeys(parts))
 
 
-def unit_text(name: str, *, bind: str = DEFAULT_BIND, port: int = DEFAULT_PORT, home: str | None = None) -> str:
+def unit_text(
+    name: str,
+    *,
+    bind: str = DEFAULT_BIND,
+    port: int = DEFAULT_PORT,
+    home: str | None = None,
+    route_port: int | None = None,
+    allow_hosts: tuple[str, ...] | list[str] = (),
+) -> str:
     env = [f"PATH={_path_env()}"]
     if home:
         env.append(f"SHIFTLEAD_HOME={home}")
@@ -85,6 +96,9 @@ KillMode=process
 WantedBy=default.target
 """
     if name == "shiftlead-ui":
+        ui_extra = (f" --route-port {route_port}" if route_port is not None else "") + "".join(
+            f" --allow-host {h}" for h in allow_hosts
+        )
         return f"""[Unit]
 Description=shiftlead web UI
 After=shiftlead-agent.service
@@ -92,7 +106,7 @@ Wants=shiftlead-agent.service
 
 [Service]
 Type=simple
-ExecStart={_bin("shiftlead-ui")} --bind {bind} --port {port}
+ExecStart={_bin("shiftlead-ui")} --bind {bind} --port {port}{ui_extra}
 Restart=on-failure
 RestartSec=2
 {env_lines}
@@ -353,13 +367,28 @@ def _systemctl(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def install(
-    *, bind: str = DEFAULT_BIND, port: int = DEFAULT_PORT, home: str | None = None, start: bool = True
+    *,
+    bind: str = DEFAULT_BIND,
+    port: int = DEFAULT_PORT,
+    home: str | None = None,
+    start: bool = True,
+    route_port: int | None = None,
+    allow_hosts: tuple[str, ...] | list[str] = (),
 ) -> list[str]:
     UNIT_DIR.mkdir(parents=True, exist_ok=True)
     written = []
     for name in UNITS:
         p = UNIT_DIR / f"{name}.service"
-        p.write_text(unit_text(name, bind=bind, port=port, home=home or os.environ.get("SHIFTLEAD_HOME")))
+        p.write_text(
+            unit_text(
+                name,
+                bind=bind,
+                port=port,
+                home=home or os.environ.get("SHIFTLEAD_HOME"),
+                route_port=route_port,
+                allow_hosts=allow_hosts,
+            )
+        )
         written.append(str(p))
     # The wheel of what was just installed — what a container node is provisioned from (design
     # §4.4a "A container node", TD-057 step 3c.2) — is written **before** the units restart: the

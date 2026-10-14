@@ -8,9 +8,10 @@ key is the usage gate's reserves, per profile, per window label as the adapter n
     usage_gate:
       grind: {"5h": 30, wk: {per_day: 10}}
 
-Seven keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319, TD-641): `usage_gate`, `usage`
-(`max_age`), `teams`, `repos`, `person`, `notify` (`telegram`) and `permissions` (hand-edited: the
-host reads it at the hook, and `set_settings` writes none of it). Each has a reader here that drops whatever is not
+Eight keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319, TD-641, TD-647): `usage_gate`, `usage`
+(`max_age`), `teams`, `repos`, `person`, `notify` (`telegram`), `permissions` (hand-edited: the
+host reads it at the hook, and `set_settings` writes none of it) and `reach` (the UI's route port reads
+it from the file; `set_settings` writes none of it). Each has a reader here that drops whatever is not
 valid — a hand edit can put anything in the file, and a malformed entry must act on nothing — and a
 `parse_*` that raises, which is what `set_settings` validates a write with. `person:` is the person's
 own and reaches no policy: the gate and the tick read the file by key and never that one.
@@ -665,6 +666,69 @@ def telegram(doc: dict[str, Any]) -> dict[str, Any] | None:
     if tg.get("on") is not True or not tg.get("secrets"):
         return None
     return {"secrets": tg["secrets"], "link": tg.get("link") or ""}
+
+
+# -- reach: the person's route to the UI's route port (§5 `reach:`, §4.5b *The setting*, TD-647) ----------
+
+REACH_KEYS = ("route", "url", "allow", "team", "aud")
+REACH_ROUTES = ("tailscale", "cloudflare")
+_HTTPS = re.compile(r"https://[^\s/:]+(:[0-9]+)?/?")
+
+
+def parse_reach(value: Any, drop: bool = False) -> dict[str, Any]:
+    """`reach:`: `route` (tailscale or cloudflare), `url` — the `https://` address a phone opens, kept
+    without a trailing slash, no path — `allow`, the logins the route port lets in (a list of strings,
+    kept lower-cased: compared without case), and for cloudflare `team` and `aud`. Written by hand
+    until `ao connect` (TD-648); the UI's route port reads it from the file itself (§4.5b)."""
+
+    def route(v: Any) -> str:
+        if v not in REACH_ROUTES:
+            raise ValueError(f"reach.route is {' or '.join(REACH_ROUTES)}, not {v!r}")
+        return v
+
+    def url(u: Any) -> str:
+        if not isinstance(u, str) or not _HTTPS.fullmatch(u.strip()):
+            raise ValueError(
+                f"reach.url is an https:// address with no path, like https://home.tail1234.ts.net, not {u!r}"
+            )
+        return u.strip().rstrip("/")
+
+    def allow(v: Any) -> list[str]:
+        if not isinstance(v, list) or not all(isinstance(x, str) and x.strip() for x in v):
+            raise ValueError(f"reach.allow is a list of logins, not {v!r}")
+        return [x.strip().casefold() for x in v]
+
+    def word(key: str) -> Any:
+        def check(v: Any) -> str:
+            if not isinstance(v, str) or not v.strip():
+                raise ValueError(f"reach.{key} is a name, not {v!r}")
+            return v.strip()
+
+        return check
+
+    got = _each(
+        _fields(value, REACH_KEYS, "reach", drop),
+        {"route": route, "url": url, "allow": allow, "team": word("team"), "aud": word("aud")},
+        drop,
+    )
+    if not drop:
+        for key in ("route", "url", "allow"):
+            if key not in got:
+                raise ValueError(f"reach: {key} is required")
+    return got
+
+
+def reach(doc: dict[str, Any]) -> dict[str, Any] | None:
+    """`reach:` as the route port reads it: the checked mapping, or None when it is absent or not valid
+    — a malformed route lets nobody in (§4.5b: the checks fail closed). A field that is not valid makes
+    the whole reading None, never a route with a field missing."""
+    raw = doc.get("reach")
+    if raw is None:
+        return None
+    try:
+        return parse_reach(raw)
+    except ValueError:
+        return None
 
 
 # -- permissions: the person's rules per role (§5 `permissions:`, §4.9b *The director seat*, TD-641) ---

@@ -272,6 +272,8 @@ def main(argv: list[str] | None = None) -> int:
                 "127.0.0.1",
                 "--port",
                 str(port),
+                "--route-port",
+                "0",  # a scratch home runs no route listener (design §4.5b): 8766 is the live UI's
             ],
             env=env,
             cwd=ROOT,

@@ -20,20 +20,36 @@ def test_unit_text_shapes():
 def test_the_ui_address_has_one_source(monkeypatch):
     """`ao ui`, `shiftlead-ui` and `ao service install` default to the same bind and port, read from
     one place (TD-149 (7)): three literals once had to be kept in step by hand."""
-    import uvicorn
-
     from shiftlead import cli
-    from shiftlead.ui import app
+    from shiftlead.ui import app, listener
 
     p = cli.build_parser()
     for argv in (["ui"], ["service", "status"]):
         a = p.parse_args(argv)
         assert (a.bind, a.port) == (service.DEFAULT_BIND, service.DEFAULT_PORT)
+    assert p.parse_args(["ui"]).route_port == service.DEFAULT_ROUTE_PORT
     seen = {}
-    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: seen.update(k))
+
+    async def serve(_app, **k):
+        seen.update(k)
+
+    monkeypatch.setattr(listener, "serve", serve)
     assert app.main([]) == 0
-    assert (seen["host"], seen["port"]) == (service.DEFAULT_BIND, service.DEFAULT_PORT)
+    assert (seen["bind"], seen["port"]) == (service.DEFAULT_BIND, service.DEFAULT_PORT)
+    assert seen["route_port"] == service.DEFAULT_ROUTE_PORT and seen["allow_hosts"] == []
     assert f"--bind {service.DEFAULT_BIND} --port {service.DEFAULT_PORT}" in service.unit_text("shiftlead-ui")
+
+
+def test_the_unit_names_the_route_port_only_when_given():
+    """§4.5b (TD-647): the unit carries `--route-port` only when its install was given one, so the
+    promote's `ao service install` picks up the default; each `--allow-host` is carried."""
+    from shiftlead import cli
+
+    assert "--route-port" not in service.unit_text("shiftlead-ui")
+    u = service.unit_text("shiftlead-ui", route_port=9766, allow_hosts=["home.lan", "box"])
+    assert "--port 8765 --route-port 9766 --allow-host home.lan --allow-host box" in u
+    a = cli.build_parser().parse_args(["service", "install", "--allow-host", "home.lan"])
+    assert a.route_port is None and a.allow_host == ["home.lan"]
 
 
 def test_install_writes_the_wheel_before_it_restarts_the_units(tmp_path, monkeypatch):
