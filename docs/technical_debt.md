@@ -69,7 +69,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-667 | A key typed into the Focus terminal while it is scrolled back is swallowed by tmux's copy mode: typing should return the pane to the live screen and reach the prompt | Medium | Designed — TD-669 builds it |
 | TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 | TD-669 | Build TD-667: a typed key leaves copy mode first — the bridge's *scrolled* mark, `copy-mode -q` before a printable key, Enter, Tab, Backspace or paste, its tmux commands in order; every host-agent send leaves copy mode first | Medium | Open |
-| TD-671 | `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL` | Low | Open |
 
 ---
 
@@ -1300,25 +1299,5 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** a key typed into a scrolled-back Focus terminal reaches the program, the pane back on the live screen, a send into such a pane submits, the composer's typing leaves the pane alone, and the tests above pass.
 
 **Related:** TD-667 (the design), TD-022 (scrollback is tmux's), TD-174 (the wheel), TD-027 (the confirmed send).
-
----
-
-## TD-671: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-14 (grinder-ao-2, met running `pytest` for TD-647)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_agent.py` (~L2280, the shell's `[$AGENT_MODEL|$AGENT_MODEL_FILE]`), `src/sessionorc/agent.py` (the shell's launch env, TD-644)
-
-**Why:** since TD-644 (#1705) every launched agent session carries `AGENT_MODEL` and `AGENT_MODEL_FILE`, so a worker that runs `pytest` from its pane hands both to the in-process host agent, and the shell it creates inherits them: the test reads `[claude-code/opus|…/shiftlead-agent-model]` where it wants `[|]`. CI, with neither set, passes. Either the shell's launch should unset both (a shell is no agent: §4.3 *a record with no agent*), or the test should clear them with `monkeypatch.delenv` — which one is the design's.
-
-**Fix:** decide from TD-644's design whether a shell launched under an agent's env must not carry its model; if so, the launch removes `AGENT_MODEL`/`AGENT_MODEL_FILE` from a shell's env, else the test clears them first.
-
-**Done when** the test passes with both variables set in the runner's env.
-
-**Related:** TD-644.
 
 ---
