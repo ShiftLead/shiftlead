@@ -15,12 +15,22 @@ from shiftlead import repoconfig
 
 pytestmark = pytest.mark.unit
 
-# the ADR's list: a repo's layout, outside a slot
+# the ADR's list, and the design's history beside its directory: a repo's layout, outside a slot
 LITERALS = re.compile(
-    r"docs/cadence\.md|/cadence\b|scripts/|docs/technical_debt\.md|docs/user_attention\.md|docs/design/|pdm run"
+    r"docs/cadence\.md|/cadence\b|scripts/|docs/technical_debt\.md|docs/user_attention\.md|docs/design[/-]|pdm run"
 )
 REPO = Path(__file__).resolve().parents[1]
-ROLES = ("grinder", "hunter", "manager", "techlead", "auditor", "anchor", "designer")
+# the slots each preset's template names: a role that silently loses one fails here
+NAMED = {
+    "grinder": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{ledger_check}", "{lint}", "{test}"},
+    "hunter": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{test}"},
+    "manager": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{test}"},
+    "techlead": {"{board}", "{design_dir}", "{gate}", "{ledger}"},
+    "auditor": {"{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{test}"},
+    "anchor": {"{board}", "{cadence_rules}", "{design_dir}", "{test}"},
+    "designer": {"{board}", "{cadence_rules}"},
+}
+ROLES = tuple(NAMED)
 
 
 def built_ins() -> list[tuple[str, str]]:
@@ -50,7 +60,7 @@ def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
     assert not LITERALS.search(rest), LITERALS.search(rest)
     assert not re.search(r"\{(gate|board|ledger|ledger_check|test|lint|design_dir|cadence_rules|pr)\}", text)
     named = {s for s in repoconfig.LAYOUT_SLOTS if s in made["slots"]}
-    assert named, f"{role} names no layout slot"
+    assert named == NAMED[role]
     if "{gate}" in named:
         assert repoconfig.NO_GATE in text and made["slots"]["{pr}"] == {"text": "<n>"}
 
@@ -59,6 +69,7 @@ def test_a_bare_repos_brief_says_each_seam_in_its_own_words(tmp_path, role):
 def test_this_repos_brief_reads_its_own_layout(role):
     text, made = repoconfig.resolve_role(repoconfig.load(REPO), role).compose()
     given = {s: made["slots"][s]["text"] for s in repoconfig.LAYOUT_SLOTS if s in made["slots"]}
+    assert set(given) == NAMED[role]  # the same slots in this repo as in a bare one
     for slot, words in {
         "{test}": "pdm run test",
         "{lint}": "pdm run lint",
