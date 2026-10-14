@@ -12,13 +12,15 @@ Four things already settled constrain every option:
 - **The licence is MIT** (`pyproject.toml`). Anyone may run their own copy of anything shiftlead
   hosts. What is sold is therefore convenience, operations, team features, or a piece that only works
   as a service, never the code itself.
-- **shiftlead is never in the path between the person and their shell** (§4.5b, decided
-  2026-10-13). Paul's judgement: a technical user would not route root-equivalent access through a
-  small company's servers. A route is the person's own (Tailscale first), and a relay, if ever
-  built, forwards ciphertext only. A paid service that needs to see the terminal fails this test.
+- **shiftlead runs nothing that can read the person's session** (a summary of §4.5b, decided
+  2026-10-13). The route is the person's own, Tailscale first. A relay, if one is built, *carries
+  only ciphertext*, and one that ends TLS, serves the UI's code or holds the login *is ruled out*,
+  because *a technical user would not hand that to a small company's servers*. A paid service
+  that needs to see the terminal fails this test.
 - **The person's subscription and tools stay theirs** (§4.5c). shiftlead does not resell model
-  access. Neutrality across tools is the moat, and a runtime is commodity
-  ([ADR 2026-09-13](2026-09-13-openai-agents-api.md)).
+  access (an inference from §4.5c: the login and its cost *stay with them*). Neutrality across tools
+  is the moat, and the runtime is commodity (§4.5c, after
+  [ADR 2026-09-13](2026-09-13-openai-agents-api.md)).
 - **What leaves the machine is minimal**: the Telegram note carries no pending text, question
   words or `doing` line (§4.10 *Told on Telegram*). Any hosted piece inherits that rule.
 
@@ -28,25 +30,27 @@ They are ordered by the session's view of their promise. *Size* is a guess, as i
 
 ### 1. Push notifications as a small paid service
 
-- **What:** the moment that matters most is *a session needs you*, reaching a locked phone. Native
-  phone push needs a server holding the app's push credentials, which a self-hoster cannot easily
-  run. The message carries only *something needs you* and opens the person's own route
+- **What:** the moment that matters most is *a session needs you*, reaching a locked phone. A
+  **native** phone app's push needs a server holding that app's push credentials, which a
+  self-hoster cannot run for an app they did not publish. The message carries only *something needs you* and opens the person's own route
   (`reach.url`), so the service learns that an event happened and nothing about it.
 - **shiftlead now:** a one-way Telegram note through the person's own bot (§4.10, TD-092). It is
   free and self-hosted, but needs a bot and a chat app. TD-003 plans the phone layout and *Add to
-  Home Screen*. A web app on the home screen can receive Web Push on recent iOS and Android, and that
-  push still goes through the browser vendor's push service, with a server that holds the keys.
+  Home Screen*. A web app on the home screen can receive Web Push on recent iOS and Android. That
+  push goes through the browser vendor's push service, but the keys that sign it (VAPID) can be the
+  home's own, **so self-hosted Web Push needs no paid relay**. That weakens this option: what is
+  left to sell is a native app, or push with nothing to set up.
 - **Trust fit:** good. No content, no path to the shell.
-- **Size:** medium (the push relay, the subscription flow, billing). **Open:** is a native
-  notification worth paying for when Telegram is free? Could the relay be the *free* part, and the
-  thing that brings users?
+- **Size:** medium (a native app, the push relay, billing). **Open:** is a native app's
+  notification worth paying for when Telegram and self-hosted Web Push are free? Is self-hosted Web
+  Push simply a feature (with TD-003), and not a product?
 
 ### 2. A team edition (open core)
 
 - **What:** the one-person product stays free and MIT. A paid licence adds what companies need
   when several people share an org: sign-in through their identity provider, roles, an audit log of
   who typed into which session, shared boards, and policies set centrally.
-- **shiftlead now:** one person per home is a design premise (§1, §4.8a). Multi-user access control
+- **shiftlead now:** one person per home is a design premise (§1; §4.7, *the home has no second person to let in*). Multi-user access control
   is a non-goal *for now* (§2).
 - **Trust fit:** good. It runs on the customer's machines.
 - **Size:** large: it reverses a premise. **Open:** is there demand from teams, or is shiftlead a
@@ -101,6 +105,7 @@ needed to choose a direction. Check them when an option is designed.
    of the rest matters.
 2. If a business: personal users first (options 1, 3, 6), or teams (options 2, 4)?
 3. The licence: does it stay MIT for everything, or is a team edition kept separate from now on?
-4. Which one, if any, becomes a design round first? The session's view is option 1. It is the
-   smallest step that fits the trust argument and is only useful as a service. Option 2 is the larger
-   prize, if teams want it.
+4. Which one, if any, becomes a design round first? The session's view: self-hosted Web Push is a
+   feature to build anyway (with TD-003), not a product. Option 2 is the real prize if teams want
+   it, and the licence question (3) is what to settle first. Option 3 waits for someone to ask, as
+   §4.5c already says.
