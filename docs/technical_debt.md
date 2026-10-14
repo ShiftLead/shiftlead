@@ -57,8 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Designed — TD-633 builds it |
 | TD-631 | §4.4 *Repo facts* says the UI runs a board reader for the Inbox's board counts: the UI runs no board reader since TD-615 slice 2 (#1633) | Low | Open |
 | TD-633 | Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept | Medium | Open |
-| TD-634 | `ao inbox --counts` run from a session counts that session's own inbox, not the person's, and marks its unread mail read | Medium | Designed — TD-635 builds it |
-| TD-635 | Build TD-634: `ao inbox --counts` asks the UI's counts read first; the person's local count names `person`; a session with no UI answering is refused in words; a test runs it as a session | Medium | Open |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
@@ -1036,51 +1034,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** a screenshot pasted into the Add entry form reaches the drafting session, by either way out, as a path it can read, an abandoned form leaves nothing past the hour, and the tests above pass; the builder's look (design §4.9b: the form with a pasted image, each way out) is named in the PR.
 
 **Related:** TD-630 (the design), TD-180 / TD-219 (the form), TD-530 (the Message dialog's attach), TD-478 (the pieces), TD-419 (an attachment's life).
-
----
-
-## TD-634: `ao inbox --counts` run from a session counts that session's own inbox, not the person's, and marks its unread mail read
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-13 (grinder-ao-2, TD-616's live check)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-13 (the designer) — **option (b)**: `ao inbox --counts` asks the UI's counts read on this host first (`/api/person/inbox?counts=1` at `127.0.0.1` and `service.DEFAULT_PORT`, or `--ui <url>`) — the keeper's numbers, no mail, nothing marked, so a session may ask them; with no UI answering, a call from outside any pane (the person, as the host reads it) counts locally with `counts_now` naming `person`, and a call under a pane — a person's own shell among them, since `rpc_inbox` reads it as a session — is refused in words; the host's refusal of a session naming `person`, not the environment, is what keeps the inbox unmarked. (a) was refused because a session would read the person's mail (§4.10); (c) because a session needs the numbers. §4.7 `ao inbox --counts`, §4.4 *The Inbox's counts*. Built by TD-635. Was: Open — found reading TD-616's live check with d808afa live. From a session, `ao inbox --counts` printed *needs you 44 · FYI 2 · overdue 42 · answered 0* while the live UI's `/api/person/inbox?counts=1` answered `needs 44, fyi_n 44, overdue_n 42` and its full read 21 *answered for you*. `Readings.counts_now` calls the `inbox` RPC with no id; `rpc_inbox` answers a caller that is a session with **its own** inbox (one entry, against the person's 62) and sets `read_at` on every unread entry in it (`mark = True`). *Needs you* agreed only because its state rows and board items, read the same way by both, are most of it. Unsetting `SHIFTLEAD_SESSION` changes nothing (identity is the host's, §4.8a). From the person's own shell the read is the person's and should agree; not checked, a session cannot run as the person.
-**Blocked by:** TD-635
-**Location:** design §4.7 `ao inbox --counts` (*is what a session or a script asks instead of `ao inbox --unread`, which marks*), §4.10 (who reads the person inbox); `src/shiftlead/cli.py` `_counts` (~L3052), `src/shiftlead/ui/app.py` `Readings.person_inbox` / `counts_now` (~L760, ~L846), `src/sessionorc/agent_mail.py` `rpc_inbox` (~L1046: a session's read is its own and marks); `tests/test_ui_inbox.py` (~L539, the `--counts` test, which runs as the person because pytest sits under no session pane)
-
-**Why:** §4.7 says `ao inbox --counts` is what a session asks, reads the same numbers as the top bar, and marks nothing; run from a session it reads the wrong inbox and marks the session's own mail read, so a session that asks it loses the doorbell on what it had not read. A session is not allowed the person inbox through the RPCs today (`rpc_inbox`: *nobody reads another session's inbox*; a session naming `person` is refused), though any local process reads it through the UI's `/api/person/inbox`.
-
-**Fix:** design first — which of these is true: (a) the host's `inbox` RPC gives a session naming `person` a read that marks nothing, and `counts_now` names `person` (a new read for sessions, §4.10); (b) `ao inbox --counts` asks the UI's counts read when a UI runs on this host, the keeper's numbers, and says so when none does; (c) `--counts` is the person's read alone, refused to a session in words, and §4.7's *what a session asks* goes. Whichever: a test that runs `--counts` as a session, so a session's `--counts` cannot read its own inbox again.
-
-**Done when** `ao inbox --counts` from a session prints the top bar's numbers or is refused in words, marks nothing in any inbox, the design says which, and the test holds it; TD-616's live check then reads it beside the top bar.
-
-**Related:** TD-616 (its live check found this), TD-614 (the design), TD-611 (slice 1's counts read).
-
----
-
-## TD-635: Build TD-634: `ao inbox --counts` asks the UI's counts read first; the person's local count names `person`; a session with no UI answering is refused in words; a test runs it as a session
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-13 (the designer, TD-634's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.7 `ao inbox --counts`, §4.4 *The Inbox's counts*; `src/shiftlead/cli.py` (`_counts` ~L3052: the UI read first, then the person's local count, then the session's refusal; `--ui <url>`), `src/shiftlead/service.py` (`DEFAULT_PORT` ~L42), `src/shiftlead/ui/app.py` (`Readings.person_inbox` / `counts_now` ~L760, ~L846: the `inbox` call names `id: "person"` explicitly), `src/sessionorc/agent_mail.py` (`rpc_inbox` ~L1046: a session naming `person` is refused today, which is what keeps the fallback the person's); `tests/test_ui_inbox.py` (~L539, the `--counts` test, which runs as the person)
-
-**Why:** TD-634: grinder-ao-2's live check of TD-616 — `ao inbox --counts` from a session printed its own inbox's numbers (FYI 2 against the person's 44) and set `read_at` on its unread mail, so the session lost the doorbell on what it had not read.
-
-**Fix:**
-1. `_counts`: GET `http://127.0.0.1:<DEFAULT_PORT>/api/person/inbox?counts=1` (or `--ui <url>`), a short timeout; on a 200, print its numbers as today's line.
-2. No UI answering: with no `SHIFTLEAD_SESSION`, count locally — `counts_now` with its `inbox` read naming `id: "person"`, which the host answers only for a caller outside any pane (its channel verdict, §4.8a) and marks nothing; with one, refuse: *no UI answers on this host: the Inbox's counts are the UI's (§4.4) — start it, or ask from a terminal outside ShiftLead*, exit 1. A session that unset the variable takes the local road: under `enforce` the host refuses its `person` read — say that refusal in the same words — and under `observe`/`off` it reads as the person (§4.8a) and prints the person's numbers; either way nothing is marked.
-3. `Readings.person_inbox` names `person` in every call, so no caller's own inbox can stand in for it.
-4. Tests: `--counts` run with a session caller and a fake UI answering prints the UI's numbers and marks nothing in the session's inbox (`read_at` stays None); with no UI it is refused with the words and makes no `inbox` call; a session caller with `SHIFTLEAD_SESSION` unset and no UI marks nothing in its own inbox (under the fixtures' `observe` it prints the person's numbers; the refusal itself needs an `enforce` agent against a real pane, tested there if the suite has one); run as the person with no UI it counts locally and marks nothing; `counts_now` names `person`.
-
-**Done when** `ao inbox --counts` from a session prints the top bar's numbers or is refused in words, marks nothing in any inbox, and the tests above pass; TD-616's live check then reads it beside the top bar.
-
-**Related:** TD-634 (the design), TD-616 (the counts), TD-614 (one owner per reading), TD-580 / TD-596 (the person's own shell, which reads as a session here).
 
 ---
 

@@ -3059,10 +3059,54 @@ def cmd_inbox(args: argparse.Namespace) -> int:
     return rc
 
 
+# `ao inbox --counts` under a pane with no UI answering (design §4.7, TD-634): never a read of its own inbox
+NO_UI_COUNTS = (
+    "no UI answers on this host: the Inbox's counts are the UI's (§4.4) — start it, "
+    "or ask from a terminal outside ShiftLead"
+)
+UI_COUNTS_WAIT = 10.0  # seconds: a fresh count on a busy UI loop; a UI that is not there refuses at once
+
+
+def _ui_counts(base: str) -> dict[str, Any] | None:
+    """The UI's counts read, `/api/person/inbox?counts=1` (§4.4 *The Inbox's counts*): the keeper's
+    numbers, which carry no mail and mark nothing. None where no UI answers with a 200 and a count."""
+    import urllib.error
+    import urllib.request
+
+    url = f"{base.rstrip('/')}/api/person/inbox?counts=1"
+    try:
+        # no proxy: a pane's `http_proxy` would take a loopback read elsewhere and lose the UI
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(url, timeout=UI_COUNTS_WAIT) as r:  # a loopback URL, or --ui's
+            got = json.loads(r.read()) if r.status == 200 else None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+    return got if isinstance(got, dict) and ("needs" in got or got.get("agent_down")) else None
+
+
+def _counts_line(args: argparse.Namespace, got: dict[str, Any]) -> int:
+    if got.get("agent_down"):
+        return fail(args, str(got.get("why") or "host agent unreachable"), 3)
+    line = (
+        f"needs you {got['needs']} · FYI {got['fyi_n']} · overdue {got['overdue_n']}"
+        f" · answered {len(got.get('answered_marks') or [])}"
+    )
+    return emit(args, got, lambda: print(line))
+
+
 def _counts(args: argparse.Namespace) -> int:
-    """`ao inbox --counts` (design §4.7, §4.4 *The Inbox's counts*, TD-616): the top bar's numbers from
-    the UI's own `counts_now` over the host agent's readings — one definition, so the two cannot
-    disagree. A person's read: it marks nothing, whoever runs it."""
+    """`ao inbox --counts` (design §4.7, §4.4 *The Inbox's counts*, TD-616, TD-634): the top bar's
+    numbers. **The UI on this host first** — its counts read at `127.0.0.1` and `service.DEFAULT_PORT`,
+    or `--ui <url>` — which marks nothing and carries no mail, so a session may ask it. With no UI
+    answering, a call from outside any pane counts locally with the UI's own `counts_now` over the host
+    agent's readings, its `inbox` read naming `person` (a person's read, marking nothing — and refused
+    by the host to a caller it reads as a session); a call under a pane is refused in words, and never
+    reads its own inbox in place of the person's."""
+    got = _ui_counts(args.ui or f"http://127.0.0.1:{service.DEFAULT_PORT}")
+    if got is not None:
+        return _counts_line(args, got)
+    if os.environ.get("SHIFTLEAD_SESSION"):
+        return fail(args, NO_UI_COUNTS, 1)
     try:
         from shiftlead.ui import uiconf
         from shiftlead.ui.app import Readings
@@ -3079,15 +3123,9 @@ def _counts(args: argparse.Namespace) -> int:
 
     try:
         got = asyncio.run(count())
-    except HTTPException as e:  # the host agent refused a read: said, never a traceback
+    except HTTPException as e:  # the host agent refused a read (a `person` read under a pane): said
         return fail(args, str(e.detail), 1)
-    if got.get("agent_down"):
-        return fail(args, str(got.get("why") or "host agent unreachable"), 3)
-    line = (
-        f"needs you {got['needs']} · FYI {got['fyi_n']} · overdue {got['overdue_n']}"
-        f" · answered {len(got['answered_marks'])}"
-    )
-    return emit(args, got, lambda: print(line))
+    return _counts_line(args, got)
 
 
 def cmd_decide(args: argparse.Namespace) -> int:
@@ -3885,6 +3923,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--thread", metavar="ID", help="a person's read of one entry's whole thread (design §4.7)")
     p.add_argument(
         "--counts", action="store_true", help="the top bar's numbers, as the UI counts them; marks nothing (TD-616)"
+    )
+    p.add_argument(
+        "--ui", metavar="URL", help="with --counts: the UI to ask (default http://127.0.0.1:<the UI's port>; TD-634)"
     )
     p.set_defaults(fn=cmd_inbox)
 

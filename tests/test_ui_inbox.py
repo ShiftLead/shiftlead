@@ -542,9 +542,11 @@ def test_ao_inbox_counts_prints_the_top_bars_numbers_and_marks_nothing(client, t
     from shiftlead.ui.app import INBOX_COUNTS
 
     monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    monkeypatch.setattr(cli.service, "DEFAULT_PORT", _closed_port())  # no UI answers: counted locally (TD-634)
     sender = sender_session(client, tmp_path)
     send(sender, text="merge PR 9?", kind="ask")
     send(sender, text="for your information", kind="note")
+    _mail_to(sender, "the session's own mail")  # a session that unset SHIFTLEAD_SESSION reads as this (§4.8a)
     ui = client.get("/api/person/inbox?counts=1").json()
     capsys.readouterr()
     assert cli.main(["--json", "inbox", "--counts"]) == 0
@@ -554,6 +556,135 @@ def test_ao_inbox_counts_prints_the_top_bars_numbers_and_marks_nothing(client, t
     assert cli.main(["inbox", "--counts"]) == 0
     assert capsys.readouterr().out.strip() == "needs you 1 · FYI 1 · overdue 0 · answered 0"
     assert all(e["read_at"] is None for e in client.get("/api/person/inbox").json()["entries"])
+    assert _unread_of(client, sender) == [None]  # nothing marked in any inbox (TD-634)
+
+
+def _closed_port() -> int:
+    """A loopback port nothing listens on: where `ao inbox --counts` finds no UI (never the live one's)."""
+    import socket
+
+    with socket.socket() as so:
+        so.bind(("127.0.0.1", 0))
+        return so.getsockname()[1]
+
+
+class _FakeUI:
+    """A UI answering the counts read alone, on a loopback port of its own, counting its requests."""
+
+    def __init__(self, body: dict) -> None:
+        import http.server
+        import threading
+
+        hits = self.hits = []
+
+        class H(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):  # noqa: N802 — the stdlib's name
+                hits.append(self.path)
+                data = json.dumps(body).encode()
+                self.send_response(200)
+                self.send_header("content-type", "application/json")
+                self.send_header("content-length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+            def log_message(self, *a):
+                pass
+
+        self.server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+        self.url = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+
+
+def _mail_to(sid: str, text: str) -> str:
+    """A person's note into a session's inbox; its id."""
+    from sessionorc.client import LocalClient
+
+    async def go():
+        async with LocalClient() as c:
+            return await c.call("msg", to=sid, text=text, kind="note")
+
+    return asyncio.run(go())["entry"]["id"]
+
+
+def _unread_of(client, sid: str) -> list:
+    """A session's mail as the person reads it (a person's read marks nothing): each entry's `read_at`."""
+    from sessionorc.client import LocalClient
+
+    async def go():
+        async with LocalClient() as c:
+            return await c.call("inbox", id=sid)
+
+    return [e["read_at"] for e in asyncio.run(go())["entries"]]
+
+
+@pytest.mark.integration
+def test_ao_inbox_counts_from_a_session_asks_the_ui_and_marks_nothing(client, tmp_path, monkeypatch, capsys):
+    """§4.7 `ao inbox --counts` (TD-634, built by TD-635): from a session it asks the UI's counts read
+    first and prints those numbers; the session's own mail stays unread — never read in the person's
+    place (the bug: it printed the session's FYI 2 against the person's 44 and marked its mail)."""
+    from shiftlead import cli
+
+    sender = sender_session(client, tmp_path)
+    _mail_to(sender, "the session's own mail")
+    body = {"needs": 7, "fyi_n": 44, "overdue_n": 2, "answered_marks": [{}], "snoozed_n": 0, "rev": 3}
+    ui = _FakeUI(body)
+    try:
+        monkeypatch.setenv("SHIFTLEAD_SESSION", sender)
+        capsys.readouterr()
+        assert cli.main(["inbox", "--counts", "--ui", ui.url]) == 0
+        assert capsys.readouterr().out.strip() == "needs you 7 · FYI 44 · overdue 2 · answered 1"
+        assert cli.main(["--json", "inbox", "--counts", "--ui", ui.url]) == 0
+        assert json.loads(capsys.readouterr().out)["fyi_n"] == 44
+        assert ui.hits == ["/api/person/inbox?counts=1"] * 2
+    finally:
+        ui.close()
+    assert _unread_of(client, sender) == [None]
+
+
+@pytest.mark.integration
+def test_ao_inbox_counts_from_a_session_with_no_ui_is_refused_in_words(client, tmp_path, monkeypatch, capsys):
+    """§4.7 (TD-634): a session with no UI answering is refused, exit 1, and makes no `inbox` read —
+    nothing counted locally in its name, its own mail left unread."""
+    from shiftlead import cli
+    from shiftlead.ui import app as uiapp
+
+    sender = sender_session(client, tmp_path)
+    _mail_to(sender, "the session's own mail")
+    monkeypatch.setenv("SHIFTLEAD_SESSION", sender)
+    monkeypatch.setattr(cli.service, "DEFAULT_PORT", _closed_port())
+
+    def no_local(*a, **k):
+        raise AssertionError("a session never counts locally")
+
+    monkeypatch.setattr(uiapp, "Readings", no_local)
+    capsys.readouterr()
+    assert cli.main(["inbox", "--counts"]) == 1
+    err = capsys.readouterr().err
+    assert "no UI answers on this host: the Inbox's counts are the UI's (§4.4) — start it" in err
+    assert "or ask from a terminal outside ShiftLead" in err
+    assert _unread_of(client, sender) == [None]
+
+
+def test_the_counts_name_person_in_every_inbox_read():
+    """§4.4 *The Inbox's counts* (TD-634 step 3): `Readings` names `person` in each `inbox` call, so no
+    caller's own inbox can stand in for the person's — a caller the host reads as a session is refused."""
+    from shiftlead.ui.app import Readings
+
+    calls = []
+
+    async def call(method, **params):
+        calls.append((method, params))
+        return {"entries": [], "trail": [], "handed": []} if method == "inbox" else []
+
+    rd = Readings(call)
+    asyncio.run(rd.person_inbox([], watching=False))
+    asyncio.run(rd.person_inbox([], watching=True))
+    asyncio.run(rd.person_waits())
+    assert [p.get("id") for m, p in calls if m == "inbox"] == ["person"] * 3
 
 
 @pytest.mark.integration
