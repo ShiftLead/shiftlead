@@ -2660,11 +2660,13 @@ def cmd_board_show(args: argparse.Namespace) -> int:
     if got is None:
         got = workorders.show(root, want, fetch=False)
     if got is None:
+        if workorders.board_path(root)[1] is None:
+            return fail(args, workorders.NO_BOARD, 1)
         return fail(args, workorders.NO_LINE.format(ref=want), 1)
 
     def prose() -> None:
         state = "" if got["open"] else " (closed)"
-        print(f"{got['key']}  line {got['line']} of {workorders.BOARD} on {got['source']}{state}")
+        print(f"{got['key']}  line {got['line']} of {workorders.board_rel(root)} on {got['source']}{state}")
         print(got["text"])
         for d in got["detail"]:
             print(f"    {d}")

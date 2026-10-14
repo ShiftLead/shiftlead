@@ -27,9 +27,12 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import ledgerboard
+import yaml
 
-BOARD = Path("docs") / "user_attention.md"
+from sessionorc import ledgerboard, paths
+
+BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*)
+NO_BOARD = "no board: the Inbox is the person's channel"  # the seam's fixed words (§5)
 PREFIX = "board:"
 PR_PREFIX = "pr:"  # a red PR nobody holds (§4.4, TD-613)
 FETCH_TIMEOUT = 45.0  # the fetch's bound; a fetch past it is a plain read, *fetch skipped (timeout)*
@@ -161,7 +164,7 @@ def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT) -> 
             why = err[-1] if err else "git fetch failed"
             return Origin("skipped", f"fetch skipped ({why})", why=why)
         at = f"origin/{branch}"
-        rel = (board.relative_to(root) if board.is_relative_to(root) else BOARD).as_posix()
+        rel = (board.relative_to(root) if board.is_relative_to(root) else board_rel(root)).as_posix()
         theirs = blob(at, rel)
         if theirs is None:
             return Origin("none", f"fetched; no board at {at}")
@@ -181,6 +184,36 @@ def _against_origin(root: Path, board: Path, timeout: float = FETCH_TIMEOUT) -> 
         return Origin("skipped", "fetch skipped (timeout)", why="timeout")
     except Exception as e:  # noqa: BLE001 — a board read without origin beats no board
         return Origin("skipped", f"fetch skipped ({e})", why=str(e))
+
+
+def board_path(root: Path | str) -> tuple[str, Path | None]:
+    """The checkout's board (§5 *The seams* `board:`, TD-587): `("set", path)` for its `.shiftlead.yml`
+    `board:`, relative to `root`; `("defaulted", BOARD)` when the key is unset and `docs/user_attention.md`
+    exists; `("absent", None)` otherwise — the person's channel is the Inbox alone. A file that cannot be
+    read, or a key that is not a non-empty string or is not a path inside the repo (absolute, or with a
+    `..`: the write-back edits it in a tree of its own), is the key unset: the clients
+    (`shiftlead.repoconfig`) refuse such a file by name."""
+    try:
+        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        doc = None
+    got = doc.get("board") if isinstance(doc, dict) else None
+    if isinstance(got, str) and got.strip() and inside(Path(got.strip())):
+        return "set", Path(got.strip())
+    if (Path(root) / BOARD).is_file():
+        return "defaulted", BOARD
+    return "absent", None
+
+
+def inside(rel: Path) -> bool:
+    """Whether `rel` is a path from a repo's root that stays inside it: relative, with no `..`."""
+    return not rel.is_absolute() and ".." not in rel.parts
+
+
+def board_rel(root: Path | str) -> Path:
+    """The board's path under `root` that the write-back edits on origin's head: `board_path`'s, else
+    `docs/user_attention.md` — the checkout may lack a file origin holds."""
+    return board_path(root)[1] or BOARD
 
 
 def board_items(content: str, today: date) -> list[dict[str, Any]]:
@@ -205,7 +238,10 @@ def read_boards(root: str | Path, *, fetch: bool = True, board: str | Path | Non
     origin: the host agent's own tree after a write-back (`board.tree_dir`), which is origin's head
     with the press landed, so the press is in the reading before the checkout pulls it."""
     root = Path(root)
-    checkout = root / BOARD
+    rel = board_path(root)[1]
+    if rel is None:
+        return {"boards": []}  # NO_BOARD (§5 *The seams*)
+    checkout = root / rel
     path = Path(board) if board is not None else checkout
     if not path.is_file():
         return {"boards": []}
@@ -293,6 +329,9 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
     branch after a fetch (`origin/<branch>`), else the checkout's file (`checkout`) — design §4.7
     `ao board show`. No board is `([], "")`."""
     root = Path(root)
+    rel = board_path(root)[1]
+    if rel is None:
+        return [], ""
     if fetch:
         try:
             # a fetch that failed leaves origin's ref as stale as the checkout: the checkout it is
@@ -306,7 +345,7 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
             heads = [cp.stdout.strip()] if cp.stdout.strip() else ["origin/main", "origin/master"]
             for head in heads if fetched.returncode == 0 else ():
                 cp = subprocess.run(
-                    ["git", "-C", str(root), "show", f"{head}:{BOARD.as_posix()}"],
+                    ["git", "-C", str(root), "show", f"{head}:{rel.as_posix()}"],
                     capture_output=True, text=True, errors="replace", timeout=READ_TIMEOUT,
                 )  # fmt: skip
                 if cp.returncode == 0:
@@ -314,7 +353,7 @@ def board_lines(root: str | Path, *, fetch: bool = True) -> tuple[list[str], str
         except (OSError, subprocess.SubprocessError):
             pass
     try:
-        return (root / BOARD).read_text(encoding="utf-8").splitlines(), "checkout"
+        return (root / rel).read_text(encoding="utf-8").splitlines(), "checkout"
     except OSError:
         return [], ""
 

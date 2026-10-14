@@ -479,11 +479,10 @@ def state_rows(
 
 
 # design §4.5 screen 6 / §4.4 (TD-069 step 3): **board items** in the Inbox. The board is each
-# repo's `docs/user_attention.md`, in ledgerboard's format, read in-process through ledgerboard
-# (TD-585) — never a second parser here — and the reading is the host agent's (§4.4 *Each reading
-# has one owner*, *The boards*, TD-615): every open item, on the repo reading as `boards`, which the
-# page reads from the `repos` RPC and runs no reader of its own.
-BOARD_FILE = Path("docs") / "user_attention.md"
+# repo's `board:` (§5 *The seams*, default `docs/user_attention.md`), in ledgerboard's format, read
+# in-process through ledgerboard (TD-585) — never a second parser here — and the reading is the host
+# agent's (§4.4 *Each reading has one owner*, *The boards*, TD-615): every open item, on the repo
+# reading as `boards`, which the page reads from the `repos` RPC and runs no reader of its own.
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
 BOARD_ACTS = ("snooze", "done", "decide")
@@ -581,7 +580,7 @@ def board_reading(
         name = str(r.get("name") or Path(str(root)).name)
         got = r.get("boards")
         if not isinstance(got, dict):
-            if (Path(str(root)) / BOARD_FILE).is_file():  # a reading from before its first board read
+            if workorders_mod.board_path(str(root))[0] != "absent":  # a reading from before its first board read
                 notes.append(f"the board of {name} has not been read yet")
             continue
         own = board_rows(got, teams)
@@ -629,8 +628,9 @@ def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str,
     out: list[dict[str, str]] = []
     for r in roots:
         root = Path(r).expanduser().resolve()
-        if (root / BOARD_FILE).is_file():
-            out.append({"label": root.name, "root": str(root), "board": str(root / BOARD_FILE)})
+        rel = workorders_mod.board_path(root)[1]
+        if rel is not None and (root / rel).is_file():
+            out.append({"label": root.name, "root": str(root), "board": str((root / rel).resolve())})
     return out
 
 

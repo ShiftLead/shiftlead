@@ -126,7 +126,7 @@ def test_the_board_seam_is_set_defaulted_or_absent(tmp_path):
     assert board.board_path(other) == ("defaulted", board.BOARD)
     assert repoconfig.load_text("board: notes/board.md\n", tmp_path).board == "notes/board.md"
     assert repoconfig.load_text("ledger: docs/debt.md\n", tmp_path).board is None
-    for text in ("board: ''\n", "board: [a]\n", "board: 3\n"):
+    for text in ("board: ''\n", "board: [a]\n", "board: 3\n", "board: /etc/board.md\n", "board: ../x.md\n"):
         with pytest.raises(ValueError, match="board file's path"):
             repoconfig.load_text(text, tmp_path)
 

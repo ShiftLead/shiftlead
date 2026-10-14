@@ -11855,3 +11855,23 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); ledgerboard#TD-001 (release v1.0); ledgerboard#TD-002 (v1.1: the bold head and the `Not right:` form); dev-cadence#TD-106 (dev-cadence vendors it).
 
 **Resolved:** 2026-10-14 (grinder-ao-1, PR #1731) — the last slice: `board.HEAD_RE`, `board.NOT_RIGHT_FORM` and `workorders.head`'s own bold run are ledgerboard v1.1's `bold_head`, `is_not_right_form` and `fill_not_right` (the decide's word-for-word check stays first; a slot-only fill `Not right: <b>` is refused; a blank `** **` is no head; bold inside a reply is no head), on the 517a2b5 sync (#1728). Slices 1–6: #1647, #1652, #1659, #1662, #1666, #1674. `render.fold_head`'s bold run is markdown and stays.
+
+## TD-587: `board:` path key and `ao board edit` (done, snooze) for a session's own branch
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done 2026-10-14 (slice 2, #1734): every board reader reads `board:`. Was: Slice 1 (grinder-ao-1, 2026-10-14, #1733): `ao board edit done|snooze` (`sessionorc.board.branch_edit`) — the line by `--line`/`--expect` or `--key`, ledgerboard's edit and subject, one file committed on the branch it is on; refused on the default branch (origin's `HEAD`, else `main`/`master`/`init.defaultBranch`), a detached head, a staged index, an edited board, and for `decide`/`reply`; `.shiftlead.yml` takes `board:` (`board.board_path`: set, defaulted, absent), which `--board` defaults to. Left, slice 2: every other board reader reads `board:` in place of the fixed `docs/user_attention.md` — the host agent's `boards` reading (`workorders.read_boards`, `workorders.BOARD`), the write-back (`board.BOARD` in `_tree`/`_write_back`/`_insert`, `agent_inbox._board_root`), the Inbox (`inbox.BOARD_FILE`) and `ao board show`; an absent board then reads as *no board: the Inbox is the person's channel* (§5). Was: Open.
+**Location:** `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py`, `src/sessionorc/board.py`, `src/sessionorc/workorders.py`, `src/sessionorc/agent_inbox.py`, `src/shiftlead/ui/inbox.py`
+
+**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. A session closes a decided board line with `scripts/board_edit.py`, a dev-cadence script, so a repo without dev-cadence cannot.
+
+**Fix:** per the ADR: `board:` (default `docs/user_attention.md`) read by every board reader; `ao board edit <done|snooze> --line <n> --expect "<start>" …` (`--board` defaulting to `board:`) calls ledgerboard's `edit_line()` and commits with `subject("shiftlead", …)` on the current branch, touching nothing else; no `decide` or `reply` (cadence §3.5: the person's words, write-back only). And `--key board:<key>` in place of `--line` and `--expect` (§4.7): the line found by its id as `ao board show` finds it (`workorders.show`, `workorders.ref`; TD-607 built the id, this verb's flag waits for the verb).
+
+**Done when** a session closes and snoozes a line on its branch in a repo with no `scripts/`, the commit carries the ledgerboard subject, and `decide`/`reply` are refused, with tests.
+
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); ledgerboard#TD-001 (release v1.0); dev-cadence#TD-106 (dev-cadence vendors it).
+
+**Resolved:** 2026-10-14 (grinder-ao-1, PRs #1733 and #1734) — slice 1: `ao board edit done|snooze` (`board.branch_edit`) commits one line's edit on the session's own branch through ledgerboard, refusing a default branch, a detached head, a staged index, an edited board and `decide`/`reply`; `.shiftlead.yml` takes `board:`. Slice 2: the host agent's `boards` reading, the write-back and its adds, the Inbox's *Put on the board* choices and `ao board show` read `workorders.board_path` (a `board:` outside the repo is the key unset); no board reads *no board: the Inbox is the person's channel*.

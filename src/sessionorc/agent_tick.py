@@ -3024,7 +3024,7 @@ class TickMixin:
         read keeps the last boards and orders with `error` and `failed_at` beside them."""
         bds, wos = old.get("boards"), old.get("work_orders")
         try:
-            st = (Path(root) / workorders.BOARD).stat()
+            st = (Path(root) / workorders.board_rel(root)).stat()
             file: list[int] | None = [st.st_mtime_ns, st.st_size]
         except OSError:
             file = None

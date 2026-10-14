@@ -169,7 +169,6 @@ from .fanout import FAILED, Fanout, Stream
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
-    BOARD_FILE,  # noqa: F401
     BOARD_WAIT_DAYS,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
     LOOK_KINDS,  # noqa: F401

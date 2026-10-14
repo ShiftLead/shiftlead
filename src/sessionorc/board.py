@@ -29,11 +29,9 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from sessionorc import ledgerboard, paths, workorders
 
-BOARD = Path("docs") / "user_attention.md"
+BOARD = workorders.BOARD
 ACTIONS = ("snooze", "done", "reply", "decide")
 TOOL = "shiftlead"  # the `<tool>:` of every board commit's subject (ledgerboard's `subject`)
 HEAD_MAX = 60
@@ -334,6 +332,7 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
     refused merge closes the PR and deletes the branch, and refuses the press as a moved line when
     `still()` — origin's board read again — no longer holds the item, else as unreachable."""
     base = _git(t, "rev-parse", "HEAD").stdout.strip()
+    rel = str(workorders.board_rel(root))
     cp = _git(
         t,
         *_identity(root),
@@ -343,7 +342,7 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
         msg,
         "--only",
         "--",
-        str(BOARD),
+        rel,
         timeout=clock.left("git commit"),
     )
     if cp.returncode != 0:
@@ -395,13 +394,13 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
             moved = shifted = False
             with contextlib.suppress(Refused):
                 if not landed and _git(t, "fetch", "-q", "origin", want, timeout=GIT_TIMEOUT).returncode == 0:
-                    landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", str(BOARD)).returncode == 0
+                    landed = _git(t, "diff", "--quiet", sha, f"origin/{want}", "--", rel).returncode == 0
                     moved = not landed and not still()
                     # the forge's own word that it did not merge, and origin's board changed under it: never a
                     # retry on a forge that could not be asked (an add might write twice) or a move elsewhere
                     shifted = (
                         state in ("OPEN", "CLOSED")
-                        and _git(t, "diff", "--quiet", base, f"origin/{want}", "--", str(BOARD)).returncode != 0
+                        and _git(t, "diff", "--quiet", base, f"origin/{want}", "--", rel).returncode != 0
                     )
             if not landed:
                 _gh_quiet(t, "pr", "close", str(n))
@@ -499,7 +498,8 @@ def _write_back(
     if shutil.which("gh") is None:
         raise unreachable("gh is not installed")
     t, want = _tree(root, clock)
-    path = t / BOARD
+    rel = workorders.board_rel(root)
+    path = t / rel
     lines = _read_lines(path) if path.exists() else []
     at = _find(lines, line, text, key, root)
     if at is None:
@@ -515,7 +515,7 @@ def _write_back(
     path.write_text("".join(lines), encoding="utf-8")
 
     def still() -> bool:
-        return _find(_read_origin(t, want), None, text) is not None
+        return _find(_read_origin(t, want, rel), None, text) is not None
 
     return {**_land(root, t, want, msg, clock, still), "line": at + 1, "text": text}
 
@@ -525,17 +525,18 @@ def _ahead(root: Path, want: str, line: int | None, text: str) -> bool:
     *ahead* — an uncommitted edit, or a board commit origin lacks — rather than behind: a checkout
     that has not pulled still shows a line origin has since done or replied to, which is a moved
     line, not an unpushed one."""
-    mine = _read_lines(root / BOARD) if (root / BOARD).exists() else []
+    rel = workorders.board_rel(root)
+    mine = _read_lines(root / rel) if (root / rel).exists() else []
     if _find(mine, line, text) is None:
         return False
-    if _git(root, "status", "--porcelain", "--", str(BOARD)).stdout.strip():
+    if _git(root, "status", "--porcelain", "--", str(rel)).stdout.strip():
         return True
-    last = _git(root, "log", "-1", "--format=%H", "--", str(BOARD)).stdout.strip()
+    last = _git(root, "log", "-1", "--format=%H", "--", str(rel)).stdout.strip()
     return bool(last) and _git(root, "merge-base", "--is-ancestor", last, f"origin/{want}").returncode != 0
 
 
-def _read_origin(t: Path, want: str) -> list[str]:
-    cp = _git(t, "show", f"origin/{want}:{BOARD.as_posix()}")
+def _read_origin(t: Path, want: str, rel: Path) -> list[str]:
+    cp = _git(t, "show", f"origin/{want}:{rel.as_posix()}")
     return cp.stdout.splitlines(keepends=True) if cp.returncode == 0 else []
 
 
@@ -632,7 +633,7 @@ def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
 
         def press() -> dict[str, Any]:
             t, want = _tree(root, clock)
-            path = t / BOARD
+            path = t / workorders.board_rel(root)
             lines = _read_lines(path)
             at = _top_of_needs(lines)
             if lines and not lines[-1].endswith("\n") and at == len(lines):
@@ -649,23 +650,7 @@ def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
 
 BRANCH_ACTIONS = ("done", "snooze")  # decide and reply are the person's words: the write-back's alone
 
-
-def board_path(root: Path | str) -> tuple[str, Path | None]:
-    """The checkout's board (§5 *The seams* `board:`, TD-587): `("set", path)` for its `.shiftlead.yml`
-    `board:`, relative to `root`; `("defaulted", BOARD)` when the key is unset and `docs/user_attention.md`
-    exists; `("absent", None)` otherwise — the person's channel is the Inbox alone. A file that cannot be
-    read, or a key that is not a non-empty string, is the key unset: the clients (`shiftlead.repoconfig`)
-    refuse such a file by name."""
-    try:
-        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
-        doc = None
-    got = doc.get("board") if isinstance(doc, dict) else None
-    if isinstance(got, str) and got.strip():
-        return "set", Path(got.strip())
-    if (Path(root) / BOARD).is_file():
-        return "defaulted", BOARD
-    return "absent", None
+board_path = workorders.board_path
 
 
 def _default_names(root: Path) -> set[str]:

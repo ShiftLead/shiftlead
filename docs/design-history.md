@@ -415,6 +415,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-14 (TD-587 slice 2, grinder-ao-1): *Inbox row: FYI* → **Put on the board**'s board is the sender's repo's `board:` (§5 *The seams*), and the pick is the registered repos that carry one (`inbox.board_choices` reads `workorders.board_path`). Was: the sender's repo's `docs/user_attention.md`.
 - 2026-10-14 (TD-641 slice 2, grinder-ao-2): *Inbox row: answered for you* built for a prompt the person's `permissions:` rules answered — keyed on `answered.answerer` being `rules`, the row names *your permissions: rules* as who answered, draws the rule as *rule: … — change it there* in place of a source, and **Dismiss** alone; the Settings page's settings.yml card names each `permissions:` value the host refused as *ignored*. A node's asker is already named, since the home's fleet carries its record under the same `<id>@<host>` the FYI's asker is.
 - 2026-10-13 (TD-667, the designer): *Focus pane: typing in a scrolled-back terminal*. Built by TD-669.
 - 2026-10-13 (TD-665, the designer): *A record with no agent* — what Focus and the card leave out on a shell or a command run (Wrap up, Message, Reports, Inbox, Working, the grants and controllers chips, the ready-to-close checklist, prompt chips), the composer's *Type a command…* and a Send that never reads Steer, and a Close with a plain confirm that reaps nothing. Built by TD-666.
@@ -1220,6 +1221,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-14 (TD-587 slice 2, grinder-ao-1): *The seams* `board:` read by every board reader as designed — the host agent's `boards` reading and its clock (`workorders.read_boards`, `board_path` moved there from `board`), the write-back's edit, adds and re-read (`board.board_rel`, `agent_inbox._board_root`), the Inbox's *Put on the board* choices and `ao board show`, which says *no board: the Inbox is the person's channel* for a repo with none (`workorders.NO_BOARD`). Was: `docs/user_attention.md`, fixed, in each.
 - 2026-10-13 (TD-657, the designer): `settings.yml` gains `director: {level, groom}` and `repos.<repo>.director.level`; `org.yml`'s `director:` seat's trigger gains `asks` and `groom`. Built by TD-662 and TD-663.
 - 2026-10-13 (TD-636, the designer): `settings.yml` gains `permissions:` per role; `org.yml` gains `director:`. Built by TD-641, TD-642.
 - 2026-10-12 (TD-589, grinder-ao-1): `worktree_setup:` built — `sessionorc.gitinfo.worktree_setup` reads it (set, defaulted to an executable `scripts/hydrate_worktree.sh`, absent); a set command runs by the shell in the new worktree in place of the default; `shiftlead.repoconfig` accepts the key.

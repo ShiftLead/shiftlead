@@ -18,6 +18,7 @@ from sessionorc import (
     hosts,
     ledgerboard,
     mail,
+    workorders,
 )
 from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
@@ -351,7 +352,7 @@ class InboxMixin:
         the board's resolved path; refused for any other file."""
         want = Path(board).resolve()
         roots = [Path(r) for r in hosts.local_host().repos()]
-        root = next((r for r in roots if (r / board_mod.BOARD).resolve() == want), None)
+        root = next((r for r in roots if (r / workorders.board_rel(r)).resolve() == want), None)
         if root is None:
             raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
         return root, want
@@ -675,7 +676,7 @@ class InboxMixin:
                 f"{e.id}'s asker had no repo, so there is no board to write your answer on: Delete declines it "
                 "(design §4.10)"
             )
-        root, board = self._board_root(str(Path(repo) / board_mod.BOARD))
+        root, board = self._board_root(str(Path(repo) / workorders.board_rel(repo)))
         first = " ".join(e.text.strip().split("\n\n", 1)[0].split())
         today = datetime.now().date().isoformat()
         try:
@@ -840,7 +841,7 @@ class InboxMixin:
         old = self._repos.get(root)
         if old is None:
             return
-        tree = board_mod.tree_dir(Path(root)) / board_mod.BOARD
+        tree = board_mod.tree_dir(Path(root)) / workorders.board_rel(root)
         here = tree if tree.is_file() else None
         try:
             bds, wos = await asyncio.to_thread(self._read_boards, root, old, here is None, False, now_iso(), tree=here)
