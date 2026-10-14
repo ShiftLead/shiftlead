@@ -1365,3 +1365,23 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Related:** TD-611 (the live check this blocks), TD-617 (the one subscriber), TD-616 (the counts keeper), TD-572 (light streams), TD-614.
 
 ---
+
+## TD-671: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL`
+
+**Priority:** Low
+**Type:** test
+**Added:** 2026-10-14 (grinder-ao-2, met running `pytest` for TD-647)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_agent.py` (~L2280, the shell's `[$AGENT_MODEL|$AGENT_MODEL_FILE]`), `src/sessionorc/agent.py` (the shell's launch env, TD-644)
+
+**Why:** since TD-644 (#1705) every launched agent session carries `AGENT_MODEL` and `AGENT_MODEL_FILE`, so a worker that runs `pytest` from its pane hands both to the in-process host agent, and the shell it creates inherits them: the test reads `[claude-code/opus|…/shiftlead-agent-model]` where it wants `[|]`. CI, with neither set, passes. Either the shell's launch should unset both (a shell is no agent: §4.3 *a record with no agent*), or the test should clear them with `monkeypatch.delenv` — which one is the design's.
+
+**Fix:** decide from TD-644's design whether a shell launched under an agent's env must not carry its model; if so, the launch removes `AGENT_MODEL`/`AGENT_MODEL_FILE` from a shell's env, else the test clears them first.
+
+**Done when** the test passes with both variables set in the runner's env.
+
+**Related:** TD-644.
+
+---
