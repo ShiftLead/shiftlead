@@ -77,7 +77,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
-| TD-664 | Build TD-658: a session's `ask` carrying `pr` refused until the PR's required checks are green, read as `done` reads them; `done --pr` refused while they run; the briefs say green before the hand-off | Medium | Open |
+| TD-664 | Build TD-658: a session's `ask` carrying `pr` refused until the PR's required checks are green, read as `done` reads them; `done --pr` refused while they run; the briefs say green before the hand-off | Medium | Slices 1–2 in #1685; slice 3 (briefs) left |
 
 ---
 
@@ -1521,7 +1521,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (the designer, TD-658's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slices 1–2 built (grinder-ao-1, PR #1685): `done --pr` refused while required checks run, a session's `ask --pr` read before it is sent. **Left: slice 3**, the briefs (fix step 3).
 **Location:** design §4.9b *The reader*, §4.8 *A `done` with a PR is told what its checks read*, §6 rule 10, §4.7; `src/sessionorc/agent.py` (`_checks_at_done` ~L2624 and its call ~L2572, the `pending` word ~L2655 and `ci: pending` ~L2588), `src/sessionorc/agent_mail.py` (`rpc_msg`'s `pr` check ~L250), `src/sessionorc/reports.py` (`at_done`, `pr_view`); the briefs: `src/shiftlead/briefs/grinder.stage.md`, `techlead.stage.md`, `docs/briefs/grinder-ao-*.md` (held, `docs/briefs/**`)
 
 **Why:** TD-658: Paul, 2026-10-13 — *an agent should not say its done if its PR is not green*; *I would expect grinders to make the PR green before handing it off to the techlead (or other depending on the workflow)*. TD-637 accepted a pending head at `done`, and nothing reads the hand-off.
