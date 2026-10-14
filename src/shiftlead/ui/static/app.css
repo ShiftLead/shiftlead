@@ -95,6 +95,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 #usagemore { cursor: default; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: var(--t-btn); font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn[hidden] { display: none; }  /* .btn sets display, which beats [hidden]: Settings' Cancel showed always (TD-296 #2) */
+.warn[hidden] { display: none; }  /* .warn sets display too: the Add entry form's error note drew as an empty orange box (TD-668) */
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); }
@@ -112,7 +113,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn:active:not(:disabled) { background-image: linear-gradient(var(--btn-wash), var(--btn-wash)); filter: var(--btn-shade) brightness(.94); box-shadow: inset 0 1px 3px rgba(0, 0, 0, .28); }
 .btn:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .input { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); font-family: inherit; display: flex; align-items: center; }
-input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
+input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; } #entrywhat.tall { height: 132px; }  /* the Add entry form's What, as the mockup draws it (TD-668) */
 /* Put on the board's *what's needed* (TD-281): four rows that grow with the text, then scroll */
 #batext { display: block; height: auto; padding: 8px 10px; min-height: 6.5em; max-height: 40vh; field-sizing: content; overflow-y: auto; resize: vertical; font-family: inherit; line-height: var(--lh); }
 /* Deny's optional reason (§4.5a, TD-117): button-height, and it gives way before a button does */

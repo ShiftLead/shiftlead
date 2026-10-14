@@ -11710,3 +11710,23 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Related:** TD-613, TD-614, TD-618.
 
 **Resolved:** 2026-10-14 (grinder-ao-1, PR #1723) — at the home, the tick's `_red_prs` now also saves `workorders.red_holders`. It goes under the reading's `pr_orders.held` as `{n: [names]}`: each PR red for `ORPHAN_AFTER` that a live record holds, found by `holds_pr` in the same pass as the orders. `teamrun.red_prs` (the facet and the Repo page's *held by <name>*) reads it, and `teamrun.pr_holders` is gone (`git grep pr_holders src/` is empty). One test checks that the page names the holder the home found; design §4.4 says the reading names the holders.
+
+## TD-668: The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2, TD-633's look on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/templates/base.html` (`#entrywhat`, `#entryerr`), `src/shiftlead/ui/static/app.css` (`.input` L114: `height: 34px`, which a `textarea.input` keeps unless it is `.tall`; `.warn` L130: `display: flex`, which beats the UA's `[hidden]`)
+
+**Why:** read on TD-633's screenshots (`docs/mockups/reviews/2026-10-13-td633-form.png`): **What** carries `rows="6"` but draws one line and a half, so a page of words — or the attachment paths the form now inserts — scrolls in a box the mockup (`docs/mockups/gen.py` `add_entry`, 132 px) draws four times as tall; and `<p class="note warn" id="entryerr" hidden>` shows as an empty orange box under **Open a session** whenever there is no error. Not TD-633's change: neither rule is touched by it.
+
+**Fix:** `#entrywhat` gets `tall` (or a height of its own near the mockup's); a `.warn[hidden] { display: none; }` rule beside `.btn[hidden]`'s, and a grep for other `warn` nodes that rely on `hidden`. A test that the form's textarea is `tall` and the stylesheet hides a hidden `.warn`.
+
+**Done when** the form's **What** draws several lines, no empty warning box shows on a form with no error, and the test holds.
+
+**Related:** TD-633 (found on its look), TD-219 (the form), TD-296 (the same `[hidden]` fault on `.btn`, `.radio`).
+
+**Resolved:** 2026-10-14 (grinder-ao-2, PR #1724) — `#entrywhat` carries `tall`, sized `#entrywhat.tall { height: 132px; }` as the mockup draws it; `.warn[hidden] { display: none; }` beside `.btn[hidden]`, which also hides `board_add.html`'s `#baerr` and the Settings page's Telegram line when hidden. `tests/test_ui_entry.py` holds both; on a scratch home under headless Chromium **What** drew 132 px, the hidden error computed `display: none` and an un-hidden one `flex` (`docs/mockups/reviews/2026-10-14-td668-form.png`).

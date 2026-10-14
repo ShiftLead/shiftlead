@@ -63,7 +63,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
-| TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 
 ---
 
@@ -1158,26 +1157,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the director grooms the person's file on its interval and on a press, seeding it the first time, a remembered answer reaches the next pass, the interview proposes, every change reaches the file only by the person's Accept or hand edit, and the tests above pass.
 
 **Related:** TD-657 (the design), TD-661, TD-662, TD-210 (the home's work tree).
-
----
-
-## TD-668: The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (grinder-ao-2, TD-633's look on a scratch home)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/base.html` (`#entrywhat`, `#entryerr`), `src/shiftlead/ui/static/app.css` (`.input` L114: `height: 34px`, which a `textarea.input` keeps unless it is `.tall`; `.warn` L130: `display: flex`, which beats the UA's `[hidden]`)
-
-**Why:** read on TD-633's screenshots (`docs/mockups/reviews/2026-10-13-td633-form.png`): **What** carries `rows="6"` but draws one line and a half, so a page of words — or the attachment paths the form now inserts — scrolls in a box the mockup (`docs/mockups/gen.py` `add_entry`, 132 px) draws four times as tall; and `<p class="note warn" id="entryerr" hidden>` shows as an empty orange box under **Open a session** whenever there is no error. Not TD-633's change: neither rule is touched by it.
-
-**Fix:** `#entrywhat` gets `tall` (or a height of its own near the mockup's); a `.warn[hidden] { display: none; }` rule beside `.btn[hidden]`'s, and a grep for other `warn` nodes that rely on `hidden`. A test that the form's textarea is `tall` and the stylesheet hides a hidden `.warn`.
-
-**Done when** the form's **What** draws several lines, no empty warning box shows on a form with no error, and the test holds.
-
-**Related:** TD-633 (found on its look), TD-219 (the form), TD-296 (the same `[hidden]` fault on `.btn`, `.radio`).
 
 ---
 

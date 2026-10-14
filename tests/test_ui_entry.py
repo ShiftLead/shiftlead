@@ -303,3 +303,18 @@ def test_attach_is_refused_in_place_where_the_team_runs_on_a_node(tmp_path, monk
     assert what < form.index('id="entryattach"') < form.index('name="entrytype"')
     assert '<input type="file" id="entryattachfile" multiple hidden>' in form
     assert 'id="entryattachcancel"' in form and "drop a file on the box" in form
+
+
+def test_the_forms_what_is_tall_and_a_hidden_warning_draws_nothing():
+    """TD-668: **What** is the tall textarea (the mockup's 132 px, not `.input`'s 34), and a `.warn`
+    carrying `hidden` is hidden — `.warn` sets `display`, which beats the UA's `[hidden]`, so the
+    form's error note drew as an empty orange box."""
+    from shiftlead.ui import app as ui
+
+    root = Path(ui.__file__).parent
+    html = (root / "templates" / "base.html").read_text()
+    assert '<textarea class="input tall" id="entrywhat" rows="6">' in html
+    assert '<p class="note warn" id="entryerr" hidden></p>' in html
+    css = (root / "static" / "app.css").read_text()
+    assert ".warn[hidden] { display: none; }" in css
+    assert "#entrywhat.tall { height: 132px; }" in css
