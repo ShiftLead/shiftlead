@@ -213,7 +213,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
      `every`, `work`, and `prompt`, the org's director seat's alone: due while a prompt no rule of the
      person's answered is pending on an unattended record of the org, cleared when none is, §4.9b
-     *The director seat*, TD-636), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
+     *The director seat*, TD-636; the director's seat is also due by `asks` while a question passed
+     up to it is open in its inbox, and by **`groom`** once `director.groom` has passed since its last
+     groom pass concluded, or at a press of **Groom now**, §4.9b *The director answers what is passed
+     up to it*, TD-657), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
      cleared again if it returns to zero before a fill — the question was answered elsewhere);
      for `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to
      the seat's repo's default branch since the seat's record was created, read with `gh` on the

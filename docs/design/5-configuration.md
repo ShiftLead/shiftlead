@@ -46,8 +46,9 @@ teams:                                        # per team, by the name org.yml or
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
 permissions:                                  # TD-636, §4.9b *The director seat*: per role, the adapter's rule syntax; a deny wins
   grinder: {allow: ["Bash(pdm run test:*)", "Bash(gh pr view:*)"], deny: ["Bash(rm -rf:*)"]}
+director: {level: conservative, groom: 7d}    # TD-657, §4.9b *The director answers what is passed up to it*: conservative | extrapolate | liberal; groom every <duration> | off
 repos:                                        # per registered checkout, by its directory name
-  shiftlead: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
+  shiftlead: {promote: {auto: false}, pull: true, director: {level: extrapolate}}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
@@ -247,8 +248,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
 
 - Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
   the org file, which holds what no one repo can: projects and teams that span repos, `place:`
-  and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` are tracked
-  by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
+  and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` (and the
+  person's `preferences.md`, §4.9b, TD-657) are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
   left at the home has a history*).
   The org file: `~/.shiftlead/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own, each preset checked key by key
@@ -266,7 +267,7 @@ teams:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
 roles:
   grinder: {profile: grind}
-director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt`; absent, none
+director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt` (with `asks` and `groom`, TD-657); absent, none
 ```
 
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under

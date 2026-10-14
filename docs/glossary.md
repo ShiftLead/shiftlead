@@ -72,10 +72,17 @@ not mix:
   is `ao`, and `shiftlead` remains the name of the packages, the state directory, the units and
   the config file until TD-060's machine-side step. — **decided** 2026-09-21 (Paul).
 - **designer** — a team's design member: an `unattended` session whose lane is the ledger's `design-first` entries, and any entry blocked by `decision (designer)` (TD-367). It writes the design and the entries the grinders pick, merges nothing on a held path, and shows the person only what needs them — an obvious design is merged and noted, a defensible default is a bounded `steer`, taste is an `ask` with answers (design §4.8 *Role names*, TD-120; decided 2026-09-24, an interactive seat from 2026-09-23 until then).
-- **director** — the session that coordinates managers: its members are managers, not workers. **The director seat** (TD-636) is the org's one seat that answers unattended members' permission prompts no rule of the person's answered, holding `permit` (design §4.9b).
+- **director** — the session that coordinates managers: its members are managers, not workers. **The director seat** (TD-636) is the org's one seat that answers unattended members' permission prompts no rule of the person's answered, and the questions techleads pass up, from the person's **preferences** (TD-657), holding `permit` (design §4.9b).
   The coordinating director is not treated specially (design §4.8): that word names a position in the
   graph, not a kind of session; the director *seat* is a seat, with its own trigger and grant. Director > manager > worker. *Not:* conductor (decided and replaced the same
   day), orc-of-orcs, orchestrator of orchestrators, top orc. — **decided** 2026-09-16 (Paul).
+- **preferences** — what the person has written of what they would say, in layers the director reads
+  in order, the most specific winning: the package's defaults, the person's own
+  (`~/.shiftlead/preferences.md`, private), a repo's (`.shiftlead/preferences.md`, checked in), and the
+  person's section for that repo (design §4.9b *The director answers what is passed up to it*,
+  TD-657). Groomed into general sentiments by the director's **groom pass**, every change landing as a
+  *proposal* the person accepts. *Not:* memory (a session's own facts, cadence §7), a brief (what a
+  role does), a primer (an index of where things are written).
 - **member** — the graph relation, not a position: B is A's member when B's `controllers` name
   A. A worker is its manager's member; a manager is its director's member. — **decided** 2026-09-16
   (Paul), as the relation behind *worker*.

@@ -72,10 +72,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 | TD-654 | Rule 8's start (and a schedule's replay) replays a team's seats live: an on-call manager or techlead filled for nothing and closed two minutes later | Medium | Designed — TD-660 builds it |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
-| TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Open |
+| TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Designed — TD-661, TD-662, TD-663 build it |
 | TD-658 | "Green before hand-off" is not enforced: a held PR's `ask` to its reader is taken on a red or pending PR, and `done --pr` is accepted as *checks pending* | Medium | Open |
 | TD-659 | `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why | Low | Open |
 | TD-660 | Build TD-654: rule 8's start writes every seat it replays held — `create` with `held`, no pane, `restarts` `held: true` — and its first tick fills it only for a cause | Medium | Open |
+| TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
+| TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
+| TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
 
 ---
 
@@ -1392,7 +1395,8 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (ao-paul, with Paul — after TD-636's round)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-13 (the designer) — design §4.9b *The director answers what is passed up to it, from the person's preferences*, with §4.5a (the *preferences proposed* row, the Settings page's **Director** card, **Remember this**, the level on *answered for you*), §4.7 `ao prefs`, §4.9 (the home's work tree tracks `preferences.md`), §5 (`director: {level, groom}`, `repos.<repo>.director.level`), §6 rule 3 (the director's `asks` and `groom`), the glossary's *preferences*. The six points: (1) `--pass-up` goes to the director where the org defines one, once per passer (`passes`), the director's pass to the person; (2) the layers — `src/shiftlead/briefs/preferences.md` → **`~/.shiftlead/preferences.md`** (the person's, private, tracked by the home's work tree) → a repo's `.shiftlead/preferences.md` → the person's `## <repo>` section; the floor (*Always ask me*, the Never list, *What always reaches the person*) no layer lowers; the package and person layers filled into the brief as `{preferences}`, the repo's read in the asker's repo, a preference cited where it is written; (3) `director.level` (`conservative` default, `extrapolate`, `liberal`), overridden per repo, on `answered.level` and the row; (4) prompts judged against the preferences too, at the level; (5) the groom pass (`director.groom`, `7d`; **Groom now**), seeded on its first run from the boards' `Decided:` lines and the person's dated quotes, **Remember this** on a reply to a director's pass, the interview (an interactive session of the person's), every change a proposal (`ao prefs propose`) the person **Accept**s; (6) **Open file** on the Director card's layers and on an *answered for you* row citing a preferences file. TD-661, TD-662 and TD-663 build it.
+**Blocked by:** TD-661, TD-662, TD-663
 **Location:** design §4.9b *The director seat answers permission prompts for the person* (TD-636), *Passing up keeps the thread and the asker* (`pass_up` is *only to the person*), *Its standing context: a primer*, *What it may answer*; §5 (`settings.yml`, `org.yml`); §2 goal 6 (*Jump out*); briefs' layering (`src/shiftlead/briefs/`, `docs/briefs/`)
 
 **Why:** TD-636's design (#1661) makes the director one per org, judging permission prompts by its brief (`director.md`). Paul, the same day, set its larger shape:
@@ -1472,5 +1476,86 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** a rule 8 start writes every seat it replays with no pane and the first tick fills one only for a cause, and the tests above pass; TD-413's live check (a week of journal with no seat closed with nothing due straight after a rule 8 start) is read once it is live.
 
 **Related:** TD-654 (the design), TD-413 (its live check, blocked by this), TD-410 (the held Start), TD-133 (the schedule's replay, same rule when built), TD-227 (rule 8's start).
+
+---
+
+## TD-661: Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-657's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-642
+**Location:** design §4.9b *Passing up keeps the thread and the asker*, *The director answers what is passed up to it*, §6 rule 3 (`asks` on the director seat), §4.5a *Inbox row: passed up*; `src/sessionorc/agent_mail.py` (`rpc_pass_up` ~L981, the `passed_up` refusal ~L1009 and ~L161), `src/sessionorc/agent_tick.py` (rule 3's `seat_due` for the director), `src/shiftlead/ui/` (the passed-up row), `src/shiftlead/briefs/techlead.md`, `director.md` (TD-642's)
+
+**Why:** TD-657: Paul, 2026-10-13 — *techleads would pass questions that they could not answer to it*; today `pass_up` goes only to the person.
+
+**Fix:**
+1. `pass_up`: open to the addressee once **per passer** — `passes: [{by, at, recommend}]` appended, `passed_up` the latest time; a second pass by the same passer refused. Where the org's director seat record exists and the passer is not it, the asker's entry goes to the director's inbox; else, and from the director, to the person as today (the full-inbox refusal only there).
+2. Rule 3: the director seat is due by `asks` while a question passed up to it is open in its inbox (as a techlead's `asks`); its *filled for* line names the question.
+3. The person's copy draws each pass's recommendation, the latest first (`ao inbox` and the row).
+4. `director.md` gains the question half: answer with `--source` or pass up with a recommendation; a `steer`'s bound is not extended. `techlead.md` says a pass reaches the director where there is one.
+5. Tests: a techlead's pass with a director lands in the director's inbox and makes it due; the director's pass reaches the person with both recommendations; a second pass by the same passer is refused, the director's after the techlead's accepted; with no director the pass goes to the person as before; the person's reply goes to the asker and closes every copy.
+
+**Done when** a question a techlead passes up reaches the director where the org has one and the person otherwise, the director's pass reaches the person showing both recommendations, and the tests above pass.
+
+**Related:** TD-657 (the design), TD-642 (the seat), TD-662, TD-663.
+
+---
+
+## TD-662: Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-657's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-642
+**Location:** design §4.9b *The director answers what is passed up to it* (*Preferences, in layers*, *Its first read*, *A level the person sets*), §4.5a (Settings page **Director** card, *Inbox row: answered for you*), §4.7 `ao prefs`, §5 `settings.yml` `director:`; `src/shiftlead/briefs/` (new `preferences.md`; `director.md`), `src/sessionorc/brief.py` (`fill`: `{preferences}`), `src/sessionorc/settings.py` (the keys), `src/sessionorc/agent_mail.py` (`answered.level`), `src/shiftlead/cli.py`, `src/shiftlead/ui/` (Settings, Inbox)
+
+**Why:** TD-657: Paul, 2026-10-13 — *preferences per repo … with some set of defaults like we do for briefs*; *conservative … reasonably extrapolated, or answer liberally*; *a button for the user to be able to open the pref file in an editor*.
+
+**Fix:**
+1. `src/shiftlead/briefs/preferences.md`: the package's defaults, under the topic headings (*Spending*, *Scope*, *Risk*, *Style*, *Always ask me*, *Permissions*), short.
+2. `{preferences}` in `director.md`, filled at each fill with the package's file, then `~/.shiftlead/preferences.md` (absent: *none written*); the director's *filled for* line names the asking repo's `.shiftlead/preferences.md` and its primer to read there. `director.md` states the order, the floor, the three levels and the citation form.
+3. `settings.yml` `director: {level, groom}` and `repos.<repo>.director.level`, validated (`conservative|extrapolate|liberal`; a duration or `off`), written by `set_settings`; the level in force handed on the fill and recorded on a sourced reply as `answered.level`.
+4. The *answered for you* row names the level and draws **Open file** on a source that is a preferences file.
+5. The Settings page's **Director** card (level, per-repo picks, groom every, the layers with Open file and *create it*), drawn when `org.yml` defines `director:`; `ao prefs` (the listing).
+6. Tests: the fill carries both layers in order; a bad level is refused by `set_settings`; a repo's override wins for its questions; `answered.level` is written and drawn; the card's Save writes both keys.
+
+**Done when** the director's fill carries the package's and the person's preferences and names the repo's, the level is set per org and per repo and shown on every answer, the Director card and `ao prefs` show the layers, and the tests above pass.
+
+**Related:** TD-657 (the design), TD-642 (the seat and `director.md`), TD-661, TD-663.
+
+---
+
+## TD-663: Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-657's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-661, TD-662
+**Location:** design §4.9b *The director answers what is passed up to it* (*Grown and groomed*, *Remember this*, *The interview*), §4.5a (*Inbox row: preferences proposed*, *Inbox row: passed up*'s Remember this, the Director card's Groom now and Interview), §4.7 `ao prefs`, §4.9 *What is left at the home has a history*, §6 rule 3 (`groom`); `src/sessionorc/agent_settings.py` (`_commit_defs` ~L271 / `rpc_commit_defs` ~L312: `preferences.md` tracked; new `prefs_propose`, `prefs_accept`, `prefs_discard`), `src/sessionorc/agent_tick.py` (the `groom` cause), `src/sessionorc/agent_mail.py` (`remember` on a reply, kept until a pass concludes), `src/shiftlead/briefs/` (new `interview.md`; `director.md`'s groom half), `src/shiftlead/cli.py`, `src/shiftlead/ui/`
+
+**Why:** TD-657: Paul, 2026-10-13 — *we would want the preferences routinely groomed so that it becomes general sentiments instead of specifics*; *would we need an interview to set those up?*
+
+**Fix:**
+1. The home's work tree tracks `preferences.md`; a hand edit is committed *edited by hand* as the other definitions are.
+2. `prefs_propose {text, why}` from the director seat or an interactive session (refused from any other): writes `~/.shiftlead/preferences.proposed.md` (a newer replaces it) and the *preferences proposed* row; `prefs_accept` / `prefs_discard`, a person's own — accept moves it over and commits *preferences: <why>* — and either concludes the groom pass.
+3. Rule 3's `groom` on the director: due `director.groom` after the last conclusion (none yet: at once), or on `ao prefs groom` / **Groom now**; not while a proposal stands.
+4. `director.md`'s groom half: read the file, the remembered answers and, the first pass or with the file empty, the seed (every registered repo's board `Decided:` lines, the person's dated quotes in its ledger and design history); write general sentiments, a remembered line about one repo under its `## <repo>` heading; name the gaps in `--why`.
+5. **Remember this** on the compose of a reply to a question the director passed up: `remember: true` on the reply and the director's copy, kept until a groom pass concludes.
+6. `ao prefs interview` / **Interview**: the person's interactive session with `interview.md` (the layers, the last gaps), ending in `ao prefs propose`.
+7. Tests: a proposal from the director writes the row and a member's is refused; Accept commits and Discard deletes, each concluding the pass; `groom` is due on the interval and on the press and not while a proposal stands; a remembered reply survives the inbox's aging until the pass concludes; a hand edit is committed.
+
+**Done when** the director grooms the person's file on its interval and on a press, seeding it the first time, a remembered answer reaches the next pass, the interview proposes, every change reaches the file only by the person's Accept or hand edit, and the tests above pass.
+
+**Related:** TD-657 (the design), TD-661, TD-662, TD-210 (the home's work tree).
 
 ---
