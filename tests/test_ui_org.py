@@ -4,6 +4,7 @@ grouping function, and one render of the page template over its output."""
 from __future__ import annotations
 
 import pathlib
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -282,6 +283,29 @@ def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(mo
     assert 'class="badge needs" id="personneeds">1</span>' in one
 
 
+def test_ready_to_close_reads_the_agent_itself_first(monkeypatch, tmp_path):
+    """Design §4.2 (TD-679): a session mid-turn is not ready to close. The agent's own state is the
+    checklist's first row, so `ready_ok` and `not_ready` carry it, and the card's *more ▾* **Close**
+    is disabled on a working session with a clean, pushed tree, saying why; idle and exited pass."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
+
+    clean = {"dirty": 0, "ahead": 0, "upstream": "origin/x", "branch": "x"}
+    base = {"id": "ao-w", "name": "w", "dir": "/tmp/a", "kind": "agent", "git": clean, "tail": []}
+    v = view({**base, "state": "working"}, [])
+    assert v["ready"][0] == ("agent working — wait or Wrap up", False)
+    assert v["ready_ok"] is False and v["not_ready"] == ["agent working — wait or Wrap up"]
+    card = templates.get_template("card.html").render(s=v)
+    close = re.search(r'<button data-act="close"[^>]*>', card).group(0)
+    assert "disabled" in close and "agent working" in close, close
+    for state, word in (("needs-you", "agent needs you"), ("stalled?", "agent stalled?"), ("limited", "agent limited")):
+        assert view({**base, "state": state}, [])["ready"][0] == (word, False)
+    for state in ("idle", "exited"):
+        v = view({**base, "state": state}, [])
+        assert v["ready"][0] == ("agent not working", True) and v["ready_ok"] is True
+    assert "ready to close ✓" in templates.get_template("card.html").render(s=view({**base, "state": "idle"}, []))
+
+
 def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph(monkeypatch, tmp_path):
     """Design §4.2 (2026-09-17): a lead idle between rounds, log pushed, used to read *ready to
     close ✓* over working members. The item comes from `controllers`, not a role — and a session
@@ -299,7 +323,8 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     assert "ready to close ✓" not in templates.get_template("card.html").render(s=v)
     # a plain worker's checklist is what it always was
     assert [n for n, _ in view(worker, fleet)["ready"]] == [
-        "tree clean", "branch pushed", "no subagents running", "outcomes reported", "mail read",
+        "agent working — wait or Wrap up", "tree clean", "branch pushed", "no subagents running",
+        "outcomes reported", "mail read",
     ]  # fmt: skip
     # design §4.2, §4.10 *Outcomes* (TD-079): the person answered and has not been told what came
     # of it — the same fact `ao progress none` is refused on, for a session that never declares
@@ -1090,7 +1115,8 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
     assert asking.count("primary") == 1 and 'class="btn sm primary" data-act="allow"' in asking
     assert 'class="btn sm link" href="/focus/ao-w"' in asking  # Focus is not the next act here
     # the default card is dirty: Close in more is disabled, and says why
-    assert 'data-confirm="Close w?" disabled title="not ready to close — tree clean' in working
+    why = "not ready to close — agent working — wait or Wrap up, tree clean"
+    assert f'data-confirm="Close w?" disabled title="{why}' in working
     clean = {"branch": "w", "dirty": 0, "unpushed": 0}
     closes = 'title="Kills the session and reaps its worktree; the record reads closed.">Close</button>'  # TD-167
     assert f'data-confirm="Close w?" {closes}' in foot(_card(git=clean))
