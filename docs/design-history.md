@@ -1232,6 +1232,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-13 (TD-654, the designer): **a replay of the team writes its seats held** (rule 3) — rule 8's start and §6 *Schedule*'s replay hand each seat to `create` with `held`, `restarts` `held: true`, so a replayed seat is on call with no pane. Before it, rule 8 replayed every seat live: three starts from 2026-10-11 to 2026-10-13 (ao-grind, dc-grind, cm-grind) filled five seats with nothing due, each closed about two minutes later (TD-413's live check). Built by TD-660.
 - 2026-10-13 (TD-636, the designer): *What is left is judgement* — a profile's `permission_prompts: ask` keeps its prompts, which meet the rules and the director before a manager. Built by TD-641, TD-642.
 - 2026-10-13 (TD-637, the designer): rule 10 receives only PRs green, pending or merged at the declaration; a pending one failing later is its *fail*. Built by TD-639.
 - 2026-10-12 (TD-619, the designer): *Keeping a team running* says a definition's later edit reaches a launch record only by Apply; rule 7's `relaunch` mark carries `profile`. Built by TD-620.
