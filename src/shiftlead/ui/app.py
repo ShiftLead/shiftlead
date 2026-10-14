@@ -311,6 +311,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     lane_count,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
+    pr_ref,  # noqa: F401
     repo_facet,  # noqa: F401
     rollup,  # noqa: F401
     team_lanes,
