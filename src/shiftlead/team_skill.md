@@ -135,18 +135,20 @@ teams:
   on it is `done` or `dropped`.
 - **A repo with little or no work** (`ao doctor repos` reads its ledger's count): a start whose every
   member's lane holds nothing to pick is refused (step 5), so a `free-pick` team on an empty ledger
-  does not start. Run an on-call manager alone — leave `members:` out; the manager has no lane, so
-  there is nothing to refuse — or one member, started with `ao team start <name> --anyway`.
+  does not start. Run an on-call manager alone (leave `members:` out) or one member, and start it with
+  `ao team start <name> --anyway`: the team's anchor seat has a lane too, so an empty ledger refuses
+  either shape without it.
 
 A team whose only project is one repo can live in **that repo's** `.shiftlead.yml` under `teams:`
 instead, and travels with the checkout. The org file wins a name collision. **Which file:** the
 repo's, when the team works that one repo from its checkout on the machine you start it from —
 its `projects:` defaults to the repo, and the project is made from the checkout it was read in;
 `org.yml`, when the team spans repos or nests another, because only `org.yml` says where a
-checkout is on a host. **A public repo's team goes in `org.yml`** whatever its shape: the repo's file
-is published with the repo, and with it the definition's profile and session names. A repo's team that should run on a node stays in the repo: `org.yml` places
+checkout is on a host. A repo's team that should run on a node stays in the repo: `org.yml` places
 it with `place: {<team>: <host>}`, and its checkout there is that host's registry entry of the
-repo's name (a repo's file never names a host).
+repo's name (a repo's file never names a host). **A public repo's team goes in `org.yml`**, whatever its
+shape and wherever it runs: the repo's file is published with the repo, and with it the definition's
+profile and session names.
 
 `.shiftlead.yml` takes these keys and refuses any other: `ledger`, `roles`, `controllers`,
 `teams` and `promote` (read by the home's promote, design §6), `gate` (the merge gate's command,

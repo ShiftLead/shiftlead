@@ -12150,7 +12150,7 @@ The window's `w.name` assignment, by contrast, is caught.
 (3) A public repo's `.shiftlead.yml` publishes its team definition, including profile and session names. The recipe's **Which file:** lead-in should say to keep a public repo's team in `org.yml`.
 (4) The closing section is headed *For a Claude session told to do this*, though a session may be another tool's.
 
-**Resolved:** 2026-10-14 (PR #1760) — `team_skill.md` gains step 0b *Is the repo ready?* (`ao doctor repos`, `ao repo init`), *A repo with little or no work* after `lane:` (an on-call manager alone, whose role has no lane, or one member with `--anyway`), *A public repo's team goes in `org.yml`* in *Which file*, and the close headed *For an agent session told to do this*; `test_the_recipe_covers_a_repos_first_team` pins the four.
+**Resolved:** 2026-10-14 (PR #1760) — `team_skill.md` gains step 0b *Is the repo ready?* (`ao doctor repos`, `ao repo init`), *A repo with little or no work* after `lane:` (an on-call manager alone or one member, either started with `--anyway`, since the anchor seat's lane is read too), *A public repo's team goes in `org.yml`* in *Which file*, and the close headed *For an agent session told to do this*; `test_the_recipe_covers_a_repos_first_team` pins the four.
 
 **Fix:** a step 0b, *Is the repo ready?*, with `ao doctor` and `ao repo init`; a sentence on a small repo's team after `lane:`; the public-repo sentence in *Which file*; the heading made tool-neutral.
 
