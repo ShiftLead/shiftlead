@@ -827,12 +827,18 @@ def test_a_red_prs_order_is_the_anchors_and_free_picks_only_where_no_team_has_an
     board = {"id": "board:00aa11bb", "title": "b", "for_page": "pickable", "pickable": "yes", "work_order": True}
     r = {"ledger": {"entries": []}, "work_orders": {"orders": [board]}, "pr_orders": {"orders": [red], "told": {}}}
     entries = teamrun.lane_entries(r)
-    assert [e["id"] for e in entries] == ["board:00aa11bb", "pr:7"] and teamrun.pr_orders(r) == [red]
+    assert [e["id"] for e in entries] == ["board:00aa11bb", "pr:7"] and teamrun.pr_orders(r) == [
+        {**red, "owner": "anchor"}
+    ]
+    assert teamrun.lane_kinds({**r, "ledger": {"by_kind": {"pickable": 2}}})["pickable"] == 4  # both orders counted
     g = {"id": "g1", "name": "grinder", "team": "t", "repo": str(repo), "lane": ["free-pick"], "state": "idle"}
     assert teamrun.repo_lanes(entries, repo, [g])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
     anchor = {"id": "a1", "name": "anchor", "team": "u", "repo": str(repo), "lane": ["anchor"], "state": "closed"}
     got = teamrun.repo_lanes(entries, repo, [g, anchor])
     assert got["t"]["pickable"] == ["board:00aa11bb"] and got["u"]["pickable"] == ["board:00aa11bb", "pr:7"]
+    assert got["t"]["rest"] == [{"owner": "anchor", "n": 1, "ids": ["pr:7"]}]  # the anchor's, never unowned
+    both = {**g, "lane": ["free-pick", "anchor"]}  # one team holding both words takes it
+    assert teamrun.repo_lanes(entries, repo, [both])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
     assert "free_pick" not in red  # the reading's own entry is never written to
     assert teamrun.pr_orders({"pr_orders": None}) == [] and teamrun.pr_orders(None) == []
 

@@ -1035,9 +1035,14 @@ def work_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
 
 def pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """A repo reading's red PRs nobody holds, `pr:<n>` (§4.4 *A red PR nobody holds is a work order*,
-    TD-613), as entries; none from an agent that predates them."""
+    TD-613), as entries, each owned by the anchor seat whose lane takes it — so a lane that does not
+    reads it as the anchor's, never as unowned; none from an agent that predates them."""
     got = ((r or {}).get("pr_orders") or {}).get("orders")
-    return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
+    if not isinstance(got, list):
+        return []
+    return [
+        {**e, "owner": e.get("owner") or ledger_mod.ANCHOR_OWNER} for e in got if isinstance(e, dict) and e.get("id")
+    ]
 
 
 def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
@@ -1049,10 +1054,11 @@ def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
 
 
 def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
-    """The ledger's counts by the page's kind, a work order counted *pickable* (§4.5a *Repo page:
-    decided lines*, TD-384) — never in the priorities, which are the ledger's alone."""
+    """The ledger's counts by the page's kind, a work order — a decided line (§4.5a *Repo page:
+    decided lines*, TD-384) or a red PR nobody holds (TD-613) — counted *pickable*, as the lanes take
+    them; never in the priorities, which are the ledger's alone."""
     kinds = dict(((r or {}).get("ledger") or {}).get("by_kind") or {})
-    if n := len(work_orders(r)):
+    if n := len(work_orders(r)) + len(pr_orders(r)):
         kinds["pickable"] = int(kinds.get("pickable") or 0) + n
     return kinds
 
