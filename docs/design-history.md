@@ -82,6 +82,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-13 (TD-638, the designer; Paul, 2026-10-13, the lessons ADR's lesson 8: *as we start using more models, recording which did what is a good idea … could expand it to list the actual model*): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE` (`<git-dir>/shiftlead-agent-model`, rewritten when the model in use changes); the commit hook writes one `Agent-Model: <adapter>/<model>` trailer, not a second co-author. Built by TD-644, TD-645.
 - 2026-10-13 (TD-629, grinder-ao-1; Paul: *I answered a question in the terminal (for dc-paul) but shiftlead does not seem to handle that properly*): a permission answered in the terminal ends its waiter at the session's next hook event — the asked call's tool event, or a `Stop`, a prompt or a `SessionEnd` — and the hook's timeout sets the terminal's question only while the record's pending is still that waiter's. Until this date nothing but `decide` ended a waiter, so ten minutes after a terminal answer the timeout set *needs you* over the record's later `idle`; and a question reaching `PermissionRequest` read as its tool input's JSON.
 - 2026-10-13 (TD-636, the designer): an unattended prompt meets the person's rules, then the director, then the person. Built by TD-641, TD-642.
 - 2026-10-12 (TD-597, the build): `transcript` is the path the hook reports (Claude Code's `transcript_path`), not the adapter's locator, which finds no file before the conversation's first write and so had nothing to set at the first hook. Was: the adapter's `transcript_path`.
@@ -123,6 +124,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-13 (TD-638, the designer): the model in use is also written to the session's `AGENT_MODEL_FILE`. Built by TD-644.
 - 2026-10-13 (TD-636, the designer): a profile's `permission_prompts: ask | skip` — under `ask` an unattended launch keeps its prompts for the person's rules and the director seat. Built by TD-641.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §4.2a cut to what a profile is — what left: the stale *not built — TD-233* on the reported reading (built, §4.4 *Usage*); *How a profile is billed* designed 2026-09-25 by the designer (#547) and reconciled the same day in a cloud session with Paul, built 2026-09-27 by TD-151 slices 1, 3, 5 and 4; the `config_dir` refusal's TD-151; the week's numbers behind the prompt-cache pin (2026-10-01–08: 4% of requests came 5–60 minutes after the one before, about 60% more than the week cost — the ADR keeps them); the pace's TD-151 decided 2026-10-07; 1,365 → 1,281 words.
 - 2026-10-09 (TD-458, the designer): **a metered profile's prompt cache lives an hour** — the adapter's launch sets `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` for a `metered` profile unless the host agent's environment carries the key; no profile field. ADR 2026-10-08 option 2, Paul's decision. Built by TD-470.
@@ -1397,6 +1399,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 8. Lessons carried in
 
+- 2026-10-13 (TD-638, the designer): *A synced file never calls `ao`* gains `AGENT_MODEL` and `AGENT_MODEL_FILE`. Built by TD-644, TD-645.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *Which side a thing lives on* becomes three layers — ledgerboard holds the formats once, dev-cadence how a repo works, ShiftLead how sessions are run — and *no second parser* in place of the 2026-10-08 paragraph's second reader held by a parity test. Built by TD-585.
 - 2026-10-08 (TD-425, grinder-ao-1): the synced-file rule's `CADENCE_ATTENTION_SCOPE` is set by every launch (§4.3); the hook's `ao status` branch stays the one exception until dev-cadence drops it on TD-425's live check.
 - 2026-10-08 (TD-159, the anchor): the rule for which side a thing lives on, agentorc or dev-cadence, added from the inventory in ADR 2026-10-08. A synced file never calls `ao`, and agentorc passes a difference in by an environment variable.
