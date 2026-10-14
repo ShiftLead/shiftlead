@@ -32,7 +32,6 @@ from sessionorc.models import (
 )
 
 log = logging.getLogger(__name__)
-RULES = "rules"  # the answerer an *Answered for you* FYI names for the person's `permissions:` (§4.9b)
 
 
 class HookMixin:
@@ -103,22 +102,29 @@ class HookMixin:
         if not rules:
             return None
         try:
-            matches = getattr(adapters.get(s.adapter), "rule_matches", None)
+            adapter = adapters.get(s.adapter)
         except KeyError:
             return None
+        matches = getattr(adapter, "rule_matches", None)
         if matches is None:
             return None
         cwd = Path(s.dir)
-        hit = next((r for r in rules.get("deny", []) if matches(r, tool, tool_input, cwd=cwd, deny=True)), None)
-        behavior = "deny"
-        if hit is None:
-            hit = next((r for r in rules.get("allow", []) if matches(r, tool, tool_input, cwd=cwd)), None)
-            behavior = "allow"
+        try:
+            hit = next((r for r in rules.get("deny", []) if matches(r, tool, tool_input, cwd=cwd, deny=True)), None)
+            behavior = "deny"
             if hit is None:
-                return None
-            if why := permits.always_the_person(tool_input, s.dir, s.repo):
-                log.info("%s: rule %s would allow %s, but %s: the person answers it", s.id, hit, tool, why)
-                return None
+                hit = next((r for r in rules.get("allow", []) if matches(r, tool, tool_input, cwd=cwd)), None)
+                behavior = "allow"
+                if hit is None:
+                    return None
+                strings = getattr(adapter, "prompt_strings", lambda *_: None)(tool, tool_input)
+                touched = permits.all_strings(tool_input) if strings is None else strings
+                if why := permits.always_the_person(touched, s.dir, s.repo):
+                    log.info("%s: rule %s would allow %s, but %s: the person answers it", s.id, hit, tool, why)
+                    return None
+        except Exception:  # noqa: BLE001 — a rule that cannot be read answers nothing: the person does
+            log.exception("%s: the permissions: rules could not be matched; the prompt waits", s.id)
+            return None
         reason = f"rule: {hit}"
         self._answered_by_rule(s, event.get("text") or tool, behavior, hit)
         return {"behavior": behavior, "reason": reason}
@@ -140,7 +146,7 @@ class HookMixin:
         )
         note.team = getattr(s, "team", "") or None
         note.subject = mail.subject_of(f"{verdict}: {prompt}")
-        note.answered = {"question": prompt, "asker": s.id, "answerer": RULES, "source": source}
+        note.answered = {"question": prompt, "asker": s.id, "answerer": mail.RULES, "source": source}
         self.person_inbox.append(note)
         self.person_store.save(self.person_inbox)
 

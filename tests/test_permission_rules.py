@@ -52,6 +52,9 @@ def test_bash_rules_prefix_exact_and_compound(tmp_path):
     # a deny matches when any part does
     assert m("Bash(rm -rf:*)", "Bash", {"command": "cd x && rm -rf y"}, deny=True)
     assert not m("Bash(rm -rf:*)", "Bash", {"command": "cd x && rm -rf y"})
+    for dodge in ("sudo rm -rf y", "FOO=1 rm -rf y", "/bin/rm -rf y", "env A=b nohup rm -rf y"):
+        assert m("Bash(rm -rf:*)", "Bash", {"command": dodge}, deny=True), dodge
+        assert not m("Bash(rm -rf:*)", "Bash", {"command": dodge}), dodge
 
 
 def test_path_web_and_mcp_rules(tmp_path):
@@ -60,8 +63,14 @@ def test_path_web_and_mcp_rules(tmp_path):
     assert not m("Edit(src/**)", "Edit", {"file_path": str(tmp_path / "docs" / "x.md")}, cwd=tmp_path)
     assert not m("Edit(src/**)", "Edit", {"file_path": "/etc/passwd"}, cwd=tmp_path)
     assert m("Read(*.md)", "Read", {"file_path": str(tmp_path / "docs" / "x.md")}, cwd=tmp_path)
-    assert m("WebFetch(domain:github.com)", "WebFetch", {"url": "https://api.github.com/x"})
+    assert m("WebFetch(domain:github.com)", "WebFetch", {"url": "https://github.com/x"})
     assert not m("WebFetch(domain:github.com)", "WebFetch", {"url": "https://evilgithub.com/x"})
+    assert not m("WebFetch(domain:github.com)", "WebFetch", {"url": "https://api.github.com/x"})  # the host exactly
+    assert not m("WebFetch(domain:github.com)", "WebFetch", {"url": "https://evil.com\\@github.com/"})
+    assert not m("WebFetch(domain:github.com)", "WebFetch", {"url": "https://u@github.com/"})
+    assert not m("WebFetch(domain:github.com)", "WebFetch", {"url": "ftp://github.com/"})
+    assert m("mcp__docs__*", "mcp__docs__read", {}) and not m("mcp__docs__*", "mcp__other__read", {})
+    assert m("Edit(src/**)", "MultiEdit", {"file_path": "x"}, cwd=None) is False
     assert m("mcp__docs", "mcp__docs__read", {})
     assert not m("mcp__docs", "mcp__other__read", {})
     assert not m("Task(anything)", "Task", {"prompt": "anything"})  # a specifier it does not read: no match
@@ -72,6 +81,7 @@ def test_a_malformed_rule_is_named():
     assert rules_mod.problem("Bash(pdm run test:*)") is None
     assert rules_mod.problem("Bash") is None
     assert rules_mod.problem("Bash(") and rules_mod.problem("Bash()") and rules_mod.problem("rm -rf")
+    assert rules_mod.problem("mcp__docs__*") is None and rules_mod.problem("Ba*sh")
 
 
 # -- what always reaches the person ------------------------------------------------------------
@@ -79,21 +89,50 @@ def test_a_malformed_rule_is_named():
 
 def test_always_the_person(tmp_path, monkeypatch):
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
-    wt, repo = tmp_path / "repo" / ".claude" / "worktrees" / "w", tmp_path / "repo"
+    repo = tmp_path / "repo"
+    wt = repo / ".claude" / "worktrees" / "w"
     wt.mkdir(parents=True)
-    atp = permits.always_the_person
-    assert atp({"command": "pdm run test 2>/dev/null"}, str(wt), str(repo)) is None
-    assert atp({"command": f"cat {wt}/src/a.py"}, str(wt), str(repo)) is None
-    assert atp({"command": "cat src/a.py"}, str(wt), str(repo)) is None
-    assert atp({"command": "git log https://github.com/x/y"}, str(wt), str(repo)) is None
-    assert atp({"command": f"ls {repo}/docs"}, str(wt), str(repo)) is None  # the checkout is the member's too
-    assert atp({"command": "cat ~/.shiftlead/settings.yml"}, str(wt), str(repo))
-    assert atp({"command": "cat $HOME/.claude/settings.json"}, str(wt), str(repo))
-    assert atp({"file_path": str(tmp_path / "home" / "x")}, str(wt), str(repo))
-    assert atp({"command": "systemctl --user restart shiftlead-agent"}, str(wt), str(repo))
-    assert atp({"command": "cat /etc/hosts"}, str(wt), str(repo))
-    assert atp({"command": "cat ../../../../elsewhere/x"}, str(wt), str(repo))
-    assert atp({"edits": [{"file_path": "/opt/x"}]}, str(wt), str(repo))  # anywhere in the input
+
+    def atp(*strings: str) -> str | None:
+        return permits.always_the_person(list(strings), str(wt), str(repo))
+
+    # the member's own
+    assert atp("pdm run test 2>/dev/null") is None
+    assert atp(f"cat {wt}/src/a.py", "cat src/a.py", "cd src && ls") is None
+    assert atp("git log https://github.com/x/y") is None
+    assert atp(f"ls {repo}/docs") is None  # the checkout is the member's too
+    assert atp("for f in a b; do echo $f; done") is None
+    # the home's, a unit, outside
+    assert atp("cat ~/.shiftlead/settings.yml")
+    assert atp("cat $HOME/.claude/settings.json") and atp("cat ${HOME}/.claude/x")
+    assert atp(str(tmp_path / "home" / "x"))
+    assert atp("systemctl --user restart shiftlead-agent") and atp("cat x.service")
+    assert atp("cat /etc/hosts")
+    assert atp("cat ../../../../elsewhere/x")
+    # the review's holes: a climb mid-command, a bare home, a glued flag, a scheme, a variable
+    assert atp("cd .. && cd .. && cd .. && cd .. && cat .claude/x")
+    assert atp("cat $PWD/../../../../.claude/x")
+    assert atp("cd ~ && cat .shiftlead/x") and atp("ls ~") and atp("cat ~root/x") and atp("cd")
+    assert atp("curl -o/etc/x http://x") and atp("tar -xf/etc/x") and atp("echo x >/etc/x")
+    assert atp("curl file:///etc/passwd")
+    assert atp("cat $XDG_CONFIG_HOME/x")
+    # another member's worktree, the git directory, a permission setting
+    (repo / ".claude" / "worktrees" / "other").mkdir()
+    assert atp(f"cat {repo}/.claude/worktrees/other/x")
+    assert atp(f"cat {repo}/.git/hooks/pre-push") and atp("cat .claude/settings.json")
+    # a path that cannot be read is the person's, never a crash
+    assert atp("cat /tmp/a\x00b")
+
+
+def test_the_adapter_names_what_a_prompt_touches():
+    ps = rules_mod.prompt_strings
+    assert ps("Bash", {"command": "ls", "description": "list /etc"}) == ["ls"]
+    # a file's content is never read as paths: `a / b` or a shebang holds nothing
+    assert ps("Edit", {"file_path": "/w/a.py", "old_string": "x", "new_string": "y = a / b"}) == ["/w/a.py"]
+    assert ps("Write", {"file_path": "/w/a.py", "content": "#!/usr/bin/env python"}) == ["/w/a.py"]
+    assert ps("Glob", {"pattern": "/etc/**", "path": "/w"}) == ["/w", "/etc/**"]
+    assert ps("WebFetch", {"url": "https://x"}) == []
+    assert ps("Task", {"prompt": "x"}) is None
 
 
 # -- the profile's permission_prompts --------------------------------------------------------------
@@ -227,7 +266,7 @@ async def test_a_rule_answers_an_unattended_prompt_and_tells_the_person(agent, r
 
 @pytest.mark.integration
 async def test_no_rule_answers_an_interactive_prompt_or_another_role(agent, rulestub, tmp_path):
-    _rules("permissions:\n  grinder: {allow: ['Bash']}\n")
+    _rules("permissions:\n  grinder: {allow: ['Bash'], deny: ['Bash(ls)']}\n")  # neither reaches them
     async with LocalClient() as c:
         (tmp_path / "a").mkdir()
         (tmp_path / "b").mkdir()

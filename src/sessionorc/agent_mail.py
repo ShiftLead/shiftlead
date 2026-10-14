@@ -355,7 +355,7 @@ class MailMixin:
                     f"copied (design §4.10)"
                 )
             replied = held[0]
-            if replied.answered and replied.answered.get("answerer") == "rules":
+            if replied.answered and replied.answered.get("answerer") == mail.RULES:
                 # a prompt the person's own rules answered (§4.9b, TD-641): nobody asked and nobody
                 # answered who could take an Overrule — the rule is the person's to change
                 raise RpcError(

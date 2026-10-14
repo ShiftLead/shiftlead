@@ -26,7 +26,7 @@
    the tmux server runs outside the user manager's subtree (§4.1), so no stop of the host agent, the
    UI or the person's user manager ends a session.
 9. Nothing keys on a session's role, team or project: policies key on `unattended`, `supervised` (§6), the
-    schedule and a team's own settings (§5 `teams.<team>`: the stop time, the reserve, `on_work` — the badge says which sessions a person's setting is about, and grants nothing), and so do the person's `permissions:` rules per role (§5, §4.9b *The director seat*: the role badge says which unattended members' prompts a rule is about, the host answers the prompt, and the session is granted nothing), acting RPCs key on grants and `controllers`, displays key on the report channels
+    schedule and a team's own settings (§5 `teams.<team>`: the stop time, the reserve, `on_work` — the badge says which sessions a person's setting is about, and grants nothing), and so do the person's `permissions:` rules per role (§5, §4.9b *The director seat*: the role badge only selects which rule applies to an unattended member's prompt, the host answers the prompt, and the session is granted nothing — a preset still sets nothing on the record beyond its start defaults), acting RPCs key on grants and `controllers`, displays key on the report channels
    (§4.8). A preset sets defaults at start and is a badge afterwards; `team` and `project` are
    badges from the start (§4.9), and the Org page's grouping is derived from `controllers` and
    the badge on each tick, never stored. **One named exception:** the message gate's sideways

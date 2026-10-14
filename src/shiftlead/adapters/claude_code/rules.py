@@ -6,7 +6,10 @@ tool itself.
 
 Conservative on purpose, since an allow here is answered with nobody looking: a rule this module
 does not understand matches nothing, an *allow* of a compound shell command must cover every part
-of it, and a *deny* matches when any part does.
+of it, and a *deny* matches when any part does — read past a leading `VAR=value`, `sudo`, `env`,
+`command`, `exec`, `nohup` or `time` and a command's directory (`/bin/rm`). A deny is still a prefix:
+`bash -c 'rm x'` or `xargs rm` is no `rm`, as in Claude Code's own rules, so a deny narrows an
+allow and never makes a bare `Bash` allow safe.
 """
 
 from __future__ import annotations
@@ -17,13 +20,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-_RULE = re.compile(r"([A-Za-z][\w-]*)(?:\((.*)\))?", re.S)
+_RULE = re.compile(r"([A-Za-z][\w*-]*)(?:\((.*)\))?", re.S)
 # what joins one shell command to the next; an allow must cover each part
 _JOIN = re.compile(r"&&|\|\||;|\||\n|(?<![<>])&(?![>&])")
 # what runs a command of its own inside a part: never covered by a prefix rule
 _NESTED = re.compile(r"`|\$\(|<\(|>\(")
 PATH_TOOLS = {"Read", "Edit", "Write", "MultiEdit", "NotebookEdit", "Glob", "Grep"}
 PATH_FIELDS = ("file_path", "notebook_path", "path")
+_WRAPPERS = {"sudo", "env", "command", "exec", "nohup", "time"}
+_ASSIGN = re.compile(r"[A-Za-z_]\w*=\S*")
 NEVER = {"AskUserQuestion"}  # a question is the person's, never a prompt a rule answers (§9 invariant 6)
 
 
@@ -32,6 +37,8 @@ def problem(rule: str) -> str | None:
     m = _RULE.fullmatch(rule.strip())
     if m is None:
         return f"{rule!r} is not Tool or Tool(specifier)"
+    if "*" in m.group(1) and not (m.group(1).startswith("mcp__") and m.group(2) is None):
+        return f"{rule!r}: only an MCP tool's name takes a *"
     if m.group(2) is not None and not m.group(2).strip():
         return f"{rule!r} has an empty specifier: write the tool alone to cover every use"
     return None
@@ -69,18 +76,34 @@ def _command_matches(spec: str, command: str) -> bool:
     return command == spec.strip()
 
 
+def _bare(part: str) -> str:
+    """A part as a deny reads it: past assignments and wrappers, the command word without its directory."""
+    words = part.split()
+    while words and (_ASSIGN.fullmatch(words[0]) or words[0] in _WRAPPERS):
+        words.pop(0)
+    if words:
+        words[0] = words[0].rsplit("/", 1)[-1]
+    return " ".join(words)
+
+
 def _bash(spec: str, command: str, deny: bool) -> bool:
     parts = [p for p in _JOIN.split(command) if p.strip()]
     if not parts:
         return False
     if deny:
-        return any(_command_matches(spec, p) for p in parts) or _command_matches(spec, command)
+        return any(_command_matches(spec, p) or _command_matches(spec, _bare(p)) for p in parts) or _command_matches(
+            spec, command
+        )
     return not _NESTED.search(command) and all(_command_matches(spec, p) for p in parts)
 
 
 def _path(spec: str, tool_input: dict[str, Any], cwd: Path | None) -> bool:
-    raw = next((tool_input[f] for f in PATH_FIELDS if isinstance(tool_input.get(f), str)), None)
-    if raw is None:
+    given = [tool_input[f] for f in PATH_FIELDS if isinstance(tool_input.get(f), str)]
+    return bool(given) and all(_one_path(spec, raw, cwd) for raw in given)
+
+
+def _one_path(spec: str, raw: str, cwd: Path | None) -> bool:
+    if "\0" in raw:
         return False
     target = Path(os.path.realpath(Path(cwd or "/") / os.path.expanduser(raw)))
     if spec.startswith("//"):
@@ -110,7 +133,11 @@ def matches(rule: str, tool: str, tool_input: Any, *, cwd: Path | None = None, d
         return False
     name, spec = m.group(1), m.group(2)
     if name.startswith("mcp__") and spec is None:
+        if "*" in name:
+            return re.fullmatch(re.escape(name).replace(r"\*", "[^ ]*"), tool) is not None
         return tool == name or tool.startswith(name + "__")
+    if "*" in name:
+        return False
     if name != tool:
         return False
     if spec is None:
@@ -125,7 +152,29 @@ def matches(rule: str, tool: str, tool_input: Any, *, cwd: Path | None = None, d
     if tool in PATH_TOOLS:
         return _path(spec, tool_input, cwd)
     if tool == "WebFetch" and spec.startswith("domain:"):
-        host = urlparse(str(tool_input.get("url") or "")).hostname or ""
+        # the host exactly, as Claude Code's own rule reads it; a URL a fetcher could read otherwise —
+        # a backslash, credentials before the host, another scheme — matches nothing
+        url = str(tool_input.get("url") or "")
+        parsed = urlparse(url)
+        if "\\" in url or parsed.scheme not in ("http", "https") or "@" in parsed.netloc:
+            return False
         want = spec[len("domain:") :].strip().lower()
-        return bool(host) and (host == want or host.endswith("." + want))
+        return bool(want) and (parsed.hostname or "") == want
     return False  # a specifier this module does not read matches nothing
+
+
+def prompt_strings(tool: str, tool_input: Any) -> list[str] | None:
+    """The command lines and paths a prompt touches, for the host's always-the-person check (§4.9b):
+    a Bash prompt's command, a file tool's paths (never what it writes), a Glob's pattern. None for a
+    tool this module does not read, so the host reads every string of the input."""
+    tool_input = tool_input if isinstance(tool_input, dict) else {}
+    if tool == "Bash":
+        return [c for c in (tool_input.get("command"),) if isinstance(c, str)]
+    if tool in PATH_TOOLS:
+        got = [tool_input[f] for f in PATH_FIELDS if isinstance(tool_input.get(f), str)]
+        if tool == "Glob" and isinstance(tool_input.get("pattern"), str):
+            got.append(tool_input["pattern"])
+        return got
+    if tool == "WebFetch":
+        return []  # a URL is the network's, never a local path; its rule reads the host
+    return None

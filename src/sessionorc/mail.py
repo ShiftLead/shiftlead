@@ -46,6 +46,7 @@ PERSON_FYI_DEPTH: int | None = 1000  # Paul's figure
 PERSON_FYI_SENDER_DEPTH: int | None = 500  # so one looping sender leaves the others room
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
+RULES = "rules"  # the answerer of an *Answered for you* FYI the person's `permissions:` rules filed (§4.9b, TD-641)
 SOURCE_CAP = 200  # characters of a reply's `source` (§4.9b): one line, where the answer is written down
 # A subject on every entry (§4.10 *A subject on every entry*, TD-561): the headline a person browses the
 # Inbox by, apart from the text, at most this many characters.

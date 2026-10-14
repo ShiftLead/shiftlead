@@ -562,6 +562,10 @@ class ClaudeCodeAdapter:
         """Whether one of the person's `permissions:` rules covers this prompt (§4.9b, TD-641)."""
         return rules_mod.matches(rule, tool, tool_input, cwd=cwd, deny=deny)
 
+    def prompt_strings(self, tool: str, tool_input: Any) -> list[str] | None:
+        """The command lines and paths a prompt touches, never a file's content (§4.9b, TD-641)."""
+        return rules_mod.prompt_strings(tool, tool_input)
+
     def rule_problem(self, rule: str) -> str | None:
         """Why a `permissions:` rule is not one Claude Code's syntax carries, or None."""
         return rules_mod.problem(rule)

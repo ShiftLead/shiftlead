@@ -1,74 +1,155 @@
 """What always reaches the person, whatever a rule or the director seat says (design §4.9b *What
-always reaches the person*, TD-641): a permission prompt whose input names `~/.shiftlead`,
-`~/.claude`, a systemd unit, or a path outside the member's own worktree and its repo's checkout.
-The host agent refuses an *allow* of such a prompt — a rule's here, the director's `permit` (TD-642)
-through the same function — while a *deny* stands.
+always reaches the person*, TD-641): a permission prompt that names `~/.shiftlead`, `~/.claude`, a
+systemd unit, or a path outside the member's own worktree and its repo's checkout. The host agent
+refuses an *allow* of such a prompt — a rule's here, the director's `permit` (TD-642) through the
+same function — while a *deny* stands.
 
-Tool-agnostic: the prompt's input is read as whatever strings it holds, never by a field or a tool
-name, so an adapter's tool that names a path anywhere in its input is caught the same way.
+Tool-agnostic: it reads the strings a prompt touches — the adapter's `prompt_strings(tool, input)`
+says which (its command lines and paths, never a file's content), and with no such method every
+string of the input is read — as shell words, never by a tool's name. Conservative on purpose: a
+word it cannot place (a variable in a path, a `cd` it cannot follow) is the person's.
 """
 
 from __future__ import annotations
 
 import os
 import re
+import shlex
 from pathlib import Path
 from typing import Any
 
 from sessionorc import paths
 
-# an absolute or home-relative path as it appears in a command line or a field: a `/` or `~` that
-# starts a word — never the `/` inside `a/b`, `s/x/y/` or after a URL's scheme
-_PATH = re.compile(r"(?<![\w.:/$}~-])(~[\w.-]*)?(/[^\s'\"`;|&<>(){}]*)")
-_HOME_VAR = re.compile(r"\$\{?HOME\}?(?=/)")
-_UP = re.compile(r"(?<![\w.-])((?:\.\./)+|\.\.$)")  # a relative path that climbs
-_SYSTEMD = re.compile(r"\bsystemctl\b|\bjournalctl\b|\.(service|timer|socket|target)\b|/systemd/")
+# what a word carries before its path: a redirection (`2>`, `>>`, `<`), a short flag glued to it
+# (`-o/x`), an option's `=`, a `file://` scheme
+_REDIRECT = re.compile(r"^[0-9]*(?:[<>]+|&>>?)&?")
+_GLUED = re.compile(r"^-[A-Za-z]+(?=[/~.$])")
+_HOME_VAR = re.compile(r"\$\{?HOME\}?(?![\w])")
+_UNIT = re.compile(r"\.(service|timer|socket|target|mount|path|slice)$")
+_SYSTEMD_WORDS = {"systemctl", "journalctl", "loginctl", "systemd-run"}
+_JOINERS = {"&&", "||", ";", "|", "&", "(", ")", "{", "}"}
 # a stream, never a file anyone touches: writing to one is not a path outside the worktree
 _HARMLESS = {"/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty"}
 _WALK_CAP = 200  # strings read from one input; a prompt is a command line or a few fields
 
 
-def _strings(value: Any, out: list[str]) -> list[str]:
+def all_strings(value: Any, out: list[str] | None = None) -> list[str]:
+    """Every string in a prompt's input, for an adapter that does not say which are its paths."""
+    out = [] if out is None else out
     if len(out) >= _WALK_CAP:
         return out
     if isinstance(value, str):
         out.append(value)
     elif isinstance(value, dict):
         for v in value.values():
-            _strings(v, out)
+            all_strings(v, out)
     elif isinstance(value, list | tuple):
         for v in value:
-            _strings(v, out)
+            all_strings(v, out)
     return out
+
+
+def _words(text: str) -> list[str]:
+    try:
+        lex = shlex.shlex(text, posix=True, punctuation_chars=";&|()")
+        lex.whitespace_split = True
+        return list(lex)
+    except ValueError:  # an unbalanced quote: split on blanks, which can only find more paths
+        return text.split()
 
 
 def _within(p: Path, roots: list[Path]) -> bool:
     return any(p == r or r in p.parents for r in roots)
 
 
-def always_the_person(tool_input: Any, dir: str, repo: str | None) -> str | None:
-    """Why this prompt is the person's alone, or None. `dir` is the member's worktree (its record's
-    `dir`), `repo` its repo's checkout; a path under either is the member's own."""
-    home = Path(os.path.expanduser("~"))
-    held = [home / ".shiftlead", home / ".claude", paths.home()]
-    roots = [Path(os.path.realpath(d)) for d in (dir, repo) if d]
-    for text in _strings(tool_input, []):
-        if _SYSTEMD.search(text):
-            return "it names a systemd unit"
-        text = _HOME_VAR.sub("~", text)
-        for m in _PATH.finditer(text):
-            raw = (m.group(1) or "") + m.group(2)
-            if raw in _HARMLESS:
+class _Place:
+    def __init__(self, dir: str, repo: str | None) -> None:
+        self.home = Path(os.path.expanduser("~"))
+        self.held = [self.home / ".shiftlead", self.home / ".claude", Path(os.path.realpath(paths.home()))]
+        self.own = Path(os.path.realpath(dir)) if dir else None
+        self.repo = Path(os.path.realpath(repo)) if repo else None
+        self.roots = [r for r in (self.own, self.repo) if r is not None]
+
+    def why(self, p: Path, word: str) -> str | None:
+        if _within(p, self.held):
+            return f"it names {word}, the home's own"
+        if not _within(p, self.roots):
+            return f"it names {word}, outside the member's worktree and checkout"
+        if "systemd" in p.parts:
+            return f"it names {word}, a systemd unit"
+        mine = self.own is not None and _within(p, [self.own])
+        for root in self.roots:
+            if not _within(p, [root]):
                 continue
-            p = Path(os.path.realpath(os.path.expanduser(raw)))
-            if _within(p, held):
-                return f"it names {raw}, the home's own"
-            if not _within(p, roots):
-                return f"it names {raw}, outside the member's worktree and checkout"
-        if dir and _UP.search(text):
-            for word in re.split(r"[\s'\"`;|&<>(){}=]+", text):
-                if ".." in word.split("/") and not word.startswith(("/", "~")):
-                    p = Path(os.path.realpath(Path(dir) / word))
-                    if not _within(p, roots):
-                        return f"it names {word}, outside the member's worktree and checkout"
+            rel = p.relative_to(root).parts
+            if rel[:1] == (".git",):
+                return f"it names {word}, the repo's own git directory"
+            if rel[:2] == (".claude", "worktrees") and not mine:
+                return f"it names {word}, another member's worktree"
+            if rel[:1] == (".claude",) and len(rel) == 2 and rel[1].startswith("settings"):
+                return f"it names {word}, a permission setting"
+        return None
+
+
+def always_the_person(strings: list[str], dir: str, repo: str | None) -> str | None:
+    """Why a prompt whose command lines and paths are `strings` is the person's alone, or None. `dir`
+    is the member's worktree (its record's `dir`), `repo` its repo's checkout."""
+    place = _Place(dir, repo)
+    try:
+        for text in strings[:_WALK_CAP]:
+            if why := _one(text, place):
+                return why
+    except (ValueError, OSError) as e:  # a NUL in a path, a loop of links: nothing to place it by
+        return f"it names a path that cannot be read ({e})"
+    return None
+
+
+def _one(text: str, place: _Place) -> str | None:
+    cwd = place.own or Path("/")
+    after_cd = False
+    for raw in _words(_HOME_VAR.sub("~", text)):
+        if raw in _JOINERS:
+            if after_cd:
+                return "it changes directory to home"
+            continue
+        word = raw
+        if word in _SYSTEMD_WORDS or _UNIT.search(word):
+            return "it names a systemd unit"
+        word = _REDIRECT.sub("", word)
+        word = _GLUED.sub("", word)
+        if word.startswith("--") and "=" in word:
+            word = word.split("=", 1)[1]
+        if word.startswith("file://"):
+            word = word[len("file://") :] or "/"
+        if after_cd:
+            after_cd = False
+            if word in ("", "-") or "$" in word or "`" in word:
+                return f"it changes directory to {raw or 'home'}, which cannot be followed"
+            cwd = Path(os.path.realpath(cwd / os.path.expanduser(word)))
+            if why := place.why(cwd, raw):
+                return why
+            continue
+        if raw == "cd":
+            after_cd = True
+            continue
+        if not word or word in _HARMLESS:
+            continue
+        if word.startswith("~"):
+            if word != "~" and not word.startswith("~/"):
+                return f"it names {raw}, another account's home"
+            p = Path(os.path.realpath(os.path.expanduser(word)))
+        elif "$" in word and ("/" in word or word.startswith("$")) and re.search(r"\$\{?[A-Za-z_]", word):
+            if "/" in word:
+                return f"it names {raw}, a path through a variable"
+            continue
+        elif word.startswith("/"):
+            p = Path(os.path.realpath(word))
+        elif ".." in word.split("/") or word.startswith("./") or "/" in word:
+            p = Path(os.path.realpath(cwd / word))
+        else:
+            continue
+        if why := place.why(p, raw):
+            return why
+    if after_cd:
+        return "it changes directory to home"
     return None
