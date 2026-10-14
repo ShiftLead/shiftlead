@@ -11930,3 +11930,84 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Done when** `commands:` is read, the test passes, and a brief filled for this repo reads as it does today.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-586, TD-587.
+
+## TD-584: Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3)
+
+**Priority:** High
+**Type:** feature
+**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-12 (the designer) — every section the ADR names says what it decided: §5 *The seams* (`board:`, `gate:`, `commands:` `test`/`lint`, `worktree_setup:`, what `ledger:` requires, each seam's fixed sentence; *Repos* ShiftLead's own roster importing dev-cadence's); §4.7 `ao repo init`, `ao board edit done|snooze` (on the session's branch, `--line`/`--expect`, no `decide`/`reply`, refused on the default branch and a dirty index), `ao doctor` **repos** (a missing ledger a lack, an unset seam a warning); §4.5a *Repo page: missing seams* and the origin note from two in-process reads; §4.5 screen 6 and §4.4 read boards through `ledgerboard.py`, the copy-picking rule gone; §4.9a closes a decided line with `ao board edit done`; §6 rule 10 runs `gate:` by exit code, *no gate: a person merges*; §8 three layers and *no second parser*; the 2026-10-08 ADR's Status line. No mockup: the one drawn change is the Repo page's seam lines, plain text under the title. Help-list wording stays with the builds. TD-585–TD-591 build it; this PR drops TD-584 from their `Blocked by:`. Was: Open.
+**Blocked by:** TD-585, TD-586, TD-587, TD-588, TD-589, TD-590, TD-591
+**Location:** design §5 *The seams* and *Repos*, §4.7 `ao repo init` / `ao board edit` / `ao doctor` **repos**, §4.5a *Repo page: missing seams* and *origin note*, §4.5 screen 6, §4.4 *Repo facts* and *Board write-back*, §4.9a, §6 rule 10, §8; `docs/design-history.md`; the 2026-10-08 ADR's Status line
+
+**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Its builds need the design first (CLAUDE.md: a change in behaviour is a change to the design first).
+
+**Fix:** as the ADR's *Builds* row 3 says: §5 gains `gate:`, `worktree_setup:`, `board:`, `commands:` read by the briefs, and ShiftLead's own roster; §4.7 `ao doctor`'s repo rows, `ao repo init` and `ao board edit <done|snooze>`; §4.5a the Repo page's missing-seam lines and the Inbox reading boards in-process (checkout and origin, the origin note derived); §4.9a `ao board edit` for a session's own branch and *What a session does with a decided line* closing it with `ao board edit done`; §6 the review stage with no gate ("no gate: a person merges"); §8 the ADR's rule in place of the 2026-10-08 paragraph. The 2026-10-08 ADR's Status gains "superseded in part by ADR 2026-10-12 (the formats' placement); the rest stands". Help-list wording goes in the build entries, not here.
+
+**Done when** every section the ADR names says what the ADR decided, design-history has the dated line, and TD-585–TD-591 can each be built from the design without a choice.
+
+**Resolved:** 2026-10-14 (the designer) — designed 2026-10-12 (§5 *The seams* and *Repos*, §4.7, §4.5a, §4.9a, §6 rule 10, §8), built by TD-585 (#1731), TD-586 (#1572), TD-587 (#1733, #1734), TD-588 (#1737, #1744), TD-589 (#1578), TD-590 (#1592) and TD-591 (#1736, #1742), all archived.
+
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-585–TD-591 (its builds).
+
+## TD-614: The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-12 (the designer) — **one owner per reading, pushed** (§4.4 *Each reading has one owner, and a client never re-derives it*): (1) **the boards are the host agent's** — `boards` on the repo reading, read every `BOARD_EVERY` (60 s) and at once after a write-back, origin fetched on `REPOS_EVERY`, the work orders derived from it, pushed with `repos`; the UI's `read_boards`/`BOARD_TTL` and `ao`'s own read go; (2) **the Inbox's counts are the UI process's, not the host agent's** — the honest answer to Paul's question: they are the Inbox's sections, classified by `shiftlead` code (state rows, the board horizon, the ledger's *for you*, review marks), and `sessionorc` never imports `shiftlead`; so the host agent pushes `inbox` with a revision on every person-inbox change, the UI recomputes the counts once per input change and pushes `counts` on every stream, the top bar polls nothing, TD-611 slice 1's counts read is the fallback (`since=<rev>` → `unchanged`), and `ao inbox --counts` runs the same template-free function; (3) per-session views once per delta for every stream, PR marks once per repo on the `repos` push, Focus's members from its stream — TD-611's slices 3–4 built in this form as TD-617; (4) said no to a revision on every record, a cache layer, and moving the Inbox's classification into `sessionorc`. No mockup: nothing drawn changes. Built by TD-615, TD-616, TD-617. Was: Open.
+**Blocked by:** TD-615, TD-616, TD-617
+**Location:** design §4.4 (*Repo facts*, *Board write-back*), §4.5 (the `/events` stream; the top bar, the Inbox), §4.7 (`ao inbox`, `ao board show`); `src/shiftlead/ui/app.py` (`read_boards` ~L372, `api_person_inbox`, `api_sessions`, `events`); `src/shiftlead/ui/inbox.py` (`board_argv`, `BOARD_TTL`); `src/shiftlead/cli.py` (its own board read ~L1502); `src/sessionorc/agent_tick.py` (the repo reading's `workorders.read` ~L2904, every `REPOS_EVERY`)
+
+**Why:** Paul, 2026-10-12, on TD-611's `ao inbox --counts`: *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?* Today three processes compute the same things on their own clocks:
+- **The board.** The host agent runs every repo's board reader every `REPOS_EVERY` (300 s) for the work orders. The UI runs it again every `BOARD_TTL` (60 s) for the Inbox's rows, and `ao` runs it a third time. That is three subprocess runs of one file, each with its own failure note.
+- **The person inbox's counts.** The host agent holds the person inbox, but the UI computes *needs*, FYI, overdue and *answered* by fetching and rendering all of it (TD-611), on every page every 20 s.
+- **Per-session views.** `/api/sessions` and the Org stream rebuild `view()` for every session on every request or delta, per client. `pr_marks` repeats one repo's PRs once per session.
+
+**Fix:** design first. One principle: **the host agent keeps each reading once and pushes changes; clients read the reading, never re-derive it.**
+1. **One board reading** in the host agent: every board's items, read by the reader on the repo reading's clock and at once after a write-back, with the work orders derived from it. The UI's Inbox rows and `ao board show` read it over RPC, so the UI stops running the reader.
+2. **Inbox counts kept by the host agent:** recomputed whenever the person inbox, a board reading or the fleet changes, and pushed on the events stream as an `inbox` delta. The top bar updates from the stream with no poll. `ao inbox --counts` (TD-611 slice 1) reads the same numbers. TD-611's counts endpoint becomes the fallback for a client with no stream.
+3. **Per-session views computed once per delta** and fanned out to every client (TD-611 slice 4 in this form), with `pr_marks` sent once per repo, not once per session.
+4. Weigh, and say no where it does not pay: a revision number on each reading so a client can ask *changed since n?*; the PR and ledger readings are already central (*Repo facts*).
+- Mockups: none, since nothing drawn changes. §4.4 says which readings exist and who reads them.
+
+**Done when** the design names each reading's one owner and its push, and build entries exist for each slice. TD-611's slices 1 and 4 are re-pointed at them or marked as their first step.
+
+**Resolved:** 2026-10-14 (the designer) — designed 2026-10-12 (§4.4 *Each reading has one owner, and a client never re-derives it*), built by TD-615 (#1633), TD-616 (#1640, its live check holding in #1692) and TD-617 (its live check of #1660 holding, 2026-10-13), all archived.
+
+**Related:** TD-611 (the lag that found it), TD-131 (whole-file stores, a later scale), TD-384 (work orders from the board).
+
+## TD-630: Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-entry-4)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-13 (the designer; mockup `AddEntry.dc.html`, shot `docs/mockups/reviews/2026-10-13-td630-add-entry-attach.png`) — the composer's road on the form's **What** (Attach, drop, paste; pieces, bound, names, progress); **where a file lands before a session exists**: a **draft folder** at the home, `~/.shiftlead/attachments/<draft>/`, its token minted by the host agent on the form's first file (`attach` takes `draft` in place of a session id), **the path inserted final** — neither way out moves a file, since the person's words name it; **at the press** the draft is claimed: *Open a session* hands it to the create and the folder lives as that session's files do; *Hand to the techlead* carries it on the `ask` and the folder is kept `runs_keep_days` from the hand; **an abandoned form** leaves an unclaimed draft the hourly sweep removes an hour after its last write, as a stale `.part`. A node-hosted team's form refuses it in place. §4.5a *Add entry form: Attach / drop / paste*, §4.4 *The Add entry form's draft* (the claim a `claimed.json` in the folder), §4.10 *An entry handed to a seat* (`draft` on `entry_add`), §4.6 *Run-log retention*, §4.9. Built by TD-633. Was: Open.
+**Blocked by:** TD-633
+**Location:** design §4.5a (*Add entry form* rows; the *Focus composer* and *Message and Reply dialog*
+**Attach / drop / paste** rows), §4.9 *Add an entry to the ledger*, §4.4 *Attachment drop* and *An
+attachment's life*; `src/shiftlead/ui/templates/base.html` (the form), `src/shiftlead/ui/static/app.js`,
+`src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/session`).
+
+**Why:** Paul (2026-10-13): *add a TD so that files/pics can be pasted into the "add entry" form. I had
+to open this session to give you those pics* — TD-629's two screenshots went in through this session's
+Focus composer, after the session was open, since the form's **What** takes text alone. The composer
+and the Message dialog already attach, drop and paste (TD-530); the form, the one door for a thought
+had while looking at the Org, is the place a screenshot of what is wrong is most often at hand.
+
+**Fix:** design first, since it is a §4.5a row: the composer's road on the form's **What** — **Attach**,
+a dropped file, a pasted image named `paste-<date>-<time>.<ext>`, each path inserted at the caret —
+with where a file lands before any session exists (both ways out start or fill one only at the press:
+a holding folder moved under the session's `attachments/` at **Open a session**, or under the techlead
+seat's at **Hand to the techlead**, and what an abandoned form leaves). **Done when** a screenshot
+pasted into the form reaches the drafting session as a path it can read, by either way out.
+
+**Resolved:** 2026-10-14 (the designer) — designed 2026-10-13 (§4.5a *Add entry form: Attach / drop / paste*, §4.4 *The Add entry form's draft*), built by TD-633 (#1677, #1694), archived.
+
+**Related:** TD-180, TD-219 (the form), TD-530 (the Message dialog's attach).
