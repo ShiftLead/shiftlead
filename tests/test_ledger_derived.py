@@ -168,6 +168,14 @@ def test_a_name_two_checkouts_share_keeps_the_block(tmp_path):
     assert (state, "neither" in why) == ("unresolved", True), "an id in neither file, and it says so"
 
 
+def test_an_id_headed_twice_is_blocked_by_what_blocks_either():
+    """TD-585 slice 6: ledgerboard keys its reading by id, so a repeated heading takes both sections'
+    blockers — the safe direction — never the last section's alone."""
+    text = "## TD-005: a\n\n**Blocked by:** TD-009\n\n## TD-005: b\n\n**Priority:** Low\n\n## TD-009: open\n"
+    got = ledger.entries(text)
+    assert [(e["id"], e["blocked_by"], e["pickable"]) for e in got[:2]] == [("TD-005", ["TD-009"], "no")] * 2
+
+
 def test_a_written_pickable_line_is_not_read():
     """TD-228 slice 4: the fallback is gone, so a ledger that still writes the line is read as if
     it did not — in the header block or below it."""

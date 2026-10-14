@@ -122,11 +122,6 @@ def ids_in(text: str | None) -> set[str]:
     return {f"TD-{n:03d}" for n in lb.heading_nums(text)}
 
 
-# One `**Blocked by:**` value as (ids — `TD-NNN` or `<repo>#TD-NNN` — decision holders, items it cannot
-# read), cadence §2.4's rule: the decision last, what follows it with no comma its pointer and never read.
-parse_blocked = lb.parse_blocked
-
-
 # a `<repo>#TD-NNN` item → `(state, why)`, ledgerboard's resolver: `archived`, `open` or `unresolved`
 Resolve = lb.Resolve
 Live = Callable[[int], bool]  # a PR number → whether its squash commit is in the repo's live commit
@@ -342,23 +337,27 @@ def entries(
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
     unknown), `blocked_by` — what still blocks, as the script lists it: open ids, `decision (<who>)`,
     an unread item quoted — and `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
-    *Repo facts*, TD-228) as ledgerboard's `pickable` derives it (TD-585): blocked while `Blocked by:` names an id not in `archive` (open, or in
-    neither file), a decision, or an item it cannot read. A `<repo>#TD-NNN` item asks `resolve` for
-    `(state, why)`, and anything but `archived` keeps the block; with no `resolve` it is unresolved. A
-    written `**Pickable:**` line is not read (TD-228 slice 4): what blocks an entry is said in
-    `Blocked by:`. `for_page` is the page's kind. A field is read only from the entry's own
-    section. A `Kind: live-check` entry also carries `built`, the PRs its line names, and `live`,
-    `yes` when `live` says every one of them is live and `no` otherwise — no callable, no PR named
-    (§4.9b, TD-323)."""
+    *Repo facts*, TD-228) as ledgerboard's `pickable` derives it (TD-585): blocked while `Blocked by:`
+    names an id not in `archive` (open, or in neither file), a decision, or an item it cannot read;
+    an id headed twice is blocked by what blocks either (ledgerboard keys its reading by id). A
+    `<repo>#TD-NNN` item asks `resolve` for `(state, why)`, and anything but `archived` keeps the
+    block; with no `resolve` it is unresolved. A written `**Pickable:**` line is not read (TD-228
+    slice 4): what blocks an entry is said in `Blocked by:`. `for_page` is the page's kind. A field
+    is read only from the entry's own section. A `Kind: live-check` entry also carries `built`, the
+    PRs its line names, and `live`, `yes` when `live` says every one of them is live and `no`
+    otherwise — no callable, no PR named (§4.9b, TD-323)."""
     t = strip_comments(text)
     heads = list(lb.HEADING_RE.finditer(t))
-    derived = {r["id"]: r for r in lb.pickable(t, archive or "", resolve)["entries"]}
+    derived: dict[str, list[str]] = {}
+    for r in lb.pickable(t, archive or "", resolve)["entries"]:
+        got = derived.setdefault(r["id"], [])
+        got += [b for b in r["blocked_by"] if b not in got]
     out: list[dict[str, Any]] = []
     for m, read in zip(heads, lb.entries(t), strict=True):
         nxt = lb.SECTION_RE.search(t, m.end())
         fields = _header(read["fields"], t[m.end() : nxt.start() if nxt else len(t)])
         etype = (fields.get("type") or "").split()[0].lower() if (fields.get("type") or "").split() else ""
-        blocked_by = list(derived[m.group(1)]["blocked_by"])
+        blocked_by = list(derived[m.group(1)])
         e = {
             "id": m.group(1),
             "title": read["title"],
