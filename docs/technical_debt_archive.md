@@ -11458,4 +11458,4 @@ Taking control and picking a model should not be the way. **Done when** a role's
 
 **Related:** TD-463 (CI flakes).
 
-**Resolved:** 2026-10-14 (grinder-ao-1) — `_git` asserts with git's stderr in its message, so a failure names its cause; the test reads the board from origin's `main` (`git show`), where the write-back lands, instead of pulling the checkout beside the home's own pull of it (§6 *Pull*). Neither cause was reproduced: the race is closed whichever it was.
+**Resolved:** 2026-10-14 (grinder-ao-1, PR #1706) — `_git` asserts with git's stderr in its message, so a failure names its cause; the test reads the board from origin's `main` (`git show`), where the write-back lands, instead of pulling the checkout beside the home's own pull of it (§6 *Pull*). Neither cause was reproduced: the race is closed whichever it was.
