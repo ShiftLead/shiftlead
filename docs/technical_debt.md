@@ -71,12 +71,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-654 | Rule 8's start (and a schedule's replay) replays a team's seats live: an on-call manager or techlead filled for nothing and closed two minutes later | Medium | Designed — TD-660 builds it |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
 | TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Designed — TD-661, TD-662, TD-663 build it |
-| TD-658 | "Green before hand-off" is not enforced: a held PR's `ask` to its reader is taken on a red or pending PR, and `done --pr` is accepted as *checks pending* | Medium | Open |
+| TD-658 | "Green before hand-off" is not enforced: a held PR's `ask` to its reader is taken on a red or pending PR, and `done --pr` is accepted as *checks pending* | Medium | Designed — TD-664 builds it |
 | TD-659 | `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why | Low | Open |
 | TD-660 | Build TD-654: rule 8's start writes every seat it replays held — `create` with `held`, no pane, `restarts` `held: true` — and its first tick fills it only for a cause | Medium | Open |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
+| TD-664 | Build TD-658: a session's `ask` carrying `pr` refused until the PR's required checks are green, read as `done` reads them; `done --pr` refused while they run; the briefs say green before the hand-off | Medium | Open |
 
 ---
 
@@ -1373,7 +1374,8 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (ao-paul, with Paul — after TD-637's round)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-13 (the designer), on Paul's words in the Why — (1) a session's `ask` carrying `pr` is read once as a `done` naming that PR is (§4.8, the same read and required set): a required check **failed or still running** refuses it, naming them, nothing sent; green, no checks, merged or closed is sent; a read the home could not make is sent with *checks unknown*; keyed on the entry's `pr`, so every hand-off — the techlead seat, a flow's stage reader, the person — and every ask again after findings is gated; a person's own is not read (§4.9b *The reader*). (2) `done --pr` on a pending head is **refused** too (§4.8), TD-637's *checks pending* withdrawn; merged, no CI, closed and an unreadable read keep TD-637's answers; rule 10 receives green or merged (§6 rule 10), an older `ci: pending` still cleared by its read. (3) The briefs say green before the hand-off in TD-664's briefs slice. TD-664 builds it.
+**Blocked by:** TD-664
 **Location:** design §4.9b *The reader* (*when a held PR is green and carries its author's own `cadence-review:` comment, the author sends `ao msg --kind ask --pr <n> {techlead}`* — a brief's rule, nothing refuses it), §4.9c (a flow's review stages), §4.8 *A `done` with a PR is told what its checks read* (TD-637, built by TD-639: refused on a failed required check, accepted as *done · checks pending* while one runs)
 
 **Why:** Paul, 2026-10-13, twice: *"I agree an agent should not say its done if its PR is not green"*, and, after TD-637's round, *"I would expect grinders to make the PR green before handing it off to the techlead (or other depending on the workflow)."* TD-637's design accepts a pending head at `done`, and the hand-off to a reader is not checked at all.
@@ -1509,5 +1511,29 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the director grooms the person's file on its interval and on a press, seeding it the first time, a remembered answer reaches the next pass, the interview proposes, every change reaches the file only by the person's Accept or hand edit, and the tests above pass.
 
 **Related:** TD-657 (the design), TD-661, TD-662, TD-210 (the home's work tree).
+
+---
+
+## TD-664: Build TD-658: a session's `ask` carrying `pr` refused until the PR's required checks are green, read as `done` reads them; `done --pr` refused while they run; the briefs say green before the hand-off
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (the designer, TD-658's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.9b *The reader*, §4.8 *A `done` with a PR is told what its checks read*, §6 rule 10, §4.7; `src/sessionorc/agent.py` (`_checks_at_done` ~L2624 and its call ~L2572, the `pending` word ~L2655 and `ci: pending` ~L2588), `src/sessionorc/agent_mail.py` (`rpc_msg`'s `pr` check ~L250), `src/sessionorc/reports.py` (`at_done`, `pr_view`); the briefs: `src/shiftlead/briefs/grinder.stage.md`, `techlead.stage.md`, `docs/briefs/grinder-ao-*.md` (held, `docs/briefs/**`)
+
+**Why:** TD-658: Paul, 2026-10-13 — *an agent should not say its done if its PR is not green*; *I would expect grinders to make the PR green before handing it off to the techlead (or other depending on the workflow)*. TD-637 accepted a pending head at `done`, and nothing reads the hand-off.
+
+**Fix:** one PR, or two slices (1–2 and their tests, then 3); 1–2 are in `src/sessionorc/**` (held).
+1. **The read, shared**: `_checks_at_done`'s read (one `gh pr view`, the base's required names from the repo reading) callable for an `ask`; `pending` becomes a refusal at `done` — *PR #<n>'s required checks are still running on <sha7>: <names> — report done once they pass (`gh pr checks <n> --watch`)*, nothing written, no `ci: pending` on a new entry (an older one is left for rule 10's read to clear).
+2. **The ask**: `rpc_msg` with `pr` from a session (not the person) runs the read before anything is written, from the sender record's `repo` (`me.repo`) — a checkout the home cannot see (a node's session) is *checks unknown* and sends, as at `done`; failed or pending refuses, naming them, *ask again once they pass*; green, no checks, merged, closed send; unknown sends with *checks unknown: <why>* in the reply. A reply-thread ask (`--reply-to` the findings) is read the same.
+3. **Briefs**: `grinder.stage.md` and the repo's grinder briefs say *wait for the PR's checks to pass (`gh pr checks <n> --watch`) before the ask and before `done --pr`*; `techlead.stage.md`'s reader line says a PR it is asked to read is green when asked.
+4. Tests: `done --pr` on a pending head refused with the names and writes nothing; failed refused as before; green, merged, no checks, closed and unknown as TD-639's tests; an `ask --pr` from a session refused on failed and on pending, sent on green and on merged, sent with *checks unknown* on a read that failed; the person's `ask --pr` is not read; an ask with no `pr` is not read; a refused ask, then green, then a new `ao msg` (a fresh nonce, not the cached refusal) is sent; the ask to the person after a reader's bound is read like any other.
+
+**Done when** neither a `done --pr` nor a session's `ask --pr` is accepted on a head whose required checks failed or are still running, the briefs say so, and the tests above pass.
+
+**Related:** TD-658 (the design), TD-637 / TD-639 (the read at `done`), TD-640 (the cadence script's `ci` row), TD-093 (the reader).
 
 ---
