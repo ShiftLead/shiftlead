@@ -345,3 +345,26 @@ def test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_noth
     assert "serviced by" in html
     assert "TDs in motion (0)" in html and "nothing claimed" in html
     assert '<span class="kind">Doing</span>' in html
+
+
+def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of_technical_debt(tmp_path, monkeypatch):
+    """TD-591 slice 2 (§4.5a *Repo page: missing seams*): from the repo facts' `seams` alone — each unset
+    seam's fixed words under the title, and no ledger is one warning line where Technical debt was."""
+    root = str(tmp_path / "samscrape")
+    absent = {"state": "absent", "value": None}
+    r = reading(root)
+    r["seams"] = {
+        "ledger": {"path": "docs/technical_debt.md", "state": "absent", "major": None, "entries": None, "why": "no ledger"},
+        "board": {"state": "defaulted", "value": "docs/user_attention.md"},
+        "gate": absent,
+        "worktree_setup": absent,
+    }  # fmt: skip
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    seams = html[html.index('id="seams"') : html.index('class="tsum"')]
+    assert re.findall(r'class="seamline">([^<]*)<', seams) == ["no gate: a person merges", "no worktree setup"]
+    debt = html[html.index('id="debt"') : html.index('id="completed"')]
+    assert 'id="noledger"' in debt and "no ledger at docs/technical_debt.md — <code>ao repo init</code>" in debt
+    assert "Technical debt" not in debt and "TD-301" not in debt
+    r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "gate": {"state": "set", "value": "make gate"}, "worktree_setup": {"state": "set", "value": "x"}}  # fmt: skip
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    assert 'id="seams"' not in html and 'id="noledger"' not in html and "TD-301" in html

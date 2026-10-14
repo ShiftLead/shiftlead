@@ -16,8 +16,8 @@ from sessionorc.models import (
     has_control,
     stop_note,
 )
+from shiftlead import doctor, repoconfig, review, teamrun, teams
 from shiftlead import org as orgmod
-from shiftlead import repoconfig, review, teamrun, teams
 
 from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
@@ -99,6 +99,25 @@ LEDGER_LISTS = (
 LEDGER_FLAG = ledger.NO_KIND  # an *other* row's flag (§4.4 *Repo facts*), the words `ledger.flags` uses
 LEDGER_FOLD = 4  # a list folds past this many rows, with *+n more*
 PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
+
+
+def missing_seams(r: Mapping[str, Any]) -> dict[str, Any]:
+    """**missing seams** (§4.5a *Repo page: missing seams*, TD-591): from the repo facts' `seams` and
+    nothing read here — `lines`, the fixed sentence of each seam left unset with no default file (the
+    words `ao doctor`'s **repos** line says), and `ledger`, the line drawn in the warning colour in place
+    of Technical debt when the ledger is absent or does not parse — `{text, cure}`, `cure` the command
+    drawn as code (`ao repo init` for an absent one, else None), the reader's reason in `text` — None
+    when it parses or the seams are not read yet."""
+    seams = r.get("seams") if isinstance(r.get("seams"), dict) else {}
+    led = seams.get("ledger") or {}
+    state, path = led.get("state"), led.get("path") or "the ledger path"
+    if state == "absent":
+        ledger_line = {"text": f"no ledger at {path} —", "cure": "ao repo init"}
+    elif state in ("unreadable", "newer"):
+        ledger_line = {"text": f"the ledger at {path} does not parse — {led.get('why') or state}", "cure": None}
+    else:
+        ledger_line = None
+    return {"lines": doctor.missing_seams(seams), "ledger": ledger_line}
 
 
 def pr_rows(

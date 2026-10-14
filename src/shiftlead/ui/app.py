@@ -349,6 +349,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     entry_teams,
     flow_head,  # noqa: F401
     ledger_lists,  # noqa: F401
+    missing_seams,
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
     team_groups,  # noqa: F401
@@ -1335,6 +1336,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "chips": doing_chips(summary["doing"]),
             "doer_w": summary.get("doer_w") or 1,
             "ledger_editor": editor_link(ledger_file) if ledger_file else None,
+            # the seams the repo leaves unset, and a ledger that is not there (§4.5a, TD-591)
+            "seams": missing_seams(r),
             "host": host_name(),
             "active": "",
         }
