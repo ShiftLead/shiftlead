@@ -197,12 +197,15 @@ def repo_facet(
     `error`, drawn *could not look*; its last numbers, when there are any, stay beside it. `lanes`,
     `lanes_line`'s, is the team's line under the legend (TD-361). `red` is the open PRs that read red
     or conflicting, the *· n red* mark's, each with its age and whose it is among `fleet`'s records
-    (`teamrun.red_prs`, TD-613), and `red_title` the mark's hover, one line each."""
+    (`teamrun.red_prs`, TD-613), and `red_title` the mark's hover, one line each. `not_run` counts the
+    open PRs whose CI never started, the *· n CI never ran* mark's, `not_run_title` its hover (TD-686)."""
     led, prs = r.get("ledger") or {}, r.get("prs") or {}
     entries = led.get("entries")
     open_ = prs.get("open")
     oldest = _age(open_[0].get("created"), now) if open_ else ""
     red = [{**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)]
+    # CI that never started, counted apart from red (§4.4, TD-686): the person's, not a lane's
+    not_run = [p for p in open_ or [] if isinstance(p, dict) and p.get("checks") == "not_run"]
     return {
         "name": str(r.get("name") or ""),
         "url": f"/repo/{r.get('name') or ''}",
@@ -226,6 +229,10 @@ def repo_facet(
             "oldest": oldest,
             "waiting": waiting,
             "red": red,
+            "not_run": len(not_run),
+            "not_run_title": "\n".join(
+                f"#{p.get('number')} · {(p.get('not_run') or {}).get('reason') or ''}" for p in not_run
+            ),
             "red_title": "\n".join(
                 " · ".join(filter(None, [f"#{x['number']}", f"{x['word']} {x['age']}", x["whose"]])) for x in red
             ),

@@ -276,20 +276,22 @@ OPEN_PR_FIELDS = (
 # `sync-all.sh` names it, and the lock among its changed files
 SYNC_BRANCH = "cadence-sync-"
 SYNC_LOCK = "docs/cadence-sync.lock"
+JOB_URL = re.compile(r"/actions/runs/(\d+)/job/(\d+)")  # an Actions job's check run (`detailsUrl`, TD-686)
+NOT_STARTED = "The job was not started because"  # GitHub's annotation on a job it never ran (TD-686)
+GITHUB_ORIGIN = re.compile(r"(^|[@/])github\.com[:/]")  # a remote on GitHub, ssh or https (TD-686)
+JOBS_CAP = 50  # failing jobs read per PR per head (design §4.4 *CI that never started*, TD-686)
 
 RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})
 RED_STATES = frozenset({"FAILURE", "ERROR"})  # a commit status's (`StatusContext`) words for red
 
 
-def fold_checks(rollup: Any) -> tuple[str, list[str]]:
-    """An open PR's `statusCheckRollup` folded into one word and the failing checks' names (design
-    §4.4 *Repo facts*, TD-613): *red* when any check run concluded one of `RED_CONCLUSIONS` (failed,
-    cancelled, timed out, waiting on an approval, never started) or a commit status reads one of
-    `RED_STATES`, *pending* while any runs, *green* when all passed, *none* with no checks. Red outranks pending:
-    one failed check is red however many still run."""
-    if not isinstance(rollup, list) or not rollup:
-        return "none", []
-    failing: list[str] = []
+def failing_items(rollup: Any) -> tuple[list[dict[str, Any]], bool]:
+    """The items of a `statusCheckRollup` that `fold_checks` calls failing, in order, and whether any
+    still runs. Each item is `{name, run, job}`: `run` and `job` the ids of an Actions job's check run
+    (`detailsUrl` `…/actions/runs/<run>/job/<job>`), None for a commit status or another check run."""
+    if not isinstance(rollup, list):
+        return [], False
+    failing: list[dict[str, Any]] = []
     pending = False
     for c in rollup:
         if not isinstance(c, dict):
@@ -300,14 +302,91 @@ def fold_checks(rollup: Any) -> tuple[str, list[str]]:
             if str(c.get("status") or "COMPLETED").upper() != "COMPLETED":
                 pending = True
             elif str(c.get("conclusion") or "").upper() in RED_CONCLUSIONS:
-                failing.append(name)
+                m = JOB_URL.search(str(c.get("detailsUrl") or ""))
+                failing.append({"name": name, "run": int(m[1]) if m else None, "job": int(m[2]) if m else None})
         else:  # a commit status (`StatusContext`)
             state = str(c.get("state") or "").upper()
             if state in RED_STATES:
-                failing.append(name)
+                failing.append({"name": name, "run": None, "job": None})
             elif state != "SUCCESS":
                 pending = True
-    return ("red" if failing else "pending" if pending else "green"), failing
+    return failing, pending
+
+
+def fold_checks(rollup: Any) -> tuple[str, list[str]]:
+    """An open PR's `statusCheckRollup` folded into one word and the failing checks' names (design
+    §4.4 *Repo facts*, TD-613): *red* when any check run concluded one of `RED_CONCLUSIONS` (failed,
+    cancelled, timed out, waiting on an approval, never started) or a commit status reads one of
+    `RED_STATES`, *pending* while any runs, *green* when all passed, *none* with no checks. Red outranks pending:
+    one failed check is red however many still run."""
+    if not isinstance(rollup, list) or not rollup:
+        return "none", []
+    items, pending = failing_items(rollup)
+    return ("red" if items else "pending" if pending else "green"), [i["name"] for i in items]
+
+
+def job_verdict(directory: Path | str, job: int, timeout: float) -> dict[str, Any] | None:
+    """Whether Actions job `job` ever started (design §4.4 *CI that never started is the person's*,
+    TD-686): `{started: False, reason, kind}` for a `completed` job with no steps, no runner and an
+    annotation beginning `NOT_STARTED` (`kind` *billing* when it names account payments or a spending
+    limit, else *other*), `{started: True}` for any other job — one cancelled while queued among them —
+    and None for a job that could not be read, which is no evidence."""
+    got, why = _gh_api(directory, f"repos/{{owner}}/{{repo}}/actions/jobs/{job}", timeout)
+    if why is not None or not isinstance(got, dict):
+        return None
+    if str(got.get("status") or "") != "completed" or got.get("steps") or got.get("runner_name"):
+        return {"started": True}
+    notes, why = _gh_api(directory, f"repos/{{owner}}/{{repo}}/check-runs/{job}/annotations", timeout)
+    if why is not None or not isinstance(notes, list):
+        return None
+    for a in notes:
+        msg = str(a.get("message") or "").strip() if isinstance(a, dict) else ""
+        if msg.startswith(NOT_STARTED):
+            low = msg.lower()
+            billing = "account payments" in low or "spending limit" in low
+            return {"started": False, "reason": msg[:300], "kind": "billing" if billing else "other"}
+    return {"started": True}
+
+
+def _verdict_ok(v: Any) -> bool:
+    """A kept verdict is `job_verdict`'s shape, else it is read again."""
+    return isinstance(v, dict) and (v.get("started", True) is not False or bool(v.get("reason")))
+
+
+def classify_failing(
+    directory: Path | str, items: list[dict[str, Any]], head: str, old: dict[str, Any] | None, timeout: float
+) -> tuple[dict[str, Any] | None, list[str], dict[str, Any]]:
+    """A red PR's failing items read for jobs that never started (TD-686): `(not_run, failing, jobs)`.
+    `not_run` is `{reason, kind, runs}` when **every** failing item is an Actions job that never
+    started, else None; `failing` the names left once the not-started ones are out; `jobs` the
+    verdicts kept by job id for `head` (`{head, read}`; `old`'s map only while its head is `head`). A
+    commit status or another check run keeps the PR red with no read; the jobs are read in order, at
+    most `JOBS_CAP`, stopping at the first that started or could not be read."""
+    old = old if isinstance(old, dict) else {}
+    ids = {str(i["job"]) for i in items if i["job"] is not None}  # an earlier attempt's jobs are not kept
+    kept = old.get("read") if old.get("head") == head and isinstance(old.get("read"), dict) else {}
+    read: dict[str, Any] = {k: v for k, v in kept.items() if k in ids and _verdict_ok(v)}
+    names = [i["name"] for i in items]
+    if not items or any(i["job"] is None for i in items):
+        out = [i["name"] for i in items if i["job"] is None or (read.get(str(i["job"])) or {}).get("started", True)]
+        return None, out, {"head": head, "read": read}
+    gone: set[int] = set()
+    whole = len(items) <= JOBS_CAP
+    for i in items[:JOBS_CAP]:
+        key = str(i["job"])
+        v = read.get(key)
+        if v is None and (v := job_verdict(directory, i["job"], timeout)) is not None:
+            read[key] = v
+        if v is None or v.get("started", True):
+            whole = False
+            break
+        gone.add(i["job"])
+    failing = [i["name"] for i in items if i["job"] not in gone]
+    if not whole:
+        return None, failing or names, {"head": head, "read": read}
+    first = read[str(items[0]["job"])]
+    runs = sorted({i["run"] for i in items if i["run"] is not None})
+    return {"reason": first["reason"], "kind": first["kind"], "runs": runs}, [], {"head": head, "read": read}
 
 
 def _gh_api(directory: Path | str, path: str, timeout: float) -> tuple[Any, str | None]:
@@ -458,6 +537,8 @@ def _gh_prs(
         }
         if fields == OPEN_PR_FIELDS:
             row["checks"], row["failing"] = fold_checks(p.get("statusCheckRollup"))
+            if row["checks"] == "red":  # what `pr_reading` reads for jobs that never started (TD-686)
+                row["failing_items"] = failing_items(p.get("statusCheckRollup"))[0]
             row["merge_state"] = str(p.get("mergeStateStatus") or "").upper()
             row["conflicting"] = row["merge_state"] == "DIRTY"
             row["fork"] = bool(p.get("isCrossRepository"))
@@ -556,7 +637,9 @@ def pr_reading(
     `old` (the last reading) by number and dropped the reading it is neither (TD-613); `fork`, whether
     its head is another repository's; and on a `cadence-sync-*` branch `sync`, whether it is a sync PR
     (`_sync_flag`), and for one `sync_since`, the first reading that saw it open, kept as `red_since`
-    is (TD-684)."""
+    is (TD-684). In a repo whose `origin` is GitHub, a red PR whose failing items all are Actions jobs
+    that never started reads `checks: not_run` with `not_run: {reason, kind, runs}`, and every red one
+    keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686)."""
     if not Path(directory).is_dir():
         return {"error": f"{directory} is not a directory here"}
     since = now - PR_WINDOWS["month"]
@@ -564,16 +647,29 @@ def pr_reading(
     if isinstance(open_, str):
         return {"error": open_}
     olds = {p.get("number"): p for p in (old or {}).get("open") or [] if isinstance(p, dict)}
+    origin: list[str] = []  # read once, and only for a red PR with an Actions job among its failing items
     for p in open_:
         # gh says UNKNOWN while it recomputes the merge state (just after a push): keep the last word
         if p.pop("merge_state", "") == "UNKNOWN" and olds.get(p["number"], {}).get("conflicting"):
             p["conflicting"] = True
+        items = p.pop("failing_items", None)
+        if items and any(i["job"] for i in items):
+            origin = origin or [_git(directory, "remote", "get-url", "origin") or ""]
+        if items and GITHUB_ORIGIN.search((origin or [""])[0]):
+            not_run, failing, p["jobs"] = classify_failing(
+                directory, items, p["head"], olds.get(p["number"], {}).get("jobs"), timeout
+            )
+            if not_run:
+                p["checks"], p["not_run"] = "not_run", not_run
+            p["failing"] = failing
         if p["checks"] == "red" or p["conflicting"]:
             p["red_since"] = olds.get(p["number"], {}).get("red_since") or now.isoformat()
         was = olds.get(p["number"]) or {}
         _sync_flag(directory, p, was, timeout)
         if p.get("sync"):
-            p["sync_since"] = was.get("sync_since") or now.isoformat()
+            # one waiting on CI that never started counts from the reading it conflicts (TD-686)
+            waits = p["checks"] == "not_run" and not p["conflicting"]
+            p["sync_since"] = (not waits and was.get("sync_since")) or now.isoformat()
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):

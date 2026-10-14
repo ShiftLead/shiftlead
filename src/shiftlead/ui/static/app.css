@@ -583,7 +583,8 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); white-space: nowrap; }
 .facet .fhead > .seg { margin-left: auto; }
 /* *· n red* after the PRs' open count (§4.5a *team card: Repo facet*, TD-613): red, its hover each PR */
-.facet .prred { margin-left: -4px; font-size: var(--t-cap); font-weight: 600; color: var(--stalled-fg); white-space: nowrap; cursor: help; }
+.facet .prred, .facet .prnotrun { margin-left: -4px; font-size: var(--t-cap); font-weight: 600; color: var(--stalled-fg); white-space: nowrap; cursor: help; }
+.facet .prnotrun { color: var(--alarm-fg); }  /* CI never ran, counted apart from red (TD-686) */
 /* the rollup's ***i*** beside Agents: a tooltip and nothing to press (TD-418) */
 .tipmark { display: inline-flex; align-items: center; justify-content: center; cursor: help; }
 .facet .dim { opacity: .7; }
@@ -698,6 +699,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .tag { font-size: var(--t-small); padding: 1px 7px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); white-space: nowrap; }
 .repopage .tag.wait { border-color: var(--needs); color: var(--needs-fg); background: var(--needs-bg); }
 .repopage .tag.red { border-color: var(--stalled); color: var(--stalled-fg); background: var(--stalled-bg); }  /* a red or conflicting PR (TD-613) */
+.repopage .tag.notrun { border-color: var(--alarm); color: var(--alarm-fg); background: var(--alarm-bg); cursor: help; }  /* CI never ran: the person's (TD-686) */
 .repopage .rrow .p-high { color: var(--stalled-fg); }
 .repopage .imark { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; }
 .repopage .secinfo { margin: -4px 0 8px; }
