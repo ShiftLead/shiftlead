@@ -11787,3 +11787,51 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Related:** TD-627 (the design), TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
 
 **Resolved:** 2026-10-14 (grinder-ao-2, PR #1725) — `AO.gitFiles` draws the Git card's lines: the code as text, the path an `a.editor` link by the recent files' form joined to the worktree's top level (`git_root`, served by the Focus route from `gitinfo.toplevel` for a record on this host with an editor; the directory where it is not); a deletion and a new directory text with why on hover; no file form, text. Focus's render draws by it on load and each delta. `tests/test_ui_focus_git_files.py` holds the Fix's cases; on a scratch home under headless Chromium a modified and an untracked path were links, a deletion and a new directory text (`docs/mockups/reviews/2026-10-14-td628-git-card.png`).
+
+
+## TD-646: Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-connect, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-13 (ao-connect); **Fable review the same day, adopted by Paul**: Tailscale ships alone first (TD-647 in two slices, Cloudflare moved to TD-656, built when asked), a dated interim serve of 8765 taken knowingly, Tailscale's identity trust stated, `listeners.json` cut for asking the port, a lost device's cut-off per route, the passkey as the coming second way in, the phone's silent failure in TD-003. Original round — §4.5b rewritten: the person brings the route and shiftlead runs nothing in its path; Tailscale offered first (`tailscale serve`, a `*.ts.net` certificate, no domain, nobody in the middle who can read it), Cloudflare Tunnel + Access second (since moved to built when asked, TD-656), `ssh -L` always; every route dials out, so each works behind CGNAT. The UI gains a **route port** (8766, loopback) on which the route's identity is required — `Tailscale-User-Login`, or a verified Access token — and the plain port 8765 keeps no login but checks `Host` and `Origin` and refuses proxy headers. `ao connect` sets a route up and checks it, writing `reach:` (§5). A relay, if one is built, forwards ciphertext only: TLS ends on the home, the home serves the UI and holds the login (a passkey). §4.5, §4.5c, §4.4a, §4.7, §4.8a, §5, §7 and §10 amended.
+**Blocked by:** TD-647, TD-648
+**Location:** design §4.5b (rewritten), §4.5 *Security* and screen 8 *Not on the page*, §4.7 `ao connect` and `ao doctor`'s **route** check, §5 `reach:`, §4.8a *The threat model*, §4.5c, §4.4a *The link*, §7 phase 2, §10
+
+**Why:** Paul, 2026-10-13: the UI is reached today by keeping an `ssh -L` running, and Paul is moving to an ISP behind CGNAT, which breaks a WireGuard endpoint at home and an `ssh -L` from outside it. Paul also judged that a technical user would not give root-equivalent access to their machine through shiftlead's own infrastructure unless Cloudflare or another well-known provider were in the path, and asked how this scales. Paul's decisions: bring your own route, with one route primary (Tailscale, since it is the easier setup) and Cloudflare for those who want it; guide the person through a free account.
+
+**Fix:** design first (this entry); built by TD-647 (the route port) and TD-648 (`ao connect`, the setting, the doctor line, the guide); the Cloudflare route by TD-656, when asked.
+
+**Done when** the design says how the person reaches the UI from anywhere, behind CGNAT included, and the build entries are filed with `Blocked by` lines.
+
+**Related:** TD-003 (the phone layout, reserved until a route exists), TD-057 (the link), the monetisation discussion of 2026-10-13 (not yet written down; an ADR is offered).
+
+**Resolved:** 2026-10-14 (PR #1729) — designed and built. The route port, TD-647 (#1710, #1713, live check #1715), and `ao connect`, `reach:`, the doctor's **route** line and the README guide, TD-648 (#1720, live check in this PR), are live. Paul reaches the UI from his phone over Tailscale. Still open: the Cloudflare route, TD-656 (built when asked), and the probe's first-certificate wait, TD-672. The monetisation discussion is written down in [ADR 2026-10-13](decisions/2026-10-13-monetisation.md).
+
+## TD-648: Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-connect, TD-646's round)
+**Owner:** anchor
+**Kind:** live-check #1720
+**Status:** Built (grinder-ao-2, PR #1720): `set_reach` (person's own, home's; shape checked; answers `before`), `set_settings` refusing `reach`; Fix 1, the Telegram link defaulting to `reach.url` and the Settings page's placeholder; `ao connect` with no argument, `tailscale` (§4.7's checks in order, the ports asked, write → serve → probe, a failed probe undone) and `off` (only its own handler), `cloudflare` refused naming TD-656, refused to a session before any provider command; `ao doctor`'s **route** line, its eighth check; README *Reach it from your phone*. **A live check**: once #1720 is live (`ao promote status`), `ao connect tailscale` is the person's to run (a session is refused), so read what follows after they have: `ao doctor route` on the live home reads *ok: route — tailscale, https://…*, and the Settings page's Telegram link placeholder shows `reach.url` (a headless GET). Whether the phone opens the UI at the printed URL is the person's to say: a look (`--answer "Works" --answer "Not right: <what>"`). **Read 2026-10-14** (grinder-ao-1; #1720 live as `21cd092`): `ao doctor route` warns *route — none set; the UI is reached over `ssh -L` (`ao connect tailscale`)*, and the route port 8766 refuses `403`, so the person has not run it yet. That is asked of them on `docs/user_attention.md` (due 2026-10-15). Its Owner is `anchor` until they have; then the reads above and the look.
+**Location:** design §4.7 `ao connect` and `ao doctor` **route**, §5 `reach:`, §4.5b *The setting* and *Cutting off a lost device*; `src/shiftlead/cli.py`, the settings schema, the `doctor` checks, `README.md` (*Reach it from your phone*), `notify.telegram.link`'s reader
+
+**Why:** TD-646: the route is the person's to set up; shiftlead checks each step, names the one it cannot take, and writes the setting only when the route works.
+
+**Fix:**
+1. `notify.telegram.link` defaults to `reach.url` (the `reach:` reader is TD-647's); the Settings page's Telegram-link placeholder is `reach.url` when set, else `http://localhost:8765` (today `http://{{ host }}:8765`, which a loopback plain port refuses).
+2. The `set_reach` RPC, the one RPC that writes the key: checks the shape (a known route, an `https` URL, a non-empty `allow`, `team` and `aud` for `cloudflare`) and is refused to a session as `set_settings` is; `set_settings` refuses the `reach` key, naming `ao connect`.
+3. `ao connect` with no argument, `tailscale`, `off`, `--allow`, `--route-port`, as §4.7 orders the checks: never `sudo`, a *lacking:* line and a stop at the first step it cannot take; a tagged home without `--allow`, a 443 already served by something else (one aimed at the plain port named as §4.5b's interim, with its `off` command), and Funnel on each refused; each port's state learnt by asking it (refused: the UI is not running, and a stop; `X-Shiftlead-Listener`: the UI's; neither: another process, named from `ss -lptn`); refused on a node; the tailscale order of §4.7 (write, serve, probe on `X-Shiftlead-Listener: route`, restore on failure, turning off only a handler this run added, by its target `127.0.0.1:<route port>`); `off` removing only its own handler; `cloudflare` refused naming TD-656 until it is built.
+4. `ao doctor`'s **route** line, the same reading, plus *lacking* when the route port did not bind, naming the holder, and when the UI is not running; and the refusals counted since the UI started (TD-647's log).
+5. README *Reach it from your phone* (and a line that a script calling the UI over HTTP sends an `Origin`): a Tailscale account with a second factor, the client, `tailscale up`, the operator line, HTTPS and MagicDNS on, Tailnet Lock, the tailnet access rule granting the person's login the home's 443 and 22 (22 for the ssh that cures the interim from the phone), `ao connect tailscale`, the phone's app, and an ssh app on the phone while the interim serve is in use; cutting off a lost phone (remove the device from the tailnet); `ssh -L` kept as the fallback. It replaces the README's *Reaching the UI from elsewhere* paragraph and the *Use it* step's route line (which names WireGuard and a Cloudflare tunnel).
+6. Tests: each check's lacking line with the provider commands faked (tagged home, 443 taken, 443 aimed at the plain port, Funnel on); each port state read by asking; `set_settings` refusing `reach`; `off` removing the setting and only its own serve.
+
+**Done when** `ao connect tailscale` on a home logged in to Tailscale leaves a phone on the same tailnet opening the UI at the printed URL.
+
+**Related:** TD-646 (the design), TD-647 (the route port), TD-656 (the Cloudflare route), TD-003 (the phone layout).
+
+**Resolved:** 2026-10-14 (PR #1729) — the live check holds. Paul ran `ao connect tailscale --allow eyecantell@github` (kmaster is tagged `tag:server`, so the default *node's owner* is the tag, and `--allow` names the login). The first run failed its probe before Tailscale's first HTTPS certificate arrived, and rolled back cleanly (TD-672). The second run succeeded. **On the live copy** (`0c7f112`): `ao doctor route` reads *ok: route — tailscale, https://kmaster.tailc00dac.ts.net, allows eyecantell@github*; `settings.yml` holds `reach:` (`route: tailscale`, `url`, `allow`); `tailscale serve status` proxies `/` to `http://127.0.0.1:8766`, tailnet only; and the Settings page's Telegram link placeholder is `https://kmaster.tailc00dac.ts.net`. The field itself holds the person's own value, `http://127.0.0.1:8765`, which wins over the default and was left for them. **The look**: Paul, 2026-10-14, *I can connect from the phone*.
