@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-680 | Live check of TD-678: **Start session** / **Open session** on the Inbox's ledger rows, on the live copy | Medium | Blocked: Paul's look (m-79c47f23b1df) |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Designed — TD-686, TD-687 build it |
-| TD-683 | `ao team --skill` leaves out what a repo's own session needs before its first team: the repo's readiness, an empty ledger, a public repo | Low | Open |
 | TD-684 | Build TD-681 (1): a sync PR the home does not merge is the team's `pr:<n>` order at once, first in the pick order; the Inbox row where no team services the repo | Medium | Open |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
 | TD-686 | Build TD-682 (1): the reading tells a run that never started from a red one — `checks: not_run` with its reason; no order, no `red_since`; the `done` refusal and the promote's checks say *never ran* | Medium | Open |
@@ -974,30 +973,6 @@ with the retired brief).
 **Done when** a refused-for-billing run gives the person one `act` line naming the org and the PRs it holds, and the line closes itself when CI runs again.
 
 **Related:** dev-cadence#TD-115, TD-652, TD-681.
-
----
-
-## TD-683: `ao team --skill` leaves out what a repo's own session needs before its first team
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-14 (the session `ao-dc-decouple`, lessons from the ledgerboard split; Paul agreed the lesson the same day)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/team_skill.md`; its tests (`tests/test_briefs_layout.py` bars repo literals in it)
-
-**Why:** Paul is about to have the pneuma-ops, ledgerboard and guardians-devenv sessions each stand up its repo's first team. The recipe takes them from definition to `ao team start`, and `ao doctor` already reads all three repos as ready. Four things are missing or wrong for a session doing this for the first time:
-(1) No step checks the repo first. `ao doctor`'s **repos** line and `ao repo init` (TD-591) are the readiness check, and the recipe names neither.
-(2) An empty ledger refuses the start. ledgerboard has 0 open entries, so a `free-pick` team there is refused (*every member's lane holds nothing to pick*), and the recipe does not say what a repo with little work should run: an on-call manager alone, or one member and `--anyway`.
-(3) A public repo's `.shiftlead.yml` publishes its team definition, including profile and session names. The recipe's **Which file:** lead-in should say to keep a public repo's team in `org.yml`.
-(4) The closing section is headed *For a Claude session told to do this*, though a session may be another tool's.
-
-**Fix:** a step 0b, *Is the repo ready?*, with `ao doctor` and `ao repo init`; a sentence on a small repo's team after `lane:`; the public-repo sentence in *Which file*; the heading made tool-neutral.
-
-**Done when** `ao team --skill` prints step 0b, the small-repo sentence, the public-repo sentence and the tool-neutral heading.
-
-**Related:** TD-591, TD-588.
 
 ---
 
