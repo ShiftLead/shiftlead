@@ -568,8 +568,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-dc-decouple, with Paul)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open.
-**Blocked by:** TD-585
+**Status:** Slice 1 (grinder-ao-1, 2026-10-14, #1733): `ao board edit done|snooze` (`sessionorc.board.branch_edit`) — the line by `--line`/`--expect` or `--key`, ledgerboard's edit and subject, one file committed on the branch it is on; refused on the default branch (origin's `HEAD`, else `main`/`master`/`init.defaultBranch`), a detached head, a staged index, an edited board, and for `decide`/`reply`; `.shiftlead.yml` takes `board:` (`board.board_path`: set, defaulted, absent), which `--board` defaults to. Left, slice 2: every other board reader reads `board:` in place of the fixed `docs/user_attention.md` — the host agent's `boards` reading (`workorders.read_boards`, `workorders.BOARD`), the write-back (`board.BOARD` in `_tree`/`_write_back`/`_insert`, `agent_inbox._board_root`), the Inbox (`inbox.BOARD_FILE`) and `ao board show`; an absent board then reads as *no board: the Inbox is the person's channel* (§5). Was: Open.
 **Location:** `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py`, `src/sessionorc/board.py`, §4.7's help list (`src/shiftlead/ui/help.py`)
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. A session closes a decided board line with `scripts/board_edit.py`, a dev-cadence script, so a repo without dev-cadence cannot.
