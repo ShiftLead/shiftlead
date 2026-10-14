@@ -100,20 +100,21 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         out["model"] = model
     if ev == "PostModelSwitch":
         return {**out, "model": payload["to_model"]} if payload.get("to_model") else None
-    if ev == "PermissionRequest":
+    if ev == "PermissionRequest" and payload.get("tool_name") != "AskUserQuestion":
         tool = payload.get("tool_name", "?")
-        what = describe_tool_input(tool, payload.get("tool_input") or {})
+        what = describe_tool_input(payload.get("tool_input") or {})
         return {
             **out,
             "kind": "permission",
-            # a question that reaches the hook reads as its question, as the PreToolUse road draws it
-            "text": what if tool == "AskUserQuestion" else f"{tool}: {what}",
+            "text": f"{tool}: {what}",
             "tool_use_id": payload.get("tool_use_id"),
-            # the tool and its input, for the person's `permissions:` rules (§4.9b, TD-641); a
-            # question carries neither, since no rule answers one (§9 invariant 6)
-            **({} if tool == "AskUserQuestion" else {"tool": tool, "input": payload.get("tool_input") or {}}),
+            # the tool and its input, for the person's `permissions:` rules (§4.9b, TD-641)
+            "tool": tool,
+            "input": payload.get("tool_input") or {},
         }
-    if ev == "PreToolUse" and payload.get("tool_name") == "AskUserQuestion":
+    if ev in ("PreToolUse", "PermissionRequest") and payload.get("tool_name") == "AskUserQuestion":
+        # a question is a question on either road, never a permission: Allow / Deny cannot pick one of
+        # its options, so nothing waits on the hook and the terminal's menu is the one channel (§4.2, TD-674)
         text = first_question(payload.get("tool_input") or {})
         return {**out, "state": "needs-you", "pending": {"kind": "question", "text": text}}
     if ev in TOOL_EVENTS and payload.get("agent_id"):
@@ -163,14 +164,12 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
 
 
 def first_question(ti: dict[str, Any]) -> str:
-    """An `AskUserQuestion`'s first question, its pending text on either road."""
+    """An `AskUserQuestion`'s first question, its pending text on either road (`PreToolUse`, `PermissionRequest`)."""
     qs = ti.get("questions") or []
     return qs[0].get("question", "") if qs and isinstance(qs[0], dict) else "question"
 
 
-def describe_tool_input(tool: str, ti: dict[str, Any]) -> str:
-    if tool == "AskUserQuestion":
-        return first_question(ti)  # whole, as the PreToolUse road draws it
+def describe_tool_input(ti: dict[str, Any]) -> str:
     for key in ("command", "file_path", "path", "url", "pattern", "description", "prompt"):
         if v := ti.get(key):
             return str(v)[:200]

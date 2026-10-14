@@ -131,7 +131,8 @@ def test_translate_permission_and_questions():
         "tool": "Bash",
         "input": {"command": "git push origin td-301"},
     }
-    # a question that reaches the PermissionRequest hook reads as its question, not its JSON (TD-629)
+    # a question that reaches the PermissionRequest hook is a question, as the PreToolUse road reports
+    # it: its text, never its JSON (TD-629), and no permission, so nothing waits on Allow / Deny (TD-674)
     a = translate(
         {
             "hook_event_name": "PermissionRequest",
@@ -140,7 +141,7 @@ def test_translate_permission_and_questions():
             "tool_use_id": "tu8",
         }
     )
-    assert a == {"kind": "permission", "text": "Which db?", "tool_use_id": "tu8"}
+    assert a == {"state": "needs-you", "pending": {"kind": "question", "text": "Which db?"}}
     # a tool event names its call, which ends that call's waiter if its dialog was answered in the terminal
     done = translate({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_use_id": "tu9"})
     assert done == {"state": "working", "pending": None, "event": "PostToolUse:Bash", "tool_use_id": "tu9"}
@@ -586,6 +587,35 @@ async def test_hook_script_end_to_end(agent, hookstub, tmp_path):
         assert cp.returncode == 0 and cp.stdout == ""
         x = await c.call("get", id=sid)
         assert x["pending"]["kind"] == "question"
+
+
+async def test_a_question_at_the_permission_hook_waits_on_nothing(agent, hookstub, tmp_path):
+    """TD-674, design §4.2: an `AskUserQuestion` that reaches the `PermissionRequest` hook was drawn as a
+    permission — Allow / Deny on the card, Focus, the Inbox row and the team's facet, which cannot pick
+    one of its options. The hook now returns at once with no decision, the record is `needs-you` with
+    a `question` pending and no waiter, and every surface built from it draws its text and Focus."""
+    from shiftlead.ui import org
+    from shiftlead.ui.app import state_rows, templates, view
+
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="q", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        payload = {
+            "hook_event_name": "PermissionRequest",
+            "tool_name": "AskUserQuestion",
+            "tool_input": {"questions": [{"question": "Press does?", "options": [{"label": "one"}, {"label": "two"}]}]},
+            "tool_use_id": "tu-ask",
+        }
+        cp = await asyncio.to_thread(run_hook, sid, payload, "20")  # a permission would block for 20 s
+        assert cp.returncode == 0 and cp.stdout == ""  # no decision: the terminal's menu answers it
+        rec = await c.call("get", id=sid)
+        assert rec["state"] == "needs-you" and rec["pending"]["kind"] == "question"
+        assert rec["pending"]["text"] == "Press does?" and not rec["pending"].get("tool_use_id")
+        assert not agent._permission_waiting(sid)
+    v = view(rec, [rec])
+    assert v["next_act"] != "allow" and v["slot"]["text"] == "question: Press does?"
+    html = templates.get_template("inbox_rows.html").render(rows=state_rows([v]), section="needs")
+    assert "Press does?" in html and ">Open<" in html and 'data-act="allow"' not in html
+    assert [(a["kind"], a["text"]) for a in org.answer_blocks([rec])] == [("question", "Press does?")]
 
 
 def test_hook_script_without_session_is_noop():

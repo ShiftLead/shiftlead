@@ -59,7 +59,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
-| TD-674 | A question that reaches the permission hook is drawn as a permission: *Needs you* offers Allow / Deny for an `AskUserQuestion` menu | Medium | Open |
 | TD-675 | Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change | Low | Open |
 
 ---
@@ -1053,24 +1052,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** a ShiftLead note arrives from ShiftLead's own bot, and `settings.yml` names no samscrape secrets.
 
 **Related:** TD-092 (Told on Telegram), TD-648 (`reach.url`, the notes' default link).
-
----
-
-## TD-674: A question that reaches the permission hook is drawn as a permission: *Needs you* offers Allow / Deny for an `AskUserQuestion` menu
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-14 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/adapters/claude_code/hook.py` (`translate`'s `PermissionRequest` branch); `src/sessionorc/agent_hook.py` (`rpc_hook`, `_await_permission`); design §4.2 *Permissions are answered through the hook, not through keystrokes*, §4.5a rows *card: Allow / Deny*, *Focus: Allow / Deny*, *Inbox row: state*, *team card: Answer needed / Doing*
-
-**Why:** Paul (2026-10-14): *It looks like we have a mismatch between what "needs you" displays and what a session is actually asking. We may have to remove the Allow/Deny options and just offer a button to open the session* — screenshots `~/.shiftlead/attachments/draft-08e7e336/paste-20261014-121205.png` (the Org: entry-6 *NEEDS YOU*, the team's *Answer needed (1)* reading *entry-6 permission* with the question's text and **Allow** / **Deny** / *why?*) and `paste-20261014-121223.png` (entry-6's Focus: the header's **Allow** / **Deny**, while the pane shows Claude Code's `AskUserQuestion` menu — three tabs, *Press does / Priority / Submit*, four numbered options). The session was asking a multi-option question, and the page offered a yes/no that cannot answer it. The cause: `translate` turns a `PermissionRequest` whose tool is `AskUserQuestion` into `kind: "permission"` with its `tool_use_id`, so `rpc_hook` starts the blocking `_await_permission` waiter and every surface that draws a permission (card, Focus, Inbox row, the team's facet, the `a` / `d` keys) draws **Allow** / **Deny**. TD-629 (#1664) gave that pending the question's text but left its kind a permission. §4.2 already says the opposite: *Questions and multi-option menus always show pending text plus **Focus** … never buttons — since the hook does not carry the option list*; the `PreToolUse` road (`kind: "question"`) already draws it so. The harm: the one state that means *you* offers a control that does not do what the session asked — Allow cannot pick an option, and the person learns to distrust the buttons on real permissions too. **Allow / Deny on a real permission stay** (§4.2: they answer through the hook while the terminal dialog stands beside them); what Paul's *open the session* asks for is what §4.2 already gives a question, so no design change is needed.
-
-**Fix:** in `translate`, a `PermissionRequest` whose tool is `AskUserQuestion` reports what the `PreToolUse` road reports — `state: needs-you`, `pending: {kind: "question", text: <its first question>}` — and no `kind: "permission"`, so `rpc_hook` does not block on it and the terminal's menu is the one channel. No surface keys on the tool's name (§4.3): each already draws a `question` as its text and **Focus**. **Done when** a test sends a `PermissionRequest` of `AskUserQuestion` through `rpc_hook` and it returns at once, leaving the record `needs-you` with a `question` pending and no permission waiter; and the card, the Focus header, the Inbox row and the team's *Answer needed* facet built from that record draw the question's text and **Focus** (the facet: its link to Focus) with no **Allow** / **Deny**.
-
-**Related:** TD-629 (archived: the waiter a terminal answer ends, and an `AskUserQuestion` permission's text), TD-641 (`rules.NEVER` already keeps a question from the `permissions:` rules).
 
 ---
 
