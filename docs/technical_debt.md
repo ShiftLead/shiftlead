@@ -54,7 +54,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
-| TD-675 | Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change | Low | Designed — TD-677 builds it |
 | TD-676 | An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form | Medium | Designed — TD-678 builds it |
 | TD-678 | Build TD-676: **Start session** / **Open session** on the Inbox's ledger rows — one press, the person's interactive session in `td-<n>` with `briefs/work.md` sent, the filled form where it cannot be silent | Medium | Open |
 
@@ -929,25 +928,6 @@ with the retired brief).
 **Done when** a ShiftLead note arrives from ShiftLead's own bot, and `settings.yml` names no samscrape secrets.
 
 **Related:** TD-092 (Told on Telegram), TD-648 (`reach.url`, the notes' default link).
-
----
-
-## TD-675: Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-14 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-14 (the designer; mockup `AddEntry.dc.html`, shot `docs/mockups/reviews/2026-10-14-td675-add-entry-name.png`) — §4.5a *Add entry form: Name*: a box beside **Open a session**, prefilled with `entry-<n>`, the default kept (Paul named it; never drawn from the words); **free** is one test for the default and a typed name — the name check answers `free` in the repo's scope, no worktree and no local branch of that name (an exited holder is not free here: an entry's session is new work); a typed name is one §4.1's slug leaves as it is (`slug(name) == name`: `[a-z0-9]`, single `-` between, none at either end, at most 32), the session's, worktree's and branch's name unchanged; checked as typed through `/api/entry/plan?name=`, a name not free disabling the button with its reason in place of the line under it; a changed Type keeps a typed name, an emptied box takes the default; `/api/entry/session` takes `name` and applies the same test at the press. §4.9 *Add an entry to the ledger* names the worktree by the box. Built by TD-677. Was: Open.
-**Blocked by:** TD-677
-**Location:** design §4.5a row *Add entry form: Open a session*, §4.9 *Add an entry to the ledger* (2. *Open a session*); `src/shiftlead/ui/app.py` (`entry_plan`'s `entry-<n>` pick, `/api/entry/plan`, `/api/entry/session`); the Add entry form in `src/shiftlead/ui/static/app.js`; mockup `AddEntry.dc.html`
-
-**Why:** Paul (2026-10-14): *In the add entry form, we offer "Open a session" and default the session name to "Entry-n" - lets add a text box that shows that default name with the option to change it.* Today the name is the server's alone: `entry_plan` takes the first `entry-<n>` free in the repo, the line under the button only reports it (*an interactive designer session, entry-3, in a new worktree*), and the same name becomes the worktree and its branch. A session talked through for one entry is then found on the Org, in Focus and in `git worktree list` by a number that says nothing of what it is about, and renaming it after the start is not offered.
-
-**Fix:** a design round. The form shows a **Name** box beside **Open a session**, prefilled with the `entry-<n>` default `/api/entry/plan` already picks; what the person types is the session's name and its worktree's, checked as they type with the New session form's *name field → holder* check (`/api/name_check`), and the default is taken when they leave it alone. The round settles: whether the default stays `entry-<n>` or is drawn from the words; what an edited name may hold (the worktree and branch rules); what the check says and whether it disables the button; and whether a changed Type (which re-reads the plan) keeps a typed name. §4.5a's row and the mockup gain the box in the same design PR.
-
-**Related:** TD-219 (Add entry's *Open a session*), TD-630 (the form's Attach), §4.5a *New session: name field → holder*.
 
 ---
 
