@@ -165,6 +165,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-14 (TD-652, grinder-ao-1): *A red PR nobody holds is a work order* — the reading names each held red PR's holders beside the orders, and the pages' *held by <name>* reads them. Was: the Repo page and the facet ran the holding test again over the records they held (`teamrun.pr_holders`, a copy of `workorders.holds_pr`).
 - 2026-10-14 (TD-670 slice 2, grinder-ao-2): *Each reading has one owner* — the counts' state-row views and board rows, and the events run's groups (views and rendered headers), are built on a worker thread. Was: on the loop, ~80 ms a recount and up to ~300 ms a regroup on the live home (TD-611's live read, #1700).
 - 2026-10-13 (TD-631, grinder-ao-2): *Repo facts* — the sentence on the board counts says the UI has them from the host agent's `boards` reading on the `repos` RPC, which TD-615 slice 2 (#1633) made so; it said the UI ran a board reader.
 - 2026-10-13 (TD-639, grinder-ao-1): the PR reading keeps each open PR's `base` and `required`, the check names each base requires — the protection's and the rulesets' — with `required_error` for a base whose read failed.

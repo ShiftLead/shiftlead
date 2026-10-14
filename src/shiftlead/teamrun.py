@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import balance as balance_mod
-from sessionorc import hosts, naming, workorders
+from sessionorc import hosts, naming
 from sessionorc import ledger as ledger_mod
 from sessionorc.agent_common import ORPHAN_AFTER
 from sessionorc.client import AgentError
@@ -1157,25 +1157,6 @@ def serviced(root: str | Path, sessions: Collection[Mapping[str, Any]]) -> bool:
     return any(s.get("team") for s in in_repo(sessions, root))
 
 
-def pr_holders(pr: Mapping[str, Any], sessions: Collection[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
-    """The live records that hold an open PR, `workorders.holds_pr` over records as the pages hold
-    them (§4.4 *A red PR nobody holds is a work order*): not ended, not superseded, not out of work,
-    and a `progress` entry naming it (`pr:<n>` or its `pr`) or its checkout on the PR's head."""
-    n = pr.get("number")
-    out = []
-    for s in sessions:
-        if s.get("state") in DEAD or s.get("superseded_by") or s.get("out_of_work"):
-            continue
-        named = any(
-            isinstance(p, dict) and (p.get("ref") == f"{workorders.PR_PREFIX}{n}" or p.get("pr") == n)
-            for p in s.get("progress") or []
-        )
-        branch = (s.get("git") or {}).get("branch") if isinstance(s.get("git"), dict) else None
-        if named or (branch and branch == pr.get("branch")):
-            out.append(s)
-    return out
-
-
 def red_prs(
     r: Mapping[str, Any] | None, sessions: Collection[Mapping[str, Any]], now: datetime
 ) -> list[dict[str, Any]]:
@@ -1184,10 +1165,12 @@ def red_prs(
     `title`, `url`, `author`, `word` (*red*, else *conflicting*), `failing`, `red_since`, and `whose`
     — past `ORPHAN_AFTER`, *nobody's — the anchor's order* for one the reading lists as an order
     (*nobody's* where no team services the repo: its row is the Inbox's), *held by <names>* for one a
-    live record of the repo holds; before it, ''. `sessions` the records, or the pages' views."""
+    live record of the repo holds, as the reading names them (`pr_orders.held`, TD-652); before it, ''.
+    `sessions` the records, or the pages' views."""
     r = r or {}
     mine = in_repo(sessions, str(r.get("root") or "")) if r.get("root") else []
     orders = {e.get("pr") for e in pr_orders(r)}
+    holders = ((r.get("pr_orders") or {}).get("held")) or {}
     nobody = "nobody's — the anchor's order" if any(s.get("team") for s in mine) else "nobody's"
     out = []
     for p in ((r.get("prs") or {}).get("open")) or []:
@@ -1201,7 +1184,7 @@ def red_prs(
             since = since.replace(tzinfo=UTC)
         whose = ""
         if now - since >= ORPHAN_AFTER:
-            held = [str(s.get("name") or s.get("id")) for s in pr_holders(p, mine)]
+            held = [str(x) for x in holders.get(str(p["number"])) or []]
             whose = nobody if p["number"] in orders else f"held by {', '.join(held)}" if held else ""
         out.append(
             {

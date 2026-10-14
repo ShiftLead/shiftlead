@@ -2725,8 +2725,13 @@ class TickMixin:
                     rec = by_id[sid]  # addressed as mail is: a node's record as `<id>@<host>`
                     self._system_note(self._address(rec), workorders.pr_note(pr), wake="uncharged", team=rec.team)
                     log.info("%s: told PR #%s is red with it idle", sid, pr["number"])
-                new = {"orders": orders, "told": told}
-                if new == {"orders": old.get("orders") or [], "told": old.get("told") or {}}:
+                held = workorders.red_holders(prs, mine, now, ORPHAN_AFTER)  # the pages' *held by* (TD-652)
+                new = {"orders": orders, "told": told, "held": held}
+                if new == {
+                    "orders": old.get("orders") or [],
+                    "told": old.get("told") or {},
+                    "held": old.get("held") or {},
+                }:
                     continue
                 if (cur := self._repos.get(root)) is None:
                     continue  # dropped from the registry while this pass ran

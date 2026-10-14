@@ -58,7 +58,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Built (#1720); live check |
-| TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
 | TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Designed — TD-661, TD-662, TD-663 build it |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
@@ -1024,27 +1023,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** `ao connect tailscale` on a home logged in to Tailscale leaves a phone on the same tailnet opening the UI at the printed URL.
 
 **Related:** TD-646 (the design), TD-647 (the route port), TD-656 (the Cloudflare route), TD-003 (the phone layout).
-
----
-
-## TD-652: The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (grinder-ao-2; the techlead's note on #1668, TD-618 slice 4)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — needs #1668 merged (it adds `pr_holders`).
-**Blocked by:** TD-618
-**Location:** `src/shiftlead/teamrun.py` (`pr_holders`, added by #1668), `src/sessionorc/workorders.py` (`holds_pr`, the `pr_orders` reading), the Repo page's *held by <name>* tag (`src/shiftlead/ui/repo.py`), design §4.4 *Each reading has one owner* (TD-614), *A red PR nobody holds is a work order*
-
-**Why:** the home's `pr_orders` reading lists only the red PRs nobody holds, so the Repo page, to tag one *held by <name>*, runs `teamrun.pr_holders` — the same test as `workorders.holds_pr`, written again over the records the page holds. Two copies of one rule drift; §4.4 *Each reading has one owner* puts a derivation on the reading, once.
-
-**Fix:** the home's reading carries, per red PR past `ORPHAN_AFTER`, its holders (`holds_pr` over the records, as the orders are derived); the page reads them and `pr_holders` goes; a test that the page and the reading name the same holder.
-
-**Done when** `git grep pr_holders src/` is empty, the Repo page's *held by* tag reads the reading, and the suite passes.
-
-**Related:** TD-613, TD-614, TD-618.
 
 ---
 
