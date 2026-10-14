@@ -184,10 +184,15 @@ def agent(monkeypatch):
     monkeypatch.setattr(cli, "_doctor_org", lambda files, node: doctor.org({}, files, 1, node))
     state["watch"] = None  # unread: the agent line as it was before the watch (TD-497 has its own test)
     monkeypatch.setattr(cli.service, "watch_reading", lambda: state["watch"])
+    # the route line asks the UI's ports: never this machine's (its own test is test_connect.py)
+    monkeypatch.setattr(cli, "_reach", lambda: None)
+    monkeypatch.setattr(
+        cli.connect, "route_line", lambda reach, *a, node=False, **k: [doctor._row("route", doctor.OK, "route — faked")]
+    )
     return state
 
 
-def test_the_seven_checks_in_order_then_the_count(agent, capsys):
+def test_the_eight_checks_in_order_then_the_count(agent, capsys):
     assert cli.main(["doctor"]) == 0
     out = capsys.readouterr().out.splitlines()
     assert [line.split(" — ")[0] for line in out[:-1]] == [
@@ -198,8 +203,9 @@ def test_the_seven_checks_in_order_then_the_count(agent, capsys):
         "ok: profile grind",
         "ok: nodes",
         "ok: org",
+        "ok: route",
     ]
-    assert out[-1] == "ok: 7 checks"
+    assert out[-1] == "ok: 8 checks"
 
 
 def test_a_seeded_lack_exits_1_and_json_carries_the_raw_reading(agent, capsys):

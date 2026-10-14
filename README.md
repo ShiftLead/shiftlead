@@ -32,8 +32,8 @@ the findings folded into the PR before merge — see the "review fixes" commits)
 and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, in order:
 
 1. **Use it** against a real repo and note what the flows get wrong (board item, due 2026-09-13).
-   From the laptop, reach the UI with `ssh -L 8765:127.0.0.1:8765 kmaster` (or WireGuard / a
-   Cloudflare tunnel, design §4.5).
+   From the laptop, reach the UI with `ssh -L 8765:127.0.0.1:8765 kmaster`; from the phone, set up
+   the Tailscale route (*Reach it from your phone*, below).
 2. **Decisions waiting on Paul**: see [`docs/user_attention.md`](docs/user_attention.md)
    (dev-cadence PRs #82/#83, GitHub merge settings, the two permission-dialog questions).
 3. **Deferred work** is in [`docs/technical_debt.md`](docs/technical_debt.md) (TD-001 `limited`
@@ -85,12 +85,43 @@ python3 -m virtualenv ~/.local/share/shiftlead-venv          # (pipx works the s
 ~/.local/share/shiftlead-venv/bin/pip install --upgrade '/path/to/shiftlead[ui]' && ~/.local/share/shiftlead-venv/bin/ao service install
 ```
 
-Reaching the UI from elsewhere: never a bare public port (design §4.5). Point a proxy at the route
-port, 8766 — `tailscale serve --bg --https=443 http://127.0.0.1:8766`, with a `reach:` written in
-`settings.yml` (`route: tailscale`, `url`, `allow`) — never at the plain port 8765, which refuses
-what a proxy sends (design §4.5b). A private network you run yourself (WireGuard) can reach the
-plain port bound to its address with `ao ui --bind <addr>` (and `--allow-host <name>` for a name it
-is reached by). A hosted, no-setup version is the `relay` transport in design §4.5b.
+### Reach it from your phone
+
+Never a bare public port (design §4.5). The UI listens on two loopback ports: the **plain port**
+8765, for a browser on this machine and an `ssh -L`, and the **route port** 8766, for a proxy that
+proves who you are on every request. Tailscale is that proxy here. Nothing below hands shiftlead a
+key, and `ao connect` never runs `sudo` (design §4.5b, §4.7).
+
+1. A **Tailscale account** (sign in with Google, GitHub or Microsoft) with a **second factor** on
+   that login: whoever holds it reaches your sessions.
+2. The **client** on this machine (<https://tailscale.com/download>), then `tailscale up` and open
+   the link it prints.
+3. On Linux, let your user run `tailscale serve` without root: `sudo tailscale set --operator=$USER`.
+4. In the admin console's DNS page (<https://login.tailscale.com/admin/dns>), turn on **MagicDNS**
+   and **HTTPS Certificates**; `tailscale serve` needs them for its certificate.
+5. Turn on **Tailnet Lock**, so a device nobody you trust signed cannot join the tailnet.
+6. In the tailnet's **access rules**, grant your login this machine's ports **443** (the UI) and
+   **22** (an ssh from the phone, for the case below).
+7. `ao connect tailscale`. It checks each step above and names the first one missing. It writes
+   `reach:` in `settings.yml`, serves 443 at the route port, and probes the result; a probe that
+   fails is undone. `--allow <login>` names the login to let in (a tagged machine needs it).
+   `ao connect` alone shows the route; `ao doctor route` checks it.
+8. On the phone: the **Tailscale app**, signed in as the same login, then open the URL
+   `ao connect` printed.
+
+**If 443 already serves the plain port** (the interim of design §4.5b, before the route port
+existed), the UI refuses what that proxy sends, and the phone shows a page saying so. Run
+`tailscale serve --https=443 off`, then `ao connect tailscale`. From the phone, do it over an ssh
+to this machine's tailnet name, so keep an ssh app on the phone while that serve is in use.
+
+**A lost phone**: remove the device from the tailnet in the admin console's Machines page; it
+reaches nothing from then on. `ao connect off` removes the route and turns off only the serve it
+added.
+
+`ssh -L 8765:127.0.0.1:8765 <this machine>` always works as the fallback. A script that POSTs to
+the UI over HTTP sends an `Origin` naming the UI's own address, as a browser does; one without it is
+refused (design §4.5b). A private network you run yourself (WireGuard) can reach the plain port bound
+to its address with `ao ui --bind <addr>` (and `--allow-host <name>` for a name it is reached by).
 
 **Do not start the agent or the UI from a VS Code Remote-SSH terminal.** VS Code auto-forwards
 any port a process in its terminal starts listening on, so `127.0.0.1:8765` on your laptop ends

@@ -57,7 +57,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
-| TD-648 | Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Slice 1 in #1720; `ao connect`, doctor, README left |
+| TD-648 | Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Built (#1720); live check |
 | TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
@@ -1008,9 +1008,8 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Type:** feature
 **Added:** 2026-10-13 (ao-connect, TD-646's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 built (grinder-ao-2, PR #1720): the `set_reach` RPC (person's own, home's; shape checked; answers `before`), `set_settings` refusing `reach`, and Fix 1 — `settings.telegram_link` (`reach.url` when the link is absent) and the Settings page's placeholder. **Left:** `ao connect` and `ao doctor`'s **route** line (Fix 3, 4: `cli.py`), the README (Fix 5), their tests. TD-647 is archived (#1715), so nothing blocks it. Before that slice, the phone did not need it: once TD-647's slice 1 is live, `reach:` written by hand in `settings.yml` (§4.5b *The setting*), with `tailscale serve --bg --https=443 http://127.0.0.1:8766` run by hand, gives a working route without this command.
-**Blocked by:** TD-647
+**Kind:** live-check #1720
+**Status:** Built (grinder-ao-2, PR #1720): `set_reach` (person's own, home's; shape checked; answers `before`), `set_settings` refusing `reach`; Fix 1, the Telegram link defaulting to `reach.url` and the Settings page's placeholder; `ao connect` with no argument, `tailscale` (§4.7's checks in order, the ports asked, write → serve → probe, a failed probe undone) and `off` (only its own handler), `cloudflare` refused naming TD-656, refused to a session before any provider command; `ao doctor`'s **route** line, its eighth check; README *Reach it from your phone*. **A live check**: once #1720 is live (`ao promote status`), `ao connect tailscale` is the person's to run (a session is refused), so read what follows after they have: `ao doctor route` on the live home reads *ok: route — tailscale, https://…*, and the Settings page's Telegram link placeholder shows `reach.url` (a headless GET). Whether the phone opens the UI at the printed URL is the person's to say: a look (`--answer "Works" --answer "Not right: <what>"`).
 **Location:** design §4.7 `ao connect` and `ao doctor` **route**, §5 `reach:`, §4.5b *The setting* and *Cutting off a lost device*; `src/shiftlead/cli.py`, the settings schema, the `doctor` checks, `README.md` (*Reach it from your phone*), `notify.telegram.link`'s reader
 
 **Why:** TD-646: the route is the person's to set up; shiftlead checks each step, names the one it cannot take, and writes the setting only when the route works.
