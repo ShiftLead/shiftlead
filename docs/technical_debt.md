@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
+| TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 
 ---
 
@@ -1029,3 +1030,27 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 
 ---
 
+## TD-673: ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (ao-connect, Paul)
+**Owner:** paul
+**Kind:** build
+**Status:** Open
+**Location:** design §4.10 *Told on Telegram* (*Where the secrets live*); `~/.shiftlead/settings.yml` `notify.telegram.secrets`; Doppler
+
+**Why:** the home's `notify.telegram` reads `secrets: samscrape/prd`, so ShiftLead's notes go out through samscrape's bot, with its token and chat (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`). That ties the two products together: rotating samscrape's token, retiring its bot or moving its Doppler project silently stops ShiftLead's notes, and the notes arrive under samscrape's name. Paul, 2026-10-14: *set up our own ShiftLead bot instead of piggy-backing on samscrape's*.
+
+**Fix:** done at a sitting with Paul, since each step is his:
+1. In Telegram, ask @BotFather `/newbot` (a name such as *ShiftLead*), and keep the token.
+2. Send the new bot any message from the chat that should receive the notes, then read that chat's id from `https://api.telegram.org/bot<token>/getUpdates` (`message.chat.id`).
+3. Create a Doppler project and config for ShiftLead (say `shiftlead/prd`) holding `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+4. On the Settings page, set the Telegram card's secrets to `shiftlead/prd`; it is the person's own setting, refused to a session.
+5. Check that a note arrives from the new bot, then decide whether samscrape's bot keeps its ShiftLead chat.
+
+**Done when** a ShiftLead note arrives from ShiftLead's own bot, and `settings.yml` names no samscrape secrets.
+
+**Related:** TD-092 (Told on Telegram), TD-648 (`reach.url`, the notes' default link).
+
+---
