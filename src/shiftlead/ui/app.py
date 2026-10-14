@@ -2758,6 +2758,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "set_at": str((info or {}).get("home") or hosts.home_name()) if node else "",
                 "notes": notes,
                 "migrate": [str(m) for m in got.get("migrate") or []],
+                # §4.9b *The person's written rules* (TD-641): what the host refused of `permissions:`
+                "permissions_malformed": [str(m) for m in (got.get("permissions") or {}).get("malformed") or []],
                 "editor_note": uiconf.open_in().error,
                 "host": host_name(),
                 "active": "Settings",

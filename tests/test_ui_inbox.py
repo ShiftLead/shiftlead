@@ -2594,6 +2594,68 @@ def test_an_answered_row_says_who_asked_what_who_answered_and_where_and_offers_o
 
 
 @pytest.mark.unit
+def test_a_prompt_answered_by_the_persons_rules_draws_dismiss_alone_and_names_the_rule():
+    """§4.5a **Inbox row: answered for you**, §4.9b (TD-641): an FYI whose `answered.answerer` is the
+    person's rules (`mail.RULES`) draws **Dismiss** alone — the prompt is answered and the member asked
+    nothing — and names the rule and where it is changed, in place of a reply's source."""
+    from sessionorc import mail
+
+    fyi = entry(
+        "m-1",
+        "note",
+        from_="system",
+        from_name="system",
+        text="allowed by your rule Bash(pdm run test:*) — change it in settings.yml's permissions:",
+        asker_name="w1",
+        asker_open="ao-w1",
+        answered={
+            "question": "Bash: pdm run test",
+            "asker": "ao-w1",
+            "answerer": mail.RULES,
+            "source": "settings.yml permissions: grinder allow Bash(pdm run test:*)",
+        },
+    )
+    html = rows("answered", [fyi])
+    assert "Overrule" not in html and 'data-act="reply"' not in html
+    assert 'data-act="dismiss" data-id="person" data-msg="m-1"' in html
+    assert "w1</span> asked" in html and "Bash: pdm run test" in html
+    assert "your permissions: rules answered" in html and "system answered" not in html
+    assert "rule: settings.yml permissions: grinder allow Bash(pdm run test:*) — change it there" in html
+    assert "source:" not in html and "answered by your rules — nothing waits on you" in html
+    find = re.search(r'data-find="([^"]*)"', html).group(1)
+    assert "your permissions: rules" in find  # the filter finds the row by what it names
+    hostile = {**fyi, "answered": {**fyi["answered"], "source": "<script>x()</script>"}}
+    assert "<script>" not in rows("answered", [hostile])  # the rule is text
+    # a teammate's sourced reply keeps its Overrule
+    assert ">Overrule</button>" in rows("answered", [answered_fyi("m-2")])
+
+
+def test_an_answered_rows_asker_on_a_node_is_named_by_its_address_in_the_fleet():
+    """§4.5a *Inbox row: answered for you* (TD-641 slice 3): a node's member is in the home's fleet under
+    its address, `<id>@<host>`, which is the asker an FYI filed over the link carries — so the row names
+    it and opens it as a local asker's."""
+    from shiftlead.ui.app import Readings
+
+    fyi = {
+        "id": "m-1",
+        "kind": "note",
+        "from": "system",
+        "to": ["person"],
+        "at": "2026-10-14T09:00:00Z",
+        "text": "allowed by your rule Bash(ls:*)",
+        "answered": {"question": "Bash: ls", "asker": "ao-w1@node1", "answerer": "rules", "source": "r"},
+    }
+
+    async def call(method, **params):
+        return {"entries": [fyi], "trail": [], "handed": []} if method == "inbox" else []
+
+    fleet = [{"id": "ao-w1@node1", "name": "w1", "host": "node1"}]
+    got = asyncio.run(Readings(call).person_inbox(fleet))
+    e = got["entries"][0]
+    assert e["asker_name"] == "w1" and e["asker_open"] == "ao-w1@node1"
+
+
+@pytest.mark.unit
 def test_overrule_is_drawn_only_on_an_answered_entry_and_everything_in_it_is_text():
     """§4.5a: *neither is offered on anything but this kind* — it keys on the structured field, not
     on who sent the entry; a note from the same answerer is an ordinary FYI row. And every field a

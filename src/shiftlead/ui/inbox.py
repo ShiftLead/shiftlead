@@ -1932,6 +1932,8 @@ def row_find(e: Mapping[str, Any], section: str = "") -> str:
         e.get("asker_name") if answered else "",
         answered.get("question") if answered else "",
         answered.get("source") if answered else "",
+        # a prompt the person's rules answered names them as who answered (§4.5a, TD-641), so finds by it
+        "your permissions: rules" if answered.get("answerer") == mail_mod.RULES else "",
     )
     return _with_subject(found, e)
 
