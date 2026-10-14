@@ -412,6 +412,8 @@ class RemoteMixin:
             return
         if params.get("kind", "interactive") != "interactive" or params.get("adapter", "shell") == "shell":
             return
+        if params.get("held"):
+            return  # a held create makes no pane, and holds no checkout: rule 3's fill checks it (TD-660)
         directory = Path(str(params.get("dir") or "")).expanduser().resolve()
         if params.get("worktree"):
             # the same place `create` puts it — one resolution, the main checkout's, shared with it

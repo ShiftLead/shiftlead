@@ -11198,3 +11198,49 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-619 (the design), TD-309 (Apply and `relaunch`), TD-399 (a seat the definition names).
 
 **Resolved:** 2026-10-13 (grinder-ao-2, the live check of #1673, live since 710d38c) — read only: `ao team flow ao-grind` prints no *profile … (next restart)* line, and none is owed — every live or closed member's record runs the profile `org.yml`'s `roles:` names (grinder-ao-1, grinder-ao-2, designer-ao-1 and the closed techlead-ao-1 seat `grind`; the auditors `grind-sonnet`; manager-ao-1 not running), so the techlead seat that replayed `grind-fable` (TD-619) now runs `grind`; the only difference the team reads is manager-ao-1's *starts under td*. A difference and its Apply could not be read live — making one is the person's edit of `org.yml` and Apply the person's press — and are held by slice 2's tests (`tests/test_flows.py`: a member's and a closed seat's changed role profile read a difference and Apply hands `profile`; `tests/test_ui_teams.py`: the card reads *definition changed*). One seen live otherwise is a new entry.
+
+
+## TD-654: Rule 8's start (and a schedule's replay) replays a team's seats live: an on-call manager or techlead filled for nothing and closed two minutes later
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (the anchor, TD-413's live check)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-13 (the designer) — the entry's default: **a replay of the team writes its seats held** (§6 rule 3, *A replay of the team writes its seats the same way*; rule 8's `start`; §6 *Schedule*). Rule 8's start and the schedule's replay hand every seat record they replay — the manager on call, the techlead, the anchor seat, any seat with a trigger — to `create` with `held` and `keep_mail`: `closed`, no pane, the launch record, the mail moved, the `restarts` entry the replay's with `held: true`; the first tick fills it only for a cause. A standing manager and a watched seat (`unattended: false`) replay live; a session's own start time (§6 *Start time*) is not a team replay. TD-660 builds it for rule 8; TD-133's replay (not built) does the same.
+**Location:** `src/sessionorc/agent_tick.py` (`_work_start`, `_work_replays` — *seats included* — and `_replay`; the §6 *Schedule* replay at a reset), `src/shiftlead/teamrun.py` (`on_call_gate`, the held create a person's Start uses); design §6 rule 3 *A Start writes the seat and never fills it*, rule 8 `on_work: start` (*seats included*), §6 *Schedule* (*a replayed seat is on call again, its trigger standing*)
+
+**Why:** TD-410 ended the fills a person's Start made into nothing (TD-413, #1287): `ao team start` and an Apply write a manager on call held. Rule 8's start does not: it replays every ended crew record, seats included, as live panes. The host agent's journal since #1287 went live shows three such starts, each filling its seats with nothing due, each seat closed by rule 3 about two minutes later — 2026-10-11 04:35 MDT (ao-grind: `techlead-ao-1`), 2026-10-12 10:57 (dc-grind: `manager-dc-1`, `techlead-dc-1`) and 2026-10-13 10:06 (cm-grind over its node's link: `manager-cm-1`, `techlead-cm-1`). Each fill reads its brief cold before it finds nothing — the cost TD-410 measured. The design reads both ways: rule 3's held create names `ao team start` and Apply alone, while §6 *Schedule* says *a replayed seat is on call again, its trigger standing*, which a live pane is not.
+
+**Fix:** a design decision first (the designer): whether a replay by rule 8 or by a schedule writes a seat's record as the held create does (`closed`, no pane, the launch record, mail moved), so its first tick fills it only for a cause — the default, matching *on call again* — or keeps the live replay and says why. Then the build: `_work_start` and the schedule's replay pass the held create for a seat record, with tests that a rule 8 start of a wound-down team makes no seat pane and that kept mail on a seat's record still fills it on the first tick.
+
+**Done when** the design says what a replay does with a seat, the code does it, and a week of journal after it is live shows no seat closed with nothing due straight after a rule 8 start (TD-413's live check, read again then).
+
+**Related:** TD-410, TD-413 (blocked by this), TD-386 (the held create), TD-227 (rule 8's start), TD-259 (the seat on call).
+
+**Resolved:** 2026-10-13 (grinder-ao-1, PR #1684) — built by TD-660 for rule 8's start; the schedule's replay does the same when TD-133 builds it; the week of journal is TD-413's live check, which now names #1684.
+
+
+## TD-660: Build TD-654: rule 8's start writes every seat it replays held — `create` with `held`, no pane, `restarts` `held: true` — and its first tick fills it only for a cause
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (the designer, TD-654's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §6 rule 3 (*A replay of the team writes its seats the same way*), rule 8 `on_work: start`, §6 *Schedule*; `src/sessionorc/agent_tick.py` (`_work_start` ~L1662, `_replay` ~L2195 — `rpc_create` here, `_route_act("create", …)` at a node); `src/sessionorc/agent.py` (the held create ~L1258: `closed`, `closer: {by: start, why: held}`, `supersedes` with `mail`, `_move_mail`)
+
+**Why:** TD-654: rule 8's start replays every ended crew record, seats included, as live panes; three starts from 2026-10-11 to 2026-10-13 filled five seats with nothing due, each closed by rule 3 about two minutes later, each fill reading its brief cold first (TD-413's live check).
+
+**Fix:**
+1. `_replay` takes `held: bool`; with it, `create` gets `held=True` beside the launch record and `keep_mail`, here and through `_route_act` at a node, and the `restarts` entry carries `held: true`. No `held_reason`: nothing holds it — the anchor seat's checkout gate stays the fill's (TD-395).
+2. `_work_start` passes `held=True` for every record whose `seat` is set and that is `unattended` (manager on call, techlead, anchor, a trigger seat) — `create` refuses `held` otherwise (`agent.py` ~L959), as `teamrun.on_call_gate` guards a Start; a member, a standing manager (`seat` unset) and a watched seat (`unattended: false`) replay live as today. Order, `ids`, `start`, `of` and the mark's removal are unchanged: a held write counts as a replay.
+3. `_scheduled_start` (a session's own start time) is untouched.
+4. Tests (`tests/test_work_start.py`): a rule 8 start of a wound-down team with an on-call manager, a techlead and an anchor seat makes no pane for any seat — each `closed`, `closer: {by: start, why: held}`, `restarts[-1]` `why: work`, `held: true` — while each member gets a pane; a seat whose ended record holds a question gets it moved and is filled on the first tick (`restarts` `why: fill`); a standing manager and a seat with `unattended: false` replay live; a seat on a node is written held through the link, and `_route_act`'s `_check_occupancy_for` (`agent_remote.py` ~L453) does not refuse a held create, which makes no pane, where a session occupies the node's checkout (or the build says why it must).
+
+**Done when** a rule 8 start writes every seat it replays with no pane and the first tick fills one only for a cause, and the tests above pass; TD-413's live check (a week of journal with no seat closed with nothing due straight after a rule 8 start) is read once it is live.
+
+**Related:** TD-654 (the design), TD-413 (its live check, blocked by this), TD-410 (the held Start), TD-133 (the schedule's replay, same rule when built), TD-227 (rule 8's start).
+
+**Resolved:** 2026-10-13 (grinder-ao-1, PR #1684) — rule 8's start replays every unattended seat held: `_replay` takes `held`, `create` gets it here and through the link, the `restarts` entry carries `held: true`; a member and a standing manager replay live; the home's anchor check for a container node passes a held create. Tests in `tests/test_work_start.py`. TD-413's live check reads it once #1684 is live.

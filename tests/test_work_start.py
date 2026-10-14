@@ -5,6 +5,7 @@ mark with `held`, which draws the row."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -81,16 +82,28 @@ async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent,
         _rec("manager-ao", lane=["TD-900"]),
         _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None, controllers=["ao-t-manager-ao"]),
         _rec("paul-ao", unattended=False, out_of_work=None, state="working"),
+        _rec("anchor-ao", seat={"trigger": "work"}, out_of_work=None),
+        _rec("watched-ao", seat={"trigger": "asks"}, unattended=False, out_of_work=None),
     )  # fmt: skip
     assert replays.calls == [], "not before the settle"
     await agent._work_marks(later)
-    assert [c[0] for c in replays.calls] == ["manager-ao", "grinder-ao-1", "techlead-ao"], "the lead first; no person"
+    names = [c[0] for c in replays.calls]
+    assert names[0] == "manager-ao" and sorted(names[1:]) == ["anchor-ao", "grinder-ao-1", "techlead-ao"], (
+        "the lead first; no person, and no seat a person watches"
+    )
     rec = _team_rec(agent)
     # every entry of the one start carries its instant and how many records it set out to replay,
     # so a client counts *n of m* when some replays fail (the techlead's read of #792)
-    about = {"ids": ["TD-002"], "start": rec["work_started"][-1], "of": 3}
+    about = {"ids": ["TD-002"], "start": rec["work_started"][-1], "of": 4}
     assert {c[1] for c in replays.calls} == {"work"} and all(c[2] == about for c in replays.calls)
-    assert all(c[3] == {"keep_mail": True} for c in replays.calls), "every record keeps its mail (TD-274)"
+    assert all(c[3]["keep_mail"] is True for c in replays.calls), "every record keeps its mail (TD-274)"
+    # each seat is written held, the standing manager and the member live (TD-660)
+    assert {c[0]: c[3]["held"] for c in replays.calls} == {
+        "manager-ao": False,
+        "grinder-ao-1": False,
+        "techlead-ao": True,
+        "anchor-ao": True,
+    }
     rec = _team_rec(agent)
     assert "work_waiting" not in rec and len(rec["work_started"]) == 1
     assert agent.host_store.load()["teams"]["g"]["work_started"] == rec["work_started"], "saved"
@@ -217,6 +230,98 @@ async def test_a_member_behind_a_down_link_holds_the_start_as_link(agent, tmp_pa
     far.host = agent.host  # the link is back: the next tick starts the team
     await agent._work_marks(later)
     assert sorted(c[0] for c in replays.calls) == ["grinder-ao-1", "grinder-ao-2"]
+
+
+@pytest.mark.integration
+async def test_a_start_by_the_rule_writes_its_seats_held_and_the_first_tick_fills_one_for_a_cause(agent, tmp_path):
+    """TD-660 (design §6 rule 3 *A replay of the team writes its seats the same way*): a rule 8 start
+    of a wound-down team makes no pane for a seat — the manager on call and the techlead each written
+    `closed`, `closer: {by: start, why: held}`, their `restarts` entry the start's with `held: true`,
+    the mail moved — while the member gets a pane; the first tick fills the seat whose mail holds a
+    question, and leaves the one with nothing due."""
+    await park_ticks(agent)
+    settings_mod.save({"teams": {"g": {"on_work": "start"}}})
+    shell = {"adapter": "shell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True, "supervised": True}
+    async with LocalClient() as person:
+        made = {}
+        for name, kw in (
+            ("mgr", {"seat": {"trigger": "team"}}),
+            ("tl", {"seat": {"trigger": "asks"}}),
+            ("grinder-ao-1", {"lane": ["free-pick"]}),
+        ):
+            (tmp_path / name).mkdir()
+            ctl = [made["mgr"]] if name == "grinder-ao-1" else []
+            got = await person.call(
+                "create", name=name, dir=str(tmp_path / name), team="g", prompt="a brief", controllers=ctl,
+                **shell, **kw,
+            )  # fmt: skip
+            made[name] = got["id"]
+        async with LocalClient(caller=made["grinder-ao-1"]) as me:
+            ask = (await me.call("msg", to=[made["tl"]], text="does this match §6?", kind="ask"))["entry"]["id"]
+        repo = str(tmp_path)
+        agent._repos[repo] = {"name": "r", "root": repo, "ledger": {"entries": [_e("TD-001"), _e("TD-002")]}}
+        for sid in made.values():
+            rec = agent.sessions[sid]
+            rec.state, rec.pane, rec.repo = "exited", True, repo
+            if rec.seat is None:
+                rec.out_of_work, rec.lane_seen = DECLARED, {"at": "x", "ids": ["TD-001"]}
+            agent.store.save(rec)
+        old = {sid: agent.sessions[sid] for sid in made.values()}
+        now = datetime.now(UTC)
+        await agent._work_marks(now)
+        await agent._work_marks(now + WORK_SETTLE)
+        start = _team_rec(agent)["work_started"][-1]
+        for name in ("mgr", "tl"):
+            new = agent.sessions[made[name]]
+            assert new is not old[made[name]] and new.state == "closed", name
+            assert new.closer == {"by": "start", "why": "held"} and new.seat_held is None
+            assert new.restarts[-1] == {
+                **new.restarts[-1],
+                "why": "work",
+                "ids": ["TD-002"],
+                "start": start,
+                "held": True,
+            }
+            assert not await asyncio.to_thread(agent.tmux.has_session, made[name]), f"{name}: no pane"
+        assert [e.id for e in agent.sessions[made["tl"]].inbox] == [ask], "the mail moved with the held write"
+        member = agent.sessions[made["grinder-ao-1"]]
+        assert member.state not in ("exited", "closed") and "held" not in member.restarts[-1]
+        assert await asyncio.to_thread(agent.tmux.has_session, made["grinder-ao-1"]), "the member replays live"
+        held = {name: agent.sessions[made[name]] for name in ("mgr", "tl")}
+        await agent._keep_running(now + WORK_SETTLE)
+        filled = agent.sessions[made["tl"]]
+        assert filled is not held["tl"] and filled.state not in ("exited", "closed"), "a question: filled"
+        assert [r["why"] for r in filled.restarts][-2:] == ["work", "fill"]
+        assert agent.sessions[made["mgr"]] is held["mgr"], "nothing due: still on call, no pane"
+        for sid in made.values():
+            await person.call("kill", id=sid)
+
+
+async def test_a_held_replay_crosses_the_link_with_held_and_the_home_does_not_refuse_it(agent, monkeypatch):
+    """TD-660: a seat on a node is written held through the link — `create` with `held` — and the
+    entry says `held: true`; the home's anchor check for a container node lets a held create pass,
+    since it makes no pane, where a session occupies the node's checkout."""
+    from sessionorc import containers
+
+    sent: list[dict] = []
+
+    async def route(method, params, caller, host):
+        sent.append({"method": method, **params})
+        raise RuntimeError("the node said no")
+
+    monkeypatch.setattr(agent, "_route_act", route)
+    seat = _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None, host="far-node", dir="/tmp")
+    agent.sessions[seat.id] = seat
+    _launch(agent._address(seat))
+    await agent._replay(seat, "work", mark={"ids": ["TD-002"]}, keep_mail=True, held=True)
+    assert sent[0]["method"] == "create" and sent[0]["held"] is True and sent[0]["host"] == "far-node"
+    assert seat.restarts[-1]["held"] is True and seat.restarts[-1]["why"] == "work", "counted, failed or not"
+    monkeypatch.setattr(containers, "container_nodes", lambda: {"cm": object()})
+    monkeypatch.setattr(agent, "occupants", lambda d: ["ao-x-here (working)"])
+    params = {"dir": "/tmp", "adapter": "claude-code", "kind": "interactive"}
+    with pytest.raises(Exception, match="anchor rule"):
+        await agent._check_occupancy_for("cm", params)
+    await agent._check_occupancy_for("cm", {**params, "held": True})
 
 
 @pytest.mark.integration

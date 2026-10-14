@@ -1677,9 +1677,11 @@ class TickMixin:
         home's record once however many records it replayed, and None is returned: the mark goes.
         Every entry of one start carries the same `start` instant and `of`, the number of records it
         set out to replay, so a client counts *n of m* from the records when some replays failed
-        (the techlead's read of #792). A member on a node whose link is down holds the whole start as
-        `held: {why: link, host, hosts}` — every down host, `host` the first — looked at again on the
-        next tick."""
+        (the techlead's read of #792). An unattended seat is replayed held — `closed`, no pane, its
+        entry `held: true` — and the first tick fills it only for a cause (rule 3, TD-660); a member
+        and a standing manager replay live. A member on a node whose link is down holds the whole
+        start as `held: {why: link, host, hosts}` — every down host, `host` the first — looked at
+        again on the next tick."""
         started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
         if started != (rec.get("work_started") or []):
             rec["work_started"] = started  # a start older than the day counts for nothing
@@ -1711,7 +1713,9 @@ class TickMixin:
             try:
                 # every record's mail kept, as a fill's and a Restart's is: a lapse note or an answer
                 # written to the closed record waits there for this successor (§4.10, TD-271)
-                await self._replay(r, "work", mark=dict(about), keep_mail=True)
+                # a seat is written held, on call again with no pane, and the first tick fills it only
+                # for a cause (rule 3, TD-660); `create` takes `held` from an unattended seat alone
+                await self._replay(r, "work", mark=dict(about), keep_mail=True, held=bool(r.seat and r.unattended))
             except Exception:  # noqa: BLE001 — one record's failure is never the team's start
                 log.exception("%s: rule 8's replay failed", self._address(r))
         return None
@@ -2194,7 +2198,14 @@ class TickMixin:
             log.exception("writing the home's host record failed")
 
     async def _replay(
-        self, s: Session, why: str, *, mark: dict[str, Any] | None = None, closing: str | None = None, **extra: Any
+        self,
+        s: Session,
+        why: str,
+        *,
+        mark: dict[str, Any] | None = None,
+        closing: str | None = None,
+        held: bool = False,
+        **extra: Any,
     ) -> None:
         """One restart by the tick (§6): the record's launch record handed to `create` again — here,
         or at its node — the attempt appended to `restarts` and the list carried onto the new record,
@@ -2202,6 +2213,8 @@ class TickMixin:
         and counts all the same. `mark` adds to the entry (rule 8's `ids`, what a start was for).
         `closing` is a line the prompt ends with, after it is filled again or stored (a manager on
         call's cause, `filled_for`, TD-410); no other replay adds one.
+        `held` writes the record alone, `closed` with no pane (`create` with `held`), for rule 3 to
+        fill once something is due, and the entry carries `held: true` (rule 8's start of a seat, TD-660).
         Every caller but a scheduled start (whose `start_of` moves the mail itself) passes `keep_mail`:
         the closed run's mail is the new record's, so a reply to its `ask` still has a thread (TD-352).
         Every entry, a failed one's too, carries `done` and `left` — what the run it replaces reported
@@ -2214,12 +2227,15 @@ class TickMixin:
             "why": why,
             **agent_common._reported(s, now),
             **(mark or {}),
+            **({"held": True} if held else {}),
         }
         history = [*s.restarts, entry]
         address = self._address(s)
         read: dict[str, Any] | None = None
         try:
             params = {**self._read_launch(address), **extra, "supervised": True}
+            if held:
+                params["held"] = True
             read = await self._refill_prompt(s, params, entry)
             if params.get("prompt"):
                 # the launch record keeps the prompt as this create hands it, so a stored prompt carries
