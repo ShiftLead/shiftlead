@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import workorders
+from sessionorc import ledger, workorders
 from sessionorc.models import pr_marks, stop_note
 from sessionorc.reports import branch_ref
 from shiftlead import teamrun
@@ -82,6 +82,30 @@ def _bars(counts: Mapping[str, Any], labels: tuple[tuple[str, str], ...]) -> lis
         for k, label in labels
         if total and int(counts.get(k) or 0)
     ]
+
+
+COMPLETED_HOVER = 10  # the *closed* block's hover lists this many entries, then *… and n more* (TD-604)
+
+
+def completed_in(r: Mapping[str, Any], window: str, now: datetime) -> list[dict[str, Any]]:
+    """The repo reading's `completed` (§4.4 *What closed, and by which PR*, TD-604) closed within
+    `window` of `now` — *day*, *week* or *month*, the windows the ledger's counts use — newest first,
+    as the reading keeps them: the Repo page's **Recently completed** and the facet's *closed* block."""
+    since = now - ledger.WINDOWS[window]
+    return [
+        c
+        for c in r.get("completed") or ()
+        if isinstance(c, dict) and (at := _instant(c.get("closed"))) is not None and at > since
+    ]
+
+
+def completed_title(rows: list[dict[str, Any]]) -> str:
+    """The *closed* block's hover (§4.5a *team card: Repo facet*, TD-604): the ids and titles it
+    counts, newest first, ten at most and *… and n more*."""
+    lines = [f"{c.get('id')} {c.get('title') or ''}".rstrip() for c in rows[:COMPLETED_HOVER]]
+    if len(rows) > COMPLETED_HOVER:
+        lines.append(f"… and {len(rows) - COMPLETED_HOVER} more")
+    return "\n".join(lines)
 
 
 def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -192,6 +216,8 @@ def repo_facet(
             "kind": _bars(teamrun.lane_kinds(r), KIND_BARS),
             "lanes": lanes,
             "windows": {w: _blocks((led.get("windows") or {}).get(w)) for w in WINDOWS} if led.get("windows") else None,
+            # the *closed* block's hover, per window: what Recently completed lists (§4.5a, TD-604)
+            "closed_titles": {w: completed_title(completed_in(r, w, now)) for w in WINDOWS},
         },
         "prs": {
             "n": len(open_) if isinstance(open_, list) else None,

@@ -1657,6 +1657,20 @@ def cmd_promote(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _completed_this_week(completed: list[Any], now: datetime | None = None) -> int:
+    """How many of a repo reading's `completed` (§4.4 *What closed, and by which PR*, TD-604) closed in
+    the last week — `ao repo`'s *completed this week: n*, the Repo page's week."""
+    since = (now or datetime.now(UTC)) - ledger_mod.WINDOWS["week"]
+    n = 0
+    for c in completed:
+        if not isinstance(c, dict):
+            continue
+        with contextlib.suppress(TypeError, ValueError):
+            at = datetime.fromisoformat(str(c.get("closed") or ""))
+            n += (at if at.tzinfo else at.replace(tzinfo=UTC)) > since
+    return n
+
+
 def cmd_repo(args: argparse.Namespace) -> int:
     """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
     registered repo — the current one without a name — as text or `--json`: its open PRs with their
@@ -1706,6 +1720,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
             print(_repo_line(r))
             if args.all:
                 continue
+            # what the ledger closed this week, the Repo page's Recently completed (§4.7, TD-604)
+            if isinstance(r.get("completed"), list):
+                print(f"  completed this week: {_completed_this_week(r['completed'])}")
             # an entry no page kind takes, flagged under the first line (§4.7, §4.4 *Repo facts*, TD-418)
             for flag in ledger_mod.flags((r.get("ledger") or {}).get("entries") or []):
                 print(f"  {flag}")
