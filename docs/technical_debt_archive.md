@@ -11912,3 +11912,21 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Done when** a repo with only a ledger shows each missing seam on the Repo page and in `ao doctor`, and `ao repo init` on a bare repo makes a ledger ShiftLead reads, with tests.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584 (the design: what it draws and from where), TD-585 (the vendored `ledgerboard.py` that `ao repo init`'s ledger and the ledger check read), TD-586 (the missing-gate line).
+
+## TD-588: Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/briefs/*.md`, `src/shiftlead/flows/**/*.md` (five), `src/shiftlead/team_skill.md`, `repoconfig.py`/`teams.py` (the filling), this repo's `.shiftlead.yml` and own brief
+
+**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. The built-in briefs hard-code this repo's layout (`pdm run test`, `docs/cadence.md`, `scripts/check_cadence.py`, `scripts/board_edit.py`, `docs/design/`), so a repo without dev-cadence, or with another layout, gets wrong instructions.
+
+**Resolved:** 2026-10-14 (PR #1744) — slice 1 the slots and their filling (#1737, `repoconfig.layout`, `sessionorc.brief.fill`'s replay); slice 2 the built-in briefs, the five flows and `team_skill.md` take them, `tests/test_briefs_layout.py` bars the literals, this repo's own in `.shiftlead.yml` `commands:` and `docs/briefs/anchor.md`; design §5 *The seams*.
+
+**Done when** `commands:` is read, the test passes, and a brief filled for this repo reads as it does today.
+
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-586, TD-587.

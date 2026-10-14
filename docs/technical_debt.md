@@ -39,7 +39,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
-| TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
@@ -558,26 +557,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** every section the ADR names says what the ADR decided, design-history has the dated line, and TD-585–TD-591 can each be built from the design without a choice.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-585–TD-591 (its builds).
-
----
-
-## TD-588: Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 (grinder-ao-2, 2026-10-14): `commands:` is read as a mapping (the older list too). `repoconfig.layout` fills the eight layout slots, `{pr}` after `{gate}`, each with its seam's sentence (design §5 *The seams*). They are filled only when a composed brief names one, and recorded as text slots. `sessionorc.brief.fill` replays a record made before them as its stored prompt (§4.9c, §6 rule 7; steer m-92ae452ba903 to the techlead). Left, slice 2: the built-in briefs, the five flows and `team_skill.md` take the slots; the test that bars the literals; this repo's `.shiftlead.yml` `commands:` and its own briefs carrying `pdm run …` and `scripts/look_home.py`; the briefs' board step as `ao board edit`. Was: Open.
-**Location:** `src/shiftlead/briefs/*.md`, `src/shiftlead/flows/**/*.md` (five), `src/shiftlead/team_skill.md`, `repoconfig.py`/`teams.py` (the filling), this repo's `.shiftlead.yml` and own brief
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. The built-in briefs hard-code this repo's layout (`pdm run test`, `docs/cadence.md`, `scripts/check_cadence.py`, `scripts/board_edit.py`, `docs/design/`), so a repo without dev-cadence, or with another layout, gets wrong instructions.
-
-**Fix:** per the ADR's *Briefs and flows name no repo's layout* and its `commands:` seam: `.shiftlead.yml`'s `commands:` (`test`, `lint`; today accepted and read by nothing) is read by `repoconfig.py` and fills `{test}` and `{lint}`; `{ledger_check}` defaults to `python3 scripts/ledger.py --check` and `{cadence_rules}` to "read docs/cadence.md §1–§4" only when those files exist, each otherwise the seam's sentence; the variables: `{gate}`, `{board}`, `{ledger}`, `{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}`; an unset one fills with a sentence naming the seam, never empty; `{pr}` inside `{gate}` filled after; this repo's specifics move to its own `.shiftlead.yml` and brief; a session's board edit is `ao board edit` (TD-587); a test fails on `docs/cadence.md`, `/cadence`, `scripts/`, `docs/technical_debt.md`, `docs/user_attention.md`, `docs/design/` or `pdm run` outside a variable. A repo with no gate (§5 *The seams* `gate:` unset and no `scripts/check_cadence.py`) fills the briefs' gate step with *no gate: a person merges* (§6 rule 10, §4.9c) — what TD-586 records and nothing draws yet.
-
-**Done when** `commands:` is read, the test passes, and a brief filled for this repo reads as it does today.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-586, TD-587.
 
 ---
 
