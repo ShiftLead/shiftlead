@@ -1110,4 +1110,4 @@ The other cases:
 - A gate exit 3 posts nothing and is tried again.
 - A head pushed between the check and the merge is not merged. `sync: {auto: false}` merges nothing. The switch shows the verdict.
 
-**Related:** TD-681 (the design), TD-684 (the order), dev-cadence#TD-113 (`post_sync`), dev-cadence#TD-114, §6 *Promote* and *Pull* (the pass it shares).
+**Related:** TD-681 (the design), TD-684 (the order), dev-cadence#TD-113 (`post_sync`), §6 *Promote* and *Pull* (the pass it shares).

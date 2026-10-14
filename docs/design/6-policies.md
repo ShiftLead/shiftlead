@@ -1110,12 +1110,13 @@ block. A policy is agent code and needs no grant; a session doing the same work 
 
   It waits on *pending*, and leaves red, conflicting and draft PRs to the team (§4.4). A green sync
   PR it declines is written as verdict *refused* at its head, and nothing is posted, so the team's
-  order follows at once (§4.4). It declines three kinds:
+  order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
   - a forked PR: *forked*;
   - another login's: *author <login> is not the home's*;
   - one in a repo with **no gate**: *no gate: a person merges*, rule 10. The gate is looked up
-    here, before anything else. A branch name
-  alone vouches for nothing. Each head is checked once:
+    here, before anything else.
+
+  Each head is checked once:
   1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
      so the PR does not choose its judge. The home finds that repo's clone in its registry: the
      checkout whose origin is `source:`, fetched once a pass. The lock's `files_commit` must be a
