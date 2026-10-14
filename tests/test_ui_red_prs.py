@@ -118,6 +118,9 @@ def test_red_pr_rows_are_for_a_repo_no_team_services_alone():
     until = (now() + timedelta(days=1)).isoformat()
     s = inbox_sections([], states=[row], attention_snoozed={"red_pr:samscrape:802|red_pr": until})
     assert s["needs"] == [] and [e["row"] for e in s["snoozed"]] == ["red_pr"]
+    # a snooze stored with no offset is UTC, never a TypeError for the whole Inbox (the UI check of #1668)
+    s = inbox_sections([], states=[row], attention_snoozed={"red_pr:samscrape:802|red_pr": "2099-01-01"})
+    assert s["needs"] == [] and [e["row"] for e in s["snoozed"]] == ["red_pr"]
 
 
 def fake(repos, fleet):
