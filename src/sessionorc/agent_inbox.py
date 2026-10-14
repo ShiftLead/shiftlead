@@ -411,7 +411,10 @@ class InboxMixin:
         # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
         self._mark(mid, handed=True, entry={"repo": name, "type": kind}, bound=None, draft=draft or None)
         if folder is not None:  # the form's files are the ask's, kept `runs_keep_days` from now (§4.4, TD-630)
-            await asyncio.to_thread(agent_common.claim_draft, folder, f"hand:{mid}", datetime.now(UTC))
+            try:
+                await asyncio.to_thread(agent_common.claim_draft, folder, f"hand:{mid}", datetime.now(UTC))
+            except (OSError, RpcError) as e:  # the ask is sent: it stands, the draft unclaimed
+                log.warning("entry_add %s: could not claim %s: %s", mid, folder.name, e)
         await self._push_changes()
         log.info("entry_add: %s handed to %s (%s, %s)", mid, seat, name, kind)
         return {

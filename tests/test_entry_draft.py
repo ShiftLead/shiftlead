@@ -63,6 +63,9 @@ async def test_a_forms_first_file_mints_a_draft_and_its_later_files_share_it(age
             "attach", draft=token, name="deck.pdf", data=_b64(body[1024:]), upload=up["upload"], offset=1024
         )
         assert pathlib.Path(done["path"]).read_bytes() == body and done["draft"] == token
+        posed = await c.call("attach", draft=token, name="claimed.json", data=_b64(b"{}"))
+        assert pathlib.Path(posed["path"]).name == "attached-claimed.json", "the claim's name is never a file's"
+        assert not (where / paths.DRAFT_CLAIM).exists()
         other = (await c.call("attach", draft="", name="x.txt", data=_b64(b"x")))["draft"]
         assert other != token, "each form's first file mints its own"
         with pytest.raises(AgentError, match="a session's id or a draft, not both"):
@@ -188,3 +191,17 @@ def test_a_draft_token_is_its_folder_name_and_nothing_else(tmp_path, monkeypatch
     for bad in ("draft-0000abcd", "ao-x", "draft-0000ABCD", "draft-0000abcd/..", ""):
         with pytest.raises(agent_common.RpcError):
             agent_common.draft_folder(bad, "attach")
+
+
+@pytest.mark.unit
+def test_a_second_claim_is_refused_and_the_first_stands(tmp_path, monkeypatch):
+    """A double press, or the draft handed to both ways out: the claim is linked into place, so the
+    second is refused and the first claimant keeps the files; no temporary is left behind."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    folder = _draft("draft-0000beef", {"a.png": 0})
+    now = datetime.now(UTC)
+    agent_common.claim_draft(folder, "ao-first-1", now)
+    with pytest.raises(agent_common.RpcError, match="already claimed"):
+        agent_common.claim_draft(folder, "hand:m-2", now)
+    assert agent_common.read_draft_claim(folder)["by"] == "ao-first-1"
+    assert sorted(f.name for f in folder.iterdir()) == ["a.png", paths.DRAFT_CLAIM]

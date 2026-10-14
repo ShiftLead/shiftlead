@@ -332,10 +332,16 @@ def draft_folder(draft: Any, act: str) -> Path:
 def claim_draft(folder: Path, by: str, now: datetime) -> None:
     """A draft claimed at a way out's press (§4.4 *The Add entry form's draft*, TD-630): `claimed.json`
     `{by, at}` in its folder, `by` the new session's id or `hand:<the ask's id>` — the one link the
-    sweep reads, so no record gains a field. Written whole under a temporary name, then renamed."""
-    tmp = folder / f".{paths.DRAFT_CLAIM}.tmp"
+    sweep reads, so no record gains a field. Written whole under a temporary name and linked into
+    place, so a second claimant (a double press) is refused rather than writing over the first."""
+    tmp = folder / f".{paths.DRAFT_CLAIM}.{os.getpid()}.{time.monotonic_ns()}.tmp"
     tmp.write_text(json.dumps({"by": by, "at": now.isoformat()}) + "\n", encoding="utf-8")
-    os.replace(tmp, folder / paths.DRAFT_CLAIM)
+    try:
+        os.link(tmp, folder / paths.DRAFT_CLAIM)
+    except FileExistsError:
+        raise RpcError(f"draft {folder.name} is already claimed") from None
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def read_draft_claim(folder: Path) -> dict[str, Any] | None:

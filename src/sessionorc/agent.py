@@ -1203,6 +1203,11 @@ class HostAgent(
                 s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
             self.sessions[sid] = s
             self.store.save(s)
+            if draft_dir is not None:  # the form's files are the new session's from here (§4.4, TD-630)
+                try:
+                    await asyncio.to_thread(agent_common.claim_draft, draft_dir, s.id, datetime.now(UTC))
+                except (OSError, RpcError) as e:  # the session exists: its create stands, the draft unclaimed
+                    log.warning("create %s: could not claim %s: %s", s.id, draft_dir.name, e)
             if isinstance(holder, Session) and holder.adapter_id != s.adapter_id:
                 self._drop_context(holder.adapter_id, holder)  # replaced in place, never forgotten
             self._remember_dir(directory)
@@ -1222,8 +1227,6 @@ class HostAgent(
                     self._write_launch(s.id, s, launch_params(locals()))
                 else:
                     self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
-        if draft_dir is not None:  # the form's files are the new session's from here (§4.4, TD-630)
-            await asyncio.to_thread(agent_common.claim_draft, draft_dir, s.id, datetime.now(UTC))
         return s.view()
 
     async def _schedule(
@@ -2275,6 +2278,8 @@ class HostAgent(
             else:
                 token = (await asyncio.to_thread(agent_common.draft_folder, draft, "attach")).name
             owner, said = token, {"draft": token}
+            if paths.attachment_name(name) == paths.DRAFT_CLAIM:
+                name = f"attached-{name}"  # the claim's name is the sweep's, never a file of the form's
         else:
             owner, said = self._get(id).id, {}
         if upload:
