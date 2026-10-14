@@ -130,6 +130,8 @@ def test_a_file_outside_every_checkout_is_one_launch_and_none_draws_no_button(tm
     assert common.editor_file_link(str(root / ".shiftlead.yml"), folder=False)["folder"] is None  # the transcript's
     assert common.editor_file_link(str(root / "a b.md"), line=7)["url"].endswith("/r/a%20b.md:7")
     assert common.checkout_of(str(tmp_path / "rr" / "x")) == ""  # a sibling with the same prefix is not inside
+    _host(monkeypatch, tmp_path, False, [str(root), str(root / "inner")])
+    assert common.checkout_of(str(root / "inner" / "a.md")) == str(root / "inner")  # the inner of two nested
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
     assert common.editor_file_link(str(home)) is None
 

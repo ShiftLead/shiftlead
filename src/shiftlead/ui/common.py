@@ -885,13 +885,15 @@ def editor_file(reach: str = "") -> str | None:
 
 def checkout_of(path: str) -> str:
     """The main checkout in this host's repos registry whose real path holds `path`, or "" — the
-    folder a file link opens first (design §4.6 *Which folder goes first*, TD-689)."""
+    folder a file link opens first (design §4.6 *Which folder goes first*, TD-689); of two nested
+    checkouts, the inner."""
     real = os.path.realpath(os.path.expanduser(path))
+    best, depth = "", -1
     for root in hosts.local_host().repos():
         top = os.path.realpath(os.path.expanduser(root))
-        if real == top or real.startswith(top.rstrip("/") + "/"):
-            return root
-    return ""
+        if (real == top or real.startswith(top.rstrip("/") + "/")) and len(top) > depth:
+            best, depth = root, len(top)
+    return best
 
 
 def editor_file_link(path: str, folder: bool = True, line: int = 1) -> dict[str, Any] | None:
