@@ -546,7 +546,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `none`, so a template that gains a slot never replays it literally (§4.9c item 5); a **layout
      slot** (§5 *The seams*: `{gate}`, `{test}` …) left in the filled text that `slots` does not name
      makes the record's replay take the stored prompt instead, since one repo's layout is no file
-     beside the package's template (TD-588). A record
+     beside the package's template (TD-588); such a member keeps its old brief, stage-brief edits
+     included, until the team's next start or Apply. A record
      carrying **`relaunch: {at, lane, review, profile}`** (§4.9c *Switching*) is restarted under this rule's
      conditions as one carrying `brief_changed` is, save that a declaration of `out_of_work` does
      not hold it back. The host agent knows a file and a slot and no role, template or team, and
