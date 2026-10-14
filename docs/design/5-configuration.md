@@ -248,8 +248,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   `{design_dir}` (`docs/design/` where the checkout holds it, else *no design directory: the README and
   the code say what is true*) and `{cadence_rules}` (*read docs/cadence.md §1–§4* where it exists, else
   *no cadence rules: the repo's README says how a change lands*). They are read only when the brief
-  being composed names one — a node's files are asked across the link — and fill a supplement's text as
-  they fill the template's. `commands:` is also read in its older list form, `[{name, run}]`.
+  being composed names one — a node's files are asked across the link, where a directory or a file
+  past the cap is refused by name and is there, and any other failure stops the start rather than tell
+  the brief a seam is absent — after every other slot, and fill a supplement's text as they fill the
+  template's. `commands:` is also read in its older list form, `[{name, run}]`.
   Convention notices (§6 rule 12) and the SessionStart line (§4.3) run only in a dev-cadence repo:
   features of one, never requirements. **Who reads them**: the host agent, at the home, reads
   `ledger:`, `board:`, `gate:` and `worktree_setup:` as it reads `promote:` — for the repo facts

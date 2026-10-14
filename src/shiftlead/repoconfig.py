@@ -174,6 +174,11 @@ NO_DESIGN_DIR = "no design directory: the README and the code say what is true"
 NO_CADENCE = "no cadence rules: the repo's README says how a change lands"
 
 
+# How a node's checkout refuses a path that is there (`sessionorc.agent_common._read_capped`): a directory,
+# and a file past its cap.
+THERE_REFUSALS = (": not a regular file", " bytes, which is not a repo config or a brief")
+
+
 def layout(cfg: RepoConfig) -> dict[str, str]:
     """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*): `gate:`, `board:`, `ledger:` and
     `commands:`'s `test` and `lint` where the file sets them, else dev-cadence's file where the checkout
@@ -188,8 +193,15 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
             return path.exists()
         try:
             return cfg.read(path) is not None
-        except (OSError, UnicodeDecodeError):
-            return False
+        except UnicodeDecodeError:
+            return True  # there, only not text
+        except OSError as e:
+            # across the link a directory, or a file past the cap, is refused by name — and is there;
+            # any other failure (the host unreachable, a timeout) goes up: a brief is never told a
+            # seam is absent because the link failed, since the replay would keep that text
+            if any(why in str(e) for why in THERE_REFUSALS):
+                return True
+            raise
 
     gate = cfg.gate or (f"python3 {CHECK_CADENCE} --pr {PR_PLACEHOLDER}" if there(CHECK_CADENCE) else NO_GATE)
     board = cfg.board or (str(workorders.BOARD) if there(str(workorders.BOARD)) else workorders.NO_BOARD)
@@ -511,14 +523,17 @@ class Role:
             # an owner word narrows what the home tells the member of (§6 rule 6), never its lane's words
             (LANE_PLACEHOLDER, ", ".join(_no_owner(lane if lane is not None else self.lane)) or "(none given)"),
         )
+        for slot, value in fills:
+            text = text.replace(slot, value)
+            slots[slot] = {"text": value}
+        # after every other slot, so a layout word in any text that arrived is filled and recorded
         named = [slot for slot in LAYOUT_SLOTS if slot in text]
         if named:  # read only when a brief names one: a node's files are asked across the link
             given = layout(self.config if self.config is not None else RepoConfig(root=self.root))
             # `{pr}` last, so the `{pr}` a `{gate}` carries is filled too
-            fills += tuple((slot, given[slot]) for slot in named) + ((PR_PLACEHOLDER, PR_IN_BRIEF),)
-        for slot, value in fills:
-            text = text.replace(slot, value)
-            slots[slot] = {"text": value}
+            for slot, value in (*((slot, given[slot]) for slot in named), (PR_PLACEHOLDER, PR_IN_BRIEF)):
+                text = text.replace(slot, value)
+                slots[slot] = {"text": value}
         return text, {"base": base, "slots": slots}
 
     def _defined_template(self, path: Path, read: Reader | None, on_call: bool) -> str:

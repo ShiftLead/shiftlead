@@ -217,6 +217,33 @@ def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
     assert not set(made["slots"]) & {*repoconfig.LAYOUT_SLOTS, "{pr}"}
 
 
+def test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise(tmp_path):
+    """Review of #1737: a node's checkout refuses a directory, or a file past its cap, by name — the
+    path is there; any other failure of the link goes up rather than tell the brief a seam is absent."""
+
+    def node(refusal):
+        def read(path):
+            rel = path.relative_to(tmp_path).as_posix()
+            if rel == "docs/design":
+                raise OSError(f"devenv: {rel}: not a regular file")
+            if rel == "docs/cadence.md":
+                raise OSError(f"devenv: {rel}: over 262144 bytes, which is not a repo config or a brief")
+            if refusal and rel == "scripts/ledger.py":
+                raise OSError("devenv: the host is not answering")
+            return None
+
+        return read
+
+    cfg = repoconfig.load_text(None, tmp_path)
+    cfg.read = node(refusal=False)
+    got = repoconfig.layout(cfg)
+    assert got["{design_dir}"] == "docs/design/" and got["{cadence_rules}"] == "read docs/cadence.md §1–§4"
+    assert got["{ledger_check}"] == repoconfig.NO_LEDGER_CHECK  # None: not there
+    cfg.read = node(refusal=True)
+    with pytest.raises(OSError, match="not answering"):
+        repoconfig.layout(cfg)
+
+
 def test_commands_is_a_mapping_or_the_older_list():
     read = repoconfig.load_text
     assert read("commands: {test: pdm run test}\n", "/r").commands == {"test": "pdm run test"}
