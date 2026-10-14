@@ -165,6 +165,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-14 (TD-682, the designer): *CI that never started is the person's, not a lane's*. A failing Actions job with no steps and no runner reads `checks: not_run`, its reason the job's *not started* annotation (billing, or its own words). It is no red PR, no order and no `red_since`. A `done` and the promote read it as *never ran*. Each account with such PRs is one *Inbox row: CI not starting*, told on Telegram, its **Re-run** the person's press. The entry's `act` board line became that row, since no policy adds a board line (*Board write-back*). Built by TD-686 and TD-687.
 - 2026-10-14 (TD-681, the designer): *A sync PR is the team's at once, unless the home merges it* — a `cadence-sync-*` PR the home does not merge is a `pr:<n>` order (`sync: true`) from the first reading, with no `ORPHAN_AFTER`, green or red, first in the pick order, an idle holder told and passed over on `sync_since` as on `red_since`; a repo no team services has the *Inbox row: red PR*, never a board line; the red-PR rule's *its owner is never nobody* for a sync PR now points here. Built by TD-684.
 - 2026-10-14 (TD-591 slice 1, grinder-ao-1): *Repo facts* **The seams** built as designed, on the repo reading as `seams` (`sessionorc.seams`): the ledger's `{path, state, major, entries, why}` — *ok*, *absent*, *unreadable* or *newer* than the vendored `ledgerboard.py` — and `board`, `gate` and `worktree_setup` each `{state, value}`, read on the reading's five-minute pass. The Repo page's lines and `ao doctor`'s **repos** check, which draw it, are the entry's slice 2.
 - 2026-10-14 (TD-585, last slice, grinder-ao-1): *Board write-back* — the live look's `Not right: <what>` form and a line's bold head are ledgerboard v1.1's (`is_not_right_form`, `fill_not_right`, `bold_head`): a fill that is only a slot (`Not right: <b>`) is refused, a blank `** **` run is no head, and bold inside a reply's words is the person's, never the head. Was: `board.NOT_RIGHT_FORM` and `board.HEAD_RE`, which accepted the slot fill and took the first bold run anywhere on the line.
@@ -418,6 +419,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-14 (TD-682, the designer): *Inbox row: CI not starting*, with **Open** (the billing page), **Re-run** and **Snooze ▾**. Built by TD-687.
 - 2026-10-14 (TD-681, the designer): the Settings page's Repos card gains the **sync** switch (`repos.<repo>.sync.auto`, on when absent) with the last sync verdict; *Inbox row: red PR* also carries a sync PR the home did not merge, with its reason. Built by TD-684 (the row) and TD-685 (the switch).
 - 2026-10-14 (TD-678, grinder-ao-2): **Inbox row: ledger entry: Start session** built (`/api/ledger/start`, `briefs/work.md`, `repoconfig.work_text`). *The team's host is not connected* reads *the team runs on another host*: the press creates on this host from this host's checkout, so a node's team lands on the filled form as Add entry's **Attach** refuses it; a refused create lands there too, with the host agent's words. The form says *Start session could not be one press* (`press=start`) and takes the opening prompt in its box.
 - 2026-10-14 (TD-676, the designer; Paul, 2026-10-14, through Add entry: *it allows the user to work out of the inbox instead of having to jump around*): **Inbox row: ledger entry: Start session / Open session** — one press starts the person's interactive session on the entry (the repo's team, the `entries:` role for its Type, worktree and branch `td-<n>` so the claim is derived, a fixed opening prompt from `briefs/work.md`), the filled New session form where it cannot be silent, **Open session** while a live record holds it; both kinds of row. Built by TD-678.
@@ -832,6 +834,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-14 (TD-682, the designer): *A `done` with a PR is told what its checks read*: a required check that never started is refused with its reason and the person named, not as a failure to fix. Built by TD-686.
 - 2026-10-13 (TD-658, the designer; Paul, 2026-10-13, after TD-637's round: *I would expect grinders to make the PR green before handing it off to the techlead (or other depending on the workflow)*): a `done --pr` on a head whose required checks are still running is **refused**, as a failed one is — TD-637 had accepted it as *checks pending* (`ci: pending`). Built by TD-664.
 - 2026-10-13 (TD-639, grinder-ao-1): *A `done` with a PR is told what its checks read* built — the read at the declaration (`reports.pr_view`, `reports.at_done`), the entry's `ci: pending` / `unknown`, rule 10's read at the head clearing it, the report line's *· checks pending*, and `--slice` refused on a PR not merged.
 - 2026-10-13 (TD-636, the designer): the **`permit`** grant — `decide` on any unattended record's prompt, nothing else. Built by TD-642.
@@ -1179,6 +1182,7 @@ decisions; this file points at them rather than repeating them.
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 
+- 2026-10-14 (TD-682, the designer): *Told on Telegram when nobody is looking*: *CI not starting* for an account joins the rows told, since every team's merges in it stop. Built by TD-687.
 - 2026-10-12 (TD-616 slice 2, grinder-ao-2; the techlead's ruling m-d5e63070e1e2): *Told on Telegram* — **Looking** rides the page's `/events` stream (`{visible}`), handed to the home on the counts keeper's recount. Was, from TD-319: the page's 20 s poll carried `watching=1`; it still does while the stream is down.
 - 2026-10-09 (TD-489, the designer; Paul found the 4h20m outage of 2026-10-09 by logging in): **When the home itself is down: the watch** — a system timer every 5 min, as the person, installed by the TD-488 root press: starts a stopped user manager (`ExecStartPre=+systemctl start user@<uid>.service`), asks the home's socket, and tells on Telegram through the same Doppler child under the same switch — once when it started the manager, once at 10 min of silence, once on recovery. The start of the manager was steered to Paul as `m-67d6ad4a60f7` (the alternative: tell only). Built by TD-497.
 - 2026-10-07 (TD-371, the designer; built — TD-373): **Snooze** — **Unsnooze** retired: from 2026-09-19 (TD-069, #249) to 2026-10-07 the snoozed list offered it alone, a press before every answer that protected nothing.
@@ -1278,6 +1282,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-14 (TD-682, the designer): *Promote*'s **checks** reading reads runs that never started as *unknown — CI never ran: <reason>*, never *failed*. Built by TD-686.
 - 2026-10-14 (TD-681, the designer): §6 *Sync* — the home merges a mechanical sync PR, one it has checked:
   - it is not forked, its author is the home's own login, and its repo has a gate (a PR failing any of these is *refused* at once, with nothing posted);
   - every lock line that differs from the base lock's is checked against dev-cadence's `files/` at `files_commit`, and each changed file's bytes against its line;

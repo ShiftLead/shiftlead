@@ -948,7 +948,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   reason; **main**, `origin/main` of the checkout after the home's own `git fetch origin main`;
   **checks**, the CI verdict on main's head read with `gh` — `green` when every check run has
   concluded and none failed, `pending`, `failed`, or `unknown` with why (no `gh`, no remote, a rate
-  limit, no check runs at all — a commit CI has not looked at is not a green one). *When main moved*
+  limit, no check runs at all — a commit CI has not looked at is not a green one; failing runs that
+  all never started, *CI never ran: <reason>*, kept per sha with **`checks_not_run: {reason, kind,
+  runs}`** beside it, a real failure beside them still *failed*, §4.4 *CI that never started is the
+  person's*). *When main moved*
   is its head's committer time (a squash merge stamps it), so the settle and the row's age survive a
   restart of the home; the readings are held in memory and re-read at start, and what must survive
   one — a run in flight, a failure — is in the intent files below. Beside the three, for the page's
@@ -1108,7 +1111,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
   pushes as), and whose repo has a gate goes on to the steps.
 
-  It waits on *pending*, and leaves red, conflicting and draft PRs to the team (§4.4). A green sync
+  It waits on *pending*, leaves a `not_run` PR alone with no verdict (§4.4 *CI that never started
+  is the person's*: it waits for the person, with no timeout), and leaves red, conflicting and draft
+  PRs to the team (§4.4). A green sync
   PR it declines is written as verdict *refused* at its head, and nothing is posted, so the team's
   order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
   - a forked PR: *forked*;

@@ -56,10 +56,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-679 | Ready to close has no row for the agent itself: a working session's checklist reads all ✓, and the card's *more ▾* **Close** is enabled on it | Low | Open |
 | TD-680 | Live check of TD-678: **Start session** / **Open session** on the Inbox's ledger rows, on the live copy | Medium | Open |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
-| TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Open |
+| TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Designed — TD-686, TD-687 build it |
 | TD-683 | `ao team --skill` leaves out what a repo's own session needs before its first team: the repo's readiness, an empty ledger, a public repo | Low | Open |
 | TD-684 | Build TD-681 (1): a sync PR the home does not merge is the team's `pr:<n>` order at once, first in the pick order; the Inbox row where no team services the repo | Medium | Open |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
+| TD-686 | Build TD-682 (1): the reading tells a run that never started from a red one — `checks: not_run` with its reason; no order, no `red_since`; the `done` refusal and the promote's checks say *never ran* | Medium | Open |
+| TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
 
 ---
 
@@ -981,7 +983,8 @@ with the retired brief).
 **Added:** 2026-10-14 (the session `ao-dc-decouple`, lessons from the ledgerboard split; Paul agreed the lesson the same day)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-14 (the designer; no mockup: one Inbox row, drawn as the red PR row is) — §4.4 *CI that never started is the person's, not a lane's*. The reading reads each failing GitHub Actions job of a PR it would call red, once per head. A job with no steps and no runner never started, and its reason is its *The job was not started because…* annotation (*billing* when it names payments or a spending limit). A PR whose failing runs all never started reads `checks: not_run`. It gets no `red_since`, is no `pr:<n>` order, has no red-PR row, and its idle holder is not told. A sync PR that is `not_run` waits. A `done` is refused naming the reason and the person (§4.8), and the promote's checks read *unknown — CI never ran* (§6). ShiftLead does this in its own fold, so it does not wait on dev-cadence#TD-115, which maps the same run for the cadence check. The person gets one *Inbox row: CI not starting* per account, under *Needs you*, counted and told on Telegram (§4.10), with **Open** (the billing page), **Re-run** (`gh run rerun --failed`, the person's press) and **Snooze ▾**. It leaves when its spell ends: two successful readings group nothing for the account (no `not_run` PR, no default-branch head that never ran) and no run a **Re-run** asked for is pending. That row replaces the entry's `act` board line, since §4.4 *Board write-back* says no policy adds one. Built by TD-686 and TD-687. Was: Open.
+**Blocked by:** TD-686, TD-687
 **Location:** the reading of a repo's red PRs (`ao repo`, TD-652's holders), the home's board writes (§4.4 *Board write-back*), §4.4 *A red PR nobody holds is a work order*, design §6
 
 **Why:** On 2026-10-14 every Actions job in ContractMatch/samscrape stopped starting: *recent account payments have failed or your spending limit needs to be increased*. `ao repo` read samscrape's sync PR (#1097) as *1 red PR nobody holds*. The cause was a fix only the person can make (the org's billing). No team could act on it, and no line told the person. A session found it by reading the run's annotations.
@@ -1088,3 +1091,73 @@ The other cases:
 - A head pushed between the check and the merge is not merged. `sync: {auto: false}` merges nothing. The switch shows the verdict.
 
 **Related:** TD-681 (the design), TD-684 (the order), dev-cadence#TD-113 (`post_sync`), §6 *Promote* and *Pull* (the pass it shares).
+
+---
+
+## TD-686: Build TD-682 (1): the reading tells a run that never started from a red one — `checks: not_run` with its reason; no order, no `red_since`; the `done` refusal and the promote's checks say *never ran*
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-682's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *CI that never started is the person's, not a lane's*, §4.8 *A `done` with a PR is told what its checks read*, §6 *Promote* (**checks**); `src/sessionorc/reports.py` (`fold_checks`, `pr_reading`, `_gh_api`), `src/sessionorc/workorders.py` (`red_prs`, `red_holders`), `src/sessionorc/agent.py` (`_pr_checks`, near *required checks failed on*), `reports.at_done`, `src/sessionorc/promote.py` (`read_checks`), and the other readers of `checks`: `src/shiftlead/teamrun.py` (`red_prs`), `src/shiftlead/ui/inbox.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/org.py`
+
+**Why:** TD-682's design. On 2026-10-14 every Actions job in ContractMatch/samscrape failed without starting, for billing. The reading called the PRs red, and `ao repo` gave samscrape's #1097 to a lane that could do nothing.
+
+**Fix:** this is `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **The jobs.** These are read only in a repo whose `origin` is GitHub. In `pr_reading`, for each open PR `fold_checks` calls *red*, take the failing CheckRuns whose `detailsUrl` matches `/actions/runs/<run>/job/<job>`, in order, fifty at most. For each one, read `gh api repos/<o>/<r>/actions/jobs/<job>` and, for a `completed` job with `steps: []` and an empty `runner_name`, `gh api repos/<o>/<r>/check-runs/<job>/annotations`. Stop at the first job that started. A PR past the cap with none started stays *red*. Keep the verdicts on the row by job id (`jobs: {head, read: {<job>: {started, reason}}}`): a job is read once, a new head replaces the map, a Re-run's new attempt (new job ids on the same head) is read afresh, and an unreadable job is not kept.
+- **Never started.** A job never started only when it is completed, has no steps and no runner, and an annotation begins *The job was not started because*. That message is the reason. `kind` is *billing* when it names *account payments* or *spending limit*, else *other*. With no such annotation the job is a real failure (a job cancelled while queued looks the same otherwise).
+- **The fold.** A PR whose failing items all are Actions jobs that never started gets `checks: not_run`, even with checks still pending. A failing `StatusContext`, a failing non-Actions check run, or a job of any conclusion that fails the three-part test keeps it *red*. A PR turning `not_run` loses its `red_since`, unless it is conflicting, which keeps `red_since` from the conflict so `red_prs` orders it by the conflict alone. The PR carries `not_run: {reason, kind, runs}`, `runs` being the run ids. With one real failure beside them it stays *red*, and the not-started names are left out of `failing`. A job read that fails is no evidence.
+- **Every reader of `checks`.** `not_run` is its own word. `red_since` is set only for *red* or conflicting PRs, so `not_run` gets none. `workorders.red_prs`, `red_holders` and `teamrun.red_prs` read it as not red. `ui/inbox.py`'s red PR row leaves it out. `ui/repo.py` and `ui/org.py` count it apart and draw it *CI never ran*. A test walks every switch on `checks` with `not_run` and asserts none falls through to red, green or pending.
+- **The declaration.** `_pr_checks` takes the reading's `jobs` for that head when it holds it. Otherwise it reads the failing required checks' jobs alone, bounded as above. `at_done` puts a required check that never started in a `not_run` list beside `failed`. A real failure still refuses as today and wins. `not_run` alone refuses with §4.8's words, naming the PR, the head and the person.
+- **The promote.** `promote.read_checks` classifies main's head the same way, from the check runs of `commits/<sha>/check-runs` (a check run's id is its job's), the verdict cached per sha. Its return widens to carry a structured `checks_not_run: {reason, kind, runs}`, kept on the promote reading beside `checks`. All failing runs never started → *unknown — CI never ran: <reason>*. A real failure beside them → *failed*. No failure and some pending → *pending*.
+- **`workorders.ci_not_run(repos)`.** In `sessionorc`, it groups, by `origin` owner (a GitHub login, `[A-Za-z0-9-]+`, else the repo is left out), every open PR reading `not_run` and every default branch whose promote reading carries `checks_not_run`. Owners are compared and keyed in lower case. TD-687's row and Telegram line read it.
+- **Tests**, against a recorded fixture of the API's answers for #1097's jobs (0 steps, no runner, the billing annotation):
+  - a billing PR;
+  - another reason;
+  - a cancelled-while-queued job with no annotation, which reads red;
+  - a failing commit status beside a not-started job, which reads red;
+  - a conflicting `not_run` PR becoming an order after `ORPHAN_AFTER`;
+  - a Re-run's new attempt on the same head, read afresh;
+  - a mix with one real failure;
+  - fifty-one failing jobs with none started;
+  - an unreadable job;
+  - a new head read again;
+  - `red_prs` making no order;
+  - the `done` refusal from the cache and from its own read;
+  - the promote's three cases;
+  - `ci_not_run` grouping two owners and leaving out a non-GitHub origin.
+
+**Done when** a PR whose Actions jobs all failed without starting reads `checks: not_run` with its reason and is neither an order nor *red* anywhere. A `done` on it is refused naming the person. The promote reads *unknown — CI never ran*. A PR with one real failure stays red.
+
+**Related:** TD-682 (the design), TD-687 (the row), dev-cadence#TD-115 (the same mapping in `forge.py`, for the cadence check), TD-613 and TD-637.
+
+---
+
+## TD-687: Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-682's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-686
+**Location:** design §4.5a *Inbox row: CI not starting*, §4.4 *CI that never started is the person's*, §4.10 *Told on Telegram when nobody is looking*; `src/shiftlead/ui/inbox.py` (beside the red PR row), the Inbox page's template and `app.js`, the home's RPCs (`src/sessionorc/agent_serve.py`, a `ci_rerun` call), `src/sessionorc/agent_notify.py` and `notify.py` (the told list, `_notify_snoozed`), the spells at the home
+
+**Why:** TD-682's design. The cure for CI that does not start is the account's billing, which only the person can fix. Today nothing tells them, and once the bill is paid nothing re-runs the PRs.
+
+**Fix:**
+- **The row.** One row per owner in `workorders.ci_not_run` (TD-686), under *Needs you*, counted, worded as §4.5a words it, each PR and each *main* a link. Its **spell** is kept at the home (`ci_spells: {<owner>: {since, clear, rerun: {at, runs}}}`). It runs from the first grouping until `CI_SPELL_CLEAR` (2) successful readings in a row group nothing for the owner and no run a Re-run asked for is still queued or running. A failed reading counts for nothing.
+- **Open.** The owner's billing page: `https://github.com/organizations/<owner>/settings/billing` for an org, `https://github.com/settings/billing` for a user, told apart once with `gh api users/<owner>` `type`.
+- **Re-run.** The person's press, joining §4.8's person-only list and served by the home alone (a node forwards it, §4.4a), refused to a session as `inbox_delete` is: `ci_rerun {owner}` runs `gh run rerun <run> --failed` from each repo's root for every run the row's PRs name, bounded as the other `gh` calls are. It answers how many runs were asked and how many `gh` refused, records them on the spell, and the row reads *re-run asked <age>* while any of them is queued or running. Their status is read with `gh api repos/<o>/<r>/actions/runs/<run>` on the same tick as the reading, bounded. A failed status read counts as pending, and a pending run resets the spell's clear count.
+- **Snooze ▾.** By time alone, kept under `ci_not_run:<owner>` in the attention store.
+- **Telegram.** `agent_notify.py` reads `ci_not_run` and the spells at the home, and tells a row once per spell under `NOTIFY_HOLD`, with a fixed line naming the owner and the count. A snoozed row is not told (`_notify_snoozed` knows the `ci_not_run:<owner>` key). It joins the told list and its test.
+- **Help.** The help text for the row is written with `help.py` in this build, not in the design (§4.5a's help list is bound to it by `tests/test_help.py`).
+- **Tests**: the row from a reading with two PRs in one org and one in another; a *main* entry; the billing link for an org and for a user; **Re-run** refused to a session and run for the person with a stubbed `gh`; the row standing while the re-run's runs are pending and not told again when they read `not_run`; a new push that reads pending for one reading and then `not_run` again, told once; a failed reading not ending the spell; a snooze running out inside the spell, not told again; the snooze; the told line.
+
+**Done when** an account whose PRs (or a default branch's head) read `not_run` shows one *CI not starting* row with them and the billing link, told on Telegram once per spell. **Re-run** asks GitHub to re-run their failed jobs. The row leaves when its spell ends: two successful readings group nothing, and no re-run is pending. `ci_rerun` is in §4.8's person-only list.
+
+**Related:** TD-682 (the design), TD-686 (the reading), TD-613 (the red PR row it sits beside), TD-092 (Telegram).
