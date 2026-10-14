@@ -95,7 +95,8 @@ def client(subprocess_agent):
 def test_the_panel_carries_the_i_mark_the_menu_and_the_pr_base(client, tmp_path):
     """The page half: the heading's **i** mark and its paragraph replace the note under the list,
     the more ▾ menu is there to fill, and the PR base rides the panel for the links."""
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "rep"}, follow_redirects=False)
+    # an agent: a shell's Focus draws no Reports (§4.5a *A record with no agent*, TD-666)
+    r = client.post("/new", data={"dir": str(tmp_path), "name": "rep", "adapter": "agentshell"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     page = client.get(f"/focus/{sid}").text
     assert 'id="i-reports"' in page and 'id="info-reports" hidden' in page

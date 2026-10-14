@@ -75,7 +75,7 @@
        reading where the adapter can tell (TD-190); the report
        line (§4.5a, TD-028 step 4) and the findings count at the right, only when non-empty #}
     <div class="row r4">
-      <span class="meta">{{ s.profile_line }}{% if s.context_short %} · <span class="context{% if s.context_over %} over{% endif %}"
+      <span class="meta">{{ s.profile_line }}{% if s.context_short and s.agent %} · <span class="context{% if s.context_over %} over{% endif %}"
             title="context {{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% if s.context_over %} — over it{% endif %}{% endif %} — what this session's last turn sent (design §6 rule 5)">{{ s.context_short }}</span>{% endif %}</span>
       <span class="grow"></span>
       {# design §4.5a **restarted** chip (TD-485, TD-487): where this run came from, in the short form;
@@ -116,7 +116,7 @@
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
       <button class="btn sm next" data-act="message" data-id="{{ s.id }}"{% if s.seat %} data-seat="1"{% endif %} data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
     {% elif next_act == 'close' %}
-      <button class="btn sm next" data-act="close" data-id="{{ s.id }}" title="{{ help_title('close') }}">Close session</button>
+      <button class="btn sm next" data-act="close" data-id="{{ s.id }}"{% if not s.agent %} data-confirm="{{ s.close_confirm }}"{% endif %} title="{{ help_title('close') }}">Close session</button>
     {% endif %}
     {# `data-focus`: while this browser holds the session popped out, it reads *Focus window* and
        raises that window (§4.5a **Focus**, TD-046) — a plain click only; a modifier is the browser's #}
@@ -133,7 +133,9 @@
         <button data-act="close" data-id="{{ s.id }}" data-confirm="Cancel {{ s.name }}'s start? Nothing ran: the record is forgotten and its directory is free." title="forget the scheduled record: nothing ran">Cancel</button>
         {#- those two alone: nothing runs, so nothing else has anything to act on (TD-328) -#}
         {%- else %}
-        <button data-act="message" data-id="{{ s.id }}"{% if s.seat %} data-seat="1"{% endif %} data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>
+        {#- a record with no agent (§4.5a *A record with no agent*, TD-666): no Message…, Wrap up or mode
+            toggle — nothing reads its inbox, prose typed into it would run, and a shell stays the person's -#}
+        {% if s.agent %}<button data-act="message" data-id="{{ s.id }}"{% if s.seat %} data-seat="1"{% endif %} data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">Message…</button>{% endif %}
         {%- if nopane %}
         {#- §4.5 row 6 *The menu draws what applies to the state* (TD-266): the process or the pane is
             gone, so Message…, Restart where restartable, and Forget — the rest are left out, not dimmed -#}
@@ -142,13 +144,13 @@
         {% if not s.seat %}<button data-act="remove" data-id="{{ s.id }}" title="{{ help_title('forget') }}">Forget</button>{% endif %}
         {%- else %}
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
-        <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
+        {% if s.agent %}<button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>{% endif %}
         {#- design §4.5a **more ▾** → **Restart** (§6 rule 2, TD-250): the Inbox row's RPC; confirms with no restart mark -#}
         {% if s.restartable %}<button data-act="restart" data-id="{{ s.id }}"{% if not s.restart_marked %} data-confirm="Restart {{ s.name }}? It is closed if still there and started again from its launch record, in its team."{% endif %} title="{{ help_title('restart') }}">Restart</button>{% endif %}
-        <button data-act="wrapup" data-id="{{ s.id }}" title="{{ help_title('wrap-up') }}">Wrap up</button>
+        {% if s.agent %}<button data-act="wrapup" data-id="{{ s.id }}" title="{{ help_title('wrap-up') }}">Wrap up</button>{% endif %}
         <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">Kill</button>
         {# enabled only when Ready to close passes (§4.5): dimmed here means disabled, and says why #}
-        <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% else %} title="{{ help_title('close') }}"{% endif %}>Close</button>
+        <button data-act="close" data-id="{{ s.id }}" data-confirm="{{ 'Close ' ~ s.name ~ '?' if s.agent else s.close_confirm }}"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% else %} title="{{ help_title('close') }}"{% endif %}>Close</button>
         <button data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">Open shell here</button>
         {# design §4.5a **Pop out** (TD-046): client-side, nothing is written to the record #}
         <button data-act="popout" data-id="{{ s.id }}" title="open its Focus in its own browser window, for alt-tab — a second press raises it">Pop out</button>

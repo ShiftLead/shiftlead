@@ -212,11 +212,12 @@
   };
 
   // §4.5a *Focus composer* **the bar** (TD-491, built by TD-500): what the folded bar reads — the reason
-  // nothing can be sent where there is one, else the draft's first words, else the invitation.
-  AO.barText = function (draft, reason) {
+  // nothing can be sent where there is one, else the draft's first words, else the invitation — the
+  // page's own (`data-invite`), which on a record with no agent reads *Type a command…* (TD-666).
+  AO.barText = function (draft, reason, invite) {
     if (reason) return reason;
     const words = (draft || "").trim().split(/\s+/).filter(Boolean);
-    if (!words.length) return "✎ Compose a prompt… (c · or paste / drop a file)";
+    if (!words.length) return invite || "✎ Compose a prompt… (c · or paste / drop a file)";
     const first = words.slice(0, 8).join(" ");
     return `✎ draft · ${first.length > 60 ? first.slice(0, 59) + "…" : first}${words.length > 8 && first.length <= 60 ? "…" : ""}`;
   };
@@ -230,7 +231,7 @@
     const folded = () => composer.classList.contains("folded");
     const redraw = () => {
       const off = !!compose.disabled;
-      text.textContent = AO.barText(compose.value, off ? hint.textContent || "nothing can be sent now" : "");
+      text.textContent = AO.barText(compose.value, off ? hint.textContent || "nothing can be sent now" : "", (text.dataset || {}).invite);
       text.classList.toggle("draft", !off && !!compose.value.trim());
       text.classList.toggle("off", off);
       send.disabled = off;
@@ -4147,10 +4148,14 @@
         // person does unblocks a cap, so it must not claim a turn starts now; the paste lands and
         // waits, and §4.5a's controls for it are Switch profile and Wait.
         compose.disabled = false;
-        const steering = v.state === "working" || v.state === "stalled?";
+        // a record with no agent (§4.5a *A record with no agent*, TD-666): no turn to steer — Send
+        // always types the line and presses Enter, into the running command while one runs
+        const agent = v.agent !== false;
+        const steering = agent && (v.state === "working" || v.state === "stalled?");
         $("#send").textContent = steering ? "→ Steer" : "→ Send";
         $("#composehint").textContent =
-          v.state === "limited" ? "the profile is at its cap: what you send waits until the window resets"
+          !agent ? (v.state === "working" || v.state === "stalled?" ? "types the line and presses Enter — into the command that is running" : "types the line and presses Enter")
+          : v.state === "limited" ? "the profile is at its cap: what you send waits until the window resets"
           : v.state === "stalled?" ? "steers the turn in flight — this session looks stalled, so it may not be read until it moves"
           : steering ? "steers the turn in flight — this session is working, and Claude Code queues what you type"
           : "starts a new turn";
@@ -4294,7 +4299,7 @@
         if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");
       } else ex.classList.add("hidden");
-      $("#adapter_id").textContent = v.adapter_id || "—";
+      const aid = $("#adapter_id"); if (aid) aid.textContent = v.adapter_id || "—";
       const tr = $("#ftranscript");
       if (tr) tr.classList.toggle("hidden", !v.adapter_id);
       // §4.5a Focus header **‹› VS Code** (TD-578): the transcript's link lands with the hook's file
@@ -4313,11 +4318,20 @@
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
       AO.paintRecent(v, s.editor, $("#frecent"), $("#frecentdt"));
       AO.paintLinks(v, $("#flinks"), $("#flinksdt"));
-      renderReports(v);
-      renderInbox(v);
+      // a record with no agent draws no Reports, Inbox or grants (§4.5a *A record with no agent*, TD-666):
+      // nothing is derived for it and nothing reads its inbox — the template leaves the cards out
+      if (v.agent !== false) { renderReports(v); renderInbox(v); }
       renderGrants(v);
       renderStop(v);
       renderMembership(v);
+      if (v.agent === false) {
+        // …and no checklist: Close session on any state Close is, its confirm the shell's (TD-666)
+        const now = v.pane !== false && !["closed", "scheduled"].includes(v.state);
+        const cm = $("#fclosemenu"); if (cm) cm.disabled = !now;
+        $("#fclose").classList.toggle("hidden", !now);
+        renderRail(v, false);
+        return;
+      }
       const checks = v.ready || [];
       $("#checks").innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
       // design §4.5a Focus header **Close session** (TD-156): the checklist passing on an idle or
@@ -4340,7 +4354,8 @@
     let railV = s, railReady = false, inboxN = 0;
     function renderRail(v, ready) {
       if (v) { railV = v; railReady = !!ready; }
-      const lines = { reports: $("#reportscount").textContent, inbox: $("#inboxcount").textContent };
+      const txt = (el) => (el ? el.textContent : "");  // a record with no agent has neither card (TD-666)
+      const lines = { reports: txt($("#reportscount")), inbox: txt($("#inboxcount")) };
       const html = AO.railHtml(railV, railReady, inboxN, lines, s.editor);
       const el = $("#railglyphs");
       if (el && el.innerHTML !== html) el.innerHTML = html;
@@ -4417,6 +4432,7 @@
     }
     AO.refreshInbox = refreshInbox;
     function refreshInbox() {
+      if (!$("#inboxcard")) return;  // a record with no agent: nothing reads its inbox (TD-666)
       clearTimeout(inboxSoon);
       inboxSoon = setTimeout(async () => {
         let got;

@@ -455,10 +455,18 @@ def view(
     d["gated"] = gated_view(s.get("gated"))  # the usage gate's pause (§6, TD-100): a mark, never a state
     d["brief_unsent"] = brief_unsent(s)  # §4.5a **brief not sent** (TD-339): the slot's and Focus's mark
     d["grants_all"] = list(GRANTS)
+    # §4.3 *A record with no agent* (TD-665, built by TD-666): what is typed at it is a command line,
+    # never a prompt — the host agent's `agent` on the view, never an adapter's name. A view built
+    # without it (an older host, a test's record) is an agent's, as the host's own default is.
+    d["agent"] = s.get("agent") is not False
     # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
     # over an unattended session; hand an interactive one back where there is someone to hand it
     # to — its `controllers` as written, or a team — and otherwise just switch it.
-    if s.get("unattended"):
+    if not d["agent"]:
+        # §4.5a *A record with no agent*: no mode toggle anywhere — a shell is the person's and stays
+        # interactive (`set_mode` to unattended is refused for one)
+        d["mode_act"] = d["mode_title"] = ""
+    elif s.get("unattended"):
         d["mode_act"] = "Take over"
         d["mode_title"] = (
             "you are watching: the terminal is read-only. Take over switches this session to interactive "
@@ -504,8 +512,15 @@ def view(
     d["holds_control"] = has_control(s.get("capabilities"))
     # `fleet_known=False`: the caller asked for the fleet and did not get it. An empty members list
     # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
-    d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
-    d["ready_ok"] = bool(d["ready"]) and all(ok for _, ok in d["ready"])
+    d["ready"] = ready_to_close(s, d["members"] if fleet_known else None) if d["agent"] else []
+    # a record with no agent is closed without the checks (§4.5a *A record with no agent*): Close is
+    # offered wherever it is drawn, and closing it kills the shell and reaps nothing
+    d["ready_ok"] = (bool(d["ready"]) and all(ok for _, ok in d["ready"])) or not d["agent"]
+    d["close_confirm"] = (
+        f"Close {s.get('name')}? It is killed and its worktree reaped."
+        if d["agent"]
+        else f"Close {s.get('name')}? The shell is killed; the directory is left as it is."
+    )
     d["not_ready"] = [name for name, ok in d["ready"] if not ok]  # what *more ▾ → Close* says it waits on
     # §6 rule 4 (TD-103): nudged once in this idle stretch and still idle another twenty minutes
     # later — the host agent is done, and it is for a person or its manager to judge
@@ -991,7 +1006,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # *last ran* for a seat with a trigger: it runs its brief rather than answering (§4.5, TD-098)
         came = "last came" if d.get("seat_when") in ("", "comes on the next question", MANAGER_WHEN) else "last ran"
         caption = came + (f" · {d['came_age']} ago" if d.get("came_age") else "")
-    elif d["ready_ok"] and state in ("idle", "exited"):
+    elif d["ready_ok"] and d.get("agent", True) and state in ("idle", "exited"):
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
         caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")
