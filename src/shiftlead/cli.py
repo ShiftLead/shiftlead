@@ -2689,7 +2689,7 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
             board=args.board,
         )
     except board_mod.Refused as e:
-        return fail(args, f"refused: {e}", 3)
+        return fail(args, f"refused: {e}", 1)
 
     def prose() -> None:
         print(f"{got['action']} line {got['line']} of {got['board']} — committed {got['commit']} on {got['branch']}")

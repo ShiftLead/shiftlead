@@ -141,7 +141,7 @@ def test_ao_board_edit_needs_no_host_agent(tmp_path, monkeypatch, capsys):
     assert cli.main(["board", "edit", "done", "--line", "5", "--expect", "act 2026-10-10", "--json"]) == 0
     got = json.loads(capsys.readouterr().out)
     assert got["action"] == "done" and got["commit"] == git(root, "rev-parse", "--short", "HEAD")
-    assert cli.main(["board", "edit", "done", "--line", "6", "--expect", "nothing like it"]) == 3
+    assert cli.main(["board", "edit", "done", "--line", "6", "--expect", "nothing like it"]) == 1
     assert "board moved" in capsys.readouterr().err
     with pytest.raises(SystemExit):
         cli.main(["board", "edit", "decide", "--line", "6", "--expect", "act"])
