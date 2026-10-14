@@ -322,7 +322,16 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     team_repo,  # noqa: F401
     team_summary,  # noqa: F401
 )
-from .pty_bridge import PtySession, attach_argv, clients_argv, pump, scroll_argv, watch_clients
+from .pty_bridge import (
+    LEAVE_WITHIN,
+    PtySession,
+    attach_argv,
+    clients_argv,
+    leave_argv,
+    pump,
+    scroll_argv,
+    watch_clients,
+)
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
     COMPLETED_WORD,  # noqa: F401
@@ -3766,18 +3775,38 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
         reapers: set[asyncio.Future[int]] = set()
 
+        async def run_tmux(argv: list[str]) -> None:
+            # One tmux command against the session, through the same prefix and socket, awaited to its
+            # end so the next frame's command never overtakes it (design §4.6 *In order*, TD-667);
+            # bounded, so a stuck container's `docker exec` holds the key pump no longer than a leave's
+            # bound, then is killed and reaped in the background
+            devnull = asyncio.subprocess.DEVNULL
+            proc = await asyncio.create_subprocess_exec(
+                *[a for a in inside if a != "-it"], *argv, stdout=devnull, stderr=devnull
+            )
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=LEAVE_WITHIN)
+            finally:
+                if proc.returncode is None:
+                    with contextlib.suppress(ProcessLookupError):
+                        proc.kill()
+                    reapers.add(asyncio.ensure_future(proc.wait()))
+
         async def scroll(direction: str, lines: int | None = None) -> None:
             # A tmux command against the session, not keys into the pane: there is no escape
             # sequence that enters copy mode (TD-022). The wheel's `lines` scroll lines, their absence
             # a page (TD-174). A bad direction or count is the client's bug; ignore.
             try:
-                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, lines, socket_name=sock)]
+                argv = scroll_argv(sid, direction, lines, socket_name=sock)
             except ValueError:
                 return
-            devnull = asyncio.subprocess.DEVNULL
-            proc = await asyncio.create_subprocess_exec(*argv, stdout=devnull, stderr=devnull)
-            # Reap in the background: waiting here would hold the key pump behind a slow tmux.
-            reapers.add(asyncio.ensure_future(proc.wait()))
+            with contextlib.suppress(TimeoutError):  # a slow scroll is no reason to end the attach
+                await run_tmux(argv)
+
+        async def leave() -> None:
+            # Back to the live screen before a typed key (design §4.6, TD-667): the pump bounds it
+            # and logs a failure
+            await run_tmux(leave_argv(sid, socket_name=sock))
 
         async def read_clients() -> str | None:
             # tmux's clients and window for the terminal mark (design §4.6, TD-480), through the same
@@ -3800,7 +3829,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
         watcher = asyncio.ensure_future(watch_clients(read_clients, ws.send_text))
         try:
-            await pump(pty, send, recv, scroll, read_only=read_only)
+            await pump(pty, send, recv, scroll, leave=leave, read_only=read_only)
         finally:
             watcher.cancel()
             for f in reapers:
