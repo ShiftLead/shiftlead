@@ -2591,9 +2591,10 @@ class HostAgent(
         if slice and word != "merged":
             raise RpcError(f"a slice is a merged PR — #{pr} is {'closed unmerged' if word == 'closed' else 'open'}")
         if word == "refused":
+            unknown = " — required set unknown, every check read" if names is None else ""
             raise RpcError(
-                f"PR #{pr}'s required checks failed on {sha7}: {', '.join(got['failed'])} — fix them and "
-                f"report done again (ao progress done {ref} --pr {pr})",
+                f"PR #{pr}'s required checks failed on {sha7}: {', '.join(got['failed'])}{unknown} — fix them "
+                f"and report done again (ao progress done {ref} --pr {pr})",
                 failed=got["failed"],
                 sha=got["sha"],
             )

@@ -196,7 +196,7 @@ async def test_a_base_never_read_takes_every_run_and_says_so(worker, agent):
     w, sid, rec, views = worker
     agent._repos[rec.repo] = {}
     views[842] = _view(_run("anything", conclusion="FAILURE"))
-    with pytest.raises(AgentError, match="required checks failed on 9c1e0f2: anything"):
+    with pytest.raises(AgentError, match="failed on 9c1e0f2: anything — required set unknown, every check read — fix"):
         await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
     views[842] = _view(_run("anything"))
     got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
