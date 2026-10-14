@@ -9,8 +9,8 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       route, Tailscale first; a relay forwards ciphertext only.)
 - [x] The person's route to the UI (2026-10-13, TD-646; Paul): **bring your own route, one
       primary** — Tailscale first (`tailscale serve`, no domain, no server, nobody in the middle
-      who can read it), Cloudflare Tunnel + Access for a person who runs Cloudflare, `ssh -L`
-      always; each dials out, so a home behind CGNAT is reached. The route's identity is checked
+      who can read the bytes, Tailscale vouching for the login), Cloudflare Tunnel + Access for a
+      device that cannot run Tailscale (built when asked, TD-656), `ssh -L` always; each dials out, so a home behind CGNAT is reached. The route's identity is checked
       on a **route port** of its own (§4.5b). A relay, if built, forwards ciphertext only.
       Rejected: a relay that ends TLS or serves the UI (root-equivalent access through
       shiftlead's servers, which a technical user would refuse); ZeroTier as the first route (no
@@ -21,6 +21,17 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       identity, DNS rebinding); the second the plain port's refusal of proxy headers (a tunnel
       aimed at it) and `ao connect`'s write–serve–probe order; the third, READY, where the
       ports are read from and how two listeners share a process.
+      **Fable review the same day, adopted by Paul**: sound with changes. Tailscale ships alone
+      first — TD-647 in two slices, the Cloudflare route designed but built when asked (TD-656),
+      its token check decided with the relay's passkey, which may replace it; a dated interim
+      serve of the plain port, its exposure to a hostile page stated; the Tailscale cell
+      honest that Tailscale vouches for the login (Tailnet Lock, a second factor, the name in CT
+      logs); each route's cut-off for a lost device; `listeners.json` cut for asking the port;
+      why not a Unix socket; the relay's passkey bound to its hostname, its timing view, and the
+      person's own domain as its recommendation; the phone's silent failure written into TD-003.
+      Then three Sonnet rounds to READY: the interim's way off (the plain port's page names the
+      manual pair until `ao connect` exists), the `reach:` reader moved into TD-647's first slice,
+      and TD-648 waiting for all of TD-647.
 - [x] Where the UI process runs (2026-09-05): **wherever `shiftlead[ui]` is installed**; nothing
       in the design assumes a particular host. `hosts.yml` lives on the UI host, which may or
       may not also be a session host; for Paul it is kmaster. A hosted service is the `relay`
