@@ -11730,3 +11730,27 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Related:** TD-633 (found on its look), TD-219 (the form), TD-296 (the same `[hidden]` fault on `.btn`, `.radio`).
 
 **Resolved:** 2026-10-14 (grinder-ao-2, PR #1724) — `#entrywhat` carries `tall`, sized `#entrywhat.tall { height: 132px; }` as the mockup draws it; `.warn[hidden] { display: none; }` beside `.btn[hidden]`, which also hides `board_add.html`'s `#baerr` and the Settings page's Telegram line when hidden. `tests/test_ui_entry.py` holds both; on a scratch home under headless Chromium **What** drew 132 px, the hidden error computed `display: none` and an un-hidden one `flex` (`docs/mockups/reviews/2026-10-14-td668-form.png`).
+
+## TD-628: Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-627's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5a *Focus side panel, Git card: changed files* (beside *recent files*); `src/shiftlead/ui/templates/focus.html` (`#gitfiles` ~L234: each line split into its status code and its path, the path an `<a>` as the recent files draw theirs), `src/shiftlead/ui/static/app.js` (the `#gitfiles` redraw ~L4248: the same split and link; the press through `AO.openFile`, as the recent files' is), `src/sessionorc/gitinfo.py` (`GitInfo.files` ~L26: read only — `"<code> <path>"`, a rename's new path, `?? dir/` for a new directory); `tests/test_ui_focus*.py` or `tests/test_ui.py` (the Focus page's pieces)
+
+**Why:** TD-627: Paul, 2026-10-13 — *our git card in the focus session screen shows modified files — add links to those files so they can be opened in vscode/other (leverage our other open file flows)*; the Git card is open by default and its files are plain text, while the folded Session card's recent files open.
+
+**Fix:**
+1. Split each `GitInfo.files` line at its first space into the code and the path; draw the code as text and the path as the recent files' link (`data-file` the path joined to the worktree's root — a porcelain path is relative to it, which is the record's directory or above it, as `app.js` ~L3631 resolves one for `isChanged` — the same class and handler), on first render and on the delta's redraw.
+2. Text, with a hover, for a line whose code ends in `D` — `D`, `MD`, `AD`, `RD` (*deleted in the worktree*; TD-632) — and a path ending in `/` (*a new directory: open it from the worktree's window*); a file deleted and made again lists as `D` (text) and `??` (a link).
+3. No link where the editor button is not drawn (`open_in: none`, another host's record): the lines as today.
+4. Tests: a modified, an untracked and a conflicted path are links with the joined path; `D`, `MD`, `AD` and `RD` lines are text with the deletion's hover, a `D c` with a `?? c` beside it draws the first as text and the second as a link, and a `dir/` text with its hover; under `open_in: none` every line is text; the delta's redraw draws the same as the first render.
+
+**Done when** a click on a changed file on the Focus Git card opens it in the person's editor by the same file link as the recent files, a deletion and a new directory stay text saying why, and the tests above pass; the builder's look (design §4.9b) is named in the PR.
+
+**Related:** TD-627 (the design), TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
+
+**Resolved:** 2026-10-14 (grinder-ao-2, PR #1725) — `AO.gitFiles` draws the Git card's lines: the code as text, the path an `a.editor` link by the recent files' form joined to the worktree's top level (`git_root`, served by the Focus route from `gitinfo.toplevel` for a record on this host with an editor; the directory where it is not); a deletion and a new directory text with why on hover; no file form, text. Focus's render draws by it on load and each delta. `tests/test_ui_focus_git_files.py` holds the Fix's cases; on a scratch home under headless Chromium a modified and an untracked path were links, a deletion and a new directory text (`docs/mockups/reviews/2026-10-14-td628-git-card.png`).
