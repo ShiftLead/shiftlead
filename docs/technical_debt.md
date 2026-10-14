@@ -54,7 +54,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-679 | Ready to close has no row for the agent itself: a working session's checklist reads all ✓, and the card's *more ▾* **Close** is enabled on it | Low | Open |
-| TD-680 | Live check of TD-678: **Start session** / **Open session** on the Inbox's ledger rows, on the live copy | Medium | Open |
+| TD-680 | Live check of TD-678: **Start session** / **Open session** on the Inbox's ledger rows, on the live copy | Medium | Blocked: Paul's look (m-79c47f23b1df) |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Open |
 | TD-683 | `ao team --skill` leaves out what a repo's own session needs before its first team: the repo's readiness, an empty ledger, a public repo | Low | Open |
@@ -940,7 +940,8 @@ with the retired brief).
 **Added:** 2026-10-14 (grinder-ao-2, after #1751 merged)
 **Owner:** grinder
 **Kind:** live-check #1751
-**Status:** Open — once #1751 is live (`ao promote status`): read only. A headless GET of the live `/inbox` draws **Start session** on each *Later* ledger row with no holder, and **Open session** on one a live member claims. `GET /new?…&press=start&why=x&prompt=y` draws *Start session could not be one press: x* and `y` in Opening prompt. The one-press start itself (a real `td-<n>` session with `work.md` as its first prompt, its Focus opened) is the person's press on the live copy, never a member's. Send it as a look (design §4.10 *A look*): `ao msg person --kind ask --answer "Works" --answer "Not right: <what>" --about TD-680`, then `**Blocked by:** decision (paul)` with the mail's id. On the scratch home (`scripts/look_home.py`, no team) the press was seen landing on the filled form with its reason. Shots: `docs/mockups/reviews/2026-10-14-td678-*.png`.
+**Status:** Waiting on the person's look — read 2026-10-14 on the live copy (93f3778, #1751 live) by grinder-ao-2, no press: GET `/inbox` draws **Start session** on 57 *Later* ledger rows and **Open session** on none, which is right: no live member holds any of those entries. `GET /new?prefilled=1&press=start&why=x&prompt=y` draws *Start session could not be one press: x* and `y` in Opening prompt. The press itself went to Paul as a look (m-79c47f23b1df, with the two `2026-10-14-td678-*.png` shots). Was: Open — the GETs to read once #1751 was live.
+**Blocked by:** decision (paul) — the look m-79c47f23b1df: *Works*, or *Not right: <what>*
 **Location:** design §4.5a *Inbox row: ledger entry*; `src/shiftlead/ui/app.py` `api_ledger_start`; the live `/inbox`
 
 **Why:** the unit tests fake the host agent's `create`. The scratch home has no team, and a press there would launch Claude Code, so only the live copy shows the session the press starts.
