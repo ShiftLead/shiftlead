@@ -369,16 +369,16 @@ def at_done(view: dict[str, Any], required: list[str] | None) -> dict[str, Any]:
     read*, TD-637), from `gh pr view`'s `state,mergedAt,headRefOid,baseRefName,statusCheckRollup`
     and its base's required names (None: never read). `{word, sha, failed, other}`: *merged*,
     *closed* (unmerged), *refused* (a required check red by `fold_checks`'s rule, named in `failed`),
-    *pending* (a required one not completed), else *green* — no checks at all included; `other` the
-    red checks no rule requires. With nothing required, or the set never read, every check counts."""
-    out: dict[str, Any] = {"sha": str(view.get("headRefOid") or ""), "failed": [], "other": []}
+    *pending* (a required one not completed, named in `running`), else *green* — no checks at all
+    included; `other` the red checks no rule requires. With nothing required, or the set never read,
+    every check counts."""
+    out: dict[str, Any] = {"sha": str(view.get("headRefOid") or ""), "failed": [], "other": [], "running": []}
     state = str(view.get("state") or "").upper()
     if state == "MERGED" or view.get("mergedAt"):
         return {**out, "word": "merged"}
     if state == "CLOSED":
         return {**out, "word": "closed"}
     wanted = set(required or [])
-    pending = False
     for c in view.get("statusCheckRollup") or []:
         if not isinstance(c, dict):
             continue
@@ -388,10 +388,10 @@ def at_done(view: dict[str, Any], required: list[str] | None) -> dict[str, Any]:
         elif word == "red":
             out["failed"].extend(failing)
         elif word == "pending":
-            pending = True
+            out["running"].append(str(c.get("name") or c.get("context") or "?"))
     if out["failed"]:
         return {**out, "word": "refused"}
-    return {**out, "word": "pending" if pending else "green"}
+    return {**out, "word": "pending" if out["running"] else "green"}
 
 
 def pr_view(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, Any] | str:

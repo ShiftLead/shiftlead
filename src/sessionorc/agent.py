@@ -2585,8 +2585,8 @@ class HostAgent(
                 f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none, restart"
             )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
-        if said and said["word"] in ("pending", "unknown"):
-            entry.ci = said["word"]
+        if said and said["word"] == "unknown":
+            entry.ci = "unknown"  # pending is refused at the declaration since TD-658: no new `ci: pending`
         new_claim = status == "claimed" and entry.source == "declared"
         if new_claim and (words := self._balance_refusal(s, entry.ref, caller)):
             raise RpcError(words, balance=self._balance_of(s))
@@ -2621,46 +2621,89 @@ class HostAgent(
             out["checks_said"] = said["line"]
         return out
 
-    async def _checks_at_done(self, s: Session, ref: str, pr: int, slice: bool) -> dict[str, Any]:
-        """What a declared `done` naming PR `pr` is told of its checks (design §4.8 *A `done` with a
-        PR is told what its checks read*, TD-637): `{word, line}`, the PR read once with `gh` from the
-        record's checkout, off the loop, against its base's required names in the repo reading. A
-        required check red on the head, or a `--slice` on a PR not merged, raises — nothing is
-        written; a read the home could not make is *unknown*, never a refusal."""
+    async def _pr_checks(self, s: Session, pr: int) -> dict[str, Any]:
+        """PR `pr` read once for its checks (design §4.8 *A `done` with a PR is told what its checks
+        read*, TD-637, TD-658): `gh pr view` from the record's checkout, off the loop, folded by
+        `reports.at_done` against its base's required names in the repo reading — `{word, sha, failed,
+        other, running, names, rollup}`, or `{word: unknown, why}` for a read the home could not make.
+        One read for a `done` and for an `ask` carrying `pr`, so the two never disagree."""
         root = str(s.repo or "")
         if not root or not Path(root).is_dir():
             view: dict[str, Any] | str = "the record names no checkout here"
         else:
             view = await asyncio.to_thread(reports.pr_view, root, pr, GH_TIMEOUT)
         if isinstance(view, str):
-            return {"word": "unknown", "line": f"PR #{pr}: checks unknown: {view}"}
+            return {"word": "unknown", "why": view}
         base = str(view.get("baseRefName") or "")
         required = ((self._repos.get(root) or {}).get("prs") or {}).get("required") or {}
         names = required.get(base) if isinstance(required.get(base), list) else None
-        got = reports.at_done(view, names)
-        word, sha7 = got["word"], got["sha"][:7]
-        if slice and word != "merged":
-            raise RpcError(f"a slice is a merged PR — #{pr} is {'closed unmerged' if word == 'closed' else 'open'}")
-        if word == "refused":
-            unknown = " — required set unknown, every check read" if names is None else ""
-            raise RpcError(
+        return {**reports.at_done(view, names), "names": names, "rollup": bool(view.get("statusCheckRollup"))}
+
+    @staticmethod
+    def _not_green(pr: int, got: dict[str, Any], failed: str, running: str) -> RpcError | None:
+        """The refusal for a head whose required checks failed (ending *fix them and <failed>*) or
+        still run (ending *<running>*), TD-637 and TD-658 — or None when neither."""
+        if got["word"] not in ("refused", "pending"):
+            return None
+        sha7 = got["sha"][:7]
+        unknown = " — required set unknown, every check read" if got["names"] is None else ""
+        if got["word"] == "refused":
+            return RpcError(
                 f"PR #{pr}'s required checks failed on {sha7}: {', '.join(got['failed'])}{unknown} — fix them "
-                f"and report done again (ao progress done {ref} --pr {pr})",
+                f"and {failed}",
                 failed=got["failed"],
                 sha=got["sha"],
             )
+        return RpcError(
+            f"PR #{pr}'s required checks are still running on {sha7}: {', '.join(got['running'])}{unknown} — "
+            f"{running}",
+            running=got["running"],
+            sha=got["sha"],
+        )
+
+    async def _checks_at_done(self, s: Session, ref: str, pr: int, slice: bool) -> dict[str, Any]:
+        """What a declared `done` naming PR `pr` is told of its checks (design §4.8 *A `done` with a
+        PR is told what its checks read, and refused until they are green*, TD-637, TD-658): `{word,
+        line}` from `_pr_checks`. A required check red or still running on the head, or a `--slice`
+        on a PR not merged, raises — nothing is written; a read the home could not make is *unknown*,
+        never a refusal."""
+        got = await self._pr_checks(s, pr)
+        if got["word"] == "unknown":
+            return {"word": "unknown", "line": f"PR #{pr}: checks unknown: {got['why']}"}
+        word, sha7 = got["word"], got["sha"][:7]
+        if slice and word != "merged":
+            raise RpcError(f"a slice is a merged PR — #{pr} is {'closed unmerged' if word == 'closed' else 'open'}")
+        again = f"report done again (ao progress done {ref} --pr {pr})"
+        if refusal := self._not_green(pr, got, again, f"report done once they pass (`gh pr checks {pr} --watch`)"):
+            raise refusal
         parts = {
             "merged": "merged",
             "closed": "closed unmerged",
-            "pending": f"checks pending on {sha7} — the cadence check reads it again",
-            "green": f"checks green on {sha7}" if view.get("statusCheckRollup") else "no checks",
+            "green": f"checks green on {sha7}" if got["rollup"] else "no checks",
         }
         line = f"PR #{pr}: {parts[word]}" if word != "merged" else ""
         if got["other"]:
             line += f"; not required, failed: {', '.join(got['other'])}"
-        if names is None and word in ("pending", "green"):
+        if got["names"] is None and word == "green":
             line += "; required set unknown — every check read"
         return {"word": word, "line": line}
+
+    async def _checks_at_ask(self, sender: str, kind: str, pr: Any) -> str | None:
+        """An `ask` carrying `pr`, sent by a session, read as a `done` naming that PR is (design §4.9b
+        *The reader*, TD-658): refused while a required check failed or still runs on the head —
+        nothing is sent — and the line *checks unknown: <why>* for a read the home could not make,
+        which sends. A person's ask, an ask with no `pr`, and a shape `_msg` refuses are not read."""
+        if mail.is_person(sender) or kind != "ask" or isinstance(pr, bool) or not isinstance(pr, int) or pr < 1:
+            return None
+        s = self._graph().get(sender)
+        if s is None:
+            return None  # `_msg` says it has no record of the sender
+        got = await self._pr_checks(s, pr)
+        if got["word"] == "unknown":
+            return f"PR #{pr}: checks unknown: {got['why']}"
+        if refusal := self._not_green(pr, got, "ask again", f"ask again once they pass (`gh pr checks {pr} --watch`)"):
+            raise refusal
+        return None
 
     async def _slice(self, s: Session, ref: str, status: str, pr: int | None, source: str) -> dict[str, Any]:
         """A slice declared (TD-325): refused but for `done` with a PR, declared, on a reference the

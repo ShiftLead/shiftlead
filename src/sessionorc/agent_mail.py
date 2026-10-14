@@ -116,6 +116,8 @@ class MailMixin:
                 raise error
             return dict(result or {})
         try:
+            # TD-658: a PR handed to its reader is green first — read before anything is written
+            said = await self._checks_at_ask(sender, kind, pr)
             result = await self._msg(
                 sender,
                 text,
@@ -141,6 +143,9 @@ class MailMixin:
             if key:
                 self._remember_nonce(key, (None, e))
             raise
+        if said:  # one line from the home, not a refusal: the CLI prints `advice`
+            result["checks_said"] = said
+            result["advice"] = f"{result['advice']}\n{said}" if result.get("advice") else said
         if key:
             self._remember_nonce(key, (result, None))
         return result

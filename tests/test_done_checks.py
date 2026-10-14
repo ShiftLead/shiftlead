@@ -1,7 +1,8 @@
 """TD-639, design §4.8 *A `done` with a PR is told what its checks read*: `ao progress done <ref>
 --pr <n>` reads the PR's checks once at the declaration, against the required checks of its base
-branch — refused while a required one failed on the head, accepted as `ci: pending` while one runs,
-accepted merged, green, with no CI, or (as *unknown*) when the home could not read them."""
+branch — refused while a required one failed or still runs on the head (TD-658), accepted merged,
+green, with no CI, or (as *unknown*) when the home could not read them. An `ask` carrying `pr` from a
+session is read the same way (design §4.9b *The reader*, TD-664)."""
 
 from __future__ import annotations
 
@@ -55,13 +56,15 @@ def test_a_failed_check_no_rule_requires_refuses_nothing_and_is_named():
 
 
 def test_pending_merged_closed_and_no_checks():
-    assert reports.at_done(_view(_run("test", "QUEUED", "")), ["test"])["word"] == "pending"
+    got = reports.at_done(_view(_run("test", "QUEUED", ""), _status("ci/x", "PENDING")), ["test", "ci/x"])
+    assert (got["word"], got["running"]) == ("pending", ["test", "ci/x"])
     # red outranks pending, as the reading folds it
     assert reports.at_done(_view(_run("a", "QUEUED", ""), _run("b", conclusion="FAILURE")), None)["word"] == "refused"
     assert reports.at_done(_view(_run("t", conclusion="FAILURE"), state="MERGED", merged="2026-10-13"), ["t"]) == {
         "sha": SHA,
         "failed": [],
         "other": [],
+        "running": [],
         "word": "merged",
     }
     assert reports.at_done(_view(state="CLOSED"), None)["word"] == "closed"
@@ -159,15 +162,25 @@ async def test_a_failed_required_check_refuses_the_done_and_writes_nothing(worke
     assert (e.status, e.pr, e.ci) == ("claimed", None, None)
 
 
-async def test_pending_is_accepted_and_marked_until_rule_10_reads_it(worker):
+async def test_pending_is_refused_naming_the_running_checks_and_writes_nothing(worker):
+    """TD-658: a required check still running refuses the declaration, as a failed one does; a
+    non-required one still running refuses nothing."""
     w, sid, rec, views = worker
+    await w.call("progress", id=sid, ref="TD-1")
     views[842] = _view(_run("test", "IN_PROGRESS", ""), _run("docs", conclusion="FAILURE"))
+    with pytest.raises(
+        AgentError,
+        match=r"PR #842's required checks are still running on 9c1e0f2: test — report done once they pass "
+        r"\(`gh pr checks 842 --watch`\)",
+    ):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    (e,) = rec.progress
+    assert (e.status, e.pr, e.ci) == ("claimed", None, None)
+    views[842] = _view(_run("test"), _run("slow", "QUEUED", ""), _run("docs", conclusion="FAILURE"))
     got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
-    assert got["progress"][0]["ci"] == "pending"
-    assert got["checks_said"].startswith("PR #842: checks pending on 9c1e0f2")
-    assert "not required, failed: docs" in got["checks_said"]
-    assert report_line(got) == "TD-001 → #842 · checks pending · 1/1 done"
-    assert report_line(got, {842: "merged"}) == "TD-001 → #842 merged · 1/1 done"
+    assert got["progress"][0]["ci"] is None
+    assert got["checks_said"] == "PR #842: checks green on 9c1e0f2; not required, failed: docs"
+    assert report_line(got) == "TD-001 → #842 · 1/1 done"
 
 
 async def test_green_merged_closed_and_no_checks_are_accepted(worker):
@@ -212,3 +225,73 @@ async def test_a_slice_on_a_pr_not_merged_is_refused(worker):
     views[842] = _view(state="MERGED", merged="2026-10-13T00:00:00Z")
     got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842, slice=True)
     assert "stays claimed" in got["slice"] and [x["pr"] for x in rec.progress[0].slices] == [842]
+
+
+# -- the hand-off: an `ask` carrying `pr` (design §4.9b *The reader*, TD-658) ------------------------
+
+
+async def test_an_ask_with_a_pr_is_refused_on_failed_and_on_pending_and_sends_nothing(worker, agent):
+    w, sid, rec, views = worker
+    views[842] = _view(_run("test", conclusion="FAILURE"))
+    with pytest.raises(AgentError, match=r"PR #842's required checks failed on 9c1e0f2: test — fix them and ask again"):
+        await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
+    views[842] = _view(_run("test", "IN_PROGRESS", ""))
+    with pytest.raises(
+        AgentError, match=r"still running on 9c1e0f2: test — ask again once they pass \(`gh pr checks 842 --watch`\)"
+    ):
+        await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-1")
+    assert rec.outbox == [] and agent.person_inbox == []
+    # green now: a fresh send goes, where the refused nonce answers as it did
+    views[842] = _view(_run("test"))
+    with pytest.raises(AgentError, match="still running"):
+        await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-1")
+    got = await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842, nonce="n-2")
+    assert got["entry"]["pr"] == 842 and "checks_said" not in got
+    assert [e.pr for e in agent.person_inbox] == [842]
+
+
+async def test_an_ask_with_a_pr_sends_on_green_merged_closed_and_no_checks(worker, agent):
+    w, sid, rec, views = worker
+    views[1] = _view(_run("test"))
+    views[2] = _view(_run("test", conclusion="FAILURE"), state="MERGED", merged="2026-10-13T00:00:00Z")
+    views[3] = _view(state="CLOSED")
+    views[4] = _view()
+    for pr in (1, 2, 3, 4):
+        got = await w.call("msg", to=["person"], text=f"read #{pr}", kind="ask", pr=pr)
+        assert got["entry"]["pr"] == pr and "checks_said" not in got
+
+
+async def test_an_ask_whose_read_failed_sends_saying_checks_unknown(worker, agent):
+    w, sid, rec, views = worker
+    views[842] = "gh could not be asked: TimeoutExpired"
+    got = await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
+    assert got["entry"]["pr"] == 842
+    assert got["checks_said"] == "PR #842: checks unknown: gh could not be asked: TimeoutExpired"
+    assert got["checks_said"] in got["advice"]
+    # a record that names no checkout here (a node's session) is the same
+    rec.repo = None
+    got = await w.call("msg", to=["person"], text="read #843", kind="ask", pr=843)
+    assert got["checks_said"] == "PR #843: checks unknown: the record names no checkout here"
+
+
+async def test_the_persons_ask_and_an_ask_with_no_pr_are_not_read(worker, agent, monkeypatch):
+    w, sid, rec, views = worker
+    read: list[int] = []
+    monkeypatch.setattr(
+        reports, "pr_view", lambda root, pr, timeout=30.0: read.append(pr) or _view(_run("test", "QUEUED", ""))
+    )
+    await w.call("msg", to=["person"], text="which entry next?", kind="ask")
+    await w.call("msg", to=["person"], text="note", kind="note")
+    async with LocalClient() as person:
+        await person.call("msg", to=[sid], text="read #842 for me", kind="ask", pr=842)
+    assert read == []
+    # an ask again on the thread — the reply to findings — is read as the first was
+    views[842] = _view(_run("test"))
+    monkeypatch.setattr(reports, "pr_view", lambda root, pr, timeout=30.0: read.append(pr) or views[pr])
+    first = (await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842))["entry"]["id"]
+    async with LocalClient() as person:
+        findings = await person.call("msg", reply_to=first, text="one finding: the test name", kind="reply")
+    views[842] = _view(_run("test", "QUEUED", ""))
+    with pytest.raises(AgentError, match="still running"):
+        await w.call("msg", reply_to=findings["entry"]["id"], text="fixed", kind="ask", pr=842)
+    assert read == [842, 842]
