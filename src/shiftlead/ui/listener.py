@@ -65,8 +65,8 @@ def origin_of(url: str) -> tuple[str, str, int] | None:
     except ValueError:
         return None
     scheme = u.scheme.casefold()
-    if scheme not in DEFAULT_PORTS or not u.hostname:
-        return None
+    if scheme not in DEFAULT_PORTS or not u.hostname or u.username is not None or u.path not in ("", "/"):
+        return None  # an Origin is scheme, host and port alone: a path or a userinfo is not one
     return scheme, u.hostname.casefold(), port or DEFAULT_PORTS[scheme]
 
 
@@ -291,20 +291,19 @@ class Gate:
         )
 
     async def _refuse(self, scope: dict, receive: Any, send: Any, refusal: dict[str, Any]) -> None:
-        from shiftlead.ui.common import templates
-
-        body = templates.get_template("refused.html").render(listener=self.listener, **refusal).encode()
-        head = self._stamp({"status": refusal["status"], "headers": [(b"content-type", b"text/html; charset=utf-8")]})
         if scope["type"] == "http":
-            await send({"type": "http.response.start", **head})
+            from shiftlead.ui.common import templates
+
+            body = templates.get_template("refused.html").render(listener=self.listener, **refusal).encode()
+            ctype = [(b"content-type", b"text/html; charset=utf-8")]
+            await send({"type": "http.response.start", **self._stamp({"status": refusal["status"], "headers": ctype})})
             await send({"type": "http.response.body", "body": body})
             return
+        # A refused upgrade is a close before accept, which uvicorn answers `403` with no body: its
+        # `websocket.http.response` path would carry the page but logs an ERROR per refusal (uvicorn 0.52,
+        # review of TD-647), which a hostile page could fill the log with. The log line above says why.
         await receive()  # websocket.connect
-        if "websocket.http.response" in (scope.get("extensions") or {}):
-            await send({"type": "websocket.http.response.start", **head})
-            await send({"type": "websocket.http.response.body", "body": body})
-        else:
-            await send({"type": "websocket.close", "code": 1008})  # the server answers the upgrade 403
+        await send({"type": "websocket.close", "code": 1008})
 
 
 # -- running both listeners in one process -----------------------------------------------------------
@@ -388,7 +387,9 @@ async def serve(
         try:
             await servers[0].serve()
         finally:
-            stop()  # the plain port ending ends the route port with it
+            for s in servers:  # the plain port ending ends the route port with it, still draining: no force
+                s.should_exit = True
+            stopping.set()
 
     try:
         await asyncio.gather(plain(), *([route()] if route_port else []))

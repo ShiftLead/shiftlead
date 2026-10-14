@@ -248,6 +248,7 @@ def test_host_and_origin_parsing():
     assert listener.host_name("[::1]:8765") == "::1"
     assert listener.origin_of("https://h") == listener.origin_of("https://H:443") == ("https", "h", 443)
     assert listener.origin_of("null") is None
+    assert listener.origin_of("http://u@h") is None and listener.origin_of("http://h/x") is None
 
 
 # -- the process: both servers on one loop -----------------------------------------------------------
@@ -275,6 +276,17 @@ def _get(port: int) -> tuple[int, dict]:
             return r.status, dict(r.headers)
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers)
+
+
+def _upgrade(port: int) -> str:
+    """The status line a real server answers a websocket upgrade of `/events` with."""
+    req = (
+        f"GET /events HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n"
+    )
+    with socket.create_connection(("127.0.0.1", port), timeout=3) as s:
+        s.sendall(req.encode())
+        return s.recv(200).decode("latin-1")
 
 
 def _up(port: int, proc: subprocess.Popen, timeout: float = 20) -> bool:
@@ -308,6 +320,8 @@ def test_both_listeners_serve_and_one_sigterm_stops_both(home):
         assert status == 200 and h["x-shiftlead-listener"] == "plain"
         status, h = _get(route)
         assert status == 403 and h["x-shiftlead-listener"] == "route"  # no reach: set
+        assert _upgrade(route).startswith("HTTP/1.1 403")  # a refused websocket is refused at its upgrade
+        assert _upgrade(plain).startswith("HTTP/1.1 403")  # no Origin
         proc.terminate()
         proc.wait(timeout=10)
         for port in (plain, route):
