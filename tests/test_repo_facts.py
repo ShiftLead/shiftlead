@@ -529,6 +529,18 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert "g2 is out of work with" in (out := capsys.readouterr().out) and "board:0123abcd" in out.split("g2 is")[1]
     assert cli.main(["--json", "repo"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["work_orders"]["orders"][0]["id"] == "board:0123abcd"
+    # a red PR nobody holds is a work order after the board's, the anchor's, counted (§4.7, TD-613)
+    red = {"id": "pr:1573", "title": "Sync dev-cadence", "for_page": "pickable", "pickable": "yes", "work_order": True,
+           "pr_order": True, "priority": "High", "pr": 1573, "failing": ["test (3.12)"],
+           "red_since": "2026-10-12T09:00:00Z"}  # fmt: skip
+    reading[str(repo)]["pr_orders"] = {"orders": [red], "told": {}}
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "6 open entries, 1 decided board line, 1 red PR nobody holds: 3 pickable (t 2 · " in out
+    row = "pickable     pr:1573  High    anchor       Sync dev-cadence · red since 2026-10-12T09:00:00Z: test (3.12)"
+    assert row in out and out.index("board:0123abcd") < out.index("pr:1573") < out.index("pickable     TD-012")
+    # g2's lane is free-pick and no team here has an anchor seat: the order is in its lane too
+    assert "pr:1573" in out.split("g2 is")[1]
 
 
 def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):
@@ -802,6 +814,33 @@ def test_repo_lanes_reads_the_repos_own_records_and_a_claim_only_while_its_holde
     assert [(m["name"], m["ids"]) for m in got["ao-grind"]["out_of_work"]] == [("grinder-ao-1", ["TD-355"])]
     sessions[1]["state"] = "working"
     assert teamrun.repo_lanes(entries, repo, sessions)["ao-grind"]["out_of_work"] == []  # a live holder holds it
+
+
+def test_a_red_prs_order_is_the_anchors_and_free_picks_only_where_no_team_has_an_anchor_seat(repo):
+    """§4.4 *A red PR nobody holds is a work order* (TD-613): `pr:<n>` is in the anchor seat's lane;
+    a `free-pick` lane takes it only where no team servicing the repo has an anchor seat — one of its
+    records here carrying the `anchor` lane word, live or ended. A decided board line is every
+    `free-pick` lane's either way."""
+    from shiftlead import teamrun
+
+    red = {"id": "pr:7", "title": "t", "for_page": "pickable", "pickable": "yes", "work_order": True, "pr_order": True}
+    board = {"id": "board:00aa11bb", "title": "b", "for_page": "pickable", "pickable": "yes", "work_order": True}
+    r = {"ledger": {"entries": []}, "work_orders": {"orders": [board]}, "pr_orders": {"orders": [red], "told": {}}}
+    entries = teamrun.lane_entries(r)
+    assert [e["id"] for e in entries] == ["board:00aa11bb", "pr:7"] and teamrun.pr_orders(r) == [
+        {**red, "owner": "anchor"}
+    ]
+    assert teamrun.lane_kinds({**r, "ledger": {"by_kind": {"pickable": 2}}})["pickable"] == 4  # both orders counted
+    g = {"id": "g1", "name": "grinder", "team": "t", "repo": str(repo), "lane": ["free-pick"], "state": "idle"}
+    assert teamrun.repo_lanes(entries, repo, [g])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
+    anchor = {"id": "a1", "name": "anchor", "team": "u", "repo": str(repo), "lane": ["anchor"], "state": "closed"}
+    got = teamrun.repo_lanes(entries, repo, [g, anchor])
+    assert got["t"]["pickable"] == ["board:00aa11bb"] and got["u"]["pickable"] == ["board:00aa11bb", "pr:7"]
+    assert got["t"]["rest"] == [{"owner": "anchor", "n": 1, "ids": ["pr:7"]}]  # the anchor's, never unowned
+    both = {**g, "lane": ["free-pick", "anchor"]}  # one team holding both words takes it
+    assert teamrun.repo_lanes(entries, repo, [both])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
+    assert "free_pick" not in red  # the reading's own entry is never written to
+    assert teamrun.pr_orders({"pr_orders": None}) == [] and teamrun.pr_orders(None) == []
 
 
 def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_of_work(repo, monkeypatch, capsys):
