@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-CHECKS = ("agent", "tmux", "hooks", "identity", "profiles", "nodes", "org")
+CHECKS = ("agent", "tmux", "hooks", "identity", "profiles", "nodes", "org", "route")
 # the checks that read the home: on a node they say *home only* and count as neither (§4.7)
 HOME_ONLY = frozenset({"nodes", "org"})
 # a queued hook line older than this the tick should have applied: it drains within a tick

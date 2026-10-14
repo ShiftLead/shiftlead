@@ -148,6 +148,7 @@ class SettingsMixin:
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             "person": settings_mod.person(doc),
             "notify": settings_mod.notify(doc),
+            "reach": settings_mod.reach(doc),
             "permissions": self._permissions_read(doc),
             "migrate": [],
         }
@@ -184,6 +185,7 @@ class SettingsMixin:
         person: dict[str, Any] | None = None,
         usage: dict[str, Any] | None = None,
         notify: dict[str, Any] | None = None,
+        reach: Any = None,
         caller: Any = None,
     ) -> dict[str, Any]:
         """Write the home's `settings.yml` (design §5, §4.7 `ao gate` / `ao team until` / `ao team
@@ -206,8 +208,12 @@ class SettingsMixin:
         - `usage`: `{max_age: "1h" | "90m" | "off" | None}` (§6 *A reading the gate can no longer
           trust*, TD-233), None clearing it back to the default hour.
         - `notify`: `{telegram: {on?, secrets?, link?} | None}` (§4.10 *Told on Telegram when nobody is
-          looking*, TD-319), a field set to None cleared; `on: true` with no secrets is refused."""
+          looking*, TD-319), a field set to None cleared; `on: true` with no secrets is refused.
+
+        `reach` is refused, naming `ao connect`: `set_reach` is the one RPC that writes it (§4.7, TD-648)."""
         agent_common.person_only(caller, "change the settings", "§5 settings.yml", self._graph())
+        if reach is not None:
+            raise RpcError("set_settings does not write reach: — `ao connect` does, through set_reach (design §4.7)")
         if all(v is None for v in (reserves, teams, repos, person, usage, notify)):
             raise RpcError(
                 "set_settings needs reserves, teams, repos, person, usage or notify (design §5 settings.yml)"
@@ -291,6 +297,40 @@ class SettingsMixin:
         self._bg.add(task)
         task.add_done_callback(self._bg.discard)
         return out
+
+    async def rpc_set_reach(self, reach: Any = None, caller: Any = None) -> dict[str, Any]:
+        """`ao connect`'s write (design §4.7, §5 `reach:`, §4.5b *The setting*, TD-648): the one RPC that
+        writes `settings.yml`'s `reach:` key — `set_settings` refuses it — `reach` the whole mapping, or
+        None to remove it. Its shape is checked before anything is written: a known route, an `https`
+        URL, a non-empty `allow`, and `team` and `aud` for `cloudflare`. **A person's own**, refused to a
+        session as `set_settings` is, and the home's alone (`modes.HOME_EDITS`). Answers `{reach,
+        before}`, `before` what the file held, which `ao connect` restores when its probe fails. The UI's
+        route port reads the file itself; linked nodes are sent it, as after `set_settings`."""
+        agent_common.person_only(caller, "change the route", "§4.7 ao connect", self._graph())
+        doc = settings_mod.load()
+        before_doc = copy.deepcopy(doc)
+        before = doc.get("reach")
+        if reach is None:
+            doc.pop("reach", None)
+        else:
+            try:
+                parsed = settings_mod.parse_reach(reach)
+            except ValueError as e:
+                raise RpcError(f"set_reach: {e}") from None
+            if not parsed["allow"]:
+                raise RpcError("set_reach: reach.allow names at least one login (design §4.5b)")
+            if parsed["route"] == "cloudflare" and not ("team" in parsed and "aud" in parsed):
+                raise RpcError("set_reach: a cloudflare route needs team and aud (design §4.5b)")
+            doc["reach"] = parsed
+        if doc.get("reach") == before:  # nothing changed: no write, no push to the nodes, no commit
+            return {"reach": before, "before": before}
+        settings_mod.save(doc)
+        log.info("settings.yml: reach %s", "removed" if reach is None else f"set to {doc['reach']['route']}")
+        await self._push_settings()
+        task = asyncio.create_task(self._commit_defs(defs.settings_message(before_doc, doc), ("settings.yml",)))
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+        return {"reach": doc.get("reach"), "before": before}
 
     @staticmethod
     def _notify_change(current: Any, notify: Any) -> dict[str, Any]:

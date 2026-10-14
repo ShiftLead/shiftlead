@@ -249,7 +249,7 @@
         <input class="input setin mono" name="tg_secrets" value="{{ telegram.secrets }}" placeholder="samscrape/prd" autocomplete="off" spellcheck="false">
         <span class="note">a Doppler project/config — a name; the token is never shown or stored here</span></label>
       <label class="setrow"><span class="setlabel">link</span>
-        <input class="input setin mono" name="tg_link" value="{{ telegram.link }}" placeholder="http://{{ host }}:8765" autocomplete="off" spellcheck="false">
+        <input class="input setin mono" name="tg_link" value="{{ telegram.link }}" placeholder="{{ telegram.link_placeholder or 'http://localhost:8765' }}" autocomplete="off" spellcheck="false">
         <span class="note">how your phone reaches this page</span></label>
       <div class="note">{{ telegram.told }}</div>
       <div class="note">{{ telegram.when }}</div>

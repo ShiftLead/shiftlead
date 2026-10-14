@@ -42,7 +42,7 @@ from sessionorc.models import (
     tokens_short,
 )
 from sessionorc.tmux import attach_argv
-from shiftlead import doctor, orgcheck, repoconfig, service, teamrun, teams
+from shiftlead import connect, doctor, orgcheck, repoconfig, service, teamrun, teams
 from shiftlead import org as orgmod
 from shiftlead.ending import closer_words, exit_words, restart_words, waiting_words
 
@@ -2385,7 +2385,7 @@ def cmd_identity(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    """`ao doctor [<check>…]` (design §4.7 **`ao doctor`**, TD-465 slice 2): the seven checks, in
+    """`ao doctor [<check>…]` (design §4.7 **`ao doctor`**, TD-465 slice 2, TD-648): the eight checks, in
     order, a line each in `ao org check`'s verdict words, every lack naming its cure; then the count,
     exit 1 on a lack. The host-side readings are the never-gated `doctor` RPC's; the build line and
     the org are the client's own reads, as `ao promote status` and `ao org check` are. It writes
@@ -2433,6 +2433,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             rows += doctor.profiles(reading["profiles"])
         elif check == "nodes":
             rows += doctor.nodes(reading["nodes"], node)
+        elif check == "route":
+            rows += connect.route_line(_reach(), node=node)
         else:
             rows += _doctor_org(reading["files"], node)
     got = doctor.summary(rows)
@@ -2444,6 +2446,71 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     emit(args, {k: v for k, v in got.items() if k != "line"}, prose)
     return 0 if got["ok"] else 1
+
+
+def _reach() -> dict[str, Any] | None:
+    """`reach:` as the route port reads it: from `settings.yml` itself, the client's own read (§4.7
+    **route**), so a session's `ao doctor` reads it as the person's does."""
+    from sessionorc import settings as settings_mod
+
+    return settings_mod.reach(settings_mod.load())
+
+
+def cmd_connect(args: argparse.Namespace) -> int:
+    """`ao connect [tailscale | cloudflare | off]` (design §4.7, §4.5b, TD-648): the person's route to
+    the UI — with no argument the route and `ao doctor`'s **route** line; `tailscale` checks each step,
+    writes `reach:` through `set_reach`, serves 443 at the route port and probes it; `off` removes
+    `reach:` and only its own handler. A person's own and the home's: refused to a session before any
+    provider command runs, and on a node. A step it cannot take is a *lacking:* line, exit 1."""
+    route, plain = args.route_port, service.DEFAULT_PORT
+    if args.provider is None:
+        reach = _reach()
+        rows = connect.route_line(reach, plain, route, node=hosts.is_node())
+
+        def show() -> None:
+            if reach:
+                print(f"{reach['route']} · {reach['url']} · allows {', '.join(reach.get('allow') or [])}")
+            else:
+                print("no route: the UI is reached over `ssh -L` — `ao connect tailscale`")
+            for r in rows:
+                print(doctor.line(r))
+
+        emit(args, {"reach": reach, "checks": rows}, show)
+        return 0 if all(r["verdict"] != doctor.LACKING for r in rows) else 1
+    if os.environ.get("SHIFTLEAD_SESSION"):
+        raise AgentError(
+            "ao connect sets the person's route: a person's own, refused to a session (design §4.7) — "
+            "run it in your own terminal"
+        )
+    if hosts.is_node():
+        raise AgentError(f"ao connect runs at the home ({hosts.home_name()}): the route is the home's (design §4.7)")
+    if args.provider == "cloudflare":
+        raise AgentError(
+            "ao connect cloudflare is designed, not built (TD-656): `ao connect tailscale` is the route today"
+        )
+
+    def set_reach(reach: dict[str, Any] | None) -> dict[str, Any]:
+        return call_sync("set_reach", reach=reach)
+
+    try:
+        if args.provider == "off":
+            done = connect.off(_reach(), route, set_reach)
+            return emit(args, {"done": done}, lambda: print("\n".join(done)))
+        allow = [a.strip() for a in args.allow or [] if a.strip()]
+        say = (lambda line: print(line, file=sys.stderr)) if args.json else print
+        got = connect.connect_tailscale(allow, route, plain, set_reach, say=say)
+    except connect.Lacking as e:
+        if args.json:
+            print(json.dumps({"error": f"lacking: route — {e}"}))
+        else:
+            print(f"lacking: route — {e}")
+        return 1
+
+    def done() -> None:
+        print(f"ok: route — tailscale, {got['url']}, allows {', '.join(got['allow'])}")
+        print(f"On the phone: install Tailscale, sign in as {got['allow'][0]}, open {got['url']}")
+
+    return emit(args, got, done)
 
 
 def _probe_rows(profiles: list[dict[str, Any]], name: str) -> list[dict[str, Any]]:
@@ -3814,7 +3881,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_whoami)
     p = add("identity", help="this host's identity mode, the connections it has classified, and its alarms (§4.8a)")
     p.set_defaults(fn=cmd_identity)
-    p = add("doctor", help="check the install: agent, tmux, hooks, identity, profiles, nodes, org (§4.7)")
+    p = add(
+        "connect",
+        help="the person's route to the UI: show it, set it up with tailscale, or turn it off (§4.7, §4.5b)",
+    )
+    p.add_argument("provider", nargs="?", choices=("tailscale", "cloudflare", "off"), help="none: show the route")
+    p.add_argument(
+        "--allow",
+        action="append",
+        metavar="login",
+        help="a login the route lets in (repeatable; default the node's owner)",
+    )
+    p.add_argument(
+        "--route-port",
+        type=int,
+        default=service.DEFAULT_ROUTE_PORT,
+        help=f"the UI's route port (default {service.DEFAULT_ROUTE_PORT})",
+    )
+    p.set_defaults(fn=cmd_connect)
+
+    p = add("doctor", help="check the install: agent, tmux, hooks, identity, profiles, nodes, org, route (§4.7)")
     p.add_argument("checks", nargs="*", metavar="check", help=f"run only these: {', '.join(doctor.CHECKS)}")
     p.add_argument(
         "--probe",
