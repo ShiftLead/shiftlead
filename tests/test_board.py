@@ -74,6 +74,9 @@ def test_the_message_names_the_item_and_the_session_that_raised_it():
     )  # ledgerboard's subject (TD-585): the head is `edit_head`'s, the session as written
     assert board.message("n/a — undated.", "done") == "shiftlead: done undated. (session n/a)"
     assert board.message(ITEM, "append").startswith("shiftlead: append Merged")
+    named = ITEM.replace("grinder-ao-1", "g" * 300)  # the subject is the PR's title: 256 at most
+    long = board.message(named, "snooze", "2026-10-01")
+    assert len(long) <= board.SUBJECT_MAX and long.startswith("shiftlead: snooze Merged") and long.endswith(")")
 
 
 def test_write_back_lands_the_one_line_on_origin_and_leaves_the_checkout_alone(repo):

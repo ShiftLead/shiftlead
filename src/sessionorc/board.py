@@ -46,6 +46,7 @@ NOT_RIGHT_FORM = re.compile(r"Not right:\s*(<[^<>]*>)?")
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
 ANSWER_MAX = 80  # an answer in a commit subject
+SUBJECT_MAX = 250  # a board commit's subject, which is its PR's title
 GIT_TIMEOUT = 20.0
 # One edit at a time on this host: each is a read, a write and a commit, and two interleaved would
 # leave a commit saying *done* over a file where the other's write undid it (review of PR #474).
@@ -126,9 +127,15 @@ def message(text: str, action: str, due: str | None = None, *, answer: str = "")
     if len(said) > ANSWER_MAX:  # a *Not right:* carries a sentence; the subject is also the PR's title
         said = said[: ANSWER_MAX - 1].rstrip() + "…"
     try:
-        return ledgerboard.subject(TOOL, action, text, to=due, answer=said)
+        got = ledgerboard.subject(TOOL, action, text, to=due, answer=said)
     except ledgerboard.Refused as e:
         raise Refused(str(e)) from None
+    # a forge's title holds 256 characters: a session name past that clips, keeping `(session …)` whole
+    if len(got) > SUBJECT_MAX:
+        head, _, who = got.rpartition(" (session ")
+        who = who.removesuffix(")")[: max(8, SUBJECT_MAX - len(head) - 12)]
+        got = f"{head[: SUBJECT_MAX - len(who) - 12]} (session {who})"
+    return got
 
 
 def _git(root: Path, *args: str, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
