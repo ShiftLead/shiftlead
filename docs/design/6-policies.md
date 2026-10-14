@@ -18,7 +18,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `--clear`; the Focus header's **stops** note, §4.5a), shown by `ao status -v` as *stops 06:00* in
   the reader's own local time. At the instant, the host agent sends the wrap-up prompt **once** and
   then kills the session when it settles or ten minutes later, whichever comes first — the same two
-  steps, and the same words, as `ao team stop`. The wording travels on the record, since
+  steps, and the same words, as `ao team stop`. A record with no agent (§4.3, a shell or a command
+  run) is killed at the instant, with no prompt typed. The wording travels on the record, since
   `sessionorc` must not know what a brief is. A session sitting on a permission or a question at
   its stop time is stopped without being asked: typing at it would answer the dialog rather than
   reach the composer (which is why `send` refuses too), and nobody is coming to answer it. This is
