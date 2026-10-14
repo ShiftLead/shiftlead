@@ -248,6 +248,13 @@ def test_a_conflicting_not_run_pr_keeps_red_since_and_is_an_order_by_its_conflic
     assert workorders.red_prs([p], [], T0 + 30 * timedelta(minutes=1), {}, HOUR)[0] == []  # not before ORPHAN_AFTER
     (o,) = workorders.red_prs([p], [], T0 + 2 * HOUR, {}, HOUR)[0]
     assert o["id"] == "pr:14" and o["context"] == "https://x/14 · conflicting · CI never ran"
+    # red then, not_run and conflicting now: the conflict's clock starts afresh; already conflicting, it keeps
+    old = {"open": [{"number": 14, "red_since": (T0 - 3 * HOUR).isoformat(), "conflicting": False}]}
+    by, _, _ = _read(tmp_path, monkeypatch, [pr], {1: _job(1)}, {1: _notes()}, old=old)
+    assert by[14]["red_since"] == T0.isoformat()
+    old["open"][0]["conflicting"] = True
+    by, _, _ = _read(tmp_path, monkeypatch, [pr], {1: _job(1)}, {1: _notes()}, old=old)
+    assert by[14]["red_since"] == (T0 - 3 * HOUR).isoformat()
 
 
 def test_no_reader_of_checks_takes_not_run_for_red():

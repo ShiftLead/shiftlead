@@ -725,7 +725,10 @@ def pr_reading(
                 p["checks"], p["not_run"] = "not_run", not_run
             p["failing"] = failing
         if p["checks"] == "red" or p["conflicting"]:
-            p["red_since"] = olds.get(p["number"], {}).get("red_since") or now.isoformat()
+            was = olds.get(p["number"]) or {}
+            # a `not_run` one is red by its conflict alone: a red spell's hour is not the conflict's (TD-686)
+            kept = was.get("red_since") if p["checks"] == "red" or was.get("conflicting") else None
+            p["red_since"] = kept or now.isoformat()
         was = olds.get(p["number"]) or {}
         _sync_flag(directory, p, was, timeout)
         if p.get("sync"):
