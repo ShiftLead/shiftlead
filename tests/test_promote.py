@@ -54,7 +54,7 @@ def checkout(tmp_path, monkeypatch):
     first = _commit(root, "a")
     _git(root, "push", "-q", "origin", "main")
     live.write_text(first + "\n")
-    monkeypatch.setattr(promote, "read_checks", lambda root, sha: ("green", "", None))
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("green", "", None))
     return root
 
 
@@ -333,7 +333,7 @@ async def test_the_persons_own_shell_presses_and_the_press_is_recorded_as_the_sh
     await park_ticks(agent)
     _register(checkout)
     main = _merge(checkout, "b")
-    monkeypatch.setattr(promote, "read_checks", lambda root, sha: ("pending", "", None))
+    monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("pending", "", None))
     shell = Session(id="ao-repo-sh", name="sh", kind="interactive", adapter="shell", dir=str(checkout))
     agent.sessions[shell.id] = shell
     async with LocalClient(caller=shell.id) as sh:
@@ -360,7 +360,7 @@ async def test_the_press_refuses_on_one_and_three_and_goes_through_the_checks(ag
         with pytest.raises(AgentError, match="uncommitted change.*precondition: tree"):
             await person.call("promote", repo=str(checkout))
         _git(checkout, "checkout", "-q", "--", "b")
-        monkeypatch.setattr(promote, "read_checks", lambda root, sha: ("pending", "", None))
+        monkeypatch.setattr(promote, "read_checks", lambda root, sha, keep=True: ("pending", "", None))
         got = await person.call("promote", repo="repo")
         assert got["sha"] == main and got["checks"] == "pending" and got["log"].endswith(f"{main}.log")
         assert agent._promotes["repo"]["inflight"]["by"] == "person"

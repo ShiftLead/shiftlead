@@ -119,8 +119,10 @@ def test_the_write_back_and_its_add_land_on_the_board_board_names(tmp_path, forg
     added = board.add(root, "Check the fetcher.", "2026-10-20", today="2026-10-14")
     git(root, "fetch", "-q", "origin")
     assert git(root, "show", "--name-only", "--format=", "origin/main") == REL
-    assert git(root, "show", f"origin/main:{REL}").splitlines()[added["line"] - 1].startswith(
-        "- [ ] 2026-10-14 (n/a) — Check the fetcher."
+    assert (
+        git(root, "show", f"origin/main:{REL}")
+        .splitlines()[added["line"] - 1]
+        .startswith("- [ ] 2026-10-14 (n/a) — Check the fetcher.")
     )
     assert not git(root, "ls-tree", "-r", "--name-only", "origin/main", "docs")  # nothing at the default
 

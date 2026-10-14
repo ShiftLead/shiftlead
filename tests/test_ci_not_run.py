@@ -438,7 +438,10 @@ def test_the_promotes_checks_say_ci_never_ran_failed_or_pending(tmp_path, monkey
     assert _job_reads(calls) == [1, 2]
     # kept per sha: the same head reads no job again; a new one does
     assert promote.read_checks(tmp_path, sha) == got and _job_reads(calls) == [1, 2]
-    assert promote.read_checks(tmp_path, "d" * 40)[0] == "unknown" and _job_reads(calls) == [1, 2, 1, 2]
+    # a rollback's commit is read without replacing main's kept verdicts
+    assert promote.read_checks(tmp_path, "9" * 40, False)[0] == "unknown" and _job_reads(calls) == [1, 2, 1, 2]
+    assert promote.read_checks(tmp_path, sha) == got and _job_reads(calls) == [1, 2, 1, 2]
+    assert promote.read_checks(tmp_path, "d" * 40)[0] == "unknown" and _job_reads(calls) == [1, 2, 1, 2, 1, 2]
     # a real failure beside them is failed
     promote, _ = _fake_promote(
         monkeypatch, [_run_of(1), _run_of(3)], {1: _job(1), 3: _job(3, runner="r")}, {1: _notes()}

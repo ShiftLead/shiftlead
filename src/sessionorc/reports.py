@@ -530,7 +530,7 @@ def git_origin(directory: Path | str) -> str:
     return (_git(directory, "remote", "get-url", "origin") or "").strip()
 
 
-GITHUB_OWNER = re.compile(r"(?:^|[@/])github\.com[:/]+([^/\s]+)/")
+GITHUB_OWNER = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/\s]+@)?github\.com[:/]+([^/\s]+)/", re.I)
 LOGIN = re.compile(r"[A-Za-z0-9-]+")
 
 

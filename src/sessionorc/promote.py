@@ -174,14 +174,15 @@ def read_ahead_since(root: str | Path, live: str | None, main: str | None) -> st
     return lines[-1].strip() if lines else None
 
 
-def read_checks(root: str | Path, sha: str) -> tuple[str, str, dict[str, Any] | None]:
+def read_checks(root: str | Path, sha: str, keep: bool = True) -> tuple[str, str, dict[str, Any] | None]:
     """The CI verdict on `sha`: `green` when every check run has concluded and none failed,
     `pending`, `failed`, or `unknown` with why (no `gh`, no remote, a rate limit, no check runs at
     all — a commit CI has not looked at is not a green one) — and, third, `checks_not_run`. Failing
     runs that are all Actions jobs that never started read `unknown`, *CI never ran: <reason>*, with
     `{reason, kind, runs}` as the third; a real failure beside them is still `failed` (design §6
     *Promote*, §4.4 *CI that never started is the person's*, TD-686). The jobs' verdicts are kept per
-    sha (`_jobs`), so a job is read once."""
+    sha (`_jobs`), so a job is read once; `keep=False` (a rollback's commit) neither reads nor replaces
+    main's kept verdicts. Only a checkout whose `origin` is GitHub reads its jobs."""
     try:
         cp = subprocess.run(
             ["gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100"],
@@ -201,15 +202,19 @@ def read_checks(root: str | Path, sha: str) -> tuple[str, str, dict[str, Any] | 
         return "unknown", f"no check runs on {sha[:7]}", None
     runs = [r for r in runs if isinstance(r, dict)]
     failing = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") in FAILED]
-    if failing:
+    if failing and reports.GITHUB_ORIGIN.search(reports.git_origin(root)):
         items = []
         for r in failing:  # a check run's id is its job's; its run is in the job's URL
             m = reports.JOB_URL.search(str(r.get("details_url") or r.get("html_url") or ""))
             job = r.get("id") if m and isinstance(r.get("id"), int) else None
             items.append({"name": str(r.get("name") or ""), "run": int(m[1]) if m else None, "job": job})
-        not_run, _, _jobs[str(root)] = reports.classify_failing(root, items, sha, _jobs.get(str(root)), GH_TIMEOUT)
+        kept = _jobs.get(str(root)) if keep else None
+        not_run, _, jobs = reports.classify_failing(root, items, sha, kept, GH_TIMEOUT)
+        if keep:
+            _jobs[str(root)] = jobs
         if not_run:
             return "unknown", f"CI never ran: {not_run['reason']}", not_run
+    if failing:
         return "failed", "", None
     if any(r.get("status") != "completed" for r in runs):
         return "pending", "", None
