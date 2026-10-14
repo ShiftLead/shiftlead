@@ -11667,3 +11667,23 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Related:** TD-667 (the design), TD-022 (scrollback is tmux's), TD-174 (the wheel), TD-027 (the confirmed send).
 
 **Resolved:** 2026-10-14 (grinder-ao-2, PR #1716) — slice 1, the bridge: `pump` takes `leave`; any scroll message sets *scrolled*, and a key frame that counts (`counts_as_typing`) awaits `copy-mode -q` (bounded at two seconds, a failure logged), clears the mark, then writes; the terminal's scroll and leave are one `run_tmux` awaited to its end, so frames' commands run in order. Slice 2 (grinder-ao-1, #1703) left copy mode at every host-agent send. The tests the Fix names pass (`tests/test_pty_bridge_typing.py`, `test_a_key_typed_into_a_scrolled_back_terminal_reaches_the_program` on a private tmux socket); on a scratch home under headless Chromium, the wheel put a shell's Focus pane in copy mode, an arrow kept it there, and a typed `echo` + Enter left it and ran (`docs/mockups/reviews/2026-10-14-td669-*.png`).
+
+## TD-651: The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2, building TD-620 slice 2)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/templates/group_head.html` (the `definition_changed` Apply button's `title`; the *flow changed* one's says *lane, reader or stage brief*), design §4.5a *flow changed — Apply*
+
+**Why:** since #1673 (TD-620) a member whose role's profile changed reads **definition changed — Apply** where nothing else differs, and Apply relaunches it; the button's title still says only *each seat it names that the run lacks is started*, and the *flow changed* one names the lane, reader and stage brief but not the profile. The mark's own title and the confirm carry the lines, so nothing is hidden; the hover words are short of what the press does.
+
+**Fix:** both titles name the profile relaunch (*a member whose profile differs is relaunched with the definition's, taken at its next restart*); a page test reads them; the UI check on a scratch home (TD-291).
+
+**Done when** both Apply titles say what Apply does to a profile difference and the test holds them.
+
+**Related:** TD-619, TD-620, TD-399.
+
+**Resolved:** 2026-10-14 (grinder-ao-2, PR #1722) — both Apply titles in `group_head.html` name the profile relaunch: *definition changed* adds *a member whose profile differs is relaunched with the definition's, taken at its next restart*, *flow changed* reads *the members whose lane, reader, stage brief or profile differ are relaunched — a profile taken at the member's next restart*; `tests/test_ui_teams.py` reads both, and a headless GET on a scratch home read both titles on a fixture team.
