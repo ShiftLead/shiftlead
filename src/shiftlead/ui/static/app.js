@@ -1055,7 +1055,6 @@
       if (action === "start") say(res.start_note ? `${res.start_note} — the agent starts it then` : "starts on the next tick", true);
       if (action2 === "controllers") {
         say(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
-        if (typeof AO.refreshMembership === "function") AO.refreshMembership();
       }
     } catch (e) {
       // Answered twice — two tabs, or the tool timed out into its own dialog between the poll and
@@ -4375,10 +4374,10 @@
       }, 150);
     }
     // design §4.5a controllers chip + Members list (§4.8, TD-036). Both are membership, which is
-    // read *across* records: this session's delta carries them, but a change on another session
-    // (a controller renamed, removed, or gone) does not reach here as a delta for us — hence the
-    // debounced re-read below. Without it the chip keeps saying who controlled this session at
-    // page load, which is the one thing a membership display must never do.
+    // read *across* records: a change on another session (a controller renamed, removed, or gone; a
+    // member's state, lane or report) comes to this page as this session's own delta again, which
+    // the server sends from the fleet it keeps (§4.4 *Per-session views*, TD-617) — so the page
+    // reads no `/api/sessions`, and the chip never keeps saying who controlled it at page load.
     function renderMembership(v) {
       const el = $("#fcontrollers");
       if (el) {
@@ -4398,18 +4397,6 @@
               + (m.report ? `<span class="meta">${esc(m.report)}</span>` : "") + `</div>`).join("")
           : `<div class="note">no members yet — <code>ao control ${esc(v.name || "")} add &lt;session&gt;</code>, or the controllers chip in a session's Session card</div>`)
         + `<div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>`;
-    }
-    let membershipSoon = null;
-    AO.refreshMembership = refreshMembership;
-    function refreshMembership() {
-      clearTimeout(membershipSoon);
-      membershipSoon = setTimeout(async () => {
-        try {
-          const all = await (await fetch("/api/sessions")).json();
-          const mine = all.find((x) => x.id === id);
-          if (mine) renderMembership(mine);
-        } catch (e) { /* the banner already covers a down agent */ }
-      }, 400);
     }
     // design §4.5a Focus header **stops** badge (§6, TD-026): the one place a stop time can be
     // changed after the session started. The agent parses the time and refuses an interactive
@@ -4466,8 +4453,6 @@
         if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); }
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
-      } else if (ev.event === "session" || ev.event === "gone") {
-        refreshMembership();  // another session changed: it may be a controller or a member of ours
       } else if (ev.event === "repos" && ev.root) {
         // a repo's PRs moved: its marks replace what the page held, and the Reports panel redraws (TD-617)
         if (ev.repo) prMarks[ev.root] = ev.pr_marks || {}; else delete prMarks[ev.root];

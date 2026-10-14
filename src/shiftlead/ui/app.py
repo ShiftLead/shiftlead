@@ -3427,6 +3427,22 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the view's rank: unseen idle sorts above idle
         return {"event": "session", "id": s["id"], "state": s["state"], "rank": v["rank"], "session": v}
 
+    async def fan_kin(run: Any, s: dict[str, Any], was: dict[str, Any]) -> None:
+        """Focus's members and its *under* chip are read across records (§4.4 *Per-session views*,
+        TD-617): a Focus page is sent its own record's delta again when the record that moved, or
+        went, is one of its controllers or members, from the fleet the run keeps — so the page reads
+        no `/api/sessions` on a peer's delta. `was` is the record before this delta, so a member
+        just released still redraws the list it left."""
+        st = run.state
+        for f in sorted({x.focus for x in run.light(other=s["id"]) if x.focus}):
+            mine = st.known.get(f)
+            if mine and (
+                s["id"] in (mine.get("controllers") or [])
+                or f in (s.get("controllers") or [])
+                or f in (was.get("controllers") or [])
+            ):
+                run.to_all(run.light(focus=f), await card_delta(mine, st))
+
     async def fan_step(run: Any, ev: dict[str, Any]) -> None:
         st = run.state
         known, repos, doing, acct_of = st.known, st.repos, st.doing, st.acct_of
@@ -3447,19 +3463,24 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # now looks like: they re-read what they draw (TD-572)
             if stirred:
                 run.to_all(run.light(other=s["id"]), {"event": "session", "id": s["id"], "state": s["state"]})
-            focused = run.light(focus=s["id"])
-            if not focused and not run.full:
-                return
-            delta = await card_delta(s, st)
-            run.to_all(focused, delta)
-            # `groups` ride on a delta that can move them (design §4.5a **team groups**): a badge or a
-            # `controllers` change on one record can move a card, change a lead, or turn grouping on
-            # or off for the whole page, and only the server sees the fleet. Any other delta marks
-            # them for the flush. A reshaping delta carries them even when a flush already sent this
-            # reading: a new card is placed by its own delta's groups.
-            if run.full:
-                delta["html"] = render_card(delta["session"])
-                await run.to_full(delta, always=reshaped)
+            try:
+                focused = run.light(focus=s["id"])
+                if not focused and not run.full:
+                    return
+                delta = await card_delta(s, st)
+                run.to_all(focused, delta)
+                # `groups` ride on a delta that can move them (design §4.5a **team groups**): a badge or a
+                # `controllers` change on one record can move a card, change a lead, or turn grouping on
+                # or off for the whole page, and only the server sees the fleet. Any other delta marks
+                # them for the flush. A reshaping delta carries them even when a flush already sent this
+                # reading: a new card is placed by its own delta's groups.
+                if run.full:
+                    delta["html"] = render_card(delta["session"])
+                    await run.to_full(delta, always=reshaped)
+            finally:
+                # after the record's own fan-out, so a kin view that fails to draw costs only itself
+                if stirred:
+                    await fan_kin(run, s, was)
         elif ev.get("event") in ("repos", "doing"):
             # A checkout's repo facts changed (design §4.4 *Repo facts*, TD-176), or a team member said
             # what it is doing (§4.8 *the doing log*): kept here, passed through as the agent sent it
@@ -3484,20 +3505,24 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # only a `gone` names a session; a `usage` event carries a profile, and popping on it
             # would one day evict a live session by coincidence
             went = str(ev.get("id") or "")
-            known.pop(went, None)
+            gone_rec = known.pop(went, None)
             run.to_all(run.light(), ev)
-            if not run.full:
-                return
-            await run.to_full(ev, always=True)
-            # A card's *under* chip names another record, so the session that went is not the only
-            # card now out of date: every card listing it as a controller has to be redrawn, or it
-            # keeps naming and linking to a session that is gone until the page is reloaded (review
-            # 2026-09-13).
-            for other in list(known.values()):
-                if went in (other.get("controllers") or []):
-                    od = await card_delta(other, st)
-                    od["html"] = render_card(od["session"])
-                    run.to_all(run.full, od)
+            try:
+                if not run.full:
+                    return
+                await run.to_full(ev, always=True)
+                # A card's *under* chip names another record, so the session that went is not the only
+                # card now out of date: every card listing it as a controller has to be redrawn, or it
+                # keeps naming and linking to a session that is gone until the page is reloaded (review
+                # 2026-09-13).
+                for other in list(known.values()):
+                    if went in (other.get("controllers") or []):
+                        od = await card_delta(other, st)
+                        od["html"] = render_card(od["session"])
+                        run.to_all(run.full, od)
+            finally:
+                if gone_rec:
+                    await fan_kin(run, gone_rec, gone_rec)
         elif ev.get("event") == "usage":
             # The agent pushes a profile's reading; the page draws **one chip per account** (§4.5a
             # **usage**, TD-122), with the lowest line among the account's profiles and each profile's
