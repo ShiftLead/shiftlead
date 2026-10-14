@@ -51,7 +51,8 @@ def origin_board(root: Path) -> str:
 
 def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
     line = f"- [ ] {ITEM}\n"
-    assert board.edit_line(line, ITEM, "done") == f"- [x] {ITEM}\n"
+    # Done ticks it and closes it today: ledgerboard's edit (TD-585; was a tick alone)
+    assert board.edit_line(line, ITEM, "done", today="2026-10-13") == f"- [x] {ITEM} Closed: 2026-10-13.\n"
     assert board.edit_line(line, ITEM, "snooze", "2026-10-01") == f"- [ ] {ITEM.replace('2026-09-22', '2026-10-01')}\n"
     # an item with no date gains one
     assert board.edit_line("- [ ] n/a — undated.", "n/a — undated.", "snooze", "2026-10-01") == (
@@ -69,9 +70,10 @@ def test_a_line_is_done_or_snoozed_only_while_it_holds_the_item():
 
 def test_the_message_names_the_item_and_the_session_that_raised_it():
     assert board.message(ITEM, "snooze", "2026-10-01") == (
-        "shiftlead: snooze Merged, live check pending: the doorbell. to 2026-10-01 (session grinder-ao-1)"
-    )
-    assert board.message("n/a — undated.", "done") == "shiftlead: done n/a — undated. (session n/a)"
+        "shiftlead: snooze Merged, live check pending: the doorbell. Look. to 2026-10-01 (session `grinder-ao-1`)"
+    )  # ledgerboard's subject (TD-585): the head is `edit_head`'s, the session as written
+    assert board.message("n/a — undated.", "done") == "shiftlead: done undated. (session n/a)"
+    assert board.message(ITEM, "append").startswith("shiftlead: append Merged")
 
 
 def test_write_back_lands_the_one_line_on_origin_and_leaves_the_checkout_alone(repo):
@@ -252,7 +254,7 @@ def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it
     """TD-140 (design §4.4, §4.5a): the one add — a line in the board's own format above the first
     item, committed with the message naming the entry, nothing else in the file touched."""
     got = board.add(
-        repo, "Check the fetcher Friday.", "2026-10-02", entry="m-abc", session="grinder-ao-2", host="kmaster",
+        repo, "Check the fetcher Friday.", "2026-10-02", session="grinder-ao-2", host="kmaster",
         context="TD-900", today="2026-09-25",
     )  # fmt: skip
     line = (
@@ -261,7 +263,7 @@ def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it
     )
     text = origin_board(repo)
     assert text == BOARD_TEXT.replace(f"- [ ] {ITEM}", line.rstrip("\n") + f"\n- [ ] {ITEM}")
-    assert got["line"] == 7 and got["message"] == "shiftlead: board Check the fetcher Friday (from m-abc)"
+    assert got["line"] == 7 and got["message"] == "shiftlead: append Check the fetcher Friday. (session `grinder-ao-2`)"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
     assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout catches up by the pull
     # no sender, no about: `n/a` and `none`
@@ -270,7 +272,7 @@ def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it
     )
     for bad in (("", "2026-10-02"), ("two\nlines", "2026-10-02"), ("x", "Friday")):
         with pytest.raises(board.Refused):
-            board.add(repo, *bad, entry="m-abc")
+            board.add(repo, *bad)
     assert on_origin(repo, "rev-list", "--count", "origin/main") == "2"
 
 
@@ -278,17 +280,17 @@ def test_the_add_on_a_board_with_no_items_goes_under_its_heading(repo):
     (repo / board.BOARD).write_text("# User attention\n\n## Needs the user\n\n## Later\n")
     git(repo, "commit", "-qam", "empty")
     git(repo, "push", "-q", "origin", "main")
-    board.add(repo, "First", "2026-10-02", entry="m-1", today="2026-09-25")
+    board.add(repo, "First", "2026-10-02", today="2026-09-25")
     assert origin_board(repo).splitlines()[4] == ("- [ ] 2026-09-25 (n/a) — First. Context: none. Due: 2026-10-02.")
 
 
 def test_the_add_is_refused_touching_nothing_where_an_edit_is(repo, monkeypatch):
     git(repo, "checkout", "-q", "-b", "feature")  # refuses nothing now (§4.4)
-    board.add(repo, "x", "2026-10-02", entry="m-1")
+    board.add(repo, "x", "2026-10-02")
     before = on_origin(repo, "rev-parse", "origin/main")
     monkeypatch.setenv("FAKE_GH_FAIL", "merge")
     with pytest.raises(board.Refused, match="origin could not be reached"):
-        board.add(repo, "y", "2026-10-02", entry="m-2")
+        board.add(repo, "y", "2026-10-02")
     assert on_origin(repo, "rev-parse", "origin/main") == before
 
 
@@ -325,7 +327,7 @@ async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(
         got = await me.call(
             "board_edit", board=path, action="add", text="Check the fetcher", due="2026-10-02", entry=note["id"]
         )
-        assert got["dismissed"] == [note["id"]] and got["message"].endswith(f"(from {note['id']})")
+        assert got["dismissed"] == [note["id"]] and got["message"].startswith("shiftlead: append Check the fetcher")
         line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] ") and "(session `w` on " in line and "Context: TD-900. Due: 2026-10-02." in line
         assert note["id"] not in [e["id"] for e in (await me.call("inbox"))["entries"]]
@@ -340,7 +342,7 @@ def test_the_add_lands_in_needs_the_user_never_above_another_sections_items(repo
     )
     git(repo, "commit", "-qam", "parked only")
     git(repo, "push", "-q", "origin", "main")
-    got = board.add(repo, "First", "2026-10-02", entry="m-1", today="2026-09-25")
+    got = board.add(repo, "First", "2026-10-02", today="2026-09-25")
     lines = origin_board(repo).splitlines()
     assert got["line"] == 5 and lines[4].startswith("- [ ] 2026-09-25 (n/a) — First.")
     assert lines[5] == "## In-flight (parked by a session)"
@@ -394,7 +396,7 @@ def test_a_reply_is_appended_to_the_items_own_line_signed_and_committed(repo):
     today = __import__("datetime").date.today().isoformat()
     line = origin_board(repo).splitlines()[6]
     assert line == f"- [ ] {ITEM} — Paul, {today}: rebase it, then merge"
-    assert got["message"] == "shiftlead: reply on Merged, live check pending: the doorbell. (session grinder-ao-1)"
+    assert got["message"] == "shiftlead: reply Merged, live check pending: the doorbell. Look. (session `grinder-ao-1`)"
     assert (
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
@@ -445,7 +447,7 @@ async def test_board_reply_is_the_persons_and_mails_nobody_without_a_holder(agen
     assert got["action"] == "reply" and got["sent"] == [] and got["note"] == "written on the board"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})" and got[
         "message"
-    ].startswith("shiftlead: reply on")
+    ].startswith("shiftlead: reply Merged")
     assert origin_board(repo).splitlines()[6].endswith(": rebase it")
     async with LocalClient() as me:  # no holder: no mail, and the trail line is still owed (§4.5a)
         trail = [t for t in (await me.call("inbox"))["trail"] if t["kind"] == "board reply"]
@@ -529,9 +531,7 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         # the closed asker's own record keeps the handed note for the name's next create (TD-271)
         left = [e for e in (await me.call("inbox", id=got["asker"]))["entries"] if e["from"] == "person"]
         assert len(left) == 1 and left[0]["handed"] and left[0]["text"].startswith("the DIU one")
-        assert got["message"].startswith("shiftlead: answer Which fetcher first?") and got["message"].endswith(
-            f"(from {q})"
-        )
+        assert got["message"] == "shiftlead: append Which fetcher first?. (session `asker`)"  # the answer stays off it
         line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] ") and "(session `asker` on " in line
         assert "— Which fetcher first? — t, " in line and ": the DIU one. Context: TD-149. Due: " in line
@@ -672,10 +672,10 @@ def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
         "- [ ] n/a — undated. Decided: Yes (2026-10-01)."
     )
     assert board.message(ASKED, "decide", answer="Lift it") == (
-        "shiftlead: decide Which window?: Lift it (session grinder-ao-1)"
+        "shiftlead: decide Which window? Say.: Lift it (session `grinder-ao-1`)"
     )
     long = board.message(ASKED, "decide", answer="Not right: " + "the ring is amber " * 9)  # a sentence is clipped
-    assert long.endswith("… (session grinder-ao-1)") and len(long) < 140
+    assert long.endswith("… (session `grinder-ao-1`)") and len(long) < 160
     for bad in (
         lambda: board.edit_line(line, ASKED, "decide", answer="  "),  # no answer
         lambda: board.edit_line(got, ASKED, "decide", answer="Keep it"),  # the line moved: it is decided
@@ -739,7 +739,7 @@ def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
     git(repo, "commit", "-qam", "asked")
     git(repo, "push", "-q", "origin", "main")
     got = board.write_back(repo, 9, ASKED, "decide", answer="Keep it")
-    assert got["message"] == "shiftlead: decide Which window?: Keep it (session grinder-ao-1)"
+    assert got["message"] == "shiftlead: decide Which window? Say.: Keep it (session `grinder-ao-1`)"
     assert (
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
@@ -778,7 +778,7 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
                 await me.call("board_edit", board=path, line=10, text=LOOK, action="decide", answer=bad, answers=pair)
         got = await me.call("board_edit", board=path, line=9, text=ASKED, action="decide", answer="Keep it",
                             answers=["Keep  it", "Lift it"])  # fmt: skip
-        assert got["answer"] == "Keep it" and got["message"].startswith("shiftlead: decide Which window?: Keep it")
+        assert got["answer"] == "Keep it" and got["message"].startswith("shiftlead: decide Which window? Say.: Keep it")
         got = await me.call("board_edit", board=path, line=10, text=LOOK, action="decide",
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip
         assert got["answer"] == "Not right: the ring is amber"
@@ -886,7 +886,7 @@ def test_a_merge_that_landed_though_the_forge_said_otherwise_is_a_landed_edit(re
     is origin's board that says so."""
     monkeypatch.setenv("FAKE_GH_FAIL", "merge-after")
     monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
-    got = board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    got = board.add(repo, "Once only", "2026-10-02", today="2026-09-25")
     assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
     board.write_back(repo, 8, ITEM, "done")
     assert f"- [x] {ITEM}" in origin_board(repo)
@@ -898,7 +898,7 @@ def test_a_merge_the_forge_took_while_origins_board_moved_elsewhere_is_a_landed_
     is not refused as a moved line, and an add is not refused as unreachable (a retry would write
     its line twice)."""
     monkeypatch.setenv("FAKE_GH_FAIL", "merge-after-moved")
-    got = board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+    got = board.add(repo, "Once only", "2026-10-02", today="2026-09-25")
     assert got["pr"] == 1 and origin_board(repo).count("Once only") == 1
     assert "A neighbour's edit." in origin_board(repo)
     board.write_back(repo, 8, ITEM, "done")
@@ -948,7 +948,7 @@ def test_a_squash_refused_for_a_neighbouring_lines_change_is_made_again_on_origi
         board.write_back(repo, 7, ITEM, "done")
         assert f"- [x] {ITEM}" in origin_board(repo)
     else:
-        board.add(repo, "Next to it", "2026-10-02", entry="m-1", today="2026-09-25")
+        board.add(repo, "Next to it", "2026-10-02", today="2026-09-25")
         assert origin_board(repo).count("Next to it") == 1
     assert len(calls) == 2 and edited in origin_board(repo)
     assert "board/" not in git(repo, "ls-remote", "--heads", "origin")
@@ -988,7 +988,7 @@ def test_no_second_press_when_the_forge_cannot_say_or_origin_moved_off_the_board
     monkeypatch.setenv("FAKE_GH_FAIL", "merge-after-moved")
     monkeypatch.setenv("FAKE_GH_VIEW_FAIL", "1")
     with pytest.raises(board.Refused, match="origin could not be reached"):
-        board.add(repo, "Once only", "2026-10-02", entry="m-1", today="2026-09-25")
+        board.add(repo, "Once only", "2026-10-02", today="2026-09-25")
     assert origin_board(repo).count("Once only") == 1
     monkeypatch.delenv("FAKE_GH_VIEW_FAIL")
     monkeypatch.setenv("FAKE_GH_FAIL", "merge")
@@ -1052,9 +1052,9 @@ def test_a_ledger_answer_is_one_decided_line_the_reader_reads_as_a_work_order(tm
 
 def test_the_third_add_lands_the_decided_line_at_the_top_committed_by_the_id(repo):
     line = board.decided_line(LEDGER_TITLE, "TD-133", ["Yes", "No"], 1, "No", "2026-10-12")
-    got = board.add_decided(repo, line, "TD-133")
+    got = board.add_decided(repo, line)
     assert origin_board(repo).splitlines()[got["line"] - 1] == line.rstrip("\n")
-    assert got["line"] == 7 and got["message"] == "shiftlead: board decide TD-133 (person)"
+    assert got["line"] == 7 and got["message"] == "shiftlead: append When should a team start on its own? (session n/a)"
     assert on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
     assert (repo / board.BOARD).read_text() == BOARD_TEXT  # the checkout is never written
 
@@ -1114,7 +1114,10 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         assert len(refused) == 1 and "already" in str(refused[0])
         got = next(x for x in both if isinstance(x, dict))
         assert origin_board(repo).count("Context: TD-133.") == 1
-        assert got["decided"] == "At the reset" and got["message"] == "shiftlead: board decide TD-133 (person)"
+        assert (
+            got["decided"] == "At the reset"
+            and got["message"] == "shiftlead: append When should a team start on its own? (session n/a)"
+        )
         line = origin_board(repo).splitlines()[got["line"] - 1]
         assert line.startswith("- [ ] decide ") and "(person) — When should a team start on its own? Context:" in line
         assert "Context: TD-133." in line and line.endswith("Decided: At the reset (" + line[-12:])

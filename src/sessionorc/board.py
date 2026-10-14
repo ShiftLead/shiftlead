@@ -4,9 +4,10 @@ its three **adds**, *Put on the board* (TD-140), an orphaned question's answer (
 person's answer to a ledger entry that waits on them (TD-565), the only lines this system ever adds
 to a board.
 
-A board is dev-cadence's file and its items are read by dev-cadence's reader
-(`nudge_user_attention.py --report --json`), which gives each item's line number and text; this
-module only edits the one item it is pointed at, and only while origin's board still holds the item
+A board is in ledgerboard's format and every line of it is read and written through the vendored
+`ledgerboard.py` (ADR 2026-10-12, TD-585) — its `edit_line`, `item_line`, `decided_line` and
+`subject("shiftlead", …)`, with no line shape of its own here; this module only edits the one item it
+is pointed at, and only while origin's board still holds the item
 the person was shown, open, word for word. **The edit is made on origin's head and landed there**
 (TD-222, built by TD-264): in the host agent's own detached tree for the repo
 (`~/.shiftlead/boards/<repo>/tree`), reset to `origin/<default>` at every press, committed with a
@@ -29,38 +30,22 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import paths, workorders
+from sessionorc import ledgerboard, paths, workorders
 
 BOARD = Path("docs") / "user_attention.md"
 ACTIONS = ("snooze", "done", "reply", "decide")
-# Any item, open or done: the add goes above the first of them, the top of the open items (§4.4).
-ANY_ITEM_RE = re.compile(r"^\s*-\s*\[[ xX]\]\s")
-NEEDS_RE = re.compile(r"^##\s+Needs the user\b")
-# dev-cadence's own shapes (`nudge_user_attention.py`'s ITEM_RE and DUE_RE): an open item, and its date.
-ITEM_RE = re.compile(r"^(?P<lead>\s*-\s*)\[ \](?P<gap>\s+)(?P<text>.+)$")
-DUE_RE = re.compile(r"\b(?P<key>Due:\s*)(?P<due>\d{4}-\d{2}-\d{2})\b", re.IGNORECASE)
-SESSION_RE = re.compile(r"\(session `?(?P<name>[^`\s,)]+)")
-# The reader's own field (`DECIDED_RE` in dev-cadence's `nudge_user_attention.py`): a sentence of
-# its own, anchored at the line's end. Kept the same shape here so a line this module calls
-# decided is one the reader reads as decided.
-DECIDED_RE = re.compile(
-    r"(?:^|(?<=[.?!]\s))Decided:\s*(?P<text>(?:(?!\bDecided:).)+?)\s*\((?P<date>\d{4}-\d{2}-\d{2})\)\.?\s*$"
-)
-ANSWERS_RE = re.compile(r"(?:^|(?<=[.?!]\s))Answers:\s*(?P<answers>(?:(?!\bAnswers:).)*?)\.?\s*(?:\bDecided:.*)?$")
+TOOL = "shiftlead"  # the `<tool>:` of every board commit's subject (ledgerboard's `subject`)
+# The board's own shapes, ledgerboard's — named here for the Inbox, which reads them from this module
+DUE_RE = ledgerboard.DUE_RE
+DECIDED_RE = ledgerboard.DECIDED_RE
+ANSWERS_RE = ledgerboard.ANSWERS_RE
 # A live look's second answer (design §4.5a **Works** / **Not right…**): the person's words follow.
 NOT_RIGHT = "Not right:"
 # The form itself, as cadence §3.5 writes it: `Not right: <what>` — a slot in angle brackets, or nothing.
 NOT_RIGHT_FORM = re.compile(r"Not right:\s*(<[^<>]*>)?")
-# A field's name inside the person's own words would be read as the field (review of PR #861).
-FIELD_NAME_RE = re.compile(r"\b(?:Answers|Decided):")
-# Every field the reader finds in a line by its name (`nudge_user_attention.py`): in a ledger entry's
-# title or answers, written on a decided line, its colon is dropped so it stays words (review of #1542).
-ANY_FIELD_RE = re.compile(r"\b(Context|Due|Answers|Decided|Closed):")
-# The reader's `CONTEXT_RE`: the decided line's `Context:` must read back as the entry's id.
-CONTEXT_RE = re.compile(r"\bContext:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
-ANSWER_MAX = 80  # an answer in a commit subject: a *Not right:* carries a sentence
+ANSWER_MAX = 80  # an answer in a commit subject
 GIT_TIMEOUT = 20.0
 # One edit at a time on this host: each is a read, a write and a commit, and two interleaved would
 # leave a commit saying *done* over a file where the other's write undid it (review of PR #474).
@@ -82,20 +67,8 @@ def reply_tail(reply: str, by: str, today: str) -> str:
     return f" — {by}, {today}: {words}"
 
 
-def _sentence(body: str) -> str:
-    """`body` ending a sentence, so a field written after it starts one (the reader's rule)."""
-    head = body.rstrip()
-    return head if head.endswith((".", "?", "!")) else f"{head}."
-
-
-def _fields_start(body: str) -> int | None:
-    """Where the line's trailing `Answers:` / `Decided:` fields begin, as the reader finds them
-    (after the item's `Due:`), or None: what a reply is written ahead of, since words after
-    `Answers:` would be read as part of its last answer."""
-    due = DUE_RE.search(body)
-    off = due.end() if due else 0
-    starts = [m.start() for m in (ANSWERS_RE.search(body[off:]), DECIDED_RE.search(body[off:])) if m]
-    return off + min(starts) if starts else None
+def _day(today: str) -> date:
+    return date.fromisoformat(today) if today else date.today()
 
 
 def edit_line(
@@ -109,72 +82,53 @@ def edit_line(
     today: str = "",
     answer: str = "",
 ) -> str:
-    """`line` with the item done, snoozed to `due`, replied to (`reply`, by `by` on `today`) or
-    decided (`answer`, on `today`). Refused unless `line` is an open item whose text is exactly
-    `text` — the item the person was shown, not whatever moved onto that line."""
-    m = ITEM_RE.match(line.rstrip("\n"))
+    """`line` with the item done (ticked, `Closed: <today>.`), snoozed to `due`, replied to (`reply`,
+    by `by` on `today`) or decided (`answer`, on `today`) — ledgerboard's `edit_line`, which re-reads
+    every edit and refuses one the reader would not read back. Refused unless `line` is an open item
+    whose text is exactly `text` — the item the person was shown, not whatever moved onto that line —
+    and, in front of the call, a decide on a line already decided (§4.4 *Decide*), which ledgerboard
+    would rewrite, or with an answer carrying a field's name."""
+    m = ledgerboard.ITEM_RE.match(line.rstrip("\n"))
     if m is None or m.group("text").strip() != text.strip():
-        raise Refused("that line of the board no longer holds this item: reload the Inbox and try again")
+        raise Refused(MOVED)
     end = "\n" if line.endswith("\n") else ""
     body = line.rstrip("\n")
-    if action == "done":
-        return f"{m.group('lead')}[x]{m.group('gap')}{m.group('text')}{end}"
-    if action == "reply":
-        if not DUE_RE.search(body) and DUE_RE.search(str(reply or "")):
-            # the reader and a later Snooze take a line's first `Due:`: on an undated item the
-            # reply's would become the item's date (review of PR #581)
-            raise Refused("this item has no Due: date, so a reply may not carry one: Snooze sets its date")
-        if FIELD_NAME_RE.search(str(reply or "")):
-            raise Refused("a reply may not carry Answers: or Decided: — the board's reader would read it as the field")
-        tail = reply_tail(reply, by, today or date.today().isoformat())
-        if (at := _fields_start(body)) is not None:
-            # ahead of the fields the reader anchors at the line's end (§4.4 *The two compose*):
-            # a reply never un-decides an item, and never becomes part of its last answer
-            return f"{_sentence(body[:at].rstrip() + tail)} {body[at:].rstrip()}{end}"
-        return f"{body.rstrip()}{tail}{end}"
-    if action == "decide":
-        # the edit `board_edit.py decide` makes (cadence §4.5), with one difference: a line
-        # already decided is refused here, never rewritten (§4.4 *Decide*)
-        words = " ".join(str(answer or "").split())
-        if not words:
-            raise Refused("a decide needs its answer: one of the item's Answers:")
-        if FIELD_NAME_RE.search(words):
-            raise Refused("an answer may not carry Answers: or Decided: — say it in other words")
-        if DECIDED_RE.search(body):
-            raise Refused("this item is already decided: Reply says more to its session, Done closes it")
-        new = f"{_sentence(body)} Decided: {words} ({today or date.today().isoformat()})."
-        d = DECIDED_RE.search(new)
-        if d is None or d.group("text") != words:
-            raise Refused(f"the board's reader would not read back 'Decided: {words}': say it in other words")
-        return new + end
-    if action != "snooze":
+    if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
+    if action == "reply" and not " ".join(str(reply or "").split()):
+        raise Refused("a reply needs its text: what the next session should do")
+    if action == "decide":
+        if not " ".join(str(answer or "").split()):
+            raise Refused("a decide needs its answer: one of the item's Answers:")
+        if ledgerboard.FIELD_NAME_RE.search(answer):
+            # ledgerboard v1.0 reads such a line back unchanged, but the next reader of the words would
+            # take the field for one (review of PR #861): refused here, in front of the call
+            raise Refused("an answer may not carry Context:, Answers:, Decided: or Closed: — say it in other words")
+        if ledgerboard.parse_decided(m.group("text")) is not None:
+            raise Refused("this item is already decided: Reply says more to its session, Done closes it")
+    to = None
+    if action == "snooze":
+        try:
+            to = date.fromisoformat(str(due))
+        except ValueError:
+            raise Refused(f"a snooze needs a date as YYYY-MM-DD, not {due!r}") from None
     try:
-        date.fromisoformat(str(due))
-    except ValueError:
-        raise Refused(f"a snooze needs a date as YYYY-MM-DD, not {due!r}") from None
-    if DUE_RE.search(body):
-        return DUE_RE.sub(lambda d: f"{d.group('key')}{due}", body, count=1) + end
-    return f"{body.rstrip()} Due: {due}.{end}"
-
-
-def _clip(words: str, most: int) -> str:
-    return words if len(words) <= most else words[: most - 1].rstrip() + "…"
+        return ledgerboard.edit_line(body, action, to=to, answer=answer, reply=reply, by=by, today=_day(today)) + end
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
 
 
 def message(text: str, action: str, due: str | None = None, *, answer: str = "") -> str:
-    """The fixed commit message (design §4.4, cadence §4's carve-out): the tool, the action, the
-    item's head, and the session that raised the item — what a reviewer greps for."""
-    h = HEAD_RE.search(text)
-    head = _clip((h.group("head") if h else text).strip(), HEAD_MAX)
-    s = SESSION_RE.search(text)
-    who = s.group("name") if s else "n/a"
-    what = {
-        "snooze": f"snooze {head} to {due}",
-        "reply": f"reply on {head}",
-        "decide": f"decide {head}: {_clip(' '.join(str(answer or '').split()), ANSWER_MAX)}",
-    }.get(action, f"done {head}")
-    return f"shiftlead: {what} (session {who})"
+    """The fixed commit message (design §4.4, cadence §4's carve-out): ledgerboard's
+    `subject("shiftlead", …)` — the action, the item's head and the session that raised it, what a
+    reviewer greps for; `append` for an add."""
+    said = " ".join(str(answer or "").split())
+    if len(said) > ANSWER_MAX:  # a *Not right:* carries a sentence; the subject is also the PR's title
+        said = said[: ANSWER_MAX - 1].rstrip() + "…"
+    try:
+        return ledgerboard.subject(TOOL, action, text, to=due, answer=said)
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
 
 
 def _git(root: Path, *args: str, timeout: float = GIT_TIMEOUT) -> subprocess.CompletedProcess[str]:
@@ -336,7 +290,7 @@ def _find(lines: list[str], line: int | None, text: str, key: str = "", root: Pa
     if key and root is not None:
         found = []
         for i, ln in enumerate(lines):
-            m = ITEM_RE.match(ln.rstrip("\n"))
+            m = ledgerboard.ITEM_RE.match(ln.rstrip("\n"))
             if m is not None and workorders.ref(root, m.group("text").strip()) == key:
                 found.append((i, m.group("text").strip()))
         # two open lines share an id only when their date, session and words do: the one the
@@ -346,7 +300,7 @@ def _find(lines: list[str], line: int | None, text: str, key: str = "", root: Pa
             return (same or [found[0][0]])[0]
 
     def holds(ln: str) -> bool:
-        m = ITEM_RE.match(ln.rstrip("\n"))
+        m = ledgerboard.ITEM_RE.match(ln.rstrip("\n"))
         return m is not None and bool(text.strip()) and m.group("text").strip() == text.strip()
 
     if isinstance(line, int) and 1 <= line <= len(lines) and holds(lines[line - 1]):
@@ -555,7 +509,7 @@ def _write_back(
         raise Refused(workorders.NO_LINE.format(ref=key) if key else MOVED)
     # found by its id, the line's own text is the item's — a snooze or a reply since the page drew
     # it changes the text and never the id (§4.4 *A board line's id*)
-    text = ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
+    text = ledgerboard.ITEM_RE.match(lines[at].rstrip("\n")).group("text").strip()  # type: ignore[union-attr]
     by = author(root) if action == "reply" else ""
     lines[at] = edit_line(lines[at], text, action, due, reply=reply, by=by, answer=answer)
     msg = message(text, action, due, answer=answer)
@@ -588,20 +542,15 @@ def _read_origin(t: Path, want: str) -> list[str]:
 
 def item_line(text: str, due: str, today: str, session: str | None, host: str | None, context: str | None) -> str:
     """The one line *Put on the board* writes (design §4.5a), in the board's own `Format:` —
-    `- [ ] <today> (session `<name>` on <host>, or n/a) — <text>. Context: <about>. Due: <date>.`
-    Refused for text that is empty or more than one line: an item is one line."""
-    words = " ".join(str(text or "").split()).rstrip(".")
-    if not words:
-        raise Refused("a board line needs its text: what is needed, in your words")
-    if "\n" in str(text).strip():
-        raise Refused("a board line is one line: put the rest in the text on one line")
+    ledgerboard's `item_line`: `- [ ] <today> (session `<name>` on <host>, or n/a) — <text>. Context:
+    <about>. Due: <date>.` Refused for text that is empty or more than one line: an item is one line."""
     try:
-        date.fromisoformat(str(due))
-    except ValueError:
-        raise Refused(f"a board line needs a Due date as YYYY-MM-DD, not {due!r}") from None
-    who = f"session `{session}` on {host}" if session else "n/a"
-    ctx = " ".join(str(context or "").split()) or "none"
-    return f"- [ ] {today} ({who}) — {words}. Context: {ctx}. Due: {due}.\n"
+        return ledgerboard.item_line(text, due, today, session, host, context)
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
+
+
+NEEDS = "## Needs the user"  # the board's section for the person's lines (cadence §3), a heading's words
 
 
 def _top_of_needs(lines: list[str]) -> int:
@@ -609,11 +558,11 @@ def _top_of_needs(lines: list[str]) -> int:
     section's items (a board's parked in-flight work) are never where a person's line lands — or,
     when that section holds none, right under its heading and blank line. A board with no such
     heading takes it above its first item, else at the end."""
-    head = next((i for i, ln in enumerate(lines) if NEEDS_RE.match(ln)), None)
+    head = next((i for i, ln in enumerate(lines) if ln.split()[:4] == NEEDS.split()), None)
     if head is None:
-        return next((i for i, ln in enumerate(lines) if ANY_ITEM_RE.match(ln)), len(lines))
+        return next((i for i, ln in enumerate(lines) if ledgerboard.is_item(ln)), len(lines))
     end = next((i for i in range(head + 1, len(lines)) if lines[i].startswith("#")), len(lines))
-    first = next((i for i in range(head + 1, end) if ANY_ITEM_RE.match(lines[i])), None)
+    first = next((i for i in range(head + 1, end) if ledgerboard.is_item(lines[i])), None)
     if first is not None:
         return first
     at = head + 1
@@ -627,7 +576,6 @@ def add(
     text: str,
     due: str,
     *,
-    entry: str,
     session: str | None = None,
     host: str | None = None,
     context: str | None = None,
@@ -636,61 +584,43 @@ def add(
 ) -> dict[str, Any]:
     """**Put on the board** (design §4.4, the write-back's first add; TD-140): one new line at the top
     of the open items of the board on origin's head for the checkout `root`'s repo, committed in the
-    host agent's own tree as `shiftlead: board <item head> (from <entry id>)` and landed by its own
-    PR, as an edit is; the checkout is never written. Refused on the same conditions as an edit,
-    touching nothing on origin. Returns `{commit, message, pr, line}` — `line` the new item's line
-    number.
+    host agent's own tree as ledgerboard's `shiftlead: append <item head> (session <name>)` and landed
+    by its own PR, as an edit is; the checkout is never written. Refused on the same conditions as an
+    edit, touching nothing on origin. Returns `{commit, message, pr, line}` — `line` the new item's
+    line number.
 
     With `answer`, the **second add** (§4.4, §4.10 *A question about a reference outlives its asker*,
     TD-216): `text` is the orphaned question's first paragraph and the person's answer follows it on
-    the line as a reply does (` — <name>, <date>: <answer>`), committed as `shiftlead: answer <item
-    head> (from <entry id>)`."""
+    the line as a reply does (` — <name>, <date>: <answer>`), committed by the same `append`."""
     root = Path(root)
     today = today or date.today().isoformat()
     words = text
     if answer is not None:
         words = " ".join(str(text or "").split()).rstrip(".") + reply_tail(answer, author(root), today)
     line = item_line(words, due, today, session, host, context)
-    head = " ".join(str(text).split()).rstrip(".")
-    if len(head) > HEAD_MAX:
-        head = head[: HEAD_MAX - 1].rstrip() + "…"
-    msg = f"shiftlead: {'board' if answer is None else 'answer'} {head} (from {entry})"
-    return _insert(root, line, msg)
+    # the subject is the line's without the answer: a person's words stay on the board (ledgerboard's `subject`)
+    bare = item_line(text, due, today, session, host, context) if answer is not None else line
+    return _insert(root, line, message(ledgerboard.ITEM_RE.match(bare.rstrip("\n"))["text"], "append"))
 
 
 def decided_line(title: str, ref: str, answers: list[str], default: int | None, words: str, today: str) -> str:
     """The one line the person's answer to a ledger entry writes (design §4.5 screen 6 *The ledger's
-    entries that wait on you*, TD-565): a decided `decide` line in the board's own format, its
-    `Answers:` the entry's with `(default)` on the one marked —
+    entries that wait on you*, TD-565): ledgerboard's `decided_line`, a decided `decide` line in the
+    board's own format, its `Answers:` the entry's with `(default)` on the one marked —
     `- [ ] decide <today> (person) — <title>. Context: <ref>. Due: <today>. Answers: a | b (default).
     Decided: <words> (<today>).` — so it is a work order at once (§4.4, §6 rule 6). Refused for empty
     words, words carrying a field's name, or a line the board's reader would not read back."""
-    head = ANY_FIELD_RE.sub(r"\1", " ".join(str(title or "").split())).rstrip(".") or ref
-    said = " ".join(str(words or "").split())
-    if not said:
-        raise Refused("a decision needs its words: one of the entry's answers, or what you typed")
-    if FIELD_NAME_RE.search(said):
-        raise Refused("an answer may not carry Answers: or Decided: — say it in other words")
-    opts = [
-        ANY_FIELD_RE.sub(r"\1", " ".join(str(a).split())).replace("|", "\\|") + (" (default)" if i == default else "")
-        for i, a in enumerate(answers or ())
-        if str(a).strip()
-    ]
-    tail = f" Answers: {' | '.join(opts)}." if opts else ""
-    body = f"decide {today} (person) — {_sentence(head)} Context: {ref}. Due: {today}.{tail} Decided: {said} ({today})."
-    d, c = DECIDED_RE.search(body), CONTEXT_RE.search(body)
-    if d is None or d.group("text") != said:
-        raise Refused(f"the board's reader would not read back 'Decided: {said}': say it in other words")
-    if c is None or c.group("ctx").rstrip(".") != ref:
-        raise Refused(f"the board's reader would not read back 'Context: {ref}' on this entry's line")
-    return f"- [ ] {body}\n"
+    try:
+        return ledgerboard.decided_line(title, ref, answers, default, words, today)
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
 
 
-def add_decided(root: str | Path, line: str, ref: str) -> dict[str, Any]:
+def add_decided(root: str | Path, line: str) -> dict[str, Any]:
     """The third add (design §4.4 *Board write-back*, TD-565): `line` (`decided_line`) at the top of
-    the open items of the board on origin's head, by the second add's road, committed as
-    `shiftlead: board decide <ref> (person)`. Returns `{commit, message, pr, line}`."""
-    return _insert(Path(root), line, f"shiftlead: board decide {ref} (person)")
+    the open items of the board on origin's head, by the second add's road, committed by the same
+    `append` (its session *n/a*: the person's). Returns `{commit, message, pr, line}`."""
+    return _insert(Path(root), line, message(ledgerboard.ITEM_RE.match(line.rstrip("\n"))["text"], "append"))
 
 
 def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
