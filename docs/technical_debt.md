@@ -60,7 +60,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
 | TD-686 | Build TD-682 (1): the reading tells a run that never started from a red one — `checks: not_run` with its reason; no order, no `red_since`; the `done` refusal and the promote's checks say *never ran* | Medium | Open |
 | TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
-| TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Open — design first |
+| TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
+| TD-689 | Build TD-688 (1): every file button is a file link — `editor_file_link`, the file form with `:1` through `AO.openFile`, the checkout first where the file lies in one; a test over the templates | Medium | Open |
+| TD-690 | Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text | Medium | Open |
+| TD-691 | Build TD-688 (3): a path in the Transcript page's turns is a link, by the same `paths` RPC and press | Low | Open |
 
 ---
 
@@ -1127,7 +1130,8 @@ The other cases:
 **Added:** 2026-10-14 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — design first: §4.5a's file buttons and §4.6's *in our repo* bound both change
+**Status:** Designed 2026-10-14 (the designer; no mockup: nothing drawn changes but an underline on hover in the Transcript page's text, as the pane's) — §4.6 *A file button is a file link*. One helper, `editor_file_link(path, folder)`, builds every button that opens one file: **Open ledger**, **Open board** (at the item's line), every **Open file** (Settings, the team header, New session, TD-657's two) and the transcript's **‹›**/**VS Code**. Each is the editor's file form with `:1`, drawn as an `a.editor` and pressed through `AO.openFile`. The folder goes first when the file lies in a registered checkout (the ledger, a `.shiftlead.yml`). A file under `~/.shiftlead` is one launch, as is the transcript. A test over the templates holds every such control to it. §4.6 *A path in the pane is a link*: the bound is now a regular file the session's user can read on the record's host, the real path judged (a symlink out answers). `PATHS_PRIVATE`, the credential paths, stays text, and a read-only Focus keeps the links (its viewer is the person, and the RPC tells no more than the user's own stat). §4.6 *A path in a transcript is a link too*: the Transcript page links paths in its turns through the same RPC and press. Built by TD-689, TD-690 and TD-691. Was: Open.
+**Blocked by:** TD-689, TD-690, TD-691
 **Location:** design §4.6 *A path in the pane is a link* and *The press is two launches* (TD-532), §4.5a rows *Repo page: Open ledger*, *Settings page: Open file*, *Org: team groups* (the team header's **Open file** on its definition's source, `group_head.html`), *New session*, *Focus header: ‹› VS Code* and *Transcript: VS Code*, and the not-yet-built *Director card*'s and *Inbox row: preferences proposed*'s **Open file** (TD-657), §5 `person.open_in` and `person.file_link`; `src/shiftlead/ui/uiconf.py` (`editor_link`, `editor_file`), `src/shiftlead/ui/common.py` (`editor_link`, the template global), `src/shiftlead/ui/templates/repo_part.html:40`, `settings.html:21,27`, `group_head.html:103`, `new.html:9`, `transcript.html:17`, `focus.html:118`, `src/shiftlead/ui/transcript.py` (`transcript_editor`), `src/shiftlead/ui/static/app.js` (`AO.openFile`, `AO.fileUrl`, the `a.editor` click handler), `src/sessionorc/agent.py` (`_resolve_paths`, `rpc_paths`)
 
 **Why:** Paul, 2026-10-14: *Pressing "Open ledger" in the repo page seems to attempt to open the file in vscode but fails, whereas I seem to recall others working (e.g. files linked in a transcript).* The links that work are a path in the pane (TD-501) and the Session card's recent files (TD-525). Both build the editor's **file form** with the line after the path (`AO.fileUrl`: `:1` where none was printed). They open it as **two launches**, the session's folder and then the file (`AO.openFile`, TD-532), so the file lands in the worktree's window. Every other file button is built by `editor_link`, which is the **folder** form with a file's path put in it: no `:line`. VS Code opens a remote path as a file only when it ends in `:digits` (TD-524), so on the ssh-remote form the press opens nothing usable. Those buttons are **Open ledger**, the Settings page's and the team card's **Open file**, the New session form's **Open file**, and the transcript's raw-file button on the transcript page and in Focus. Five of the seven lack the `editor` class, so they navigate the tab itself instead of going through `AO.openEditor`'s hidden frame, and no folder launch goes first. The two transcript buttons have the class. They are one launch on purpose: §4.5a *Focus header: ‹› VS Code* says the file is the tool's, not the worktree's. They still send the folder form with no `:line`. One person pressing two buttons that look alike gets two behaviours. Paul's second ask: *add links in our transcripts to any file that is actually available on the corresponding machine (e.g. ~/.bashrc would not have a link currently).* Today `_resolve_paths` answers only a regular file under the record's `dir` or `repo`, the *in our repo* bound §4.6 names as Paul's, so `~/.bashrc`, a file in `~/.claude`, or a sibling repo's file is text.
@@ -1140,3 +1144,93 @@ The other cases:
 **Done when** every file button on the pages opens the file in the person's editor by the same two launches as a pane path, on the local, ssh-remote and container forms, held by a test over the templates. A path in the pane or the transcript that names a readable file on the session's host outside its checkout (`~/.bashrc`) is a link under the bound the design writes.
 
 **Related:** TD-501 (a path in the pane is a link), TD-524 and TD-526 (the line after the path), TD-532 (two launches), TD-535 and TD-536 (the recent files, `person.file_link`), TD-148 (the Settings page's **Open file**).
+
+---
+
+## TD-689: Build TD-688 (1): every file button is a file link — `editor_file_link`, the file form with `:1` through `AO.openFile`, the checkout first where the file lies in one; a test over the templates
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-14 (the designer, building TD-688's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.6 *A file button is a file link*, §4.5a rows *Repo page: Open ledger*, *Settings page: Open file*, *Focus header: ‹› VS Code*, *Transcript*; `src/shiftlead/ui/uiconf.py` (a new `editor_file_link` beside `editor_link` and `editor_file`), `src/shiftlead/ui/common.py` (the template global), `src/shiftlead/ui/templates/repo_part.html`, `settings.html`, `group_head.html`, `new.html`, `transcript.html`, `focus.html`, `inbox_row.html` (**Open board**), `src/shiftlead/ui/inbox.py` (the board rows' `editor`, built with `vscode_url` and `:line` today), `src/shiftlead/ui/transcript.py` (`transcript_editor`), `src/shiftlead/ui/static/app.js` (the `a.editor` click handler, `AO.openFile`)
+
+**Why:** TD-688's design. Paul, 2026-10-14: **Open ledger** fails in VS Code while a pane path's link works. Every file button but the pane's is `editor_link`'s folder form with a file's path in it, so the ssh-remote form opens nothing usable. Five of the seven are not `a.editor`, so they navigate the tab.
+
+**Fix:**
+- **The helper.** `uiconf.editor_file_link(path, *, local, remote, reach, folder_url, line=1)` builds the forms and answers `{label, url, folder, wait}` or None under `open_in: none`. `url` is `editor_file`'s form filled with the percent-encoded path, then `:<line>` on a `vscode` form; a template's `{line}` is filled with it. `folder` is `editor_link`'s link for the registry checkout whose real path holds the file, or None outside every checkout. `wait` is `person.file_link.wait`. The registry lookup lives in the `common.editor_file_link(path, folder=True)` global, since `uiconf` has no registry. That global finds the checkout, builds its `editor_link`, and fills the host. The transcript passes `folder=False`.
+- **The helper's folder.** With `person.file_link.folder_first: false` the helper answers no `folder`, so the press is one launch. `wait` is in seconds.
+- **The macro.** A `file_link(l, text, title)` macro in a shared template draws `<a class="editor {{ cls }}" data-file-link href="{{ l.url }}" data-label …>`, with `data-folder` and `data-wait` when `l.folder` is set. `cls` is the button's own classes (`btn sm ghost` where it has them), kept, since the Inbox's `o` and Enter keys find **Open board** by `a.btn` (`app.js`).
+- **The templates.** `repo_part.html` (Open ledger), `settings.html` (every card's Open file), `group_head.html` (the team header's), `new.html` (`fromfile`), `transcript.html` (**VS Code**) and `inbox_row.html` (**Open board**) call the macro. For **Open board**, `inbox.py` builds the row's link with `editor_file_link(board, line=<the item's line>)` in place of `vscode_url` plus `:line`, so it opens the checkout first and lands at the item.
+- **The Focus header's ‹›.** `focus.html` always draws `#ftranscript_editor` through `file_link`, with an empty `url`, the marker, `hidden`, and the person's editor label from the page (`s.editor`'s label, `editor_link`'s). The page's JS fills only `href` and `data-label` from the record's `transcript_editor`, and never sets `data-folder`. `transcript_editor` returns `editor_file_link(path, folder=False)`, so `{label, url, wait}` and no folder. The `or s.editor` fallback goes, so the button is never the folder form. TD-657's two **Open file** buttons use it when they are built (the Director card's by TD-662, the *preferences proposed* row's by TD-663).
+- **The press.** The existing `a.editor` handler sends two launches with `data-folder` and one without, so `app.js` needs no change beyond the Focus header's fill.
+- **The test.** `tests/test_ui_editor_links.py` walks `src/shiftlead/ui/templates/*.html`. It fails on any control whose text is **Open file**, **Open ledger** or **Open board**, or that is `#ftranscript_editor` or the Transcript page's **VS Code**, unless the control is drawn by `file_link` and carries `data-file-link`. It also fails if the Session card's folder button `#feditor` carries `data-file-link`. It also renders the Repo page and the Settings page under the three `vscode` forms (local, ssh-remote, container) and a template, asserting the file form with `:1` and the folder: the checkout for the ledger and a `.shiftlead.yml`, none for `~/.shiftlead/hosts.yml`.
+- The help text, if any button's changes, goes with `help.py` here.
+
+**Done when** **Open ledger**, **Open board** (at the item's line), every **Open file** and the transcript buttons open the file in VS Code on the local, ssh-remote and container forms (the ledger in the repo's window), and the template test holds them.
+
+**Related:** TD-688 (the design), TD-532 (two launches), TD-536 (`person.file_link`), TD-662 and TD-663 (TD-657's **Open file** buttons).
+
+---
+
+## TD-690: Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-688's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.6 *A path in the pane is a link*, §4.5a *Focus pane: a path is a link*; `src/sessionorc/agent.py` (`_resolve_paths`, `rpc_paths`, `PATHS_RUNS_MAX`), its tests
+
+**Why:** TD-688's design. Paul, 2026-10-14: *add links in our transcripts to any file that is actually available on the corresponding machine (e.g. ~/.bashrc would not have a link currently)*.
+
+**Fix:** this is `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **The bound.** `_resolve_paths` drops its `roots` argument, and `rpc_paths` drops the `roots` it computes. A run answers its real path when, after `os.path.realpath`, it is a regular file the process can read (`os.access(p, os.R_OK)`) and `PATHS_PRIVATE` does not match it.
+- **`PATHS_PRIVATE`** sits beside `PATHS_RUNS_MAX` as three tuples matched on the real path, so a symlink into one is text too:
+  - prefixes: `/proc`, `/sys`, `/dev`;
+  - path components or component pairs anywhere: `.ssh`, `.gnupg`, `.aws`, `.doppler`, `.kube`, `.password-store`, `.config/doppler`, `.config/gcloud`, `.config/gh`;
+  - file names and patterns: `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc`, `.claude.json`, `.credentials.json`, `.docker/config.json`, `.bash_history`, `.zsh_history`, `*.pem`, `*.key`, `.env`, `.env.*`.
+
+  The build lists any token or secret file under `~/.shiftlead` (the Telegram secret's name, an attachment of credentials) and adds it, saying so in the PR.
+- **The docstring** of `rpc_paths` says the new bound, and drops *`dir` or `repo`*.
+- **Tests:**
+  - `~/.bashrc` answers;
+  - a symlink in the checkout to a readable file outside answers its target;
+  - an unreadable file is nothing;
+  - `~/.ssh/config` is nothing, and so is a `.ssh/` in another user's home or a repo;
+  - a symlink to `~/.ssh/id_x` is nothing;
+  - `/proc/self/environ` is nothing;
+  - a `.env` and a `.env.local` are nothing;
+  - a directory is nothing;
+  - the run limits stand.
+
+**Done when** a path in the pane naming a readable regular file anywhere on the session's host is a link, and every path under `PATHS_PRIVATE` stays text.
+
+**Related:** TD-688 (the design), TD-501 (the pane's links), TD-691 (the transcript's, which read this bound).
+
+---
+
+## TD-691: Build TD-688 (3): a path in the Transcript page's turns is a link, by the same `paths` RPC and press
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-688's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.6 *A path in a transcript is a link too*, §4.5a *Transcript*; `src/shiftlead/ui/transcript.py` (the route's folder link), `src/shiftlead/ui/templates/transcript.html`, `src/shiftlead/ui/static/app.js` (the pane's path shape and `fetchPaths`, `AO.fileUrl`, `AO.openFile`), the `/api/sessions/<id>/paths` route
+
+**Why:** TD-688's design: Paul asked for links in transcripts, and the Transcript page links no path today.
+
+**Fix:**
+- **The shape.** The pane's path shape is factored into one function the Transcript page also calls, over a turn's text, a tool line's input and a tool result's text, as they render.
+- **The ask.** Each turn block, on its first hover, asks `/api/sessions/<id>/paths` once with its runs, eight at most per ask (more runs, more asks). One ask is in flight at a time, and each run's answer is cached for the page's life. Each run that answered is wrapped in an `a.editor`. Its `href` is `AO.fileUrl` of the editor's file form, and its `data-folder` and `data-wait` are the record's folder link, as `AO.recentFiles` builds them. The route (`transcript.py`) passes that link beside the transcript's own file link: `editor_link` for the record's `dir`, or none under `open_in: none` or with `folder_first: false`, in which case the press is one launch. A block is asked once, and a failed ask leaves it as text.
+- **Where.** The links are drawn only where the page draws its **VS Code** button, for a record on this host, and absent with it (`open_in: none`, a node's or a container's record).
+- **Tests:** in the page's JS tests, a turn with a resolving path and one without, a block asked once on its first hover, a run met twice asked once, and no ask before a hover.
+
+**Done when** a path in a transcript turn that the host resolves is a Ctrl+click link opening the file as the pane's does.
+
+**Related:** TD-688 (the design), TD-690 (the bound it reads), TD-501.
