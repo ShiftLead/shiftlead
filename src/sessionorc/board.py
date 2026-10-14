@@ -668,6 +668,18 @@ def board_path(root: Path | str) -> tuple[str, Path | None]:
     return "absent", None
 
 
+def _default_names(root: Path) -> set[str]:
+    """The branch names a session's board edit is never committed on: origin's default branch, and
+    where the clone does not know it (no origin, or no `origin/HEAD`), `main`, `master` and git's
+    `init.defaultBranch` — a guess that refuses too much rather than commit to a default branch."""
+    cp = _git(root, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    ref = cp.stdout.strip() if cp.returncode == 0 else ""
+    if "/" in ref:
+        return {ref.split("/", 1)[1]}
+    init = _git(root, "config", "init.defaultBranch").stdout.strip()
+    return {"main", "master", *([init] if init else [])}
+
+
 def branch_edit(
     cwd: Path | str,
     action: str,
@@ -729,7 +741,7 @@ def branch_edit(
     branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip()
     if not branch:
         raise Refused("HEAD is detached: a session's board edit is committed on its work branch, in its PR")
-    if branch == default_branch(root):
+    if branch in _default_names(root):
         raise Refused(
             f"this is {branch}, origin's default branch: a session's board edit goes in the PR that did "
             "the work, never a commit to it (design §4.7)"

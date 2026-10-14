@@ -147,3 +147,43 @@ def test_ao_board_edit_needs_no_host_agent(tmp_path, monkeypatch, capsys):
         cli.main(["board", "edit", "decide", "--line", "6", "--expect", "act"])
     assert cli.main(["board", "edit", "snooze", "--line", "6", "--expect", "act", "--until", "2026-11-02"]) == 0
     assert "committed" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_origins_default_is_refused_whatever_its_name_and_unknown_main_and_master_are(tmp_path):
+    """Review of TD-587 slice 1: the default branch is origin's `HEAD` where the clone knows it, else
+    `main`, `master` and `init.defaultBranch` are each refused."""
+    root = make_repo(tmp_path, branch="trunk")
+    git(root, "update-ref", "refs/remotes/origin/trunk", "HEAD")
+    git(root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
+    with pytest.raises(board.Refused, match="trunk, origin's default branch"):
+        board.branch_edit(root, "done", line=5, expect="act")
+    git(root, "switch", "-q", "main")  # origin says trunk: main is a branch like any other
+    assert board.branch_edit(root, "done", line=5, expect="act")["branch"] == "main"
+    other = make_repo(tmp_path / "b", branch="master")
+    with pytest.raises(board.Refused, match="master, origin's default branch"):
+        board.branch_edit(other, "done", line=5, expect="act")
+
+
+@pytest.mark.unit
+def test_the_expect_is_the_text_or_the_raw_line_and_crlf_lines_keep_their_ending(tmp_path):
+    root = make_repo(tmp_path)
+    path = root / "docs/user_attention.md"
+    path.write_bytes(BOARD_TEXT.replace("\n", "\r\n").encode())
+    git(root, "commit", "-qam", "crlf")
+    got = board.branch_edit(root, "done", line=6, expect="- [ ] act 2026-10-11")
+    assert got["line"] == 6
+    raw = path.read_bytes().decode()
+    assert raw.split("\r\n")[5].startswith("- [x] act 2026-10-11") and raw.count("\r\n") == BOARD_TEXT.count("\n")
+
+
+@pytest.mark.unit
+def test_a_commit_git_refuses_restores_the_board(tmp_path):
+    root = make_repo(tmp_path)
+    hook = root / ".git" / "hooks" / "pre-commit"
+    hook.write_text("#!/bin/sh\necho no commits today >&2\nexit 1\n")
+    hook.chmod(0o755)
+    with pytest.raises(board.Refused, match="git commit failed.*no commits today.*restored"):
+        board.branch_edit(root, "done", line=5, expect="act")
+    assert (root / "docs/user_attention.md").read_text() == BOARD_TEXT
+    assert git(root, "rev-list", "--count", "HEAD") == "1"
