@@ -1,0 +1,23 @@
+<!doctype html>
+{# design §4.5b *The route port* (TD-647): a refusal by either listener's checks — which check failed, and
+   the command that cures it. Standalone: it is drawn before the app sees the request, with no session read. #}
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShiftLead · refused</title>
+<style>
+body { font: 15px/1.5 system-ui, sans-serif; margin: 2em auto; max-width: 42em; padding: 0 1em; color: #222; background: #fff; }
+code { font: 13px ui-monospace, monospace; background: #f2f2f2; padding: 2px 5px; border-radius: 3px; }
+li { margin: .4em 0; }
+@media (prefers-color-scheme: dark) { body { color: #ddd; background: #161616; } code { background: #2a2a2a; } }
+</style>
+</head>
+<body>
+<h1>Refused · the {{ listener }} port · {{ check }}</h1>
+<p>{{ why }}</p>
+<p>What cures it:</p>
+<ul>{% for c in cure %}<li><code>{{ c }}</code></li>{% endfor %}</ul>
+<p>(design §4.5b; HTTP {{ status }})</p>
+</body>
+</html>

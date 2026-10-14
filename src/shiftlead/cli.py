@@ -3186,7 +3186,13 @@ def cmd_service(args: argparse.Namespace) -> int:
             ),
         )
     if args.action == "install":
-        written = service.install(bind=args.bind, port=args.port, start=not args.no_start)
+        written = service.install(
+            bind=args.bind,
+            port=args.port,
+            start=not args.no_start,
+            route_port=args.route_port,
+            allow_hosts=args.allow_host,
+        )
         status = service.status()
         try:
             # the tmux server's and the watch's system units, root's (design §4.1, §4.10, TD-495, TD-497)
@@ -3378,7 +3384,8 @@ def fail(args: argparse.Namespace, message: str, code: int, prose: str | None = 
 def cmd_ui(args: argparse.Namespace) -> int:
     from shiftlead.ui.app import main as ui_main
 
-    return ui_main(["--bind", args.bind, "--port", str(args.port)])
+    extra = [a for h in args.allow_host for a in ("--allow-host", h)]
+    return ui_main(["--bind", args.bind, "--port", str(args.port), "--route-port", str(args.route_port), *extra])
 
 
 def skill_text() -> str:
@@ -3947,8 +3954,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_inbox)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
-    p.add_argument("--bind", default=service.DEFAULT_BIND)
-    p.add_argument("--port", type=int, default=service.DEFAULT_PORT)
+    p.add_argument("--bind", default=service.DEFAULT_BIND, help="the plain port's address")
+    p.add_argument("--port", type=int, default=service.DEFAULT_PORT, help="the plain port")
+    p.add_argument(
+        "--route-port",
+        type=int,
+        default=service.DEFAULT_ROUTE_PORT,
+        help="the route port a proxy is pointed at, always 127.0.0.1; 0 runs none (design §4.5b)",
+    )
+    p.add_argument(
+        "--allow-host",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="a name the plain port also serves (repeatable)",
+    )
     p.set_defaults(fn=cmd_ui)
 
     p = add("host", help="a container node: bring it up, rebuild it, forget it, or read its state (design §4.4a)")
@@ -3985,6 +4005,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["install", "uninstall", "status"])
     p.add_argument("--bind", default=service.DEFAULT_BIND)
     p.add_argument("--port", type=int, default=service.DEFAULT_PORT)
+    p.add_argument(
+        "--route-port",
+        type=int,
+        default=None,
+        help=f"the UI's route port (default {service.DEFAULT_ROUTE_PORT}; the unit names it only when given)",
+    )
+    p.add_argument(
+        "--allow-host", action="append", default=[], metavar="NAME", help="a name the UI's plain port also serves"
+    )
     p.add_argument(
         "--no-start",
         action="store_true",

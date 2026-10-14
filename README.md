@@ -85,10 +85,12 @@ python3 -m virtualenv ~/.local/share/shiftlead-venv          # (pipx works the s
 ~/.local/share/shiftlead-venv/bin/pip install --upgrade '/path/to/shiftlead[ui]' && ~/.local/share/shiftlead-venv/bin/ao service install
 ```
 
-Reaching the UI from elsewhere: never a bare public port (design §4.5). Use a private network
-you already have (WireGuard, Tailscale) and bind to that address with `ao ui --bind <addr>`, or
-put an authenticated tunnel in front (Cloudflare Tunnel + Access pointed at `127.0.0.1:8765`;
-websockets work through it). A hosted, no-setup version is the `relay` transport in design §4.5b.
+Reaching the UI from elsewhere: never a bare public port (design §4.5). Point a proxy at the route
+port, 8766 — `tailscale serve --bg --https=443 http://127.0.0.1:8766`, with a `reach:` written in
+`settings.yml` (`route: tailscale`, `url`, `allow`) — never at the plain port 8765, which refuses
+what a proxy sends (design §4.5b). A private network you run yourself (WireGuard) can reach the
+plain port bound to its address with `ao ui --bind <addr>` (and `--allow-host <name>` for a name it
+is reached by). A hosted, no-setup version is the `relay` transport in design §4.5b.
 
 **Do not start the agent or the UI from a VS Code Remote-SSH terminal.** VS Code auto-forwards
 any port a process in its terminal starts listening on, so `127.0.0.1:8765` on your laptop ends

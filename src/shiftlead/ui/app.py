@@ -3827,18 +3827,38 @@ app = create_app()
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
-    import uvicorn
-
-    from shiftlead.service import DEFAULT_BIND, DEFAULT_PORT
+    from sessionorc import hosts
+    from shiftlead.service import DEFAULT_BIND, DEFAULT_PORT, DEFAULT_ROUTE_PORT
+    from shiftlead.ui import listener
 
     ap = argparse.ArgumentParser(prog="shiftlead-ui")
-    ap.add_argument("--bind", default=DEFAULT_BIND, help="address to listen on (design §4.5: never the LAN)")
-    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
+    ap.add_argument("--bind", default=DEFAULT_BIND, help="the plain port's address (design §4.5: never the LAN)")
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT, help="the plain port")
+    ap.add_argument(
+        "--route-port",
+        type=int,
+        default=DEFAULT_ROUTE_PORT,
+        help="the route port a proxy is pointed at, always 127.0.0.1; 0 runs none (design §4.5b)",
+    )
+    ap.add_argument(
+        "--allow-host",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="a name the plain port also serves, beside the loopback names (repeatable; design §4.5b)",
+    )
     args = ap.parse_args(argv)
-    # lifespan="off": the app has no startup/shutdown handlers, and with lifespan on, Ctrl+C makes
-    # uvicorn log a CancelledError traceback from starlette's lifespan task (seen 2026-09-06).
-    uvicorn.run(
-        "shiftlead.ui.app:app", host=args.bind, port=args.port, log_level="info", ws_ping_interval=20, lifespan="off"
+    # lifespan="off" (in `listener.serve`): the app has no startup/shutdown handlers, and with lifespan on,
+    # Ctrl+C makes uvicorn log a CancelledError traceback from starlette's lifespan task (seen 2026-09-06).
+    asyncio.run(
+        listener.serve(
+            app,
+            bind=args.bind,
+            port=args.port,
+            route_port=args.route_port,
+            allow_hosts=args.allow_host,
+            is_node=bool(args.route_port) and hosts.is_node(),
+        )
     )
     return 0
 

@@ -58,7 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
-| TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
+| TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Slice 1 built; slice 2 open |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
 | TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
@@ -71,6 +71,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 | TD-669 | Build TD-667: a typed key leaves copy mode first — the bridge's *scrolled* mark, `copy-mode -q` before a printable key, Enter, Tab, Backspace or paste, its tmux commands in order; every host-agent send leaves copy mode first | Medium | Open |
 | TD-670 | A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder | High | Live check — once #1704 is live |
+| TD-671 | `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL` | Low | Open |
 
 ---
 
@@ -1048,7 +1049,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (ao-connect, TD-646's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — two slices; slice 1 is what Paul's phone waits on (Fable review, 2026-10-13). The Cloudflare token check moved to TD-656.
+**Status:** Slice 1 built (grinder-ao-2, 2026-10-14): `shiftlead.ui.listener` — the `Gate` layer on each listener, both `uvicorn.Server`s on one loop with one pair of signal handlers (uvicorn's own `capture_signals` overridden to nothing, so no bound on uvicorn is taken: the one-SIGTERM test holds it), the route port's socket bound by the layer and retried each minute; `settings.reach`/`parse_reach`; `--route-port`/`--allow-host` on `ao ui`, `shiftlead-ui` and `ao service install`; `look_home.py` runs `--route-port 0`. **Left: slice 2** (open websockets follow the setting). Its live look waits for the promote, at a keyboard (*Done when*). The Cloudflare token check moved to TD-656.
 **Location:** design §4.5b *The route port*; `src/shiftlead/ui/app.py` (`main`, the middleware), `src/shiftlead/ui/pty_bridge.py` (the websocket upgrade), `src/shiftlead/service.py` (`DEFAULT_BIND`, `unit_text`), `src/shiftlead/cli.py` (`ao ui`, `ao service install`), `src/shiftlead/ui/templates/refused.html` (new), `src/sessionorc/settings.py` (the `reach:` reader), `README.md` (one line)
 
 **Why:** TD-646: `tailscale serve` reaches the UI from loopback, as a local browser does, so the identity check needs a port of its own on which an absent identity is a refusal.
@@ -1363,5 +1364,25 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the probe above — a static file every 50 ms for 75 s beside one Focus stream, and again beside the Org stream — finds no probe over ~50 ms in steady state, and the tests pass; then TD-611's live check is read again.
 
 **Related:** TD-611 (the live check this blocks), TD-617 (the one subscriber), TD-616 (the counts keeper), TD-572 (light streams), TD-614.
+
+---
+
+## TD-671: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (grinder-ao-2, met running `pytest` for TD-647)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_agent.py` (~L2280, the shell's `[$AGENT_MODEL|$AGENT_MODEL_FILE]`), `src/sessionorc/agent.py` (the shell's launch env, TD-644)
+
+**Why:** since TD-644 (#1705) every launched agent session carries `AGENT_MODEL` and `AGENT_MODEL_FILE`, so a worker that runs `pytest` from its pane hands both to the in-process host agent, and the shell it creates inherits them: the test reads `[claude-code/opus|…/shiftlead-agent-model]` where it wants `[|]`. CI, with neither set, passes. Either the shell's launch should unset both (a shell is no agent: §4.3 *a record with no agent*), or the test should clear them with `monkeypatch.delenv` — which one is the design's.
+
+**Fix:** decide from TD-644's design whether a shell launched under an agent's env must not carry its model; if so, the launch removes `AGENT_MODEL`/`AGENT_MODEL_FILE` from a shell's env, else the test clears them first.
+
+**Done when** the test passes with both variables set in the runner's env.
+
+**Related:** TD-644.
 
 ---

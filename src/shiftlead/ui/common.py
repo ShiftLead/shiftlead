@@ -124,7 +124,11 @@ templates.env.globals["help_where"] = lambda where: Markup(rendermod.inline(wher
 
 
 def page_origin(request: Request) -> str:
-    """`scheme://host:port` of the page being served: the one origin a rendered link may not name."""
+    """`scheme://host:port` of the page being served: the one origin a rendered link may not name. Behind
+    the listener's checks (§4.5b, TD-647) it is the one the layer put in the scope — `reach.url` on the
+    route port, the checked `Host` on the plain one — and the request's own where nothing wraps the app."""
+    if origin := (request.scope.get("shiftlead") or {}).get("origin"):
+        return str(origin).rstrip("/")
     return str(request.base_url).rstrip("/")
 
 
