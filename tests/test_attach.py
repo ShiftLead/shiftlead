@@ -882,3 +882,140 @@ def test_the_message_dialog_is_wired_with_each_callers_addressee():
     assert 'data-from="{{ a.asker or \'\' }}" data-name="{{ asker }}"' in rows  # Overrule: the asker
     card = (UI / "templates" / "card.html").read_text()
     assert card.count('data-act="message"') == card.count('{% if s.seat %} data-seat="1"{% endif %}') == 2
+
+
+@pytest.mark.unit
+def test_the_entry_forms_route_carries_its_draft_and_answers_it(tmp_path, monkeypatch):
+    """§4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633): `POST /api/entry/attach`
+    hands `attach` the form's `draft` in place of a session — `""` on the first piece, the token after —
+    with the same pieces, and every answer carries the token; a cancel names its upload and draft."""
+    calls: list = []
+    c = _client(monkeypatch, tmp_path, calls)
+    answers = iter(
+        [
+            {"upload": "ab" * 8, "bytes": 3, "draft": "draft-0a1b2c3d"},
+            {"path": "/h/attachments/draft-0a1b2c3d/deck.pptx", "bytes": 5, "draft": "draft-0a1b2c3d"},
+            {"upload": "cd" * 8, "cancelled": True, "draft": "draft-0a1b2c3d"},
+        ]
+    )
+
+    async def fake(method, **kw):
+        calls.append((method, kw))
+        return next(answers) if method == "attach" else {}
+
+    from shiftlead.ui import app as ui
+
+    monkeypatch.setattr(ui.LocalClient, "call", lambda self, method, **kw: fake(method, **kw))
+    r = c.post("/api/entry/attach", data={"draft": "", "total": "5"}, files={"file": ("deck.pptx", b"abc")})
+    assert r.json() == {"ok": True, "upload": "ab" * 8, "bytes": 3, "draft": "draft-0a1b2c3d"}
+    r = c.post(
+        "/api/entry/attach",
+        data={"draft": "draft-0a1b2c3d", "upload": "ab" * 8, "offset": "3"},
+        files={"file": ("deck.pptx", b"de")},
+    )
+    assert r.json() == {"ok": True, "path": "/h/attachments/draft-0a1b2c3d/deck.pptx", "draft": "draft-0a1b2c3d"}
+    r = c.post("/api/entry/attach", data={"draft": "draft-0a1b2c3d", "upload": "cd" * 8, "cancel": "1"})
+    assert r.json() == {"ok": True, "cancelled": True, "draft": "draft-0a1b2c3d"}
+    first, second, third = (kw for m, kw in calls if m == "attach")
+    assert first["draft"] == "" and first["total"] == 5 and "id" not in first and "upload" not in first
+    assert second["draft"] == "draft-0a1b2c3d" and second["upload"] == "ab" * 8 and second["offset"] == 3
+    assert third == {"draft": "draft-0a1b2c3d", "upload": "cd" * 8, "cancel": True}
+
+
+ENTRY_PROBE = (
+    PRELUDE
+    + """
+const tick = () => new Promise((r) => setImmediate(r));
+const stub = (extra) => { const on = {}; return Object.assign({ on, hidden: false, disabled: false, title: "",
+  classList: { hid: true, contains(c) { return c === "hidden" && this.hid; }, toggle(c, off) { this.hid = off; } },
+  addEventListener: (k, f) => { (on[k] = on[k] || []).push(f); },
+  dispatchEvent: () => {}, focus: () => {}, click() {} }, extra); };
+const fire = (el, k, e) => (el.on[k] || []).forEach((f) => f(e));
+const ev = (kind, files, types) => { const e = { prevented: false, preventDefault() { this.prevented = true; } };
+  e[kind] = { files, types: types || (files.length ? ["Files"] : []) }; return e; };
+const file = (name, size) => ({ name, type: "image/png", size: size || 3, slice: (a, b) => "x".repeat(b - a) });
+AO.toast = () => {};
+async function run() {
+  // the form's own upload, against a fake route: the first piece goes with draft "", the answer mints
+  // the token, and every later piece and file names it
+  const posts = [];
+  let minted = 0;
+  global.FormData = class { constructor() { this.f = {}; } append(k, v) { this.f[k] = v; } };
+  global.fetch = async (url, o) => {
+    const f = o.body.f; posts.push([url, f.draft, f.upload || "", f.name || ""]);
+    const draft = f.draft || `draft-${++minted}`;
+    const json = f.total && Number(f.total) > 4 ? { upload: "u1", bytes: 4, draft }
+      : { path: `/h/attachments/${draft}/${f.upload ? "big.png" : (o.body.f.file ? "x" : "")}`, draft };
+    return { ok: true, json: async () => json };
+  };
+  const dlg = stub(), button = stub({ lastChild: { textContent: "Attach" }, title: "attach files" });
+  const input = stub({ files: [], value: "" }), cancel = stub(), note = stub({ textContent: "or paste a screenshot" });
+  const text = stub({ value: "", selectionStart: 0, selectionEnd: 0 });
+  const e = AO.wireEntryAttach({ dlg, button, input, cancel, text, note }, (held) => AO.draftUpload(held, 4));
+  const out = {};
+  e.open();
+  out.before = e.draft();
+  text.value = "the board hides it "; text.selectionStart = text.selectionEnd = text.value.length;
+  const shot = ev("clipboardData", [file("image.png")], ["Files"]); fire(text, "paste", shot);
+  const drop = ev("dataTransfer", [file("big.png", 6)]); fire(text, "drop", drop);
+  await e.attach([]);
+  out.first = { draft: e.draft(), posts: posts.map((p) => [p[1], p[2]]), shot: shot.prevented, drop: drop.prevented,
+    value: text.value };
+  // a new opening is a new draft
+  e.open();
+  out.reopened = e.draft();
+  await e.attach([file("c.png")]);
+  out.second = { draft: e.draft(), sent: posts.slice(3).map((p) => p[1]) };
+  // closed with a file in flight: nothing inserted, nothing queued sent, the next draft untouched
+  let hold = null;
+  const slow = (held) => async (f) => { if (f.name === "slow.png") await new Promise((r) => { hold = r; });
+    held.draft = "draft-late"; return `/h/attachments/draft-late/${f.name}`; };
+  const e2dlg = stub(), e2text = stub({ value: "", selectionStart: 0, selectionEnd: 0 });
+  const e2 = AO.wireEntryAttach({ dlg: e2dlg, button: stub({ lastChild: { textContent: "Attach" } }),
+    input: stub({ files: [] }), cancel: stub(), text: e2text, note: stub({ textContent: "hint" }) }, slow);
+  e2.open();
+  e2.attach([file("slow.png"), file("queued.png")]); await tick();
+  fire(e2dlg, "close", {}); e2.open(); hold(); await e2.attach([]);
+  out.late = { value: e2text.value, draft: e2.draft() };
+  // refused in place: the note says why, Attach is disabled, a drop or a paste attaches nothing
+  const n = posts.length;
+  e.refuse("sam-grind runs on node1: this call does not cross the link");
+  const drop2 = ev("dataTransfer", [file("d.png")]); fire(text, "drop", drop2);
+  const shot2 = ev("clipboardData", [file("image.png")], ["Files"]); fire(text, "paste", shot2);
+  await e.attach([]);
+  out.refused = { note: note.textContent, disabled: button.disabled, title: button.title,
+    prevented: drop2.prevented || shot2.prevented, sent: posts.length - n };
+  e.refuse("");
+  out.cleared = { note: note.textContent, disabled: button.disabled, title: button.title };
+  out.url = posts[0][0];
+  console.log(JSON.stringify(out));
+}
+run().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.mark.unit
+def test_the_entry_forms_attach_holds_one_draft_per_opening(tmp_path):
+    """§4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633), under node: an image
+    pasted into **What** and a file dropped on it go up `/api/entry/attach`, the first piece with draft
+    `""` and every later piece and file naming the token its answer gave, each path at the caret; a new
+    opening is a new draft; a batch whose form closed inserts nothing and leaves the next draft alone;
+    refused in place (a node team's repo), the note says the words and nothing attaches."""
+    got = _node(tmp_path, ENTRY_PROBE)
+    assert got["before"] == "" and got["url"] == "/api/entry/attach"
+    f = got["first"]
+    assert f["shot"] is True and f["drop"] is True and f["draft"] == "draft-1"
+    # the pasted image's one piece mints; the dropped file's two pieces name the token, the second its upload
+    assert f["posts"] == [["", ""], ["draft-1", ""], ["draft-1", "u1"]]
+    assert f["value"].startswith("the board hides it /h/attachments/draft-1/") and f["value"].count("draft-1") == 2
+    assert got["reopened"] == "" and got["second"] == {"draft": "draft-2", "sent": [""]}
+    assert got["late"] == {"value": "", "draft": ""}
+    assert got["refused"] == {
+        "note": "sam-grind runs on node1: this call does not cross the link",
+        "disabled": True,
+        "title": "sam-grind runs on node1: this call does not cross the link",
+        "prevented": False,
+        "sent": 0,
+    }
+    assert got["cleared"] == {"note": "or paste a screenshot", "disabled": False, "title": "attach files"}

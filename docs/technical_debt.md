@@ -50,7 +50,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
 | TD-628 | Build TD-627: each path on the Focus Git card a link by the recent files' form; a deletion and a new directory stay text | Low | Open |
 | TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Designed — TD-633 builds it |
-| TD-633 | Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept | Medium | Open |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
@@ -73,6 +72,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-665 | A shell's Focus and card draw an agent's controls: Wrap up types the wrap-up prompt into bash, and Message, Reports, Ready to close and the Session card's grants and controllers are agent-shaped | Medium | Designed — TD-666 builds it |
 | TD-666 | Build TD-665: a record with no agent — the adapter's `agent` on the view; no prose typed, no mail, no derived claim; Focus and the card draw a shell's controls | Medium | Open |
 | TD-667 | A key typed into the Focus terminal while it is scrolled back is swallowed by tmux's copy mode: typing should return the pane to the live screen and reach the prompt | Medium | Designed — TD-669 builds it |
+| TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 | TD-669 | Build TD-667: a typed key leaves copy mode first — the bridge's *scrolled* mark, `copy-mode -q` before a printable key, Enter, Tab, Backspace or paste, its tmux commands in order; every host-agent send leaves copy mode first | Medium | Open |
 
 ---
@@ -867,32 +867,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 
 ---
 
-## TD-633: Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-13 (the designer, TD-630's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 of 2 (grinder-ao-1, 2026-10-13, #1677): fix steps 1, 3 and 4 and their tests, the host agent's (`src/sessionorc/**`) — `attach` takes `draft` (`""` mints `draft-<8 hex>`, answered with the path); `create` and `entry_add` take `draft` and write `claimed.json` (`by` the new session's id, or `hand:<ask id>` with `draft` on the envelope as `MailEntry.draft`), each refusing a bad or claimed draft before anything is made; `_prune_drafts` runs before `_prune_runs`' early returns. Left: slice 2, steps 2 and 5 and their tests (`src/shiftlead/**`: the form's **Attach**, drop and paste, a `POST /api/entry/attach`, `draft` passed by `/api/entry/session` and `/api/entry/hand`, the node team's refusal from `/api/entry/plan`; the builder's look). Was: Open
-**Location:** design §4.5a *Add entry form: Attach / drop / paste*, §4.4 *The Add entry form's draft*, §4.9 *Add an entry to the ledger*; `src/sessionorc/agent.py` (`rpc_attach` ~L2206: `draft` in place of `id` — `""` mints `draft-<8 hex>`, a known draft appends to its folder; the same pieces, names and bound; person-only as today), `src/sessionorc/paths.py` (the attachments root), the hourly sweep (`src/sessionorc/agent_tick.py` `_prune_runs` ~L3060–3120: a draft rule **before** its `keep <= 0` and `live_ids is None` returns — no `claimed.json` and older than `ATTACH_PART_IDLE_S` removed; a session's claim treated as that session's folder, its id among the live ones; a hand's claim removed `runs_keep_days` after `at`), the create (`draft` handed with *Open a session*: `claimed.json` `{by: <id>, at}`), the hand (`src/sessionorc/agent_inbox.py` `entry_add` ~L354 gains `draft` and writes `claimed.json` `{by: hand:<ask id>, at}`; `/api/entry/hand` ~L2008 passes it), `/api/entry/plan` (the team's host, for the node refusal), `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/session`, a `POST /api/entry/attach` beside `/api/sessions/<id>/attach`), `src/shiftlead/ui/templates/base.html` (the form: **Attach** under **What**, the drop and paste handlers), `src/shiftlead/ui/static/app.js` (the composer's attach code reused on the form's textarea, the draft token kept on the open form), `docs/mockups/gen.py` (drawn by TD-630); `tests/test_attach*.py`, `tests/test_ui_entry*.py`
-
-**Why:** TD-630: Paul, 2026-10-13 — *add a TD so that files/pics can be pasted into the "add entry" form. I had to open this session to give you those pics*; the form's **What** takes text alone.
-
-**Fix:**
-1. `attach` with `draft`: `""` on the first piece of a form's first file mints `draft-<8 hex>` (returned with the path); a later call names it; files land in `~/.shiftlead/attachments/<draft>/`; everything else (pieces, `.part`, names made safe, `-2`, the bound) as for a session.
-2. The form: **Attach** under **What**, a drop on the box, a pasted image named `paste-<date>-<time>.<ext>`; each path inserted at the caret; the progress line and **✕** as the composer's; the draft token held while the form is open.
-3. The claim: `claimed.json` `{by, at}` in the draft folder — *Open a session* hands `draft` to the create, which writes `by` the new session's id; *Hand to the techlead* hands it to `entry_add`, which writes `by: hand:<ask id>` and carries `draft` in the envelope beside `entry`. No record gains a field.
-4. The sweep: the draft rule runs before `_prune_runs`'s early returns — a folder with no `claimed.json` and no write for `ATTACH_PART_IDLE_S` is removed; one claimed by a session is kept while that session's record is live and swept as its folder after; one claimed by a hand is removed `runs_keep_days` after `at` (kept under `0`).
-5. A repo whose servicing team runs on a node: **Attach** refused in place in the existing words, *this call does not cross the link*, the page reading the team's host from `/api/entry/plan`.
-6. Tests: a first file mints a draft and later files share it; the inserted path is the file's; *Open a session* claims it (`claimed.json` names the session) and the folder lives with the session; a hand claims it through `entry_add` and it is kept `runs_keep_days`; the sweep's draft rule runs with `runs_keep_days` at `0`; an unclaimed draft is swept after an hour and a claimed one is not; a node team's form refuses.
-
-**Done when** a screenshot pasted into the Add entry form reaches the drafting session, by either way out, as a path it can read, an abandoned form leaves nothing past the hour, and the tests above pass; the builder's look (design §4.9b: the form with a pasted image, each way out) is named in the PR.
-
-**Related:** TD-630 (the design), TD-180 / TD-219 (the form), TD-530 (the Message dialog's attach), TD-478 (the pieces), TD-419 (an attachment's life).
-
----
-
 ## TD-636: A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated
 
 **Priority:** Medium
@@ -1414,6 +1388,26 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** §4.6 and §4.5a say what a key typed into a scrolled-back terminal does, and the build entry is filed.
 
 **Related:** TD-022 (scrollback is tmux's), TD-174 (the wheel as a scroll message), TD-491 (the composer's bar).
+
+---
+
+## TD-668: The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2, TD-633's look on a scratch home)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/base.html` (`#entrywhat`, `#entryerr`), `src/shiftlead/ui/static/app.css` (`.input` L114: `height: 34px`, which a `textarea.input` keeps unless it is `.tall`; `.warn` L130: `display: flex`, which beats the UA's `[hidden]`)
+
+**Why:** read on TD-633's screenshots (`docs/mockups/reviews/2026-10-13-td633-form.png`): **What** carries `rows="6"` but draws one line and a half, so a page of words — or the attachment paths the form now inserts — scrolls in a box the mockup (`docs/mockups/gen.py` `add_entry`, 132 px) draws four times as tall; and `<p class="note warn" id="entryerr" hidden>` shows as an empty orange box under **Open a session** whenever there is no error. Not TD-633's change: neither rule is touched by it.
+
+**Fix:** `#entrywhat` gets `tall` (or a height of its own near the mockup's); a `.warn[hidden] { display: none; }` rule beside `.btn[hidden]`'s, and a grep for other `warn` nodes that rely on `hidden`. A test that the form's textarea is `tall` and the stylesheet hides a hidden `.warn`.
+
+**Done when** the form's **What** draws several lines, no empty warning box shows on a form with no error, and the test holds.
+
+**Related:** TD-633 (found on its look), TD-219 (the form), TD-296 (the same `[hidden]` fault on `.btn`, `.radio`).
 
 ---
 

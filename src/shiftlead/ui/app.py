@@ -1589,6 +1589,59 @@ def repo_of(choices: list[dict[str, str]], directory: str) -> str:
     return next((c["path"] for c in choices if os.path.realpath(c["path"]) == want), "")
 
 
+async def attach_piece(
+    call: Callable[..., Any],
+    who: dict[str, Any],
+    file: UploadFile | None,
+    upload: str,
+    offset: int,
+    total: int | None,
+    cancel: str,
+) -> dict[str, Any]:
+    """One piece of one file up the attach road (design §4.4 *Attachment drop*, TD-478), for `who` —
+    `{id}`, a session's, or `{draft}`, the Add entry form's (§4.4 *The Add entry form's draft*,
+    TD-630) — handed to the host agent's `attach`. A piece past `paths.ATTACH_PIECE_BYTES` is refused
+    here (413) before the host agent is asked; `cancel` names its `upload`. Answers the route's JSON:
+    `{path}` for the last piece, `{upload, bytes}` for one before it, `{cancelled}`; a draft's answer
+    carries `draft`, the token the form names on every later piece."""
+    if cancel:
+        if not upload:
+            raise HTTPException(400, "attach: cancel names the upload it cancels")
+        got = await call("attach", **who, upload=upload, cancel=True)
+        return {"ok": True, "cancelled": True, **_drafted(got)}
+    if file is None:
+        raise HTTPException(400, "attach: send the file's piece as `file`")
+    raw = await file.read(paths.ATTACH_PIECE_BYTES + 1)
+    if len(raw) > paths.ATTACH_PIECE_BYTES:
+        mib = paths.ATTACH_PIECE_BYTES // (1024 * 1024)
+        raise HTTPException(413, f"a piece of {file.filename or 'the file'} is past the {mib} MiB a piece may be")
+    params: dict[str, Any] = {**who, "name": file.filename or "", "data": base64.b64encode(raw).decode("ascii")}
+    if upload:
+        params.update(upload=upload, offset=offset)
+    elif total is not None:
+        params["total"] = total
+    got = await call("attach", **params)
+    if "path" in got:
+        return {"ok": True, "path": got["path"], **_drafted(got)}
+    return {"ok": True, "upload": got["upload"], "bytes": got["bytes"], **_drafted(got)}
+
+
+def _draft_of(body: dict[str, Any]) -> dict[str, str]:
+    """The Add entry form's `draft`, where it attached files (TD-630): handed to the way out, which
+    claims the folder at the press (§4.4 *The Add entry form's draft*); none where it attached nothing."""
+    draft = body.get("draft")
+    if draft is None or draft == "":
+        return {}
+    if not isinstance(draft, str):
+        raise HTTPException(400, "draft is the token the form's first file was answered with")
+    return {"draft": draft}
+
+
+def _drafted(got: Any) -> dict[str, str]:
+    """`draft` from an `attach` answer, where it carries one (TD-630)."""
+    return {"draft": got["draft"]} if isinstance(got, dict) and got.get("draft") else {}
+
+
 def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
     call = h.call
@@ -2011,13 +2064,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 break
         if not name:
             raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
-        manager, records = "", {}
+        manager, records, attach = "", {}, ""
         with contextlib.suppress(HTTPException):  # no list: the hand line reads as a seat nobody fills
             records = {r["id"]: r for r in await call("list")}
         if team:
             t, here = org.teams[team], host_name()
             mid = teams.manager_id(org, t, t.host or here, here)
             manager = mid if mid in {s["id"] for s in teamrun.live(list(records.values()))} else ""
+            if (t.host or here) != here:  # **Attach** in the composer's words for a node's session (§4.5a, TD-630)
+                attach = f"{team} runs on {t.host}: this call does not cross the link"
         servicing = entry_teams(org, root, host_name())
         return {
             "repo": repo,
@@ -2031,12 +2086,28 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "line": entry_line(role, name, team),
             "teams": servicing,  # what `entry_add` is handed (TD-218), in definition order
             "hand": entry_hand(servicing, records, datetime.now(UTC)),  # **Hand to the techlead** (TD-219 slice 4)
+            "attach": attach,  # why **Attach** refuses, or "" (§4.5a *Add entry form: Attach / drop / paste*)
         }
 
     @app.get("/api/entry/plan")
     async def api_entry_plan(repo: str = "", type: str = "debt"):
         """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes."""
         return await entry_plan(repo, type)
+
+    @app.post("/api/entry/attach")
+    async def api_entry_attach(
+        file: UploadFile | None = None,
+        draft: str = Form(""),
+        upload: str = Form(""),
+        offset: int = Form(0),
+        total: int | None = Form(None),
+        cancel: str = Form(""),
+    ):
+        """§4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633): the composer's
+        pieces with the form's `draft` in place of a session — `""` on the form's first file, which the
+        host agent answers with a new `draft-<8 hex>`, and that token on every later piece and file
+        (§4.4 *The Add entry form's draft*). Every answer carries `draft`; the path is final."""
+        return JSONResponse(await attach_piece(call, {"draft": draft}, file, upload, offset, total, cancel))
 
     @app.post("/api/entry/hand")
     async def api_entry_hand(request: Request):
@@ -2055,6 +2126,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             type=plan["type"],
             text=str(body.get("words") or ""),
             teams=[{"team": t["team"], "seat": t["seat"]} for t in plan["teams"]],
+            **_draft_of(body),
         )
         name = plan["hand"]["name"] if got.get("to") == plan["hand"]["to"] else got.get("to")
         return {
@@ -2113,6 +2185,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             controllers=[plan["manager"]] if plan["manager"] else [],
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
             start_context=repoconfig.entry_text(plan["repo"], plan["type"], plan["ledger"]),
+            **_draft_of(body),
         )
         text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
         return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
@@ -2174,26 +2247,7 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `.part`. A piece past `paths.ATTACH_PIECE_BYTES` is refused here (413) before the host agent is
         asked; the file's bound, `person.attach.max`, is the host agent's, in its words. One piece is
         read, never the file."""
-        if cancel:
-            if not upload:
-                raise HTTPException(400, "attach: cancel names the upload it cancels")
-            await call("attach", id=sid, upload=upload, cancel=True)
-            return JSONResponse({"ok": True, "cancelled": True})
-        if file is None:
-            raise HTTPException(400, "attach: send the file's piece as `file`")
-        raw = await file.read(paths.ATTACH_PIECE_BYTES + 1)
-        if len(raw) > paths.ATTACH_PIECE_BYTES:
-            mib = paths.ATTACH_PIECE_BYTES // (1024 * 1024)
-            raise HTTPException(413, f"a piece of {file.filename or 'the file'} is past the {mib} MiB a piece may be")
-        params: dict[str, Any] = {"id": sid, "name": file.filename or "", "data": base64.b64encode(raw).decode("ascii")}
-        if upload:
-            params.update(upload=upload, offset=offset)
-        elif total is not None:
-            params["total"] = total
-        got = await call("attach", **params)
-        if "path" in got:
-            return JSONResponse({"ok": True, "path": got["path"]})
-        return JSONResponse({"ok": True, "upload": got["upload"], "bytes": got["bytes"]})
+        return JSONResponse(await attach_piece(call, {"id": sid}, file, upload, offset, total, cancel))
 
     @app.post("/api/sessions/{sid}/paths")
     async def pane_paths(sid: str, request: Request):
