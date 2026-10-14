@@ -421,9 +421,10 @@ def red_holders(
 
 def is_sync_order(pr: dict[str, Any]) -> bool:
     """A sync PR the reading can order (design §4.4 *A sync PR is the team's at once*, TD-684): any
-    `checks` but *pending*, which waits — unless it is conflicting, when no check will run. Until the
-    home merges one (TD-685), every other is an order."""
-    waits = pr.get("checks") == "pending" and not pr.get("conflicting")
+    `checks` but *pending*, and *not_run* (CI that never started is the person's, TD-686), which wait —
+    unless it is conflicting, when no check will run and a team can cure that part. Until the home
+    merges one (TD-685), every other is an order."""
+    waits = pr.get("checks") in ("pending", "not_run") and not pr.get("conflicting")
     return bool(pr.get("sync")) and bool(pr.get("sync_since")) and not waits
 
 
@@ -431,6 +432,7 @@ def sync_reason(pr: dict[str, Any]) -> str:
     """Why a sync PR waits on someone, in its order's words: the failing checks, *conflicting*,
     *draft*, else *green: review and merge it*."""
     why = [*(pr.get("failing") or []), *(["conflicting"] if pr.get("conflicting") else [])]
+    why += ["CI never ran"] if pr.get("checks") == "not_run" else []
     why += ["draft"] if pr.get("draft") else []
     return ", ".join(why) or "green: review and merge it"
 
@@ -455,6 +457,7 @@ def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
     sync = is_sync_order(pr)
     why = sync_reason(pr) if sync else ""
     red = [", ".join(failing), "conflicting" * bool(pr.get("conflicting"))]
+    red += ["CI never ran"] if pr.get("checks") == "not_run" else []  # ordered by its conflict alone (TD-686)
     context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync else red)]))
     return {
         "id": f"{PR_PREFIX}{pr['number']}",

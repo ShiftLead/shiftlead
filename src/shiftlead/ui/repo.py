@@ -150,7 +150,7 @@ def pr_rows(
     branch it is, else the GitHub login — its age, *draft*, its standing with the techlead
     (`standing`, by number; nothing when no entry names it), and `red` for one that reads red or
     conflicting — its word, how long, and past `ORPHAN_AFTER` whose it is among `fleet`'s records
-    (`teamrun.red_prs`, TD-613)."""
+    (`teamrun.red_prs`, TD-613); `not_run` for one whose CI never started (TD-686), drawn *CI never ran*."""
     by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
     reds = {x["number"]: {**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)}
     rows = []
@@ -169,6 +169,8 @@ def pr_rows(
                 "draft": bool(p.get("draft")),
                 "standing": standing.get(p["number"]),
                 "red": reds.get(p["number"]),
+                # CI that never started is the person's, drawn apart from red (§4.4, TD-686)
+                "not_run": p.get("not_run") if p.get("checks") == "not_run" else None,
             }
         )
     return rows
