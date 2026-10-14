@@ -1,4 +1,13 @@
 {
+ "bold_heads": {
+  "2026-01-05 (session s-1 on h) — **Fix the export** before Friday. Due: 2026-01-20.": "Fix the export",
+  "2026-01-05 (session s-1) — **  ** is no head. Due: 2026-01-20.": null,
+  "2026-01-05 (session s-1) — **First**, then **second**. Due: 2026-01-20.": "First",
+  "2026-01-05 (session s-1) — **Spread\tover   space** here. Due: 2026-01-20.": "Spread over space",
+  "2026-01-05 (session s-1) — Plain words. Due: 2026-01-20. — Paul, 2026-01-10: **mine**, not a head": null,
+  "decide 2026-01-05 (session s-1) — Pick one. Context: TD-004. Due: 2026-01-20. Answers: a | b.": null,
+  "decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: **a** | b.": "a"
+ },
  "compose": [
   {
    "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Look at the dashboard. Context: TD-4. Due: 2026-01-20.\n"
@@ -59,6 +68,41 @@
   "snooze-undated-no-fields": {
    "ok": "- [ ] 2026-01-05 (session s-1) — Plain. Due: 2026-01-20."
   }
+ },
+ "not_right_fills": {
+  "another-answer": {
+   "ok": null
+  },
+  "bare-form-offered": {
+   "ok": "Not right: wrong page"
+  },
+  "empty": {
+   "ok": null
+  },
+  "filled": {
+   "ok": "Not right: the button is grey"
+  },
+  "form-as-offered": {
+   "refused": "Not right needs its words: say what is off"
+  },
+  "no-form-offered": {
+   "ok": null
+  },
+  "placeholder-only": {
+   "refused": "Not right needs its words: say what is off"
+  },
+  "prefix-only": {
+   "refused": "Not right needs its words: say what is off"
+  }
+ },
+ "not_right_forms": {
+  "Not right:": true,
+  "Not right:   <say what>": true,
+  "Not right: <a> <b>": false,
+  "Not right: <what>": true,
+  "Not right: wrong repo": false,
+  "Works": false,
+  "not right: <what>": false
  },
  "predicates": {
   "  - [x] 2026-01-05 (session s-1) — Closed.": {
