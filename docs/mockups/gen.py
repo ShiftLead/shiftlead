@@ -1572,7 +1572,7 @@ def inbox(picks=False):
         lrow = lambda tid, pri, title, why, repo, team, held="", detail="", answers=None: mcard("#cbd0d6", f"ledger · {why}", repo, team, f"added Oct 7 · {pri}" + (f" · held by {held}" if held else ""),
             f'<div class="txt"><b>{tid}</b> {title}</div>' + (fold("details", open_=bool(answers), body=detail) if detail else "")
             + ('<div class="sugg"><span class="lbl">its answers</span>' + "".join(b(a) for a in answers) + '</div>' if answers else ""),
-            (b("Reply") + b("Go with it", "primary") if answers else b("Reply", "primary")) + gap + b(ICON["focus"] + "Open", "ghost"))
+            (b("Reply") + b("Go with it", "primary") if answers else b("Reply", "primary")) + b("Open session" if held else "Start session") + gap + b(ICON["focus"] + "Open", "ghost"))
         ledger = ('<div class="muted mono" style="padding: 2px 2px 4px; font-size: 12px;">shiftlead</div>'
             + lrow("TD-133", "L", "Build the team start at the reset — schedules: in settings.yml, the tick's replay, ao schedule, the card's starts note", "your decision", "shiftlead", "ao-grind",
                    detail='<b>Why:</b> a team started by hand at the reset loses the first hour of the window. <b>Fix:</b> a <span class="mono">schedules:</span> block the tick replays; the card says <i>starts 05:00</i>.',
