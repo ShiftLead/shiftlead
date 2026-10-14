@@ -92,12 +92,19 @@ PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
 
 
 def pr_rows(
-    r: Mapping[str, Any], members: Collection[dict[str, Any]], standing: Mapping[int, dict[str, Any]], now: datetime
+    r: Mapping[str, Any],
+    members: Collection[dict[str, Any]],
+    standing: Mapping[int, dict[str, Any]],
+    now: datetime,
+    fleet: Collection[dict[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     """**Open PRs** (§4.5 screen 11): every open PR, newest last, with its author — the member whose
-    branch it is, else the GitHub login — its age, *draft*, and its standing with the techlead
-    (`standing`, by number; nothing when no entry names it)."""
+    branch it is, else the GitHub login — its age, *draft*, its standing with the techlead
+    (`standing`, by number; nothing when no entry names it), and `red` for one that reads red or
+    conflicting — its word, how long, and past `ORPHAN_AFTER` whose it is among `fleet`'s records
+    (`teamrun.red_prs`, TD-613)."""
     by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
+    reds = {x["number"]: {**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)}
     rows = []
     for p in (r.get("prs") or {}).get("open") or []:
         if not isinstance(p, dict) or not isinstance(p.get("number"), int):
@@ -113,6 +120,7 @@ def pr_rows(
                 "age": _age(p.get("created"), now),
                 "draft": bool(p.get("draft")),
                 "standing": standing.get(p["number"]),
+                "red": reds.get(p["number"]),
             }
         )
     return rows

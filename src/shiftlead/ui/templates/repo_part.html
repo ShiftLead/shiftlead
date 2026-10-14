@@ -18,7 +18,7 @@
   {% for p in prs %}
     <div class="rrow"><a class="mono strong" href="{{ p.url }}" target="_blank" rel="noopener">#{{ p.number }}</a><span class="rtitle">{{ p.title }}</span><span class="grow"></span>
       {% if p.author %}<a class="mono" href="/focus/{{ p.author.id }}">{{ p.author.name }}</a>{% else %}<span class="mono meta">{{ p.login }}</span>{% endif %}<span class="meta">· {{ p.age }}</span>
-      {% if p.draft %}<span class="tag">draft</span>{% endif %}{% if p.standing %}<span class="tag {{ p.standing.cls }}">{{ p.standing.word }}</span>{% endif %}</div>
+      {% if p.draft %}<span class="tag">draft</span>{% endif %}{% if p.red %}<span class="tag red" title="{{ p.red.failing | join(', ') if p.red.failing else 'conflicting with its base' if p.red.word == 'conflicting' else 'a check failed' }}">{{ p.red.word }} {{ p.red.age }}{% if p.red.whose %} · {{ p.red.whose }}{% endif %}</span>{% endif %}{% if p.standing %}<span class="tag {{ p.standing.cls }}">{{ p.standing.word }}</span>{% endif %}</div>
   {% else %}
     <div class="rrow meta">{% if r.prs and r.prs.open is not none %}no open PRs{% else %}could not look{% if r.prs and r.prs.error %} — {{ r.prs.error }}{% endif %}{% endif %}</div>
   {% endfor %}

@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from sessionorc import workorders
 from sessionorc.models import pr_marks, stop_note
 from sessionorc.reports import branch_ref
 from shiftlead import teamrun
@@ -164,16 +165,20 @@ def repo_facet(
     now: datetime,
     waiting: dict[str, Any] | None = None,
     lanes: dict[str, Any] | None = None,
+    fleet: Collection[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """The team card's **Repo** facet (§4.5a *team card: Repo facet*): the repo's name and page, the
     ledger's open entries as two bars and its windows as blocks, the PRs' windows as blocks, the
     oldest open PR's age, how many wait on review, and the readings' age. A reading that failed is
     `error`, drawn *could not look*; its last numbers, when there are any, stay beside it. `lanes`,
-    `lanes_line`'s, is the team's line under the legend (TD-361)."""
+    `lanes_line`'s, is the team's line under the legend (TD-361). `red` is the open PRs that read red
+    or conflicting, the *· n red* mark's, each with its age and whose it is among `fleet`'s records
+    (`teamrun.red_prs`, TD-613), and `red_title` the mark's hover, one line each."""
     led, prs = r.get("ledger") or {}, r.get("prs") or {}
     entries = led.get("entries")
     open_ = prs.get("open")
     oldest = _age(open_[0].get("created"), now) if open_ else ""
+    red = [{**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)]
     return {
         "name": str(r.get("name") or ""),
         "url": f"/repo/{r.get('name') or ''}",
@@ -194,9 +199,19 @@ def repo_facet(
             "windows": {w: _blocks((prs.get("windows") or {}).get(w)) for w in WINDOWS} if prs.get("windows") else None,
             "oldest": oldest,
             "waiting": waiting,
+            "red": red,
+            "red_title": "\n".join(
+                " · ".join(filter(None, [f"#{x['number']}", f"{x['word']} {x['age']}", x["whose"]])) for x in red
+            ),
         },
         "read": _age(r.get("at"), now),
     }
+
+
+def pr_ref(ref: str) -> int | None:
+    """The number of a red PR's reference, `pr:<n>` (§4.4 *A red PR nobody holds*, TD-613), else None."""
+    n = ref.removeprefix(workorders.PR_PREFIX)
+    return int(n) if n != ref and n.isascii() and n.isdigit() else None
 
 
 def _pr_states(r: Mapping[str, Any] | None) -> dict[int, dict[str, Any]]:
@@ -230,9 +245,12 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     the entry's `priority` — *high*, *medium* or *low*, else '' (a foreign or archived reference, an
     entry with none or another word), drawn as a letter (TD-232). Rows in phase order, then priority
     with High first and an unmarked row last, then by reference."""
-    # a claimed work order (`board:<key>`, TD-384) is drawn as any reference, its title the line's head
+    # a claimed work order (`board:<key>`, TD-384) is drawn as any reference, its title the line's head;
+    # a claimed red PR (`pr:<n>`, TD-613) is held, so out of the orders: its title is the open PR's
     led_entries = ((r or {}).get("ledger") or {}).get("entries") or []
-    entries = {e["id"]: e for e in [*led_entries, *teamrun.work_orders(r)] if isinstance(e, dict)}
+    entries = {
+        e["id"]: e for e in [*led_entries, *teamrun.work_orders(r), *teamrun.pr_orders(r)] if isinstance(e, dict)
+    }
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
     # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
     by_branch: dict[str, int] = {}
@@ -257,6 +275,8 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
         known = prs.get(pr) if pr else None
         state = str((known or {}).get("state") or "")
         row["phase"] = "design" if e.get("kind") == "design-first" else "review" if pr else "grind"
+        if not e and (n := pr_ref(ref)) is not None:
+            e = {"title": (prs.get(n) or {}).get("title") or ""}
         row["title"] = str(e.get("title") or "")
         prio = str(e.get("priority") or "").lower()
         row["priority"] = prio if prio in MOTION_PRIORITIES else ""
@@ -417,7 +437,13 @@ def team_summary(
     answers = answer_blocks(members)
     return {
         "team": team,
-        "repo": repo_facet(r, now, waiting, team_lanes(team, fleet if fleet is not None else members, r))
+        "repo": repo_facet(
+            r,
+            now,
+            waiting,
+            team_lanes(team, fleet if fleet is not None else members, r),
+            fleet if fleet is not None else members,
+        )
         if r
         else None,
         "motion": motion,

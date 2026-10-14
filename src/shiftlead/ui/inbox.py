@@ -34,6 +34,7 @@ from sessionorc.models import (
 )
 from sessionorc.work import manager_of
 from shiftlead import review as review_mod
+from shiftlead import teamrun
 
 from . import render as rendermod
 from .cards import _clock, _first_line, alarm_note, alarm_to_view
@@ -706,6 +707,51 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
                 "find": " ".join(x for x in (repo, "promote", text, (failed or {}).get("why") or "") if x),
             }
         )
+    return out
+
+
+def red_pr_rows(
+    repos: Mapping[str, Any] | None, records: Collection[Mapping[str, Any]], now: datetime | None = None
+) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: red PR** (§4.4 *A red PR nobody holds is a work order*, TD-613): one
+    row per `pr:<n>` order of a repo **no team services** (`teamrun.serviced`) — a serviced repo's
+    order is a lane's, never the person's — under *Needs you*, counted: *`<repo>` #<n> · red 3h 5m ·
+    <the failing checks> · <author>*. **Open** is the PR on its forge; **Snooze ▾** by time alone,
+    keyed `red_pr:<repo>:<n>` in the attention store. Every part from the home's reading; it leaves
+    when the order does — green, closed, or held by a live record."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    for root, r in sorted((repos or {}).items()):
+        if not isinstance(r, dict) or teamrun.serviced(str(r.get("root") or root), records):
+            continue
+        repo = str(r.get("name") or Path(str(root)).name)
+        for e in teamrun.pr_orders(r):
+            n = e.get("pr")
+            if not isinstance(n, int):
+                continue
+            since = str(e.get("red_since") or "")
+            word = "red" if e.get("checks") == "red" else "conflicting"
+            failing = ", ".join(e.get("failing") or [])
+            parts = [f"{repo} #{n}", f"{word} {_age(since, at)}".strip(), failing, str(e.get("author") or "")]
+            text = " · ".join(x for x in parts if x)
+            out.append(
+                {
+                    "row": "red_pr",
+                    "sid": f"red_pr:{repo}:{n}",
+                    "id": f"red_pr:{repo}:{n}",
+                    "name": repo,
+                    "repo": repo,
+                    "pr": n,
+                    "url": str(e.get("url") or ""),
+                    "title": str(e.get("title") or ""),
+                    "subject": kind_subject("red PR", f"{repo} #{n}"),
+                    "team": "",
+                    "at": since,
+                    "age": _age(since, at),
+                    "text": text,
+                    "find": " ".join(x for x in (repo, f"#{n}", "red PR", str(e.get("title") or ""), text) if x),
+                }
+            )
     return out
 
 

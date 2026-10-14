@@ -818,6 +818,37 @@
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: red PR** (§4.4 *A red PR nobody holds is a work order*, TD-613) ──────
+   A red or conflicting PR nobody holds, in a repo no team services — a serviced repo's goes to a
+   lane, never here. Every part the home's reading. **Open** is the PR on its forge; **Snooze ▾**
+   by time alone, the board rows' choices, keyed `red_pr:<repo>:<n>`. It leaves when the PR turns
+   green, closes, or a live record holds it. #}
+{% macro red_pr_row(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="{{ e.repo }}: no team services it, so its red PR is yours (design §4.4)">{{ e.repo }}</span>
+  <span class="badge kindmark k-promote">red PR</span>
+  <span class="grow"></span>
+  {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="red since">{{ e.age or '' }}</span>{% endif %}
+</div>
+{{ subj(e) }}
+<div class="body">{{ e.text }}{% if e.title %} — {{ e.title }}{% endif %}</div>
+<div class="row gap wrap mfoot">
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
+  <span class="grow"></span>
+  <details class="more"><summary class="btn sm ghost" title="set this row aside until a day you pick; the PR is untouched">Snooze ▾</summary>
+    <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="red_pr" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="red_pr" data-when="1d">+1 day</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="red_pr" data-when="1w">+1 week</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="red_pr" data-when="pick">pick a date…</button>
+    </div>
+  </details>
+  {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a>{% endif %}
+</div>
+{%- endmacro %}
+
 {# ── design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3) ─────────────────────────
    One row per wound-down team whose lanes gained work, every part a structured reading of the
    home's (`work_waiting`, `work` on `host`): the team, when it wound down, the ids — each a link
@@ -925,6 +956,7 @@
 <div class="mailrow staterow" tabindex="0"{% if e.row == 'promote' %} id="promote-{{ e.repo }}"{% endif %} data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {%- if e.row == 'promote' %}{{ promote_row(e, section) }}
 {%- elif e.row == 'work' %}{{ work_row(e, section) }}
+{%- elif e.row == 'red_pr' %}{{ red_pr_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>

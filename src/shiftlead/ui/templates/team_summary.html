@@ -36,7 +36,7 @@
     {% if led.error %}<div class="meta dim" title="{{ led.error }}">the last read failed — these are the numbers before it</div>{% endif %}
     {% endif %}
     {% set p = r.prs %}
-    <div class="fhead"><span class="kind">Pull requests{% if p.n is not none %} ({{ p.n }} open){% endif %}</span><span class="grow"></span>
+    <div class="fhead"><span class="kind">Pull requests{% if p.n is not none %} ({{ p.n }} open){% endif %}</span>{% if p.red %}<span class="prred" title="{{ p.red_title }}">· {{ p.red | length }} red</span>{% endif %}<span class="grow"></span>
       <span class="seg" data-pick="win">{% for w in ('day', 'week', 'month') %}<button type="button" data-v="{{ w }}">{{ w }}</button>{% endfor %}</span></div>
     {% if p.n is none %}
     <div class="meta dim" title="{{ p.error or 'not read yet' }}">could not look</div>
