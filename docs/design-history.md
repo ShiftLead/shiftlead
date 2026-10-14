@@ -82,6 +82,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-13 (TD-629, grinder-ao-1; Paul: *I answered a question in the terminal (for dc-paul) but shiftlead does not seem to handle that properly*): a permission answered in the terminal ends its waiter at the session's next hook event — the asked call's tool event, or a `Stop`, a prompt or a `SessionEnd` — and the hook's timeout sets the terminal's question only while the record's pending is still that waiter's. Until this date nothing but `decide` ended a waiter, so ten minutes after a terminal answer the timeout set *needs you* over the record's later `idle`; and a question reaching `PermissionRequest` read as its tool input's JSON.
 - 2026-10-13 (TD-636, the designer): an unattended prompt meets the person's rules, then the director, then the person. Built by TD-641, TD-642.
 - 2026-10-12 (TD-597, the build): `transcript` is the path the hook reports (Claude Code's `transcript_path`), not the adapter's locator, which finds no file before the conversation's first write and so had nothing to set at the first hook. Was: the adapter's `transcript_path`.
 - 2026-10-12 (TD-578, the designer): the record carries `transcript`, the tool's file path on its host, set with `adapter_id`. Built by TD-597.

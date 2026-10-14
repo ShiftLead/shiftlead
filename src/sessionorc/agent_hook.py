@@ -55,13 +55,20 @@ class HookMixin:
         self._waiters[key] = fut
         await self._push_changes()
         try:
-            return await asyncio.wait_for(fut, timeout=wait)
+            decision = await asyncio.wait_for(fut, timeout=wait)
         except TimeoutError:
-            # Fell through to the terminal dialog: the decision now lives there (design §4.2).
+            # Fell through to the terminal dialog: the decision now lives there (design §4.2) — but
+            # only while the record still waits on this one. A later event already moved it on.
+            s = self.sessions.get(session)
+            if s is None or s.pending is None or s.pending.tool_use_id != tool_use_id:
+                return None
             s.set_state("needs-you", confidence="hook", pending=Pending(kind="question", text=pending.text))
             self.store.save(s)
             await self._push_changes()
             return None
+        else:
+            # answered in the terminal (`_end_waiters`): the hook prints nothing, the tool has moved on
+            return None if decision.get("terminal") else decision
         finally:
             self._waiters.pop(key, None)
 
