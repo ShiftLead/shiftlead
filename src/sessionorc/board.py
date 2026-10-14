@@ -29,6 +29,8 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from sessionorc import ledgerboard, paths, workorders
 
 BOARD = Path("docs") / "user_attention.md"
@@ -641,3 +643,143 @@ def _insert(root: Path, line: str, msg: str) -> dict[str, Any]:
             return {**_land(root, t, want, msg, clock, lambda: True), "line": at + 1}
 
         return _twice(press)
+
+
+# -- a session's own edit, on its branch (design §4.7 `ao board edit`, TD-587) --------------------------
+
+BRANCH_ACTIONS = ("done", "snooze")  # decide and reply are the person's words: the write-back's alone
+
+
+def board_path(root: Path | str) -> tuple[str, Path | None]:
+    """The checkout's board (§5 *The seams* `board:`, TD-587): `("set", path)` for its `.shiftlead.yml`
+    `board:`, relative to `root`; `("defaulted", BOARD)` when the key is unset and `docs/user_attention.md`
+    exists; `("absent", None)` otherwise — the person's channel is the Inbox alone. A file that cannot be
+    read, or a key that is not a non-empty string, is the key unset: the clients (`shiftlead.repoconfig`)
+    refuse such a file by name."""
+    try:
+        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        doc = None
+    got = doc.get("board") if isinstance(doc, dict) else None
+    if isinstance(got, str) and got.strip():
+        return "set", Path(got.strip())
+    if (Path(root) / BOARD).is_file():
+        return "defaulted", BOARD
+    return "absent", None
+
+
+def branch_edit(
+    cwd: Path | str,
+    action: str,
+    *,
+    line: int | None = None,
+    expect: str = "",
+    key: str = "",
+    why: str = "",
+    until: str = "",
+    board: str | Path | None = None,
+    today: str = "",
+) -> dict[str, Any]:
+    """`ao board edit done|snooze` (design §4.7, TD-587): a session's own edit of one line of the board
+    **on the branch it is on**, in the tree `cwd` is in — ledgerboard's `edit_line` (`done` with `why`,
+    `snooze` to `until`), committed on that branch with ledgerboard's `subject("shiftlead", …)`,
+    touching nothing else, never pushed. The line is `line` opening with `expect` (its text or the
+    raw line), or the open line whose id is `key` (§4.4 *A board line's id*). Refused on origin's
+    default branch or a detached head (a session's board edit is a PR, never a commit to main), with
+    a staged change or an uncommitted edit of the board (the commit would carry it), and for
+    `decide` and `reply`, the person's words (cadence §3.5). Returns `{board, line, action, key,
+    text, commit, message}`; needs no host agent."""
+    if action not in BRANCH_ACTIONS:
+        raise Refused(
+            f"ao board edit makes {' or '.join(BRANCH_ACTIONS)}: {action!r} is the person's words, "
+            "written by the write-back alone (cadence §3.5, design §4.7)"
+        )
+    to = None
+    if action == "snooze":
+        try:
+            to = date.fromisoformat(str(until))
+        except ValueError:
+            raise Refused(f"a snooze needs --until as YYYY-MM-DD, not {until!r}") from None
+    elif until:
+        raise Refused("--until is for snooze only")
+    if action != "done" and why:
+        raise Refused("--why is for done only")
+    if key and (line is not None or expect):
+        raise Refused("name the line by --key, or by --line and --expect, not both")
+    if not key and (line is None or not str(expect).strip()):
+        raise Refused('name the line: --line <n> --expect "<its first words>", or --key board:<key>')
+    if key and not workorders.is_work_order(key):
+        raise Refused(f"{key!r} is not a board line's id: board: and eight hex digits (design §4.4)")
+    top = _git(Path(cwd), "rev-parse", "--show-toplevel")
+    if top.returncode != 0:
+        raise Refused(f"{cwd} is not in a git work tree")
+    root = Path(top.stdout.strip())
+    if board is None:
+        _, rel = board_path(root)
+        if rel is None:
+            raise Refused(
+                f"no board here: {BOARD} does not exist and .shiftlead.yml names no board: (design §5 *The seams*)"
+            )
+        path = root / rel
+    else:
+        path = Path(board) if Path(board).is_absolute() else Path(cwd) / board
+    path = path.resolve()
+    if not path.is_relative_to(root.resolve()):
+        raise Refused(f"{path} is not in this work tree ({root})")
+    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD").stdout.strip()
+    if not branch:
+        raise Refused("HEAD is detached: a session's board edit is committed on its work branch, in its PR")
+    if branch == default_branch(root):
+        raise Refused(
+            f"this is {branch}, origin's default branch: a session's board edit goes in the PR that did "
+            "the work, never a commit to it (design §4.7)"
+        )
+    if _git(root, "diff", "--cached", "--quiet").returncode != 0:
+        raise Refused("the index has staged changes: the board edit commits one file — commit or unstage them first")
+    if _git(root, "status", "--porcelain", "--", str(path)).stdout.strip():
+        raise Refused(f"{path.relative_to(root.resolve())} has uncommitted changes: the commit would carry them")
+    try:
+        raw = path.read_bytes()
+    except OSError as e:
+        raise Refused(f"cannot read {path}: {e}") from None
+    lines = raw.decode("utf-8", errors="surrogateescape").splitlines(keepends=True)
+    if key:
+        at = _find(lines, None, "", key, root)
+        if at is None:
+            raise Refused(workorders.NO_LINE.format(ref=key))
+    else:
+        if not 1 <= int(line) <= len(lines):
+            raise Refused(f"line {line} is outside the board ({len(lines)} lines)")
+        at = int(line) - 1
+    body = lines[at].rstrip("\r\n")
+    eol = lines[at][len(body) :]
+    m = ledgerboard.ITEM_RE.match(body)
+    if m is None:
+        raise Refused(f"line {at + 1} is not an open item: {body[:80]!r}")
+    text = m.group("text").strip()
+    exp = str(expect).strip()
+    if exp and not (text.startswith(exp) or body.lstrip().startswith(exp)):
+        raise Refused(f"line {at + 1} no longer starts with the expected item — the board moved; re-read it. "
+                      f"Line {at + 1} is: {body[:80]!r}")  # fmt: skip
+    try:
+        new = ledgerboard.edit_line(body, action, to=to, why=why or None, today=_day(today))
+    except ledgerboard.Refused as e:
+        raise Refused(str(e)) from None
+    msg = message(text, action, to.isoformat() if to else None)
+    lines[at] = new + eol
+    path.write_bytes("".join(lines).encode("utf-8", errors="surrogateescape"))
+    cp = _git(root, "commit", "-q", "-m", msg, "--", str(path))
+    if cp.returncode != 0:
+        path.write_bytes(raw)
+        raise Refused(f"{_why(cp, 'git commit failed')} — the board is restored")
+    sha = _git(root, "rev-parse", "--short", "HEAD").stdout.strip()
+    return {
+        "board": str(path),
+        "line": at + 1,
+        "action": action,
+        "key": workorders.ref(root, text),
+        "text": new,
+        "commit": sha,
+        "message": msg,
+        "branch": branch,
+    }

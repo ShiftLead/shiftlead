@@ -520,6 +520,9 @@ class RepoConfig:
     # §5 *The seams* `worktree_setup:` (TD-589): the command run in each new worktree; `sessionorc.gitinfo`
     # runs it at the worktree's creation. None: unset — the default is `scripts/hydrate_worktree.sh` where it exists
     worktree_setup: str | None = None
+    # §5 *The seams* `board:` (TD-587): the person's board, relative to the repo; `sessionorc.board.board_path`
+    # reads it. None: unset — the default is `docs/user_attention.md` where it exists
+    board: str | None = None
     # §4.9c (TD-309): the repo's held paths, top level — what a flow's review stage waits for. None:
     # the key is absent (a review stage then has nothing to hold); never an empty list
     held: list[str] | None = None
@@ -616,6 +619,10 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{where} must be a command, `{{pr}}` where the PR's number goes (design §5 *The seams*)")
         cfg.gate = value.strip()
+    elif key == "board":
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{where} must be the board file's path, from the repo's root (design §5 *The seams*)")
+        cfg.board = value.strip()
     elif key == "worktree_setup":
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{where} must be a command, run in each new worktree (design §5 *The seams*)")
