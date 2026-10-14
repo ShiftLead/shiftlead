@@ -230,9 +230,11 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
     the entry's `priority` — *high*, *medium* or *low*, else '' (a foreign or archived reference, an
     entry with none or another word), drawn as a letter (TD-232). Rows in phase order, then priority
     with High first and an unmarked row last, then by reference."""
-    # a claimed work order (`board:<key>`, TD-384) is drawn as any reference, its title the line's head
+    # a claimed work order (`board:<key>`, TD-384; `pr:<n>`, TD-613) is drawn as any reference, its title the
+    # line's head, or the PR's
     led_entries = ((r or {}).get("ledger") or {}).get("entries") or []
-    entries = {e["id"]: e for e in [*led_entries, *teamrun.work_orders(r)] if isinstance(e, dict)}
+    orders = [*teamrun.work_orders(r), *teamrun.pr_orders(r)]
+    entries = {e["id"]: e for e in [*led_entries, *orders] if isinstance(e, dict)}
     prs, web = _pr_states(r), _https(str((r or {}).get("remote") or ""))
     # open PRs only: a merged slice's branch must not mark the next slice of the same entry *review*
     by_branch: dict[str, int] = {}

@@ -1033,11 +1033,19 @@ def work_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
 
 
+def pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    """A repo reading's red PRs nobody holds, `pr:<n>` (§4.4 *A red PR nobody holds is a work order*,
+    TD-613), as entries; none from an agent that predates them."""
+    got = ((r or {}).get("pr_orders") or {}).get("orders")
+    return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
+
+
 def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
     """What a team's lanes read of a repo (§4.4 *In a team's lanes*): the ledger's open entries and
-    the board's work orders beside them (TD-384), or None where the ledger was not read."""
+    the work orders beside them — the board's decided lines (TD-384) and the red PRs nobody holds
+    (TD-613) — or None where the ledger was not read."""
     entries = ((r or {}).get("ledger") or {}).get("entries")
-    return None if entries is None else [*entries, *work_orders(r)]
+    return None if entries is None else [*entries, *work_orders(r), *pr_orders(r)]
 
 
 def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -1069,6 +1077,11 @@ def repo_lanes(
         for p in s.get("progress") or []
         if isinstance(p, dict) and p.get("status") == "claimed"
     }
+    # a red PR's order is the anchor seat's, and every `free-pick` lane's where no team servicing the
+    # repo has one (§4.4 *A red PR nobody holds is a work order*, TD-613): a team has an anchor seat
+    # when one of its records here carries the `anchor` lane word, live or ended
+    if not any(ledger_mod.ANCHOR_OWNER in (s.get("lane") or ()) for s in mine if s.get("team")):
+        entries = [{**e, "free_pick": True} if e.get("pr_order") else e for e in entries]
     out: dict[str, dict[str, Any]] = {}
     for team in sorted({str(s["team"]) for s in mine if s.get("team")}):
         got = ledger_mod.in_lanes(entries, [s for s in mine if s.get("team") == team], held)
