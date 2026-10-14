@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-675 | Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change | Low | Designed — TD-677 builds it |
+| TD-676 | An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form | Medium | Open |
 | TD-677 | Build TD-675: the **Name** box on Add entry's Open a session — the default `entry-<n>`, a typed name checked by the test the default is picked by, as typed and at the press | Low | Open |
 
 ---
@@ -1029,6 +1030,26 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Fix:** a design round. The form shows a **Name** box beside **Open a session**, prefilled with the `entry-<n>` default `/api/entry/plan` already picks; what the person types is the session's name and its worktree's, checked as they type with the New session form's *name field → holder* check (`/api/name_check`), and the default is taken when they leave it alone. The round settles: whether the default stays `entry-<n>` or is drawn from the words; what an edited name may hold (the worktree and branch rules); what the check says and whether it disables the button; and whether a changed Type (which re-reads the plan) keeps a typed name. §4.5a's row and the mockup gain the box in the same design PR.
 
 **Related:** TD-219 (Add entry's *Open a session*), TD-630 (the form's Attach), §4.5a *New session: name field → holder*.
+
+---
+
+## TD-676: An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-14 (Paul, through Add entry; drafted by entry-6)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 screen 6 *The ledger's entries that wait on you*, §4.5a *Inbox row: ledger entry* (and *Focus (exited / closed)*'s **Resume**, whose press-or-form rule this borrows; *Org: team card + card*'s `/new?team=`); `src/shiftlead/ui/inbox.py` (`ledger_for_you`), `src/shiftlead/ui/templates/inbox_row.html` (the `ledger` row), `src/shiftlead/ui/app.py` (`/new`)
+
+**Why:** the Inbox already lists every entry that waits on the person (`Owner: paul`, or blocked by `decision (paul)`) under *Later*, with its answers, **Reply** and **Open**, but an entry the person means to work themselves has no way in from there: they go to the Org, find the repo's team, open the + card's form, and type the name, lane and prompt. Paul, 2026-10-14: *it allows the user to work out of the inbox instead of having to jump around*. Today six entries are `Owner: paul` in this repo alone (`ledger.py --list --owner paul`).
+
+**Fix:** a **Start session** button on the ledger row (not a separate *Your TDs* list: the row and its source exist). One press, a form only on doubt, as **Resume** is: an interactive session (the person's, `unattended: false`) on the repo's servicing team (the row's team badge), in a new worktree named for the entry (`td-676`), lane the id, its opening prompt naming the entry; then its Focus opens. When it cannot be silent — no team, a live holder of the name, a host not connected — the press lands on the New session form filled in, with the reason. While a live record holds the entry (the row's *held by <name>*), the button reads **Open session** and focuses that one. The design round settles the opening prompt's words, whether a `decision (paul)` row gets the button too, and the name's form.
+
+**Done when** a press on a ledger row in the Inbox starts the person's session on that entry, on its team, named for it, and opens its Focus, or opens the filled form saying why not; and a second press while that session lives opens it instead of starting another.
+
+**Related:** TD-367 and TD-560 (the rows), TD-565 (drawn as full rows in *Later*).
 
 ---
 
