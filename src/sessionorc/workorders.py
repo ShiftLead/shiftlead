@@ -421,8 +421,10 @@ def red_holders(
 
 def is_sync_order(pr: dict[str, Any]) -> bool:
     """A sync PR the reading can order (design §4.4 *A sync PR is the team's at once*, TD-684): any
-    `checks` but *pending*, which waits. Until the home merges one (TD-685), every other is an order."""
-    return bool(pr.get("sync")) and bool(pr.get("sync_since")) and pr.get("checks") != "pending"
+    `checks` but *pending*, which waits — unless it is conflicting, when no check will run. Until the
+    home merges one (TD-685), every other is an order."""
+    waits = pr.get("checks") == "pending" and not pr.get("conflicting")
+    return bool(pr.get("sync")) and bool(pr.get("sync_since")) and not waits
 
 
 def sync_reason(pr: dict[str, Any]) -> str:

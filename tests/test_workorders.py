@@ -450,6 +450,9 @@ def test_a_sync_pr_is_an_order_from_the_first_reading_whatever_its_checks_but_pe
         assert o["context"] == f"{pr['url']} · {reason}" and o["sync_since"] == T0.isoformat(), word
         assert o["pr_order"] and o["priority"] == "High" and o["pickable"] == "yes", word
     assert workorders.red_prs([_sync(checks="pending")], [], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    # a conflicting one runs no checks, so pending never clears: it is an order at once
+    (o,) = workorders.red_prs([_sync(checks="pending", conflicting=True)], [], T0, {}, HOUR)[0]
+    assert (o["sync"], o["reason"]) == (True, "conflicting")
     # a cadence-sync branch whose files lack the lock is no sync PR: a green one is never an order
     assert workorders.red_prs([_sync(sync=False)], [], T0 + 3 * HOUR, {}, HOUR)[0] == []
     # sync orders come first, before a red PR's
