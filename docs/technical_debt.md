@@ -56,8 +56,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-676 | An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form | Medium | Designed — TD-678 builds it |
 | TD-679 | Ready to close has no row for the agent itself: a working session's checklist reads all ✓, and the card's *more ▾* **Close** is enabled on it | Low | Open |
-| TD-681 | A repo's sync PRs have no owner: in a repo with no session running, a green sync PR waits for nobody | Medium | Open — design first |
-| TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Open — design first |
+| TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Open |
+| TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Open |
 | TD-683 | `ao team --skill` leaves out what a repo's own session needs before its first team: the repo's readiness, an empty ledger, a public repo | Low | Open |
 
 ---
@@ -975,7 +975,7 @@ with the retired brief).
 
 ---
 
-## TD-681: A repo's sync PRs have no owner: in a repo with no session running, a green sync PR waits for nobody
+## TD-681: A green sync PR has no owner: in a repo with no session running, it waits for nobody
 
 **Priority:** Medium
 **Type:** feature
@@ -983,9 +983,9 @@ with the retired brief).
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Location:** design §5 (*The seams*), §6 (the home's policies), §4.8 (the built-in briefs); `src/shiftlead/briefs/` (grinder, manager)
+**Location:** design §4.4 (*A red PR nobody holds is a work order*), §6 (the home's policies), §4.8 (role presets); `src/shiftlead/briefs/` (grinder, manager)
 
-**Why:** `sync-all.sh` from dev-cadence 517a2b5 opened six sync PRs. Only ledgerboard's merged that day, by the session that ran the sync. The PRs for pneuma-ops (#20) and guardians-devenv (#19) were green, but no session ran in either repo to merge them. samscrape's (#1097) and contractmatch's (#175) waited on their own sessions. ShiftLead's (#1728) failed its tests until a session added a step by hand (dev-cadence#TD-113). A sync PR changes only files dev-cadence owns, which may go in directly (Paul, 2026-09-12). Nothing needs the repo's judgement except its tests and its gate, and no one is assigned to read those.
+**Why:** `sync-all.sh` from dev-cadence 517a2b5 opened six sync PRs. Only ledgerboard's merged that day, by the session that ran the sync. The PRs for pneuma-ops (#20) and guardians-devenv (#19) were green, but no session ran in either repo to merge them. samscrape's (#1097) and contractmatch's (#175) waited on their own sessions. ShiftLead's (#1728) failed its tests until a session added a step by hand (dev-cadence#TD-113). A sync PR changes only files dev-cadence owns, which may go in directly (Paul, 2026-09-12). Nothing needs the repo's judgement except its tests and its gate. Design §4.4 already gives a **red** sync PR an owner (*its owner is never nobody*), as a work order once it has been red for `ORPHAN_AFTER`. A **green** one is never an order, so nobody is assigned to merge it.
 
 **Fix:** design first, in two parts (Paul, 2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and post_sync would handle it that's even better*):
 1. **A team runs its repo's sync PRs to ground.** The built-in grinder and manager briefs say that an open sync PR (`cadence-sync-*`) in the team's repo is the team's next pick, ahead of the lane. The mechanical review checks that the files are only SYNC files plus what the repo's `post_sync` wrote. Then the gate runs and the PR merges. A red one goes to the team like any red PR.
@@ -1005,11 +1005,11 @@ with the retired brief).
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Location:** the reading of a repo's red PRs (`ao repo`, TD-652's holders), the home's board writes (§4.4 *Board write-back*), design §6
+**Location:** the reading of a repo's red PRs (`ao repo`, TD-652's holders), the home's board writes (§4.4 *Board write-back*), §4.4 *A red PR nobody holds is a work order*, design §6
 
 **Why:** On 2026-10-14 every Actions job in ContractMatch/samscrape stopped starting: *recent account payments have failed or your spending limit needs to be increased*. `ao repo` read samscrape's sync PR (#1097) as *1 red PR nobody holds*. The cause was a fix only the person can make (the org's billing). No team could act on it, and no line told the person. A session found it by reading the run's annotations.
 
-**Fix:** design first. Once dev-cadence#TD-115 reads such a run as *never ran — billing or spending limit*, ShiftLead's PR reading carries that reason. The home then writes one `act` line per account (org), not one per PR, to the board of a repo it affects: *GitHub Actions does not start in <org>: billing or spending limit (PRs …)*. The line is closed when a run in that org starts again. Until then, a red PR whose runs never started is never routed to a team as broken.
+**Fix:** design first. Once dev-cadence#TD-115 reads such a run as *never ran — billing or spending limit*, ShiftLead's PR reading carries that reason. The home then writes one `act` line per account (org), not one per PR, to the board of a repo it affects: *GitHub Actions does not start in <org>: billing or spending limit (PRs …)*. The line is closed when a run in that org starts again. This changes §4.4's work-order rule for these PRs: a PR is red only because its runs never started, so it is not a `pr:<n>` order for a team. No team can fix it, and the `act` line is how the person hears about it.
 
 **Done when** a refused-for-billing run gives the person one `act` line naming the org and the PRs it holds, and the line closes itself when CI runs again.
 
@@ -1030,11 +1030,11 @@ with the retired brief).
 **Why:** Paul is about to have the pneuma-ops, ledgerboard and guardians-devenv sessions each stand up its repo's first team. The recipe takes them from definition to `ao team start`, and `ao doctor` already reads all three repos as ready. Four things are missing or wrong for a session doing this for the first time:
 (1) No step checks the repo first. `ao doctor`'s **repos** line and `ao repo init` (TD-591) are the readiness check, and the recipe names neither.
 (2) An empty ledger refuses the start. ledgerboard has 0 open entries, so a `free-pick` team there is refused (*every member's lane holds nothing to pick*), and the recipe does not say what a repo with little work should run: an on-call manager alone, or one member and `--anyway`.
-(3) A public repo's `.shiftlead.yml` publishes its team definition, including profile and session names. The recipe's *Which file* paragraph should say to keep a public repo's team in `org.yml`.
+(3) A public repo's `.shiftlead.yml` publishes its team definition, including profile and session names. The recipe's **Which file:** lead-in should say to keep a public repo's team in `org.yml`.
 (4) The closing section is headed *For a Claude session told to do this*, though a session may be another tool's.
 
 **Fix:** a step 0b, *Is the repo ready?*, with `ao doctor` and `ao repo init`; a sentence on a small repo's team after `lane:`; the public-repo sentence in *Which file*; the heading made tool-neutral.
 
-**Done when** `ao team --skill` prints the four.
+**Done when** `ao team --skill` prints step 0b, the small-repo sentence, the public-repo sentence and the tool-neutral heading.
 
 **Related:** TD-591, TD-588.
