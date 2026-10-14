@@ -161,9 +161,19 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
 def test_a_name_two_checkouts_share_keeps_the_block(tmp_path):
     a = _repo(tmp_path / "a" / "other", "# L\n", "# A\n\n## TD-002: archived\n")
     b = _repo(tmp_path / "b" / "other", "# L\n", "# A\n\n## TD-002: archived\n")
-    assert ledger.Registry([str(a)])("other#TD-002") == "archived"
-    assert ledger.Registry([str(a), str(b)])("other#TD-002") == "unresolved"
-    assert ledger.Registry([str(a)])("other#TD-009") == "unresolved", "an id in neither file"
+    assert ledger.Registry([str(a)])("other#TD-002") == ("archived", "")
+    state, why = ledger.Registry([str(a), str(b)])("other#TD-002")
+    assert (state, "registry" in why) == ("unresolved", True), why
+    state, why = ledger.Registry([str(a)])("other#TD-009")
+    assert (state, "neither" in why) == ("unresolved", True), "an id in neither file, and it says so"
+
+
+def test_an_id_headed_twice_is_blocked_by_what_blocks_either():
+    """TD-585 slice 6: ledgerboard keys its reading by id, so a repeated heading takes both sections'
+    blockers — the safe direction — never the last section's alone."""
+    text = "## TD-005: a\n\n**Blocked by:** TD-009\n\n## TD-005: b\n\n**Priority:** Low\n\n## TD-009: open\n"
+    got = ledger.entries(text)
+    assert [(e["id"], e["blocked_by"], e["pickable"]) for e in got[:2]] == [("TD-005", ["TD-009"], "no")] * 2
 
 
 def test_a_written_pickable_line_is_not_read():
