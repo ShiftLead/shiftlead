@@ -48,8 +48,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
 | TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
-| TD-619 | A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record | Medium | Designed — TD-620 builds it |
-| TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Built (#1673) — live check next |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
@@ -799,53 +797,6 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Done when** the top bar updates from the stream with no poll while the stream is up, the counts are computed once per change in the UI process however many pages are open, the host pushes `inbox` on every person-inbox change, `ao inbox --counts` prints the same numbers, and the tests above pass; a re-measurement of `/api/person/inbox` requests per hour on the live UI after the promote is the live check.
 
 **Related:** TD-614 (the design), TD-611 (slice 1's counts read is this entry's fallback), TD-572 (the light stream).
-
----
-
-## TD-619: A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-12 (ao-paul, at Paul's report)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-12 (the designer) — **option 1, through the gate that exists**: the client's member-by-member comparison of a live team with its definition (§4.9c *Switching*: lane, `review`, the stage brief, who runs) gains **the profile** — the member's `profile:`, else its role's from the org's `roles:` overlay — against the launch record's; a difference reads **definition changed — Apply** on the team card and in `ao team flow <team>` (*techlead-ao-1: profile grind-fable → grind (next restart)*), and Apply hands `profile` in the existing `relaunch` RPC (`RELAUNCH_KEYS` gains it; the mark `relaunch: {at, lane, review, profile}`), so rule 7 restarts an idle member on it at once, a working one is told on its `ao` replies and restarted on its word, and a seat, compared running or closed, takes it at its next fill. Option 2 (the replay resolving the role's profile) was refused: it needs the host agent to read the definition, which §4.9 and §6 keep it from; option 3 (only announcing) is less than Apply already gives. No new command and no new mark: one more field in a comparison and an RPC. §4.9c *Switching*, §6 *Keeping a team running* and rule 7, §4.5a *flow changed — Apply*, §4.7 `ao team flow`, §9 invariant 10. Built by TD-620. Was: Open.
-**Blocked by:** TD-620
-**Location:** design §6 *Keeping a team running* (the launch record, ~L83–94), §4.9 (roles, `profile`); `src/sessionorc/agent_tick.py` (`_write_launch`, `_read_launch`); `~/.shiftlead/launch/<address>.json`
-
-**Why:** Paul, 2026-10-12: *I have had to take control of techlead-ao-1 three times now to change it to use opus. Apparently it is defaulting back to fable on restarts?* At 16:12 that day `org.yml` moved `techlead` and `designer` from `grind-fable` to `grind`. A restart or seat fill hands `create` the launch record again and never re-reads a definition (§6, by design: the host agent does not read `org.yml`), so only a team start re-reads. The ao and samscrape techlead seats were refilled after the edit (20:04, 16:27) and each fill rewrote its record with `grind-fable`; cm-grind's techlead and the ao designer's records, written before the edit, still held it; dc-grind, started after the edit, got `grind`. Switching the model in the pane (`/model`) changes the running conversation only. The four records were repointed to `grind` by hand the same day (every record backed up first under `~/.shiftlead/backups/launch-2026-10-12-opus/`).
-
-**Fix:** design first. Choose one:
-1. **The team start's reading carries to the records.** `ao org check`, or the next tick after `org.yml` changes, names each launch record whose profile differs from its role's, and a new `ao team refresh <team>` (or the Settings page) rewrites the profile in place.
-2. **A replay takes the role's current profile.** The record keeps the role, and the profile is resolved at replay from the overlay the team start last handed (still no `org.yml` read in the host agent).
-3. At least, say so: a role change in `org.yml` prints *takes effect at the next team start; running members replay `<old>`*.
-
-Taking control and picking a model should not be the way. **Done when** a role's profile change reaches that role's next restart or fill without a team restart, or is refused/announced in words that say when it will.
-
----
-
-## TD-620: Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow`
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-12 (the designer, TD-619's round)
-**Owner:** grinder
-**Kind:** live-check #1673
-**Status:** Built — the live check is next. Slice 2 (grinder-ao-2, 2026-10-13, #1673): `teamrun.differences` compares the profile the definition resolves with what the member runs next (its `relaunch` mark's, else its record's) on every live unattended member and every seat, closed or running, under a flow or none; a profile-only difference reads *<name>: profile <old> → <new> (next restart)* and the team **definition changed — Apply**; `relaunch_params` always hands `profile`. **The check, once #1673 is live** (`ao promote status`), read only: `ao team flow ao-grind` (the bare form presses nothing) prints a *profile … (next restart)* line for each member or seat whose record runs another profile than `org.yml` names, and none where they match; after the person's Apply, the members' `relaunch` marks carry the new profile (`ao status --json`) and a restarted or filled member's record `profile` is it. A difference to Apply is the person's press, never the checker's. Slice 1 (grinder-ao-1, 2026-10-13): fix step 2's home side and its tests (`src/sessionorc/**`) — `RELAUNCH_KEYS` gains `profile`, kept when not handed (`RELAUNCH_KEPT`), refused unless the member's adapter runs it (`doctor_profiles`, a home member only), written into the launch record and the mark `relaunch: {at, lane, review, profile}`; the replay creates under it (`tests/test_relaunch.py`). Left: slice 2 (`src/shiftlead/**`) — step 1's comparison (`teamrun.differences`, `cards.flow_mark`, a closed seat compared too), the client always handing `profile`, step 4's `ao team flow` lines and Apply's confirm, and step 5's comparison, closed-seat-fill and `ao team flow` tests. Was: Open.
-**Location:** design §4.9c *Switching* (the comparison and the `relaunch` RPC), §6 *Keeping a team running* and rule 7, §4.5a *flow changed — Apply*, §4.7 `ao team flow`, §9 invariant 10; `src/sessionorc/agent_common.py` (`RELAUNCH_KEYS` ~L153: add `profile`), `src/sessionorc/agent.py` (`rpc_relaunch` ~L1752: `profile` in its `kinds` map ~L1779 as a `str`, checked against `profiles.yml` as a create checks it; the mark's write ~L1801 gains `profile`; a `closed` seat's record is accepted, as it is today), the client's comparison (`src/shiftlead/teamrun.py` `differences` ~L900–940 and `_next_run`, and `src/shiftlead/ui/cards.py` `flow_mark` ~L622: the profile the member's definition resolves — its `profile:`, else its role's from the `roles:` overlay (`teams.py` ~L842) — against the session record's `profile`, or the `relaunch` mark's when one stands; and for a seat, the profile check runs on a `closed` record too, which `differences` skips today ~L920), `src/shiftlead/cli.py` (`ao team flow`'s difference lines); `tests/test_teamrun*.py`, `tests/test_relaunch*.py` or `tests/test_agent*.py`, `tests/test_ui_org*.py`
-
-**Why:** TD-619: Paul, 2026-10-12 — *I have had to take control of techlead-ao-1 three times now to change it to use opus. Apparently it is defaulting back to fable on restarts?*; `org.yml` moved `techlead` and `designer` to `grind`, and every restart and seat fill replayed `grind-fable` from the launch record.
-
-**Fix:**
-1. The comparison: for each live, unattended member — and every seat, closed between fills or running — the profile its definition resolves (member `profile:`, else role's from the overlay, else the team's default) against its session record's `profile` (or its `relaunch` mark's, once Apply has run); a difference is a member line *profile <old> → <new> (next restart)* and makes the team read *definition changed — Apply* when nothing else differs, *flow changed — Apply* as today otherwise.
-2. `relaunch`: `RELAUNCH_KEYS` gains `profile`; the RPC checks it names a profile `profiles.yml` holds (refused naming it otherwise), writes it into the launch record, and marks `relaunch: {at, lane, review, profile}`; the client always hands it with the rest of the composed launch.
-3. Rule 7 is unchanged: the mark is already its second trigger; an idle member restarts on the new record, a working one is told on its `ao` replies and restarts on its word (rule 2); a closed seat's next fill replays the relaunched record, a running seat at its next fill after it closes. A `--profile` given at `ao team start` shows as a difference until the next start.
-4. `ao team flow <team>` prints the profile lines; Apply's confirm names them.
-5. Tests: a member whose role's profile changed reads a difference and the team the mark; a closed seat whose role's profile changed reads one too, `rpc_relaunch` on that closed seat succeeds, and its next fill creates under the new profile; Apply relaunches with the new profile and the replay creates under it; a member with its own `profile:` that matches is no difference; an interactive member is compared on nothing; a profile `profiles.yml` lacks is refused by `relaunch`; `ao team flow` prints the line.
-
-**Done when** a role's profile changed in `org.yml` shows on a running team's card as a difference, Apply carries it into every affected launch record, the next restart or fill runs it without a team restart, and the tests above pass.
-
-**Related:** TD-619 (the design), TD-309 (Apply and `relaunch`), TD-399 (a seat the definition names).
 
 ---
 
