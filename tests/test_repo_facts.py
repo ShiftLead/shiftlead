@@ -541,6 +541,17 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert row in out and out.index("board:0123abcd") < out.index("pr:1573") < out.index("pickable     TD-012")
     # g2's lane is free-pick and no team here has an anchor seat: the order is in its lane too
     assert "pr:1573" in out.split("g2 is")[1]
+    # a sync PR's order is first of all, before the board's line, counted apart (§4.4, TD-684)
+    sync = {"id": "pr:1728", "title": "sync dev-cadence 517a2b5", "for_page": "pickable", "pickable": "yes",
+            "work_order": True, "pr_order": True, "priority": "High", "pr": 1728, "sync": True,
+            "sync_since": "2026-10-14T09:00:00Z", "reason": "green: review and merge it"}  # fmt: skip
+    reading[str(repo)]["pr_orders"] = {"orders": [sync, red], "told": {}}
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "1 decided board line, 1 sync PR to land, 1 red PR nobody holds: 4 pickable" in out
+    row = "pickable     pr:1728  High    anchor       sync dev-cadence 517a2b5 · sync since 2026-10-14T09:00:00Z: green"
+    assert row in out and out.index("pr:1728") < out.index("board:0123abcd") < out.index("pickable     pr:1573")
+    assert out.count("pr:1728  High") == 1
 
 
 def test_ao_repo_marks_a_live_check_and_lists_the_ones_that_wait(repo, monkeypatch, capsys):
@@ -840,6 +851,11 @@ def test_a_red_prs_order_is_the_anchors_and_free_picks_only_where_no_team_has_an
     both = {**g, "lane": ["free-pick", "anchor"]}  # one team holding both words takes it
     assert teamrun.repo_lanes(entries, repo, [both])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
     assert "free_pick" not in red  # the reading's own entry is never written to
+    # a sync PR's order comes before every entry and every other order (TD-684)
+    sync = {**red, "id": "pr:8", "sync": True}
+    td = {"id": "TD-001", "title": "e", "for_page": "pickable", "pickable": "yes", "priority": "High"}
+    r2 = {**r, "ledger": {"entries": [td]}, "pr_orders": {"orders": [red, sync], "told": {}}}
+    assert [e["id"] for e in teamrun.lane_entries(r2)] == ["pr:8", "TD-001", "board:00aa11bb", "pr:7"]
     assert teamrun.pr_orders({"pr_orders": None}) == [] and teamrun.pr_orders(None) == []
 
 
@@ -1032,6 +1048,59 @@ def test_red_since_is_the_first_reading_that_saw_it_red_kept_while_it_stays_so(t
     third = reports.pr_reading(tmp_path, t2, old=second)
     by = {p["number"]: p for p in third["open"]}
     assert (by[5]["red_since"], by[6]["red_since"]) == (t0.isoformat(), t2.isoformat())
+
+
+def test_a_sync_pr_is_read_by_its_branch_and_the_lock_among_all_its_files_once_per_head(tmp_path, monkeypatch):
+    """TD-684, design §4.4 *A sync PR is the team's at once*: a `cadence-sync-*` branch whose changed
+    files, read whole through the paginated list, include the lock is `sync`, with `sync_since` the
+    first reading that saw it; the files are read once per head; a fork says so."""
+    t0 = datetime.now(UTC)
+    sync = _pr(5, "open", t0, headRefName="cadence-sync-517a2b5", headRefOid="h1", isCrossRepository=True)
+    other = _pr(6, "open", t0, headRefName="cadence-sync-x", headRefOid="h2")  # no lock among its files
+    plain = _pr(7, "open", t0)  # not a candidate: its files are never read
+    files = {5: [f"src/f{i}.py" for i in range(150)] + ["docs/cadence-sync.lock"], 6: ["scripts/a.sh"]}
+    reads = []
+    calls = _fake_gh(monkeypatch, [sync, other, plain], [])
+    run = reports.subprocess.run
+
+    def with_files(argv, **kw):
+        if argv[1] == "api" and "/files" in argv[2]:
+            n = int(argv[2].split("/")[-2])
+            reads.append((n, argv))
+            return subprocess.CompletedProcess(argv, 0, "".join(f"{f}\n" for f in files[n]), "")
+        return run(argv, **kw)
+
+    monkeypatch.setattr(reports.subprocess, "run", with_files)
+    first = reports.pr_reading(tmp_path, t0)
+    by = {p["number"]: p for p in first["open"]}
+    assert (by[5]["sync"], by[5]["sync_since"], by[5]["fork"]) == (True, t0.isoformat(), True)
+    assert by[6]["sync"] is False and "sync_since" not in by[6] and by[6]["fork"] is False
+    assert "sync" not in by[7]
+    assert sorted(n for n, _ in reads) == [5, 6]
+    assert all("--paginate" in argv and argv[2] == f"repos/{{owner}}/{{repo}}/pulls/{n}/files" for n, argv in reads)
+    assert calls  # the open read itself still went through gh pr list
+    # the next reading at the same heads reads no files and keeps `sync_since`; a new head reads again
+    reads.clear()
+    second = reports.pr_reading(tmp_path, t0 + timedelta(minutes=10), old=first)
+    assert reads == [] and second["open"][0]["sync_since"] == t0.isoformat()
+    sync["headRefOid"] = "h3"
+    third = reports.pr_reading(tmp_path, t0 + timedelta(minutes=20), old=second)
+    assert [n for n, _ in reads] == [5] and third["open"][0]["sync_since"] == t0.isoformat()
+    # a files read that failed keeps the last word and asks again next time
+    reads.clear()
+    sync["headRefOid"] = "h4"
+    files.pop(5)
+
+    def failing(argv, **kw):
+        if argv[1] == "api" and "/files" in argv[2]:
+            reads.append((0, argv))
+            return subprocess.CompletedProcess(argv, 1, "", "HTTP 502")
+        return run(argv, **kw)
+
+    monkeypatch.setattr(reports.subprocess, "run", failing)
+    fourth = reports.pr_reading(tmp_path, t0 + timedelta(minutes=30), old=third)
+    s4 = {p["number"]: p for p in fourth["open"]}[5]
+    assert (s4["sync"], s4["sync_head"], s4["sync_since"]) == (True, "h3", t0.isoformat())
 
 
 async def test_the_home_hands_each_pr_read_the_last_reading_so_red_since_is_kept(agent, repo, monkeypatch):

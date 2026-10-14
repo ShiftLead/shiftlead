@@ -718,7 +718,9 @@ def red_pr_rows(
     order is a lane's, never the person's — under *Needs you*, counted: *`<repo>` #<n> · red 3h 5m ·
     <the failing checks> · <author>*. **Open** is the PR on its forge; **Snooze ▾** by time alone,
     keyed `red_pr:<repo>:<n>` in the attention store. Every part from the home's reading; it leaves
-    when the order does — green, closed, or held by a live record."""
+    when the order does — green, closed, or held by a live record. A sync PR's order (TD-684) has the
+    row green or red, *`<repo>` #<n> · sync · <its reason> · <author>*, and leaves when it merges,
+    closes or is held."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for root, r in sorted((repos or {}).items()):
@@ -729,10 +731,15 @@ def red_pr_rows(
             n = e.get("pr")
             if not isinstance(n, int):
                 continue
-            since = str(e.get("red_since") or "")
-            word = "red" if e.get("checks") == "red" else "conflicting"
-            failing = ", ".join(e.get("failing") or [])
-            parts = [f"{repo} #{n}", f"{word} {_age(since, at)}".strip(), failing, str(e.get("author") or "")]
+            if e.get("sync"):
+                # a sync PR the home did not merge, green or red, its reason in place of the checks (TD-684)
+                since = str(e.get("sync_since") or "")
+                parts = [f"{repo} #{n}", "sync", str(e.get("reason") or ""), str(e.get("author") or "")]
+            else:
+                since = str(e.get("red_since") or "")
+                word = "red" if e.get("checks") == "red" else "conflicting"
+                failing = ", ".join(e.get("failing") or [])
+                parts = [f"{repo} #{n}", f"{word} {_age(since, at)}".strip(), failing, str(e.get("author") or "")]
             text = " · ".join(x for x in parts if x)
             out.append(
                 {

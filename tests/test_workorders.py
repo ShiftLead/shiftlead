@@ -427,6 +427,53 @@ def test_a_red_pr_order_is_the_anchor_lanes_and_free_picks_only_with_free_pick()
     assert not ledger_mod.lane_matches(["design-first"], o)
 
 
+def _sync(n=1728, since=T0, checks="green", **kw):
+    pr = {"number": n, "title": "sync dev-cadence 517a2b5", "url": f"https://github.com/o/r/pull/{n}"}
+    return {**pr, "branch": f"cadence-sync-{n}", "author": "a", "checks": checks, "failing": [], "sync": True,
+            "sync_since": since.isoformat(), **kw}  # fmt: skip
+
+
+@pytest.mark.unit
+def test_a_sync_pr_is_an_order_from_the_first_reading_whatever_its_checks_but_pending():
+    """TD-684, design §4.4 *A sync PR is the team's at once*: no `ORPHAN_AFTER`, green or red; a
+    pending one waits; the reason is the order's `Context` beside the URL."""
+    red = _sync(1, checks="red", failing=["test (3.13)"], red_since=T0.isoformat())
+    cases = {
+        "green": (_sync(2), "green: review and merge it"),
+        "red": (red, "test (3.13)"),
+        "conflicting": (_sync(3, conflicting=True), "conflicting"),
+        "draft": (_sync(4, draft=True), "draft"),
+    }
+    for word, (pr, reason) in cases.items():
+        (o,) = workorders.red_prs([pr], [], T0, {}, HOUR)[0]
+        assert (o["id"], o["sync"], o["reason"]) == (f"pr:{pr['number']}", True, reason), word
+        assert o["context"] == f"{pr['url']} · {reason}" and o["sync_since"] == T0.isoformat(), word
+        assert o["pr_order"] and o["priority"] == "High" and o["pickable"] == "yes", word
+    assert workorders.red_prs([_sync(checks="pending")], [], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    # a cadence-sync branch whose files lack the lock is no sync PR: a green one is never an order
+    assert workorders.red_prs([_sync(sync=False)], [], T0 + 3 * HOUR, {}, HOUR)[0] == []
+    # sync orders come first, before a red PR's
+    orders = workorders.red_prs([_red(since=T0 - HOUR), _sync()], [], T0, {}, HOUR)[0]
+    assert [o["id"] for o in orders] == ["pr:1728", "pr:1573"]
+    assert "sync" not in orders[1]
+
+
+@pytest.mark.unit
+def test_a_held_sync_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over_on_sync_since():
+    working = _rec(state="working", git={"branch": "cadence-sync-1728"})
+    assert workorders.red_prs([_sync()], [working], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    holder = _rec(progress=[ProgressEntry(ref="pr:1728")])
+    assert workorders.red_prs([_sync()], [holder], T0 + HOUR - timedelta(seconds=1), {}, HOUR) == ([], {}, [])
+    orders, told, notes = workorders.red_prs([_sync()], [holder], T0 + HOUR, {}, HOUR)
+    assert orders == [] and [(sid, p["number"]) for sid, p in notes] == [("ao-g1", 1728)]
+    assert told == {"1728": {"red_since": T0.isoformat(), "at": (T0 + HOUR).isoformat()}}
+    note = workorders.pr_note(notes[0][1])
+    assert note.startswith("sync PR #1728 has been open since") and "green: review and merge it" in note
+    assert workorders.red_prs([_sync()], [holder], T0 + 2 * HOUR - timedelta(seconds=1), told, HOUR)[0] == []
+    orders, kept, notes = workorders.red_prs([_sync()], [holder], T0 + 2 * HOUR, told, HOUR)
+    assert [o["id"] for o in orders] == ["pr:1728"] and orders[0]["sync"] and kept == told and notes == []
+
+
 @pytest.mark.unit
 def test_the_holders_of_a_red_pr_are_named_past_the_bound():
     """TD-652: the reading names each red PR's holders, for the pages' *held by <name>*: a live

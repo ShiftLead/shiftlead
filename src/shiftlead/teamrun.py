@@ -1097,9 +1097,13 @@ def pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
 def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
     """What a team's lanes read of a repo (§4.4 *In a team's lanes*): the ledger's open entries and
     the work orders beside them — the board's decided lines (TD-384) and the red PRs nobody holds
-    (TD-613) — or None where the ledger was not read."""
+    (TD-613) — or None where the ledger was not read. A sync PR's order comes before every entry and
+    every other order (§4.4 *A sync PR is the team's at once*, TD-684)."""
     entries = ((r or {}).get("ledger") or {}).get("entries")
-    return None if entries is None else [*entries, *work_orders(r), *pr_orders(r)]
+    if entries is None:
+        return None
+    prs = pr_orders(r)
+    return [*(e for e in prs if e.get("sync")), *entries, *work_orders(r), *(e for e in prs if not e.get("sync"))]
 
 
 def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
