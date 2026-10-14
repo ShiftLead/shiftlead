@@ -310,6 +310,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      something already due fills at once** — a question in the mail a Start keeps (`keep_mail`;
      the held create moves the mail as a fill does), a member `needs-you` from the first minute —
      by this rule and no Start-time case: the Start itself is never a cause.
+     **A replay of the team writes its seats the same way**: rule 8's start and §6 *Schedule*'s
+     replay at a reset hand every seat record they replay — the manager on call, the techlead, the
+     anchor seat, any seat with a trigger — to `create` with `held` and `keep_mail`: `closed`, no
+     pane, the launch record, the mail moved, `closer: {by: start, why: held}`, its `restarts` entry
+     the replay's (`why: work` or `schedule`, the start's `ids`, `start` and `of`) with **`held:
+     true`**. A replayed seat is on call again with its trigger standing, and the first tick fills it
+     only for a cause, as after a Start; a seat that ended with a question in its mail is filled on
+     that tick. A standing manager (`on_call: false`) is no seat and replays live; a session's own
+     start time (§6 *Start time*) is not a team's replay and creates what it was set for.
      **A fill says why it came**: the prompt a fill hands `create` is the brief, filled again as
      rule 7 has it, with **one closing line** in fixed words — *[shiftlead] you are filled for: <by>
      — <member or the question's id>* — the cause as `seat_due` carries it, so the seat's first
@@ -599,7 +608,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      - **`start`**, and what a team with no key has (`ON_WORK_DEFAULT`; TD-466 slice 2): a person's standing press, as a schedule is. The home
        replays the team: the launch record of every record carrying the badge that ended by the
        team's own ending, as §6 *Schedule* replays at the reset and under its rules (seats included,
-       no launch record no start, a suspended record or one at its ceiling left out — a seat's
+       each written on call by rule 3's held create and never filled by the start, no launch record no start, a suspended record or one at its ceiling left out — a seat's
        fills, which rule 3 never counts toward `RESTART_CEILING`, not counted here either), `why:
        work`, each entry carrying the `ids` it was started for, the start's instant as `start` and
        `of`, how many records the start set out to replay (so a start whose replays partly fail is
@@ -1097,7 +1106,7 @@ teams:
   manager's own close after a wind-down (§4.9a) — not suspended and not at a restart ceiling, the
   tick replays its launch record as rule 2 does for a wanted restart, `why: schedule`, under
   `RESTART_CEILING` as every restart is, the seats included (a replayed seat is on call again, its
-  trigger standing). A team with anything live at the reset is left alone. One with no launch
+  trigger standing: written held by rule 3's create, no pane, filled only for a cause). A team with anything live at the reset is left alone. One with no launch
   records — never started by a person on this home, or its cards forgotten, which deletes them —
   starts nothing: **a schedule restarts a team a person once started and never invents one**, so the
   briefs a scheduled team runs are the ones its last person-pressed start read, and a brief change
