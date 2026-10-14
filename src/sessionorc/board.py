@@ -743,7 +743,7 @@ def branch_edit(
         raise Refused("HEAD is detached: a session's board edit is committed on its work branch, in its PR")
     if branch in _default_names(root):
         raise Refused(
-            f"this is {branch}, origin's default branch: a session's board edit goes in the PR that did "
+            f"this is {branch}, a default branch: a session's board edit goes in the PR that did "
             "the work, never a commit to it (design §4.7)"
         )
     if _git(root, "diff", "--cached", "--quiet").returncode != 0:

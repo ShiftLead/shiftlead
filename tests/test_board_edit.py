@@ -85,7 +85,7 @@ def test_a_moved_line_main_a_detached_head_and_a_dirty_index_are_refused_touchin
         board.branch_edit(root, "done", line=5, expect="act")
     git(root, "checkout", "-q", "--", "docs/user_attention.md")
     git(root, "switch", "-q", "main")
-    with pytest.raises(board.Refused, match="origin's default branch"):
+    with pytest.raises(board.Refused, match="a default branch"):
         board.branch_edit(root, "done", line=5, expect="act")
     git(root, "switch", "-q", "--detach")
     with pytest.raises(board.Refused, match="detached"):
@@ -156,12 +156,12 @@ def test_origins_default_is_refused_whatever_its_name_and_unknown_main_and_maste
     root = make_repo(tmp_path, branch="trunk")
     git(root, "update-ref", "refs/remotes/origin/trunk", "HEAD")
     git(root, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk")
-    with pytest.raises(board.Refused, match="trunk, origin's default branch"):
+    with pytest.raises(board.Refused, match="trunk, a default branch"):
         board.branch_edit(root, "done", line=5, expect="act")
     git(root, "switch", "-q", "main")  # origin says trunk: main is a branch like any other
     assert board.branch_edit(root, "done", line=5, expect="act")["branch"] == "main"
     other = make_repo(tmp_path / "b", branch="master")
-    with pytest.raises(board.Refused, match="master, origin's default branch"):
+    with pytest.raises(board.Refused, match="master, a default branch"):
         board.branch_edit(other, "done", line=5, expect="act")
 
 
