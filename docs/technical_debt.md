@@ -64,12 +64,14 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-635 | Build TD-634: `ao inbox --counts` asks the UI's counts read first; the person's local count names `person`; a session with no UI answering is refused in words; a test runs it as a session | Medium | Open |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
-| TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Open |
+| TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
 | TD-639 | Build TD-637: `done … --pr` reads the PR's required checks at the declaration — refused on a failure, *checks pending* while running; the repo reading keeps each base branch's required set | Medium | Open |
 | TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Open |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
 | TD-643 | Two writers of `spend.json.tmp` at once: the home's spend save fails with ENOENT, and a link test flakes | Medium | Open |
+| TD-644 | Build TD-638 (ShiftLead): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE`; the host writes the model in use to the file whenever it is set or changes | Low | Open |
+| TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, Cloudflare second, `ssh -L` always; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
 | TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, cloudflare, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
@@ -1207,7 +1209,8 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 8)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-13 (the designer) — (1) **one trailer, `Agent-Model: <adapter>/<model>`**, not a second `Co-Authored-By` (a model is no git identity, and the forge draws a co-author as a person); (2) **the hook reads a file**, `AGENT_MODEL_FILE` (`<absolute git-dir>/shiftlead-agent-model`, one per worktree), which the host agent writes with the full id whenever the record's model in use is set or changes (both set-sites: the hook's SessionStart and `PostModelSwitch`, the tick's transcript read), with `AGENT_MODEL` (the profile's alias with its adapter, `claude-code/opus`, the full id being unknown at launch) as the fallback, the trailer replaced, not added, on an amend and nothing where neither is set — the synced hook never asks `ao` (§8); (3) a review's model stays the `cadence-review:` line's; a subagent's is not named, the commit being the session's; (4) the hook is dev-cadence's (TD-645), the launch's variables and the file ShiftLead's (TD-644). §4.2, §4.2a, §8. Built by TD-644 and TD-645. Was: Open.
+**Blocked by:** TD-644, TD-645
 **Location:** `scripts/git-hooks/prepare-commit-msg` (dev-cadence's, cadence §9.9: `Co-Authored-By: $AGENT_NAME <…>` from the `AGENT_NAME` the orchestrator exports); design §4.2a (the model in use, TD-031), §4.3 (a metered profile's `Turn` carries `model`)
 
 **Why:** Paul, 2026-10-13: *"As we start using more models, recording which did what is a good idea. We get some of this by including the session name as a git contributor, but could expand it to list the actual model."* Today a squash commit carries the session's trailer (`ao-paul <ao-paul@shiftlead.placeholder>`) and, from Claude Code's own attribution, `Claude Opus 5.5`; a tool that adds no attribution of its own (Codex, Gemini CLI) leaves only the session, and a mid-run model switch or a subagent on another model is in neither.
@@ -1337,6 +1340,50 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** concurrent spend saves never raise, and the link test passes in repeated full runs.
 
 **Related:** TD-151 (the spend ledger), TD-463 (the CI flakes).
+
+---
+
+## TD-644: Build TD-638 (ShiftLead): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE`; the host writes the model in use to the file whenever it is set or changes
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-638's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 (*And the model*), §4.2a, §8; `src/sessionorc/agent.py` (the launch env ~L1120, beside `AGENT_NAME`: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (`profiles.py` ~L44 keeps an alias, not a full id), `AGENT_MODEL_FILE` = `git rev-parse --absolute-git-dir` in the session's directory joined with `shiftlead-agent-model`), both places the record's `model` is set — the hook apply `agent_tick.py` ~L3840 (SessionStart, `PostModelSwitch`) and the transcript read ~L3278 — writing the file with `<adapter>/<s.model>` when the value changes (`s.model` is the full id; `short_model`, `adapters.py` ~L214, is display only); `tests/test_agent*.py`, `tests/test_hook*.py`
+
+**Why:** TD-638: Paul, 2026-10-13 — *recording which did what is a good idea … could expand it to list the actual model*; a commit names the session, and only Claude Code's own attribution names a model, never after a `/model` switch.
+
+**Fix:**
+1. At create: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (absent where the profile names none), `AGENT_MODEL_FILE` = `<absolute git-dir>/shiftlead-agent-model` (absent outside a git tree); no file yet — the full id is unknown until the tool reports it.
+2. Whenever the record's `model` is set or changes, at either set-site: write the file with `<adapter>/<s.model>`; a write that fails is logged, never the hook's or the tick's.
+3. A `shell` session: no `AGENT_MODEL`, no file.
+4. Tests: the launch env carries both, `AGENT_MODEL` the alias; the file is written at SessionStart's model and rewritten by a `PostModelSwitch`, and by the tick's transcript read when no hook gave one; the path is absolute from a subdirectory; a shell gets neither.
+
+**Done when** every agent session's environment names `AGENT_MODEL` and `AGENT_MODEL_FILE`, the file holds the model in use and follows a switch, and the tests above pass.
+
+**Related:** TD-638 (the design), TD-645 (the hook), TD-031 (the model in use), TD-185 (`AGENT_NAME`).
+
+---
+
+## TD-645: `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638)
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-638's round)
+**Owner:** dev-cadence
+**Kind:** build
+**Status:** Open
+**Location:** `scripts/git-hooks/prepare-commit-msg` (a SYNCED FILE, dev-cadence's: the change is made there and synced; cadence §9.9)
+
+**Why:** TD-638: ShiftLead now names the model in use in `AGENT_MODEL_FILE` and the declared one in `AGENT_MODEL` (design §4.2); the hook that writes `AGENT_NAME` as a co-author writes no model.
+
+**Fix:** in dev-cadence, beside the `Co-Authored-By` trailer: read the first line of `$AGENT_MODEL_FILE` when it is set and readable, else `$AGENT_MODEL`, and add `Agent-Model: <value>` with `git interpret-trailers --if-exists replace` for that key (an amend after a model switch names the new model, never two); nothing when neither is set; tool-neutral, never calling `ao`. Then the sync brings it here.
+
+**Done when** a commit made in a session with either variable carries one `Agent-Model:` trailer naming the model then in use, one made without carries none, and dev-cadence's sync lands it.
+
+**Related:** TD-638 (the design), TD-644 (ShiftLead's side).
 
 ---
 

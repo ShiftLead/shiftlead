@@ -31,6 +31,8 @@ seams*).
 - A synced file never calls `ao`. Where it must behave differently in an shiftlead session, it
   reads an environment variable that shiftlead's launch sets. `CADENCE_ATTENTION_SCOPE` is the
   first: the hook reads it, and every launch sets it, `own` unattended and `machine` interactive
-  (§4.3, TD-425). The hook's `ao status` branch is the one known exception until dev-cadence
+  (§4.3, TD-425). `AGENT_MODEL` and `AGENT_MODEL_FILE` are the next (§4.2, TD-638): the commit hook
+  reads the file, which the host agent rewrites when the model in use changes, so a variable set once
+  at launch is not the only source and no hook asks `ao`. The hook's `ao status` branch is the one known exception until dev-cadence
   drops it, which waits on TD-425's live check telling it the variable reaches the hook.
 
