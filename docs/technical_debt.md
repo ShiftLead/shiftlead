@@ -74,6 +74,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-664 | Build TD-658: a session's `ask` carrying `pr` refused until the PR's required checks are green, read as `done` reads them; `done --pr` refused while they run; the briefs say green before the hand-off | Medium | Slices 1–2 in #1685; slice 3 (briefs) left |
 | TD-665 | A shell's Focus and card draw an agent's controls: Wrap up types the wrap-up prompt into bash, and Message, Reports, Ready to close and the Session card's grants and controllers are agent-shaped | Medium | Designed — TD-666 builds it |
 | TD-666 | Build TD-665: a record with no agent — the adapter's `agent` on the view; no prose typed, no mail, no derived claim; Focus and the card draw a shell's controls | Medium | Open |
+| TD-667 | A key typed into the Focus terminal while it is scrolled back is swallowed by tmux's copy mode: typing should return the pane to the live screen and reach the prompt | Medium | Open |
 
 ---
 
@@ -1438,5 +1439,25 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** nothing types prose into a shell or a command run, mail to one is refused, no claim is derived for one, Focus and the card draw only a shell's controls (looked at, shots in the PR), and the tests above pass.
 
 **Related:** TD-665 (the design), TD-580 (the person's own shell), TD-577 (Open shell here), TD-112 (adapter neutrality).
+
+---
+
+## TD-667: A key typed into the Focus terminal while it is scrolled back is swallowed by tmux's copy mode: typing should return the pane to the live screen and reach the prompt
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (the Focus terminal: `term.onData` sends keys as they are; the `wheel` handler and Shift+PageUp send `{scroll}` messages), `src/shiftlead/ui/pty_bridge.py` (`scroll_argv`: `copy-mode -e`, `send-keys -X -N n scroll-up`; `pump`'s `up()` writes key frames to the pty and awaits `scroll` only until the tmux command is spawned); design §4.6 *Scrollback is tmux's, reached through tmux*, §4.5a (no row yet for a key in a scrolled-back terminal; *Focus composer* rows for what stays out)
+
+**Why:** Paul, 2026-10-13: *"Is there a way to have the Focus terminal unscroll to the prompt input when a user starts typing in it? Typing into the composer should not do this, just in the terminal portion."* The wheel and Shift+PageUp scroll tmux's history by putting the pane in copy mode (§4.6), and in copy mode tmux reads keys as copy-mode commands, not input: checked on a scratch tmux 3.5a (emacs `mode-keys`, the default), `x y z` typed after a five-line scroll-up left the pane in copy mode and reached nothing. So a person who scrolled back to read and starts typing loses the keys, silently, and must scroll down to the bottom (or know copy mode's `q`) first. A local terminal and VS Code jump to the prompt on input; xterm.js's `scrollOnUserInput` would do that here, but it does nothing with `scrollback: 0`, since the history is tmux's.
+
+**Fix:** design first, a §4.6 sentence and a §4.5a row: a key the person types into the terminal while the pane is in copy mode first leaves copy mode (`copy-mode -q` against the session; checked: it returns the pane to the live screen) and then reaches the pane, so the first key is not lost. The round settles: (1) **which input counts** — a printable key, Enter, Backspace and a paste (Paul's *starts typing*), and not a lone modifier, Shift+PageUp/PageDown, the wheel, Ctrl+C or Ctrl+Shift+C taken by Copy, or a key on a read-only attach (dropped anyway, §4.6); (2) **who knows the pane is scrolled** — the page (a flag set by its own scroll messages, cleared at the bottom; another client's copy mode unseen) or the bridge (`#{pane_in_mode}` read before a key frame), and **the order**: the leave must finish before the key is written, which `pump`'s `scroll` does not wait for today; (3) **the composer stays out**, as Paul asks: typing in it leaves the terminal where it is (whether its **Send** should leave copy mode is the round's call); (4) a program's own mode (`less`, a pane's `vi`) is not copy mode and is untouched. The design names the build entry.
+
+**Done when** §4.6 and §4.5a say what a key typed into a scrolled-back terminal does, and the build entry is filed.
+
+**Related:** TD-022 (scrollback is tmux's), TD-174 (the wheel as a scroll message), TD-491 (the composer's bar).
 
 ---
