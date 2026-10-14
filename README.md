@@ -109,6 +109,20 @@ key, and `ao connect` never runs `sudo` (design §4.5b, §4.7).
    `ao connect` alone shows the route; `ao doctor route` checks it.
 8. On the phone: the **Tailscale app**, signed in as the same login, then open the URL
    `ao connect` printed.
+9. On each computer you code from: the **client**, signed in as the same login. Point the ssh alias
+   your editor uses (VS Code Remote-SSH, and the UI's VS Code links through `vscode_host`) at this
+   machine's tailnet name or address, not its LAN address:
+
+   ```
+   Host kmaster
+     HostName 100.x.y.z        # `tailscale ip -4` on this machine, or kmaster.<tailnet>.ts.net
+     User you
+   ```
+
+   The alias goes in the ssh config of the program that runs ssh: on Windows, VS Code reads
+   `C:\Users\<you>\.ssh\config` by default, not WSL's `~/.ssh/config`; and when `HostName` is a
+   name, a line for it in `C:\Windows\System32\drivers\etc\hosts` decides where it goes. The first connect asks you to accept the
+   host key again, because ssh files it under the new address. Port 22 is already granted (step 6).
 
 **If 443 already serves the plain port** (the interim of design §4.5b, before the route port
 existed), the UI refuses what that proxy sends, and the phone shows a page saying so. Run
