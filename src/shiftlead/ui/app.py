@@ -1367,6 +1367,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             repos=repos,
             waits=await h.person_waits(),  # the header's *waiting* chip (§4.5a, TD-274)
         )
+        # §4.5a *Git card: changed files* (TD-628): the porcelain's paths are relative to the worktree's top
+        # level, the directory or above it — read here, where the links are drawn (a record on this host)
+        here = v.get("editor") and v.get("host") == host_name() and v.get("dir")
+        v["git_root"] = await asyncio.to_thread(gitinfo.toplevel, Path(str(v["dir"]))) if here else ""
         return templates.TemplateResponse(
             request,
             "focus.html",
