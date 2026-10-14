@@ -8,6 +8,7 @@
    mark, a row is a card. Everything here is drawn from `settings_page.py`; every write posts to
    `/api/settings/<section>` and says *applies on the next tick*, or the refusal in place. #}
 {% block body %}
+{% from "file_link.html" import file_link %}
 {% macro imark(id, name, text) -%}
 <button class="imark helpmark" type="button" data-info="set-{{ id }}" id="i-set-{{ id }}" aria-controls="set-{{ id }}" aria-expanded="false" aria-describedby="set-{{ id }}" aria-label="About {{ name }}" title="{{ text }}">i</button>
 {%- endmacro %}
@@ -18,13 +19,13 @@
 {#- a file card's foot (§4.5a *Open file*, *read-only values and the i mark*): the file, when it is
     re-read and who edits it, and the editor button with the file's path; none under `open_in: none` -#}
 <div class="row gap wrap setfoot"><span class="note"><span class="mono">{{ path }}</span> · read {{ read }} · {{ who }}</span><span class="grow"></span>
-{%- set ed = editor_link(path) %}{% if ed and path %}<a class="btn sm ghost" href="{{ ed.url }}" title="open {{ path }} in {{ ed.label }}">Open file</a>{% endif %}</div>
+{%- set ed = editor_file_link(path) %}{% if ed %}{{ file_link(ed, "Open file", "open " ~ path ~ " in " ~ ed.label, "btn sm ghost") }}{% endif %}</div>
 {%- endmacro %}
 {% macro filehead(path, what) -%}
 {#- a card whose values are set here but whose definition is a file's (TD-286): the file named at the
     card's head as its source, beside the card's name, so **Open file** is not read as one more setting -#}
 <span class="grow"></span><span class="note" title="{{ path }}">{{ what }} <span class="mono">{{ path.rsplit("/", 1)[-1] }}</span></span>
-{%- set ed = editor_link(path) %}{% if ed and path %}<a class="btn sm ghost" href="{{ ed.url }}" title="open {{ path }} in {{ ed.label }}">Open file</a>{% endif %}
+{%- set ed = editor_file_link(path) %}{% if ed %}{{ file_link(ed, "Open file", "open " ~ path ~ " in " ~ ed.label, "btn sm ghost") }}{% endif %}
 {%- endmacro %}
 {% macro saverow(said) -%}
 {#- a card's Save row (§4.5a *Settings page*, TD-286): Save stays disabled, and Cancel hidden, until a

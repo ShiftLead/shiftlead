@@ -222,6 +222,30 @@ def editor_file(*, local: bool, remote: str, reach: str = "") -> str | None:
     return f"vscode://vscode-remote/ssh-remote+{remote}{{path}}"
 
 
+def editor_file_link(
+    path: str, *, local: bool, remote: str, reach: str = "", folder_url: str | None = None, line: int = 1
+) -> dict[str, Any] | None:
+    """A file button's link (design §4.6 *A file button is a file link*, TD-688, built by TD-689):
+    `{label, url, folder, wait}`, or None where no file button is drawn — `open_in: none`, no path, or
+    an editor form that names no file. `url` is `editor_file`'s form filled with the path, percent-encoded
+    with `/` kept, and `:<line>` after it on every `vscode` form (a remote path opens as a file only when
+    it ends in `:digits`, TD-524), a template's `{line}` taking the line — `AO.fileUrl`'s shape. `folder`
+    is `folder_url`, the checkout's folder link the caller found, sent first; None when there is none
+    or the person turned `file_link.folder_first` off, so the press is one launch. `wait` is in seconds."""
+    form = editor_file(local=local, remote=remote, reach=reach) if path else None
+    if not form:
+        return None
+    at = f":{line}" if form.startswith("vscode://") and form.endswith("{path}") else ""
+    url = form.replace("{path}", quote(path, safe="/") + at).replace("{line}", str(line))
+    fl = file_link()
+    return {
+        "label": open_in().label,
+        "url": url,
+        "folder": folder_url if folder_url and fl["folder_first"] else None,
+        "wait": fl["wait"],
+    }
+
+
 def vscode_link(directory: str, *, local: bool, remote: str) -> str:
     """The default's two forms (design §4.5): `vscode://vscode-remote/ssh-remote+<alias><path>` — the
     alias must be in the person's own ~/.ssh/config — or `vscode://file/…` when the UI runs where

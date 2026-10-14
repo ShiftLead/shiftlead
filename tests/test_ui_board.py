@@ -114,7 +114,7 @@ def test_a_board_row_carries_its_repo_team_due_words_text_and_the_board_at_its_l
     assert r["row"] == "board" and r["repo"] == "samscrape" and r["team"] == "sam-grind"
     assert r["due_tag"] == "2d overdue" and r["at"] == "2026-09-20" and r["line"] == 7
     assert r["id"] == f"board:{root}:7"
-    assert r["editor"].startswith("vscode://file") and "user_attention.md:7" in r["editor"]
+    assert r["editor"]["url"].startswith("vscode://file") and "user_attention.md:7" in r["editor"]["url"]
     assert "decide x" in r["find"] and "samscrape" in r["find"]
     # a repo no team's projects hold carries none (the filter's `team:`), and junk is skipped
     assert board_rows(report(root, item(1, "t", "2026-09-20", "due")), {})[0]["team"] == ""

@@ -38,7 +38,7 @@ from shiftlead import teamrun
 
 from . import render as rendermod
 from .cards import _clock, _first_line, alarm_note, alarm_to_view
-from .common import _age, _countdown, _instant, _iso, _left, host_name, templates, vscode_url
+from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -1397,10 +1397,8 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                 continue
             line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
             detail = board_detail(it)
-            url = vscode_url(board) if board else ""
-            if url and isinstance(line, int):
-                head, _, query = url.partition("?")
-                url = f"{head}:{line}" + (f"?{query}" if query else "")
+            # **Open board** is a file link at the item's line, the checkout first (§4.6, TD-689)
+            url = editor_file_link(board, line=line if isinstance(line, int) else 1) if board else None
             rows.append(
                 {
                     "row": "board",

@@ -100,7 +100,7 @@
 {% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member or remove one — org.yml is edited in place, and on a live team the member is started or wound down">Members…</button>
 {% else %}{% set why = "defined in " ~ (g.source_repo or "the repo") ~ "'s .shiftlead.yml — changed by PR" %}<button class="btn sm ghost" disabled title="{{ why }}">Members…</button> <span class="meta" title="{{ g.source or 'a repo' }}">{{ why }}</span>
 {% endif %}
-{%- set ed = editor_link(g.source) if g.source else None %}{% if ed %} <a class="btn sm ghost" href="{{ ed.url }}" title="open {{ g.source }} in {{ ed.label }}">Open file</a>{% endif %}
+{%- set ed = editor_file_link(g.source) if g.source else None %}{% if ed %}{% from "file_link.html" import file_link %} {{ file_link(ed, "Open file", "open " ~ g.source ~ " in " ~ ed.label, "btn sm ghost") }}{% endif %}
  <a class="btn sm ghost" href="/settings#team-{{ g.team }}" title="this team's card on the Settings page, where its flow is picked">Flow on Settings →</a></div>
 {% if g.not_concluded %}<div class="meta notconcluded" title="{{ help_title('not-concluded') }}">not concluded: {{ g.not_concluded | join(' · ') }}</div>{% endif %}
 {% endcall %}{% endif %}

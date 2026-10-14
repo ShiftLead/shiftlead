@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .common import editor_link
+from .common import editor_file_link
 
 TRANSCRIPT_TURNS = 20  # the page opens on the last twenty turns, and *earlier turns* asks for twenty more
 
@@ -81,9 +81,10 @@ def transcript_view(t: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def transcript_editor(path: str, here: bool) -> dict[str, str] | None:
-    """**VS Code** beside the head (§4.5a *Transcript*): the editor button's link from `open_in:`
-    with the transcript file's path in place of the directory — the raw file's reader. Only for a
-    record on this host: another host's file is not at that path here, and a container's reach link
-    names a directory, not a file. None under `open_in: none`."""
-    return editor_link(path) if here and path else None
+def transcript_editor(path: str, here: bool) -> dict[str, Any] | None:
+    """**VS Code** beside the head (§4.5a *Transcript*), and the Focus header's **‹›**: a file link
+    (§4.6 *A file button is a file link*, TD-689) — the editor's file form with `:1`, one launch and
+    no folder, since the file is the tool's and not the worktree's. Only for a record on this host:
+    another host's file is not at that path here, and a container's reach link names a directory,
+    not a file. None under `open_in: none`."""
+    return editor_file_link(path, folder=False) if here and path else None

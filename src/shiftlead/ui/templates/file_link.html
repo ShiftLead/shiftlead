@@ -1,0 +1,10 @@
+{#- design §4.6 *A file button is a file link* (TD-688, built by TD-689): every control that opens one
+    file in the person's editor is drawn here, from `editor_file_link`'s `{label, url, folder, wait}` —
+    an `a.editor` the page's handler presses as the pane's paths are: the checkout's folder first when
+    `folder` is set (`data-folder`, `data-wait` in seconds), else the file form alone. `cls` is the
+    button's own classes, kept (the Inbox's `o` and Enter find **Open board** by `a.btn`). A test holds
+    every **Open file**, **Open ledger**, **Open board** and transcript button to this macro. -#}
+{% macro file_link(l, text, title="", cls="", id="", hidden=false) -%}
+<a class="editor{% if cls %} {{ cls }}{% endif %}{% if hidden %} hidden{% endif %}"{% if id %} id="{{ id }}"{% endif %} data-file-link href="{{ l.url }}" data-label="{{ l.label }}"
+{%- if l.folder %} data-folder="{{ l.folder }}" data-wait="{{ l.wait }}"{% endif %}{% if title %} title="{{ title }}"{% endif %}>{{ text }}</a>
+{%- endmacro %}

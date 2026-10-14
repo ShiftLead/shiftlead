@@ -130,7 +130,9 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
     build_chip,  # noqa: F401
+    checkout_of,  # noqa: F401
     editor_file,  # noqa: F401
+    editor_file_link,
     editor_link,  # noqa: F401
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
@@ -1360,7 +1362,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "doing": summary["doing"],
             "chips": doing_chips(summary["doing"]),
             "doer_w": summary.get("doer_w") or 1,
-            "ledger_editor": editor_link(ledger_file) if ledger_file else None,
+            # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first
+            "ledger_editor": editor_file_link(ledger_file) if ledger_file else None,
             # the seams the repo leaves unset, and a ledger that is not there (§4.5a, TD-591)
             "seams": missing_seams(r),
             "host": host_name(),

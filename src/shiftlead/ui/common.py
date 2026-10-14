@@ -883,7 +883,32 @@ def editor_file(reach: str = "") -> str | None:
     return uiconf.editor_file(local=h.local, remote=h.vscode_host, reach=reach)
 
 
-templates.env.globals["editor_link"] = editor_link  # the Settings page's **Open file** (§4.5a, TD-148)
+def checkout_of(path: str) -> str:
+    """The main checkout in this host's repos registry whose real path holds `path`, or "" — the
+    folder a file link opens first (design §4.6 *Which folder goes first*, TD-689)."""
+    real = os.path.realpath(os.path.expanduser(path))
+    for root in hosts.local_host().repos():
+        top = os.path.realpath(os.path.expanduser(root))
+        if real == top or real.startswith(top.rstrip("/") + "/"):
+            return root
+    return ""
+
+
+def editor_file_link(path: str, folder: bool = True, line: int = 1) -> dict[str, Any] | None:
+    """A file button's link on this host (design §4.6 *A file button is a file link*, TD-689):
+    `{label, url, folder, wait}`, or None for no button. `folder` False is the transcript's one
+    launch; else the checkout holding the file is opened first, and a file outside every checkout —
+    the home's files under `~/.shiftlead` — is one launch."""
+    h = hosts.local_host()
+    root = checkout_of(path) if folder and path else ""
+    ed = editor_link(root) if root else None
+    return uiconf.editor_file_link(
+        path, local=h.local, remote=h.vscode_host, folder_url=ed["url"] if ed else None, line=line
+    )
+
+
+templates.env.globals["editor_link"] = editor_link
+templates.env.globals["editor_file_link"] = editor_file_link  # every file button (§4.6, §4.5a; TD-689)
 templates.env.globals["person_terminal"] = uiconf.terminal  # every page hands it to its terminals (goal 12)
 
 

@@ -114,9 +114,11 @@
       {# design §4.5a Focus header **‹› VS Code** (TD-578): the transcript file in the person's editor, one
          launch — the Transcript page's own link. Not drawn under `open_in: none` or for another host's
          record; hidden until the hook reports the file, as **Transcript** is until the id. #}
-      {% if s.transcript_drawn %}{% set te = s.transcript_editor or s.editor %}
-      <a class="btn sm link editor{% if not s.transcript_editor %} hidden{% endif %}" id="ftranscript_editor" href="{{ s.transcript_editor.url if s.transcript_editor else '#' }}"
-         data-label="{{ te.label }}" title="the transcript file in {{ te.label }}">‹› {{ te.label }}</a>
+      {% if s.transcript_drawn %}{% from "file_link.html" import file_link %}
+      {#- a file link (§4.6, TD-689): the file form with `:1`, one launch — never the folder form; the
+          page fills `href` and `data-label` from the record's `transcript_editor` when the hook reports it -#}
+      {%- set te = s.transcript_editor or {"url": "", "label": s.editor.label} %}
+      {{ file_link(te, "‹› " ~ te.label, "the transcript file in " ~ te.label, "btn sm link", "ftranscript_editor", not s.transcript_editor) }}
       {% endif %}
       <span class="grow"></span>
       {% if s.state != 'scheduled' %}
