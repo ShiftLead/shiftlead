@@ -317,7 +317,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the replay's (`why: work` or `schedule`, the start's `ids`, `start` and `of`) with **`held:
      true`**. A replayed seat is on call again with its trigger standing, and the first tick fills it
      only for a cause, as after a Start; a seat that ended with a question in its mail is filled on
-     that tick. A standing manager (`on_call: false`) is no seat and replays live; a session's own
+     that tick. A seat the definition asks to be watched (`unattended: false`) replays live, as a Start makes it (a held record is an unattended seat's), and a standing manager (`on_call: false`) is no seat and replays live too; a session's own
      start time (§6 *Start time*) is not a team's replay and creates what it was set for.
      **A fill says why it came**: the prompt a fill hands `create` is the brief, filled again as
      rule 7 has it, with **one closing line** in fixed words — *[shiftlead] you are filled for: <by>
