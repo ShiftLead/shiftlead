@@ -449,21 +449,26 @@ def _required_reading(
     return required, errors
 
 
-def at_done(view: dict[str, Any], required: list[str] | None) -> dict[str, Any]:
+def at_done(view: dict[str, Any], required: list[str] | None, verdicts: dict[str, Any] | None = None) -> dict[str, Any]:
     """What a `done` naming a PR is told (design §4.8 *A `done` with a PR is told what its checks
     read*, TD-637), from `gh pr view`'s `state,mergedAt,headRefOid,baseRefName,statusCheckRollup`
-    and its base's required names (None: never read). `{word, sha, failed, other}`: *merged*,
+    and its base's required names (None: never read). `{word, sha, failed, not_run, other}`: *merged*,
     *closed* (unmerged), *refused* (a required check red by `fold_checks`'s rule, named in `failed`),
+    *not_run* (every red required check an Actions job that never started, by `verdicts` — `job_verdict`'s
+    answers by job id — named in `not_run`, the first one's `{reason, kind}` as `not_run_why`, TD-686),
     *pending* (a required one not completed, named in `running`), else *green* — no checks at all
-    included; `other` the red checks no rule requires. With nothing required, or the set never read,
-    every check counts."""
-    out: dict[str, Any] = {"sha": str(view.get("headRefOid") or ""), "failed": [], "other": [], "running": []}
+    included; `other` the red checks no rule requires. A real failure wins over `not_run`, and
+    `not_run` over *pending*. With nothing required, or the set never read, every check counts."""
+    out: dict[str, Any] = {
+        "sha": str(view.get("headRefOid") or ""), "failed": [], "not_run": [], "other": [], "running": [],
+    }  # fmt: skip
     state = str(view.get("state") or "").upper()
     if state == "MERGED" or view.get("mergedAt"):
         return {**out, "word": "merged"}
     if state == "CLOSED":
         return {**out, "word": "closed"}
     wanted = set(required or [])
+    verdicts = verdicts if isinstance(verdicts, dict) else {}
     for c in view.get("statusCheckRollup") or []:
         if not isinstance(c, dict):
             continue
@@ -471,12 +476,67 @@ def at_done(view: dict[str, Any], required: list[str] | None) -> dict[str, Any]:
         if wanted and str(c.get("name") or c.get("context") or "") not in wanted:
             out["other"].extend(failing)
         elif word == "red":
-            out["failed"].extend(failing)
+            item = failing_items([c])[0][0]
+            v = verdicts.get(str(item["job"])) if item["job"] is not None else None
+            if isinstance(v, dict) and v.get("started", True) is False:
+                out["not_run"].append(item["name"])
+                out.setdefault("not_run_why", {"reason": v.get("reason") or "", "kind": v.get("kind") or "other"})
+            else:
+                out["failed"].append(item["name"])
         elif word == "pending":
             out["running"].append(str(c.get("name") or c.get("context") or "?"))
     if out["failed"]:
         return {**out, "word": "refused"}
+    if out["not_run"]:
+        return {**out, "word": "not_run"}
     return {**out, "word": "pending" if out["running"] else "green"}
+
+
+def done_verdicts(
+    directory: Path | str, view: dict[str, Any], required: list[str] | None, kept: dict[str, Any] | None, timeout: float
+) -> dict[str, Any]:
+    """The verdicts `at_done` reads for PR view `view` (design §4.4 *A `done`'s read*, TD-686), by job id:
+    `kept` — the repo reading's `jobs` for the PR — when its `head` is the view's, then, in a repo whose
+    `origin` is GitHub, the failing *required* Actions jobs it lacks read with `job_verdict`, in order, at
+    most `JOBS_CAP`, stopping at the first that started or could not be read. A read that fails is no
+    evidence: the job stays failed."""
+    head = str(view.get("headRefOid") or "")
+    kept = kept if isinstance(kept, dict) else {}
+    read: dict[str, Any] = dict(kept.get("read") or {}) if head and kept.get("head") == head else {}
+    read = {k: v for k, v in read.items() if _verdict_ok(v)}
+    wanted = set(required or [])
+    items = [i for i in failing_items(view.get("statusCheckRollup"))[0] if not wanted or i["name"] in wanted]
+    if not items or any(i["job"] is None for i in items):
+        return read  # a commit status or another check run fails as it is: nothing to read
+    todo = [i for i in items if str(i["job"]) not in read]
+    if not todo or not GITHUB_ORIGIN.search(git_origin(directory)):
+        return read
+    if any(read[str(i["job"])].get("started", True) for i in items if str(i["job"]) in read):
+        return read  # one started already: the PR is red whatever the rest say
+    for i in todo[:JOBS_CAP]:
+        v = job_verdict(directory, i["job"], timeout)
+        if v is None:
+            break
+        read[str(i["job"])] = v
+        if v.get("started", True):
+            break
+    return read
+
+
+def git_origin(directory: Path | str) -> str:
+    """The checkout's `origin` URL, or "" when it has none or git cannot say."""
+    return (_git(directory, "remote", "get-url", "origin") or "").strip()
+
+
+GITHUB_OWNER = re.compile(r"(?:^|[@/])github\.com[:/]+([^/\s]+)/")
+LOGIN = re.compile(r"[A-Za-z0-9-]+")
+
+
+def github_owner(url: str | None) -> str | None:
+    """The org or user a GitHub `origin` (ssh or https) or PR URL names, when it is a GitHub login
+    (`[A-Za-z0-9-]+`), else None (design §4.4 *The person is told once per account*, TD-686)."""
+    m = GITHUB_OWNER.search(str(url or ""))
+    return m[1] if m and LOGIN.fullmatch(m[1]) else None
 
 
 def pr_view(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, Any] | str:

@@ -63,6 +63,7 @@ def test_pending_merged_closed_and_no_checks():
     assert reports.at_done(_view(_run("t", conclusion="FAILURE"), state="MERGED", merged="2026-10-13"), ["t"]) == {
         "sha": SHA,
         "failed": [],
+        "not_run": [],
         "other": [],
         "running": [],
         "word": "merged",
@@ -300,3 +301,74 @@ async def test_the_persons_ask_and_an_ask_with_no_pr_are_not_read(worker, agent,
     with pytest.raises(AgentError, match="still running"):
         await w.call("msg", reply_to=findings["entry"]["id"], text="fixed", kind="ask", pr=842)
     assert read == [842, 842]
+
+
+# -- CI that never started (TD-686 slice 2, design §4.4 *A `done`'s read*) ------------------------------
+
+NEVER = {
+    "started": False,
+    "reason": "The job was not started because recent account payments have failed",
+    "kind": "billing",
+}
+
+
+def _job_run(name: str, job: int, conclusion: str = "FAILURE") -> dict:
+    url = f"https://github.com/ContractMatch/samscrape/actions/runs/77/job/{job}"
+    return {**_run(name, conclusion=conclusion), "detailsUrl": url}
+
+
+async def test_a_required_check_that_never_started_refuses_the_done_naming_the_person(worker, agent, monkeypatch):
+    """From the repo reading's `jobs` for this head: nothing is read and nothing is written."""
+    w, sid, rec, views = worker
+    read: list[int] = []
+    monkeypatch.setattr(reports, "job_verdict", lambda d, job, t: read.append(job) or NEVER)
+    agent._repos[str(tmp := rec.repo)]["prs"]["open"] = [
+        {
+            "number": 842,
+            "url": "https://github.com/ContractMatch/samscrape/pull/842",
+            "jobs": {"head": SHA, "read": {"5": NEVER}},
+        }
+    ]
+    await w.call("progress", id=sid, ref="TD-1")
+    views[842] = _view(_job_run("test", 5), _run("lint"))
+    with pytest.raises(
+        AgentError,
+        match=r"PR #842's checks never started on 9c1e0f2: billing or spending limit in ContractMatch — the person's "
+        r"to fix \(the Inbox says so\); push nothing for it, report done again once CI runs, or drop the claim with "
+        r'`ao progress drop TD-001 --why "CI never ran"`',
+    ):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert read == [] and tmp
+    (e,) = rec.progress
+    assert (e.status, e.pr) == ("claimed", None)
+    # a real failure beside it refuses as before, and wins
+    views[842] = _view(_job_run("test", 5), _job_run("lint", 6))
+    agent._repos[rec.repo]["prs"]["required"] = {"main": ["test", "lint"]}
+    monkeypatch.setattr(reports, "job_verdict", lambda d, job, t: {"started": True})
+    monkeypatch.setattr(reports, "git_origin", lambda d: "git@github.com:ContractMatch/samscrape.git")
+    with pytest.raises(AgentError, match=r"required checks failed on 9c1e0f2: lint — fix them"):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+
+
+async def test_the_done_reads_the_jobs_itself_when_the_reading_holds_none_for_the_head(worker, monkeypatch):
+    w, sid, rec, views = worker
+    read: list[int] = []
+    monkeypatch.setattr(reports, "job_verdict", lambda d, job, t: read.append(job) or NEVER)
+    monkeypatch.setattr(reports, "git_origin", lambda d: "https://github.com/Paulw/other.git")
+    await w.call("progress", id=sid, ref="TD-1")
+    views[842] = _view(_job_run("test", 5), _job_run("docs", 6))  # docs is not required: never read
+    with pytest.raises(
+        AgentError, match=r"PR #842's checks never started on 9c1e0f2: billing or spending limit in Paulw"
+    ):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert read == [5]
+
+
+async def test_an_ask_on_a_pr_whose_checks_never_started_sends_saying_so(worker, agent, monkeypatch):
+    w, sid, rec, views = worker
+    monkeypatch.setattr(reports, "job_verdict", lambda d, job, t: NEVER)
+    monkeypatch.setattr(reports, "git_origin", lambda d: "git@github.com:ContractMatch/samscrape.git")
+    views[842] = _view(_job_run("test", 5))
+    got = await w.call("msg", to=["person"], text="read #842", kind="ask", pr=842)
+    assert got["entry"]["pr"] == 842
+    assert got["checks_said"] == f"PR #842: checks never started on 9c1e0f2: {NEVER['reason']}"

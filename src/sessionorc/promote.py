@@ -28,7 +28,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import build, paths
+from sessionorc import build, paths, reports
 
 PROMOTE_EVERY = 300.0  # seconds between full readings: the reports' cadence (§6)
 PROMOTE_WATCH = 15.0  # seconds between `check` reads while a run is in flight
@@ -47,6 +47,9 @@ HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")  # a rollback's commit: its hex in full
 _procs: dict[int, subprocess.Popen[bytes]] = {}
 _exits: dict[int, int] = {}
 FAILED = {"failure", "timed_out", "cancelled", "action_required", "startup_failure", "stale"}
+# the verdicts on main's head's failing jobs, by checkout: `{head, read}` (`reports.classify_failing`,
+# TD-686) — one sha's per checkout, so a job is read once and a new head reads afresh
+_jobs: dict[str, dict[str, Any]] = {}
 
 
 def block(root: str | Path) -> dict[str, str] | None:
@@ -171,33 +174,46 @@ def read_ahead_since(root: str | Path, live: str | None, main: str | None) -> st
     return lines[-1].strip() if lines else None
 
 
-def read_checks(root: str | Path, sha: str) -> tuple[str, str]:
+def read_checks(root: str | Path, sha: str) -> tuple[str, str, dict[str, Any] | None]:
     """The CI verdict on `sha`: `green` when every check run has concluded and none failed,
     `pending`, `failed`, or `unknown` with why (no `gh`, no remote, a rate limit, no check runs at
-    all — a commit CI has not looked at is not a green one)."""
+    all — a commit CI has not looked at is not a green one) — and, third, `checks_not_run`. Failing
+    runs that are all Actions jobs that never started read `unknown`, *CI never ran: <reason>*, with
+    `{reason, kind, runs}` as the third; a real failure beside them is still `failed` (design §6
+    *Promote*, §4.4 *CI that never started is the person's*, TD-686). The jobs' verdicts are kept per
+    sha (`_jobs`), so a job is read once."""
     try:
         cp = subprocess.run(
             ["gh", "api", f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100"],
             capture_output=True, text=True, timeout=GH_TIMEOUT, cwd=str(root),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired) as e:
-        return "unknown", f"gh could not be asked: {type(e).__name__}"
+        return "unknown", f"gh could not be asked: {type(e).__name__}", None
     if cp.returncode != 0:
-        return "unknown", ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
+        return "unknown", ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200], None
     try:
         runs = json.loads(cp.stdout or "{}").get("check_runs")
     except (json.JSONDecodeError, AttributeError):
-        return "unknown", "gh api printed something that is not the check runs"
+        return "unknown", "gh api printed something that is not the check runs", None
     if not isinstance(runs, list):
-        return "unknown", "gh api printed something that is not the check runs"
+        return "unknown", "gh api printed something that is not the check runs", None
     if not runs:
-        return "unknown", f"no check runs on {sha[:7]}"
+        return "unknown", f"no check runs on {sha[:7]}", None
     runs = [r for r in runs if isinstance(r, dict)]
-    if any(r.get("status") == "completed" and r.get("conclusion") in FAILED for r in runs):
-        return "failed", ""
+    failing = [r for r in runs if r.get("status") == "completed" and r.get("conclusion") in FAILED]
+    if failing:
+        items = []
+        for r in failing:  # a check run's id is its job's; its run is in the job's URL
+            m = reports.JOB_URL.search(str(r.get("details_url") or r.get("html_url") or ""))
+            job = r.get("id") if m and isinstance(r.get("id"), int) else None
+            items.append({"name": str(r.get("name") or ""), "run": int(m[1]) if m else None, "job": job})
+        not_run, _, _jobs[str(root)] = reports.classify_failing(root, items, sha, _jobs.get(str(root)), GH_TIMEOUT)
+        if not_run:
+            return "unknown", f"CI never ran: {not_run['reason']}", not_run
+        return "failed", "", None
     if any(r.get("status") != "completed" for r in runs):
-        return "pending", ""
-    return "green", ""
+        return "pending", "", None
+    return "green", "", None
 
 
 def unmet(reading: dict[str, Any], press: bool = False, kind: str = "promote") -> tuple[str, str] | None:
@@ -603,8 +619,9 @@ def survey(
                 r.pop(k, None)
             r.update(main)
             if r.get("main"):
-                r["checks"], why = read_checks(root, r["main"])
+                r["checks"], why, r["checks_not_run"] = read_checks(root, r["main"])
                 r["checks_why"] = why or None
+                r["origin"] = reports.git_origin(root)  # whose account `ci_not_run` groups it under (TD-686)
             r["at"] = stamp
         if full or first or r["inflight"]:
             sha, why = read_live(root, b["check"])

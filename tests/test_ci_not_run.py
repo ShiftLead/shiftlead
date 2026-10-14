@@ -340,3 +340,148 @@ def test_a_sync_pr_whose_ci_never_ran_waits_and_is_an_order_from_the_reading_it_
     assert (p["checks"], p["conflicting"], p["sync_since"]) == ("not_run", True, T0.isoformat())
     (o,) = workorders.red_prs([p], [], t1, {}, HOUR)[0]
     assert (o["id"], o["sync"], o["reason"]) == ("pr:1097", True, "conflicting, CI never ran")
+
+
+# -- slice 2: the `done`'s read, the promote's checks, `ci_not_run` ----------------------------------
+
+
+def _view(*checks: dict, head: str = "a" * 40) -> dict:
+    return {
+        "state": "OPEN",
+        "mergedAt": None,
+        "headRefOid": head,
+        "baseRefName": "main",
+        "statusCheckRollup": list(checks),
+    }
+
+
+NEVER = {"started": False, "reason": BILLING, "kind": "billing"}
+
+
+def test_at_done_puts_a_required_job_that_never_started_in_not_run_and_a_real_failure_wins():
+    view = _view(_check(1, "Lint"), _check(2, "test"), _check(3, "docs"))
+    got = reports.at_done(view, ["Lint", "test"], {"1": NEVER, "2": NEVER})
+    assert (got["word"], got["not_run"], got["failed"], got["other"]) == ("not_run", ["Lint", "test"], [], ["docs"])
+    assert got["not_run_why"] == {"reason": BILLING, "kind": "billing"}
+    # one that started beside it is a real failure, and wins
+    got = reports.at_done(view, ["Lint", "test"], {"1": NEVER, "2": {"started": True}})
+    assert (got["word"], got["failed"], got["not_run"]) == ("refused", ["test"], ["Lint"])
+    # with no verdict a failing job is failed, as before
+    assert reports.at_done(view, ["Lint"], None)["word"] == "refused"
+    # not_run outranks a required check still running
+    queued = {**_check(9, "test"), "status": "QUEUED", "conclusion": ""}
+    got = reports.at_done(_view(_check(1, "Lint"), queued), ["Lint", "test"], {"1": NEVER})
+    assert (got["word"], got["running"]) == ("not_run", ["test"])
+
+
+def test_done_verdicts_take_the_readings_jobs_for_this_head_else_read_the_required_ones(tmp_path, monkeypatch):
+    view = _view(_check(1, "Lint"), _check(2, "test"), _check(3, "docs"))
+    kept = {"head": "a" * 40, "read": {"1": NEVER, "2": NEVER}}
+    calls = _fake(monkeypatch, [], {}, {})
+    assert reports.done_verdicts(tmp_path, view, ["Lint", "test"], kept, 5) == kept["read"]
+    assert _job_reads(calls) == []  # the reading held them: nothing read
+    # another head's map is not this head's: the required failing jobs are read, the unrequired one not
+    calls = _fake(monkeypatch, [], {1: _job(1), 2: _job(2), 3: _job(3)}, {1: _notes(), 2: _notes(), 3: _notes()})
+    got = reports.done_verdicts(tmp_path, view, ["Lint", "test"], {**kept, "head": "b" * 40}, 5)
+    assert got == {"1": NEVER, "2": NEVER} and _job_reads(calls) == [1, 2]
+    # stops at the first that started; an unreadable one is no evidence and is not kept
+    calls = _fake(monkeypatch, [], {1: _job(1, runner="r"), 2: _job(2)}, {2: _notes()})
+    assert reports.done_verdicts(tmp_path, view, ["Lint", "test"], None, 5) == {"1": {"started": True}}
+    assert _job_reads(calls) == [1]
+    calls = _fake(monkeypatch, [], {2: _job(2)}, {2: _notes()})
+    assert reports.done_verdicts(tmp_path, view, ["Lint", "test"], None, 5) == {}
+    # a repo whose origin is not GitHub reads nothing
+    calls = _fake(monkeypatch, [], {1: _job(1)}, {1: _notes()}, origin="https://gitlab.com/x/y.git")
+    assert reports.done_verdicts(tmp_path, view, ["Lint"], None, 5) == {} and _job_reads(calls) == []
+
+
+def _fake_promote(monkeypatch, runs: list, jobs: dict, notes: dict):
+    from sessionorc import promote
+
+    calls = _fake(monkeypatch, [], jobs, notes)
+    real = reports.subprocess.run
+
+    def run(argv, **kw):
+        if argv[0] == "gh" and "/commits/" in argv[2]:
+            calls.append(argv)
+            return subprocess.CompletedProcess(argv, 0, json.dumps({"check_runs": runs}), "")
+        return real(argv, **kw)
+
+    monkeypatch.setattr(promote.subprocess, "run", run)
+    return promote, calls
+
+
+def _run_of(job: int, conclusion: str = "failure", run: int = RUN) -> dict:
+    url = f"https://github.com/ContractMatch/samscrape/actions/runs/{run}/job/{job}"
+    return {"id": job, "name": f"j{job}", "status": "completed", "conclusion": conclusion, "details_url": url}
+
+
+def test_the_promotes_checks_say_ci_never_ran_failed_or_pending(tmp_path, monkeypatch):
+    sha = "c" * 40
+    promote, calls = _fake_promote(
+        monkeypatch, [_run_of(1), _run_of(2, run=RUN + 1)], {1: _job(1), 2: _job(2)}, {1: _notes(), 2: _notes()}
+    )
+    monkeypatch.setattr(promote, "_jobs", {})
+    got = promote.read_checks(tmp_path, sha)
+    assert got == (
+        "unknown",
+        f"CI never ran: {BILLING}",
+        {"reason": BILLING, "kind": "billing", "runs": [RUN, RUN + 1]},
+    )
+    assert _job_reads(calls) == [1, 2]
+    # kept per sha: the same head reads no job again; a new one does
+    assert promote.read_checks(tmp_path, sha) == got and _job_reads(calls) == [1, 2]
+    assert promote.read_checks(tmp_path, "d" * 40)[0] == "unknown" and _job_reads(calls) == [1, 2, 1, 2]
+    # a real failure beside them is failed
+    promote, _ = _fake_promote(
+        monkeypatch, [_run_of(1), _run_of(3)], {1: _job(1), 3: _job(3, runner="r")}, {1: _notes()}
+    )
+    assert promote.read_checks(tmp_path, "e" * 40) == ("failed", "", None)
+    # nothing failed and one still running is pending, as before
+    promote, _ = _fake_promote(monkeypatch, [_run_of(1, "success"), {"status": "queued"}], {}, {})
+    assert promote.read_checks(tmp_path, "f" * 40) == ("pending", "", None)
+
+
+def test_ci_not_run_groups_by_owner_and_leaves_out_a_non_github_origin():
+    nr = {"reason": BILLING, "kind": "billing", "runs": [RUN]}
+    pr = {
+        "number": 1097,
+        "checks": "not_run",
+        "not_run": nr,
+        "url": "https://github.com/ContractMatch/samscrape/pull/1097",
+    }
+    repos = {
+        "/r/samscrape": {
+            "prs": {
+                "open": [pr, {"number": 1, "checks": "red", "url": "https://github.com/ContractMatch/samscrape/pull/1"}]
+            }
+        },
+        "/r/cm": {"prs": {"open": [{**pr, "number": 7, "url": "https://github.com/contractmatch/cm/pull/7"}]}},
+        "/r/other": {"prs": {"open": [{**pr, "number": 3, "url": "https://github.com/Paulw/other/pull/3"}]}},
+        "/r/lab": {"prs": {"open": [{**pr, "number": 4, "url": "https://gitlab.com/x/lab/-/merge_requests/4"}]}},
+    }
+    promotes = {
+        "samscrape": {
+            "root": "/r/samscrape",
+            "main": "m" * 40,
+            "checks_not_run": nr,
+            "origin": "git@github.com:ContractMatch/samscrape.git",
+        },
+        "shiftlead": {
+            "root": "/r/sl",
+            "main": "s" * 40,
+            "checks_not_run": None,
+            "origin": "git@github.com:ShiftLead/shiftlead.git",
+        },
+        "lab": {"root": "/r/lab", "main": "l" * 40, "checks_not_run": nr, "origin": "git@gitlab.com:x/lab.git"},
+    }
+    got = workorders.ci_not_run(repos, promotes)
+    assert sorted(got) == ["contractmatch", "paulw"]
+    cm = got["contractmatch"]
+    assert (cm["reason"], cm["kind"]) == (BILLING, "billing")
+    assert [(i["repo"], i.get("pr"), i.get("main")) for i in cm["items"]] == [
+        ("cm", 7, None),
+        ("samscrape", 1097, None),
+        ("samscrape", None, "m" * 40),
+    ]
+    assert cm["items"][2]["root"] == "/r/samscrape" and cm["items"][0]["runs"] == [RUN]
