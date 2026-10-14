@@ -12,7 +12,11 @@ from fastapi.testclient import TestClient
 
 pytestmark = pytest.mark.unit
 
-NOW = datetime.now(UTC)
+
+def now() -> datetime:
+    """The clock read at each use: a module-level instant goes stale across a long suite run and the
+    pages' ages, read on their own clock, then drift from it."""
+    return datetime.now(UTC)
 
 
 def _iso(t: datetime) -> str:
@@ -20,7 +24,7 @@ def _iso(t: datetime) -> str:
 
 
 def order(n: int, **kw) -> dict:
-    return {"id": f"pr:{n}", "pr": n, "title": f"PR {n}", "priority": "High", "pr_order": True, "work_order": True, "url": f"https://x/{n}", "author": "eye", "checks": "red", "failing": ["test"], "red_since": _iso(NOW - timedelta(hours=3)), **kw}  # fmt: skip
+    return {"id": f"pr:{n}", "pr": n, "title": f"PR {n}", "priority": "High", "pr_order": True, "work_order": True, "url": f"https://x/{n}", "author": "eye", "checks": "red", "failing": ["test"], "red_since": _iso(now() - timedelta(hours=3)), **kw}  # fmt: skip
 
 
 def reading(root: str, orders: list[dict] | None = None) -> dict:
@@ -31,15 +35,15 @@ def reading(root: str, orders: list[dict] | None = None) -> dict:
         "ledger": {"path": "docs/technical_debt.md", "entries": [], "by_priority": {}, "by_kind": {}},
         "prs": {
             "open": [
-                {"number": 801, "title": "green one", "created": _iso(NOW - timedelta(days=3)), "author": "eye", "branch": "g", "url": "https://x/801", "checks": "green", "failing": [], "conflicting": False},
-                {"number": 802, "title": "red, nobody's", "created": _iso(NOW - timedelta(days=2)), "author": "eye", "branch": "r", "url": "https://x/802", "checks": "red", "failing": ["test", "lint"], "conflicting": False, "red_since": _iso(NOW - timedelta(hours=3))},
-                {"number": 803, "title": "conflicting, held", "created": _iso(NOW - timedelta(days=1)), "author": "eye", "branch": "td9", "url": "https://x/803", "checks": "green", "failing": [], "conflicting": True, "red_since": _iso(NOW - timedelta(hours=2))},
-                {"number": 804, "title": "red, young", "created": _iso(NOW - timedelta(hours=1)), "author": "eye", "branch": "y", "url": "https://x/804", "checks": "red", "failing": ["test"], "conflicting": False, "red_since": _iso(NOW - timedelta(minutes=20))},
+                {"number": 801, "title": "green one", "created": _iso(now() - timedelta(days=3)), "author": "eye", "branch": "g", "url": "https://x/801", "checks": "green", "failing": [], "conflicting": False},
+                {"number": 802, "title": "red, nobody's", "created": _iso(now() - timedelta(days=2)), "author": "eye", "branch": "r", "url": "https://x/802", "checks": "red", "failing": ["test", "lint"], "conflicting": False, "red_since": _iso(now() - timedelta(hours=3))},
+                {"number": 803, "title": "conflicting, held", "created": _iso(now() - timedelta(days=1)), "author": "eye", "branch": "td9", "url": "https://x/803", "checks": "green", "failing": [], "conflicting": True, "red_since": _iso(now() - timedelta(hours=2))},
+                {"number": 804, "title": "red, young", "created": _iso(now() - timedelta(hours=1)), "author": "eye", "branch": "y", "url": "https://x/804", "checks": "red", "failing": ["test"], "conflicting": False, "red_since": _iso(now() - timedelta(minutes=20))},
             ],
             "windows": {w: {"opened": 1, "closed": 1} for w in ("day", "week", "month")},
         },
         "pr_orders": {"orders": orders if orders is not None else [order(802)], "told": {}},
-        "at": _iso(NOW),
+        "at": _iso(now()),
     }  # fmt: skip
 
 
@@ -52,7 +56,7 @@ def test_the_red_prs_say_their_word_and_past_the_bound_whose_they_are():
 
     root = "/r/samscrape"
     holder = rec("g1", root, git={"branch": "td9"})
-    got = {x["number"]: x for x in teamrun.red_prs(reading(root), [holder], NOW)}
+    got = {x["number"]: x for x in teamrun.red_prs(reading(root), [holder], now())}
     assert sorted(got) == [802, 803, 804]  # a green PR is never one
     assert (got[802]["word"], got[802]["whose"], got[802]["failing"]) == (
         "red",
@@ -65,28 +69,28 @@ def test_the_red_prs_say_their_word_and_past_the_bound_whose_they_are():
     ended = rec("g1", root, git={"branch": "td9"}, state="exited")
     elsewhere = rec("g2", "/r/other", git={"branch": "td9"})
     claimed = rec("g3", root, progress=[{"ref": "pr:803", "status": "claimed"}])
-    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [ended, elsewhere], NOW)}[803] == ""
-    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [claimed], NOW)}[803] == "held by g3"
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [ended, elsewhere], now())}[803] == ""
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [claimed], now())}[803] == "held by g3"
     # a stamp with no offset is read as UTC, never a page's TypeError (review of #1668)
     naive = reading(root)
-    naive["prs"]["open"][1]["red_since"] = (NOW - timedelta(hours=3)).replace(tzinfo=None).isoformat()
-    assert {x["number"]: x["whose"] for x in teamrun.red_prs(naive, [holder], NOW)}[802].startswith("nobody's")
+    naive["prs"]["open"][1]["red_since"] = (now() - timedelta(hours=3)).replace(tzinfo=None).isoformat()
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(naive, [holder], now())}[802].startswith("nobody's")
     # where no team services the repo the order is the Inbox's, not the anchor's
-    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [], NOW)}[802] == "nobody's"
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [], now())}[802] == "nobody's"
 
 
 def test_the_facet_counts_the_red_prs_with_a_hover_of_each():
     from shiftlead.ui.app import repo_facet
 
     root = "/r/samscrape"
-    f = repo_facet(reading(root), NOW, fleet=[rec("g1", root, git={"branch": "td9"})])["prs"]
+    f = repo_facet(reading(root), now(), fleet=[rec("g1", root, git={"branch": "td9"})])["prs"]
     assert [x["number"] for x in f["red"]] == [802, 803, 804]
     assert f["red_title"].splitlines() == [
         "#802 · red 3h 0m · nobody's — the anchor's order",
         "#803 · conflicting 2h 0m · held by g1",
         "#804 · red 20m",
     ]
-    assert repo_facet({**reading(root), "prs": {"open": []}}, NOW)["prs"]["red"] == []
+    assert repo_facet({**reading(root), "prs": {"open": []}}, now())["prs"]["red"] == []
 
 
 def test_a_claimed_red_pr_is_in_motion_with_the_prs_title():
@@ -104,14 +108,14 @@ def test_red_pr_rows_are_for_a_repo_no_team_services_alone():
     from shiftlead.ui.app import inbox_sections, red_pr_rows
 
     root = "/r/samscrape"
-    (row,) = red_pr_rows({root: reading(root)}, [], NOW)
+    (row,) = red_pr_rows({root: reading(root)}, [], now())
     assert row["row"] == "red_pr" and row["sid"] == "red_pr:samscrape:802" and row["url"] == "https://x/802"
     assert row["text"] == "samscrape #802 · red 3h 0m · test · eye" and row["subject"] == "red PR · samscrape #802"
-    assert red_pr_rows({root: reading(root)}, [rec("g1", root, state="exited")], NOW) == []  # a team services it
-    assert red_pr_rows({root: reading(root, orders=[])}, [], NOW) == []
+    assert red_pr_rows({root: reading(root)}, [rec("g1", root, state="exited")], now()) == []  # a team services it
+    assert red_pr_rows({root: reading(root, orders=[])}, [], now()) == []
     s = inbox_sections([], states=[row])
     assert [e["row"] for e in s["needs"]] == ["red_pr"]
-    until = (NOW + timedelta(days=1)).isoformat()
+    until = (now() + timedelta(days=1)).isoformat()
     s = inbox_sections([], states=[row], attention_snoozed={"red_pr:samscrape:802|red_pr": until})
     assert s["needs"] == [] and [e["row"] for e in s["snoozed"]] == ["red_pr"]
 
