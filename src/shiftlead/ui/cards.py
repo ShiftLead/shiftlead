@@ -1006,7 +1006,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # *last ran* for a seat with a trigger: it runs its brief rather than answering (§4.5, TD-098)
         came = "last came" if d.get("seat_when") in ("", "comes on the next question", MANAGER_WHEN) else "last ran"
         caption = came + (f" · {d['came_age']} ago" if d.get("came_age") else "")
-    elif d["ready_ok"] and d.get("agent", True) and state in ("idle", "exited"):
+    elif d["ready_ok"] and d.get("agent", True):
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
         caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")
@@ -1045,14 +1045,23 @@ def next_act(d: dict[str, Any]) -> str:
 
 
 def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ()) -> list[tuple[str, bool]]:
-    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents — and,
+    """Phase 1 subset of the checklist (design §4.2): the agent not working, tree clean, branch pushed,
+    no subagents — and,
     for a session other sessions list as a controller, no live member. That last one comes from the
     control graph, not from a role: it covers a lead, a director over leads, and a session attached
     by hand with `ao control`, and a session that controls nothing never sees it. A lead idle
     between rounds with its log pushed used to read *ready to close ✓* over three working members,
     one click from orphaning them (seen 2026-09-17)."""
     git = s.get("git") or {}
-    checks = []
+    # design §4.2 (TD-679): the agent itself, first — a session mid-turn is not ready to close, and
+    # this row is the one test every surface reads (Close, *ready to close ✓*, the side panel)
+    state = str(s.get("state") or "")
+    if state in ("idle", "exited"):
+        checks = [("agent not working", True)]
+    elif state == "working":
+        checks = [("agent working — wait or Wrap up", False)]
+    else:
+        checks = [(f"agent {'needs you' if state == 'needs-you' else state or 'state unknown'}", False)]
     if s.get("dir") and git:
         checks.append(("tree clean", git.get("dirty", 0) == 0))
         # one measure, computed by the host agent and read here (design §4.2, TD-080): a branch

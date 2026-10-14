@@ -4155,7 +4155,7 @@
       // the chips go with the composer on a session nothing can be sent to (§4.5a, TD-170)
       const pc = $("#promptchips");
       if (pc) pc.classList.toggle("hidden", ["exited", "closed", "limited", "unreachable"].includes(v.state));
-      const readyNow = !!((v.ready || []).length && (v.ready || []).every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
+      const readyNow = !!((v.ready || []).length && (v.ready || []).every(([, ok]) => ok));
       const cls = v.state_class, scraped = v.scraped ? " scraped" : "";
       // the pill's hover (§4.5a **state pill hover**, TD-490): the card's one text, from the view
       let head = `<span class="pill s-${cls}${scraped}" title="${esc(v.pill_title || "")}"><span class="dot"></span>${v.state_label}</span>`;
@@ -4388,7 +4388,8 @@
       // design §4.5a Focus header **Close session** (TD-156): the checklist passing on an idle or
       // exited session puts *ready to close ✓* on the identity line, in the card's words, and the
       // outlined Close session on the acts line; the side card's small Close is the same act.
-      const ready = !!(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
+      // the agent's own state is the checklist's first row (TD-679): one test, not a second one here
+      const ready = !!(checks.length && checks.every(([, ok]) => ok));
       $("#closebtn").disabled = !ready;
       $("#closebtn").classList.toggle("hidden", !v.own);  // a member's checklist has no button: its Close is more ▾'s
       const cm = $("#fclosemenu"); if (cm) cm.disabled = !ready;

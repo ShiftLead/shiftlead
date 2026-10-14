@@ -25,7 +25,7 @@
       {# design §4.5a Focus header **Close session** (TD-156): the card's caption in the card's words,
          the moment the checklist passes on an idle or exited session; the act is on the line below.
          Always in the page and hidden until true, kept current from the pushed delta as the marks are. #}
-      {% if s.agent %}<span class="badge readymark{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fready"
+      {% if s.agent %}<span class="badge readymark{% if not (s.own and s.ready_ok) %} hidden{% endif %}" id="fready"
             title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>{% endif %}
       {# §4.8a (TD-077 a2): the **suspended** mark, beside the state and never inside it — a
          suspension is not a state, and only a person's Resume or Forget lifts it. #}
@@ -90,13 +90,13 @@
       {% if s.state != 'scheduled' %}
       {#- a record with no agent (§4.5a *A record with no agent*, TD-666): Close session on any state Close is,
           without the checks; no mode toggle, no Message, no Wrap up — nothing reads it and prose would run -#}
-      {%- set close_now = (not s.agent and s.pane is not sameas false and s.state != 'closed') or (s.own and s.ready_ok and s.state in ('idle', 'exited')) %}
+      {%- set close_now = (not s.agent and s.pane is not sameas false and s.state != 'closed') or (s.agent and s.own and s.ready_ok) %}
       <button class="btn sm next{% if not close_now %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"
               title="{{ help_title('close') }}">Close session</button>
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
          Take over an unattended session (read-only until then) is the next act here; Hand back and
          Switch to unattended, the same toggle the other way, sit in more ▾ (TD-156). #}
-      {% if s.agent %}<button class="btn sm {{ 'link' if s.own and s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
+      {% if s.agent %}<button class="btn sm {{ 'link' if s.own and s.ready_ok else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
       <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>
@@ -134,7 +134,7 @@
           <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
           {# Close for a team member (TD-156, Paul): its team's Wind down or Start closes it, so the
              act is here and not on the acts line; enabled only when Ready to close passes #}
-          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"{% if not (close_now or (s.ready_ok and s.state in ('idle', 'exited'))) %} disabled{% endif %}
+          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"{% if not (close_now or (s.agent and s.ready_ok)) %} disabled{% endif %}
                   title="{{ help_title('close') }}">Close</button>
           <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
         </div>
