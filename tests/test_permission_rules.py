@@ -308,25 +308,86 @@ def test_the_host_reads_no_tool_name():
 
 
 @pytest.mark.integration
-async def test_a_node_answers_no_prompt_by_rule(agent, rulestub, tmp_path):
-    """The hook is the node's, but the *Answered for you* FYI is mail, whose one writer is the home
-    (§9 invariant 15): a node matches no rule, so its member's prompt waits for the person and the
-    node's own person inbox is never written (TD-641's review)."""
+async def test_a_node_answers_by_rule_only_once_the_home_has_filed_the_fyi(agent, rulestub, tmp_path, monkeypatch):
+    """The hook is the node's and the rules its replica of the home's, but the *Answered for you* FYI
+    is mail, whose one writer is the home (§9 invariant 15): a node answers by rule only while its
+    link is up, and only once the home has filed the FYI (`answered_by_rule`). With no link, or a
+    filing refused, the prompt waits for the person; the node's own person inbox is never written."""
+    from sessionorc import link
+
     _rules("permissions:\n  grinder: {allow: ['Bash'], deny: ['Bash(ls)']}\n")
+    asked: list[dict] = []
+    refuse = False
+
+    class Mux:
+        async def request(self, method, timeout=None, **params):
+            if refuse:
+                raise link.LinkError("answered_by_rule names no record of kmaster")
+            asked.append({"method": method, **params})
+            return {"filed": True}
+
+        async def notify(self, method, **params):  # the node's own reports go the same road
+            pass
+
     async with LocalClient() as c:
         w = (await c.call("create", name="w", dir=str(tmp_path), adapter="rulestub", unattended=True, role="grinder"))[
             "id"
         ]
-        agent.mode = "node"
-        try:
-            for tu, command in (("n1", "pdm run test"), ("n2", "ls")):
-                task = asyncio.create_task(_hook(w, "Bash", command, tu))
-                st = await wait_state(c, w, "needs-you")
-                assert st["pending"]["tool_use_id"] == tu
-                agent.mode = "home"  # the person's answer, as the home relays it
-                await c.call("decide", id=w, tool_use_id=tu, behavior="allow")
-                assert await task == {"behavior": "allow", "reason": None}
-                agent.mode = "node"
-        finally:
-            agent.mode = "home"
+        monkeypatch.setattr(agent, "mode", "node")
+        monkeypatch.setattr(agent, "_home_mux", Mux())
+        monkeypatch.setattr(agent, "_snapshot_sent", True)
+        assert await _hook(w, "Bash", "pdm run test", "n1") == {"behavior": "allow", "reason": "rule: Bash"}
+        assert await _hook(w, "Bash", "ls", "n2") == {"behavior": "deny", "reason": "rule: Bash(ls)"}
+        assert asked == [
+            {
+                "method": "answered_by_rule",
+                "id": w,
+                "prompt": "Bash: pdm run test",
+                "behavior": "allow",
+                "rule": "Bash",
+            },
+            {"method": "answered_by_rule", "id": w, "prompt": "Bash: ls", "behavior": "deny", "rule": "Bash(ls)"},
+        ]
+
+        # a filing refused, a link not past its snapshot, a link that is down: the person answers
+        refuse = True
+        for tu, setup in (("n3", None), ("n4", ("_snapshot_sent", False)), ("n5", ("_home_mux", None))):
+            if setup:
+                monkeypatch.setattr(agent, *setup)
+            task = asyncio.create_task(_hook(w, "Bash", "pdm run test", tu))
+            st = await wait_state(c, w, "needs-you")
+            assert st["pending"]["tool_use_id"] == tu
+            monkeypatch.setattr(agent, "mode", "home")  # the person's answer, as the home relays it
+            await c.call("decide", id=w, tool_use_id=tu, behavior="allow")
+            assert await task == {"behavior": "allow", "reason": None}
+            monkeypatch.setattr(agent, "mode", "node")
+        monkeypatch.setattr(agent, "mode", "home")
         assert not [e for e in agent.person_inbox if e.answered]
+
+
+async def test_the_home_files_a_nodes_answer_by_rule(agent):
+    """At the home, `answered_by_rule` from a node files the *Answered for you* FYI as the home's own
+    rule step does, the asker the node's record by its address; a record of another host, or no
+    answer, is refused, so the node's prompt waits for the person."""
+    from sessionorc import link
+    from sessionorc.models import Session
+
+    rec = Session(
+        id="ao-x-w", name="w", kind="worker", adapter="hookstub", dir="/tmp/x", host="laptop", role="grinder"
+    ).to_dict()
+    agent._take_records("laptop", [rec], whole=True)
+    params = {"id": "ao-x-w", "prompt": "Bash: pdm run test", "behavior": "allow", "rule": "Bash(pdm run test)"}
+    assert await agent._take_answered_by_rule("laptop", params) == {"filed": True}
+    fyi = [e for e in agent.person_inbox if e.answered]
+    assert len(fyi) == 1 and fyi[0].answered == {
+        "question": "Bash: pdm run test",
+        "asker": "ao-x-w@laptop",
+        "answerer": "rules",
+        "source": "settings.yml permissions: grinder allow Bash(pdm run test)",
+    }
+    for bad in ({**params, "id": "ao-x-nope"}, {**params, "behavior": "maybe"}, {**params, "rule": ""}):
+        with pytest.raises(link.LinkError):
+            await agent._take_answered_by_rule("laptop", bad)
+    with pytest.raises(link.LinkError):
+        await agent._take_answered_by_rule("desk", params)
+    assert len([e for e in agent.person_inbox if e.answered]) == 1

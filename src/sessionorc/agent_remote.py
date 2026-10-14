@@ -588,6 +588,8 @@ class RemoteMixin:
             if method == "usage_report":
                 await self._take_usage_report(host, params)
                 return None
+            if method == "answered_by_rule":
+                return await self._take_answered_by_rule(host, params)
             if method == "forward":
                 return await self._forwarded(host, params)
             if method == "cancel":
@@ -607,6 +609,19 @@ class RemoteMixin:
                 log.warning("link from %s: down — %s", host, why)
                 with contextlib.suppress(Exception):
                     await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    async def _take_answered_by_rule(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """A prompt one of a node's members had answered by the person's rule (design §4.9b, TD-641):
+        the *Answered for you* FYI filed here, mail's one writer (§9 invariant 15), before the node
+        answers the hook — a refusal leaves the node's prompt waiting for the person."""
+        rid = str(params.get("id") or "")
+        s = self.remote.get(host, {}).get(rid)
+        behavior, prompt, rule = (str(params.get(k) or "") for k in ("behavior", "prompt", "rule"))
+        if s is None or behavior not in ("allow", "deny") or not prompt or not rule:
+            raise link.LinkError(f"answered_by_rule names no record of {host}, or no answer")
+        self._answered_by_rule(s, prompt, behavior, rule, asker=f"{rid}@{host}")
+        await self._push_changes()
+        return {"filed": True}
 
     async def _take_usage_report(self, host: str, params: dict[str, Any]) -> None:
         """A report one of a node's sessions made (§4.4 *A node's sessions report to their node*,
