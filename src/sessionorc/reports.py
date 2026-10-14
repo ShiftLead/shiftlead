@@ -501,6 +501,8 @@ def done_verdicts(
     most `JOBS_CAP`, stopping at the first that started or could not be read. A read that fails is no
     evidence: the job stays failed."""
     head = str(view.get("headRefOid") or "")
+    if str(view.get("state") or "").upper() != "OPEN" or view.get("mergedAt"):
+        return {}  # merged or closed: `at_done` reads no check of it
     kept = kept if isinstance(kept, dict) else {}
     read: dict[str, Any] = dict(kept.get("read") or {}) if head and kept.get("head") == head else {}
     read = {k: v for k, v in read.items() if _verdict_ok(v)}
