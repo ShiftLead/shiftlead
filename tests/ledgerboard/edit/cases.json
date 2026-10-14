@@ -198,5 +198,89 @@
     "# Board\n\n- [ ] 2026-01-05 (session s) — x.\nLedgerboard: 3\n",
     "# Board\n\n- [docs](x)\nLedgerboard: 2\n\n- [ ] 2026-01-05 (session s) — x.\n",
     "# T\n\n## Summary\n\nLedgerboard: 2\n\n## TD-001: x\n"
+  ],
+  "bold_heads": [
+    "2026-01-05 (session s-1 on h) — **Fix the export** before Friday. Due: 2026-01-20.",
+    "decide 2026-01-05 (session s-1) — Pick one. Context: TD-004. Due: 2026-01-20. Answers: a | b.",
+    "2026-01-05 (session s-1) — **First**, then **second**. Due: 2026-01-20.",
+    "2026-01-05 (session s-1) — Plain words. Due: 2026-01-20. — Paul, 2026-01-10: **mine**, not a head",
+    "2026-01-05 (session s-1) — **Spread\tover   space** here. Due: 2026-01-20.",
+    "2026-01-05 (session s-1) — **  ** is no head. Due: 2026-01-20.",
+    "decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: **a** | b."
+  ],
+  "not_right_forms": [
+    "Not right: <what>",
+    "Not right:",
+    "Not right:   <say what>",
+    "Not right: wrong repo",
+    "not right: <what>",
+    "Works",
+    "Not right: <a> <b>"
+  ],
+  "not_right_fills": [
+    {
+      "name": "filled",
+      "said": "Not right:  the  button is grey",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "bare-form-offered",
+      "said": "Not right: wrong page",
+      "offered": [
+        "Works",
+        "Not right:"
+      ]
+    },
+    {
+      "name": "form-as-offered",
+      "said": "Not right: <what>",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "prefix-only",
+      "said": "Not right:  ",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "another-answer",
+      "said": "Works",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "no-form-offered",
+      "said": "Not right: wrong repo",
+      "offered": [
+        "Works",
+        "Not right: wrong repo"
+      ]
+    },
+    {
+      "name": "empty",
+      "said": "",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    },
+    {
+      "name": "placeholder-only",
+      "said": "Not right: <b>",
+      "offered": [
+        "Works",
+        "Not right: <what>"
+      ]
+    }
   ]
 }
