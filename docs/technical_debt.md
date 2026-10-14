@@ -73,6 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, cloudflare, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
 | TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
+| TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 
 ---
 
@@ -1404,5 +1405,26 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** both Apply titles say what Apply does to a profile difference and the test holds them.
 
 **Related:** TD-619, TD-620, TD-399.
+
+---
+
+## TD-652: The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2; the techlead's note on #1668, TD-618 slice 4)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — needs #1668 merged (it adds `pr_holders`).
+**Blocked by:** TD-618
+**Location:** `src/shiftlead/teamrun.py` (`pr_holders`, added by #1668), `src/sessionorc/workorders.py` (`holds_pr`, the `pr_orders` reading), the Repo page's *held by <name>* tag (`src/shiftlead/ui/repo.py`), design §4.4 *Each reading has one owner* (TD-614), *A red PR nobody holds is a work order*
+
+**Why:** the home's `pr_orders` reading lists only the red PRs nobody holds, so the Repo page, to tag one *held by <name>*, runs `teamrun.pr_holders` — the same test as `workorders.holds_pr`, written again over the records the page holds. Two copies of one rule drift; §4.4 *Each reading has one owner* puts a derivation on the reading, once.
+
+**Fix:** the home's reading carries, per red PR past `ORPHAN_AFTER`, its holders (`holds_pr` over the records, as the orders are derived); the page reads them and `pr_holders` goes; a test that the page and the reading name the same holder.
+
+**Done when** `git grep pr_holders src/` is empty, the Repo page's *held by* tag reads the reading, and the suite passes.
+
+**Related:** TD-613, TD-614, TD-618.
 
 ---
