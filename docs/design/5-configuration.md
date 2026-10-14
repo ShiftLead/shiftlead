@@ -59,7 +59,13 @@ person:                                       # the person's own — nothing her
 notify:                                       # §4.10 *Told on Telegram when nobody is looking*: read by the home's tick, and by the watch (§4.10 *When the home itself is down*)
   telegram: {on: false,                       # the one switch; absent or false, nothing is sent
              secrets: "samscrape/prd",        # the Doppler project/config holding TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID — a name, never a value
-             link: "http://kmaster:8765"}     # how the person's phone reaches the UI (§4.5b); the row's address is appended
+             link: "http://kmaster:8765"}     # how the person's phone reaches the UI (§4.5b); the row's address is appended; absent, reach.url
+reach:                                        # §4.5b *The setting*: the person's route to the UI's route port; written by `ao connect` alone (`set_reach`; `set_settings` refuses the key), absent until it runs
+  route: tailscale                            # tailscale | cloudflare
+  url: "https://kmaster.tail1234.ts.net"      # what a phone opens
+  allow: ["paul@example.com"]                 # the logins the route port lets in: Tailscale-User-Login, or the Access token's email; compared without case; empty lets nobody in
+  # team: myteam                              # cloudflare only: <team>.cloudflareaccess.com, whose certs sign the token
+  # aud: "4f1c…"                              # cloudflare only: the Access application's audience tag
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has

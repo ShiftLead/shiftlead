@@ -50,6 +50,6 @@
 
 Non-goals (for now): multi-user access control, a kanban/task-board model of work (see §3 prior
 art), replacing Claude Code's own `/resume`, mobile-first UI. A hosted service is **not** a
-non-goal: it is the `relay` transport in §4.5b, kept compatible from phase 1 and scheduled after
-phase 5.
+non-goal: it is the `relay` transport in §4.5b — a route that forwards ciphertext only — kept
+compatible from phase 1 and scheduled after phase 5.
 
