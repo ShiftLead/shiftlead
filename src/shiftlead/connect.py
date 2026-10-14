@@ -28,7 +28,9 @@ INSTALL_PAGE = "https://tailscale.com/download"
 DNS_PAGE = "https://login.tailscale.com/admin/dns"
 PROBE_AFTER = 10.0  # seconds the UI's read of `reach:` is given before the probe (§4.7)
 ASK_WAIT = 3.0
-PROBE_WAIT = 15.0
+PROBE_WAIT = 15.0  # seconds one fetch of the route's URL is given
+PROBE_BOUND = 180.0  # seconds a probe retries a fetch nothing answered: a first certificate takes a minute or two
+PROBE_EVERY = 5.0  # seconds between those tries
 _LOOPBACK = {"127.0.0.1", "localhost", "::1", "[::1]"}
 
 Run = Callable[[list[str]], tuple[int, str, str]]
@@ -189,12 +191,35 @@ def tailscale(
     return {"url": f"https://{dns}", "allow": logins, "ours": ours(target, route)}
 
 
-def probe(url: str, fetch: Callable[[str], dict[str, Any]] | None = None) -> str | None:
+def probe(
+    url: str,
+    fetch: Callable[[str], dict[str, Any]] | None = None,
+    *,
+    sleep: Callable[[float], None] | None = None,
+    clock: Callable[[], float] | None = None,
+    say: Callable[[str], None] = lambda line: None,
+) -> str | None:
     """The route's URL fetched over the tailnet (§4.7 *The probe*): None when an answer marked `route`
-    came back that is not a `421`; else what it got, in words."""
-    got = (fetch or (lambda u: _answer(u, PROBE_WAIT)))(url)
-    if got.get("status") is None:
-        return f"{url} did not answer ({got.get('why') or 'no reason given'})"
+    came back that is not a `421`; else what it got, in words. A fetch nothing answered is tried again
+    every `PROBE_EVERY` up to `PROBE_BOUND`, saying so once: a tailnet name's first certificate is
+    fetched when the handler is added, and the TLS handshake waits on it (TD-672). Any answer is judged
+    at once."""
+    import time
+
+    fetch = fetch or (lambda u: _answer(u, PROBE_WAIT))
+    sleep, clock = sleep or time.sleep, clock or time.monotonic
+    deadline, told = clock() + PROBE_BOUND, False
+    while (got := fetch(url)).get("status") is None:
+        why = got.get("why") or "no reason given"
+        if clock() + PROBE_EVERY > deadline:
+            return f"{url} did not answer in {PROBE_BOUND / 60:.0f} minutes ({why})"
+        if not told:
+            say(
+                f"no answer yet ({why}): the first HTTPS certificate can take a minute or two — "
+                f"trying again for up to {PROBE_BOUND / 60:.0f} minutes…"
+            )
+            told = True
+        sleep(PROBE_EVERY)
     if got.get("listener") == "route" and got["status"] != 421:
         return None
     if got["status"] == 421:
@@ -214,12 +239,14 @@ def connect_tailscale(
     ask: Ask = ask_port,
     fetch: Callable[[str], dict[str, Any]] | None = None,
     sleep: Callable[[float], None] | None = None,
+    clock: Callable[[], float] | None = None,
     say: Callable[[str], None] = print,
     which: Callable[[str], str | None] = shutil.which,
 ) -> dict[str, Any]:
     """`ao connect tailscale` (§4.7): the ports asked, the checks, then in this order — `reach:`
     written, `tailscale serve --bg --https=443 http://127.0.0.1:<route>` unless it is already this
-    route's, the probe once the UI has had `PROBE_AFTER` to read the setting. A probe that fails
+    route's, the probe once the UI has had `PROBE_AFTER` to read the setting, retrying a fetch nothing
+    answered up to `PROBE_BOUND` (a first certificate is still being fetched). A probe that fails
     restores the `reach:` there before and turns off the handler if this run added it."""
     import time
 
@@ -258,7 +285,7 @@ def connect_tailscale(
             added = True
         say(f"checking {got['url']} in {PROBE_AFTER:.0f}s, once the UI has read the route…")
         (sleep or time.sleep)(PROBE_AFTER)
-        why = probe(got["url"], fetch)
+        why = probe(got["url"], fetch, sleep=sleep, clock=clock, say=say)
     except Lacking:
         raise
     except BaseException:  # an interrupt or a failure mid-way: undone before it goes on up

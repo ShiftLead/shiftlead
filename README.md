@@ -104,7 +104,8 @@ key, and `ao connect` never runs `sudo` (design §4.5b, §4.7).
    **22** (an ssh from the phone, for the case below).
 7. `ao connect tailscale`. It checks each step above and names the first one missing. It writes
    `reach:` in `settings.yml`, serves 443 at the route port, and probes the result; a probe that
-   fails is undone. `--allow <login>` names the login to let in (a tagged machine needs it).
+   fails is undone. On the first run the probe can wait a minute or two while Tailscale fetches the
+   machine's first HTTPS certificate. `--allow <login>` names the login to let in (a tagged machine needs it).
    `ao connect` alone shows the route; `ao doctor route` checks it.
 8. On the phone: the **Tailscale app**, signed in as the same login, then open the URL
    `ao connect` printed.
