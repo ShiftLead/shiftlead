@@ -54,7 +54,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
-| TD-676 | An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form | Medium | Designed — TD-678 builds it |
 | TD-679 | Ready to close has no row for the agent itself: a working session's checklist reads all ✓, and the card's *more ▾* **Close** is enabled on it | Low | Open |
 
 ---
@@ -928,27 +927,6 @@ with the retired brief).
 **Done when** a ShiftLead note arrives from ShiftLead's own bot, and `settings.yml` names no samscrape secrets.
 
 **Related:** TD-092 (Told on Telegram), TD-648 (`reach.url`, the notes' default link).
-
----
-
-## TD-676: An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-14 (Paul, through Add entry; drafted by entry-6)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-14 (the designer; mockup `Inbox.dc.html`, shot `docs/mockups/reviews/2026-10-14-td676-inbox-ledger-start-session.png`) — §4.5a *Inbox row: ledger entry: Start session / Open session*, §4.5 screen 6: on **both** kinds of row (*yours* and *your decision*: talking a decision through is working it); one press, as **Resume**: the person's interactive session on the repo's servicing team, the `entries:` role for the entry's `Type:` (else `techlead`), lane the id, the team's live manager its controller; **named `td-<n>`** — session, worktree and branch — so the tick derives its claim from the branch and the row reads *held by td-676* with nothing declared; **the opening prompt is sent**, fixed text in a new package file `briefs/work.md` with the id, repo, ledger and the row's kind filled (read the entry, check what is built or decided, say what it asks and what you would do first, then wait — the person drives), never the entry's own words, and the role's brief not sent; **the filled New session form with the reason** where it cannot be silent (no team, the name not free by Add entry's test, an unresolved role or profile, the host not connected); **Open session** while a live record holds the entry, focusing it, and a press while a live session holds the name `td-<n>` (before the claim is derived) focusing that one. Built by TD-678. Was: Open.
-**Blocked by:** TD-678
-**Location:** design §4.5 screen 6 *The ledger's entries that wait on you*, §4.5a *Inbox row: ledger entry* (and *Focus (exited / closed)*'s **Resume**, whose press-or-form rule this borrows; *Org: team card + card*'s `/new?team=`); `src/shiftlead/ui/inbox.py` (`ledger_for_you`), `src/shiftlead/ui/templates/inbox_row.html` (the `ledger` row), `src/shiftlead/ui/app.py` (`/new`)
-
-**Why:** the Inbox already lists every entry that waits on the person (`Owner: paul`, or blocked by `decision (paul)`) under *Later*, with its answers, **Reply** and **Open**, but an entry the person means to work themselves has no way in from there: they go to the Org, find the repo's team, open the + card's form, and type the name, lane and prompt. Paul, 2026-10-14: *it allows the user to work out of the inbox instead of having to jump around*. Today six entries are `Owner: paul` in this repo alone (`ledger.py --list --owner paul`).
-
-**Fix:** a **Start session** button on the ledger row (not a separate *Your TDs* list: the row and its source exist). One press, a form only on doubt, as **Resume** is: an interactive session (the person's, `unattended: false`) on the repo's servicing team (the row's team badge), in a new worktree named for the entry (`td-676`), lane the id, its opening prompt naming the entry; then its Focus opens. When it cannot be silent — no team, a live holder of the name, a host not connected — the press lands on the New session form filled in, with the reason. While a live record holds the entry (the row's *held by <name>*), the button reads **Open session** and focuses that one. The design round settles the opening prompt's words, whether a `decision (paul)` row gets the button too, and the name's form.
-
-**Done when** a press on a ledger row in the Inbox starts the person's session on that entry, on its team, named for it, and opens its Focus, or opens the filled form saying why not; and a second press while that session lives opens it instead of starting another.
-
-**Related:** TD-367 and TD-560 (the rows), TD-565 (drawn as full rows in *Later*).
 
 ---
 
