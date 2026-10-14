@@ -178,11 +178,14 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     backup_store,  # noqa: F401
     cache_lapsed,  # noqa: F401
     cache_restarts,  # noqa: F401
+    claim_draft,  # noqa: F401
     closer_of,
+    draft_folder,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
+    read_draft_claim,  # noqa: F401
     stat_dir,  # noqa: F401
     tick_ready,  # noqa: F401
 )
@@ -273,6 +276,15 @@ def _write_attachment(where: Path, name: str, raw: bytes) -> Path:
             f.write(raw)
 
     return _place_attachment(where, name, write)
+
+
+def _mint_draft() -> str:
+    """A new draft token (§4.4 *The Add entry form's draft*, TD-630): `draft-<8 hex>` whose folder
+    does not exist yet; the folder itself is made by the first file's write."""
+    while True:
+        token = f"draft-{secrets.token_hex(4)}"
+        if not (paths.attachments_dir() / token).exists():
+            return token
 
 
 def _start_part(part: Path, raw: bytes) -> None:
@@ -898,8 +910,15 @@ class HostAgent(
         held: bool = False,
         held_reason: dict[str, Any] | None = None,
         team_start: bool = False,
+        draft: str = "",
     ) -> dict[str, Any]:
-        """`team_start` marks a create that is part of `ao team start`: the dispatcher reads it at
+        """`draft` (design §4.4 *The Add entry form's draft*, TD-630): the Add entry form's draft
+        folder, which **Open a session** hands to the create — claimed for the new session once it
+        exists (`claimed.json` `{by: <its id>, at}`), so the folder then lives as that session's own
+        attachments do. A person's own, as `attach` is; refused beside `start_at` or `held`, and
+        before anything is made where the draft is not this host's, unclaimed.
+
+        `team_start` marks a create that is part of `ao team start`: the dispatcher reads it at
         the home, before any routing, to keep the start's usage reading (`_mark_team_start`, §4.9a
         *The home's note says more*, TD-468); the create itself does nothing more with it.
 
@@ -977,6 +996,12 @@ class HostAgent(
             isinstance(seat, dict) and isinstance(seat.get("trigger"), str) and seat["trigger"]
         ):
             raise RpcError("seat is {trigger, after?}: the trigger its team definition gives it (design §4.9b)")
+        draft_dir: Path | None = None
+        if draft:
+            agent_common.person_only(caller, "claim a draft", "§4.4 *The Add entry form's draft*", self._graph())
+            if starts or held:
+                raise RpcError("a draft is claimed by a session started now: not beside start_at or held (design §4.4)")
+            draft_dir = await asyncio.to_thread(agent_common.draft_folder, draft, "create")
         # Create adds the creator (design §4.8): a session that starts another may act on what it
         # started, without a second call and without a person in the loop. `caller` is the request
         # envelope's, injected by the dispatcher — a person's create has none, and then the new
@@ -1178,6 +1203,11 @@ class HostAgent(
                 s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
             self.sessions[sid] = s
             self.store.save(s)
+            if draft_dir is not None:  # the form's files are the new session's from here (§4.4, TD-630)
+                try:
+                    await asyncio.to_thread(agent_common.claim_draft, draft_dir, s.id, datetime.now(UTC))
+                except (OSError, RpcError) as e:  # the session exists: its create stands, the draft unclaimed
+                    log.warning("create %s: could not claim %s: %s", s.id, draft_dir.name, e)
             if isinstance(holder, Session) and holder.adapter_id != s.adapter_id:
                 self._drop_context(holder.adapter_id, holder)  # replaced in place, never forgotten
             self._remember_dir(directory)
@@ -2208,13 +2238,14 @@ class HostAgent(
 
     async def rpc_attach(
         self,
-        id: str,
+        id: str = "",
         name: str = "",
         data: str = "",
         upload: str = "",
         offset: int = 0,
         total: int | None = None,
         cancel: bool = False,
+        draft: str | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
         """The Focus composer's **Attach** / drop / paste (design §4.4 *Attachment drop*, §4.5a,
@@ -2229,19 +2260,38 @@ class HostAgent(
         answers `{path, bytes}`. `cancel` with the `upload` deletes the `.part`. A file past
         `person.attach.max` (§5) is refused on its first piece, before anything is written. A
         person's own act, for a session on this host only: `_get` refuses a node's, whose copy over
-        ssh is §7's phase 2."""
+        ssh is §7's phase 2.
+
+        `draft` in place of `id` (§4.4 *The Add entry form's draft*, TD-630): the Add entry form's
+        files, before any session exists. `""` on a form's first file mints `draft-<8 hex>`; every
+        later call names it, refused once a way out has claimed it (`agent_common.draft_folder`).
+        The files land in `attachments/<draft>/` by the same pieces, names and bound, and each answer
+        carries `draft`."""
         agent_common.person_only(caller, "attach a file", "§4.5a", self._graph())
-        s = self._get(id)
+        if draft is not None:
+            if id:
+                raise RpcError("attach: a session's id or a draft, not both")
+            if draft == "":
+                if upload or cancel:
+                    raise RpcError("attach: a later piece names its draft, as the first piece's answer gave it")
+                token = _mint_draft()
+            else:
+                token = (await asyncio.to_thread(agent_common.draft_folder, draft, "attach")).name
+            owner, said = token, {"draft": token}
+            if paths.attachment_name(name) == paths.DRAFT_CLAIM:
+                name = f"attached-{name}"  # the claim's name is the sweep's, never a file of the form's
+        else:
+            owner, said = self._get(id).id, {}
         if upload:
             up = self._uploads.get(upload)
-            if up is None or up["session"] != s.id:
+            if up is None or up["session"] != owner:
                 raise RpcError(
-                    f"attach: no upload {upload} for {s.id} (finished, cancelled, or the host agent restarted)"
+                    f"attach: no upload {upload} for {owner} (finished, cancelled, or the host agent restarted)"
                 )
             if cancel:
                 self._uploads.pop(upload, None)
                 await asyncio.to_thread(up["part"].unlink, missing_ok=True)
-                return {"upload": upload, "cancelled": True}
+                return {"upload": upload, "cancelled": True, **said}
         elif cancel:
             raise RpcError("attach: cancel names the upload it cancels")
         try:
@@ -2257,10 +2307,10 @@ class HostAgent(
                 self._uploads.pop(upload, None)
                 raise RpcError(f"attach: upload {upload} {why}")
             if written < up["total"]:
-                return {"upload": upload, "bytes": written}
+                return {"upload": upload, "bytes": written, **said}
             self._uploads.pop(upload, None)
             path = await asyncio.to_thread(_finish_part, up["part"], up["name"])
-            return {"path": str(path), "bytes": written}
+            return {"path": str(path), "bytes": written, **said}
         if total is None:
             total = len(raw)
         if isinstance(total, bool) or not isinstance(total, int) or total < len(raw):
@@ -2269,17 +2319,17 @@ class HostAgent(
         if total > bound:
             label = paths.attachment_name(name)
             raise RpcError(f"attach: {label} is {_mib(total)}, past the {_mib(bound)} a file may be")
-        where = paths.attachments_dir() / s.id
+        where = paths.attachments_dir() / owner
         if len(raw) == total:
             path = await asyncio.to_thread(_write_attachment, where, name, raw)
-            return {"path": str(path), "bytes": len(raw)}
+            return {"path": str(path), "bytes": len(raw), **said}
         for gone in [k for k, v in self._uploads.items() if not v["part"].exists()]:
             self._uploads.pop(gone)  # cancelled by a closed page and swept: nothing will name it again
         upload = secrets.token_hex(8)
         part = where / f"{paths.attachment_name(name)}.{upload}.part"
         await asyncio.to_thread(_start_part, part, raw)
-        self._uploads[upload] = {"session": s.id, "part": part, "name": name, "total": total}
-        return {"upload": upload, "bytes": len(raw)}
+        self._uploads[upload] = {"session": owner, "part": part, "name": name, "total": total}
+        return {"upload": upload, "bytes": len(raw), **said}
 
     async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
         self._get(id)

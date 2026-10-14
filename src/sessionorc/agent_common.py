@@ -313,6 +313,50 @@ def person_only(caller: Any, act: str, section: str, records: Mapping[str, Sessi
     )
 
 
+def draft_folder(draft: Any, act: str) -> Path:
+    """The Add entry form's draft folder a call names (design §4.4 *The Add entry form's draft*,
+    TD-630), refused in words unless it is a `draft-<8 hex>` token whose folder this host holds and
+    no way out has claimed: a claimed draft's files are the claimer's, and a node holds no draft
+    (the form attaches at the home; *this call does not cross the link*)."""
+    token = str(draft or "")
+    if not paths.DRAFT.fullmatch(token):
+        raise RpcError(f"{act}: {token!r} is not a draft (draft-<8 hex>, as attach mints it)")
+    folder = paths.attachments_dir() / token
+    if folder.is_symlink() or not folder.is_dir():
+        raise RpcError(f"{act}: no draft {token} on this host (swept after an hour unclaimed, or another host's)")
+    if (folder / paths.DRAFT_CLAIM).exists():
+        raise RpcError(f"{act}: draft {token} is already claimed")
+    return folder
+
+
+def claim_draft(folder: Path, by: str, now: datetime) -> None:
+    """A draft claimed at a way out's press (§4.4 *The Add entry form's draft*, TD-630): `claimed.json`
+    `{by, at}` in its folder, `by` the new session's id or `hand:<the ask's id>` — the one link the
+    sweep reads, so no record gains a field. Written whole under a temporary name and linked into
+    place, so a second claimant (a double press) is refused rather than writing over the first."""
+    tmp = folder / f".{paths.DRAFT_CLAIM}.{os.getpid()}.{time.monotonic_ns()}.tmp"
+    tmp.write_text(json.dumps({"by": by, "at": now.isoformat()}) + "\n", encoding="utf-8")
+    try:
+        os.link(tmp, folder / paths.DRAFT_CLAIM)
+    except FileExistsError:
+        raise RpcError(f"draft {folder.name} is already claimed") from None
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def read_draft_claim(folder: Path) -> dict[str, Any] | None:
+    """A draft folder's claim, or None where it has none; one that cannot be read is a claim by
+    nobody, kept rather than swept as unclaimed (the person's files are the safe direction)."""
+    f = folder / paths.DRAFT_CLAIM
+    try:
+        got = json.loads(f.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError):
+        return {"by": "", "at": ""}
+    return got if isinstance(got, dict) else {"by": "", "at": ""}
+
+
 def _is_branch_claim(e: Any) -> bool:
     """A derived `claimed` entry with no PR: only the branch it came from ever supported it, so it
     is the one kind of report entry the tick may retire (TD-045)."""

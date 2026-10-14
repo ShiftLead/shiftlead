@@ -54,6 +54,10 @@ ATTACH_PIECE_BYTES = 2 * 1024 * 1024
 ATTACH_PART_IDLE_S = 3600
 # An upload's `.part`, `<safe name>.<upload>.part`, the upload id `secrets.token_hex(8)`.
 UPLOAD_PART = re.compile(r".+\.[0-9a-f]{16}\.part")
+# The Add entry form's draft folder, `attachments/<draft>/` (§4.4 *The Add entry form's draft*, TD-630):
+# its token `draft-<8 hex>`, and the claim a way out writes in it, `{by, at}`.
+DRAFT = re.compile(r"draft-[0-9a-f]{8}")
+DRAFT_CLAIM = "claimed.json"
 
 
 def attachment_name(name: str) -> str:

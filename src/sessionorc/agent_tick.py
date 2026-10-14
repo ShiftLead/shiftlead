@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import json
 import os
+import shutil
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -3072,7 +3073,8 @@ class TickMixin:
         exited nor closed; a forgotten one has none — each folder removed once empty; `None` sweeps no
         attachment. An attachment's `.part` nothing has written to for an hour goes whatever
         the bound (§4.4 *Attachment drop*, TD-478): a browser closed mid-upload leaves nothing.
-        Runs in a thread: touches files, never `self.sessions`."""
+        The Add entry form's draft folders go by their claim (`_prune_drafts`, TD-630), before the
+        early returns. Runs in a thread: touches files, never `self.sessions`."""
         idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
         for f in paths.attachments_dir().glob("*/*.part"):
             try:
@@ -3084,6 +3086,7 @@ class TickMixin:
             except OSError:
                 continue
         keep = hosts.local_host().runs_keep_days
+        _prune_drafts(now, keep, live_ids)
         if keep <= 0:
             return
         cutoff = (now - timedelta(days=keep)).timestamp()
@@ -3108,6 +3111,8 @@ class TickMixin:
         for folder in paths.attachments_dir().glob("*"):
             if folder.name in live_ids or folder.is_symlink() or not folder.is_dir():
                 continue
+            if paths.DRAFT.fullmatch(folder.name):
+                continue  # a draft goes by its claim (`_prune_drafts`)
             try:
                 files = [f for f in folder.iterdir() if f.is_file() and not f.is_symlink()]
             except OSError:  # gone meanwhile
@@ -3982,6 +3987,51 @@ class TickMixin:
             last.pop(sid, None)
         self._scrub(sid)
         self._gone.append(sid)
+
+
+def _prune_drafts(now: datetime, keep: int, live_ids: set[str] | None) -> None:
+    """The Add entry form's draft folders (design §4.6 *Run-log retention*, §4.4 *The Add entry form's
+    draft*, TD-630), by their `claimed.json`: one with none is removed once nothing in it was written
+    for `ATTACH_PART_IDLE_S`, whatever `keep`; one claimed by a hand (`by: hand:<ask id>`) is removed
+    `keep` days after its `at`, and kept under `0`; one claimed by a session lives as that session's
+    own folder does — kept while its id is in `live_ids` (`None`: nothing is known, so kept), its
+    files then going by age and the folder, claim and all, once nothing else is left. A claim that
+    cannot be read is kept: the person's files are the safe direction."""
+    idle = now.timestamp() - paths.ATTACH_PART_IDLE_S
+    cutoff = (now - timedelta(days=keep)).timestamp()
+    for folder in paths.attachments_dir().glob("draft-*"):
+        if not paths.DRAFT.fullmatch(folder.name) or folder.is_symlink() or not folder.is_dir():
+            continue
+        try:
+            claim = agent_common.read_draft_claim(folder)
+            if claim is None:
+                last = max([folder.lstat().st_mtime, *(f.lstat().st_mtime for f in folder.iterdir())])
+                if last < idle:
+                    shutil.rmtree(folder)
+                    log.info("pruned draft %s (unclaimed, nothing written for an hour)", folder.name)
+                continue
+            by = str(claim.get("by") or "")
+            if by.startswith("hand:"):
+                try:
+                    at = datetime.fromisoformat(str(claim.get("at"))).timestamp()
+                except ValueError:
+                    continue
+                if keep > 0 and at < cutoff:
+                    shutil.rmtree(folder)
+                    log.info("pruned draft %s (handed as %s, older than %d days)", folder.name, by[5:], keep)
+                continue
+            if not by or live_ids is None or by in live_ids or keep <= 0:
+                continue
+            files = [f for f in folder.iterdir() if f.name != paths.DRAFT_CLAIM]
+            for f in files:
+                if f.is_file() and not f.is_symlink() and f.lstat().st_mtime < cutoff:
+                    f.unlink()
+                    log.info("pruned attachment %s (older than %d days)", f, keep)
+            if not any(f.name != paths.DRAFT_CLAIM for f in folder.iterdir()):
+                (folder / paths.DRAFT_CLAIM).unlink(missing_ok=True)
+                folder.rmdir()
+        except OSError as e:  # gone meanwhile, or not ours to remove: the next sweep tries again
+            log.warning("could not prune draft %s: %s", folder, e)
 
 
 def _recent_files(directory: str) -> list[dict[str, Any]] | None:
