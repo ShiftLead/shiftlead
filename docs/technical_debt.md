@@ -43,7 +43,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
-| TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Open |
+| TD-611 | The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count | High | Live check — blocked by TD-670 |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
@@ -74,6 +74,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-667 | A key typed into the Focus terminal while it is scrolled back is swallowed by tmux's copy mode: typing should return the pane to the live screen and reach the prompt | Medium | Designed — TD-669 builds it |
 | TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 | TD-669 | Build TD-667: a typed key leaves copy mode first — the bridge's *scrolled* mark, `copy-mode -q` before a printable key, Enter, Tab, Backspace or paste, its tmux commands in order; every host-agent send leaves copy mode first | Medium | Open |
+| TD-670 | A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder | High | Open |
 
 ---
 
@@ -666,9 +667,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Type:** debt
 **Added:** 2026-10-12 (ao-paul; measured by two read-only agents on the live UI)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1's page half in PR #1610 (2026-10-12, grinder-ao-2): `/api/person/inbox?counts=1` answers the top bar's numbers from `inbox_sections` with nothing rendered, and every page but the Inbox page and a message page polls it. Left of slice 1: `ao inbox --counts` — the counts are the UI's (state rows, the board horizon), not the host agent's, so a shell read needs either the UI's endpoint or a home read of the board; its own slice (TD-616's §4.7 `ao inbox` once TD-614's design lands). Slice 5 in PR #1615 (2026-10-12, grinder-ao-2): the bridge's queue bounded in bytes (`QUEUE_HIGH` / `QUEUE_LOW`, the pty unread between) and each send everything queued. Slices 3–4 are TD-617's. Slice 2 in PR #1619 (2026-10-12, grinder-ao-2): `/api/person/inbox` builds its sections, markup and JSON on a worker thread (`asyncio.to_thread`), gzipped there when the browser takes it, so nothing the size of the inbox runs on the loop; per-endpoint rather than `GZipMiddleware`, which compresses on the loop. Not built: the cap on *answered for you* with a *show more* — a control §4.5a does not have, so a design round's if the re-measurement still wants it (Dismiss all, TD-602, shrinks the group today). What is left is TD-616's and TD-617's; once both merge this entry is the live check its *Done when* names.
-**Blocked by:** TD-616, TD-617
+**Kind:** live-check #1660
+**Status:** Open — slice 1's page half in PR #1610 (2026-10-12, grinder-ao-2): `/api/person/inbox?counts=1` answers the top bar's numbers from `inbox_sections` with nothing rendered, and every page but the Inbox page and a message page polls it. Left of slice 1: `ao inbox --counts` — the counts are the UI's (state rows, the board horizon), not the host agent's, so a shell read needs either the UI's endpoint or a home read of the board; its own slice (TD-616's §4.7 `ao inbox` once TD-614's design lands). Slice 5 in PR #1615 (2026-10-12, grinder-ao-2): the bridge's queue bounded in bytes (`QUEUE_HIGH` / `QUEUE_LOW`, the pty unread between) and each send everything queued. Slices 3–4 are TD-617's. Slice 2 in PR #1619 (2026-10-12, grinder-ao-2): `/api/person/inbox` builds its sections, markup and JSON on a worker thread (`asyncio.to_thread`), gzipped there when the browser takes it, so nothing the size of the inbox runs on the loop; per-endpoint rather than `GZipMiddleware`, which compresses on the loop. Not built: the cap on *answered for you* with a *show more* — a control §4.5a does not have, so a design round's if the re-measurement still wants it (Dismiss all, TD-602, shrinks the group today). What is left is TD-616's and TD-617's; once both merge this entry is the live check its *Done when* names. Live read 2026-10-14 (grinder-ao-2, `9bb725c` live, journal and headless reads only): the bulk polls are gone — no `GET /api/sessions` at all, and the full `/api/person/inbox` only from the Inbox page (`watching=1`, 15 in the busiest hour of four, against ~540 an hour before); `counts=1` only at a page's load or while its stream is down (~10–20 an hour). **The loop is not yet quiet**: a static-file probe every 50 ms for 75 s holds p99 5 ms, max 20 ms with no stream open, but with one Focus stream (`light=1&focus=`) 8 probes over 50 ms (max 139 ms), and with the Org stream 33 (max ~300 ms in a 150 s run). Each Focus stream receives every repo's whole facts on every `repos` push, ~1.2 MB a minute (shiftlead's 755 KB), to read `pr_marks` alone, and further 45–85 ms holds come between its events. What is wrong is TD-670; the re-measurement waits on it.
+**Blocked by:** TD-670
 **Location:** `src/shiftlead/ui/static/app.js` (`refreshInboxCount` ~L1198 and the 20 s interval ~L1259 that runs it, or the Inbox's `refreshInboxPage`; Focus's `refreshMembership` ~L4370, called on a peer's event ~L4436); `src/shiftlead/ui/app.py` (`api_person_inbox` ~L3025–3105, `api_sessions` ~L2359, `events` ~L3381–3570); `src/shiftlead/ui/cards.py` (the `pr_marks` map ~L327); `src/shiftlead/ui/pty_bridge.py` (the queue ~L27, the pump ~L185)
 
 **Why:** Paul, 2026-10-12: the Focus terminal lags again, better after TD-572 (#1544) and slower by the day since. The pty bridge shares `shiftlead-ui`'s one asyncio loop with every handler, so any synchronous render holds every keystroke and output frame. Measured on the live UI (about an hour after a promote):
@@ -1431,5 +1432,33 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** a key typed into a scrolled-back Focus terminal reaches the program, the pane back on the live screen, a send into such a pane submits, the composer's typing leaves the pane alone, and the tests above pass.
 
 **Related:** TD-667 (the design), TD-022 (scrollback is tmux's), TD-174 (the wheel), TD-027 (the confirmed send).
+
+---
+
+## TD-670: A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-14 (grinder-ao-2, TD-611's live read)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`fan_step`'s `repos`/`doing` branch: `run.to_all(run.live, ev)`; `heads` ~L971, run per regroup on the loop; `counts_now` ~L855), `src/shiftlead/ui/fanout.py` (`to_all`, the `groups` flush ~L157), `src/shiftlead/ui/counts.py` (`_recounter`, `_ticker`), `src/shiftlead/ui/static/app.js` (Focus's `repos` handler ~L4518, the Inbox's re-read ~L3156)
+
+**Why:** TD-611's live read, 2026-10-14 (`9bb725c` live; read-only: a static-file probe of `/static/app.css` every 50 ms beside one `/events` websocket the probe opened, nothing pressed). The bulk polls TD-616 and TD-617 removed are gone, but the loop is not yet what TD-611's *Done when* asks (no request above ~50 ms of loop time with a Focus tab open):
+- With no stream open: 1397 probes, p99 5 ms, max 20 ms.
+- With one Focus stream (`light=1&focus=…`): 8 of 1383 over 50 ms, max 139 ms. The stream received 1.6 MB in 75 s, almost all `repos`: the host pushes every repo's facts about once a minute (7 repos, ~1.2 MB a burst; shiftlead 755 KB, samscrape 246 KB, dev-cadence 128 KB — their `prs`, `ledger`, `completed` and `boards`), and `fan_step` forwards each event whole to every live stream, light ones included, though Focus reads only `root` and `pr_marks` from it and the Inbox page only re-reads on it. A ~70 ms hold follows each burst.
+- Holds of 45–85 ms also come every few seconds with no event on the Focus stream: work the one subscriber does for the fleet (another record's delta, the counts keeper's recount, which awaits the person inbox, the board and the build chip on the loop before its `to_thread`) — not attributed yet.
+- With the Org stream open: 33 of 1340 over 50 ms in 75 s, and up to ~300 ms in a 150 s run. Each regroup ships `groups` of ~200 KB, built by `heads`, which runs `view()` over the whole fleet and renders every header and the rollup on the loop.
+
+**Fix:**
+1. A light stream's `repos` is `{event, root, pr_marks}` and a mark that the repo is held or dropped — never the repo's facts — and is sent only when that repo's marks changed (the Inbox page re-reads on it, so an unchanged minute is a re-read for nothing). The full stream keeps the whole event.
+2. Find the 45–85 ms holds: run `scripts/look_home.py` with repo facts and a person inbox the live size (or profile the subscriber's steps with timings) and name each step over ~20 ms; move what is pure computation (`heads`'s views and renders, the decode of a large host reply, the counts' pre-thread reads) to a worker thread, or coalesce it.
+3. The Org stream's `groups`: computed off the loop, and sent only when they changed.
+- Tests: a light stream's `repos` carries no `repo` facts and is not sent when the marks did not change; Focus's handler still replaces its marks and drops a repo's on `repo: null`.
+
+**Done when** the probe above — a static file every 50 ms for 75 s beside one Focus stream, and again beside the Org stream — finds no probe over ~50 ms in steady state, and the tests pass; then TD-611's live check is read again.
+
+**Related:** TD-611 (the live check this blocks), TD-617 (the one subscriber), TD-616 (the counts keeper), TD-572 (light streams), TD-614.
 
 ---
