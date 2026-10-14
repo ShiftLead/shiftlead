@@ -172,6 +172,7 @@ def test_a_focus_page_takes_its_members_and_controllers_from_its_own_stream(tmp_
         {"event": "session", "session": {**w, "state": "working"}},  # a member moves
         {"event": "session", "session": {**other, "state": "working"}},  # a stranger moves
         {"event": "session", "session": {**w, "state": "working", "controllers": []}},  # released
+        {"event": "session", "session": {**other, "state": "idle", "controllers": ["lead"]}},  # joins
         {"event": "gone", "id": "boss"},  # the controller goes
     ]
     replies = {"repos": {root: reading(root)}, "doing_log": {}, "list": [lead, w, other, boss], "usage": {}, "host": {}}
@@ -198,10 +199,11 @@ def test_a_focus_page_takes_its_members_and_controllers_from_its_own_stream(tmp_
     monkeypatch.setattr(ui, "LocalClient", Fake)
     evs = received(TestClient(ui.create_app()), "/events?light=1&focus=lead")
     mine = [e["session"] for e in evs if e.get("id") == "lead"]
-    assert len(mine) == 3, evs  # the member's move, its release, the controller's going — not the stranger
+    assert len(mine) == 4, evs  # a member's move, its release, a joining, the controller's going — not the stranger
     assert mine[0]["members"][0]["id"] == "w" and mine[0]["members"][0]["state"] == "working"
     assert mine[1]["members"] == []
-    assert mine[2]["under"] == [{"id": "boss", "name": "boss", "gone": True}]
+    assert [m["id"] for m in mine[2]["members"]] == ["x"]
+    assert mine[3]["under"] == [{"id": "boss", "name": "boss", "gone": True}]
 
 
 def test_the_focus_page_reads_no_sessions_list():
@@ -210,4 +212,4 @@ def test_the_focus_page_reads_no_sessions_list():
     import re
 
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
-    assert not re.search(r"""fetch\(["'`]/api/sessions["'`]""", js)
+    assert not re.search(r"""fetch\(\s*["'`]/api/sessions[/]?["'`?]""", js)
