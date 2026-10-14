@@ -19,7 +19,7 @@ from sessionorc import balance as balance_mod
 from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
-from sessionorc import hosts
+from sessionorc import hosts, ledgerboard
 from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
@@ -489,7 +489,7 @@ BOARD_FILE = Path("docs") / "user_attention.md"
 BOARD_ACTS = ("snooze", "done", "decide")
 # the kinds a live look is written as: `look` since dev-cadence TD-082, `watch` before it (TD-292)
 LOOK_KINDS = ("look", "watch")
-WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is `board.NOT_RIGHT`'s form)
+WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is the `Not right: <what>` form)
 
 # the home's pull readings by repo name (`host`'s `pulls`, §6 *Pull*), kept fresh by the app as
 # `work_marks` keeps its marks: what the *behind* note's tail says
@@ -1032,7 +1032,7 @@ def live_look(it: Mapping[str, Any]) -> bool:
         str(it.get("kind") or "") in LOOK_KINDS
         and len(answers) == 2
         and answers[0] == WORKS
-        and bool(board_mod.NOT_RIGHT_FORM.fullmatch(answers[1]))
+        and ledgerboard.is_not_right_form(answers[1])
     )
 
 
@@ -1120,7 +1120,7 @@ def look_pair(e: Mapping[str, Any]) -> bool:
         and any(isinstance(s, str) and s.strip() for s in shots)
         and len(answers) == 2
         and answers[0] == WORKS
-        and bool(board_mod.NOT_RIGHT_FORM.fullmatch(answers[1]))
+        and ledgerboard.is_not_right_form(answers[1])
     )
 
 
@@ -1149,8 +1149,7 @@ def look_review(e: dict[str, Any], seat: str, seat_name: str, handed: Mapping[st
 def board_head(text: str) -> str:
     """A board item's head, as the write-back's commit message names it: its first bold run, else
     the line, clipped."""
-    h = board_mod.HEAD_RE.search(text)
-    words = " ".join((h.group("head") if h else text).split())
+    words = ledgerboard.bold_head(text) or " ".join(text.split())
     return words if len(words) <= board_mod.HEAD_MAX else words[: board_mod.HEAD_MAX - 1].rstrip() + "…"
 
 

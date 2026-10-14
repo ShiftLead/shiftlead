@@ -76,8 +76,7 @@ def ref(root: str | Path, text: str) -> str:
 def head(text: str) -> str:
     """A line's head text, the work order's title: its bold head where it has one, else what
     follows the `(session …) —` lead, clipped."""
-    bold = re.search(r"\*\*(.+?)\*\*", text)
-    out = bold.group(1) if bold else text.split(" — ", 1)[-1]
+    out = ledgerboard.bold_head(text) or text.split(" — ", 1)[-1]
     out = " ".join(out.split()).rstrip(" .")
     return out if len(out) <= HEAD_MOST else out[: HEAD_MOST - 1].rstrip() + "…"
 

@@ -21,7 +21,6 @@ moved are each refused in words, with nothing landed.
 from __future__ import annotations
 
 import contextlib
-import re
 import shutil
 import subprocess
 import threading
@@ -35,11 +34,6 @@ from sessionorc import ledgerboard, paths, workorders
 BOARD = Path("docs") / "user_attention.md"
 ACTIONS = ("snooze", "done", "reply", "decide")
 TOOL = "shiftlead"  # the `<tool>:` of every board commit's subject (ledgerboard's `subject`)
-# A live look's second answer (design §4.5a **Works** / **Not right…**): the person's words follow.
-NOT_RIGHT = "Not right:"
-# The form itself, as cadence §3.5 writes it: `Not right: <what>` — a slot in angle brackets, or nothing.
-NOT_RIGHT_FORM = re.compile(r"Not right:\s*(<[^<>]*>)?")
-HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
 ANSWER_MAX = 80  # an answer in a commit subject
 SUBJECT_MAX = 250  # a board commit's subject, which is its PR's title
