@@ -89,10 +89,20 @@ const ANSWER = { "src/a.py": "/r/wt/src/a.py", "docs/x.md": "/r/wt/docs/x.md", "
   const lost = text("e/g.py");
   await AO.transcriptBlock(block(lost), asker, ED);
   fail = false;
+  // the chain goes on after a failure; a run the answer leaves out is not kept, so it is asked again
+  const after = text("src/a.py and e/g.py");
+  await AO.transcriptBlock(block(after), asker, ED);
+  const short = AO.pathsAsker((runs) => Promise.resolve({ paths: {} }));
+  await short.resolve(["x/y.py"]);
+  const shortAsks = [];
+  const short2 = AO.pathsAsker((runs) => { shortAsks.push(runs); return Promise.resolve({ paths: {} }); });
+  await short2.resolve(["x/y.py"]); await short2.resolve(["x/y.py"]);
+  const hostile = AO.pathLinksHtml(`src/a.py <i>'"`, { "src/a.py": `/r/"a'.py` }, { ...ED, label: `V"S <x>` });
   // a block with no run asks nothing
   const before = asked.length;
   const none = AO.transcriptBlock(block(text("no paths")), asker, ED);
   console.log(JSON.stringify({ askedAtStart, again, asked, most, none, noRunAsks: asked.length - before,
+    after: after.innerHTML, shortAsks, hostile,
     said: said.innerHTML, plain: plain.innerHTML, t2: t2.innerHTML, t3: t3.innerHTML, lost: lost.innerHTML,
     oneLaunch: AO.pathLinksHtml("src/a.py", { "src/a.py": "/r/wt/src/a.py" }, { ...ED, url: null }) }));
 })();
@@ -118,7 +128,10 @@ def test_a_block_is_asked_on_its_first_hover_and_a_run_met_twice_once():
     assert got["asked"][0] == ["src/a.py", "build/review"]
     assert got["asked"][1] == ["docs/x.md"]  # src/a.py was kept; docs/x.md met twice, asked once
     assert [len(a) for a in got["asked"][2:4]] == [8, 3] and got["most"] == 1  # eight at most, one in flight
-    assert got["asked"][4] == ["e/g.py"] and got["none"] is None and got["noRunAsks"] == 0
+    assert got["asked"][4] == ["e/g.py"] and got["asked"][5] == ["e/g.py"]  # the failure kept nothing
+    assert got["none"] is None and got["noRunAsks"] == 0
+    assert got["after"].count("<a ") == 1  # the chain goes on after a failed ask
+    assert got["shortAsks"] == [["x/y.py"], ["x/y.py"]]  # a run the answer left out is asked again
 
 
 @pytest.mark.unit
@@ -133,6 +146,9 @@ def test_a_resolved_run_is_a_ctrl_link_with_the_folder_first_and_the_rest_stays_
     assert 'href="vscode://file/r/wt/docs/x.md:3"' in got["t3"]
     assert got["lost"] is None
     assert "data-folder" not in got["oneLaunch"]  # folder_first off: the file alone
+    hostile = got["hostile"]  # the session's words and the person's label are escaped wherever they land
+    assert hostile.count("<a ") == 1 and "<i>" not in hostile and "&lt;i&gt;" in hostile
+    assert 'data-label="V&quot;S &lt;x&gt;"' in hostile and "/r/%22a'.py:1" in hostile  # the path percent-encoded
 
 
 @pytest.mark.unit

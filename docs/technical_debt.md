@@ -61,7 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
 | TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
 | TD-690 | Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text | Medium | Open |
-| TD-691 | Build TD-688 (3): a path in the Transcript page's turns is a link, by the same `paths` RPC and press | Low | Open |
 
 ---
 
@@ -1166,24 +1165,3 @@ The other cases:
 
 ---
 
-## TD-691: Build TD-688 (3): a path in the Transcript page's turns is a link, by the same `paths` RPC and press
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-14 (the designer, building TD-688's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.6 *A path in a transcript is a link too*, §4.5a *Transcript*; `src/shiftlead/ui/transcript.py` (the route's folder link), `src/shiftlead/ui/templates/transcript.html`, `src/shiftlead/ui/static/app.js` (the pane's path shape and `fetchPaths`, `AO.fileUrl`, `AO.openFile`), the `/api/sessions/<id>/paths` route
-
-**Why:** TD-688's design: Paul asked for links in transcripts, and the Transcript page links no path today.
-
-**Fix:**
-- **The shape.** The pane's path shape is factored into one function the Transcript page also calls, over a turn's text, a tool line's input and a tool result's text, as they render.
-- **The ask.** Each turn block, on its first hover, asks `/api/sessions/<id>/paths` once with its runs, eight at most per ask (more runs, more asks). One ask is in flight at a time, and each run's answer is cached for the page's life. Each run that answered is wrapped in an `a.editor`. Its `href` is `AO.fileUrl` of the editor's file form, and its `data-folder` and `data-wait` are the record's folder link, as `AO.recentFiles` builds them. The route (`transcript.py`) passes that link beside the transcript's own file link: `editor_link` for the record's `dir`, or none under `open_in: none` or with `folder_first: false`, in which case the press is one launch. A block is asked once, and a failed ask leaves it as text.
-- **Where.** The links are drawn only where the page draws its **VS Code** button, for a record on this host, and absent with it (`open_in: none`, a node's or a container's record).
-- **Tests:** in the page's JS tests, a turn with a resolving path and one without, a block asked once on its first hover, a run met twice asked once, and no ask before a hover.
-
-**Done when** a path in a transcript turn that the host resolves is a Ctrl+click link opening the file as the pane's does.
-
-**Related:** TD-688 (the design), TD-690 (the bound it reads), TD-501.

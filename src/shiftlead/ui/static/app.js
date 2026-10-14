@@ -3718,7 +3718,8 @@
   // **A path in a transcript is a link too** (§4.6, §4.5a *Transcript*, TD-691): the pane's shape
   // (`AO.pathRuns`) over a turn's text, a tool line's input and a tool result's text, the same `paths`
   // read, the same press. The asker keeps one ask in flight and each run's answer for the page's life,
-  // eight runs at most per ask, so a path met twice is asked once; a failed ask keeps nothing.
+  // eight runs at most per ask, so a path met twice is asked once; a failed ask, or a run the answer
+  // leaves out, keeps nothing.
   AO.TRANSCRIPT_TEXT = ".ttext, .targ, .tbody";
   AO.pathsAsker = function (ask) {
     const known = new Map();
@@ -3730,7 +3731,7 @@
         const batch = want.slice(i, i + 8);
         step = step.then(() => ask(batch)).then((got) => {
           const ans = (got && got.paths) || {};
-          batch.forEach((p) => known.set(p, ans[p] || null));
+          batch.forEach((p) => { if (p in ans) known.set(p, ans[p] || null); });  // a run left out is asked again
         });
       }
       return step.catch(() => {}).then(() => Object.fromEntries(paths.filter((p) => known.get(p)).map((p) => [p, known.get(p)])));
