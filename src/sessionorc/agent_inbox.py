@@ -359,6 +359,7 @@ class InboxMixin:
         type: str = "",
         text: str = "",
         teams: list[dict[str, str]] | None = None,
+        draft: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Hand to the techlead** and `ao td add` (design §4.10 *An entry handed to a seat*, §4.9
@@ -370,7 +371,10 @@ class InboxMixin:
         teams that service the repo, in definition order, each `{team, seat}` — `seat` the id the
         team's techlead takes, or empty where the team defines none — as `board_reply`'s `refs`
         come from the reader. Refused in words: no such repo, no team services it, the team has no
-        techlead seat, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`."""
+        techlead seat, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`.
+        `draft`, where the form attached files (§4.4 *The Add entry form's draft*, TD-630): refused
+        before the send unless it is this host's and unclaimed, then claimed for the ask
+        (`claimed.json` `{by: hand:<its id>, at}`) and carried in the envelope beside `entry`."""
         agent_common.person_only(
             caller,
             "add an entry to the ledger this way — a session writes one on its branch (cadence §2), "
@@ -397,6 +401,7 @@ class InboxMixin:
         seat = str(servicing[0].get("seat") or "").strip()
         if not seat:
             raise RpcError(f"{team} has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
+        folder = await asyncio.to_thread(agent_common.draft_folder, draft, "entry_add") if draft else None
         sent = await self._msg(PERSON, words, [seat], "ask", None, None, None, None)
         mid = (sent.get("entry") or {}).get("id")
         if not mid:
@@ -404,7 +409,9 @@ class InboxMixin:
         # a seat closed and started again under its name is followed to the record that took it (review of #764)
         seat = next(iter(sent.get("delivered") or ()), seat)
         # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
-        self._mark(mid, handed=True, entry={"repo": name, "type": kind}, bound=None)
+        self._mark(mid, handed=True, entry={"repo": name, "type": kind}, bound=None, draft=draft or None)
+        if folder is not None:  # the form's files are the ask's, kept `runs_keep_days` from now (§4.4, TD-630)
+            await asyncio.to_thread(agent_common.claim_draft, folder, f"hand:{mid}", datetime.now(UTC))
         await self._push_changes()
         log.info("entry_add: %s handed to %s (%s, %s)", mid, seat, name, kind)
         return {

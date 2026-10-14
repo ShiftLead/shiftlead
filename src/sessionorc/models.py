@@ -382,6 +382,9 @@ class MailEntry:
     # `feature` — on a `handed` `ask` from the person. From the form's fields, never read out of
     # the text.
     entry: dict[str, str] | None = None
+    # The Add entry form's draft folder the hand claimed (§4.4 *The Add entry form's draft*, TD-630):
+    # `draft-<8 hex>`, beside `entry`, where the form attached files; None where it attached none.
+    draft: str | None = None
     # Passed up (design §4.9b *Passing up keeps the thread and the asker*, TD-075 step 3): when the
     # addressee of an open `ask` or `steer` handed it to the person — once — with its own
     # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text}`,
