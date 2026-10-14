@@ -9,6 +9,7 @@ callable, so each check is tested against a faked provider.
 
 from __future__ import annotations
 
+import http.client
 import json
 import re
 import shutil
@@ -52,11 +53,14 @@ def _answer(url: str, timeout: float, host: str | None = None) -> dict[str, Any]
     """One GET: `{status, listener, refused}` from any answer, a refusal's included; `{status: None}`
     when nothing answered, with `why`."""
     req = urllib.request.Request(url, headers={"Host": host} if host else {})
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))  # never an http_proxy's answer
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 — a URL of ours
+        with opener.open(req, timeout=timeout) as r:
             status, headers = r.status, r.headers
     except urllib.error.HTTPError as e:
         status, headers = e.code, e.headers
+    except http.client.HTTPException as e:  # something answered, not in HTTP: another process
+        return {"status": 0, "listener": None, "refused": None, "why": f"{type(e).__name__}: not an HTTP answer"}
     except (OSError, ValueError) as e:
         return {"status": None, "listener": None, "refused": None, "why": str(getattr(e, "reason", e))}
     return {
@@ -176,7 +180,7 @@ def tailscale(
                 "`tailscale serve --https=443 off` first, then `ao connect tailscale`"
             )
         raise Lacking(
-            f"HTTPS 443 is already served ({target or 'a TCP forward'}): ao connect never replaces another serve"
+            f"HTTPS 443 is already served ({target or 'another handler'}): ao connect never replaces another serve"
         )
     if (serve.get("AllowFunnel") or {}).get(f"{dns}:443"):
         raise Lacking(
@@ -224,20 +228,44 @@ def connect_tailscale(
     reach = {"route": "tailscale", "url": got["url"], "allow": got["allow"]}
     before = set_reach(reach).get("before")
     added = False
-    if not got["ours"]:
-        rc, out, err = run(["tailscale", "serve", "--bg", "--https=443", f"http://127.0.0.1:{route}"])
-        if rc != 0:
-            set_reach(before)
-            raise Lacking(f"tailscale serve failed: {(err or out).strip() or 'no reason given'}")
-        added = True
-    say(f"checking {got['url']} in {PROBE_AFTER:.0f}s, once the UI has read the route…")
-    (sleep or time.sleep)(PROBE_AFTER)
-    if why := probe(got["url"], fetch):
-        set_reach(before)
+
+    def undo() -> str:
+        """The handler this run added turned off first, then the setting there before restored: a
+        restore that fails (a hand-written `reach:` the RPC refuses) still leaves no handler up."""
+        said = []
         if added:
-            run(["tailscale", "serve", "--https=443", "off"])
-        undone = "the setting restored and the handler it added turned off" if added else "the setting restored"
-        raise Lacking(f"the probe failed: {why} — {undone}")
+            rc, out, err = run(["tailscale", "serve", "--https=443", "off"])
+            said.append(
+                "the handler it added turned off"
+                if rc == 0
+                else f"`tailscale serve --https=443 off` failed: {(err or out).strip()}"
+            )
+        try:
+            set_reach(before)
+            said.insert(0, "the setting restored")
+        except Exception as e:  # noqa: BLE001 — named, never raised over the failure being undone
+            said.insert(0, f"the setting there before could not be restored ({e}): fix settings.yml's reach: by hand")
+        return " and ".join(said)
+
+    try:
+        if not got["ours"]:
+            rc, out, err = run(["tailscale", "serve", "--bg", "--https=443", f"http://127.0.0.1:{route}"])
+            if rc != 0:
+                why = (err or out).strip() or "no reason given"
+                if re.search(r"access denied|permission|operator|root", why, re.I):
+                    why += " — run `sudo tailscale set --operator=$USER`"
+                raise Lacking(f"tailscale serve failed: {why} — {undo()}")
+            added = True
+        say(f"checking {got['url']} in {PROBE_AFTER:.0f}s, once the UI has read the route…")
+        (sleep or time.sleep)(PROBE_AFTER)
+        why = probe(got["url"], fetch)
+    except Lacking:
+        raise
+    except BaseException:  # an interrupt or a failure mid-way: undone before it goes on up
+        undo()
+        raise
+    if why:
+        raise Lacking(f"the probe failed: {why} — {undo()}")
     return {**reach, "added": added}
 
 

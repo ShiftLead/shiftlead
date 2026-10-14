@@ -226,3 +226,130 @@ def test_a_probe_reads_the_listener_mark():
     assert connect.probe("https://h", lambda u: {"status": 403, "listener": "route"}) is None  # marked: reached
     assert "plain port" in connect.probe("https://h", lambda u: {"status": 403, "listener": "plain"})
     assert "not the UI" in connect.probe("https://h", lambda u: {"status": 200, "listener": None})
+
+
+def _connect(ts, reach, fetch=lambda u: {"status": 403, "listener": "plain"}, **kw):
+    return connect.connect_tailscale(
+        [],
+        8766,
+        8765,
+        reach,
+        run=ts,
+        ask=_ask(),
+        fetch=fetch,
+        sleep=kw.pop("sleep", lambda s: None),
+        say=lambda line: None,
+        which=lambda _: "x",
+        **kw,
+    )
+
+
+def test_a_restore_the_rpc_refuses_still_turns_off_the_handler():
+    """Review of #1720: the handler goes first, so a hand-written `reach:` that `set_reach` refuses to
+    restore leaves no handler up, and the line names what to fix by hand."""
+    ts, writes = Tailscale(), []
+
+    def reach(r):
+        writes.append(r)
+        if r == {"route": "tailscale", "url": "http://old"}:
+            raise RuntimeError("reach.url is an https:// address")
+        return {"reach": r, "before": {"route": "tailscale", "url": "http://old"}}
+
+    with pytest.raises(connect.Lacking, match="could not be restored .* and the handler it added turned off"):
+        _connect(ts, reach)
+    assert ts.serve == {}  # turned off
+
+
+def test_an_interrupt_mid_way_is_undone_and_goes_on_up():
+    ts, reach = Tailscale(), Reach()
+
+    def interrupted(_):
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        _connect(ts, reach, sleep=interrupted)
+    assert reach.held is None and ts.serve == {}
+
+
+def test_a_refused_serve_names_the_operator_line_and_is_undone():
+    class Denied(Tailscale):
+        def __call__(self, argv):
+            if "--bg" in argv:
+                self.calls.append(argv)
+                return 1, "", "Access denied: serve config denied"
+            return super().__call__(argv)
+
+    ts, reach = Denied(), Reach()
+    with pytest.raises(connect.Lacking, match=r"sudo tailscale set --operator=\$USER.* the setting restored$"):
+        _connect(ts, reach)
+    assert reach.held is None and not ts.ran("tailscale", "serve", "--https=443", "off")
+
+
+def test_a_port_that_answers_not_in_http_is_another_process():
+    import socket
+    import threading
+
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+
+    def garbage():
+        conn, _ = srv.accept()
+        conn.recv(1024)
+        conn.sendall(b"SSH-2.0-OpenSSH_9.6\r\n")
+        conn.close()
+
+    t = threading.Thread(target=garbage, daemon=True)
+    t.start()
+    try:
+        assert connect.ask_port(port, timeout=3)["state"] == "other"
+    finally:
+        t.join(3)
+        srv.close()
+
+
+def test_the_command_refuses_a_session_a_node_and_cloudflare_before_any_provider_command(monkeypatch, capsys):
+    from shiftlead import cli
+
+    ran = []
+    monkeypatch.setattr(connect, "run", lambda argv, timeout=30.0: ran.append(argv) or (0, "", ""))
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-x-worker")
+    assert cli.main(["connect", "tailscale"]) == 1
+    assert "a person's own, refused to a session" in capsys.readouterr().err
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: True)
+    monkeypatch.setattr(cli.hosts, "home_name", lambda: "kmaster")
+    assert cli.main(["connect", "off"]) == 1
+    assert "runs at the home (kmaster)" in capsys.readouterr().err
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
+    assert cli.main(["connect", "cloudflare"]) == 1
+    assert "TD-656" in capsys.readouterr().err
+    assert ran == []
+
+
+def test_a_lack_is_one_line_and_json_carries_it(monkeypatch, capsys):
+    from shiftlead import cli
+
+    monkeypatch.delenv("SHIFTLEAD_SESSION", raising=False)
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: False)
+
+    def lacking(*a, **k):
+        raise connect.Lacking("the UI is not running (`ao service install`)")
+
+    monkeypatch.setattr(connect, "connect_tailscale", lacking)
+    assert cli.main(["connect", "tailscale"]) == 1
+    assert capsys.readouterr().out == "lacking: route — the UI is not running (`ao service install`)\n"
+    assert cli.main(["--json", "connect", "tailscale"]) == 1
+    assert json.loads(capsys.readouterr().out) == {
+        "error": "lacking: route — the UI is not running (`ao service install`)"
+    }
+    monkeypatch.setattr(cli, "_reach", lambda: None)
+    monkeypatch.setattr(
+        connect, "route_line", lambda *a, **k: [{"check": "route", "verdict": "warning", "text": "route — none set"}]
+    )
+    assert cli.main(["connect"]) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "no route: the UI is reached over `ssh -L` — `ao connect tailscale`",
+        "warning: route — none set",
+    ]
