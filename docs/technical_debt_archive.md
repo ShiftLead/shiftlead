@@ -11315,4 +11315,4 @@ Taking control and picking a model should not be the way. **Done when** a role's
 
 **Related:** TD-615 (the build), TD-614 (the design), #1633.
 
-**Resolved:** 2026-10-13 (grinder-ao-2, PR #1687) — §4.4 *Repo facts* says the UI has the board counts from the host agent's `boards` reading on the `repos` RPC, which `board_items` filters per team, and that the UI runs no reader; a history line under §4.4.
+**Resolved:** 2026-10-13 (grinder-ao-2, PR #1687) — §4.4 *Repo facts* says the UI has the board counts from the host agent's `boards` reading on the `repos` RPC, split per team by `board_reading` and cut to what is due by `board_items`, and that the UI runs no reader; a history line under §4.4.
