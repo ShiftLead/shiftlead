@@ -1,7 +1,8 @@
 {#- design §4.5 screen 9 **Transcript** (TD-166): the turns, and *earlier turns* above them when the
     file holds more. The page draws this once; *earlier turns* fetches it again with `before` and
     puts it in the button's place, so the older turns land above the ones already shown. Everything
-    here is text (TD-071): a session's words never become a link or a button. -#}
+    here is text (TD-071): a session's words never become a link or a button — a path in them is a
+    link only once the host has resolved it, on a block's first hover (§4.6, TD-691), as the pane's. -#}
 {%- macro entry(e) -%}
 {%- if e.kind == 'prompt' -%}
 <div class="tprompt"><span class="tmark mono">&gt;</span><div class="ttext">{{ e.text }}</div>{% if e.at %}<span class="meta mono localtime" data-at="{{ e.at }}" title="{{ e.at }}">{{ e.at }}</span>{% endif %}</div>

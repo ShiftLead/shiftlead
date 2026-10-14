@@ -359,7 +359,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     team_groups,  # noqa: F401
     who_for_what,  # noqa: F401
 )
-from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_view
+from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
 
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
 
@@ -1454,6 +1454,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             error = str(e.detail)
         v = view(s)
         here = v["host"] == host_name()
+        editor = transcript_editor(t["path"], here) if t else None
         return templates.TemplateResponse(
             request,
             "transcript.html",
@@ -1461,7 +1462,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "s": v,
                 "t": t,
                 "error": error,
-                "editor": transcript_editor(t["path"], here) if t else None,
+                "editor": editor,
+                # a path in a turn is a link where **VS Code** is drawn, and absent with it (§4.6, TD-691)
+                "paths": transcript_paths(str(v.get("dir") or "")) if editor else None,
                 "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": host_name(),
                 "active": "Org",

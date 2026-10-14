@@ -513,6 +513,8 @@
     ev.preventDefault();
     // a file's link carries its session's folder (the recent files, TD-535): the pair; any other
     // editor link — the Session card's button, a folder — the one launch
+    // a path in a transcript's turn (`data-ctrl`, TD-691) opens as the pane's does: on Ctrl or Cmd alone
+    if ("ctrl" in a.dataset && !(ev.ctrlKey || ev.metaKey)) return;
     if (a.dataset.folder) AO.openFile({ url: a.dataset.folder, label: a.dataset.label, wait: a.dataset.wait ? Number(a.dataset.wait) : undefined }, a.href);
     else AO.openEditor(a.href, a.dataset.label);
   });
@@ -3093,6 +3095,15 @@
     const box = $("#transcript"); if (!box) return;
     const id = box.dataset.id;
     showLocalTimes();
+    // a path in a turn (TD-691): served only where the page draws its editor button
+    let pe = null;
+    try { pe = box.dataset.paths ? JSON.parse(box.dataset.paths) : null; } catch (e) { pe = null; }
+    if (pe && pe.file) {
+      const asker = AO.pathsAsker((runs) => fetch(`/api/sessions/${encodeURIComponent(id)}/paths`, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ runs }),
+      }).then((r) => (r.ok ? r.json() : Promise.reject(r.status))));
+      box.addEventListener("mouseover", (ev) => AO.transcriptBlock(ev.target.closest(".tturns > *"), asker, pe));
+    }
     box.addEventListener("click", async (ev) => {
       const b = ev.target.closest('[data-act="transcript-earlier"]'); if (!b || b.disabled) return;
       b.disabled = true;
@@ -3703,6 +3714,57 @@
     if (!(event && (event.ctrlKey || event.metaKey)) || !file || !resolved) return false;
     AO.openFile(editor, AO.fileUrl(file, resolved, line, col), open);
     return true;
+  };
+  // **A path in a transcript is a link too** (§4.6, §4.5a *Transcript*, TD-691): the pane's shape
+  // (`AO.pathRuns`) over a turn's text, a tool line's input and a tool result's text, the same `paths`
+  // read, the same press. The asker keeps one ask in flight and each run's answer for the page's life,
+  // eight runs at most per ask, so a path met twice is asked once; a failed ask keeps nothing.
+  AO.TRANSCRIPT_TEXT = ".ttext, .targ, .tbody";
+  AO.pathsAsker = function (ask) {
+    const known = new Map();
+    let chain = Promise.resolve();
+    const run = (paths) => {
+      const want = [...new Set(paths)].filter((p) => !known.has(p));
+      let step = Promise.resolve();
+      for (let i = 0; i < want.length; i += 8) {
+        const batch = want.slice(i, i + 8);
+        step = step.then(() => ask(batch)).then((got) => {
+          const ans = (got && got.paths) || {};
+          batch.forEach((p) => known.set(p, ans[p] || null));
+        });
+      }
+      return step.catch(() => {}).then(() => Object.fromEntries(paths.filter((p) => known.get(p)).map((p) => [p, known.get(p)])));
+    };
+    return {
+      resolve(paths) { const p = chain.then(() => run(paths)); chain = p; return p; },
+    };
+  };
+  // …a text with each resolved run an `a.editor` the click handler opens on Ctrl or Cmd alone
+  // (`data-ctrl`), the session's folder first as the recent files' links, the rest escaped text
+  AO.pathLinksHtml = function (text, paths, editor) {
+    const s = String(text), label = editor.label || "the editor";
+    const folder = editor.url ? ` data-folder="${esc(editor.url)}"${typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : ""}` : "";
+    let out = "", at = 0;
+    for (const r of AO.pathRuns(s)) {
+      const to = paths[r.path];
+      if (!to || r.start < at) continue;
+      out += esc(s.slice(at, r.start)) + `<a class="editor tpath" data-ctrl href="${esc(AO.fileUrl(editor.file, to, r.line, r.col))}"${folder}`
+        + ` data-label="${esc(label)}" title="${esc(`Ctrl+click: ${to} in ${label}`)}">${esc(r.run)}</a>`;
+      at = r.end;
+    }
+    return out + esc(s.slice(at));
+  };
+  // …a turn block, on its first hover: asked once, whatever the answer; the texts holding a resolved run redrawn
+  AO.transcriptBlock = function (block, asker, editor) {
+    if (!block || block.dataset.paths) return null;
+    block.dataset.paths = "asked";
+    const els = [...block.querySelectorAll(AO.TRANSCRIPT_TEXT)];
+    const runs = els.map((el) => AO.pathRuns(el.textContent));
+    const paths = [...new Set(runs.flat().map((r) => r.path))];
+    if (!paths.length) return null;
+    return asker.resolve(paths).then((got) => {
+      els.forEach((el, i) => { if (runs[i].some((r) => got[r.path])) el.innerHTML = AO.pathLinksHtml(el.textContent, got, editor); });
+    });
   };
   // The Session card's **recent files** (§4.5 item 4, §4.5a, TD-525): the record's `files`, newest
   // first, each drawn relative to the session's directory (else its repo) with the absolute path and
