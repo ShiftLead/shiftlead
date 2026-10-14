@@ -39,7 +39,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
-| TD-587 | `board:` path key and `ao board edit` (done, snooze) for a session's own branch | Medium | Open |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
 | TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
@@ -558,26 +557,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** every section the ADR names says what the ADR decided, design-history has the dated line, and TD-585–TD-591 can each be built from the design without a choice.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-585–TD-591 (its builds).
-
----
-
-## TD-587: `board:` path key and `ao board edit` (done, snooze) for a session's own branch
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 (grinder-ao-1, 2026-10-14, #1733): `ao board edit done|snooze` (`sessionorc.board.branch_edit`) — the line by `--line`/`--expect` or `--key`, ledgerboard's edit and subject, one file committed on the branch it is on; refused on the default branch (origin's `HEAD`, else `main`/`master`/`init.defaultBranch`), a detached head, a staged index, an edited board, and for `decide`/`reply`; `.shiftlead.yml` takes `board:` (`board.board_path`: set, defaulted, absent), which `--board` defaults to. Left, slice 2: every other board reader reads `board:` in place of the fixed `docs/user_attention.md` — the host agent's `boards` reading (`workorders.read_boards`, `workorders.BOARD`), the write-back (`board.BOARD` in `_tree`/`_write_back`/`_insert`, `agent_inbox._board_root`), the Inbox (`inbox.BOARD_FILE`) and `ao board show`; an absent board then reads as *no board: the Inbox is the person's channel* (§5). Was: Open.
-**Location:** `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py`, `src/sessionorc/board.py`, §4.7's help list (`src/shiftlead/ui/help.py`)
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. A session closes a decided board line with `scripts/board_edit.py`, a dev-cadence script, so a repo without dev-cadence cannot.
-
-**Fix:** per the ADR: `board:` (default `docs/user_attention.md`) read by every board reader; `ao board edit <done|snooze> --line <n> --expect "<start>" …` (`--board` defaulting to `board:`) calls ledgerboard's `edit_line()` and commits with `subject("shiftlead", …)` on the current branch, touching nothing else; no `decide` or `reply` (cadence §3.5: the person's words, write-back only). And `--key board:<key>` in place of `--line` and `--expect` (§4.7): the line found by its id as `ao board show` finds it (`workorders.show`, `workorders.ref`; TD-607 built the id, this verb's flag waits for the verb).
-
-**Done when** a session closes and snoozes a line on its branch in a repo with no `scripts/`, the commit carries the ledgerboard subject, and `decide`/`reply` are refused, with tests.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); ledgerboard#TD-001 (release v1.0); dev-cadence#TD-106 (dev-cadence vendors it).
 
 ---
 
