@@ -2892,7 +2892,12 @@
     const err = $("#entryerr");
     const say = (m) => { err.textContent = m || ""; err.hidden = !m; };
     const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
-    let asked = 0;  // a later Type press wins over an earlier answer that arrives after it
+    let asked = 0;  // a later Type press or keystroke wins over an earlier answer that arrives after it
+    // §4.5a *Add entry form: Name* (TD-677): untouched, the box follows the plan's default; typed in, it is
+    // the person's, sent with every read; emptied, the default is its placeholder and the press takes it
+    const nameBox = $("#entryname");
+    let named = false;
+    const typed = () => (named && nameBox.value.trim() ? nameBox.value : "");
     let handWhy = "…";  // **Hand to the techlead**'s reason to be disabled, from the plan (TD-219 slice 4)
     let busy = false;  // a hand in flight: nothing re-enables the button under it, so one press hands once
     const hand = $("#entryhand");
@@ -2910,14 +2915,18 @@
       $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";  // the last Type's, until this answer
       let r, v;
       try {
-        r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}`);
+        const q = typed() ? `&name=${encodeURIComponent(typed())}` : "";
+        r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}${q}`);
         v = await r.json();
       } catch (e) { if (mine === asked) { say(`the page could not ask: ${e.message}`); $("#entrygo").disabled = true; } return; }
       if (mine !== asked) return;
       if (!r.ok) { say(v.detail || "the repo could not be read"); $("#entrygo").disabled = true; return; }
-      say(""); $("#entrygo").disabled = false;
+      say(""); $("#entrygo").disabled = !!v.name_why;
+      nameBox.placeholder = v.default || "";
+      if (!named) nameBox.value = v.default || "";
       $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
-      $("#entryline").textContent = `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under Told at start.`;
+      // a name that is not free: its reason stands in place of the line, and the button is disabled
+      $("#entryline").textContent = v.name_why || `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under Told at start.`;
       const h = v.hand || { why: "the host agent did not say who takes it" };
       handWhy = h.why || "";
       $("#entryseat").textContent = h.name || h.to || "";
@@ -2941,13 +2950,16 @@
     };
     $("#entrywhere").textContent = repo;
     $("#entrywhat").value = ""; $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";
+    named = false; nameBox.value = ""; nameBox.placeholder = "";
+    // checked as typed, debounced as New session's name field is (§4.5a *New session: name field → holder*)
+    nameBox.oninput = () => { named = true; clearTimeout(nameBox._t); nameBox._t = setTimeout(plan, 250); };
     dlg.querySelector("input[name=entrytype][value=debt]").checked = true;
     dlg.querySelectorAll("input[name=entrytype]").forEach((x) => { x.onchange = plan; });
     $("#entrygo").onclick = async () => {
       $("#entrygo").disabled = true;
       let r, got;
       try {
-        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft() }) });
+        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft(), name: typed() }) });
         got = await r.json();
       } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }

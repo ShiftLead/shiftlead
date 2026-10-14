@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-675 | Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change | Low | Designed — TD-677 builds it |
 | TD-676 | An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form | Medium | Open |
-| TD-677 | Build TD-675: the **Name** box on Add entry's Open a session — the default `entry-<n>`, a typed name checked by the test the default is picked by, as typed and at the press | Low | Open |
 
 ---
 
@@ -968,23 +967,3 @@ with the retired brief).
 **Done when** a press on a ledger row in the Inbox starts the person's session on that entry, on its team, named for it, and opens its Focus, or opens the filled form saying why not; and a second press while that session lives opens it instead of starting another.
 
 **Related:** TD-367 and TD-560 (the rows), TD-565 (drawn as full rows in *Later*).
-
----
-
-## TD-677: Build TD-675: the **Name** box on Add entry's Open a session — the default `entry-<n>`, a typed name checked by the test the default is picked by, as typed and at the press
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-14 (the designer, building TD-675's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a rows *Add entry form: Name* and *Add entry form: Open a session*, §4.9 *Add an entry to the ledger* (2. *Open a session*); `src/shiftlead/ui/app.py` (`entry_plan`'s `entry-<n>` loop, `/api/entry/plan`, `/api/entry/session`); `src/shiftlead/ui/repo.py` (`ENTRY_PREFIX`, `entry_line`); the Add entry form in `src/shiftlead/ui/static/app.js` (`openEntry`'s `plan()` and `#entrygo`) and its template; `tests/test_ui_entry.py`
-
-**Why:** TD-675's design (Paul, 2026-10-14: *lets add a text box that shows that default name with the option to change it*). Today `entry_plan` picks `entry-<n>` alone and the line under the button only reports it; its test of *free* is the name check and the worktree's path, so a leftover local branch `entry-<n>` is checked out by `ensure_worktree` rather than skipped.
-
-**Fix:** one test of *free* in `entry_plan` — `name_check` answers `free` with `repo=root`, no `gitinfo.worktree_path` of that name exists, and no `refs/heads/<name>` — used by the default's loop and by a `name=` the plan is asked with; the plan answers `name` (the one used), `default` (the `entry-<n>` picked) and `name_why` (`""` when free, else §4.5a's words: the slug rule, the name check's own message for `live` / `suspended`, *<name> names an exited session — pick another name* for `supersede`, the worktree's and the branch's). A typed name with `naming.slug(name) != name` (so `entry-`, `a--b`, `Entry-2`, `my entry`) is refused in words, never slugified behind the person's back: the name check reads the slug while the worktree and branch take the name raw. The form draws the **Name** box beside **Open a session** (`maxlength=32`), prefilled with `default`; its input asks the plan with `name=`, debounced as the New session form's name check is, and a later answer than the latest ask is dropped as `plan()`'s `asked` counter already does; a `name_why` disables **Open a session** and stands in place of the line under it; untouched, the box follows `default` on every read; typed in, a Type change re-reads with it and keeps it; emptied, the placeholder is `default` and the press sends no name. `/api/entry/session` takes `name` and calls the plan with it, refusing a `name_why` with 409 and those words, so the create's `name` and `worktree` are the checked name.
-
-**Done when** the form shows the box prefilled with `entry-<n>`; a free typed name starts the session, its worktree and its branch under that name and the line under the button names it; a live holder's name, an exited holder's, an existing worktree's, an existing local branch's, and a name with an upper-case letter, a space, a trailing `-` or a `--` each disable the button with §4.5a's words and are refused by `/api/entry/session` with them; a Type change keeps a typed name; an emptied box takes the default; and the default's loop skips a number whose local branch exists — each held by a test in `tests/test_ui_entry.py`.
-
-**Related:** TD-675 (the design), TD-219 (Add entry's *Open a session*), §4.5a *New session: name field → holder*.
