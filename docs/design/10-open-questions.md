@@ -31,7 +31,17 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       person's own domain as its recommendation; the phone's silent failure written into TD-003.
       Then three Sonnet rounds to READY: the interim's way off (the plain port's page names the
       manual pair until `ao connect` exists), the `reach:` reader moved into TD-647's first slice,
-      and TD-648 waiting for all of TD-647.
+      and TD-648 waiting for all of TD-647. **Fable's second round** (NOT READY, four shoulds,
+      adopted): the plain port's proxy-header refusal judged before `Host`, so the interim's
+      phone gets the route-port page; the route port reads `settings.yml` itself, never through
+      the host agent, so the route outlives the agent; `--allow-host` honoured on a loopback
+      bind; the interim's end may be an automatic promote, cured by ssh over the tailnet or a
+      promote by hand; every refusal logged, counted on `X-Shiftlead-Refused`. **Fable's third
+      round** (NOT READY, adopted): the access rule grants 22 as well as 443 (the interim's ssh
+      cure); a loopback-`Host` refusal on the route port logged at `info`, uncounted (the CLI's
+      probes); the home known by `hosts.is_node()`; the uvicorn bound left to the build.
+      **Fable's fourth round: READY**, with two coulds taken (an ssh app on the phone in the
+      guide; the route port's default *on the home* in §4.5).
 - [x] Where the UI process runs (2026-09-05): **wherever `shiftlead[ui]` is installed**; nothing
       in the design assumes a particular host. `hosts.yml` lives on the UI host, which may or
       may not also be a session host; for Paul it is kmaster. A hosted service is the `relay`
