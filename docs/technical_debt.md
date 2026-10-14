@@ -64,7 +64,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Designed — TD-644, TD-645 build it |
-| TD-639 | Build TD-637: `done … --pr` reads the PR's required checks at the declaration — refused on a failure, *checks pending* while running; the repo reading keeps each base branch's required set | Medium | Open |
 | TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Open |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
@@ -1195,31 +1194,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the design says how a commit names the model that made it and the build entries are filed.
 
 **Related:** TD-636, TD-637, TD-031, cadence §9.9.
-
----
-
-## TD-639: Build TD-637: `done … --pr` reads the PR's required checks at the declaration — refused on a failure, *checks pending* while running; the repo reading keeps each base branch's required set
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-13 (the designer, TD-637's round)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.8 *A `done` with a PR is told what its checks read*, §4.7, §6 rule 10; `src/sessionorc/agent.py` (`rpc_progress` ~L2485: on `status == "done"` with `pr`, the read and the verdict before anything is written; `--slice` too), `src/sessionorc/reports.py` (the repo reading: `required: {<base>: [names]}` from `gh api repos/<o>/<r>/branches/<base>/protection/required_status_checks` and `gh api repos/<o>/<r>/rules/branches/<base>` — the `required_status_checks` rules — on `REPOS_EVERY`; a read that fails keeps the last), `src/sessionorc/models.py` (`ProgressEntry`: `ci: str` — `pending` / `unknown`; not `checks`, which rule 10's record field and the PR reading already use), `src/sessionorc/cadence.py` (rule 10: a `ci: pending` entry read on its cadence like any `done`, its read at the head clearing `ci`), `src/shiftlead/cli.py` (the refusal printed as the agent words it; the reply's *checks unknown*, *closed unmerged*, non-required names), the card's report line (`src/shiftlead/ui/cards.py`: *done · checks pending*); `tests/test_progress*.py` or `tests/test_agent*.py`, `tests/test_reports.py`, `tests/test_cadence*.py`
-
-**Why:** TD-637: Paul, 2026-10-13 — *an agent should not say its done if its PR is not green*; a `done` is accepted today and checked afterwards, on rule 10's cadence.
-
-**Fix:**
-1. The required set: on the repo reading's `REPOS_EVERY` pass, per base branch the open PRs name, the union of the protection's required contexts and the rulesets' `required_status_checks` (`parameters.required_status_checks[].context`); a protection 404 (*Branch not protected*) is none from it, an empty list when the rulesets require none too; a 403 or other failure keeps the last with its error; a base never read is absent.
-2. The declaration: `done` with `pr` reads `gh pr view <n> --json state,mergedAt,headRefOid,baseRefName,statusCheckRollup` from the record's repo root, in a thread (`asyncio.to_thread`), bounded by `GH_TIMEOUT`; merged → accept; a required check red by `reports.fold_checks`'s rule (`RED_CONCLUSIONS` for a run, `RED_STATES` for a status), a required name matched on a run's `name` or a status's `context` (with none required, any run; with the base's set never read, any run and *required set unknown* in the reply) → refuse with *PR #<n>'s required checks failed on <sha7>: <names> — fix them and report done again*, nothing written; one not completed → accept with `ci: pending`; else accept; a read that fails, times out or finds no `gh` → accept with `ci: unknown` and the why in the reply; non-required failures named in the reply; closed unmerged → accept, said. `--slice` on a PR that is not merged → refused, *a slice is a merged PR — #<n> is open* (`_slice` ~L2540 checks nothing today).
-3. Rule 10: reads a `ci: pending` entry as any `done`; its read at that head clears `ci`; a later failure is its first *fail*, told as today.
-4. The card's report line: *done · checks pending* while the entry carries `ci: pending`.
-5. Tests: a failed required check refuses and writes nothing — a run's `FAILURE` and `STARTUP_FAILURE`, a status's `FAILURE` and `ERROR`; a failed non-required one accepts and names it; pending accepts with `ci: pending`, and rule 10's read at the head clears it; merged accepts with no rollup read; no checks accepts; a `gh` failure or timeout accepts with *unknown*; a base never read takes every run; `--slice` on an open PR is refused; the required set read from protection and from rulesets, a protection 404 empty, a 403 keeping the last.
-
-**Done when** `ao progress done <ref> --pr <n>` is refused in words while a required check of the PR's head has failed, is marked *checks pending* while one runs, is accepted merged, green or with no CI, and the tests above pass.
-
-**Related:** TD-637 (the design), TD-618 (the open PRs' `checks`, which can fold by the same required set), TD-640 (the cadence script's row), docs/decisions/2026-10-13-hermes-agent.md.
 
 ---
 
