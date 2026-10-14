@@ -211,9 +211,11 @@ def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
     assert "make test | make lint | ./gate <n> | notes/board.md | notes/ledger.md | python3" in text
     assert made["slots"]["{gate}"] == {"text": "./gate {pr}"} and made["slots"]["{pr}"] == {"text": "<n>"}
     assert list(made["slots"])[-1] == "{pr}"  # after `{gate}`, so a replay fills it the same way
-    # a brief naming none reads nothing for them and records none
+    # a brief naming none reads nothing for them and records none: a role with no package template,
+    # whose brief is its whole text (every built-in template names some since TD-588 slice 2)
     (tmp_path / "briefs" / "g.md").write_text("plain words\n")
-    _, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    (tmp_path / ".shiftlead.yml").write_text("roles: {plain: {brief: briefs/g.md}}\n")
+    _, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "plain").compose()
     assert not set(made["slots"]) & {*repoconfig.LAYOUT_SLOTS, "{pr}"}
 
 

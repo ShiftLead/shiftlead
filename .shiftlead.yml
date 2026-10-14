@@ -15,6 +15,10 @@ promote:
 # the PR; a team with no flow reads a role's own `review:`, and this file writes none.
 held: ["src/sessionorc/**", "docs/briefs/**"]
 
+# The commands the built-in briefs' {test} and {lint} fill with (design §5 *The seams* `commands:`; TD-588):
+# the briefs name no repo's layout, so this repo's own lives here.
+commands: {test: pdm run test, lint: pdm run lint}
+
 # The ao-grind team, defined in the repo it works (design §4.9 *The org is an aggregate*; TD-229
 # slice 2), on flows since TD-310 (design §4.9c): `td` — design → build → review — is its default,
 # `build-review` the switch when no design is wanted (`ao team flow ao-grind build-review`). The flow
@@ -46,6 +50,9 @@ teams:
 roles:
   designer:
     brief: docs/briefs/designer-ao-1.md
+  # the anchor's part: the scratch home and the ledger script, which the built-ins no longer name (TD-588)
+  anchor:
+    brief: docs/briefs/anchor.md
   # a one-week trial of a 200k bound on the grinders, from 2026-10-08 (Paul's decision on TD-378's ADR,
   # docs/decisions/2026-10-08-prompt-cache.md option 4): the anchor reads usage per merged PR against the
   # week before, and the line stays or goes (TD-460)
