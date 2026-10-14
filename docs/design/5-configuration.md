@@ -60,8 +60,8 @@ notify:                                       # §4.10 *Told on Telegram when no
   telegram: {on: false,                       # the one switch; absent or false, nothing is sent
              secrets: "samscrape/prd",        # the Doppler project/config holding TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID — a name, never a value
              link: "http://kmaster:8765"}     # how the person's phone reaches the UI (§4.5b); the row's address is appended; absent, reach.url
-reach:                                        # §4.5b *The setting*: the person's route to the UI's route port; written by `ao connect` alone (`set_reach`; `set_settings` refuses the key), absent until it runs
-  route: tailscale                            # tailscale | cloudflare
+reach:                                        # §4.5b *The setting*: the person's route to the UI's route port; written by `ao connect` (`set_reach`; `set_settings` refuses the key) or by hand in this file, absent until then
+  route: tailscale                            # tailscale | cloudflare (TD-656, built when asked)
   url: "https://kmaster.tail1234.ts.net"      # what a phone opens
   allow: ["paul@example.com"]                 # the logins the route port lets in: Tailscale-User-Login, or the Access token's email; compared without case; empty lets nobody in
   # team: myteam                              # cloudflare only: <team>.cloudflareaccess.com, whose certs sign the token
