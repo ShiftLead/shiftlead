@@ -82,21 +82,27 @@ async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent,
         _rec("manager-ao", lane=["TD-900"]),
         _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None, controllers=["ao-t-manager-ao"]),
         _rec("paul-ao", unattended=False, out_of_work=None, state="working"),
+        _rec("anchor-ao", seat={"trigger": "work"}, out_of_work=None),
+        _rec("watched-ao", seat={"trigger": "asks"}, unattended=False, out_of_work=None),
     )  # fmt: skip
     assert replays.calls == [], "not before the settle"
     await agent._work_marks(later)
-    assert [c[0] for c in replays.calls] == ["manager-ao", "grinder-ao-1", "techlead-ao"], "the lead first; no person"
+    names = [c[0] for c in replays.calls]
+    assert names[0] == "manager-ao" and sorted(names[1:]) == ["anchor-ao", "grinder-ao-1", "techlead-ao"], (
+        "the lead first; no person, and no seat a person watches"
+    )
     rec = _team_rec(agent)
     # every entry of the one start carries its instant and how many records it set out to replay,
     # so a client counts *n of m* when some replays fail (the techlead's read of #792)
-    about = {"ids": ["TD-002"], "start": rec["work_started"][-1], "of": 3}
+    about = {"ids": ["TD-002"], "start": rec["work_started"][-1], "of": 4}
     assert {c[1] for c in replays.calls} == {"work"} and all(c[2] == about for c in replays.calls)
     assert all(c[3]["keep_mail"] is True for c in replays.calls), "every record keeps its mail (TD-274)"
-    # the seat is written held, the standing manager and the member live (TD-660)
+    # each seat is written held, the standing manager and the member live (TD-660)
     assert {c[0]: c[3]["held"] for c in replays.calls} == {
         "manager-ao": False,
         "grinder-ao-1": False,
         "techlead-ao": True,
+        "anchor-ao": True,
     }
     rec = _team_rec(agent)
     assert "work_waiting" not in rec and len(rec["work_started"]) == 1
