@@ -300,6 +300,7 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert spec.argv[0] == "claude" and "--settings" in spec.argv and "--session-id" in spec.argv
     assert spec.adapter_id and uuid.UUID(spec.adapter_id)
     assert spec.first_prompt == "do it" and "--model" in spec.argv and "--name" in spec.argv
+    assert spec.model == "opus"  # the profile's alias, the host's `AGENT_MODEL` (§4.2, TD-644)
     assert not any("do it" in a for a in spec.argv)  # typed at the composer, never passed (TD-339)
     assert "CLAUDE_CONFIG_DIR" not in spec.env or spec.env["CLAUDE_CONFIG_DIR"].endswith(".claude")
     assert spec.env["SHIFTLEAD_PERMISSION_WAIT"] == "600"

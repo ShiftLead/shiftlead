@@ -28,6 +28,9 @@ class LaunchSpec:
     # the prompt the launch did not put in the argv (design §4.1 *No prose in the argv*, TD-339): the
     # host agent types it once the session reports its first `idle`; None when there is none
     first_prompt: str | None = None
+    # the profile's declared model as the profile names it (an alias, `opus`): the session's
+    # `AGENT_MODEL` with the adapter in front (design §4.2 *And the model*, TD-638); None when it names none
+    model: str | None = None
 
 
 @runtime_checkable

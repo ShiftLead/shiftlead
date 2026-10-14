@@ -11415,3 +11415,27 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-630 (the design), TD-180 / TD-219 (the form), TD-530 (the Message dialog's attach), TD-478 (the pieces), TD-419 (an attachment's life).
 
 **Resolved:** 2026-10-13 (grinder-ao-2, PR #1694) — a screenshot pasted or a file dropped or attached on the Add entry form goes to its draft folder as a final path, claimed by the session it opens or the hand; a node team's form refuses in place.
+
+## TD-644: Build TD-638 (ShiftLead): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE`; the host writes the model in use to the file whenever it is set or changes
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-638's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.2 (*And the model*), §4.2a, §8; `src/sessionorc/agent.py` (the launch env ~L1120, beside `AGENT_NAME`: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (`profiles.py` ~L44 keeps an alias, not a full id), `AGENT_MODEL_FILE` = `git rev-parse --absolute-git-dir` in the session's directory joined with `shiftlead-agent-model`), both places the record's `model` is set — the hook apply `agent_tick.py` ~L3840 (SessionStart, `PostModelSwitch`) and the transcript read ~L3278 — writing the file with `<adapter>/<s.model>` when the value changes (`s.model` is the full id; `short_model`, `adapters.py` ~L214, is display only); `tests/test_agent*.py`, `tests/test_hook*.py`
+
+**Why:** TD-638: Paul, 2026-10-13 — *recording which did what is a good idea … could expand it to list the actual model*; a commit names the session, and only Claude Code's own attribution names a model, never after a `/model` switch.
+
+**Fix:**
+1. At create: `AGENT_MODEL` = `<adapter>/<the profile's model alias>` (absent where the profile names none), `AGENT_MODEL_FILE` = `<absolute git-dir>/shiftlead-agent-model` (absent outside a git tree); no file yet — the full id is unknown until the tool reports it.
+2. Whenever the record's `model` is set or changes, at either set-site: write the file with `<adapter>/<s.model>`; a write that fails is logged, never the hook's or the tick's.
+3. A `shell` session: no `AGENT_MODEL`, no file.
+4. Tests: the launch env carries both, `AGENT_MODEL` the alias; the file is written at SessionStart's model and rewritten by a `PostModelSwitch`, and by the tick's transcript read when no hook gave one; the path is absolute from a subdirectory; a shell gets neither.
+
+**Done when** every agent session's environment names `AGENT_MODEL` and `AGENT_MODEL_FILE`, the file holds the model in use and follows a switch, and the tests above pass.
+
+**Related:** TD-638 (the design), TD-645 (the hook), TD-031 (the model in use), TD-185 (`AGENT_NAME`).
+
+**Resolved:** 2026-10-14 (grinder-ao-1, PR #1705) — the launch spec carries the profile's alias (`LaunchSpec.model`, set by the Claude Code adapter); the host sets `AGENT_MODEL` (`<adapter>/<alias>`) and `AGENT_MODEL_FILE` (`<absolute git-dir>/shiftlead-agent-model`, the record's `model_file`) on an agent's session, neither on a record with no agent, and removes an earlier run's file at the create; `agent_common.write_model_file` writes `<adapter>/<model>` where the hook sets or changes `model` and where the tick's transcript read does, a failed write logged. Tests: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use`, `test_launch_argv_and_env`.

@@ -91,6 +91,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     LEASE_TTL,  # noqa: F401
     LINKS_EVERY,  # noqa: F401
     MODEL_EVERY,  # noqa: F401
+    MODEL_FILE,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
     ORPHAN_AFTER,  # noqa: F401
@@ -183,11 +184,13 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     draft_folder,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
+    model_env,  # noqa: F401
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
     read_draft_claim,  # noqa: F401
     stat_dir,  # noqa: F401
     tick_ready,  # noqa: F401
+    write_model_file,  # noqa: F401
 )
 from sessionorc.agent_doctor import DoctorMixin
 from sessionorc.agent_hook import HookMixin
@@ -1127,6 +1130,7 @@ class HostAgent(
                 # `_take_name` would otherwise write the ending of a record merely replaced (§4.10)
                 self._attention_ended(holder.id, "resumed", "*")
             previous_run, freed = await self._take_name(holder)
+            model_env = await asyncio.to_thread(agent_common.model_env, adapter, spec.model, directory)
             # read after the supersede, so the id it freed is not `taken` and gets reused
             live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             # Records can no longer hold the base id: `_claim_name` refused or superseded the one
@@ -1144,7 +1148,8 @@ class HostAgent(
                 # adapter's session gets it, and a blank name was given its automatic one above.
                 # CADENCE_ATTENTION_SCOPE tells dev-cadence's start hook whose board to nudge from —
                 # its own for an unattended session, the machine's for one a person drives — so the
-                # synced script never asks `ao status` (design §4.3, §8, TD-425).
+                # synced script never asks `ao status` (design §4.3, §8, TD-425). AGENT_MODEL and
+                # AGENT_MODEL_FILE name the model for its `Agent-Model:` trailer (§4.2, TD-638).
                 shown = name if sid == base else name + sid[len(base) :]  # a shown suffix, never a hidden one
                 env = {
                     **spec.env,
@@ -1152,6 +1157,7 @@ class HostAgent(
                     "SHIFTLEAD_HOME": str(paths.home()),
                     "AGENT_NAME": shown,
                     "CADENCE_ATTENTION_SCOPE": "own" if unattended else "machine",
+                    **model_env,
                 }
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
                 try:
@@ -1196,6 +1202,7 @@ class HostAgent(
                 context_bound=bound,
                 start_context=start_context,
                 first_prompt=spec.first_prompt or None,
+                model_file=model_env.get("AGENT_MODEL_FILE"),
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
