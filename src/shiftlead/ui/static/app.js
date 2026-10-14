@@ -186,7 +186,7 @@
         stopNow = () => {};
         cancelOff(true);
       }
-      say(word); buttons.forEach((b) => { b.disabled = false; });
+      say(word); buttons.forEach((b) => { b.disabled = !!(b.dataset && b.dataset.refused); });  // a refusal outlives the run
       if (!put) { compose.dispatchEvent(new Event("input")); compose.focus(); }
     }
     function attach(files, put) {
@@ -613,6 +613,7 @@
     const refuse = (words) => {
       refused = words || "";
       button.disabled = !!refused; button.title = refused || tip;
+      if (button.dataset) { if (refused) button.dataset.refused = "1"; else delete button.dataset.refused; }
       note.textContent = refused || hint;
     };
     return {
