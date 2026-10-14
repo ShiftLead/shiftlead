@@ -787,7 +787,8 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     html = card.render(s=view(derived))
     assert "TD-027~ → #60" in html and 'class="meta scraped"' in html and "did not declare it" in html
 
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "rep"}, follow_redirects=False)
+    # an agent's Focus: a shell's draws no Reports and no grants (§4.5a *A record with no agent*, TD-666)
+    r = client.post("/new", data={"dir": str(tmp_path), "name": "rep", "adapter": "agentshell"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     page = client.get(f"/focus/{sid}").text
     assert 'id="reportscard"' in page and 'id="progresslist"' in page and 'id="findinglist"' in page
@@ -852,7 +853,9 @@ def test_the_membership_controls(client, tmp_path):
     assert ">ao-vanished<" in html and "badge controller scraped" in html and "re-attach or remove it" in html
 
     # the live pages
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "mw"}, follow_redirects=False)
+    # the worker an agent: a shell's Focus draws no controllers chip (§4.5a *A record with no agent*, TD-666)
+    form = {"dir": str(tmp_path), "name": "mw", "adapter": "agentshell"}
+    r = client.post("/new", data=form, follow_redirects=False)
     worker = r.headers["location"].rsplit("/", 1)[-1]
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "morc"}, follow_redirects=False)
     orc_id = r.headers["location"].rsplit("/", 1)[-1]

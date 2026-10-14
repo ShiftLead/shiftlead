@@ -123,6 +123,7 @@ out.texts = {
   none: AO.barText("", ""), short: AO.barText("  fix   the race ", ""),
   long: AO.barText("one two three four five six seven eight nine ten", ""),
   reason: AO.barText("a draft", "answer in the terminal above"),
+  shell: AO.barText("", "", "✎ Type a command… (c · or paste / drop a file)"),
 };
 out.fill = { roomy: AO.termFill(1000, 120, 70), cramped: AO.termFill(500, 200, 70) };
 out.key = AO.keyEntry("focus", "c");
@@ -166,6 +167,7 @@ def test_the_bars_words_and_the_terminals_fill():
     got = _probe()
     t = got["texts"]
     assert t["none"].startswith("✎ Compose a prompt…") and t["short"] == "✎ draft · fix the race"
+    assert t["shell"].startswith("✎ Type a command…")  # the page's invitation on a record with no agent (TD-666)
     assert t["long"] == "✎ draft · one two three four five six seven eight…"
     assert t["reason"] == "answer in the terminal above"
     assert got["fill"] == {"roomy": 810, "cramped": 360}  # the 360px floor kept

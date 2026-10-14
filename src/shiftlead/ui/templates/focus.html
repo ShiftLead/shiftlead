@@ -25,8 +25,8 @@
       {# design §4.5a Focus header **Close session** (TD-156): the card's caption in the card's words,
          the moment the checklist passes on an idle or exited session; the act is on the line below.
          Always in the page and hidden until true, kept current from the pushed delta as the marks are. #}
-      <span class="badge readymark{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fready"
-            title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
+      {% if s.agent %}<span class="badge readymark{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fready"
+            title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>{% endif %}
       {# §4.8a (TD-077 a2): the **suspended** mark, beside the state and never inside it — a
          suspension is not a state, and only a person's Resume or Forget lifts it. #}
       <span class="badge suspendedmark{% if not s.suspended_note %} hidden{% endif %}" id="fsuspended" title="{{ s.suspended_note }}">suspended</span>
@@ -88,19 +88,22 @@
       {#- a scheduled record has run nothing: its acts are the banner's, Start now and Cancel, and the
           host agent refuses the rest (§6 *Start time*, TD-328) — so the line draws none of them -#}
       {% if s.state != 'scheduled' %}
-      <button class="btn sm next{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."
+      {#- a record with no agent (§4.5a *A record with no agent*, TD-666): Close session on any state Close is,
+          without the checks; no mode toggle, no Message, no Wrap up — nothing reads it and prose would run -#}
+      {%- set close_now = (not s.agent and s.pane is not sameas false and s.state != 'closed') or (s.own and s.ready_ok and s.state in ('idle', 'exited')) %}
+      <button class="btn sm next{% if not close_now %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"
               title="{{ help_title('close') }}">Close session</button>
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
          Take over an unattended session (read-only until then) is the next act here; Hand back and
          Switch to unattended, the same toggle the other way, sit in more ▾ (TD-156). #}
-      <button class="btn sm {{ 'link' if s.own and s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
+      {% if s.agent %}<button class="btn sm {{ 'link' if s.own and s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
       <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" data-line="{{ s.message_line }}" title="{% if s.message_line %}for {{ s.message_line }}&#10;{% endif %}{{ help_title('message') }}">✉ Message</button>
       {# design §4.5a Focus **Wrap up** (TD-156, *What Wrap up promises*): a person's Wrap up is only
          the prompt; the hover and the press's toast say that the close is theirs #}
       <button class="btn sm link" data-act="wrapup" data-id="{{ s.id }}"
-              title="{{ help_title('wrap-up') }}">Wrap up</button>
+              title="{{ help_title('wrap-up') }}">Wrap up</button>{% endif %}
       <button class="btn sm link" data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">⌘ Open shell here</button>
       {% endif %}
       {# design §4.5a Focus header **Transcript** (TD-166): the Transcript page in a new tab, on any
@@ -126,12 +129,12 @@
           <button id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click){% if s.unattended %} — not while you are watching: Take over first{% endif %}">⎘ Paste <span class="key">Ctrl+V</span></button>
           {# design §4.5a *Focus: copy on select* (TD-164, built by TD-174): the person's, in settings.yml, on by default #}
           <label id="tcopyselrow" class="menutoggle" title="copy on select: a selection is copied as soon as you release the mouse (or Shift+click), silently — Ctrl+C and Copy work either way. Yours everywhere: settings.yml person.terminal.copy_on_select"><input type="checkbox" id="tcopysel"{% if copy_on_select %} checked{% endif %}> Copy on select</label>
-          <button id="fmodemenu" data-act="mode" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.unattended %} hidden{% endif %}
-                  title="{{ s.mode_title }}">{{ s.mode_act }}</button>
+          {% if s.agent %}<button id="fmodemenu" data-act="mode" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.unattended %} hidden{% endif %}
+                  title="{{ s.mode_title }}">{{ s.mode_act }}</button>{% endif %}
           <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
           {# Close for a team member (TD-156, Paul): its team's Wind down or Start closes it, so the
              act is here and not on the acts line; enabled only when Ready to close passes #}
-          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."{% if not (s.ready_ok and s.state in ('idle', 'exited')) %} disabled{% endif %}
+          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"{% if not (close_now or (s.ready_ok and s.state in ('idle', 'exited'))) %} disabled{% endif %}
                   title="{{ help_title('close') }}">Close</button>
           <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
         </div>
@@ -166,7 +169,7 @@
     <div class="termwrap{% if folded %} cfold{% endif %}" id="termwrap">
     <div id="term" class="termbox"></div>
     <div class="card composer{% if folded %} overlay folded{% endif %}{% if s.unattended %} hidden{% endif %}" id="composer">
-      <textarea id="compose"{% if folded %} rows="6"{% endif %} placeholder="Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal."></textarea>
+      <textarea id="compose"{% if folded %} rows="6"{% endif %} placeholder="{% if s.agent %}Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal.{% else %}Type a command…{% endif %}"></textarea>
       <div class="row gap">
         {#- design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002):
             the picker, a file dropped on the terminal or the composer, or an image pasted into the
@@ -182,7 +185,7 @@
         {#- design §4.5a *Focus composer* **prompt chips** (§4.8, TD-161, built by TD-170): the role's
             `prompts:` in the file's order, beside Send; a press is Send with the chip's text, and
             its `title` is that text — the definition's words, never a session's -#}
-        {%- if prompts %}
+        {%- if prompts and s.agent %}
         <span class="row gap wrap promptchips" id="promptchips" role="group" aria-label="saved prompts">
           {%- for p in prompts %}
           <button type="button" class="btn sm chip" data-text="{{ p.text }}" title="{{ p.text }}">{{ p.label }}</button>
@@ -198,7 +201,8 @@
         terminal); its Attach is the composer's road, which then needs the box; its Send sends the draft.
         While folded, the reason nothing can be sent is the bar's text, and an upload in flight shows here -#}
     <div class="card composerbar row gap{% if s.unattended %} hidden{% endif %}" id="composerbar">
-      <button type="button" class="cbtext grow" id="cbtext" title="open the composer (c)">✎ Compose a prompt… (c · or paste / drop a file)</button>
+      {%- set invite = '✎ ' ~ ('Compose a prompt…' if s.agent else 'Type a command…') ~ ' (c · or paste / drop a file)' %}
+      <button type="button" class="cbtext grow" id="cbtext" data-invite="{{ invite }}" title="open the composer (c)">{{ invite }}</button>
       <button type="button" class="btn sm" id="cbattach" title="attach files: the composer opens with their paths in it"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
       <button type="button" class="btn sm hidden" id="cbcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
       <button type="button" class="btn primary" id="cbsend">→ Send</button>
@@ -225,10 +229,10 @@
        says it is doing (§4.8 `doing`), with its age — its own words, shown, never acted on; drawn
        only while it says something, beside Reports, which is what it has finished. Always in the
        page and hidden until true, kept current from the pushed delta as the marks are. #}
-    <details class="card pad side{% if not s.doing %} hidden{% endif %}" data-side="working" id="workingcard" open>
+    {% if s.agent %}<details class="card pad side{% if not s.doing %} hidden{% endif %}" data-side="working" id="workingcard" open>
       <summary class="row gap"><span class="h2">Working</span><span class="meta" id="workingage">{% if s.doing and s.doing.age %}says · {{ s.doing.age }} ago{% endif %}</span></summary>
       <div class="doing" id="workingtext" title="what this session says it is doing (design §4.8): its own words">{{ (s.doing or {}).text }}</div>
-    </details>
+    </details>{% endif %}
     <details class="card pad side" data-side="git" id="gitcard" open>
       <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
@@ -237,7 +241,7 @@
        in progress, in review (a claim with a PR), done, dropped — so a claim in review never reads as
        one not started. The explanation is the heading's **i** mark, read before a press; **Drop**
        sits behind the panel's **more ▾**, on in-progress claims only, its confirm naming the cost. #}
-    <details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-pr-marks='{{ (pr_marks or {}) | tojson }}' data-name="{{ s.name }}" open>
+    {% if s.agent %}<details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-pr-marks='{{ (pr_marks or {}) | tojson }}' data-name="{{ s.name }}" open>
       <summary class="row gap"><span class="h2">Reports</span><span class="meta" id="reportscount"></span>
         <button class="imark" type="button" id="i-reports" aria-controls="info-reports" aria-expanded="false" aria-describedby="info-reports" aria-label="About Reports" title="What the session declared, and what the agent derived from its branch and PRs (dashed), grouped by state. A claim with a PR is in review, not in progress. Drop, under more ▾, lets go of a claim that has no PR yet.">i</button>
       </summary>
@@ -253,7 +257,7 @@
       <summary class="row gap"><span class="h2">Inbox</span><span class="meta" id="inboxcount"></span></summary>
       <div id="inboxlist"></div>
       <div class="note">Mail addressed to this session. Opening it here marks nothing read — only the session's own <code>ao inbox</code> does. Reply goes to the sender's inbox; delete removes this session's copy only.</div>
-    </details>
+    </details>{% endif %}
     {# design §4.5a Focus (lead) **Members** list (§4.8, TD-036): every session whose
        `controllers` name this one — the lead's central view. Derived from the records on
        each render, never stored. Shown for a session holding `control`, even with no members
@@ -272,16 +276,16 @@
     </details>{% endif %}
     {# open on the person's own session, folded on a team member (TD-156, Paul: *a user will presume
        the team members behave correctly and close when they are supposed to*) #}
-    <details class="card pad side" data-side="ready"{% if s.own %} open{% endif %}>
+    {% if s.agent %}<details class="card pad side" data-side="ready"{% if s.own %} open{% endif %}>
       <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm{% if not s.own %} hidden{% endif %}" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped." title="{{ help_title('close') }}" disabled>Close session</button></summary>
       <div class="checks" id="checks"></div>
       <div class="note">{% if s.own %}Closing is your act; the checklist only says when it is ready.{% else %}A team member is closed by its team's Wind down or Start once these pass; Close this one alone is under more ▾.{% endif %}</div>
-    </details>
+    </details>{% endif %}
     {# design §4.5a Focus side panel **Told at start** (TD-283 part 2): what the session was told beside
        the person's own words — its start context (§4.3), the package's text with the definition's
        values filled. Display only: the closed markdown subset with no link, escaped, selectable, nothing in it a control; closed by default and
        drawn only on a record that holds one. #}
-    {% if s.start_lines %}<details class="card pad side" data-side="told" id="toldcard">
+    {% if s.start_lines and s.agent %}<details class="card pad side" data-side="told" id="toldcard">
       <summary class="row gap"><span class="h2">Told at start</span><span class="grow"></span><span class="meta">{{ s.start_lines }} line{{ '' if s.start_lines == 1 else 's' }}</span></summary>
       <div class="told" title="the session's start context (design §4.3, TD-283): display only">{{ md(s.start_context, links=False) }}</div>
     </details>{% endif %}
@@ -293,8 +297,8 @@
       <summary class="row gap"><span class="h2">Session</span><span class="meta mono small">{{ s.profile_line }}</span>{% if s.editor %}<span class="grow"></span><a class="btn sm link editor" id="feditor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}</summary>
       <dl class="kv">
         <dt>profile</dt><dd class="mono small">{{ s.profile_line }}</dd>
-        {% if s.context_line %}<dt>context</dt><dd title="what this session's last turn sent (design §6 rule 5)"{% if s.context_over %} class="context over"{% endif %}>{{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% endif %}</dd>{% endif %}
-        <dt>adapter id</dt><dd class="mono small" id="adapter_id">{{ s.adapter_id or '—' }}</dd>
+        {% if s.context_line and s.agent %}<dt>context</dt><dd title="what this session's last turn sent (design §6 rule 5)"{% if s.context_over %} class="context over"{% endif %}>{{ s.context_line }}{% if s.context_bound %}, bound {{ s.context_bound }}{% endif %}</dd>{% endif %}
+        {% if s.agent %}<dt>adapter id</dt><dd class="mono small" id="adapter_id">{{ s.adapter_id or '—' }}</dd>{% endif %}
         <dt>tmux</dt><dd class="mono small">{{ s.id }}</dd>
         <dt>directory</dt><dd class="mono small">{{ s.dir }}</dd>
         <dt>started</dt><dd>{{ s.created[:16].replace('T', ' ') }}Z</dd>
@@ -311,9 +315,9 @@
            by the page's script from the view and each delta (`AO.recentLinks`); absent while it holds none #}
         <dt id="flinksdt" class="hidden">recent links</dt><dd class="mono small recentlinks hidden" id="flinks"></dd>
         {# the rounds line (design §4.5a, TD-191): the round log's last two lines, display only #}
-        {% if rounds is defined and rounds is not none %}<dt>rounds</dt><dd class="small" title="ao log --tail --id {{ s.id }} reads the whole round log">{% for r in rounds.lines %}<div><span class="mono">{{ r.at[5:16].replace("T", " ") }}</span> {{ r.text }}{% if r.earlier %} <span class="dim">· from an earlier run</span>{% endif %}</div>{% else %}<span class="dim">no round log</span>{% endfor %}</dd>{% endif %}
+        {% if rounds is defined and rounds is not none and s.agent %}<dt>rounds</dt><dd class="small" title="ao log --tail --id {{ s.id }} reads the whole round log">{% for r in rounds.lines %}<div><span class="mono">{{ r.at[5:16].replace("T", " ") }}</span> {{ r.text }}{% if r.earlier %} <span class="dim">· from an earlier run</span>{% endif %}</div>{% else %}<span class="dim">no round log</span>{% endfor %}</dd>{% endif %}
         {# design §4.5a **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}
-        <dt>grants</dt><dd><span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span></dd>
+        {% if s.agent %}<dt>grants</dt><dd><span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span></dd>
         {# design §4.5a **controllers** chip (§4.8, TD-036): who may act on this session; click to
            add or remove one. A person always may; a session only if it already controls this one —
            the agent decides, this only asks. #}
@@ -324,7 +328,7 @@
                 title="{{ c.id }} — click to remove it as a controller{{ ' (its session is gone)' if c.gone else '' }}">{{ c.name }} ×</button>{% endfor %}
           {% else %}<span class="note">none — nobody may act on this session</span>{% endif %}
           <button class="btn sm ghost" data-act="control-add" data-id="{{ s.id }}" title="add a controller">+</button>
-        </span></dd>
+        </span></dd>{% endif %}
       </dl>
     </details>
   </div>
