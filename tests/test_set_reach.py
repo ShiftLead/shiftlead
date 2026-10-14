@@ -30,6 +30,9 @@ async def test_set_reach_writes_the_key_and_answers_what_was_there(agent):
         got = await person.call("set_reach", reach=None)  # `ao connect off`
         assert got["reach"] is None and "reach" not in settings_mod.load()
         assert settings_mod.load()["usage"] == {"max_age": "2h"}
+        mtime = settings_mod.settings_file().stat().st_mtime_ns
+        assert await person.call("set_reach", reach=None) == {"reach": None, "before": None}
+        assert settings_mod.settings_file().stat().st_mtime_ns == mtime  # unchanged: not written
 
 
 @pytest.mark.parametrize(
@@ -42,6 +45,8 @@ async def test_set_reach_writes_the_key_and_answers_what_was_there(agent):
         ({k: v for k, v in TAILSCALE.items() if k != "allow"}, "allow is required"),
         ({**TAILSCALE, "route": "cloudflare", "team": "t"}, "needs team and aud"),
         ({**TAILSCALE, "port": 443}, "unknown key"),
+        ("https://home.tail1234.ts.net", "set_reach: "),
+        ({}, "route is required"),
     ],
 )
 async def test_set_reach_refuses_a_bad_shape_and_writes_nothing(agent, bad, says):

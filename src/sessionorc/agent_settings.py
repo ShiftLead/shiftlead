@@ -322,6 +322,8 @@ class SettingsMixin:
             if parsed["route"] == "cloudflare" and not ("team" in parsed and "aud" in parsed):
                 raise RpcError("set_reach: a cloudflare route needs team and aud (design §4.5b)")
             doc["reach"] = parsed
+        if doc.get("reach") == before:  # nothing changed: no write, no push to the nodes, no commit
+            return {"reach": before, "before": before}
         settings_mod.save(doc)
         log.info("settings.yml: reach %s", "removed" if reach is None else f"set to {doc['reach']['route']}")
         await self._push_settings()
