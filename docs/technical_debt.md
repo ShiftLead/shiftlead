@@ -49,7 +49,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-613 | A red PR whose author is gone has no owner: nothing fixes or closes it until someone notices (#1573 sat red with its author idle and the anchor closed) | Medium | Designed — TD-618 builds it |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
 | TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
-| TD-617 | Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form) | High | Open |
 | TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
 | TD-619 | A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record | Medium | Designed — TD-620 builds it |
 | TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Slice 1 of 2 merged — `profile` in `relaunch`; slice 2, the comparison and `ao team flow` |
@@ -824,30 +823,6 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Done when** the top bar updates from the stream with no poll while the stream is up, the counts are computed once per change in the UI process however many pages are open, the host pushes `inbox` on every person-inbox change, `ao inbox --counts` prints the same numbers, and the tests above pass; a re-measurement of `/api/person/inbox` requests per hour on the live UI after the promote is the live check.
 
 **Related:** TD-614 (the design), TD-611 (slice 1's counts read is this entry's fallback), TD-572 (the light stream).
-
----
-
-## TD-617: Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form)
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-12 (the designer, TD-614's round)
-**Owner:** grinder
-**Kind:** live-check #1660
-**Status:** Built — slice 1 (#1645, the one subscriber and `fan_step`), slice 2 (#1651, PR marks per repo on `repos` and Focus's first load; no session view carries `pr_marks`), slice 3 (#1660, 2026-10-13, grinder-ao-2: `fan_kin` sends a Focus page its own record's delta when one of its controllers or members moves or goes; app.js reads no `/api/sessions`). Left: the live check, once #1660 is live (`ao promote status`): read `shiftlead-ui`'s CPU (`systemctl --user status shiftlead-ui` / `ps -o %cpu`) with several pages open against the figures before TD-614, and count `/api/sessions` GETs in `journalctl --user -u shiftlead-ui` over an hour with a Focus page open — none from Focus. It holds → archive with `**Resolved:**`.
-**Location:** design §4.4 *Each reading has one owner* (*Per-session views*), §4.5 *Live state*; `src/shiftlead/ui/app.py` (`events` ~L3381–3570: one fan-out per delta — `view()`, `compact_in`, `render_card` and `fresh_heads` computed once and handed to every connected stream, the light streams taking their parts; `api_sessions` ~L2359), `src/shiftlead/ui/cards.py` (`pr_marks` ~L327: out of the session view, into a per-repo map sent on load and with `repos`), `src/shiftlead/ui/static/app.js` (cards look PRs up by repo; Focus's `refreshMembership` ~L4370 reads its stream's fleet, no `/api/sessions`); `tests/test_ui_events*.py`, `tests/test_ui_focus*.py`
-
-**Why:** TD-614: Paul, 2026-10-12 — *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*; the board was read on three clocks by three processes, the counts rendered per page every 20 s, the card views per client. This slice is the views: every delta was rendered once per connected tab, and each session view repeated its repo's PRs.
-
-**Fix:**
-1. The stream: a single subscriber to the host agent computes, per delta, the session's view, its compact form, its rendered card and (when shaping) the heads, once, and fans the result to every connected client queue; a light stream takes `{id, state}` or its own session's whole delta from the same result.
-2. PR marks: a per-repo map `{repo: {number: mark}}` on the page's first load and on each `repos` push; the session view drops `pr_marks`; a card resolves its PRs from its repo's map.
-3. Focus: members from the `focus=` stream's fleet; no `/api/sessions` on a peer's delta.
-4. Tests: with three connected streams one delta runs `view()` once (a counter); the session view carries no `pr_marks` and the page's map does; Focus issues no `/api/sessions` on a peer's delta; the Org's cards render as before.
-
-**Done when** a delta is computed once however many pages are connected, no session view carries PR marks, Focus reads no `/api/sessions`, the UI's CPU falls with the number of tabs no longer multiplying it, and the tests above pass; a re-measurement of `shiftlead-ui`'s CPU and `/api/sessions` requests per hour after the promote is the live check.
-
-**Related:** TD-614 (the design), TD-611 (its slices 3 and 4, built here), TD-572.
 
 ---
 

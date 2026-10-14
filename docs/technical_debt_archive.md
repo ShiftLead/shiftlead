@@ -10975,3 +10975,27 @@ the `question`; and an `AskUserQuestion` permission's pending text is its questi
 words), TD-079 (the attention trail).
 
 **Resolved:** 2026-10-13 (PR #1664) — a later hook event ends a live permission waiter as answered in the terminal: the asked call's tool event (`tool_use_id` on Claude Code's tool events), or one naming no call (`Stop`, a prompt, `SessionEnd`); a parallel tool's event ends nothing and the buttons stay up; the timeout sets the terminal's question only while the record's pending is still that waiter's; an `AskUserQuestion` permission reads as its first question. §4.2 *Permissions are answered through the hook* says it.
+
+## TD-617: Build TD-614 (3): per-session views once per delta fanned out to every stream; PR marks once per repo on the `repos` push; Focus's members from its stream (TD-611 slices 3–4 in this form)
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (the designer, TD-614's round)
+**Owner:** grinder
+**Kind:** live-check #1660
+**Status:** Built — slice 1 (#1645, the one subscriber and `fan_step`), slice 2 (#1651, PR marks per repo on `repos` and Focus's first load; no session view carries `pr_marks`), slice 3 (#1660, 2026-10-13, grinder-ao-2: `fan_kin` sends a Focus page its own record's delta when one of its controllers or members moves or goes; app.js reads no `/api/sessions`). Left: the live check, once #1660 is live (`ao promote status`): read `shiftlead-ui`'s CPU (`systemctl --user status shiftlead-ui` / `ps -o %cpu`) with several pages open against the figures before TD-614, and count `/api/sessions` GETs in `journalctl --user -u shiftlead-ui` over an hour with a Focus page open — none from Focus. It holds → archive with `**Resolved:**`.
+**Location:** design §4.4 *Each reading has one owner* (*Per-session views*), §4.5 *Live state*; `src/shiftlead/ui/app.py` (`events` ~L3381–3570: one fan-out per delta — `view()`, `compact_in`, `render_card` and `fresh_heads` computed once and handed to every connected stream, the light streams taking their parts; `api_sessions` ~L2359), `src/shiftlead/ui/cards.py` (`pr_marks` ~L327: out of the session view, into a per-repo map sent on load and with `repos`), `src/shiftlead/ui/static/app.js` (cards look PRs up by repo; Focus's `refreshMembership` ~L4370 reads its stream's fleet, no `/api/sessions`); `tests/test_ui_events*.py`, `tests/test_ui_focus*.py`
+
+**Why:** TD-614: Paul, 2026-10-12 — *should we have the host agent run it and maintain counts somewhere to reduce burden even further? are there other centralizations we should make as well?*; the board was read on three clocks by three processes, the counts rendered per page every 20 s, the card views per client. This slice is the views: every delta was rendered once per connected tab, and each session view repeated its repo's PRs.
+
+**Fix:**
+1. The stream: a single subscriber to the host agent computes, per delta, the session's view, its compact form, its rendered card and (when shaping) the heads, once, and fans the result to every connected client queue; a light stream takes `{id, state}` or its own session's whole delta from the same result.
+2. PR marks: a per-repo map `{repo: {number: mark}}` on the page's first load and on each `repos` push; the session view drops `pr_marks`; a card resolves its PRs from its repo's map.
+3. Focus: members from the `focus=` stream's fleet; no `/api/sessions` on a peer's delta.
+4. Tests: with three connected streams one delta runs `view()` once (a counter); the session view carries no `pr_marks` and the page's map does; Focus issues no `/api/sessions` on a peer's delta; the Org's cards render as before.
+
+**Done when** a delta is computed once however many pages are connected, no session view carries PR marks, Focus reads no `/api/sessions`, the UI's CPU falls with the number of tabs no longer multiplying it, and the tests above pass; a re-measurement of `shiftlead-ui`'s CPU and `/api/sessions` requests per hour after the promote is the live check.
+
+**Related:** TD-614 (the design), TD-611 (its slices 3 and 4, built here), TD-572.
+
+**Resolved:** 2026-10-13 (grinder-ao-2; the live check of #1660) — it holds. #1660 (`7796087`) went live at 18:52 MDT and the UI restarted at 19:18 and again at 19:50 (`abbaddd`). Read from `journalctl --user -u shiftlead-ui` 18:52–19:53, with four Focus pages and the Org page open throughout: no `GET /api/sessions` at all (a Focus page's only reads its own `/api/sessions/<id>/inbox`, 3 each, one per load), where 17:00–18:52 under the build before it logged 538. `shiftlead-ui`'s CPU (`ps -o time`): 1 min 52 s in the first 16 min (≈12 % of a core) with those five pages, and 11 s in the 3 min after the 19:50 restart (≈6 %), where TD-611 measured a full core (888 s in 20 min) with three Focus tabs; the tabs no longer multiply it.
