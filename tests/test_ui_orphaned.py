@@ -122,7 +122,10 @@ def test_only_a_failed_write_is_drawn_as_not_written():
 
 
 def _git(root: pathlib.Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
+    cp = subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+    # git's own words in the failure: a bare exit 128 in CI could not say which of its fatal causes it was (TD-659)
+    assert cp.returncode == 0, f"git {' '.join(args)} exited {cp.returncode}: {cp.stderr.strip()}"
+    return cp.stdout.strip()
 
 
 def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_agent, tmp_path, capsys):
@@ -170,8 +173,10 @@ def test_the_inbox_row_and_the_reply_route_for_an_orphaned_question(subprocess_a
             assert r.status_code == 200, r.text
             got = r.json()
             assert got["note"].startswith("written on the board") and got["board"] and got["closed"] == q
-        _git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up by the pull
-        assert ": the DIU one. Context: TD-149." in (repo / "docs" / "user_attention.md").read_text()
+        # read on origin's head, where the write-back landed: a pull of the checkout here raced the
+        # home's own pull of it (§6 *Pull*) and once exited 128 in CI (TD-659)
+        origin = pathlib.Path(_git(repo, "remote", "get-url", "origin"))
+        assert ": the DIU one. Context: TD-149." in _git(origin, "show", "main:docs/user_attention.md")
         # `ao msg --reply-to` by a person takes the same road, and says where the answer went
         w = call_sync("create", name="asker", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"])["id"]
         q2 = call_sync("msg", caller=w, to="person", text="Drop it?", about="#702", kind="ask")["entry"]["id"]
