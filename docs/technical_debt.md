@@ -58,7 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
-| TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
+| TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Slice 1 built; slice 2 open |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
 | TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
