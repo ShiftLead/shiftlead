@@ -11977,7 +11977,7 @@ a click on a changed file on the Git card opens it in the person's editor.
 
 **Done when** the design names each reading's one owner and its push, and build entries exist for each slice. TD-611's slices 1 and 4 are re-pointed at them or marked as their first step.
 
-**Resolved:** 2026-10-14 (the designer) — designed 2026-10-12 (§4.4 *Each reading has one owner, and a client never re-derives it*), built by TD-615 (#1633), TD-616 (#1640, its live check holding in #1692) and TD-617 (its live check of #1660 holding, 2026-10-13), all archived.
+**Resolved:** 2026-10-14 (the designer) — designed 2026-10-12 (§4.4 *Each reading has one owner, and a client never re-derives it*), built by TD-615 (#1633), TD-616 (#1640 and #1678, its live check holding in #1692) and TD-617 (its live check of #1660 holding, 2026-10-13), all archived.
 
 **Related:** TD-611 (the lag that found it), TD-131 (whole-file stores, a later scale), TD-384 (work orders from the board).
 
