@@ -45,7 +45,17 @@ async def _ws(ws: WebSocket) -> None:
     await ws.close()
 
 
-inner = Starlette(routes=[Route("/", _echo, methods=["GET", "POST"]), WebSocketRoute("/events", _ws)])
+async def _held(ws: WebSocket) -> None:
+    """A socket held open as `/events` and `/term` hold theirs: until its receive says disconnect."""
+    await ws.accept()
+    await ws.send_json({"open": True})
+    while (got := await ws.receive()).get("type") != "websocket.disconnect":
+        await ws.send_json({"echo": got.get("text")})
+
+
+inner = Starlette(
+    routes=[Route("/", _echo, methods=["GET", "POST"]), WebSocketRoute("/events", _ws), WebSocketRoute("/held", _held)]
+)
 
 
 @pytest.fixture
@@ -241,6 +251,77 @@ def test_a_loopback_probe_of_the_route_port_is_logged_at_info_and_not_counted(ho
     assert r.status_code == 403 and r.headers["x-shiftlead-refused"].split()[0] == "0"
     rec = [x for x in caplog.records if "refused on the route port" in x.getMessage()]
     assert rec and all(x.levelno == logging.INFO for x in rec)
+
+
+# -- open websockets follow the setting (slice 2) ----------------------------------------------------
+
+
+def _following(gate: listener.Gate, change, *, closes: bool) -> None:
+    """Open `/held` on the route port, apply `change`, read `reach:` as the route listener's task does,
+    and see the socket closed `1008` or still open."""
+    c = TestClient(gate, base_url=URL)
+    with c.websocket_connect(_ws_url(c, "/held"), headers={**ID, "origin": URL}) as ws:
+        assert ws.receive_json() == {"open": True}
+        assert len(gate.open) == 1
+        change()
+        gate.sweep()
+        if closes:
+            with pytest.raises(WebSocketDisconnect) as e:
+                ws.receive_json()
+            assert e.value.code == 1008
+        else:
+            ws.send_text("still here")
+            assert ws.receive_json() == {"echo": "still here"}
+    deadline = time.monotonic() + 5
+    while gate.open and time.monotonic() < deadline:  # the handler ends on its disconnect
+        time.sleep(0.01)
+    assert not gate.open
+
+
+def test_an_open_websocket_is_closed_when_reach_is_removed_or_allow_narrows(home):
+    gate = lambda: listener.Gate(inner, "route", reach=listener.Reach(every=0))  # noqa: E731
+    _reach()
+    _following(gate(), lambda: _reach(allow=[LOGIN, "eve@example.com"]), closes=False)  # still let in
+    _following(gate(), lambda: settings.save({}), closes=True)  # `ao connect off`
+    _reach()
+    _following(gate(), lambda: _reach(allow=["eve@example.com"]), closes=True)  # a narrowed allow
+    _reach()
+    _following(gate(), lambda: _reach(url="https://other.tail1234.ts.net"), closes=True)  # judged in full
+
+
+def test_a_broken_settings_file_holds_the_last_reading_a_minute_then_closes(home, monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(listener.time, "monotonic", lambda: now[0])
+    reach = listener.Reach(every=0)
+    gate = listener.Gate(inner, "route", reach=reach)
+    _reach()
+    assert reach.read() is not None  # the last good reading
+
+    def broken() -> None:
+        settings.settings_file().write_text("reach: [unclosed\n")
+        now[0] += 30
+
+    _following(gate, broken, closes=False)  # thirty seconds into the failure: the reading holds
+    c = TestClient(gate, base_url=URL)
+    assert c.get("/", headers=ID).status_code == 200
+
+    def later() -> None:
+        now[0] += 31  # a minute and a second since the last good read
+
+    _following(gate, later, closes=True)
+    r = c.get("/", headers=ID)
+    assert r.status_code == 403 and "cannot be read or parsed" in r.text
+    _reach()  # a read that answers lets the person in again
+    assert c.get("/", headers=ID).status_code == 200
+
+
+def test_the_route_port_refuses_until_a_first_read_answers(home):
+    settings.settings_file().write_text("reach: [unclosed\n")
+    r = _route().get("/", headers=ID)
+    assert r.status_code == 403 and "cannot be read or parsed" in r.text
+    settings.settings_file().unlink()  # a missing file is a reading: no route
+    r = _route().get("/", headers=ID)
+    assert r.status_code == 403 and "cannot be read" not in r.text and "no route is set" in r.text
 
 
 def test_host_and_origin_parsing():

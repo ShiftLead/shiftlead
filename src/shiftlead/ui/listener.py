@@ -43,6 +43,7 @@ PROXY_HEADERS = (
     "x-forwarded-host",
 )
 REACH_EVERY = 5.0  # seconds: the route port reads `reach:` from the file at most this often
+REACH_HOLD = 60.0  # seconds a last good reading holds while settings.yml cannot be read or parsed
 ROUTE_RETRY = 60.0  # seconds between tries of a route port another process holds
 SAFE_METHODS = ("GET", "HEAD")
 DEFAULT_PORTS = {"http": 80, "https": 443}
@@ -109,19 +110,50 @@ class Refused:
 class Reach:
     """`reach:` as the route port reads it — from `settings.yml` itself through the settings reader, never
     the host agent's RPC, so the route outlives the agent — at most every `REACH_EVERY` seconds. None
-    (no route, or one that is not valid) refuses everything."""
+    (no route, or one that is not valid) refuses everything. It fails closed (§4.5b): nothing is let in
+    before a first read answers, and while the file cannot be read or parsed the last good reading holds
+    for `REACH_HOLD` seconds, then `failing` says why and everything is refused until a read answers. A
+    missing file is a reading — no route — not a failure."""
 
-    def __init__(self, every: float = REACH_EVERY) -> None:
+    def __init__(self, every: float = REACH_EVERY, hold: float = REACH_HOLD) -> None:
         self.every = every
+        self.hold = hold
         self._at = -float("inf")
+        self._good_at: float | None = None
         self._got: dict[str, Any] | None = None
+        self.failing = ""
 
     def get(self) -> dict[str, Any] | None:
-        now = time.monotonic()
-        if now - self._at >= self.every:
-            self._got = settingsmod.reach(settingsmod.load())
-            self._at = now
+        if time.monotonic() - self._at >= self.every:
+            self.read()
         return self._got
+
+    def read(self) -> dict[str, Any] | None:
+        """Read the file now, whatever the last read's age."""
+        now = self._at = time.monotonic()
+        path = settingsmod.settings_file()
+        doc = settingsmod.read(path) if path.exists() else {}
+        if doc is not None:
+            self._got, self._good_at, self.failing = settingsmod.reach(doc), now, ""
+        elif self._good_at is None or now - self._good_at >= self.hold:
+            self._got, self.failing = None, f"{path} cannot be read or parsed"
+        return self._got
+
+
+class Open:
+    """A websocket the route port let in: its scope and headers, judged again on each reading of `reach:`,
+    and the loop it runs on, so a reading taken anywhere can close it."""
+
+    def __init__(self, scope: dict, headers: dict[str, str]) -> None:
+        self.scope = scope
+        self.headers = headers
+        self.loop = asyncio.get_running_loop()
+        self.kicked = asyncio.Event()
+        self.closing = False  # kicked once: a handler slow to end is not logged again by the next sweep
+
+    def kick(self) -> None:
+        self.closing = True
+        self.loop.call_soon_threadsafe(self.kicked.set)
 
 
 class Gate:
@@ -146,6 +178,7 @@ class Gate:
         self.names = plain_names(bind, allow_hosts)
         self.reach = reach or Reach()
         self.refused = refused or Refused()
+        self.open: dict[int, Open] = {}  # the route port's open websockets, by id
 
     # -- the checks ---------------------------------------------------------------------------------
 
@@ -168,6 +201,13 @@ class Gate:
             origin = f"http://{host.strip()}"
             return self._origin(scope, headers, origin), origin
         reach = self.reach.get()
+        if reach is None and self.reach.failing:
+            return {
+                "status": 403,
+                "check": "reach",
+                "why": f"{self.reach.failing}, and the last good reading is over a minute old",
+                "cure": ["fix settings.yml: the route port lets nobody in until it reads"],
+            }, ""
         if reach is None:
             return {
                 "status": 403,
@@ -273,7 +313,67 @@ class Gate:
                 message = self._stamp(message)
             await send(message)
 
-        await self.app({**scope, "shiftlead": {"listener": self.listener, "origin": origin}}, receive, stamped)
+        inner = {**scope, "shiftlead": {"listener": self.listener, "origin": origin}}
+        if scope["type"] == "websocket" and self.listener == "route":
+            await self._followed(inner, headers, receive, stamped)
+            return
+        await self.app(inner, receive, stamped)
+
+    async def _followed(self, scope: dict, headers: dict[str, str], receive: Any, send: Any) -> None:
+        """A route-port websocket that `sweep` can close: once kicked, it is closed `1008` and the app's
+        next receive is its disconnect — both handlers end on that — and whatever the app sends after is
+        dropped."""
+        conn = Open(scope, headers)
+        closed = False
+
+        async def close() -> None:
+            nonlocal closed
+            if not closed:
+                closed = True
+                await send({"type": "websocket.close", "code": 1008})
+
+        async def followed_receive() -> dict:
+            if not conn.kicked.is_set():
+                got = asyncio.ensure_future(receive())
+                kick = asyncio.ensure_future(conn.kicked.wait())
+                try:  # the app cancels a pending receive on its own ends: neither task outlives this one
+                    done, _ = await asyncio.wait({got, kick}, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    kick.cancel()
+                    if not got.done():
+                        got.cancel()
+                if got in done:
+                    return got.result()
+            await close()
+            return {"type": "websocket.disconnect", "code": 1008}
+
+        async def followed_send(message: dict) -> None:
+            if conn.kicked.is_set():
+                await close()
+                return
+            await send(message)
+
+        self.open[id(conn)] = conn
+        try:
+            await self.app(scope, followed_receive, followed_send)
+        finally:
+            self.open.pop(id(conn), None)
+
+    def sweep(self) -> None:
+        """Read `reach:` now and close each open websocket the reading no longer lets in (§4.5b *An open
+        websocket*): each is judged again with the request it was let in with."""
+        self.reach.read()
+        for conn in [c for c in list(self.open.values()) if not c.closing]:
+            refusal, _ = self.judge(conn.scope, conn.headers)
+            if refusal is not None:
+                log.warning(
+                    "closed on the route port: %s (%s; %s, login %r)",
+                    refusal["check"],
+                    refusal["why"],
+                    conn.scope.get("path"),
+                    decode_login(conn.headers.get("tailscale-user-login", "")) or None,
+                )
+                conn.kick()
 
     def _log(self, refusal: dict[str, Any], headers: dict[str, str]) -> None:
         local = self.listener == "route" and host_name(headers.get("host", "")) in LOOPBACK_NAMES
@@ -352,12 +452,14 @@ async def serve(
         named = route_port or DEFAULT_ROUTE_PORT
         return Gate(app, listener, bind=bind, allow_hosts=allow_hosts, route_port=named, refused=refused)
 
+    route_gate = gated("route")
+
     servers = [Server(uvicorn.Config(gated("plain"), host=bind, port=port, **common))]  # configures the log
     if route_port and is_node:
         log.info("no route listener: not the home")
         route_port = 0
     if route_port:
-        servers.append(Server(uvicorn.Config(gated("route"), host="127.0.0.1", port=route_port, **common)))
+        servers.append(Server(uvicorn.Config(route_gate, host="127.0.0.1", port=route_port, **common)))
     stopping = asyncio.Event()
 
     def stop() -> None:
@@ -383,6 +485,17 @@ async def serve(
             await servers[1].serve(sockets=[sock])
             return
 
+    async def follow() -> None:
+        # the route listener reads `reach:` on its own every REACH_EVERY seconds, not only when a request
+        # comes, and closes the websockets the reading no longer lets in (§4.5b, TD-647 slice 2)
+        while not stopping.is_set():
+            try:
+                route_gate.sweep()
+            except Exception:  # noqa: BLE001 — a failed sweep is logged and tried again; it never ends the UI
+                log.exception("the route port's reading of reach: failed")
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(stopping.wait(), REACH_EVERY)
+
     async def plain() -> None:
         try:
             await servers[0].serve()
@@ -392,7 +505,7 @@ async def serve(
             stopping.set()
 
     try:
-        await asyncio.gather(plain(), *([route()] if route_port else []))
+        await asyncio.gather(plain(), *([route(), follow()] if route_port else []))
     finally:
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.remove_signal_handler(sig)
