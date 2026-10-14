@@ -1,11 +1,11 @@
 # Written by scripts/vendor_ledgerboard.sh — do not edit by hand.
-tag: v1.0
-commit: bc4b2ea4d84dcfd3339a3c71b05fbe39150bc9d6
-file: src/sessionorc/ledgerboard.py 4db4245c9f5a65f33af755407a2e09e656180d148532550d11702ed116121208
+tag: v1.1
+commit: c57d8379c013d8b3ec331d382a1992da70effaa0
+file: src/sessionorc/ledgerboard.py 1879074a638fcb12af2db7976e1a5db2cc16ef4257c31fc5b368d8b092efbfee
 file: tests/ledgerboard/board/basic.json 2e6fd2eb6fb7b31eb17f14afbaf5b09db657402618029d0f0dda4ad64ab5c312
 file: tests/ledgerboard/board/basic.md a8911f1afae75534477966cba517af45ede59335c1072f2ea6bf9cfa7f236b54
-file: tests/ledgerboard/edit/cases.json 1444e6ea0bb22458b1c66e8bffff95102f19aae3aa376c292dc8adda6a11ef09
-file: tests/ledgerboard/edit/expected.json 845981f995c99e4404f3437626c0506765da740278aec7ffb0878157a0426e58
+file: tests/ledgerboard/edit/cases.json c210945328126666bb22073e49c403094ce74be7a430b74ac2e0b324f90730a8
+file: tests/ledgerboard/edit/expected.json ad7b84642f652cc6faad5c0e945e4059e03dde5934c943348a90b216cd6de1db
 file: tests/ledgerboard/ledger/basic.archive.md e30dbbbf73065564e295f3eef936a863781b16b9730807e4a4cbaa94afc4f7a1
 file: tests/ledgerboard/ledger/basic.json f8a7f4943b52f2e2a6cec5190a227749ea37a1b76ee63ced703e309bd1ab0b19
 file: tests/ledgerboard/ledger/basic.md 05c06b9d0cbf42471dfb38d6cef4d15609bde0ec7675e8c34c87a6f5e78e46b2
@@ -13,4 +13,4 @@ file: tests/ledgerboard/ledger/basic.resolve.json d134b65c50c738858cdb0a02661c18
 file: tests/ledgerboard/ledger/empty.archive.md e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 file: tests/ledgerboard/ledger/empty.json 84d0fcfaa3a51c622cc74f579710c767f7b13983fc0e2ac916be63e83ee63cd3
 file: tests/ledgerboard/ledger/empty.md 92933f850cd6e4f522f1101da57553eb182692427b51e58fab6a739c7e5809a5
-file: tests/ledgerboard/run.py 73e27b2dbd2369ad0c0185f99eb49d7085d1ef564617a4a47030754a635dfed7
+file: tests/ledgerboard/run.py a0f11f873fa1e56232a80b62ac4a0a62297ade6c806af55976a434bc581cf6f2

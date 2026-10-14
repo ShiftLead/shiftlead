@@ -16,6 +16,7 @@ from sessionorc import (
     adapters,
     agent_common,
     hosts,
+    ledgerboard,
     mail,
 )
 from sessionorc import board as board_mod
@@ -330,14 +331,16 @@ class InboxMixin:
         said = " ".join(str(answer or "").split())
         # an offered answer word for word comes first, so an item's own complete *Not right: wrong
         # repo* is an answer like any other; the pair's second answer is a form, `Not right: <what>`,
-        # whose slot is the person's words, and pressed as written it says nothing
-        form = [a for a in offered if board_mod.NOT_RIGHT_FORM.fullmatch(a)]
-        if said and said in offered and said not in form:
+        # whose slot is the person's words, and pressed as written — or filled with a slot — it says
+        # nothing (ledgerboard's reading of the form, TD-585)
+        if said and said in offered and not ledgerboard.is_not_right_form(said):
             return said
-        if form and said.startswith(board_mod.NOT_RIGHT):
-            if said in form or not said[len(board_mod.NOT_RIGHT) :].strip():
-                raise board_mod.Refused("Not right needs its words: say what is off")
-            return said
+        try:
+            filled = ledgerboard.fill_not_right(said, offered)
+        except ledgerboard.Refused as e:
+            raise board_mod.Refused(str(e)) from None
+        if filled:
+            return filled
         raise board_mod.Refused(
             "a decide records one of the item's own answers, word for word: anything else is a Reply (design §4.4)"
         )
@@ -478,8 +481,7 @@ class InboxMixin:
         log.info("board %s: %s", root, done["message"])
         await self._reread_board(root)
         text = str(done.get("text") or text)  # the line found, by its id where the press named one
-        h = board_mod.HEAD_RE.search(text)
-        head = " ".join((h.group("head") if h else text).split())
+        head = ledgerboard.bold_head(text) or " ".join(text.split())
         by = await asyncio.to_thread(board_mod.author, root)
         # the mail half and the trail line are the home's, served there with the same words
         sent, refused = await self._board_reply_mail(head, by, reply, refs, root.name)

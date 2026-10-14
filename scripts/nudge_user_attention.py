@@ -1014,8 +1014,8 @@ def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
                 verdicts.append(hits[-1].upper())
         mark = f", reviewed {verdicts[-1]} — unmerged" if verdicts else ""
         title = " ".join("".join(ch if ch.isprintable() else " " for ch in str(pr.get("title") or "")).split())
-        num = pr.get("number") if isinstance(pr.get("number"), int) else "?"
-        old.append((age, f"  • #{num} {title[:100]} ({age}d open{mark})"))
+        num = forge.ref(pr["number"]) if isinstance(pr.get("number"), int) else "?"   # #N, or GitLab's !N
+        old.append((age, f"  • {num} {title[:100]} ({age}d open{mark})"))
     if not old:
         return []
     old.sort(key=lambda p: -p[0])
@@ -1038,8 +1038,8 @@ def _local_origin(root: Path) -> str | None:
 
 # TD-034 tier 2: the merge settings cadence.md §4 assumes. adopt_repo_settings.sh checks and
 # applies them one repo at a time; this only REPORTS, in the --fetch report, so drift is seen
-# without anyone remembering to run it. Same values as that script's WANT (a parity pair);
-# the one copy is the GitHub backend's (TD-103).
+# without anyone remembering to run it. One copy: each backend's settings_wanted, which that
+# script reads through `forge.py wanted` (TD-104; this name is GitHub's, kept for its tests).
 CADENCE_SETTINGS = dict(F.GitHub.settings_wanted) if F is not None else {}
 
 
@@ -1063,10 +1063,11 @@ def _no_auto_delete() -> set[str]:
 
 
 def settings_line(root: Path, spent: dict) -> str | None:
-    """One "⚙ repo settings" line when the repo's GitHub merge settings disagree with the
-    cadence; None when they agree, there is no origin, or gh cannot answer (offline,
-    unauthenticated, a non-admin sees null) — never a guess, never a write. An origin that
-    is not GitHub gets a "not checked" line instead, so the row never reads clean (TD-098)."""
+    """One "⚙ repo settings" line when the repo's merge settings (GitHub's, or GitLab's since
+    TD-104) disagree with the cadence; None when they agree, there is no origin, or the forge
+    cannot answer (offline, unauthenticated, a non-admin cannot see them) — never a guess,
+    never a write. An origin no backend reads gets a "not checked" line instead, so the row
+    never reads clean (TD-098)."""
     kind, slug = origin_forge(root)
     if (kind, slug) == ("other", "none"):
         return None   # no forge, no merge settings to compare (TD-105)
@@ -1074,7 +1075,7 @@ def settings_line(root: Path, spent: dict) -> str | None:
         why = forge_unread_line(slug or "?").removeprefix("PRs not checked: ")
         return f"⚙ repo settings not checked: {why}"
     forge = _forge(root, spent=spent, per_call=GH_TIMEOUT, total=GH_BUDGET)
-    if kind != "github" or slug is None or forge is None:
+    if kind not in ("github", "gitlab") or slug is None or forge is None:
         return None
     want = dict(forge.settings_wanted)
     if slug.lower() in _no_auto_delete():
@@ -1089,10 +1090,13 @@ def settings_line(root: Path, spent: dict) -> str | None:
     off = []
     for name, value in want.items():
         have = got.get(name)
-        if have is None:
-            return None     # not readable here (a non-admin): cannot say, so say nothing
+        # Not readable here: GitHub reads a non-admin's as null, GitLab leaves the key out (its
+        # squash template is null until set, which is drift) — cannot say, so say nothing.
+        if name not in got or (have is None and isinstance(value, bool)):
+            return None
         if have != value:
-            off.append(f"{name} {'on' if have else 'off'}")
+            off.append(f"{name} {'on' if have else 'off'}" if isinstance(value, bool)
+                       else f"{name} {'unset' if have is None else F.show(have)}")
     if not off:
         return None
     return (f"⚙ repo settings differ from cadence.md §4: {', '.join(off)} — "

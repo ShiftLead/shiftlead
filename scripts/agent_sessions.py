@@ -17,7 +17,9 @@ tool with no backend, or no readable state, goes into `blind`.
 
 Backends: claude (the live registry ~/.claude/sessions/*.json and the transcripts under
 ~/.claude/projects/<munged path>/, both undocumented Claude Code internals — TD-050's
-canary watches the registry). Others are TD-102's.
+canary watches the registry); gemini (TD-109: ~/.gemini's projects.json and its
+tmp/<slug>/chats/*.jsonl, liveness from /proc — Gemini CLI keeps no live registry). Codex
+is TD-102's.
 
 Stdlib only; imported by the scripts beside it.
 """
@@ -30,7 +32,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-BACKENDS = ("claude",)
+BACKENDS = ("claude", "gemini")
 
 
 @dataclass
@@ -73,6 +75,10 @@ def _blind_line(tool: str, what: str) -> str:
     return f"{tool} {what}: no backend for {tool} (TD-102)"
 
 
+def _gemini_dir(*parts: str) -> Path:
+    return Path.home().joinpath(".gemini", *parts)
+
+
 def _claude_dir(*parts: str) -> Path:
     return Path.home().joinpath(".claude", *parts)
 
@@ -106,6 +112,13 @@ def live(repo: "Path | str | None" = None) -> Seen:
                     out.blind.append(f"claude sessions: {why}")
                 continue
             out.items += [{**s, "tool": "claude", "id": s.get("sessionId")} for s in live_sessions()]
+        elif tool == "gemini":
+            why = _unreadable(_gemini_dir()) or (None if procfs_available() else "no /proc to find its processes by")
+            if why:
+                if tool in want:
+                    out.blind.append(f"gemini sessions: {why}")
+                continue
+            out.items += gemini_live()
         else:
             out.blind.append(_blind_line(tool, "sessions"))
     return out
@@ -126,6 +139,13 @@ def history_dirs(repo: Path) -> Seen:
             for d in project_dirs(repo):
                 wt = d.name.split(WORKTREE_MARKER, 1)[1] if WORKTREE_MARKER in d.name else None
                 out.items.append(("claude", d, wt))
+        elif tool == "gemini":
+            why = _unreadable(_gemini_dir("tmp"))
+            if why:
+                if tool in want:
+                    out.blind.append(f"gemini transcripts: {why}")
+                continue
+            out.items += [("gemini", d, wt) for d, wt in gemini_chat_dirs(repo)]
         else:
             out.blind.append(_blind_line(tool, "transcripts"))
     return out
@@ -136,7 +156,8 @@ def ever_ran(repo: Path) -> "bool | None":
     False, or None when a listed tool cannot be looked at. Deliberately broad for Claude:
     every project dir whose name starts with the repo's munged path counts, which also
     counts a sibling repo sharing the prefix — that only ever says "ran", the safe
-    direction for the line that hides a warning (TD-28)."""
+    direction for the line that hides a warning (TD-28). Gemini's is broad the same way:
+    a history in any directory under the repo counts."""
     blind, want = False, wanted(repo)
     for tool in sorted(set(BACKENDS) | set(want)):
         if tool == "claude":
@@ -151,18 +172,238 @@ def ever_ran(repo: Path) -> "bool | None":
                     return True
             except OSError:
                 blind = True
+        elif tool == "gemini":
+            if _unreadable(_gemini_dir("tmp")):
+                blind = blind or tool in want
+                continue
+            me = str(Path(repo).resolve())
+            for path, slug in gemini_projects().items():
+                if (path == me or path.startswith(me + "/")) and any(_gemini_dir("tmp", slug, "chats").glob("*.jsonl")):
+                    return True
         else:
             blind = True
     return None if blind else False
 
 
 def resume_hint(session_id: str, tool: str = "claude") -> str:
-    return {"claude": f"claude --resume {session_id}"}.get(tool, f"resume {tool} session {session_id}")
+    # gemini --resume <uuid> resumed that session when read (TD-109), though its --help names
+    # only `latest` and an index; it is per project, so it runs in the session's directory
+    return {"claude": f"claude --resume {session_id}",
+            "gemini": f"gemini --resume {session_id}"}.get(tool, f"resume {tool} session {session_id}")
+
+
+def scan(tool: str, path: Path) -> "dict | None":
+    """A non-Claude transcript's head and tail, unclipped, in list_sessions' keys (id, start,
+    last, first_user, last_assistant, summary); None when it cannot be read or says nothing.
+    Claude's scan stays list_sessions.scan_session — its format is that script's history."""
+    return gemini_scan(path) if tool == "gemini" else None
 
 
 def format_canary() -> "str | None":
     """Each backend's format warning, or None (TD-050)."""
-    return registry_format_note()
+    notes = [n for n in (registry_format_note(), gemini_format_note()) if n]
+    return "\n".join(notes) or None
+
+
+# ----------------------------------------------------------------------------------------
+# The Gemini CLI backend (TD-109), on the facts read off Gemini CLI 0.64.0 on 2026-10-13
+# (docs/plans/2026-10-12-session-introspection-adapter.md in dev-cadence, *Gemini CLI, as
+# read*): ~/.gemini/projects.json maps an absolute path to a slug (the basename,
+# lowercased); tmp/<slug>/.project_root holds the path again; each session is
+# tmp/<slug>/chats/session-<time>-<uuid8>.jsonl, its first record {sessionId, projectHash,
+# startTime, lastUpdated, kind}, then messages {id, timestamp, type: user|gemini, content}
+# among {"$set": {...}} patches. No cwd field and no live registry.
+# ----------------------------------------------------------------------------------------
+
+# A Gemini CLI process: comm is node (the npm install) — or gemini, for an install that is
+# its own binary — and its script is .../bin/gemini. comm alone matches every node process.
+GEMINI_COMMS = {"node", "gemini"}
+
+
+def gemini_projects() -> dict[str, str]:
+    """Absolute project path -> slug: projects.json, then each tmp/<slug>/.project_root
+    (which also covers a slug projects.json has lost). Unreadable parts are skipped —
+    gemini_format_note() is what says the shape moved."""
+    out: dict[str, str] = {}
+    try:
+        reg = json.loads(_gemini_dir("projects.json").read_text(encoding="utf-8"))
+        for path, slug in (reg.get("projects") or {}).items():
+            if isinstance(path, str) and isinstance(slug, str) and "/" not in slug:
+                out[path.rstrip("/") or "/"] = slug
+    except (OSError, ValueError, AttributeError):
+        pass
+    try:
+        for d in _gemini_dir("tmp").iterdir():
+            try:
+                path = (d / ".project_root").read_text(encoding="utf-8").strip().rstrip("/")
+            except OSError:
+                continue
+            if path:
+                out.setdefault(path, d.name)
+    except OSError:
+        pass
+    return out
+
+
+def gemini_chat_dirs(repo: "Path | str") -> list[tuple[Path, "str | None"]]:
+    """(chats dir, worktree name or None) for the repo itself and each Claude-layout
+    worktree under it (<repo>/.claude/worktrees/<name>, the dirs the Claude backend finds)."""
+    me = str(Path(repo).resolve())
+    wt_dir = me + "/.claude/worktrees/"
+    out = []
+    for path, slug in sorted(gemini_projects().items()):
+        if path == me:
+            wt = None
+        elif path.startswith(wt_dir) and "/" not in path[len(wt_dir):]:
+            wt = path[len(wt_dir):]
+        else:
+            continue
+        d = _gemini_dir("tmp", slug, "chats")
+        if d.is_dir():
+            out.append((d, wt))
+    return out
+
+
+def _gemini_argv(pid: int) -> "list[str] | None":
+    """The pid's argv when it is a Gemini CLI process, else None."""
+    try:
+        comm = Path(f"/proc/{pid}/comm").read_text(encoding="ascii", errors="replace").strip()
+        if comm not in GEMINI_COMMS:
+            return None
+        argv = [a for a in Path(f"/proc/{pid}/cmdline").read_bytes().decode("utf-8", "replace").split("\0") if a]
+    except OSError:
+        return None
+    if not argv:
+        return None
+    if os.path.basename(argv[0]) == "gemini":
+        return argv
+    script = next((a for a in argv[1:] if not a.startswith("-")), "")
+    return argv if script.endswith("/bin/gemini") or script == "gemini" else None
+
+
+def _ppid(pid: int) -> "int | None":
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+        return int(stat[stat.rindex(")") + 2:].split()[1])
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def gemini_live() -> list[dict]:
+    """Running Gemini CLI sessions, from /proc: one per process pair (the npm shim relaunches
+    itself as a child, so a gemini process whose parent is one is the same session and is
+    left out). The session id is not knowable from the process — no live registry, and the
+    chat file names no pid — so `id` is gemini:<pid>, which never matches a transcript."""
+    pids = set()
+    try:
+        for name in os.listdir("/proc"):
+            if name.isdigit() and _gemini_argv(int(name)) is not None:
+                pids.add(int(name))
+    except OSError:
+        return []
+    out = []
+    for pid in sorted(pids):
+        if _ppid(pid) in pids:
+            continue
+        try:
+            cwd = os.readlink(f"/proc/{pid}/cwd")
+        except OSError:
+            cwd = ""
+        started = _proc_start_epoch(pid)
+        out.append({"tool": "gemini", "id": f"gemini:{pid}", "pid": pid, "cwd": cwd,
+                    **({"startedAt": started * 1000} if started is not None else {})})
+    return out
+
+
+def _gemini_text(content) -> str:
+    """A Gemini message's text: a string, or a list of {text} parts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(p.get("text", "") for p in content if isinstance(p, dict) and p.get("text"))
+    return ""
+
+
+def gemini_scan(path: Path) -> "dict | None":
+    """One chat file: its id and start from the first record, `last` from the newest
+    lastUpdated (a $set's, else the file's mtime), the first user text past Gemini's own
+    <session_context> preamble, the last model reply and a $set summary."""
+    from datetime import datetime, timezone
+    info = {"id": None, "file": path, "start": None, "last": None, "first_user": "", "last_assistant": "", "summary": ""}
+    last = None
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for i, line in enumerate(f):
+                try:
+                    obj = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(obj, dict):
+                    continue
+                if i == 0:
+                    info["id"], info["start"] = obj.get("sessionId"), obj.get("startTime")
+                    last = obj.get("lastUpdated") or last
+                    continue
+                patch = obj.get("$set")
+                if isinstance(patch, dict):
+                    last = patch.get("lastUpdated") or last
+                    if isinstance(patch.get("summary"), str):
+                        info["summary"] = patch["summary"]
+                    continue
+                text = _gemini_text(obj.get("content"))
+                if obj.get("type") == "user" and not info["first_user"] and text.strip() \
+                        and not text.lstrip().startswith("<session_context>"):
+                    info["first_user"] = text
+                elif obj.get("type") == "gemini" and text.strip():
+                    info["last_assistant"] = text
+        mtime = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return None
+    try:
+        info["last"] = datetime.fromisoformat(str(last).replace("Z", "+00:00")) if last else mtime
+    except ValueError:
+        info["last"] = mtime
+    if info["last"].tzinfo is None:
+        info["last"] = info["last"].replace(tzinfo=timezone.utc)
+    if not info["id"] or not (info["first_user"] or info["last_assistant"] or info["summary"]):
+        return None
+    return info
+
+
+def gemini_format_note() -> "str | None":
+    """TD-050's canary for Gemini CLI (read on 0.64.0, and it updates itself): projects.json
+    must be {"projects": {path: slug}}, and the newest settled chat file's first record must
+    carry sessionId and startTime. Silent when ~/.gemini has no such file yet."""
+    bad = []
+    pj = _gemini_dir("projects.json")
+    try:
+        reg = json.loads(pj.read_text(encoding="utf-8"))
+        if not (isinstance(reg, dict) and isinstance(reg.get("projects"), dict)):
+            bad.append(f"{pj} is not {{\"projects\": {{path: slug}}}}")
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError) as e:
+        bad.append(f"{pj} does not parse ({e})")
+    now = time.time()
+    try:
+        settled = sorted(((f.stat().st_mtime, f) for f in _gemini_dir("tmp").glob("*/chats/*.jsonl")
+                          if now - f.stat().st_mtime >= REGISTRY_SETTLE_S), reverse=True)
+    except OSError:
+        settled = []
+    if settled:
+        newest = settled[0][1]
+        try:
+            with open(newest, encoding="utf-8", errors="replace") as f:
+                head = json.loads(f.readline())
+            ok = isinstance(head, dict) and "sessionId" in head and "startTime" in head
+        except (OSError, ValueError):
+            ok = False
+        if not ok:
+            bad.append(f"the newest chat file ({newest}) does not open with a session record")
+    if not bad:
+        return None
+    return ("⚠ Gemini CLI's session files have moved on (read on 0.64.0): " + "; ".join(bad)
+            + " — until the scripts are updated, the session index and the sweep row may miss Gemini sessions.")
 
 
 # ----------------------------------------------------------------------------------------

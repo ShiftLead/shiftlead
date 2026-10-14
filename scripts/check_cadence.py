@@ -271,7 +271,8 @@ def row_pr(pr, root=None):
     return row(
         "pr",
         "fail",
-        f"merge commit {sha[:7]} has {parents} parents — not a squash",
+        f"merge commit {sha[:7]} has {parents} parents — not a squash"
+        + getattr(FORGE, "not_squash_hint", ""),
     )
 
 
@@ -434,10 +435,21 @@ def row_ci(pr):
     bad = [
         r["name"]
         for r in runs
-        if r.get("conclusion") not in ("success", "skipped", "neutral")
+        if r.get("conclusion") not in ("success", "skipped", "neutral", "not_run")
     ]
     if bad:
         return row("ci", "fail", f"not green on {sha[:7]}: {', '.join(bad)}")
+    # GitLab (TD-104): a pipeline that ended failed with no jobs and no yaml_errors never
+    # ran — a runner or an account setting, not a red build (a broken .gitlab-ci.yml has
+    # yaml_errors and is red above) — so it is no evidence either way, never a pass.
+    never = [r.get("name", "?") for r in runs if r.get("conclusion") == "not_run"]
+    if never:
+        return row(
+            "ci",
+            "unknown",
+            f"{', '.join(never)} on {sha[:7]} ended failed with no jobs — it never ran "
+            "(runners, or the account's CI verification); that is no evidence, not a red build",
+        )
     # A skipped or neutral check does not FAIL the row — a job a workflow deliberately
     # gates off must never block a merge — but it did not run either, and the old message
     # said "N check run(s) green" for a commit where N-2 of them never started. That reads

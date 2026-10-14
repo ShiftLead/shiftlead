@@ -815,10 +815,29 @@ def test_an_offered_answer_word_for_word_comes_before_the_not_right_form():
     both = ["Works", "Not right: <what>", "Not right: wrong repo"]
     assert A._board_answer("decide", "Not right: wrong repo", both) == "Not right: wrong repo"
     assert A._board_answer("decide", "Not right: the ring is amber", both) == "Not right: the ring is amber"
-    for bad in ("Not right: <what>", "Not right:"):
+    # a slot of its own is the form again, not words (ledgerboard's `fill_not_right`, TD-585)
+    for bad in ("Not right: <what>", "Not right:", "Not right: <b>"):
         with pytest.raises(board.Refused, match="needs its words"):
             A._board_answer("decide", bad, both)
     assert A._board_answer("snooze", "anything", both) == ""
+
+
+@pytest.mark.unit
+def test_a_board_lines_head_is_ledgerboards_bold_head():
+    """TD-585: the work order's title and the Inbox's head read ledgerboard's `bold_head` — a blank
+    bold run is no head, and bold inside a reply's words is the person's, never the head; each
+    falls back as it did, and the work order keeps its clipping and its trailing stop."""
+    from sessionorc import workorders
+    from shiftlead.ui.inbox import board_head
+
+    plain = "[act] 2026-10-14 (session w on kmaster) — Rotate the key. Due: 2026-10-15."
+    replied = plain + " — Paul, 2026-10-14: **not yet**"
+    assert workorders.head("[act] **Rotate the key.** Due: 2026-10-15.") == "Rotate the key"
+    assert workorders.head(plain.replace("Rotate", "** ** Rotate")) == "** ** Rotate the key. Due: 2026-10-15"
+    assert workorders.head(replied).startswith("Rotate the key")
+    assert board_head("[act] **Rotate  the key** Due: 2026-10-15.") == "Rotate the key"
+    assert board_head("** ** x") == "** ** x"
+    assert "not yet" not in board_head(replied)
 
 
 def test_board_reply_hand_is_the_homes_edit():

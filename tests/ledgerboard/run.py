@@ -17,7 +17,8 @@ Fixtures, each an invented input and its expected JSON:
 - ``board/<case>.md`` → ``<case>.json``: every open item's ``item_record()`` at ``TODAY``, plus
   ``item_key()`` of every item line and ``closed_items()``.
 - ``edit/cases.json`` → ``edit/expected.json``: ``edit_line()``, ``subject()``, ``subject_kind()``,
-  ``item_line()``/``decided_line()``, the line predicates and the version reader.
+  ``item_line()``/``decided_line()``, the line predicates, the version reader (v1.0), and
+  ``bold_head()``, ``is_not_right_form()`` and ``fill_not_right()`` (v1.1).
 """
 
 from __future__ import annotations
@@ -118,6 +119,10 @@ def edit_cases(L, spec: dict) -> dict:
                                  "is_sweep_stamp": L.is_stamp(ln, ("Swept", "Swept-deep"))}
     for t in spec["versions"]:
         out["versions"].append({"major": L.format_major(t), "problem": L.version_problem(t)})
+    out["bold_heads"] = {t: L.bold_head(t) for t in spec["bold_heads"]}
+    out["not_right_forms"] = {a: L.is_not_right_form(a) for a in spec["not_right_forms"]}
+    out["not_right_fills"] = {c["name"]: _refused(lambda c=c: L.fill_not_right(c["said"], c["offered"]))
+                              for c in spec["not_right_fills"]}
     return out
 
 
