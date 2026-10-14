@@ -363,7 +363,7 @@ def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of
     seams = html[html.index('id="seams"') : html.index('class="tsum"')]
     assert re.findall(r'class="seamline">([^<]*)<', seams) == ["no gate: a person merges", "no worktree setup"]
     debt = html[html.index('id="debt"') : html.index('id="completed"')]
-    assert 'id="noledger"' in debt and "no ledger at docs/technical_debt.md — `ao repo init`" in debt
+    assert 'id="noledger"' in debt and "no ledger at docs/technical_debt.md — <code>ao repo init</code>" in debt
     assert "Technical debt" not in debt and "TD-301" not in debt
     r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "gate": {"state": "set", "value": "make gate"}, "worktree_setup": {"state": "set", "value": "x"}}  # fmt: skip
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text

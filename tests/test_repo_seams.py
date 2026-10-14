@@ -79,12 +79,13 @@ def test_the_repo_page_says_each_unset_seam_and_a_ledger_that_is_not_there():
     got = missing_seams(repo("notes", seam_reading(led, board=ABSENT, gate=ABSENT, worktree_setup=ABSENT)))
     assert got == {
         "lines": ["no gate: a person merges", "no board: the Inbox is the person's channel", "no worktree setup"],
-        "ledger": "no ledger at notes/ledger.md — `ao repo init`",
+        "ledger": {"text": "no ledger at notes/ledger.md —", "cure": "ao repo init"},
     }
     bad = {**led, "state": "unreadable", "why": "notes/ledger.md does not parse: boom"}
-    assert missing_seams(repo("n", seam_reading(bad)))["ledger"] == (
-        "the ledger at notes/ledger.md does not parse — notes/ledger.md does not parse: boom"
-    )
+    assert missing_seams(repo("n", seam_reading(bad)))["ledger"] == {
+        "text": "the ledger at notes/ledger.md does not parse — notes/ledger.md does not parse: boom",
+        "cure": None,
+    }
 
 
 def git_repo(tmp_path: Path, name: str = "bare") -> Path:

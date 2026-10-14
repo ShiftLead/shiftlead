@@ -105,15 +105,16 @@ def missing_seams(r: Mapping[str, Any]) -> dict[str, Any]:
     """**missing seams** (§4.5a *Repo page: missing seams*, TD-591): from the repo facts' `seams` and
     nothing read here — `lines`, the fixed sentence of each seam left unset with no default file (the
     words `ao doctor`'s **repos** line says), and `ledger`, the line drawn in the warning colour in place
-    of Technical debt when the ledger is absent or does not parse, with the reader's reason; None when
-    it parses or the seams are not read yet."""
+    of Technical debt when the ledger is absent or does not parse — `{text, cure}`, `cure` the command
+    drawn as code (`ao repo init` for an absent one, else None), the reader's reason in `text` — None
+    when it parses or the seams are not read yet."""
     seams = r.get("seams") if isinstance(r.get("seams"), dict) else {}
     led = seams.get("ledger") or {}
     state, path = led.get("state"), led.get("path") or "the ledger path"
     if state == "absent":
-        ledger_line = f"no ledger at {path} — `ao repo init`"
+        ledger_line = {"text": f"no ledger at {path} —", "cure": "ao repo init"}
     elif state in ("unreadable", "newer"):
-        ledger_line = f"the ledger at {path} does not parse — {led.get('why') or state}"
+        ledger_line = {"text": f"the ledger at {path} does not parse — {led.get('why') or state}", "cure": None}
     else:
         ledger_line = None
     return {"lines": doctor.missing_seams(seams), "ledger": ledger_line}

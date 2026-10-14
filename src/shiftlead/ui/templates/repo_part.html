@@ -30,7 +30,7 @@
 {# (2) Technical debt — the ledger's open entries in seven lists, one per kind; an entry is edited in its file.
    A ledger that is not there, or does not parse, is one warning line in its place (§4.5a *missing seams*) #}
 {% if seams and seams.ledger %}
-<section class="rsec" id="debt"><div class="warn" id="noledger">{{ seams.ledger }}</div></section>
+<section class="rsec" id="debt"><div class="warn" id="noledger">{{ seams.ledger.text }}{% if seams.ledger.cure %} <code>{{ seams.ledger.cure }}</code>{% endif %}</div></section>
 {% else %}
 <section class="rsec" id="debt">
   <div class="row gap rsh"><span class="h2">Technical debt</span>
