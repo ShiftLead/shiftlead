@@ -11687,3 +11687,26 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Related:** TD-619, TD-620, TD-399.
 
 **Resolved:** 2026-10-14 (grinder-ao-2, PR #1722) — both Apply titles in `group_head.html` name the profile relaunch: *definition changed* adds *a member whose profile differs is relaunched with the definition's, taken at its next restart*, *flow changed* reads *the members whose lane, reader, stage brief or profile differ are relaunched — a profile taken at the member's next restart*; `tests/test_ui_teams.py` reads both, and a headless GET on a scratch home read both titles on a fixture team.
+
+---
+
+## TD-652: The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2; the techlead's note on #1668, TD-618 slice 4)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done (grinder-ao-1) — `workorders.red_holders`, the reading's `pr_orders.held`, read by `teamrun.red_prs`. — needs #1668 merged (it adds `pr_holders`).
+**Blocked by:** TD-618
+**Location:** `src/shiftlead/teamrun.py` (`pr_holders`, added by #1668), `src/sessionorc/workorders.py` (`holds_pr`, the `pr_orders` reading), the Repo page's *held by <name>* tag (`src/shiftlead/ui/repo.py`), design §4.4 *Each reading has one owner* (TD-614), *A red PR nobody holds is a work order*
+
+**Why:** the home's `pr_orders` reading lists only the red PRs nobody holds, so the Repo page, to tag one *held by <name>*, runs `teamrun.pr_holders` — the same test as `workorders.holds_pr`, written again over the records the page holds. Two copies of one rule drift; §4.4 *Each reading has one owner* puts a derivation on the reading, once.
+
+**Fix:** the home's reading carries, per red PR past `ORPHAN_AFTER`, its holders (`holds_pr` over the records, as the orders are derived); the page reads them and `pr_holders` goes; a test that the page and the reading name the same holder.
+
+**Done when** `git grep pr_holders src/` is empty, the Repo page's *held by* tag reads the reading, and the suite passes.
+
+**Related:** TD-613, TD-614, TD-618.
+
+**Resolved:** 2026-10-14 (grinder-ao-1, PR #PRNUM) — at the home, the tick's `_red_prs` now also saves `workorders.red_holders`. It goes under the reading's `pr_orders.held` as `{n: [names]}`: each PR red for `ORPHAN_AFTER` that a live record holds, found by `holds_pr` in the same pass as the orders. `teamrun.red_prs` (the facet and the Repo page's *held by <name>*) reads it, and `teamrun.pr_holders` is gone (`git grep pr_holders src/` is empty). One test checks that the page names the holder the home found; design §4.4 says the reading names the holders.
