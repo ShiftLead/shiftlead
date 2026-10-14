@@ -4353,7 +4353,8 @@
       if (tr) tr.classList.toggle("hidden", !v.adapter_id);
       // §4.5a Focus header **‹› VS Code** (TD-578): the transcript's link lands with the hook's file
       const te = $("#ftranscript_editor");
-      if (te) { te.classList.toggle("hidden", !v.transcript_editor); if (v.transcript_editor) te.href = v.transcript_editor.url; }
+      // a file link (§4.6, TD-689): `href` and `data-label` alone — the transcript is one launch, so never `data-folder`
+      if (te) { te.classList.toggle("hidden", !v.transcript_editor); if (v.transcript_editor) { te.href = v.transcript_editor.url; te.dataset.label = v.transcript_editor.label; } }
       $("#last_output").textContent = v.last_output ? fmtAge(v.last_output) + " ago" : "—";
       if (v.git) {
         // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which

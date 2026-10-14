@@ -123,18 +123,20 @@ def test_earlier_turns_asks_with_the_offset_and_returns_the_fragment(page):
 def test_the_editor_button_opens_the_file_and_none_draws_none(page, monkeypatch):
     c, _, _, t = page
     html = c.get("/transcript/ao-x-designer").text
-    assert re.search(r'<a class="btn sm link editor" href="vscode://[^"]*' + re.escape(t["path"]), html)
+    # a file link (§4.6, TD-689): the file form with `:1`, one launch
+    m = re.search(r'<a class="editor btn sm link" data-file-link href="(vscode://[^"]*)"[^>]*>', html)
+    assert m and m.group(1).endswith(t["path"] + ":1") and "data-folder" not in m.group(0)
     from shiftlead.ui import uiconf
 
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
-    assert 'class="btn sm link editor"' not in c.get("/transcript/ao-x-designer").text
+    assert 'class="editor btn sm link"' not in c.get("/transcript/ao-x-designer").text
 
 
 @pytest.mark.unit
 def test_another_host_s_record_draws_no_editor_button(page):
     c, _, replies, _ = page
     replies["get"] = {**REC, "host": "laptop"}
-    assert 'class="btn sm link editor"' not in c.get("/transcript/ao-x-designer").text
+    assert 'class="editor btn sm link"' not in c.get("/transcript/ao-x-designer").text
 
 
 @pytest.mark.unit
@@ -177,7 +179,7 @@ def test_the_page_script_keeps_the_button_and_the_banner_s_words_in_step():
 @pytest.mark.unit
 def test_the_focus_header_offers_the_transcript_file_in_the_editor(tmp_path, monkeypatch):
     """§4.5a Focus header **‹› VS Code** (TD-578, built by TD-597): right after **Transcript**, the
-    Transcript page's own link on the record's `transcript` — the file's path, one launch, no `:line`.
+    Transcript page's own link on the record's `transcript` — the file's path with `:1`, one launch (TD-689).
     Hidden until the hook reports the file; not drawn under `open_in: none` or for another host's record."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     monkeypatch.setattr("shiftlead.ui.cards.host_name", lambda: "kmaster")
@@ -191,19 +193,21 @@ def test_the_focus_header_offers_the_transcript_file_in_the_editor(tmp_path, mon
         return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
 
     def link(html):
-        m = re.search(r'<a class="btn sm link editor[^"]*" id="ftranscript_editor"[^>]*>', html)
+        m = re.search(r'<a class="editor btn sm link[^"]*" id="ftranscript_editor"[^>]*>', html)
         return m.group(0) if m else None
 
     html = focus(transcript=path)
     a = link(html)
-    assert a and 'class="btn sm link editor"' in a, "a record with a transcript draws the link, shown"
+    assert a and 'class="editor btn sm link"' in a and "data-file-link" in a, (
+        "a record with a transcript draws the link, shown"
+    )
     href = re.search(r'href="([^"]*)"', a).group(1)
-    assert href.startswith("vscode://") and re.search(re.escape(path) + r"(?![:\d])", href), href  # no :line
+    assert href.startswith("vscode://") and href.endswith(path + ":1"), href  # the file form, never the folder's
     assert html.index('id="ftranscript"') < html.index('id="ftranscript_editor"')  # right after Transcript
     assert "data-folder" not in a and 'title="the transcript file in ' in a  # one launch
     # no file reported yet (a shell, or before the first hook): drawn, hidden
-    assert 'class="btn sm link editor hidden"' in link(focus(transcript=None))
-    assert 'class="btn sm link editor hidden"' in link(focus(adapter="shell", adapter_id=None))
+    assert 'class="editor btn sm link hidden"' in link(focus(transcript=None))
+    assert 'class="editor btn sm link hidden"' in link(focus(adapter="shell", adapter_id=None))
     # another host's record: the file is not at that path here
     assert link(focus(transcript=path, host="laptop")) is None
     monkeypatch.setattr(uiconf, "open_in", lambda: uiconf.OpenIn(kind="none"))
@@ -215,4 +219,5 @@ def test_the_page_script_lands_the_transcript_link_with_the_delta():
     """The link is unhidden and its href set when a delta brings the view's `transcript_editor`."""
     js = (pathlib.Path(__file__).resolve().parent.parent / "src/shiftlead/ui/static/app.js").read_text()
     assert 'te.classList.toggle("hidden", !v.transcript_editor);' in js
-    assert "if (v.transcript_editor) te.href = v.transcript_editor.url;" in js
+    assert "te.href = v.transcript_editor.url; te.dataset.label = v.transcript_editor.label;" in js
+    assert "te.dataset.folder" not in js  # the transcript is one launch (TD-689)

@@ -14,7 +14,7 @@
     {% if s.role %}<span class="badge">{{ s.role }}</span>{% endif %}
     <span class="meta">{{ s.profile_line }}</span>
     <span class="grow"></span>
-    {% if editor %}<a class="btn sm link editor" href="{{ editor.url }}" data-label="{{ editor.label }}" title="the raw file: one JSON object per line">‹› {{ editor.label }}</a>{% endif %}
+    {% if editor %}{% from "file_link.html" import file_link %}{{ file_link(editor, "‹› " ~ editor.label, "the raw file: one JSON object per line", "btn sm link") }}{% endif %}
   </div>
   {% if error %}
   <div class="card tcard"><p class="note" id="terror">{{ error }}</p></div>
