@@ -16,6 +16,8 @@ from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
+    link,
     mail,
     permits,
 )
@@ -49,7 +51,7 @@ class HookMixin:
             return None
         self._last_hook[session] = datetime.now(UTC)
         self._live_hook_at[session] = time.time()
-        if (ruled := self._by_rule(s, event)) is not None:
+        if (ruled := await self._by_rule(s, event)) is not None:
             await self._push_changes()
             return ruled
         wait = float(event.get("wait_seconds") or 600)
@@ -86,7 +88,7 @@ class HookMixin:
         finally:
             self._waiters.pop(key, None)
 
-    def _by_rule(self, s: Any, event: dict[str, Any]) -> dict[str, Any] | None:
+    async def _by_rule(self, s: Any, event: dict[str, Any]) -> dict[str, Any] | None:
         """The person's written rules, the first line in front of them (design §4.9b *The director seat
         answers permission prompts for the person*, TD-641): for an **unattended** record only, its
         role's `deny` and then its `allow` in `settings.yml`'s `permissions:`, matched by the record's
@@ -94,11 +96,15 @@ class HookMixin:
         prompt is one that always reaches the person (`permits.always_the_person`), which goes on to
         the person as today. Every answer is filed to the person as *Answered for you*. None: no rule
         answered, and the prompt waits as before. An interactive record's prompt, and a question
-        (which carries no tool), are never matched. **Nor is any prompt on a node** (TD-641's review):
-        the hook is the node's, but the FYI is mail and mail has one writer, the home (§9 invariant
-        15) — an answer filed to a node's own person inbox would go untold, so the prompt waits."""
+        (which carries no tool), are never matched. **On a node** the hook is the node's and the rules
+        its replica of the home's `settings.yml`, but the FYI is mail, whose one writer is the home
+        (§9 invariant 15): a rule answers only while the link is up, and only once the home has filed
+        the FYI over it (`answered_by_rule`); a link that is down, or a filing that fails, leaves the
+        prompt waiting for the person, never answered untold."""
         tool, tool_input = event.get("tool"), event.get("input")
-        if self.mode != "home" or not s.unattended or not isinstance(tool, str) or not tool:
+        if self.mode not in ("home", "node") or not s.unattended or not isinstance(tool, str) or not tool:
+            return None
+        if self.mode == "node" and (self._home_mux is None or not self._snapshot_sent):
             return None
         rules = settings_mod.permissions(settings_mod.load())[0].get(s.role or "")
         if not rules:
@@ -128,10 +134,25 @@ class HookMixin:
             log.exception("%s: the permissions: rules could not be matched; the prompt waits", s.id)
             return None
         reason = f"rule: {hit}"
-        self._answered_by_rule(s, event.get("text") or tool, behavior, hit)
+        prompt = event.get("text") or tool
+        if self.mode == "node":
+            try:
+                await self._home_mux.request(
+                    "answered_by_rule",
+                    timeout=agent_common.REPORT_WRITE,
+                    id=s.id,
+                    prompt=prompt,
+                    behavior=behavior,
+                    rule=hit,
+                )
+            except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
+                log.warning("%s: rule %s matched, but the home filed no FYI (%s): the person answers", s.id, hit, e)
+                return None
+        else:
+            self._answered_by_rule(s, prompt, behavior, hit)
         return {"behavior": behavior, "reason": reason}
 
-    def _answered_by_rule(self, s: Any, prompt: str, behavior: str, rule: str) -> None:
+    def _answered_by_rule(self, s: Any, prompt: str, behavior: str, rule: str, asker: str | None = None) -> None:
         """The *Answered for you* FYI for a prompt a rule answered (§4.9b, §4.5a): the `answered` shape a
         sourced reply's FYI has — the prompt as the question, the member as the asker, *rules* as the
         answerer, the rule as the source. Written by the home, so it is no one's to reply to."""
@@ -148,7 +169,7 @@ class HookMixin:
         )
         note.team = getattr(s, "team", "") or None
         note.subject = mail.subject_of(f"{verdict}: {prompt}")
-        note.answered = {"question": prompt, "asker": s.id, "answerer": mail.RULES, "source": source}
+        note.answered = {"question": prompt, "asker": asker or s.id, "answerer": mail.RULES, "source": source}
         self.person_inbox.append(note)
         self.person_store.save(self.person_inbox)
 
