@@ -232,7 +232,17 @@ const snap = (w) => ({ name: w.name, features: w.features, href: w.location.href
   let called = false;
   AO.act = async () => { called = true; return { id: "x" }; };
   out.blocked = await AO.shellHere("a", "/repo/x", true);
+  out.blockedTab = await AO.shellHere("a", "/repo/x", false);
   out.blockedCalled = called;
+  block = false;
+  // a create that answers without an id: the placeholder is closed, not left reading "opening…"
+  AO.act = async () => ({});
+  out.noId = await AO.shellHere("a", "/repo/x", false);
+  out.noIdTab = snap(opened[3]);
+  // a card whose data-dir is empty: the placeholder names the session's directory
+  AO.act = async () => { seen = snap(opened[opened.length - 1]); return { id: "ao-sh-2" }; };
+  await AO.shellHere("a", "", false);
+  out.noDir = seen;
   out.toasts = toasts;
   out.pageHref = location.href;
   console.log(JSON.stringify(out));
@@ -266,8 +276,15 @@ def test_open_shell_here_opens_beside_the_page_it_was_pressed_on():
     assert got["win"]["features"] == "popup,width=1184,height=860"
     assert got["win"]["name"] == "ao-focus-ao-sh-1" and got["win"]["href"] == "/focus/ao-sh-1?window=1"
     assert got["refused"] == "refused: no such dir" and got["refusedWin"]["closed"] is True
-    assert got["blocked"] is None and got["blockedCalled"] is False
-    assert got["toasts"] == ["the browser blocked the window — allow pop-ups for this page"]
+    assert got["blocked"] is None and got["blockedTab"] is None and got["blockedCalled"] is False
+    # the plain press opens a tab, and its blocked toast says so (TD-622)
+    assert got["toasts"] == [
+        "the browser blocked the window — allow pop-ups for this page",
+        "the browser blocked the tab — allow pop-ups for this page",
+    ]
+    assert got["noId"] == {} and got["noIdTab"]["closed"] is True and got["noIdTab"]["href"] == "about:blank"
+    fallback = "opening a shell in this session's directory…"
+    assert got["noDir"]["title"] == fallback and got["noDir"]["text"] == fallback
     assert got["pageHref"] == "/focus/a"
 
 
