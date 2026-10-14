@@ -167,7 +167,7 @@ def first_question(ti: dict[str, Any]) -> str:
 
 def describe_tool_input(tool: str, ti: dict[str, Any]) -> str:
     if tool == "AskUserQuestion":
-        return first_question(ti)[:200]
+        return first_question(ti)  # whole, as the PreToolUse road draws it
     for key in ("command", "file_path", "path", "url", "pattern", "description", "prompt"):
         if v := ti.get(key):
             return str(v)[:200]
