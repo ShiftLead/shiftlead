@@ -30,7 +30,7 @@ grep the directory, read a section by its file.
 - **§4.4a** [Home and nodes: one session graph across hosts](design/4.4a-home-and-nodes.md) — one session graph across hosts: the home, its nodes, and how a container node is made.
 - **§4.5** [UI](design/4.5-ui.md) — the pages — Org, Focus, Inbox, New session, Repo, Settings, Help — and what each shows.
 - **§4.5a** [Controls](design/4.5a-controls.md) — every control, what it does and who executes it; a control not in this table does not exist.
-- **§4.5b** [Reachability, and the shape of a hosted service](design/4.5b-reachability.md) — how someone who never opened a port reaches the page, and a hosted service's shape.
+- **§4.5b** [Reachability: the person's own route, and the shape of a hosted service](design/4.5b-reachability.md) — how the person reaches the page from anywhere over a route of their own (Tailscale first), the route port that checks who they are, and a hosted relay's shape.
 - **§4.5c** [Product direction](design/4.5c-product-direction.md) — the two products this architecture serves, and who owns the host in each.
 - **§4.6** [Transport and terminal mechanics](design/4.6-transport.md) — the links between UI, host agents and panes; reconnects, backoff, `unreachable`.
 - **§4.7** [CLI](design/4.7-cli.md) — the `ao` command: its verbs, its JSON, what each one mutates.

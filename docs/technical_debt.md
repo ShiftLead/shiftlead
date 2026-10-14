@@ -70,6 +70,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Open |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
 | TD-643 | Two writers of `spend.json.tmp` at once: the home's spend save fails with ENOENT, and a link test flakes | Medium | Open |
+| TD-646 | Reachability: the person's own route to the UI — Tailscale first, Cloudflare second, `ssh -L` always; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
+| TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
+| TD-648 | Build TD-646 (2): `ao connect` (tailscale, cloudflare, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
 
 ---
 
@@ -102,7 +105,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 
 **Why:** Design §4.5 (phone, phase 2): Team collapses to cards with Allow / Deny, Focus gets a narrow mode with the terminal full-width and a soft-key row (↑ ↓ ← → Enter Esc Tab 1–9) so questions are still answered through the terminal. The CSS has a bare media query; there is no soft-key row and nothing has been tried on a phone.
 
-**Fix:** soft-key row that sends keys through the terminal websocket (not `send-keys`, invariant 6), collapsed side panel, 44 px tap targets on Allow / Deny; test on a phone over WireGuard or the Cloudflare tunnel (design §4.5) once phase 2 lands it.
+**Fix:** soft-key row that sends keys through the terminal websocket (not `send-keys`, invariant 6), collapsed side panel, 44 px tap targets on Allow / Deny; test on a phone over the route `ao connect` sets up (design §4.5b; TD-647, TD-648).
 
 **Related:** design §10 "Phone answers for questions" (open).
 
@@ -1334,5 +1337,78 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** concurrent spend saves never raise, and the link test passes in repeated full runs.
 
 **Related:** TD-151 (the spend ledger), TD-463 (the CI flakes).
+
+---
+
+## TD-646: Reachability: the person's own route to the UI — Tailscale first, Cloudflare second, `ssh -L` always; a relay forwards ciphertext only
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-connect, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-13 (ao-connect) — §4.5b rewritten: the person brings the route and shiftlead runs nothing in its path; Tailscale offered first (`tailscale serve`, a `*.ts.net` certificate, no domain, nobody in the middle who can read it), Cloudflare Tunnel + Access second, `ssh -L` always; every route dials out, so each works behind CGNAT. The UI gains a **route port** (8766, loopback) on which the route's identity is required — `Tailscale-User-Login`, or a verified Access token — and the plain port 8765 is unchanged. `ao connect` sets a route up and checks it, writing `reach:` (§5). A relay, if one is built, forwards ciphertext only: TLS ends on the home, the home serves the UI and holds the login (a passkey). §4.5, §4.5c, §4.4a, §4.7, §4.8a, §5, §7 and §10 amended.
+**Blocked by:** TD-647, TD-648
+**Location:** design §4.5b (rewritten), §4.5 *Security* and screen 8 *Not on the page*, §4.7 `ao connect` and `ao doctor`'s **route** check, §5 `reach:`, §4.8a *The threat model*, §4.5c, §4.4a *The link*, §7 phase 2, §10
+
+**Why:** Paul, 2026-10-13: the UI is reached today by keeping an `ssh -L` running, and Paul is moving to an ISP behind CGNAT, which breaks a WireGuard endpoint at home and an `ssh -L` from outside it. Paul also judged that a technical user would not give root-equivalent access to their machine through shiftlead's own infrastructure unless Cloudflare or another well-known provider were in the path, and asked how this scales. Paul's decisions: bring your own route, with one route primary (Tailscale, since it is the easier setup) and Cloudflare for those who want it; guide the person through a free account.
+
+**Fix:** design first (this entry); built by TD-647 (the route port) and TD-648 (`ao connect`, the setting, the doctor line, the guide).
+
+**Done when** the design says how the person reaches the UI from anywhere, behind CGNAT included, and the build entries are filed with `Blocked by` lines.
+
+**Related:** TD-003 (the phone layout, reserved until a route exists), TD-057 (the link), the monetisation discussion of 2026-10-13 (not yet written down; an ADR is offered).
+
+---
+
+## TD-647: Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-connect, TD-646's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5b *The route port*; `src/shiftlead/ui/app.py` (`main`, the middleware), `src/shiftlead/ui/pty_bridge.py` (the websocket upgrade), `src/shiftlead/service.py` (`DEFAULT_BIND`, `unit_text`), `src/shiftlead/cli.py` (`ao ui`, `ao service install`)
+
+**Why:** TD-646: `tailscale serve` and `cloudflared` reach the UI from loopback, as a local browser does, so the identity check needs a port of its own on which an absent identity is a refusal.
+
+**Fix:**
+1. The UI listens on the route port (8766, `--route-port`, always `127.0.0.1`; `0` runs no route listener) beside the plain port, in one process: `main()`'s one `uvicorn.run` becomes two `uvicorn.Server`s on one loop (`ws_ping_interval=20`, `lifespan="off"`, `log_level="info"` kept; `proxy_headers=False` on both), each serving the app wrapped by an ASGI layer of its own that knows its listener (never inferred from `Host`). Every check below lives in that layer, outside `create_app()`, and runs before the app's websocket-attempt logger, so the app's existing `TestClient` tests are untouched and the new ones drive the layer; every answer carries `X-Shiftlead-Listener: plain|route`, and the layer puts `scope["shiftlead"] = {listener, origin}` for the absolute links the server renders (`page_origin`; the websocket URLs are built in the browser from `location`). The route listener binds its own socket and hands it to `serve(sockets=[…])`, so a failed bind is caught and retried rather than `Server.startup`'s exit; signal handlers are installed once by the process and set `should_exit` on both servers. `~/.shiftlead/ui/listeners.json` (pid, ports, bound) written at start and at each bind attempt. `--host <name>` (repeatable) on `ao ui`, `shiftlead-ui` and `ao service install`. `ao ui`, `shiftlead-ui` and the unit share the default; the unit carries `--route-port` only when its install was given one, so the promote's `ao service install` picks up the default. A route port that cannot bind leaves the plain port serving, is logged, and is retried each minute.
+2. On the route port, a check before every request and websocket upgrade, reading `reach:` through the `settings` read (the UI's five-second idiom): no `reach:` → `403` naming `ao connect`; `tailscale` → `Tailscale-User-Login` in `reach.allow`; `cloudflare` → `Cf-Access-Jwt-Assertion` verified with PyJWT (`pyjwt[crypto]`, a new dependency): algorithm pinned to RS256, the key its `kid` names from `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` (cached; fetched again on an unknown `kid`, at most once a minute), `iss` that URL's origin, `aud` holding `reach.aud`, `nbf`/`exp` with 60 s leeway, `email` present and in `reach.allow`. `reach.allow` compared without case. The refusal is a small template (`templates/refused.html`) saying which check failed and the command that cures it.
+3. On both ports, §4.5b *Origin and Host*: `Host` (case-folded, port split off, `[::1]` understood) one the port serves, else `421` naming `--host`; a websocket upgrade must carry an `Origin`, and a request other than `GET`/`HEAD` an `Origin` or `Sec-Fetch-Site: same-origin`; a present `Origin` must match whatever else the request carries (scheme, host and port, a default port elided) — `reach.url`'s on the route port, `http://<Host>` on the plain port — else `403`. The plain port refuses `403` a request carrying `Tailscale-User-Login`, `Tailscale-User-Name`, `Cf-Access-Jwt-Assertion`, `Cf-Connecting-Ip` or `X-Forwarded-For`. `page_origin` from `reach.url` on the route port, from the checked `Host` on the plain one.
+4. The route listener's own task reads `reach:` every five seconds; each open websocket keeps the identity it was let in with and is closed when the new `reach:` no longer lets it in. Cloudflare's certs cached an hour, refetched on an unknown `kid` at most once a minute. Fail closed: refuse until a first read answers; on failing reads keep the last for a minute, then close the route port's sockets and refuse until a read answers. An empty `allow` lets nobody in.
+5. Tests: each refusal and each pass, for HTTP and for a websocket upgrade, with a test key pair standing in for Cloudflare's certs (wrong `alg`, `iss`, `aud`, expired, no `email`); a foreign-`Origin` POST and websocket refused on both ports; an `http` `Origin` refused on the route port of an `https` `reach.url`; a rebound `Host` refused on the plain port, `localhost` at another port served, a `--host` name served when bound to a private address; each proxy header refused on the plain port; a websocket closed after a minute of failed reads; a present but foreign `Origin` refused beside `Sec-Fetch-Site: same-origin`; `scope["shiftlead"]` reaching the app on each listener; one SIGTERM stopping both servers; a websocket closed by `ao connect off`; the route port's bind failure leaving the plain port up; `--route-port 0`.
+
+**Done when** a request on the route port without the person's identity is refused and one with it is served, on both routes, and the plain port behaves as before.
+
+**Related:** TD-646 (the design), TD-648 (`ao connect`, which writes `reach:`).
+
+---
+
+## TD-648: Build TD-646 (2): `ao connect` (tailscale, cloudflare, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-connect, TD-646's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-647
+**Location:** design §4.7 `ao connect` and `ao doctor` **route**, §5 `reach:`, §4.5b *The setting*; `src/shiftlead/cli.py`, the settings schema, the `doctor` checks, `README.md` (*Reach it from your phone*), `notify.telegram.link`'s reader
+
+**Why:** TD-646: the route is the person's to set up; shiftlead checks each step, names the one it cannot take, and writes the setting only when the route works.
+
+**Fix:**
+1. `reach:` in the settings schema and its validator (`route`, `url`, `allow`, `team`, `aud`); `notify.telegram.link` defaults to `reach.url`.
+2. The `set_reach` RPC, the key's one writer: checks the shape (a known route, an `https` URL, a non-empty `allow`, `team` and `aud` for `cloudflare`) and is refused to a session as `set_settings` is; `set_settings` refuses the `reach` key, naming `ao connect`.
+3. `ao connect` with no argument, `tailscale`, `cloudflare --hostname --team --aud`, `off`, `--allow`, as §4.7 orders the checks: never `sudo`, a *lacking:* line and a stop at the first step it cannot take; a tagged home without `--allow`, a 443 already served by something else, and Funnel on each refused; the ports read from `listeners.json`, `--route-port` overriding, and a stop when the UI is not running; refused on a node; the tailscale order of §4.7 (write, serve, probe on `X-Shiftlead-Listener: route`, restore on failure, turning off only a handler this run added, by its target `127.0.0.1:<route port>`); `cloudflare` refused on any answer marked by a listener, and with no terminal and no `--allow`; `off` removing only its own handler, or for `cloudflare` only `reach:`.
+4. `ao doctor`'s **route** line, the same reading — for `cloudflare` the cookieless fetch and the certs fetch again — plus *lacking* when the route port did not bind, naming the holder, and when the UI is not running.
+5. README *Reach it from your phone* (and a line that a script calling the UI over HTTP sends an `Origin`): the Tailscale account and client, `tailscale up`, the operator line, `ao connect tailscale`, the phone's app; then Cloudflare's domain, named tunnel pointed at `127.0.0.1:8766`, and Access application; `ssh -L` kept as the fallback. It replaces the README's *Reaching the UI from elsewhere* paragraph and the *Use it* step's route line (which names WireGuard and a Cloudflare tunnel).
+6. Tests: each check's lacking line with the provider commands faked (tagged home, 443 taken, Funnel on); `cloudflare` refused when the probe gets the UI's own page; `set_settings` refusing `reach`; `off` removing the setting and only its own serve.
+
+**Done when** `ao connect tailscale` on a home logged in to Tailscale leaves a phone on the same tailnet opening the UI at the printed URL, and `ao connect cloudflare` refuses a tunnel with no Access in front.
+
+**Related:** TD-646 (the design), TD-647 (the route port), TD-003 (the phone layout).
 
 ---

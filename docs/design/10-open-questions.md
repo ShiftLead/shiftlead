@@ -5,7 +5,22 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
 - [x] Reachability (2026-09-06): **never a bare public port** — a private network (WireGuard,
       Tailscale) or an authenticated tunnel (Cloudflare Tunnel + Access); no VPS needed. For
       non-technical users and a hosted service, the agent-initiated **relay** transport (§4.5b),
-      kept compatible now and scheduled later.
+      kept compatible now and scheduled later. (Refined 2026-10-13, below: the person's own
+      route, Tailscale first; a relay forwards ciphertext only.)
+- [x] The person's route to the UI (2026-10-13, TD-646; Paul): **bring your own route, one
+      primary** — Tailscale first (`tailscale serve`, no domain, no server, nobody in the middle
+      who can read it), Cloudflare Tunnel + Access for a person who runs Cloudflare, `ssh -L`
+      always; each dials out, so a home behind CGNAT is reached. The route's identity is checked
+      on a **route port** of its own (§4.5b). A relay, if built, forwards ciphertext only.
+      Rejected: a relay that ends TLS or serves the UI (root-equivalent access through
+      shiftlead's servers, which a technical user would refuse); ZeroTier as the first route (no
+      HTTPS name of its own, less identity built in; still usable as a private network);
+      checking the identity on the one port (a proxy's request and a local browser's both arrive
+      from loopback, so a tunnel without Access would be open). Reviewed in Sonnet rounds: the
+      first added `Host` and `Origin` checks on both ports (a hostile page riding the proxy's
+      identity, DNS rebinding); the second the plain port's refusal of proxy headers (a tunnel
+      aimed at it) and `ao connect`'s write–serve–probe order; the third, READY, where the
+      ports are read from and how two listeners share a process.
 - [x] Where the UI process runs (2026-09-05): **wherever `shiftlead[ui]` is installed**; nothing
       in the design assumes a particular host. `hosts.yml` lives on the UI host, which may or
       may not also be a session host; for Paul it is kmaster. A hosted service is the `relay`

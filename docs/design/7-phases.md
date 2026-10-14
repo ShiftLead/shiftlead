@@ -20,8 +20,8 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    (§4.4a *A container node*). **Not built:** a machine node in use — the VPS or laptop added
    as a node and a session started there from the UI, mail from a laptop worker to its kmaster
    manager through a laptop sleep, the laptop closed for an hour with the session still there
-   (TD-057); the phone's route in (WireGuard client, or the Cloudflare tunnel) and the phone
-   layout (Org + narrow Focus); the terminal over the link; attachment upload over ssh (drag
+   (TD-057); the phone's route in (§4.5b: the route port and `ao connect`, Tailscale first,
+   TD-647 and TD-648) and the phone layout (Org + narrow Focus); the terminal over the link; attachment upload over ssh (drag
    and drop, picker, paste — the copy path is the same plumbing).
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by samscrape's
    `.shiftlead.yml`; run both side by side for one window with tdgrind's cron disabled and the
