@@ -784,7 +784,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      finished team live by not saying so.
 
   10. **The cadence check** (`sessionorc.cadence`; the Inbox row from `ui/inbox.py`
-     `cadence_marks`). The script's verdict needs no reader, so the home runs it, not the
+     `cadence_marks`). A `done` whose PR's required checks had failed was refused at the declaration
+     (§4.8 *A `done` with a PR is told what its checks read*, TD-637), so what reaches this rule is a
+     PR green, pending or merged when declared; a pending one that fails later is this rule's *fail*. The script's verdict needs no reader, so the home runs it, not the
      manager. For a supervised member, not a seat, each `progress` entry `done` carrying `pr` —
      declared or derived, so a PR merged from the member's branch is one too (§4.4 *Repo facts*,
      `reports.derive`) — that the record's **`checks: [{pr, at, sha, verdict, failed, told, row,
