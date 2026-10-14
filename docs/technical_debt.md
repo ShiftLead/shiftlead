@@ -61,7 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
-| TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (58 s live) | High | Open |
+| TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 
 ---
 
@@ -1102,9 +1102,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 
 ---
 
----
-
-## TD-672: `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (58 s live)
+## TD-672: `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live)
 
 **Priority:** High
 **Type:** debt
@@ -1114,10 +1112,13 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Status:** Open
 **Location:** design §4.7 `ao connect` (*The probe*); `src/shiftlead/connect.py` (`PROBE_AFTER`, `PROBE_WAIT`, `probe`, `connect_tailscale`)
 
-**Why:** the first `tailscale serve --https=443` on a tailnet name has no certificate yet; tailscaled fetches one from Let's Encrypt (dns-01 through Tailscale's control plane) when the first TLS handshake asks for it. On kmaster, 2026-10-14, Paul ran `ao connect tailscale --allow eyecantell@github`: the handler was added at 09:14:41, the probe went out 10 s later with a 15 s budget, and failed with *lacking: route — the probe failed: https://kmaster.tailc00dac.ts.net did not answer (_ssl.c:1012: The handshake operation timed out)*. The rollback ran correctly (no `reach:`, *No serve config*). tailscaled's log shows the certificate arrived at 09:15:39, 58 s after the handler, 33 s after the rollback. Every new home meets this on its first run, and a person is told the route failed when it only needed to wait. A second run works, since the certificate is then cached.
+**Why:** the first `tailscale serve --https=443` on a tailnet name has no certificate yet; tailscaled starts fetching one from Let's Encrypt (dns-01 through Tailscale's control plane, its `tls-cert-pending` health warning standing meanwhile) the moment the handler is added, and a rollback cancels that fetch. On kmaster, 2026-10-14, Paul ran `ao connect tailscale --allow eyecantell@github`: the handler was added at 09:14:41, the probe went out 10 s later with a 15 s budget, and failed with *lacking: route — the probe failed: https://kmaster.tailc00dac.ts.net did not answer (_ssl.c:1012: The handshake operation timed out)*. The rollback ran correctly (no `reach:`, *No serve config*). tailscaled's log shows the fetch started with the handler, was cancelled by the rollback (*context canceled*), started again at once and finished at 09:15:39; each attempt's DNS step took about 30 s, so an uninterrupted fetch would have needed 30–40 s, more than the probe's 25. Every new home meets this on its first run, and a person is told the route failed when it only needed to wait. A second run works, since the certificate is then cached.
 
-**Fix:** the probe waits for a first certificate before it judges the route. Either `ao connect` asks tailscaled before probing (the `tls-cert-pending` health warning in `tailscale status --json`, or a `tailscale cert` of the name, which blocks until it has one) and says *fetching the HTTPS certificate — the first can take a minute or two*; or the probe retries an answer that did not come, up to a bound of about three minutes, saying so. The design's §4.7 *The probe* names which, and the bound. A probe that answers with the wrong listener, or `421`, still fails at once. Test: a fake fetch that times out for the first few tries and then answers `route` passes inside the bound, and one that never answers fails at it, with the rollback.
+**Fix:** the probe waits for a first certificate before it judges the route. Either `ao connect` asks tailscaled before probing (the `tls-cert-pending` health warning in `tailscale status --json`, or a `tailscale cert` of the name, which blocks until it has one, given `--cert-file`/`--key-file` in a scratch directory so it leaves no files behind; the design step checks that the warning shows in `status --json` during a fetch) and says *fetching the HTTPS certificate — the first can take a minute or two*; or the probe retries an answer that did not come, up to a bound of about three minutes, saying so. The design's §4.7 *The probe* names which, and the bound. A probe that answers with the wrong listener, or `421`, still fails at once. Test: a fake fetch that times out for the first few tries and then answers `route` passes inside the bound, and one that never answers fails at it, with the rollback.
 
 **Done when** `ao connect tailscale` on a home whose tailnet name has never had a certificate succeeds on its first run.
 
 **Related:** TD-648 (`ao connect`; its live check waits on this run), TD-646 (the design).
+
+---
+
