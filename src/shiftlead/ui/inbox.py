@@ -2088,7 +2088,9 @@ def ledger_for_you(
     a mail row's shape — `row: "ledger"`, its `kind` (*ledger · yours* for `Owner: paul`, *ledger ·
     your decision* for a `decision (paul)` item), `name` the repo, `team`, `at` its `Added:` date and
     `added` its words, `pri`, `held`, `title`, `detail`, `answers`, `default` (the default's text),
-    `root` and `url` — with `held` the names of the live records of that repo claiming it; an entry an
+    `root` and `url`, and for **Start session** (TD-678) the entry's `type`, `why` (`yours` or
+    `decision`) and `holder`, the id of the first live record claiming it — with `held` the names of
+    the live records of that repo claiming it; an entry an
     open decided line's `Context:` names (the repo's work orders' `refs`) is left out; the team the
     rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
     checkout), else the team most of its live records carry, else none; the link the Repo page
@@ -2126,14 +2128,15 @@ def ledger_for_you(
         team = (named or {}).get(str(here)) or (max(sorted(tally), key=lambda t: tally[t]) if tally else "")
         rows = []
         for e in sorted(entries, key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"])):
-            held = [
-                str(s.get("name") or s.get("id"))
+            holders = [
+                s
                 for s in mine
                 if any(
                     isinstance(p, dict) and p.get("ref") == e["id"] and p.get("status") == "claimed"
                     for p in s.get("progress") or []
                 )
             ]
+            held = [str(s.get("name") or s.get("id")) for s in holders]
             owner = str(e.get("owner") or "").lower() == "paul"
             answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
             d = e.get("default")
@@ -2150,6 +2153,9 @@ def ledger_for_you(
                     "subject": mail_mod.clip_subject(str(e.get("title") or "")),  # §4.10 *A subject on every entry*
                     "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
                     "held": ", ".join(held),
+                    "holder": str(holders[0].get("id") or "") if holders else "",  # **Open session** (TD-678)
+                    "type": str(e.get("type") or ""),  # the role **Start session** takes, by `entries:`
+                    "why": "yours" if owner else "decision",  # `repoconfig.WORK_WHY`'s key
                     "team": team,
                     "at": added,
                     "added": _added_words(added),

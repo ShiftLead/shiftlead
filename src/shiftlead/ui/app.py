@@ -563,6 +563,29 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     return "/new?" + urlencode({k: v for k, v in q.items() if v})
 
 
+def ledger_start_form(root: str, name: str, ref: str, team: str, role: str, manager: str, prompt: str, why: str) -> str:
+    """Where **Start session** lands when it cannot be silent (§4.5a *Inbox row: ledger entry*, TD-678):
+    New session filled in as the press would have started it — the repo, a new worktree `td-<n>` under
+    that name, the team, the role, the entry as its lane, the team's manager, the opening prompt — with
+    the reason on it, as **Resume**'s press lands (`resume_form_url`). Never *Unattended*: the session
+    is the person's."""
+    q = {
+        "dir": root,
+        "where": "worktree",
+        "worktree": name,
+        "name": name,
+        "team": team,
+        "role": role,
+        "lane": ref,
+        "controllers": manager,
+        "prompt": prompt,
+        "prefilled": "1",
+        "why": why,
+        "press": "start",
+    }
+    return "/new?" + urlencode({k: v for k, v in q.items() if v})
+
+
 def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
     try:
         v = int(float(raw)) if raw not in (None, "") else default
@@ -1710,6 +1733,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         prefilled: str = "",
         why: str = "",
         host: str = "",
+        # the opening prompt **Start session** would have sent (§4.5a *Inbox row: ledger entry*, TD-678)
+        prompt: str = "",
+        press: str = "",  # `start`: the landing is **Start session**'s, and the warning says so
     ):
         profs, default = profiles_mod.load()
         # registered repos (design §5 *Repos*: the home's roster and dev-cadence's, or `repos_registry`) first,
@@ -1792,6 +1818,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "host": host,
                     "prefilled": prefilled == "1",
                     "why": why,
+                    "prompt": prompt,
+                    "press": press,
                 },
             },
         )
@@ -2261,6 +2289,130 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
         text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
         return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
+
+    @app.post("/api/ledger/start")
+    async def api_ledger_start(request: Request):
+        """§4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-676, built by
+        TD-678): `{repo, id}` — the repo by its name, as the Add entry form names it — on an entry the
+        home's repo facts sort *for you* (refused 409 in words once it is not). A live record of the
+        repo claiming the entry, or a live one named `td-<n>` there (a start the tick has not yet
+        derived a claim for), answers `{focus: <its id>}` and starts nothing. Else one press, no form,
+        as **Resume** is: the person's own **interactive** session on the repo's team, the role its
+        `entries:` names for the entry's Type, its profile, grants and `review` as **Open a session**
+        takes them, the team's live manager its controller, `lane` the id, in a new worktree and branch
+        `td-<n>` under that name, its first prompt `work.md` filled (no `start_context`, no brief) —
+        answering `{id}`. **When it cannot be silent it is not a guess**: no team, a team on another
+        host, a name not free by Add entry's test (`entry_name_why`), a role or profile that does not
+        resolve, or the create refused answers `{form, why}` — New session filled in
+        (`ledger_start_form`) with the reason on it."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if not isinstance(body, dict):
+            raise HTTPException(400, "send {repo, id}")
+        repo, ref = str(body.get("repo") or ""), str(body.get("id") or "")
+        root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
+        if root is None:
+            raise HTTPException(404, f"no registered repo is named {repo!r} — ao repo --all lists them")
+        here = Path(root).expanduser().resolve()
+        root = str(here)
+        facts = next(
+            (
+                r
+                for k, r in ((await call("repos")) or {}).items()
+                if isinstance(r, dict) and Path(str(r.get("root") or k)).resolve() == here
+            ),
+            {},
+        )
+        entry = next(
+            (e for e in (facts.get("ledger") or {}).get("entries") or () if isinstance(e, dict) and e.get("id") == ref),
+            None,
+        )
+        if entry is None or entry.get("for_page") != "for-you":
+            raise HTTPException(409, f"{ref} no longer waits on you in {repo}'s ledger — nothing was started")
+        name = ref.lower()  # cadence's work-branch shape: the tick derives the claim from it (§4.8)
+        records = await call("list")
+        live = [
+            s
+            for s in records
+            if s.get("state") not in ("exited", "closed") and s.get("repo") and Path(str(s["repo"])).resolve() == here
+        ]
+        holder = next(
+            (
+                s
+                for s in live
+                if any(
+                    isinstance(p, dict) and p.get("ref") == ref and p.get("status") == "claimed"
+                    for p in s.get("progress") or []
+                )
+            ),
+            None,
+        ) or next((s for s in live if s.get("name") == name), None)
+        if holder is not None:  # **Open session**, and a second press before the tick: never a second one
+            return {"ok": True, "focus": holder["id"]}
+        type_ = str(entry.get("type") or "")
+        type_ = type_ if type_ in orgmod.ENTRY_TYPES else orgmod.ENTRY_TYPES[0]
+        why_key = "yours" if str(entry.get("owner") or "").lower() == "paul" else "decision"
+        org, _notes = await asyncio.to_thread(org_here)
+        team = repo_teams(org, host_name()).get(root, "")
+        role = await asyncio.to_thread(entry_role, org, team, type_)
+        manager, ledger, cfg_why = "", repoconfig.DEFAULT_LEDGER, ""
+        try:
+            cfg = await asyncio.to_thread(repoconfig.discover, root)
+            ledger = cfg.ledger
+        except ValueError as e:
+            cfg, cfg_why = None, str(e).strip('"')
+        prompt = repoconfig.work_text(ref, repo, ledger, why_key)
+        t = org.teams.get(team) if team else None
+        if t is not None:
+            mid = teams.manager_id(org, t, t.host or host_name(), host_name())
+            manager = mid if mid in {s["id"] for s in teamrun.live(records)} else ""
+
+        def form(why: str, role_: str = role) -> JSONResponse:
+            url = ledger_start_form(root, name, ref, team, role_, manager, prompt, why)
+            return JSONResponse({"ok": False, "form": url, "why": why})
+
+        if t is None:  # the form's *Interactive*, not `plain`: a role pick there is a team's
+            return form(f"no team services {repo}: pick one, or start the session with no team", "")
+        if (t.host or host_name()) != host_name():
+            return form(f"{team} runs on {t.host}: this press does not cross the link")
+        if cfg is None:
+            return form(cfg_why)
+        if why := await entry_name_why(root, name):
+            return form(why)
+        try:
+            preset = repoconfig.resolve_role(cfg, role, org.roles)
+        except (KeyError, ValueError) as e:
+            return form(f"the role {role} does not resolve here: {str(e).strip(chr(34))}", "")
+        profs, _default = profiles_mod.load()
+        if preset.profile and preset.profile not in profs:
+            return form(f"the role {preset.name} names the profile {preset.profile}, which is not defined")
+        review = preset.review
+        got = await asyncio.to_thread(team_reader, team, root, None, preset.name)
+        if got.get("flow") or review is None:  # as **Open a session** takes it
+            review = got["review"]
+        try:
+            s = await call(
+                "create",
+                name=name,
+                dir=root,
+                adapter="claude-code",
+                profile=preset.profile or "",
+                prompt=prompt,  # the opening prompt, never the role's brief (§4.9)
+                unattended=False,
+                **teams.gate_prompts(False),
+                worktree=name,
+                repo=root,
+                capabilities=[g for g in dict.fromkeys(preset.grants) if g in GRANTS],
+                lane=[ref],
+                role=preset.name,
+                review=review,
+                context_bound=preset.bound_for(False),
+                ledger=cfg.ledger,
+                controllers=[manager] if manager else [],
+                team=team,
+            )
+        except HTTPException as e:
+            return form(str(e.detail).strip('"') or "the host agent refused the start")
+        return {"ok": True, "id": s["id"], "name": s.get("name") or name}
 
 
 def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:

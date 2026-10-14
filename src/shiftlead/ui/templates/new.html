@@ -13,7 +13,8 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
   {# design §4.5a **Resume** (TD-081 step 2): *when it cannot be silent it is not a guess* — a
      one-press Resume that could not run lands here, filled in, with the reason on it, so a person
      knows which control they pressed and what stopped it. Fixed text plus the reason as given. #}
-  {% if prefill.why %}<div class="warn" id="resumewhy">⚠ Resume could not be one press: {{ prefill.why }} — the form is filled in from that session; change what needs changing and Start.</div>{% endif %}
+  {% if prefill.why and prefill.press == 'start' %}<div class="warn" id="resumewhy">⚠ Start session could not be one press: {{ prefill.why }} — the form is filled in as it would have started; change what needs changing and Start.</div>
+  {%- elif prefill.why %}<div class="warn" id="resumewhy">⚠ Resume could not be one press: {{ prefill.why }} — the form is filled in from that session; change what needs changing and Start.</div>{% endif %}
   <form method="post" action="/new" class="col gap"{% if prefill.prefilled %} data-prefilled="1"{% endif %}>
     {#- design §4.5a New session **the form** (TD-277; TD-284 slice 1): asked in the order a
         person starts a session — who (Name, Host, Role, Profile), where (Team, Project, the
@@ -141,7 +142,7 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
     {#- design §4.5a *New session* **prompt chips** (§4.8, TD-161, built by TD-170): the picked role's
         `prompts:`, rebuilt with the Role pick; a press fills the Opening prompt — nothing runs yet -#}
     <div class="row gap wrap promptchips" id="newchips" role="group" aria-label="saved prompts of the picked role"></div>
-    <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt."></textarea></div>
+    <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt.">{{ prefill.prompt }}</textarea></div>
     {# design §4.5a New session **Controllers** picker (§4.8, TD-036): which sessions may act on
        this one once it starts. The candidates are the sessions holding `control` — nothing
        else could act on it anyway — and none is selected by default: an empty list means nobody

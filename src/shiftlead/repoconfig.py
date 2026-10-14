@@ -113,6 +113,12 @@ NO_REPO = "none"
 # opening lines of the composer a person's entry session starts with, the slots filled from the form.
 ENTRY_TEMPLATE = "entry.md"
 ENTRY_PLACEHOLDER = "{entry}"
+# The opening prompt of the person's own session on an entry that waits on them (design §4.5a *Inbox
+# row: ledger entry: Start session*, TD-676, built by TD-678): fixed text in the package, an opening
+# text and not a brief, its slots the id, the repo, the ledger file and why the entry is the person's.
+WORK_TEMPLATE = "work.md"
+WORK_SLOTS = ("{id}", "{repo}", "{ledger}", "{why}")
+WORK_WHY = {"yours": "its owner is me", "decision": "it is blocked by a decision of mine"}
 # A template's shape for a seat on call (design §6 *What is left is judgement, and a seat holds it*,
 # TD-247): the manager's, which reads one `seat_due` and ends, where `manager.md` rounds on `ao wait`.
 ON_CALL_BRIEFS = {"manager.md": "manager_on_call.md"}
@@ -215,6 +221,15 @@ def layout(cfg: RepoConfig) -> dict[str, str]:
         "{design_dir}": DESIGN_DIR if there(DESIGN_DIR) else NO_DESIGN_DIR,
         "{cadence_rules}": f"read {CADENCE_DOC} §1–§4" if there(CADENCE_DOC) else NO_CADENCE,
     }
+
+
+def work_text(id_: str, repo: str, ledger: str, why: str) -> str:
+    """`work.md` with its four slots filled: the opening prompt **Start session** sends (TD-678), `why`
+    a key of `WORK_WHY` — the Inbox row's kind, *ledger · yours* or *ledger · your decision*."""
+    text = resources.files("shiftlead").joinpath("briefs", WORK_TEMPLATE).read_text(encoding="utf-8")
+    for slot, value in zip(WORK_SLOTS, (id_, repo, ledger, WORK_WHY[why]), strict=True):
+        text = text.replace(slot, value)
+    return text.strip()
 
 
 def entry_text(repo: str, type_: str, ledger: str) -> str:

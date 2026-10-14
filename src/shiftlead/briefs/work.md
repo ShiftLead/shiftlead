@@ -1,0 +1,1 @@
+I opened this session from the Inbox to work {id} of {repo}'s ledger ({ledger}) myself: it waits on me ({why}). Read the entry, check the code and the design for what is already built or decided, and tell me in a few lines what it asks of me and what you would do first. Then wait for me: I drive this one.
