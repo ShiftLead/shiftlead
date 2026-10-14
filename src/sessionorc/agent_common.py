@@ -336,12 +336,17 @@ def model_env(adapter: str, model: str | None, directory: Path) -> dict[str, str
     """`AGENT_MODEL` (`<adapter>/<the profile's alias>`, absent where the profile names none) and
     `AGENT_MODEL_FILE` (the session's git directory's `shiftlead-agent-model`, absent outside a git
     tree), for a commit hook's `Agent-Model:` trailer (design §4.2 *And the model*, TD-638). A record
-    with no agent gets neither. No file yet: the full id is the tool's to report."""
+    with no agent gets neither. No file yet: the full id is the tool's to report, so an earlier run's
+    file in the same git directory is removed rather than read as this run's."""
     if not adapters.has_agent(adapter):
         return {}
     env = {"AGENT_MODEL": f"{adapter}/{model}"} if model else {}
     if git_dir := absolute_git_dir(directory):
         env["AGENT_MODEL_FILE"] = str(Path(git_dir) / MODEL_FILE)
+        try:
+            Path(env["AGENT_MODEL_FILE"]).unlink(missing_ok=True)
+        except OSError as e:
+            log.warning("could not remove %s: %s", env["AGENT_MODEL_FILE"], e)
     return env
 
 

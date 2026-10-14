@@ -2253,6 +2253,7 @@ async def test_the_model_rides_the_env_and_its_file_follows_the_model_in_use(age
     monkeypatch.setattr(stub, "launch", lambda **kw: dataclasses.replace(launch(**kw), model="opus"), raising=False)
     out = tmp_path / "env.txt"
     want_file = (repo / ".git" / "shiftlead-agent-model").resolve()
+    want_file.write_text("agentshell/an-earlier-run\n")  # an earlier run's, in the same git directory
     async with LocalClient() as c:
         sid = (
             await c.call(
@@ -2266,7 +2267,7 @@ async def test_the_model_rides_the_env_and_its_file_follows_the_model_in_use(age
         assert await wait_for(lambda: out.exists() and out.read_text().strip())
         model, path = out.read_text().strip().split("|")
         assert model == "agentshell/opus" and Path(path).resolve() == want_file
-        assert not want_file.exists()  # the full id is the tool's to report
+        assert not want_file.exists()  # the full id is the tool's to report; the earlier run's is gone
         await c.call("hook", session=sid, adapter_id="conv-1", model="claude-opus-5-5", state="working")
         assert want_file.read_text() == "agentshell/claude-opus-5-5\n"
         await c.call("hook", session=sid, model="claude-sonnet-5-5")  # a `/model` switch
