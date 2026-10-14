@@ -222,6 +222,11 @@ class ProgressEntry:
     # `ao progress done <ref> --pr <n> --slice`, or derived by the tick from a merged PR the session
     # did not declare. Neither touches the claim's status, `pr` or `why` (§9 invariant 10).
     slices: list[dict[str, Any]] = field(default_factory=list)
+    # On a declared `done` naming a PR (§4.8 *A `done` with a PR is told what its checks read*,
+    # TD-637): `pending` while a required check of the PR's head still ran at the declaration, until
+    # rule 10's read at a head clears it; `unknown` when the home could not read them. Not `checks`,
+    # which rule 10's record field and the PR reading already use.
+    ci: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -815,12 +820,16 @@ def report_ref(session: dict[str, Any], prs: Mapping[int, str] | None = None) ->
     mark** (design §4.5a card **report line**, TD-182, built by TD-193): one word after the PR's
     number, *merged* or *closed*, when `prs` (the readings' PRs of the record's repo, by number, as
     their state) holds it so. An open PR, one the readings do not hold, and `prs` None leave it
-    unmarked — never guessed. Display only: the record is not touched. Empty with no entry."""
+    unmarked — never guessed. A `done` the declaration found with checks still running reads
+    *· checks pending* until rule 10 reads its head (§4.8, TD-637), unless the PR is marked already.
+    Display only: the record is not touched. Empty with no entry."""
     head = report_head(session)
     if not head:
         return ""
     pr = head.get("pr")
     mark = f" {prs[pr]}" if pr and prs and prs.get(pr) in PR_MARKS else ""
+    if not mark and pr and head.get("status") == "done" and head.get("ci") == "pending":
+        mark = " · checks pending"
     ref = head["ref"] + ("~" if head.get("source", "declared") != "declared" else "")
     if pr and head["ref"] == f"#{pr}":
         return ref + mark

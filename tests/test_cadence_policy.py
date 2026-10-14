@@ -194,13 +194,16 @@ async def test_a_pass_writes_the_entry_and_nothing_else(agent, composerstubs, tm
         await agent._cadence_pass([rec])
         assert rec.checks == [] and gh.ran == [], "no `done` with a PR: nothing to read"
         _done(rec, "TD-257", 842)
+        rec.progress[-1].ci = "pending"  # TD-637: the declaration found a check still running
         await agent._cadence_pass([rec])
         assert rec.checks == [] and gh.ran == [], "gh gave no head: no reading"
         gh.heads[842], gh.verdicts[842] = ("aaa", "open"), None
         await agent._cadence_pass([rec])
         assert rec.checks == [] and gh.ran == [842], "the script gave no reading (exit 2): no entry"
+        assert rec.progress[-1].ci == "pending", "no reading clears nothing"
         gh.verdicts[842] = PASS
         await agent._cadence_pass([rec])
+        assert rec.progress[-1].ci is None, "rule 10's read at the head clears `ci: pending` (TD-637)"
         (c,) = rec.checks
         assert (c["pr"], c["sha"], c["verdict"], c["failed"]) == (842, "aaa", "pass", [])
         assert "told" not in c and "row" not in c and "merged" not in c

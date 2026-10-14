@@ -1151,6 +1151,9 @@ class TickMixin:
                 old = cadence_mod.entry_of(s.checks, pr)
                 new = cadence_mod.record(old, pr, sha, merged, got, now_iso(), closed=closed)
                 s.checks = [*(c for c in s.checks if c.get("pr") != pr), new]
+                for e in s.progress:  # its read at the head clears a `done`'s `ci: pending` (TD-637)
+                    if e.status == "done" and e.pr == pr and e.ci == "pending":
+                        e.ci = None
                 log.info("%s: PR #%s read by the cadence check: %s", self._address(s), pr, cadence_mod.said(new))
                 self._save(s)
                 break  # one PR per run

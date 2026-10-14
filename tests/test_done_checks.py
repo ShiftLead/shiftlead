@@ -1,0 +1,214 @@
+"""TD-639, design §4.8 *A `done` with a PR is told what its checks read*: `ao progress done <ref>
+--pr <n>` reads the PR's checks once at the declaration, against the required checks of its base
+branch — refused while a required one failed on the head, accepted as `ci: pending` while one runs,
+accepted merged, green, with no CI, or (as *unknown*) when the home could not read them."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+
+import pytest
+from conftest import park_ticks
+
+from sessionorc import reports
+from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import report_line
+
+SHA = "9c1e0f2aaaabbbbccccdddd"
+
+
+def _run(name: str, status: str = "COMPLETED", conclusion: str = "SUCCESS") -> dict:
+    return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion}
+
+
+def _status(context: str, state: str) -> dict:
+    return {"__typename": "StatusContext", "context": context, "state": state}
+
+
+def _view(*checks: dict, state: str = "OPEN", merged: str | None = None) -> dict:
+    return {
+        "state": state,
+        "mergedAt": merged,
+        "headRefOid": SHA,
+        "baseRefName": "main",
+        "statusCheckRollup": list(checks),
+    }
+
+
+# -- the verdict, pure -----------------------------------------------------------------------------
+
+
+def test_a_required_check_red_on_the_head_is_refused_by_the_repo_readings_rule():
+    for bad in (_run("test", conclusion="FAILURE"), _run("test", conclusion="STARTUP_FAILURE")):
+        got = reports.at_done(_view(_run("lint"), bad), ["test", "lint"])
+        assert (got["word"], got["failed"], got["sha"]) == ("refused", ["test"], SHA)
+    for state in ("FAILURE", "ERROR"):
+        assert reports.at_done(_view(_status("ci/x", state)), ["ci/x"])["failed"] == ["ci/x"]
+
+
+def test_a_failed_check_no_rule_requires_refuses_nothing_and_is_named():
+    got = reports.at_done(_view(_run("test"), _run("docs", conclusion="FAILURE")), ["test"])
+    assert (got["word"], got["failed"], got["other"]) == ("green", [], ["docs"])
+    # one still running that is not required is not *pending* either
+    assert reports.at_done(_view(_run("test"), _run("slow", "IN_PROGRESS", "")), ["test"])["word"] == "green"
+
+
+def test_pending_merged_closed_and_no_checks():
+    assert reports.at_done(_view(_run("test", "QUEUED", "")), ["test"])["word"] == "pending"
+    # red outranks pending, as the reading folds it
+    assert reports.at_done(_view(_run("a", "QUEUED", ""), _run("b", conclusion="FAILURE")), None)["word"] == "refused"
+    assert reports.at_done(_view(_run("t", conclusion="FAILURE"), state="MERGED", merged="2026-10-13"), ["t"]) == {
+        "sha": SHA,
+        "failed": [],
+        "other": [],
+        "word": "merged",
+    }
+    assert reports.at_done(_view(state="CLOSED"), None)["word"] == "closed"
+    assert reports.at_done(_view(), [])["word"] == "green"
+
+
+def test_with_nothing_required_or_the_set_never_read_every_check_counts():
+    for required in (None, []):
+        got = reports.at_done(_view(_run("anything", conclusion="TIMED_OUT")), required)
+        assert (got["word"], got["failed"]) == ("refused", ["anything"])
+
+
+# -- the required set, read with the repo reading ---------------------------------------------------
+
+
+def _fake_api(monkeypatch, answers: dict[str, tuple[int, str, str]]) -> list[list[str]]:
+    calls: list[list[str]] = []
+
+    def run(argv, **kw):
+        calls.append(argv)
+        for key, (rc, out, err) in answers.items():
+            if key in argv[-1]:
+                return subprocess.CompletedProcess(argv, rc, out, err)
+        raise AssertionError(argv)
+
+    monkeypatch.setattr(reports.subprocess, "run", run)
+    return calls
+
+
+def test_the_required_set_is_the_protections_and_the_rulesets_union(tmp_path, monkeypatch):
+    protection = {"contexts": ["test (3.12)", "lint"], "checks": [{"context": "lint", "app_id": 1}]}
+    rules = [
+        {"type": "deletion"},
+        {"type": "required_status_checks", "parameters": {"required_status_checks": [{"context": "ci/build"}]}},
+    ]
+    calls = _fake_api(
+        monkeypatch,
+        {"/protection/": (0, json.dumps(protection), ""), "/rules/branches/": (0, json.dumps(rules), "")},
+    )
+    assert reports.required_checks(tmp_path, "release/1") == ["ci/build", "lint", "test (3.12)"]
+    assert "branches/release%2F1/protection" in calls[0][-1]
+
+
+def test_a_branch_not_protected_requires_none_from_it_and_a_403_is_an_error(tmp_path, monkeypatch):
+    not_protected = (1, '{"message":"Branch not protected"}', "gh: Branch not protected (HTTP 404)")
+    _fake_api(monkeypatch, {"/protection/": not_protected, "/rules/branches/": (0, "[]", "")})
+    assert reports.required_checks(tmp_path, "main") == []
+    _fake_api(monkeypatch, {"/protection/": (1, "", "gh: Resource not accessible by integration (HTTP 403)")})
+    assert "HTTP 403" in reports.required_checks(tmp_path, "main")
+    not_found = (1, "", "gh: Branch not found (HTTP 404)")
+    _fake_api(monkeypatch, {"/protection/": not_found})
+    assert "Branch not found" in reports.required_checks(tmp_path, "gone")
+
+
+def test_a_failed_read_keeps_the_last_set_with_its_error(tmp_path, monkeypatch):
+    got = iter([["test"], "HTTP 403", "HTTP 403"])
+    monkeypatch.setattr(reports, "required_checks", lambda d, base, timeout=30.0: next(got))
+    required, errors = reports._required_reading(tmp_path, {"main"}, None, 1.0)
+    assert (required, errors) == ({"main": ["test"]}, {})
+    required, errors = reports._required_reading(tmp_path, {"main"}, {"required": required}, 1.0)
+    assert (required, errors) == ({"main": ["test"]}, {"main": "HTTP 403"})
+    # a base never read is absent: the declaration then takes every run
+    required, errors = reports._required_reading(tmp_path, {"dev"}, None, 1.0)
+    assert required == {} and errors == {"dev": "HTTP 403"}
+
+
+# -- the declaration ----------------------------------------------------------------------------------
+
+
+@pytest.fixture
+async def worker(agent, tmp_path, monkeypatch):
+    """A session on a checkout the home reads, `gh pr view` answered from `views` (a `str` is a read
+    that failed), and `main` requiring `test` — what the repo reading would hold."""
+    await park_ticks(agent)
+    views: dict[int, dict | str] = {}
+    monkeypatch.setattr(reports, "pr_view", lambda root, pr, timeout=30.0: views.get(pr, "no such PR"))
+    made = {"dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True}
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="w", **made))["id"]
+        rec = agent.sessions[sid]
+        rec.repo = str(tmp_path)
+        agent._repos[str(tmp_path)] = {"prs": {"required": {"main": ["test"]}}}
+        async with LocalClient(caller=sid) as w:
+            yield w, sid, rec, views
+        await person.call("kill", id=sid)
+
+
+async def test_a_failed_required_check_refuses_the_done_and_writes_nothing(worker):
+    w, sid, rec, views = worker
+    await w.call("progress", id=sid, ref="TD-1")
+    views[842] = _view(_run("test", conclusion="FAILURE"), _run("lint"))
+    with pytest.raises(AgentError, match=r"PR #842's required checks failed on 9c1e0f2: test — fix them"):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    (e,) = rec.progress
+    assert (e.status, e.pr, e.ci) == ("claimed", None, None)
+
+
+async def test_pending_is_accepted_and_marked_until_rule_10_reads_it(worker):
+    w, sid, rec, views = worker
+    views[842] = _view(_run("test", "IN_PROGRESS", ""), _run("docs", conclusion="FAILURE"))
+    got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert got["progress"][0]["ci"] == "pending"
+    assert got["checks_said"].startswith("PR #842: checks pending on 9c1e0f2")
+    assert "not required, failed: docs" in got["checks_said"]
+    assert report_line(got) == "TD-001 → #842 · checks pending · 1/1 done"
+    assert report_line(got, {842: "merged"}) == "TD-001 → #842 merged · 1/1 done"
+
+
+async def test_green_merged_closed_and_no_checks_are_accepted(worker):
+    w, sid, rec, views = worker
+    views[1] = _view(_run("test"))
+    views[2] = _view(_run("test", conclusion="FAILURE"), state="MERGED", merged="2026-10-13T00:00:00Z")
+    views[3] = _view(state="CLOSED")
+    views[4] = _view()
+    said = {}
+    for pr in (1, 2, 3, 4):
+        got = await w.call("progress", id=sid, ref=f"TD-{pr}", status="done", pr=pr)
+        assert got["progress"][-1]["ci"] is None
+        said[pr] = got.get("checks_said")
+    assert said == {1: "PR #1: checks green on 9c1e0f2", 2: None, 3: "PR #3: closed unmerged", 4: "PR #4: no checks"}
+
+
+async def test_a_read_the_home_could_not_make_is_accepted_as_unknown(worker):
+    w, sid, rec, views = worker
+    views[842] = "gh could not be asked: TimeoutExpired"
+    got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert got["progress"][0]["ci"] == "unknown"
+    assert got["checks_said"] == "PR #842: checks unknown: gh could not be asked: TimeoutExpired"
+
+
+async def test_a_base_never_read_takes_every_run_and_says_so(worker, agent):
+    w, sid, rec, views = worker
+    agent._repos[rec.repo] = {}
+    views[842] = _view(_run("anything", conclusion="FAILURE"))
+    with pytest.raises(AgentError, match="required checks failed on 9c1e0f2: anything"):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    views[842] = _view(_run("anything"))
+    got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842)
+    assert "required set unknown" in got["checks_said"]
+
+
+async def test_a_slice_on_a_pr_not_merged_is_refused(worker):
+    w, sid, rec, views = worker
+    await w.call("progress", id=sid, ref="TD-1")
+    views[842] = _view(_run("test"))
+    with pytest.raises(AgentError, match="a slice is a merged PR — #842 is open"):
+        await w.call("progress", id=sid, ref="TD-1", status="done", pr=842, slice=True)
+    views[842] = _view(state="MERGED", merged="2026-10-13T00:00:00Z")
+    got = await w.call("progress", id=sid, ref="TD-1", status="done", pr=842, slice=True)
+    assert "stays claimed" in got["slice"] and [x["pr"] for x in rec.progress[0].slices] == [842]
