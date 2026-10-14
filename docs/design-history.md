@@ -408,6 +408,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-13 (TD-618 slice 4, grinder-ao-2): **Inbox row: red PR** built — its Snooze ▾ kept under `red_pr:<repo>:<n>` in the attention store, by time alone, the board rows' +1 day · +1 week · a date; the Repo facet's *· n red* and the Repo page's Open PRs tags name whose a PR is only past `ORPHAN_AFTER`, as the order and the idle holder's note wait that long, and *nobody's* alone where no team services the repo (its row is the Inbox's, not the anchor's); a claimed `pr:<n>` in TDs in motion takes the PR's title.
 - 2026-10-13 (TD-632, the designer; docs-audit-ao-1 found `MD` and `AD` drawn as links): **Focus side panel, Git card: changed files** — a deletion is a code whose last letter is `D` (`D`, `MD`, `AD`, `RD`); a file deleted and made again lists as `D` and `??`, text and a link.
 - 2026-10-13 (TD-630, the designer; mockup `AddEntry.dc.html`, shot `docs/mockups/reviews/2026-10-13-td630-add-entry-attach.png`): **Add entry form: Attach / drop / paste** — the composer's road on **What**. Built by TD-633.
 - 2026-10-13 (TD-627, the designer; Paul, 2026-10-13: *our git card in the focus session screen shows modified files — add links to those files so they can be opened in vscode/other*): **Focus side panel, Git card: changed files** — each path a link by the recent files' form; a deletion and a new directory stay text. Built by TD-628.

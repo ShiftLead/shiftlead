@@ -1074,6 +1074,9 @@ def _iso(raw: Any) -> datetime | None:
     if not isinstance(raw, str) or not raw:
         return None
     try:
-        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
     except ValueError:
         return None
+    # a stamp with no offset (a date alone, from a client that sent one) is UTC, as `_instant` reads it:
+    # compared naive against an aware instant it raised and took down the whole Inbox (TD-618's UI check)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)

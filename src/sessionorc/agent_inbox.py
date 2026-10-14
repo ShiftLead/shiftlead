@@ -240,14 +240,16 @@ class InboxMixin:
         # held*, TD-559, whose Dismiss is the restart row's `dismissed:<since>`): a record's row, keyed as `stalled` is
         # `cadence:<pr>` (§4.5a *Inbox row: cadence check failed*, TD-258): a record's row and one a
         # PR, so the key carries the PR's number
+        # `red_pr` (§4.5a *Inbox row: red PR*, TD-613): keyed `red_pr:<repo>:<n>`, a PR and not a record
         cadence = (
             kind.startswith("cadence:") and kind[8:].isascii() and kind[8:].isdigit() and kind[8:] == str(int(kind[8:]))
         )
-        rows = (*ATTENTION_KINDS, "alarm", "restart", "idle_open", "seat_held", "promote", "work")
+        rows = (*ATTENTION_KINDS, "alarm", "restart", "idle_open", "seat_held", "promote", "work", "red_pr")
         if not cadence and kind not in rows:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
-                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, seat_held, cadence:<pr>, promote, work"
+                f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, seat_held, cadence:<pr>, promote, work, "
+                "red_pr"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:

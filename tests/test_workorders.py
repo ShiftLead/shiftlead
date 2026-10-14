@@ -559,3 +559,16 @@ def test_a_pass_for_the_board_alone_keeps_the_ledger_unread(tmp_path, monkeypatc
     alone = TickMixin._read_repos([str(root)], {str(root): full}, set(), None, None, set(), True)[str(root)]
     assert alone["ledger"] == full["ledger"]
     assert alone["boards"]["boards"][0]["items"] == [] and alone["work_orders"]["orders"] == []
+
+
+async def test_a_red_pr_rows_snooze_is_kept_by_repo_and_number(agent):
+    """§4.5a *Inbox row: red PR* (TD-618 slice 4): its Snooze ▾ is the attention store's, keyed
+    `red_pr:<repo>:<n>` — a PR, not a record."""
+    from conftest import park_ticks
+
+    from sessionorc.client import LocalClient
+
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        got = await person.call("attention_snooze", id="red_pr:samscrape:802", kind="red_pr", until="2030-01-01")
+    assert got["row"] == "red_pr:samscrape:802|red_pr" and agent.attention_snoozed[got["row"]] == "2030-01-01"

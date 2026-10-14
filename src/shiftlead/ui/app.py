@@ -259,6 +259,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     rail_kind,  # noqa: F401
     rail_picks,  # noqa: F401
     rail_rows,  # noqa: F401
+    red_pr_rows,
     restart_mark,  # noqa: F401
     restart_subject,  # noqa: F401
     review_pr,  # noqa: F401
@@ -310,6 +311,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     lane_count,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
+    pr_ref,  # noqa: F401
     repo_facet,  # noqa: F401
     rollup,  # noqa: F401
     team_lanes,
@@ -734,6 +736,8 @@ class Readings:
             rows
             + promote_rows(home.get("promotes"))
             + work_rows(work, self.wound_of(fleet) if work else None, records=fleet)
+            # §4.5a *Inbox row: red PR* (TD-613): a repo no team services, from the repo readings
+            + red_pr_rows(repos, fleet)
         )
 
     def wound_of(self, fleet: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1126,6 +1130,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         promos += work_rows(
             work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")}, records=sessions
         )
+        promos += red_pr_rows(repos, sessions)  # …and a red PR of a repo no team services (§4.5a, TD-613)
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)
         if entries or handed or vs or boards or promos:
             secs = inbox_sections(
@@ -1234,13 +1239,13 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # numbers, since no live member points the summary at the repo (review of slice 5)
             members = [v for v in vs if v.get("team") == named]
             summary = team_summary(named, members, {}, doing, prs_waiting(members), now, needs=h.needs_cache["rows"])
-            summary["repo"] = repo_facet(r, now, prs_waiting(members), team_lanes(named, vs, r))
+            summary["repo"] = repo_facet(r, now, prs_waiting(members), team_lanes(named, vs, r), vs)
             summary["motion"] = motion_rows(members, r)
             summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
         else:
             summary = {
                 "team": "",
-                "repo": repo_facet(r, now),
+                "repo": repo_facet(r, now, fleet=vs),
                 "motion": [],
                 "phases": {},
                 "answers": [],
@@ -1277,7 +1282,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "name": name,
             "g": {"team": summary["team"], "summary": summary},
             "teams": teams,
-            "prs": pr_rows(r, members, standing, now),
+            "prs": pr_rows(r, members, standing, now, sessions),
             "lists": ledger_lists(r, summary["motion"], lanes),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
             "lanes": [ln for team, got in lanes.items() if (ln := lanes_line(team, got, teamrun.lane_kinds(r)))],
