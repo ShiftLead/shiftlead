@@ -218,6 +218,10 @@ def _never_this_machines_home(tmp_path_factory):
     mp.setenv("SHIFTLEAD_HOME", str(tmp_path_factory.mktemp("unit-home")))
     mp.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("unit-claude")))
     mp.delenv("SHIFTLEAD_SESSION", raising=False)  # a test run inside an ao session is not a caller
+    # …nor does it hand its model to the private tmux server, whose shells would inherit it (TD-671):
+    # the live server is the host agent's, whose own env never carries a session's model (§4.2)
+    mp.delenv("AGENT_MODEL", raising=False)
+    mp.delenv("AGENT_MODEL_FILE", raising=False)
     # …and nor is its ancestry: the exit-3 sentence reads the pane's environment above `ao` (TD-089)
     from shiftlead import cli
 
