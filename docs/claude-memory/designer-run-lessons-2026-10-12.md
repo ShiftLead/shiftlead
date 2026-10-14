@@ -15,7 +15,7 @@ Later the same day (TD-584, TD-578, TD-580, TD-581; PRs #1567, #1568, #1575, #15
 
 - **A new ledger entry goes at the file's true end, after its last `---`.** On 2026-10-12 the ledger ended with an unclosed `<!-- Entry template:` line (an entry after it rendered hidden); by 2026-10-13 that tail was gone. Read the last lines before inserting, and never locate the end by a marker (below).
 - **`ao msg --shot` rides only on a steer or an ask to `person`**; to the techlead it is refused (*a look is the person's*). A design with a mockup sends its steer to the person with the shot.
-- **Re-read the highest TD on `origin/main` *and* in open PRs right before committing**, not at the start of the round: TD-593 was used twice on main (#1569 and #1568; #1574 renumbered TD-578's build to TD-597), and TD-594 was taken on main by #1570 while #1575 held it, so that build became TD-596. A renumber after a rebase is the edit script re-run on main's ledger with the new number, then the id-order test.
+- **Re-read the highest TD on `origin/main` *and* in open PRs' diffs right before committing** ([[td-ids-live-in-pr-diffs]]), not at the start of the round: TD-593 was used twice on main (#1569 and #1568; #1574 renumbered TD-578's build to TD-597), and TD-594 was taken on main by #1570 while #1575 held it, so that build became TD-596. A renumber after a rebase is the edit script re-run on main's ledger with the new number, then the id-order test.
 
 On 2026-10-13 (TD-604, TD-627):
 

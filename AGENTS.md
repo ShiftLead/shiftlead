@@ -162,6 +162,7 @@ header belong to dev-cadence: edit them there, never here.
 | Whether Meta's Muse (a consumer personal agent) takes shiftlead's ground, who each is for, and Muse Code as a harness to run | [docs/decisions/2026-10-13-muse.md](docs/decisions/2026-10-13-muse.md) |
 | Whether Nous Research's Hermes Agent (open-source, self-hosted, with a Kanban board of workers) takes shiftlead's ground, and how shiftlead could run it | [docs/decisions/2026-10-13-hermes-agent.md](docs/decisions/2026-10-13-hermes-agent.md) |
 | What Grok Bot, Muse and Hermes Agent suggest shiftlead learn, what each lesson would touch, and the open question on each (for discussion) | [docs/decisions/2026-10-13-agent-product-lessons.md](docs/decisions/2026-10-13-agent-product-lessons.md) |
+| How shiftlead could make money without standing in the person's path, and the questions that decide it (for discussion) | [docs/decisions/2026-10-13-monetisation.md](docs/decisions/2026-10-13-monetisation.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | [docs/cadence.md](docs/cadence.md) |
 | Known issues and deferred work | [docs/technical_debt.md](docs/technical_debt.md) |
