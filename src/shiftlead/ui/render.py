@@ -226,3 +226,13 @@ def fold_head(text: str) -> tuple[str, str]:
     end = _SENTENCE_END.search(t, h.end())
     cut = end.end() if end else len(t)
     return t[:cut].rstrip(), t[cut:].strip()
+
+
+# a bold run ending in a colon after a sentence's end — *… (TD-095). **Cards:** a report …* — is the
+# head of a part of a long line, and opens a paragraph under *details*: markdown, not the board's format
+_PART_HEAD = re.compile(r"(?<=[.;!?)])\s+(?=\*\*[^*\n]{1,80}?:\*\*)")
+
+
+def part_heads(text: str) -> str:
+    """`text` with each part's bold head (`_PART_HEAD`) opening a paragraph of its own."""
+    return _PART_HEAD.sub("\n\n", text)

@@ -8,7 +8,6 @@ read through it: the suite patches both there.
 from __future__ import annotations
 
 import functools
-import re
 import time
 from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -22,6 +21,7 @@ from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import hosts
 from sessionorc import ledger as ledger_mod
+from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
 from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
@@ -483,9 +483,6 @@ def state_rows(
 # has one owner*, *The boards*, TD-615): every open item, on the repo reading as `boards`, which the
 # page reads from the `repos` RPC and runs no reader of its own.
 BOARD_FILE = Path("docs") / "user_attention.md"
-# the fields of a board item the Inbox draws that a reader older than them does not give: a copy
-# that lacks one is named on the page rather than drawn as if the board had nothing there (TD-278)
-BOARD_FIELDS = {"answers": "dev-cadence TD-036"}
 # §4.5a's answers to a board row, the `board_edit` RPC's actions: Snooze, Done, and **Decide** — one
 # of the item's own `Answers:`, or *Go with it* for the one marked default (§4.4 *Decide*, TD-255)
 BOARD_ACTS = ("snooze", "done", "decide")
@@ -493,20 +490,6 @@ BOARD_ACTS = ("snooze", "done", "decide")
 LOOK_KINDS = ("look", "watch")
 WORKS = "Works"  # a live look's first answer, cadence §3.5's word (the second is `board.NOT_RIGHT`'s form)
 
-# §4.5 screen 6 *Boards are read against origin*, §4.5a **origin note** (TD-221 slice 3): which case the
-# reader's fetch found, read from the fixed phrases of its `fetch_note` — the reader gives the cases no
-# field of their own (one is asked of dev-cadence) — in order, the first that opens the note winning,
-# so the parenthesis after *board DIFFERS from* is read before the opening alone. A case of None draws
-# no note. `tests/test_ui_board.py` fails on a phrase in the reader that this table does not know.
-ORIGIN_PHRASES: tuple[tuple[str, str, str | None], ...] = (
-    ("fetch skipped", "", "unreached"),
-    ("fetched; no board at", "", None),
-    ("fetched; board matches", "", None),
-    ("fetched; local clone is behind", "", "behind"),
-    ("fetched; board DIFFERS from", "(no common history", "both"),
-    ("fetched; board DIFFERS from", "(local edits not pushed)", "local"),
-    ("fetched; board DIFFERS from", "(both sides changed)", "both"),
-)
 # the home's pull readings by repo name (`host`'s `pulls`, §6 *Pull*), kept fresh by the app as
 # `work_marks` keeps its marks: what the *behind* note's tail says
 PULLS: dict[str, Any] = {}
@@ -528,24 +511,22 @@ def pull_tail(reading: Mapping[str, Any] | None) -> str:
     return ""
 
 
-def origin_case(source: str, fetch_note: str) -> str | None:
+def origin_case(source: str, fetch_case: str) -> str | None:
     """The case of one board's read against origin (§4.5 screen 6): `behind`, `local`, `both`,
-    `unreached`, or None — matches origin, no board there, a plain read, or a phrase this table does
-    not know. `source` is non-empty only when the board was read from origin, which is *behind*."""
+    `unreached`, or None — matches origin, no board there, or a plain read. The reading's own
+    `fetch_case` (`workorders.FETCH_CASES`, TD-585) decides, never its sentence; `source` is non-empty
+    only when the board was read from origin, which is *behind*."""
     if source:
         return "behind"
-    for opening, paren, case in ORIGIN_PHRASES:
-        if fetch_note.startswith(opening) and (not paren or paren in fetch_note):
-            return case
-    return None
+    return {"skipped": "unreached", "behind": "behind", "local": "local", "both": "both"}.get(fetch_case)
 
 
 def origin_note(row: Mapping[str, Any]) -> dict[str, Any] | None:
     """§4.5a **origin note**: the line above a repo's first board row, in the design's words, as
     `{text, warn}` — `warn` the warning colour, for the one case where rows are hidden — or None.
     The reader's sentence is never drawn but for a skipped fetch's reason, which carries no count."""
-    source, fetch_note = str(row.get("source") or ""), str(row.get("fetch_note") or "")
-    case = origin_case(source, fetch_note)
+    source = str(row.get("source") or "")
+    case = origin_case(source, str(row.get("fetch_case") or ""))
     if case == "behind":
         tail = pull_tail(PULLS.get(Path(str(row.get("root") or "")).name)) if row.get("root") else ""
         return {"text": f"read from {source or 'origin'}: this checkout has not pulled it yet{tail}", "warn": False}
@@ -558,7 +539,7 @@ def origin_note(row: Mapping[str, Any]) -> dict[str, Any] | None:
             "warn": True,
         }
     if case == "unreached":
-        why = fetch_note.removeprefix("fetch skipped").strip().removeprefix("(").removesuffix(")")
+        why = str(row.get("fetch_why") or "")
         return {
             "text": f"origin could not be reached ({why.strip() or 'no reason given'}): "
             "showing the checkout's board as of its last pull",
@@ -584,35 +565,13 @@ def origin_firsts(rows: Collection[Mapping[str, Any]]) -> set[str]:
 templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts)
 
 
-def reader_lacks(report: Any) -> str:
-    """The page's note when the board reading gives no field the Inbox draws (TD-278): its items carry
-    no `answers`, say, so no row would draw its answers and nothing would say why. "" when every
-    field is there, or there is no item to tell by."""
-    items = [
-        it
-        for b in (report.get("boards") or [] if isinstance(report, dict) else [])
-        if isinstance(b, dict)
-        for it in b.get("items") or []
-        if isinstance(it, dict)
-    ]
-    if not items:
-        return ""
-    gone = [f for f in BOARD_FIELDS if not any(f in it for it in items)]
-    if not gone:
-        return ""
-    whose = "the board reader"
-    since = ", ".join(f"`{f}` ({BOARD_FIELDS[f]})" for f in gone)
-    return f"board rows are drawn without {since}: {whose} predates it — sync dev-cadence's files into that repo"
-
-
 def board_reading(
     repos: Mapping[str, Any] | None, teams: Mapping[str, str] | None = None
 ) -> tuple[list[dict[str, Any]], str]:
     """The Inbox's board rows (`board_rows`) from the host agent's repo readings — the `repos` RPC,
     each checkout's `boards` (§4.4 *Each reading has one owner*, *The boards*, TD-615) — and a note
     saying what could not be read, never drawn as an empty board (§4.5 *no silent failure path*): a
-    reading the host agent could not take again keeps its last items and says since when; a reading
-    that predates a field the rows draw (TD-278) is said."""
+    reading the host agent could not take again keeps its last items and says since when."""
     rows: list[dict[str, Any]] = []
     notes: list[str] = []
     for root, r in sorted((repos or {}).items()):
@@ -630,8 +589,6 @@ def board_reading(
             shown = "its rows are the last reading" if own else "no row is shown"
             notes.append(f"the board of {name} could not be read{since} ({got['error']}): {shown}")
         rows += own
-        if lacks := reader_lacks(got):
-            notes.append(lacks)
     return rows, "; ".join(notes)
 
 
@@ -971,21 +928,15 @@ def board_body(text: str, it: Mapping[str, Any]) -> str:
     `Decided:` tails where the reader read them as fields — those are drawn as the row's buttons and
     its *decided* line, so the body does not print them twice. The reader's fields decide, never the
     prose: an item the reader gave no `answers` and no `decided` keeps its whole text."""
-    fields = (it.get("answers") and board_mod.ANSWERS_RE, it.get("decided") and board_mod.DECIDED_RE)
-    due = board_mod.DUE_RE.search(text)
+    fields = (it.get("answers") and lb.ANSWERS_RE, it.get("decided") and lb.DECIDED_RE)
+    due = lb.DUE_RE.search(text)
     off = due.end() if due else 0  # the reader looks for the fields after the item's `Due:`
     starts = [m.start() for m in (f.search(text[off:]) for f in fields if f) if m]
     return text[: off + min(starts)].rstrip() if starts else text
 
 
-# the reader's own `Context:` field (`CONTEXT_RE` in dev-cadence's `nudge_user_attention.py`)
-# a bold run ending in a colon after a sentence's end — *… (TD-095). **Cards:** a report …* — is the
-# head of a part of a long line, and opens a paragraph under *details*
-SUBHEAD_RE = re.compile(r"(?<=[.;!?)])\s+(?=\*\*[^*\n]{1,80}?:\*\*)")
-# — at a sentence's start only, so *the Context: of this* in prose and a bold **Context:** stay text
-CONTEXT_RE = re.compile(r"(?:^|(?<=[.;!?)]\s))Context:\s*(?P<ctx>.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)")
-# a reply tail's mark, as the reader writes it: *— Paul, 2026-10-02:*
-REPLY_MARK_RE = re.compile(r"(?:^|\s)—\s+[^,—]+,\s*\d{4}-\d{2}-\d{2}:")
+# a board line's fields — its `Context:`, `Due:` and reply tails — are ledgerboard's to find (TD-585): the
+# text drawn here is cut where ledgerboard's own patterns find them, never by a second pattern of ours
 
 
 def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
@@ -1001,21 +952,21 @@ def board_text(body: str, it: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(r, dict) and str(r.get("text") or "").strip()
     ]
     text, tail = body, ""
-    due = board_mod.DUE_RE.search(body)
+    due = lb.DUE_RE.search(body)
     if due:
         text, tail = body[: due.start()].rstrip(), body[due.end() :].lstrip(" .")
-        if replies and tail.startswith("—") and len(REPLY_MARK_RE.findall(tail)) == len(replies):
+        if replies and tail.startswith("—") and len(lb.REPLY_TAIL_RE.findall(f" {tail}")) == len(replies):
             tail = ""  # the reader's replies, drawn from its field — every one of them, or none
         elif tail:
             replies = []  # what follows the `Due:` is not just the reader's replies: the text keeps it all, once
     if tail:
         text = f"{text} {tail}"
-    ctx = CONTEXT_RE.search(text)
+    ctx = lb.CONTEXT_RE.search(text)
     context = ctx.group("ctx").rstrip(" .") if ctx else ""
     if ctx:
         text = (text[: ctx.start()] + text[ctx.end() :]).rstrip()
     lead, rest = rendermod.fold_head(text)
-    rest = SUBHEAD_RE.sub("\n\n", rest)  # a walk's **Part:** heads each open a paragraph
+    rest = rendermod.part_heads(rest)  # a walk's **Part:** heads each open a paragraph
     if context:
         rest = f"{rest}\n\nContext: {context}" if rest else f"Context: {context}"
     for r in replies:
@@ -1368,8 +1319,8 @@ def board_detail(it: Mapping[str, Any]) -> str:
 def board_subject_text(text: str) -> str:
     """A board line's text before its `Due:` and without its `Context:` — what a head-less line's
     subject is cut from, so a headline never carries the due date or the answers after it."""
-    due = board_mod.DUE_RE.search(text)
-    return CONTEXT_RE.sub("", text[: due.start()] if due else text).strip() or text
+    due = lb.DUE_RE.search(text)
+    return lb.CONTEXT_RE.sub("", text[: due.start()] if due else text).strip() or text
 
 
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
@@ -1449,6 +1400,9 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     # sentence for what its fetch found, kept for the note above the repo's rows
                     "source": str(b.get("source") or ""),
                     "fetch_note": str(b.get("fetch_note") or ""),
+                    # the case the read found and a skip's why, which the note is drawn from (TD-585)
+                    "fetch_case": str(b.get("fetch_case") or ""),
+                    "fetch_why": str(b.get("fetch_why") or ""),
                     "find": _find_text(label, text, tag, "board", detail),
                 }
             )

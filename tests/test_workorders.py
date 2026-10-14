@@ -193,7 +193,7 @@ def test_each_case_of_the_read_against_origin(tmp_path):
     """§4.5 screen 6 *Boards are read against origin* (TD-585): the checkout's board against
     `origin/<default>` and their merge-base's, real git — *matches*; *behind*, origin's copy read and
     named as the source; *local*; *both*; *none* for an origin with no board — each case a word
-    (`fetch_case`) and a sentence in the phrases the Inbox's origin note reads."""
+    (`fetch_case`), which the Inbox's origin note reads, and a sentence for people."""
     from shiftlead.ui.inbox import origin_case
 
     origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "clone"
@@ -212,7 +212,7 @@ def test_each_case_of_the_read_against_origin(tmp_path):
 
     def case():
         (b,) = workorders.read_boards(clone)["boards"]
-        return b["fetch_case"], origin_case(b["source"] or "", b["fetch_note"]), b
+        return b["fetch_case"], origin_case(b["source"] or "", b["fetch_case"]), b
 
     assert case()[:2] == ("none", None)
     (seed / "docs").mkdir()

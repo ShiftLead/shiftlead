@@ -35,10 +35,6 @@ from sessionorc import ledgerboard, paths, workorders
 BOARD = Path("docs") / "user_attention.md"
 ACTIONS = ("snooze", "done", "reply", "decide")
 TOOL = "shiftlead"  # the `<tool>:` of every board commit's subject (ledgerboard's `subject`)
-# The board's own shapes, ledgerboard's — named here for the Inbox, which reads them from this module
-DUE_RE = ledgerboard.DUE_RE
-DECIDED_RE = ledgerboard.DECIDED_RE
-ANSWERS_RE = ledgerboard.ANSWERS_RE
 # A live look's second answer (design §4.5a **Works** / **Not right…**): the person's words follow.
 NOT_RIGHT = "Not right:"
 # The form itself, as cadence §3.5 writes it: `Not right: <what>` — a slot in angle brackets, or nothing.
