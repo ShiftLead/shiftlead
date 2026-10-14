@@ -214,7 +214,8 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   holds it, and a fixed sentence the Repo page, `ao doctor` and the briefs say when neither is there,
   never empty text or a silent fallback (§4.5a *Repo page: missing seams*, §4.7 `ao doctor` **repos**):
   - **`board:`** — the person's board, default `docs/user_attention.md` when that file exists; unset
-    and absent, the person's channel is the Inbox alone (*no board: the Inbox is the person's channel*).
+    and absent, the person's channel is the Inbox alone (*no board: the Inbox is the person's channel*;
+    every reader, `workorders.board_path`, built by TD-587).
     With one, the Inbox reads it in-process through `ledgerboard.py` — the checkout's file and
     `origin/<default>`'s after the host's own fetch, the origin note derived from the two (§4.5 screen 6
     *Boards are read against origin*) — and runs no dev-cadence script; a repo with a board needs no

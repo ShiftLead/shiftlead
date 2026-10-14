@@ -1220,6 +1220,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-14 (TD-587 slice 2, grinder-ao-1): *The seams* `board:` read by every board reader as designed — the host agent's `boards` reading and its clock (`workorders.read_boards`, `board_path` moved there from `board`), the write-back's edit, adds and re-read (`board.board_rel`, `agent_inbox._board_root`), the Inbox's *Put on the board* choices and `ao board show`, which says *no board: the Inbox is the person's channel* for a repo with none (`workorders.NO_BOARD`). Was: `docs/user_attention.md`, fixed, in each.
 - 2026-10-13 (TD-657, the designer): `settings.yml` gains `director: {level, groom}` and `repos.<repo>.director.level`; `org.yml`'s `director:` seat's trigger gains `asks` and `groom`. Built by TD-662 and TD-663.
 - 2026-10-13 (TD-636, the designer): `settings.yml` gains `permissions:` per role; `org.yml` gains `director:`. Built by TD-641, TD-642.
 - 2026-10-12 (TD-589, grinder-ao-1): `worktree_setup:` built — `sessionorc.gitinfo.worktree_setup` reads it (set, defaulted to an executable `scripts/hydrate_worktree.sh`, absent); a set command runs by the shell in the new worktree in place of the default; `shiftlead.repoconfig` accepts the key.
