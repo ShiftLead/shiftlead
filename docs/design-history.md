@@ -122,6 +122,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-13 (TD-636, the designer): a profile's `prompts: ask | skip` — under `ask` an unattended launch keeps its prompts for the person's rules and the director seat. Built by TD-641.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §4.2a cut to what a profile is — what left: the stale *not built — TD-233* on the reported reading (built, §4.4 *Usage*); *How a profile is billed* designed 2026-09-25 by the designer (#547) and reconciled the same day in a cloud session with Paul, built 2026-09-27 by TD-151 slices 1, 3, 5 and 4; the `config_dir` refusal's TD-151; the week's numbers behind the prompt-cache pin (2026-10-01–08: 4% of requests came 5–60 minutes after the one before, about 60% more than the week cost — the ADR keeps them); the pace's TD-151 decided 2026-10-07; 1,365 → 1,281 words.
 - 2026-10-09 (TD-458, the designer): **a metered profile's prompt cache lives an hour** — the adapter's launch sets `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` for a `metered` profile unless the host agent's environment carries the key; no profile field. ADR 2026-10-08 option 2, Paul's decision. Built by TD-470.
 - 2026-10-07 (TD-151, grinder-ao-1): built — `spend.sums` keeps the rows' `turns` and each window's `begins`, and `spend.reading` gives each window `turns` and `pace` (`{per_hour, unit, at}`); a pace that moves with the clock alone is kept current at the host agent and pushed with the next move of the spend.
@@ -1218,6 +1219,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-13 (TD-636, the designer): *What is left is judgement* — a profile's `prompts: ask` keeps its prompts, which meet the rules and the director before a manager. Built by TD-641, TD-642.
 - 2026-10-13 (TD-637, the designer): rule 10 receives only PRs green, pending or merged at the declaration; a pending one failing later is its *fail*. Built by TD-639.
 - 2026-10-12 (TD-619, the designer): *Keeping a team running* says a definition's later edit reaches a launch record only by Apply; rule 7's `relaunch` mark carries `profile`. Built by TD-620.
 - 2026-10-12 (TD-613, the designer): rule 6's work orders include `pr:<n>`, the anchor's, a free-pick lane's where no team has an anchor seat. Built by TD-618.
@@ -1411,7 +1413,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 10. Open questions
 
-- 2026-10-13 (TD-636, the designer): *Allow for this session* stays declined; the director and the rules are not it. 
+- 2026-10-13 (TD-636, the designer): *Allow for this session* stays declined; the director and the rules are not it.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §10 is the dated log by design and is left as it is, one line corrected — the devcontainer entry's *Build list: TD-057 step 3c* reads *Built*, since step 3c is in git.
 - 2026-09-25 (TD-177, Paul): *what may a manager do with the repo's numbers* — a balance line (open PRs above n, the oldest past d, the reader's queue past its bound) on which the manager stops handing out claims and asks the techlead to read; the numbers made visible first (TD-176), the rule after.
 - 2026-09-04 morning: name chosen `sessionherd`; 2026-09-04 evening: renamed `agentorc` to sit beside cmdorc — free on PyPI, one empty GitHub repo of that name, no dashboards among the neighbours.

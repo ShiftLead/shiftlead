@@ -260,6 +260,7 @@ teams:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
 roles:
   grinder: {profile: grind}
+director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt`; absent, none
 ```
 
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under
