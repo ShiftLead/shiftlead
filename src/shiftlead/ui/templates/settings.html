@@ -305,7 +305,9 @@
   <section class="isec" id="sec-settingsfile">
     <div class="row gap sechead"><span class="h2">settings.yml</span>{{ imark("settingsfile", "settings.yml", info_settings) }}</div>
     {{ panel("settingsfile", info_settings) }}
-    <div class="card pad setcard">{{ filefoot(files.settings, reads.settings[0], reads.settings[1]) if files.settings else '' }}{% if not files.settings %}<span class="note">not read: the host agent did not answer</span>{% endif %}</div>
+    <div class="card pad setcard">{{ filefoot(files.settings, reads.settings[0], reads.settings[1]) if files.settings else '' }}{% if not files.settings %}<span class="note">not read: the host agent did not answer</span>{% endif %}
+      {#- §4.9b, TD-641: a `permissions:` rule the host cannot read is named here and acts on nothing #}
+      {% for m in permissions_malformed %}<div class="note warn permbad">{{ m }} — ignored: no prompt is answered by it</div>{% endfor %}</div>
   </section>
 </div>
 {% endblock %}

@@ -627,3 +627,22 @@ console.log(JSON.stringify([k("ao-x-1|permission"), k("ao-x-1|alarm"), k("work:a
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout.strip().splitlines()[-1])
     assert got == ["ao-x-1:permission", "ao-x-1:alarm", "work:ao-grind", "", ""]
+
+
+def test_a_malformed_permissions_rule_is_named_where_the_page_shows_settings_yml(client, subprocess_agent):
+    """§4.9b *The person's written rules* (TD-641): a `permissions:` value the host refuses — read
+    through the agent's `settings` read, never the file — is named on the settings.yml card as
+    ignored; a well-formed one is not named."""
+    f = subprocess_agent.home / "settings.yml"
+    was = f.read_text() if f.exists() else None
+    try:
+        f.write_text('permissions:\n  grinder: {allow: ["Bash(ls:*)", 7], deny: "rm"}\n')
+        page = client.get("/settings").text
+        bad = re.findall(r'<div class="note warn permbad">([^<]*)</div>', page)
+        assert len(bad) == 2 and all("— ignored: no prompt is answered by it" in b for b in bad)
+        assert any("permissions.grinder.allow" in b for b in bad) and any("permissions.grinder.deny" in b for b in bad)
+        assert "Bash(ls" not in " ".join(bad)  # the good rule beside them is not named
+        f.write_text('permissions:\n  grinder: {allow: ["Bash(ls:*)"]}\n')
+        assert "permbad" not in client.get("/settings").text.split('id="sec-settingsfile"')[1]
+    finally:  # the module's agent outlives this test: its file is put back
+        f.write_text(was) if was is not None else f.unlink(missing_ok=True)

@@ -399,12 +399,17 @@
    this entry, which the home sends **to the asker** with a copy to the answerer, on the question's
    own thread, marked `[person]` — so the compose names the asker, not the answerer who sent the
    FYI. **Dismiss** ends the row. Both are drawn by this macro alone, which `row()` reaches only on
-   an entry carrying `answered`: never on another kind, and never on who sent it. #}
+   an entry carrying `answered`: never on another kind, and never on who sent it.
+   **A prompt the person's `permissions:` rules answered** (§4.9b, TD-641) — `answered.answerer` is
+   `rules` (`sessionorc.mail.RULES`) — draws **Dismiss** alone: the prompt is answered and the member
+   asked nothing, so there is no one to overrule; the row names the rule and where it is changed. #}
 {% macro answered(e, section) -%}
 {%- set a = e.answered %}
 {%- set asker = e.asker_name or a.asker or 'the asker' %}
+{%- set by_rules = a.answerer == 'rules' %}
+{%- set answerer = 'your permissions: rules' if by_rules else (e.from_name or e['from']) %}
 <div class="row gap wrap mhead">
-  <span class="ref" title="{{ e['from'] }} — who answered">{{ e.from_name or e['from'] }}</span>
+  <span class="ref" title="{% if by_rules %}settings.yml's permissions: — who answered{% else %}{{ e['from'] }} — who answered{% endif %}">{{ answerer }}</span>
   {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-answered">answered for you</span>
@@ -416,13 +421,20 @@
 <div class="st asked"><span title="{{ a.asker or '' }}">{{ asker }}</span> asked{% if e.asker_open %} <a class="btn sm ghost" href="/focus/{{ e.asker_open }}" title="Focus on {{ asker }}">Open</a>{% endif %}</div>
 {#- the question's first paragraph (§4.5a *Inbox row: details*): the answer is what this row is for #}
 <div class="body md quoted">{% if a.question %}{{ shaped(a.question, origin).lead }}{% else %}—{% endif %}</div>
-<div class="st asked">{{ e.from_name or e['from'] }} answered</div>
+<div class="st asked">{{ answerer }} answered</div>
 {{ body(e) }}
+{%- if by_rules %}
+<div class="st dflt" title="change it in settings.yml's permissions:">rule: {{ a.source or '—' }} — change it there</div>
+<div class="row gap wrap mfoot">
+  <span class="st">answered by your rules — nothing waits on you</span>
+  <span class="grow"></span>
+{%- else %}
 <div class="st dflt">source: {{ a.source or '—' }}</div>
 <div class="row gap wrap mfoot">
   <span class="st">answered from the record — nothing waits on you</span>
   <span class="grow"></span>
   <button class="btn sm" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ a.asker or '' }}" data-name="{{ asker }}" data-quote="{{ a.question or '' }}" data-when-note="{{ e.asker_when or '' }}" title="your answer instead: it goes to {{ asker }} on the question's own thread, copied to {{ e.from_name or e['from'] }}, and {{ asker }} owes you what came of it">Overrule</button>
+{%- endif %}
   <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}">Dismiss</button>
 </div>
 {%- endmacro %}
