@@ -605,6 +605,14 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
     ]
 
 
+def refill(held: dict[str, Any], new: Mapping[str, Any]) -> None:
+    """`held` made `new` in place, never emptied on the way: a view built on a worker thread (TD-670)
+    reads it while the loop refills it, and a `clear()` first would draw that view without its marks."""
+    for k in set(held) - set(new):
+        held.pop(k, None)
+    held.update(new)
+
+
 async def agent_call(method: str, **params: Any) -> Any:
     """One host-agent RPC as the page makes it: down is a 503, a refusal a 400."""
     try:
@@ -680,8 +688,7 @@ class Readings:
         got: dict[str, Any] = {}
         with contextlib.suppress(Exception):
             got = dict((await self.call("host")).get("pulls") or {})
-        inbox_mod.PULLS.clear()
-        inbox_mod.PULLS.update(got)
+        refill(inbox_mod.PULLS, got)
 
     async def board_all(self) -> tuple[list[dict[str, Any]], str]:
         """Every open board row of this host's repos and the note beside them (TD-069 step 3), from the
@@ -955,13 +962,14 @@ def create_app() -> FastAPI:
             log.debug("the flows read failed; the last reading stands", exc_info=True)
         # what every card a delta draws reads of it (`cards.flow_mark`): the flow by team, the acts by id
         got = flow_cache["flows"]
-        cards_mod.FLOWS.clear()
-        cards_mod.FLOWS.update({n: str(v["flow"]) for n, v in got.items() if v.get("flow")})
-        cards_mod.FLOW_ACTS.clear()
-        for v in got.values():
-            for d in v.get("differences") or []:
-                if d.get("id"):
-                    cards_mod.FLOW_ACTS[str(d["id"])] = str(d.get("act") or "")
+        refill(cards_mod.FLOWS, {n: str(v["flow"]) for n, v in got.items() if v.get("flow")})
+        acts = {
+            str(d["id"]): str(d.get("act") or "")
+            for v in got.values()
+            for d in v.get("differences") or []
+            if d.get("id")
+        }
+        refill(cards_mod.FLOW_ACTS, acts)
         return got
 
     async def group_heads(
