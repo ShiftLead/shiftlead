@@ -211,7 +211,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
      by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
-     `every`, `work`), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
+     `every`, `work`, and `prompt`, the org's director seat's alone: due while a prompt no rule of the
+     person's answered is pending on an unattended record of the org, cleared when none is, §4.9b
+     *The director seat*, TD-636), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and
      cleared again if it returns to zero before a fill — the question was answered elsewhere);
      for `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to
      the seat's repo's default branch since the seat's record was created, read with `gh` on the
@@ -362,7 +364,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   failure earns one, none typed by a session. What is left reads a screen or weighs words: an
   `ask` addressed to the manager, a permission on an unattended member (rare, since an unattended
   launch skips them — the Claude Code adapter's `--dangerously-skip-permissions`, §4.8; a profile's
-  `unattended_args` may not), a `stalled?` member, one *idle · open work* after the nudge, and the
+  `permission_prompts: ask` does not, §4.2a, and its prompts go to the person's rules and the director seat
+  before a manager, §4.9b *The director seat*), a `stalled?` member, one *idle · open work* after the nudge, and the
   prose of an escalation. So **the manager is a seat on call** unless its definition says
   otherwise (`on_call`, §4.9, whose default is the `manager` role's alone), filled by rule 3's
   `team` trigger on exactly those readings and closed when it has acted, as the techlead is; a

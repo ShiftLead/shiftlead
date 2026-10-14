@@ -82,6 +82,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2 State feed: hooks first, scraping as a labelled fallback
 
+- 2026-10-13 (TD-636, the designer): an unattended prompt meets the person's rules, then the director, then the person. Built by TD-641, TD-642.
 - 2026-10-12 (TD-597, the build): `transcript` is the path the hook reports (Claude Code's `transcript_path`), not the adapter's locator, which finds no file before the conversation's first write and so had nothing to set at the first hook. Was: the adapter's `transcript_path`.
 - 2026-10-12 (TD-578, the designer): the record carries `transcript`, the tool's file path on its host, set with `adapter_id`. Built by TD-597.
 - 2026-10-12 (TD-592, ao-paul; Paul: *this session has been sitting idle since I ran the /clear, but its chip says working*): `SessionStart` with `source: clear` reports `idle`. Until this date it read `working`, as TD-155 had found for `resume`: `/clear` lands at an empty composer, no `Stop` follows, and the chip sat `working` until the next turn ended, headed for `stalled?`.
@@ -121,6 +122,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.2a Profiles: tool · account · model
 
+- 2026-10-13 (TD-636, the designer): a profile's `permission_prompts: ask | skip` — under `ask` an unattended launch keeps its prompts for the person's rules and the director seat. Built by TD-641.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §4.2a cut to what a profile is — what left: the stale *not built — TD-233* on the reported reading (built, §4.4 *Usage*); *How a profile is billed* designed 2026-09-25 by the designer (#547) and reconciled the same day in a cloud session with Paul, built 2026-09-27 by TD-151 slices 1, 3, 5 and 4; the `config_dir` refusal's TD-151; the week's numbers behind the prompt-cache pin (2026-10-01–08: 4% of requests came 5–60 minutes after the one before, about 60% more than the week cost — the ADR keeps them); the pace's TD-151 decided 2026-10-07; 1,365 → 1,281 words.
 - 2026-10-09 (TD-458, the designer): **a metered profile's prompt cache lives an hour** — the adapter's launch sets `CLAUDE_CODE_PROMPT_CACHE_TTL=1h` for a `metered` profile unless the host agent's environment carries the key; no profile field. ADR 2026-10-08 option 2, Paul's decision. Built by TD-470.
 - 2026-10-07 (TD-151, grinder-ao-1): built — `spend.sums` keeps the rows' `turns` and each window's `begins`, and `spend.reading` gives each window `turns` and `pace` (`{per_hour, unit, at}`); a pace that moves with the clock alone is kept current at the host agent and pushed with the next move of the spend.
@@ -789,6 +791,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-13 (TD-636, the designer): the **`permit`** grant — `decide` on any unattended record's prompt, nothing else. Built by TD-642.
 - 2026-10-13 (TD-637, the designer; Paul, 2026-10-13, the lessons ADR's lesson 4: *an agent should not say its done if its PR is not green*): *A `done` with a PR is told what its checks read* — read at the declaration against the base branch's required checks: refused while one failed on the exact head; accepted as *checks pending* while one runs, rule 10 reading it again; accepted merged, green, with no CI, or on a read the home could not make. Was: accepted always, checked afterwards. Built by TD-639.
 - 2026-10-12 (TD-580, the designer; Paul, 2026-10-12, after `ao promote shiftlead` was refused in a shell he opened with **Open shell here**: *a shell being directly controlled by the user should have permissions to promote/other without interference*): *The person's own shell is the person* — a `shell` record, interactive, no role, no team, an empty `controllers` list, passes every `PERSON_ONLY` RPC as the person; `person_shell(record)` beside the list; the right read at each request, lost on a mode flip, a controller or a role; the act still recorded as the shell's. Was: every session refused alike. Built by TD-596.
 - 2026-10-09 (TD-489, the designer; the 2026-10-09 outage, a designer run's `kill $ppid` loop over `sleep 90` matches that killed `systemd --user`): the template's never-list gains **the process rule** — a session signals only a pid it started and holds, never a parent, never by a name matched across the machine; a helper gets a bound at birth — carried by `ao --skill` too. The repo briefs under `docs/briefs/` are held paths and keep their own lines (grinder-ao-1's pattern-kill rule, 2026-09). Built by TD-496.
@@ -961,6 +964,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-13 (TD-636, the designer; Paul, 2026-10-13, the lessons ADR's lesson 1: *I like the idea of filtering permission prompts — essentially allowing a director seat to handle them for the user*): *The director seat answers permission prompts for the person* — the person's `permissions:` rules per role first (the host, no tokens), then the org's `director:` seat (on call, the `permit` grant), then the person; questions, interactive sessions and prompts touching `~/.shiftlead`, `~/.claude`, systemd or another worktree always the person's; every answer an FYI in *Answered for you*. The point: an unattended profile may launch without the skip. Built by TD-641, TD-642.
 - 2026-10-12 (TD-559, the designer): a Start's held anchor record carries `seat_held.since`, the start's time. Built by TD-564.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 9): §4.9b cut to what the seat is and does — every *designed/built — TD-NNN* clause, Paul's quotes and the dated counts left for this record; 7,896 → 7,588 words. What left: the seat rule's build (§6 rule 3, TD-103; the manager's brief stated it until TD-103's slice 5); the manager on call (TD-247 designed 2026-09-30, the field written and read since 2026-10-01 by TD-259); the anchor seat (TD-381 designed 2026-10-07, built by TD-385/TD-386/TD-387; Paul, 2026-10-07: *let's also plan out the on-call anchor session. Are managers automatically added to teams? I wonder if anchor sessions should be as well.* — `Owner: anchor` held 34 of agentorc's open entries that day, moving only while Paul kept a session open in the checkout, and samscrape, contractmatch and dev-cadence had no anchor; opt-in rejected by steer `m-581533eadebf`, since a repo with no anchor is where the eleven decided lines sat; the start that never waits on the checkout TD-394 designed 2026-10-08, built by TD-395; Apply's seat difference TD-399 built by TD-400); the UI-change road (TD-290 designed 2026-10-03 on Paul's points of that day; TD-291 built as the scratch home #970, the briefs #972, the techlead's read #973, its first use #975; TD-292 built in part; before it every merged page change ended in a board line asking the person to look, mostly mechanical and unchecked); the live check's lane (TD-320; Paul, 2026-10-04: *we should make live-checks pickable by grinders so they do not have to wait on a promote*, designed that day; seven High entries waited on the anchor that day; built by TD-323 slices 1–3; the page's *live check* kind TD-418/TD-428, until then the live ones under *pickable* and the rest under *other*); the handed entry's count (TD-180, built 2026-09-29 by TD-218 slice 1); TD-160 on a person in the team; `prs_waiting.asks` built by TD-333, the header line by TD-309 slice 6d; TD-125; and the reader's build record (TD-093 slice 1: `review:` on a preset, `pr` on an ask, `prs_waiting` on the view; the *not built* list — `ao pr held`, the header's count, the briefs — since built).
 - 2026-10-08 (TD-405, grinder-ao-1): *Seats with a trigger* names the home's tick as what reads a `prs:` count and times `every:`, as §6 rule 3 has it and the build does (`agent_tick._seat_due`); it had said the manager's, which the tick took over in TD-103.
@@ -1177,6 +1181,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-13 (TD-636, the designer): `settings.yml` gains `permissions:` per role; `org.yml` gains `director:`. Built by TD-641, TD-642.
 - 2026-10-12 (TD-589, grinder-ao-1): `worktree_setup:` built — `sessionorc.gitinfo.worktree_setup` reads it (set, defaulted to an executable `scripts/hydrate_worktree.sh`, absent); a set command runs by the shell in the new worktree in place of the default; `shiftlead.repoconfig` accepts the key.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *The seams* — `board:`, `gate:`, `worktree_setup:`, `commands:` (`test`, `lint`) and what `ledger:` requires (a ledger in ledgerboard format); *Repos* is ShiftLead's own roster importing dev-cadence's. Was: `commands:` read by nothing, the roster dev-cadence's file. Built by TD-585–TD-591.
 - 2026-10-10 (TD-060 step 2, the anchor): a repo's file is `.shiftlead.yml`; `.agentorc.yml` is read while no `.shiftlead.yml` is beside it.
@@ -1216,6 +1221,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-13 (TD-636, the designer): *What is left is judgement* — a profile's `permission_prompts: ask` keeps its prompts, which meet the rules and the director before a manager. Built by TD-641, TD-642.
 - 2026-10-13 (TD-637, the designer): rule 10 receives only PRs green, pending or merged at the declaration; a pending one failing later is its *fail*. Built by TD-639.
 - 2026-10-12 (TD-619, the designer): *Keeping a team running* says a definition's later edit reaches a launch record only by Apply; rule 7's `relaunch` mark carries `profile`. Built by TD-620.
 - 2026-10-12 (TD-613, the designer): rule 6's work orders include `pr:<n>`, the anchor's, a free-pick lane's where no team has an anchor seat. Built by TD-618.
@@ -1409,6 +1415,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 10. Open questions
 
+- 2026-10-13 (TD-636, the designer): *Allow for this session* stays declined; the director and the rules are not it.
 - 2026-10-09 (TD-464, the designer; the second pass, slice 13): §10 is the dated log by design and is left as it is, one line corrected — the devcontainer entry's *Build list: TD-057 step 3c* reads *Built*, since step 3c is in git.
 - 2026-09-25 (TD-177, Paul): *what may a manager do with the repo's numbers* — a balance line (open PRs above n, the oldest past d, the reader's queue past its bound) on which the manager stops handing out claims and asks the techlead to read; the numbers made visible first (TD-176), the rule after.
 - 2026-09-04 morning: name chosen `sessionherd`; 2026-09-04 evening: renamed `agentorc` to sit beside cmdorc — free on PyPI, one empty GitHub repo of that name, no dashboards among the neighbours.

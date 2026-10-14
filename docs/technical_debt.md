@@ -63,11 +63,13 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-633 | Build TD-630: Attach, drop and paste on the Add entry form's **What** — `attach` with a `draft`, the draft folder claimed at the press, an unclaimed one swept | Medium | Open |
 | TD-634 | `ao inbox --counts` run from a session counts that session's own inbox, not the person's, and marks its unread mail read | Medium | Designed — TD-635 builds it |
 | TD-635 | Build TD-634: `ao inbox --counts` asks the UI's counts read first; the person's local count names `person`; a session with no UI answering is refused in words; a test runs it as a session | Medium | Open |
-| TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Open |
+| TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
 | TD-638 | A commit names the session that made it, not the model: as tools and models multiply, which model did what is lost | Low | Open |
 | TD-639 | Build TD-637: `done … --pr` reads the PR's required checks at the declaration — refused on a failure, *checks pending* while running; the repo reading keeps each base branch's required set | Medium | Open |
 | TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
+| TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Open |
+| TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
 
 ---
 
@@ -1207,7 +1209,8 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (ao-paul, with Paul — the lessons ADR, lesson 1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-13 (the designer) — (1) **one director seat per org**, `org.yml`'s `director:` (absent, none: off by default), on call by the trigger *a prompt no rule answered pending on an unattended record*, distinct from the techlead (which answers asks) and replacing a manager's permission triage where defined; (2) **the person's `permissions:` rules per role** in `settings.yml`, the adapter's syntax, matched by the host first at no token cost, then the director's judgement, then the person; **always the person's**: questions and menus, every interactive session's prompt (§9 invariant 5), and any prompt naming `~/.shiftlead`, `~/.claude`, a systemd unit or a path outside the member's worktree and checkout unless denied — the host refuses a rule's or the director's *allow* there, a deny standing as a manager's does today; the director is **the first seat of no team**, written by any team start when the org defines it, trigger `prompt`; a profile's **`permission_prompts: ask`** is what lets an unattended launch keep its prompts (an empty `unattended_args` falls back to the skip today); a rule's or director's answer is an *Answered for you* FYI in the sourced reply's shape, with no Overrule; (4) **every answer told** as an FYI in *Answered for you*, the rule or reason with it; (5) **not *Allow for this session***: no session's settings change, one prompt at a time, rules written by the person; (6) the **`permit`** grant: `decide` on unattended records only. The value: an unattended profile can launch without `--dangerously-skip-permissions`. §4.9b *The director seat*, §4.8 `permit`, §4.2, §5, §10, glossary. Built by TD-641 and TD-642. Was: Open.
+**Blocked by:** TD-641, TD-642
 **Location:** design §4.2 (the permission relay, Allow/Deny), §4.8 (roles, grants), §4.9 / §4.9b (seats; the techlead seat answers asks for the person), §10 *"Allow for this session"* (decided no, 2026-09-23); `src/shiftlead/briefs/manager.md` (a manager's permission triage)
 
 **Why:** Paul, 2026-10-13: *"I like the idea of filtering permission prompts — essentially allowing a director seat to handle them for the user (we talked about a director seat at one point but have not implemented)."* Every prompt a tool does not pre-allow reaches the person, or a team's manager, which triages its members' prompts by its brief. Muse's Sentinel, Grok Bot's Auto-review rules and Hermes's `smart` approvals all put a second line in front of the person (`docs/decisions/2026-10-13-agent-product-lessons.md`). The glossary's *director* is a position in the control graph (the session whose members are managers), not a seat; no seat answers prompts for the person.
@@ -1303,5 +1306,58 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the `ci` row passes a PR whose required checks passed and a non-required one failed, fails one whose required check failed, and dev-cadence's sync lands it.
 
 **Related:** TD-637 (the design), TD-639 (ShiftLead's side).
+
+---
+
+## TD-641: Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-636's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.9b *The director seat answers permission prompts for the person* (line 1 and *What always reaches the person*), §4.2 (the relay), §5 `settings.yml` `permissions:`; `src/sessionorc/settings.py` (the key, checked: a role name, `allow`/`deny` lists of strings), the adapter (`src/shiftlead/adapters/claude_code/`: a `rule_matches(rule, tool, input)` in Claude Code's `Tool(pattern)` syntax, the core naming no tool), the host agent's `PermissionRequest` path (`src/sessionorc/agent_hook.py`: match before the waiter; a deny over an allow; answered through the hook with the rule as reason), the always-the-person check (a path under `~/.shiftlead` or `~/.claude`, a systemd unit, outside the record's worktree and checkout — one function, used here and by TD-642's `permit`), the *Answered for you* FYI (`src/sessionorc/agent_mail.py` ~L671 writes one only for a reply with `source` today: a host-written one in the same `answered: {question, asker, answerer, source}` shape, `models.py` ~L390, the prompt as question, the member as asker, `rules` as answerer, the rule as source; the row draws no Overrule for it), the profile key (`src/shiftlead/profiles.py` ~L48 and the adapter ~L533: `permission_prompts: ask | skip`, the skip flag added only under `skip`, the default); `tests/test_hook*.py`, `tests/test_agent*.py`, `tests/test_mail.py`, `tests/test_profiles*.py`
+
+**Why:** TD-636: Paul, 2026-10-13 — *filtering permission prompts*; the first line in front of the person is the person's own rules, at no token cost.
+
+**Fix:**
+1. `settings.yml` `permissions: {<role>: {allow: [...], deny: [...]}}`, read by the host agent; a malformed rule is named where the Settings page shows settings, and ignored. `profiles.yml`'s `permission_prompts: ask | skip` (default `skip`): the adapter adds `--dangerously-skip-permissions` to an unattended launch only under `skip`.
+2. At the hook, for an **unattended** record only: the role's `deny`, then its `allow`; an *allow* of a prompt on the always-the-person list (a path under `~/.shiftlead` or `~/.claude`, a systemd unit, outside the record's worktree and checkout) is not made — the prompt goes on — while a deny of one stands; a match answers through the hook with *rule: <the rule>* as the reason.
+3. Every answer by a rule: one FYI in the person inbox's *Answered for you*, the `answered` shape filled as the design says; no Overrule on its row, the row naming `settings.yml`'s `permissions:` instead.
+4. An interactive record's prompt and a question or menu are never matched.
+5. Tests: an allow rule answers and writes the FYI; a deny wins over an allow; an allow of a prompt naming `~/.shiftlead` is not made and a deny of one is; `permission_prompts: ask` launches without the skip flag and the default with it; an interactive record is never matched; a question is never matched; no rules leaves everything as today.
+
+**Done when** a prompt on an unattended member that the person's rules cover is answered at once by the host with the rule as reason and told in *Answered for you*, the always-the-person prompts and every interactive session's are not, and the tests above pass.
+
+**Related:** TD-636 (the design), TD-642 (the seat), TD-075 (*Answered for you*).
+
+---
+
+## TD-642: Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (the designer, TD-636's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-641
+**Location:** design §4.9b *The director seat* (line 2), §4.8 `permit`, §5 `org.yml` `director:`, §6 rule 3 (seats and their triggers); `src/shiftlead/teams.py` / `teamrun.py` (the org's `director:` read by the client; any `ao team start` or Apply writes the director seat when the org defines it and no record holds it — the first seat of no team, trigger `prompt`, added to the trigger set), `src/sessionorc/agent_tick.py` (rule 3: the trigger *a prompt no rule answered pending on an unattended record*, filling the seat, closing it with nothing due), `src/sessionorc/agent_common.py` / `agent.py` (the `permit` grant: `decide` on any unattended supervised record of the org, without controllers, refused on interactive, on itself and where TD-641's always-the-person check holds), `src/shiftlead/briefs/director.md` (new: what to allow, deny and pass up), `src/shiftlead/briefs/manager.md` (*with a director, permissions are its*), the *Answered for you* FYI with the director's reason; `tests/test_agent*.py`, `tests/test_seat*.py`, `tests/test_tick*.py`
+
+**Why:** TD-636: Paul, 2026-10-13 — *allowing a director seat to handle them for the user*; the prompts no written rule covers need a judge before the person.
+
+**Fix:**
+1. `org.yml` `director: {profile, brief}` (absent: none); the home keeps the seat as a team's techlead seat is kept, with no team badge.
+2. The trigger: an unattended record's prompt still pending after TD-641's rules, with the director defined; the seat filled, handed the prompt's record, tool, input, and the member's role, brief and claim.
+3. `permit`: `ao allow|deny <id> <reason>` (the `decide` RPC) from the seat on any unattended record of the org; refused on interactive, on itself, and on an *allow* of an always-the-person prompt (a deny stands).
+4. A pass: `ao msg person` naming the prompt and why, the prompt left as `needs-you`.
+5. Every answer: an FYI in *Answered for you* with the reason.
+6. The manager's brief: with a director defined, it leaves permissions to it.
+7. Tests: the seat fills on an unmatched prompt and not on a matched one; `permit` allows and denies an unattended record's prompt, is refused on an interactive one, on itself and on a `~/.shiftlead` prompt; no `director:` leaves the prompt to the person; the FYI is written.
+
+**Done when** an unattended member's prompt no rule covers is answered by the director seat with a reason told to the person, or passed up in words, never touching an interactive session or the always-the-person prompts, and the tests above pass.
+
+**Related:** TD-636 (the design), TD-641 (the rules), TD-151 (the techlead seat), §6 rule 3.
 
 ---

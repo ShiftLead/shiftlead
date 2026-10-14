@@ -44,6 +44,8 @@ teams:                                        # per team, by the name org.yml or
     on_work: start                            # §6 rule 8: start | ask | off, when a wound-down team's lanes, or a finished member's lane, gain work; start when absent
     flow: build-review                        # §4.9c: which of the team's flows it runs now; absent, the first
     balance: {prs: 10, oldest: 2d, review: true}   # §6 *Balance*: over any of these the team's members take no new claim; absent, no rule
+permissions:                                  # TD-636, §4.9b *The director seat*: per role, the adapter's rule syntax; a deny wins
+  grinder: {allow: ["Bash(pdm run test:*)", "Bash(gh pr view:*)"], deny: ["Bash(rm -rf:*)"]}
 repos:                                        # per registered checkout, by its directory name
   shiftlead: {promote: {auto: false}, pull: true}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
 person:                                       # the person's own — nothing here reaches a policy
@@ -258,6 +260,7 @@ teams:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
 roles:
   grinder: {profile: grind}
+director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt`; absent, none
 ```
 
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under
