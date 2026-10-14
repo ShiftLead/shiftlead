@@ -53,7 +53,28 @@
   </div>
 </section>
 
-{# (3) Waiting on you — the Inbox's own board rows, filtered to the repo: acting here is acting on the board #}
+{# (3) Recently completed — the window's closed entries, newest first, each with the PR that closed it and
+   who opened that PR (§4.5 screen 11, TD-604); one list per window, the page's one picker shows one #}
+<section class="rsec" id="completed">
+  {% for w, c in completed.items() %}
+  <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
+  <div class="row gap rsh"><span class="h2">Recently completed</span> <span class="meta">{{ c.rows | length }} {{ c.word }} · newest first</span>
+    <button class="imark" type="button" aria-expanded="false" aria-controls="info-completed-{{ w }}" title="About this list">i</button></div>
+  <div class="secinfo meta" id="info-completed-{{ w }}" hidden>entries the ledger closed in the window (day · week · month, the page's one picker): the first commit whose ledger no longer holds the entry, the PR whose squash merge took it out, and who opened that PR — <i>no PR</i> where the closing commit names none</div>
+  <div class="rlist">
+  {% for e in c.rows %}
+    <div class="rrow{% if loop.index > 8 %} folded{% endif %}" data-list="completed-{{ w }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
+      {% if e.pr is none %}<span class="meta">no PR</span>{% elif e.url %}<a class="mono" href="{{ e.url }}" target="_blank" rel="noopener">#{{ e.pr }}</a>{% else %}<span class="mono">#{{ e.pr }}</span>{% endif %}{% if e.pr is not none %}<span class="meta">·</span>{% if e.author %}<a class="mono" href="/focus/{{ e.author.id }}">{{ e.author.name }}</a>{% elif e.login %}<span class="mono meta">{{ e.login }}</span>{% else %}<span class="meta">—</span>{% endif %}{% endif %}<span class="meta">· {{ e.age }}</span></div>
+  {% else %}
+    <div class="rrow meta">nothing closed {{ c.word }}</div>
+  {% endfor %}
+  {% if c.fold %}<button class="rrow meta mono more" type="button" data-unfold="completed-{{ w }}">+{{ c.fold }} more</button>{% endif %}
+  </div>
+  </div>
+  {% endfor %}
+</section>
+
+{# (4) Waiting on you — the Inbox's own board rows, filtered to the repo: acting here is acting on the board #}
 <section class="rsec" id="waiting">
   <div class="row gap rsh"><span class="h2">Waiting on you</span> <span class="meta">{{ boards | length }} due</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-wait" title="About this list">i</button>
@@ -65,7 +86,7 @@
   {% with hz = horizon %}{% include "board_horizon.html" %}{% endwith %}</div>
 </section>
 
-{# (4) Doing — the team's ao doing calls, newest first, with a chip per doer #}
+{# (5) Doing — the team's ao doing calls, newest first, with a chip per doer #}
 <section class="rsec" id="doing">
   <div class="row gap rsh"><span class="h2">Doing</span> <span class="meta">the team's ao doing calls · newest first</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-doing" title="About this list">i</button></div>

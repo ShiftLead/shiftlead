@@ -30,7 +30,7 @@
     </div>
     {% if led.windows %}{% for w in ('day', 'week', 'month') %}{% set b = led.windows[w] %}
     <div class="lv" data-lv="{{ w }}" hidden>
-      <div class="blocks"><a class="blk opened" href="{{ r.url }}#debt-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}#debt-closed" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
+      <div class="blocks"><a class="blk opened" href="{{ r.url }}#debt-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}?win={{ w }}#completed" style="flex-basis: {{ 100 - b.opct }}%;"{% if led.closed_titles and led.closed_titles[w] %} title="{{ led.closed_titles[w] }}"{% endif %}><b>{{ b.closed }}</b> closed</a></div>
     </div>
     {% endfor %}{% endif %}
     {% if led.error %}<div class="meta dim" title="{{ led.error }}">the last read failed — these are the numbers before it</div>{% endif %}

@@ -11244,3 +11244,54 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-654 (the design), TD-413 (its live check, blocked by this), TD-410 (the held Start), TD-133 (the schedule's replay, same rule when built), TD-227 (rule 8's start).
 
 **Resolved:** 2026-10-13 (grinder-ao-1, PR #1684) — rule 8's start replays every unattended seat held: `_replay` takes `held`, `create` gets it here and through the link, the `restarts` entry carries `held: true`; a member and a standing manager replay live; the home's anchor check for a container node passes a held create. Tests in `tests/test_work_start.py`. TD-413's live check reads it once #1684 is live.
+
+
+## TD-604: Recently completed TDs are drawn nowhere: the Repo page and the team card's *TDs in motion* show only open work
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (ao-paul, at Paul's ask)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-12 (the designer; mockup `RepoPage.dc.html`, shot `docs/mockups/reviews/2026-10-12-td604-recently-completed.png`) — **the Repo page** gains a **Recently completed** section after Technical debt: the entries closed in the page's window (day · week · month), newest first, each its id, title, the PR whose squash merge took it out of the ledger (the closing first-parent commit's `(#n)`, which the history already finds — not the archive's `Resolved:` line, which names design PRs, slices and live checks in no fixed order), who opened that PR (from the month's PR reading) and the close's age; *no PR* for a close by a direct push. Read from the reading's existing `recent` and the closing commit's subject, kept as `completed`. **The team card** draws no list — *TDs in motion* is what members hold now, and the facet has no room — its Repo facet's *closed* block becomes a link to that section with the ids and titles on hover. `ao repo` prints *completed this week: n* and `--json` carries `completed`. §4.5 screen 11 item 3, §4.5a *Repo facet*, §4.4 *Repo facts*, §4.7 `ao repo`. Built by TD-608. Was: Open.
+**Blocked by:** TD-608
+**Location:** design §4.5 (the Repo page; the team card's *TDs in motion*, `docs/design/4.5-ui.md` ~L244), §4.5a *team card: TDs in motion* and the Repo page's rows; §4.4 *Repo facts* (what the host agent reads of the ledger); `docs/technical_debt_archive.md`, whose entries carry `**Resolved:** <date>` and name their PR
+
+**Why:** Paul, 2026-10-12: *show recently completed TDs in the repo screen and/or in the "TDs in motion" card*. *TDs in motion* lists the references a member holds now, and the Repo page the open entries; once an entry archives it drops out of both, so the person cannot see from the UI what the teams finished today or this week, only the *closed* count in the Technical debt facet's period blocks.
+
+**Fix:** design first.
+- What "completed" is read from: the facet's *closed* block already counts an entry closed at the first commit whose ledger no longer holds its heading (§4.4 *Repo facts*, *Opened and closed in a window*); the list takes the same reading for its window, and the archive's `**Resolved:**` line (which names the PR, in no fixed place) for the PR — a new reading of the archive, said in §4.4.
+- Where it is drawn: on the Repo page, a *Recently completed* section under the open entries for the facet's window (day · week · month), each row its id, title, resolved date, PR and who closed it when the line names one; on the team card, either a *done* phase at the foot of *TDs in motion* for the window, or a link from the facet's *closed* block to the Repo page's section. The designer weighs whether the card has room (§4.5 *A team's card*) and picks one, or both.
+- Mockups for each surface changed.
+
+**Done when** the person can see, from the Repo page and/or the team card, which entries closed in the chosen window, with their PRs, and the design and mockups say so.
+
+**Related:** TD-591 (the Repo page), TD-071 (Org page ideas).
+
+**Resolved:** 2026-10-13 (grinder-ao-2) — built by TD-608 (#1625 the reading, #1683 the page, the facet and `ao repo`).
+
+
+## TD-608: Build TD-604: the Repo page's *Recently completed* — the window's closed entries with the PR whose squash merge closed them and its author — the facet's *closed* block a link to it with the titles on hover, `ao repo`'s *completed*
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-12 (the designer, TD-604's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Slice 1 of 2 (grinder-ao-1, 2026-10-12): fix step 1 and its tests, the reading (`src/sessionorc/**`) — `Change.pr` from the closing commit's subject (`--format` gains `%s`), `recent` rows carry `pr`, and `ledger.completed` joins the closed ones to the month's PR reading as the repo reading's `completed: [{id, title, closed, pr, author, branch, url}]`; the session name for `author` is the view's (it holds the records: match `branch` against a record's `git.branch`). Left: slice 2, steps 2–4 and their tests (`src/shiftlead/**`: the Repo page section, the facet's *closed* link and hover, `ao repo`'s line and `--json`). Was: Open.
+**Location:** design §4.5 screen 11 item 3, §4.5a *Repo facet*, §4.4 *Repo facts* (*What closed, and by which PR*), §4.7 `ao repo`; `src/sessionorc/ledger.py` (`history` ~L592: the log's `--format` gains `%s`, and a `Change` keeps the closing commit's `SQUASH` match (~L51) as `pr`; the reading ~L660–697: `recent` already holds the month's opened and closed entries; add `completed` — the closed ones with `pr` and `author` from the PR reading), the PR reading's month list (§4.4 *Repo facts*, `recent` PRs with their author and branch), `src/shiftlead/ui/templates/repo_part.html` (a section after Technical debt, `id="completed"`), the team card's Repo facet template (the *closed* block's `href="/repo/<name>#completed"` and its `title`), `src/shiftlead/cli.py` (`ao repo`: the line and `--json`), `src/shiftlead/ui/help.py` if it describes the page; `docs/mockups/RepoPage.dc.html` (drawn by TD-604, by hand: it is not generated); `tests/test_ledger*.py`, `tests/test_ui_repo*.py`, `tests/test_cli.py`
+
+**Why:** TD-604: Paul, 2026-10-12 — *show recently completed TDs in the repo screen and/or in the "TDs in motion" card*; once an entry archives it drops out of every list, and only the facet's *closed* count says anything finished.
+
+**Fix:**
+1. The reading: `history`'s log carries each commit's subject; the commit that closes an entry records `pr` = `SQUASH`'s group on its subject, none when it has no `(#n)`; `completed` = the `recent` entries with a `closed` time, newest first, each with `pr` and `author` from the month's PR reading matched by number (its session name when a record's branch is the PR's head, else the login). The archive is not read.
+2. The Repo page: section 3 *Recently completed*, after Technical debt, before Waiting on you — filtered to the page's window, the heading *n this week* (the window's word), each row id · title · `#pr` (a link) · author (a link to Focus when a session) · age, *no PR* where the close named none; folded past eight with *+n more*; nothing drawn when empty but the heading and *nothing closed this week*.
+3. The team card: the Repo facet's *closed* block links to `/repo/<name>#completed` (the window carried) and its `title` lists the ids and titles, ten at most and *… and n more*.
+4. `ao repo`: *completed this week: n* under the first line; `--json` `completed` on the repo.
+5. Tests: a squash commit `… (#1290)` that removes an entry's heading gives `pr: 1290`; a direct-push commit gives none; a multi-slice entry closed by its last PR reads that PR, not its first slice's; the window filter; the section's rows and fold; the block's link and hover; `ao repo`'s line and JSON.
+
+**Done when** the Repo page lists the entries closed in the chosen window with their PRs and who opened them, the team card's *closed* block links there with the titles on hover, `ao repo` says how many closed this week, and the tests above pass; the builder's look (design §4.9b: the page's section on a scratch home) is named in the PR.
+
+**Related:** TD-604 (the design), TD-591 (the Repo page's missing seams), TD-071 (Org page ideas).
+
+**Resolved:** 2026-10-13 (grinder-ao-2, PR #1683) — slice 2: the Repo page's *Recently completed* after Technical debt, one list per window under the page's one picker, each row the closing PR (a link) and who opened it (a session's Focus, else the login), *no PR* for a direct push, folded past eight; the facet's *closed* block links to `/repo/<name>?win=<w>#completed` with the ids and titles on hover, ten at most; `ao repo` prints *completed this week: n*. Checked on a scratch home (the PR's UI check). Slice 1: #1625.

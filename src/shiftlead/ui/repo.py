@@ -23,7 +23,17 @@ from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
 from .common import _age, _instant, host_name
 from .inbox import held_for, seat_held_mark, work_note, work_started
-from .org import compact_line, drawn_facets, lane_count, team_lanes, team_repo, team_summary
+from .org import (
+    WINDOWS,
+    _https,
+    compact_line,
+    completed_in,
+    drawn_facets,
+    lane_count,
+    team_lanes,
+    team_repo,
+    team_summary,
+)
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
 
@@ -124,6 +134,43 @@ def pr_rows(
             }
         )
     return rows
+
+
+COMPLETED_FOLD = 8  # Recently completed folds past this many rows, with *+n more* (§4.5 screen 11, TD-604)
+COMPLETED_WORD = {"day": "today", "week": "this week", "month": "this month"}  # the heading's window word
+
+
+def completed_rows(r: Mapping[str, Any], fleet: Collection[dict[str, Any]], now: datetime) -> dict[str, dict[str, Any]]:
+    """**Recently completed** (§4.5 screen 11 item 3, TD-604), one list per window of the page's one
+    picker: `{rows, fold, word}` by *day*, *week* and *month*, each row the entry's id and title, the
+    PR whose squash merge closed it (`pr`, a link: the PR reading's page, else the remote's; None —
+    *no PR* — for a close by a commit that names none), who opened that PR — the session among
+    `fleet`'s records whose branch is the PR's head (a link to its Focus), else the GitHub login —
+    and the close's age. Newest first, as the reading keeps them; nothing on it is a control."""
+    by_branch = {
+        str((s.get("git") or {}).get("branch") or ""): s
+        for s in fleet
+        if isinstance(s.get("git"), dict) and (s.get("git") or {}).get("branch")
+    }
+    web = _https(str(r.get("remote") or ""))
+    out = {}
+    for w in WINDOWS:
+        rows = []
+        for c in completed_in(r, w, now):
+            pr, who = c.get("pr"), by_branch.get(str(c.get("branch") or "")) if c.get("branch") else None
+            rows.append(
+                {
+                    "id": str(c.get("id") or ""),
+                    "title": str(c.get("title") or ""),
+                    "pr": pr,
+                    "url": str(c.get("url") or "") or (f"{web}/pull/{pr}" if web and pr is not None else ""),
+                    "author": {"id": who["id"], "name": who.get("name") or who["id"]} if who else None,
+                    "login": str(c.get("author") or ""),
+                    "age": _age(c.get("closed"), now),
+                }
+            )
+        out[w] = {"rows": rows, "fold": max(0, len(rows) - COMPLETED_FOLD), "word": COMPLETED_WORD[w]}
+    return out
 
 
 def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) -> dict[int, dict[str, Any]]:

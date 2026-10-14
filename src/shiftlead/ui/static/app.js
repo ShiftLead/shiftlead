@@ -3035,8 +3035,14 @@
   AO.repo = function () {
     const box = $("#repopage"); if (!box) return;
     const repo = box.dataset.repo, whoKey = "doingwho:" + repo;
+    // the facet's *closed* block carries its window (`?win=week#completed`, TD-604): the page's one picker takes it
+    const carried = new URLSearchParams(location.search).get("win");
+    if (["day", "week", "month"].includes(carried)) store.set("win", carried);
     function apply() {
       syncSummaries();
+      // Recently completed follows the page's one window picker (§4.5 screen 11 item 3, TD-604)
+      const win = store.get("win", "day");
+      $$("#completed .wv", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
       const who = store.get(whoKey, "");
       $$(".dchips .chip", box).forEach((c) => c.setAttribute("aria-pressed", c.dataset.who === who ? "true" : "false"));
       $$("#doing .drow", box).forEach((r) => (r.hidden = !!who && r.dataset.who !== who));
@@ -3073,7 +3079,7 @@
     }
     box.addEventListener("click", (e) => {
       const p = e.target.closest(".tsum .seg[data-pick] button");
-      if (p && !p.disabled) return pickSummary(p);
+      if (p && !p.disabled) { pickSummary(p); return apply(); }
       const chip = e.target.closest(".dchips .chip");
       if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
       const more = e.target.closest("[data-unfold]");

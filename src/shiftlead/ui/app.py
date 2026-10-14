@@ -282,6 +282,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     work_started,  # noqa: F401
 )
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
+    COMPLETED_HOVER,  # noqa: F401
     DOER_WIDTH,  # noqa: F401
     DOING_KEPT,  # noqa: F401
     FACETS,  # noqa: F401
@@ -307,6 +308,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     ask_blocks,  # noqa: F401
     asked_line,  # noqa: F401
     compact_line,  # noqa: F401
+    completed_in,  # noqa: F401
+    completed_title,  # noqa: F401
     doing_rows,  # noqa: F401
     drawn_facets,  # noqa: F401
     lane_count,  # noqa: F401
@@ -321,6 +324,8 @@ from .org import (  # re-exported: routes, templates and tests read these from t
 )
 from .pty_bridge import PtySession, attach_argv, clients_argv, pump, scroll_argv, watch_clients
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
+    COMPLETED_FOLD,  # noqa: F401
+    COMPLETED_WORD,  # noqa: F401
     ENTRY_PREFIX,
     ENTRY_TRIES,
     LEDGER_FLAG,  # noqa: F401
@@ -328,6 +333,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     LEDGER_LISTS,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401
     compact_in,  # noqa: F401
+    completed_rows,
     doing_chips,  # noqa: F401
     entry_hand,
     entry_line,
@@ -1287,6 +1293,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "teams": teams,
             "prs": pr_rows(r, members, standing, now, sessions),
             "lists": ledger_lists(r, summary["motion"], lanes),
+            # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
+            "completed": completed_rows(r, sessions, now),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
             "lanes": [ln for team, got in lanes.items() if (ln := lanes_line(team, got, teamrun.lane_kinds(r)))],
             "boards": boards,
