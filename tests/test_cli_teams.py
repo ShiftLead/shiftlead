@@ -105,6 +105,7 @@ def world(tmp_path, monkeypatch):
                 "state": "working",
                 "dir": params["dir"],
                 "adapter": params["adapter"],
+                "profile": params.get("profile") or "",  # the home records the profile it launched
                 "controllers": list(params.get("controllers") or []),
                 "unattended": bool(params.get("unattended")),
                 "review": params.get("review"),

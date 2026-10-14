@@ -841,7 +841,7 @@ def test_a_switch_sits_the_designer_out_and_relaunches_whose_stage_or_reader_mov
     handed = {p["id"]: p["launch"] for _, p in calls if "launch" in p}
     assert sorted(handed) == ["ao-shiftlead-grind-1", "ao-shiftlead-grind-2"]
     launch = handed["ao-shiftlead-grind-1"]
-    assert sorted(launch) == ["lane", "prompt", "prompt_from", "review"]
+    assert sorted(launch) == ["lane", "profile", "prompt", "prompt_from", "review"]  # profile always (TD-620)
     assert launch["prompt_from"]["slots"]["{stage}"]["file"].endswith("build-review/build.md")
     assert "designer-ao: sits out under build-review" in out
     assert "grind-1: relaunched — stage td/build.md → build-review/build.md" in out
@@ -1352,3 +1352,138 @@ def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # no
     t["seats"] = []
     with pytest.raises(teams.TeamError, match="td-ui cannot be followed by ao-grind: no seat of role auditor"):
         teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
+
+
+def test_a_roles_profile_changed_reads_a_difference_and_apply_relaunches_with_it(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """TD-619 (§4.9c *Switching*): a role's `profile:` edited in `org.yml` is a difference on every live
+    member it resolves for — the team reads **definition changed** where nothing else differs, and
+    `ao team flow` prints *profile <old> → <new> (next restart)*; Apply hands the new profile, and the
+    home's `relaunch` mark, carrying it, is what the member runs next, so Apply is not offered again."""
+    from shiftlead import cli, teamrun
+
+    state, doc = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    doc["roles"]["grinder"]["profile"] = "repo-grind"
+    _write(tmp_path, doc)
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    diffs = json.loads(capsys.readouterr().out)["differences"]
+    assert {d["name"]: d["what"] for d in diffs} == {
+        n: ["profile org-grind → repo-grind"] for n in ("grind-1", "grind-2")
+    }
+    assert all(d["act"] == "relaunch" and d["definition"] for d in diffs)
+    assert teamrun.definition_changed(diffs, "td")
+    assert cli.main(["team", "flow", "ao-grind"]) == 0
+    out = capsys.readouterr().out
+    assert "definition changed — Apply (ao team flow ao-grind --apply):" in out
+    assert "  grind-1: profile org-grind → repo-grind (next restart)" in out
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    applied = json.loads(capsys.readouterr().out)["apply"]["applied"]
+    assert [d["line"] for d in applied][0] == "grind-1: profile org-grind → repo-grind (next restart)"
+    handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch"}
+    assert {k: v["profile"] for k, v in handed.items()} == dict.fromkeys(
+        ("ao-shiftlead-grind-1", "ao-shiftlead-grind-2"), "repo-grind"
+    )
+    # the home marks the record with what it runs next; its own `profile` stays the running one
+    for s in state["sessions"]:
+        if s["id"] in handed:
+            s["relaunch"] = {
+                "at": "2026-10-13T00:00:00Z",
+                "lane": s["lane"],
+                "review": s["review"],
+                "profile": "repo-grind",
+            }
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+
+
+def test_a_profile_beside_another_difference_reads_flow_changed_and_a_members_own_profile_wins(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """A profile difference beside a lane's is one relaunch line under **flow changed**; a member whose
+    own `profile:` still matches its record is no difference, whatever its role's now says; an
+    interactive member is compared on nothing (§4.9c *Switching*, TD-619)."""
+    from shiftlead import cli, teamrun
+
+    state, doc = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    doc["roles"]["grinder"]["profile"] = "repo-grind"
+    doc["roles"]["hunter"] = {"profile": "member-grind"}
+    grind = next(m for m in doc["teams"]["ao-grind"]["members"] if m["role"] == "grinder")
+    grind["profile"] = "org-grind"  # the members' own: what their records run
+    _write(tmp_path, doc)
+    hunt = next(s for s in state["sessions"] if s["name"] == "hunt")
+    hunt["lane"] = ["other"]
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    diffs = json.loads(capsys.readouterr().out)["differences"]
+    (d,) = diffs
+    assert d["name"] == "hunt" and d["what"] == ["lane other → ui", "profile default → member-grind"]
+    assert d["line"] == "hunt: relaunched — lane other → ui; profile default → member-grind"
+    assert not d["definition"] and not teamrun.definition_changed(diffs, "td")
+    hunt["unattended"] = False  # a person's session: its lane, brief and profile are theirs
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+
+
+def test_a_closed_seat_whose_roles_profile_changed_reads_a_difference_and_apply_relaunches_it(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """A seat is compared on its profile closed between fills (§4.9c *Switching*, TD-619): its next fill
+    replays its record, so the techlead's role's new profile is offered there and Apply relaunches the
+    closed record; a closed member that is not a seat is still the next Start's, compared on nothing."""
+    from shiftlead import cli
+
+    state, doc = _switching(world, tmp_path, monkeypatch, ["td", "build-review"])
+    doc["roles"]["techlead"] = {"profile": "repo-grind"}
+    doc["roles"]["grinder"]["profile"] = "repo-grind"
+    _write(tmp_path, doc)
+    for s in state["sessions"]:
+        if s["name"] in ("techlead-ao", "grind-2"):
+            s["state"] = "closed"
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    diffs = json.loads(capsys.readouterr().out)["differences"]
+    assert {d["name"]: d["what"] for d in diffs} == {
+        "techlead-ao": ["profile default → repo-grind"],
+        "grind-1": ["profile org-grind → repo-grind"],
+    }
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    handed = {p["id"]: p["launch"] for m, p in state["calls"] if m == "relaunch"}
+    assert handed["ao-shiftlead-techlead-ao"]["profile"] == "repo-grind"
+    assert "ao-shiftlead-grind-2" not in handed
+
+
+def test_a_team_with_no_flows_is_compared_on_its_profiles_too(world, tmp_path, capsys, monkeypatch):  # noqa: F811
+    """A team that runs no flow is compared on its seats and on every live member's profile (§4.9c
+    *Switching*, TD-619: the profile is the definition's, not a flow's), and reads **definition changed**."""
+    from shiftlead import cli, teamrun
+
+    _, state = world
+    org = orgmod.load()
+    teamrun.start(cli.call_sync, org, "ao-grind", HOST)
+    doc = _team_doc(tmp_path)
+    doc["roles"]["grinder"]["profile"] = "repo-grind"
+    _write(tmp_path, doc)
+    fake = cli.call_sync
+
+    def call(method, **params):
+        if method == "relaunch":
+            state["calls"].append((method, params))
+            return next(s for s in state["sessions"] if s["id"] == params["id"])
+        return fake(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    diffs = json.loads(capsys.readouterr().out)["differences"]
+    assert sorted(d["name"] for d in diffs) == ["grind-1", "grind-2"]
+    assert teamrun.definition_changed(diffs, None)
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    handed = [p["launch"]["profile"] for m, p in state["calls"] if m == "relaunch"]
+    assert handed == ["repo-grind", "repo-grind"]
