@@ -178,11 +178,14 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     backup_store,  # noqa: F401
     cache_lapsed,  # noqa: F401
     cache_restarts,  # noqa: F401
+    claim_draft,  # noqa: F401
     closer_of,
+    draft_folder,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
+    read_draft_claim,  # noqa: F401
     stat_dir,  # noqa: F401
     tick_ready,  # noqa: F401
 )
