@@ -60,6 +60,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-674 | A question that reaches the permission hook is drawn as a permission: *Needs you* offers Allow / Deny for an `AskUserQuestion` menu | Medium | Open |
+| TD-675 | Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change | Low | Open |
 
 ---
 
@@ -1071,3 +1072,21 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Fix:** in `translate`, a `PermissionRequest` whose tool is `AskUserQuestion` reports what the `PreToolUse` road reports — `state: needs-you`, `pending: {kind: "question", text: <its first question>}` — and no `kind: "permission"`, so `rpc_hook` does not block on it and the terminal's menu is the one channel. No surface keys on the tool's name (§4.3): each already draws a `question` as its text and **Focus**. **Done when** a test sends a `PermissionRequest` of `AskUserQuestion` through `rpc_hook` and it returns at once, leaving the record `needs-you` with a `question` pending and no permission waiter; and the card, the Focus header, the Inbox row and the team's *Answer needed* facet built from that record draw the question's text and **Focus** (the facet: its link to Focus) with no **Allow** / **Deny**.
 
 **Related:** TD-629 (archived: the waiter a terminal answer ends, and an `AskUserQuestion` permission's text), TD-641 (`rules.NEVER` already keeps a question from the `permissions:` rules).
+
+---
+
+## TD-675: Add entry's **Open a session** names the session `entry-<n>` with no say: show the name in a text box the person can change
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-14 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a row *Add entry form: Open a session*, §4.9 *Add an entry to the ledger* (2. *Open a session*); `src/shiftlead/ui/app.py` (`entry_plan`'s `entry-<n>` pick, `/api/entry/plan`, `/api/entry/session`); the Add entry form in `src/shiftlead/ui/static/app.js`; mockup `AddEntry.dc.html`
+
+**Why:** Paul (2026-10-14): *In the add entry form, we offer "Open a session" and default the session name to "Entry-n" - lets add a text box that shows that default name with the option to change it.* Today the name is the server's alone: `entry_plan` takes the first `entry-<n>` free in the repo, the line under the button only reports it (*an interactive designer session, entry-3, in a new worktree*), and the same name becomes the worktree and its branch. A session talked through for one entry is then found on the Org, in Focus and in `git worktree list` by a number that says nothing of what it is about, and renaming it after the start is not offered.
+
+**Fix:** a design round. The form shows a **Name** box beside **Open a session**, prefilled with the `entry-<n>` default `/api/entry/plan` already picks; what the person types is the session's name and its worktree's, checked as they type with the New session form's *name field → holder* check (`/api/name_check`), and the default is taken when they leave it alone. The round settles: whether the default stays `entry-<n>` or is drawn from the words; what an edited name may hold (the worktree and branch rules); what the check says and whether it disables the button; and whether a changed Type (which re-reads the plan) keeps a typed name. §4.5a's row and the mockup gain the box in the same design PR.
+
+**Related:** TD-219 (Add entry's *Open a session*), TD-630 (the form's Attach), §4.5a *New session: name field → holder*.
