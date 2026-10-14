@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from importlib import resources
 from typing import Any
 
+from sessionorc import board as board_mod
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming, promote, workorders
 from sessionorc import ledger as ledger_mod
@@ -2671,6 +2672,33 @@ def cmd_board_show(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def cmd_board_edit(args: argparse.Namespace) -> int:
+    """`ao board edit done|snooze --line <n> --expect "<start>" | --key board:<key> [--why … | --until …]
+    [--board <path>]` (design §4.7, TD-587): a session's own edit of one board line on the branch it is
+    on, committed there by `sessionorc.board.branch_edit` — ledgerboard's edit and subject, nothing
+    pushed, no host agent. `decide` and `reply` are the person's words, and not offered."""
+    try:
+        got = board_mod.branch_edit(
+            os.getcwd(),
+            args.edit,
+            line=args.line,
+            expect=args.expect or "",
+            key=args.key or "",
+            why=args.why or "",
+            until=args.until or "",
+            board=args.board,
+        )
+    except board_mod.Refused as e:
+        return fail(args, f"refused: {e}", 1)
+
+    def prose() -> None:
+        print(f"{got['action']} line {got['line']} of {got['board']} — committed {got['commit']} on {got['branch']}")
+        print(f"  {got['message']}")
+        print("  not pushed: it lands with this branch's PR")
+
+    return emit(args, got, prose)
+
+
 def cmd_td_add(args: argparse.Namespace) -> int:
     """`ao td add [--repo <name>] [--type debt|feature] ["<words>"]` (design §4.7 *Entries*, §4.9 *Add
     an entry to the ledger*; TD-218 slice 4): the terminal's form of **Hand to the techlead**. The
@@ -3936,6 +3964,21 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", default=argparse.SUPPRESS, help="{key, line, text, detail, open, source}"
     )
     q.set_defaults(fn=cmd_board_show)
+    q = bsub.add_parser(
+        "edit", help="a session's own done or snooze of one line, committed on the branch it is on (not pushed)"
+    )
+    q.add_argument("edit", choices=board_mod.BRANCH_ACTIONS, help="done checks it off; snooze moves its Due:")
+    q.add_argument("--line", type=int, help="the line's 1-based number on the board")
+    q.add_argument("--expect", help="the line's first words, as last read: refused when line n does not open with them")
+    q.add_argument("--key", help="the line's id, board: and eight hex digits, in place of --line and --expect")
+    q.add_argument("--why", help="done: what was done, for its Closed: field")
+    q.add_argument("--until", help="snooze: the new Due: date, YYYY-MM-DD")
+    q.add_argument("--board", help="the board file (default: .shiftlead.yml's board:, else docs/user_attention.md)")
+    q.add_argument(
+        "--json", action="store_true", default=argparse.SUPPRESS,
+        help="{board, line, action, key, text, commit, message, branch}",
+    )  # fmt: skip
+    q.set_defaults(fn=cmd_board_edit)
 
     p = add("td", help="hand the techlead an entry for the ledger (design §4.9; a person's own)")
     dsub = p.add_subparsers(dest="action", required=True)
