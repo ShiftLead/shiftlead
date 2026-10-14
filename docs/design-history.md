@@ -415,6 +415,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-14 (TD-587 slice 2, grinder-ao-1): *Inbox row: FYI* → **Put on the board**'s board is the sender's repo's `board:` (§5 *The seams*), and the pick is the registered repos that carry one (`inbox.board_choices` reads `workorders.board_path`). Was: the sender's repo's `docs/user_attention.md`.
 - 2026-10-14 (TD-641 slice 2, grinder-ao-2): *Inbox row: answered for you* built for a prompt the person's `permissions:` rules answered — keyed on `answered.answerer` being `rules`, the row names *your permissions: rules* as who answered, draws the rule as *rule: … — change it there* in place of a source, and **Dismiss** alone; the Settings page's settings.yml card names each `permissions:` value the host refused as *ignored*. A node's asker is already named, since the home's fleet carries its record under the same `<id>@<host>` the FYI's asker is.
 - 2026-10-13 (TD-667, the designer): *Focus pane: typing in a scrolled-back terminal*. Built by TD-669.
 - 2026-10-13 (TD-665, the designer): *A record with no agent* — what Focus and the card leave out on a shell or a command run (Wrap up, Message, Reports, Inbox, Working, the grants and controllers chips, the ready-to-close checklist, prompt chips), the composer's *Type a command…* and a Send that never reads Steer, and a Close with a plain confirm that reaps nothing. Built by TD-666.
