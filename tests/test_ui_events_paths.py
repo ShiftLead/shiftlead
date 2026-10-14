@@ -124,7 +124,6 @@ def test_a_repos_push_carries_the_repos_pr_marks_once_for_every_stream(tmp_path,
     assert [e["pr_marks"] for e in light if e["event"] == "repos"] == [{"811": "merged"}]
 
 
-
 def test_a_light_stream_takes_a_repos_marks_alone(tmp_path, monkeypatch):
     """TD-670: a light stream (Focus, the Inbox) is sent a repo's root and PR marks, never its facts —
     which run to most of a megabyte a push — on every push, which the Inbox re-reads on; a dropped
@@ -149,6 +148,29 @@ def test_a_light_stream_takes_a_repos_marks_alone(tmp_path, monkeypatch):
     ]
     full = [e for e in received(client(monkeypatch, tmp_path, pushed), "/events") if e["event"] == "repos"]
     assert [bool(e["repo"]) for e in full] == [True, True, False] and full[1]["repo"]["ledger"] == {"moved": True}
+
+
+def test_the_groups_are_built_off_the_loop(tmp_path, monkeypatch):
+    """TD-670: a regroup's views of every record and its rendered headers are built on a worker thread
+    — up to ~300 ms a regroup on the live home — never on the loop every Focus terminal shares."""
+    import asyncio
+
+    from shiftlead.ui import app as ui
+
+    on_loop, real = [], ui.team_groups
+
+    def spy(*a, **k):
+        try:
+            asyncio.get_running_loop()
+            on_loop.append(True)
+        except RuntimeError:
+            on_loop.append(False)
+        return real(*a, **k)
+
+    monkeypatch.setattr(ui, "team_groups", spy)
+    evs = received(client(monkeypatch, tmp_path, first_then()), "/events")
+    assert evs[0]["groups"] and on_loop and not any(on_loop)
+
 
 def test_a_reading_equal_to_the_last_one_sent_is_not_sent_again(tmp_path, monkeypatch):
     """g1's tail moves twice: the second marks the groups, the flush reads them, and they are the

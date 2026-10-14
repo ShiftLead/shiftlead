@@ -730,6 +730,38 @@ def test_the_inbox_read_is_built_off_the_loop_and_gzipped(client, tmp_path, monk
 
 
 @pytest.mark.integration
+def test_the_counts_read_views_the_fleet_and_reads_the_boards_off_the_loop(client, tmp_path, monkeypatch):
+    """TD-670: the state rows' view of every record and every repo's board rows — ~90 ms a recount on
+    the live home — run on a worker thread, on a counts read (the keeper's recount) as on the full one."""
+    import asyncio
+
+    from shiftlead.ui import app as appmod
+
+    sender_session(client, tmp_path)
+    on_loop: dict[str, list[bool]] = {"view": [], "board_reading": []}
+
+    def spy(name):
+        real = getattr(appmod, name)
+
+        def wrapped(*a, **k):
+            try:
+                asyncio.get_running_loop()
+                on_loop[name].append(True)
+            except RuntimeError:
+                on_loop[name].append(False)
+            return real(*a, **k)
+
+        monkeypatch.setattr(appmod, name, wrapped)
+
+    spy("view")
+    spy("board_reading")
+    for url in ("/api/person/inbox?counts=1", "/api/person/inbox"):
+        assert client.get(url).status_code == 200
+    assert on_loop["view"] and not any(on_loop["view"])
+    assert on_loop["board_reading"] and not any(on_loop["board_reading"])
+
+
+@pytest.mark.integration
 def test_snooze_hides_and_uncounts_an_entry_and_now_brings_it_back(client, tmp_path):
     """§4.10 *Snooze*: `/api/person/snooze` is `inbox_snooze` caller-less; the entry leaves its
     section and the count until its time, is listed under *snoozed*, and no `until` — the snoozed

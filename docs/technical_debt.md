@@ -73,7 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-667 | A key typed into the Focus terminal while it is scrolled back is swallowed by tmux's copy mode: typing should return the pane to the live screen and reach the prompt | Medium | Designed — TD-669 builds it |
 | TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 | TD-669 | Build TD-667: a typed key leaves copy mode first — the bridge's *scrolled* mark, `copy-mode -q` before a printable key, Enter, Tab, Backspace or paste, its tmux commands in order; every host-agent send leaves copy mode first | Medium | Open |
-| TD-670 | A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder | High | Open |
+| TD-670 | A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder | High | Live check — once #1704 is live |
 
 ---
 
@@ -1416,8 +1416,8 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Type:** debt
 **Added:** 2026-10-14 (grinder-ao-2, TD-611's live read)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1 (fix 1) in PR #1702 (2026-10-14, grinder-ao-2): a light stream takes `{event: "repos", root, pr_marks}` (`null` for a dropped repo), the full stream the push whole — on every push, not only when the marks moved as fix 1 said: the host pushes a repo only when its reading changed, and the Inbox re-reads its boards and ledger on that push (review of #1702). Left: fixes 2 and 3.
+**Kind:** live-check #1704
+**Status:** Built — slice 1 (fix 1) in PR #1702 (2026-10-14, grinder-ao-2): a light stream takes `{event: "repos", root, pr_marks}` (`null` for a dropped repo), the full stream the push whole — on every push, not only when the marks moved as fix 1 said: the host pushes a repo only when its reading changed, and the Inbox re-reads its boards and ledger on that push (review of #1702). Slice 2 (fix 2, and fix 3's off-the-loop half) in PR #1704 (2026-10-14, grinder-ao-2): profiled offline with the live home's readings, a counts recount spent ~45 ms in `person_states`' views and ~40 ms in `board_reading`, and `heads` the same views and every header render per regroup — each now in `asyncio.to_thread` (the longest loop gap of a recount 37 → 18 ms in the harness); the groups were already sent only when changed (`heads_key`). Left: the live check, once #1704 is live (`ao promote status`): the probe of *Done when* beside one Focus stream and beside the Org stream; then TD-611's.
 **Location:** `src/shiftlead/ui/app.py` (`fan_step`'s `repos`/`doing` branch: `run.to_all(run.live, ev)`; `heads` ~L971, run per regroup on the loop; `counts_now` ~L855), `src/shiftlead/ui/fanout.py` (`to_all`, the `groups` flush ~L157), `src/shiftlead/ui/counts.py` (`_recounter`, `_ticker`), `src/shiftlead/ui/static/app.js` (Focus's `repos` handler ~L4518, the Inbox's re-read ~L3156)
 
 **Why:** TD-611's live read, 2026-10-14 (`9bb725c` live; read-only: a static-file probe of `/static/app.css` every 50 ms beside one `/events` websocket the probe opened, nothing pressed). The bulk polls TD-616 and TD-617 removed are gone, but the loop is not yet what TD-611's *Done when* asks (no request above ~50 ms of loop time with a Focus tab open):

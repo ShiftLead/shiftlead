@@ -605,6 +605,14 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
     ]
 
 
+def refill(held: dict[str, Any], new: Mapping[str, Any]) -> None:
+    """`held` made `new` in place, never emptied on the way: a view built on a worker thread (TD-670)
+    reads it while the loop refills it, and a `clear()` first would draw that view without its marks."""
+    for k in set(held) - set(new):
+        held.pop(k, None)
+    held.update(new)
+
+
 async def agent_call(method: str, **params: Any) -> Any:
     """One host-agent RPC as the page makes it: down is a 503, a refusal a 400."""
     try:
@@ -680,8 +688,7 @@ class Readings:
         got: dict[str, Any] = {}
         with contextlib.suppress(Exception):
             got = dict((await self.call("host")).get("pulls") or {})
-        inbox_mod.PULLS.clear()
-        inbox_mod.PULLS.update(got)
+        refill(inbox_mod.PULLS, got)
 
     async def board_all(self) -> tuple[list[dict[str, Any]], str]:
         """Every open board row of this host's repos and the note beside them (TD-069 step 3), from the
@@ -696,7 +703,10 @@ class Readings:
             repos = await self.call("repos")
         except Exception as e:  # noqa: BLE001 — said in words, never an empty board
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
-        return board_reading(repos if isinstance(repos, dict) else {}, repo_teams(await self.defs(), host_name()))
+        teams_of = repo_teams(await self.defs(), host_name())
+        # off the loop (TD-670): every repo's board rows and their standings run to ~40 ms on the live
+        # home, on every recount of the Inbox's counts as on the page's read
+        return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, teams_of)
 
     async def board_items(self) -> tuple[list[dict[str, Any]], str]:
         """The Inbox's **due** board rows and the note beside them: what is counted is what is due,
@@ -726,7 +736,11 @@ class Readings:
         seats = await self.seats_of(fleet)
         # what each waits on (§4.2 *Waiting*, TD-428), so a row's pill is the Org card's
         waits, repos = await self.person_waits(), (await self.repo_facts())[0]
-        views = [view(s, fleet, icons=icons, seats=seats, repos=repos, waits=waits) for s in fleet]
+        # every record's view off the loop (TD-670): ~2 ms a record with the live home's repo readings,
+        # on every recount of the Inbox's counts as on the page's read
+        views = await asyncio.to_thread(
+            lambda: [view(s, fleet, icons=icons, seats=seats, repos=repos, waits=waits) for s in fleet]
+        )
         info = await self.identity_info()
         rows = state_rows(
             views,
@@ -948,13 +962,14 @@ def create_app() -> FastAPI:
             log.debug("the flows read failed; the last reading stands", exc_info=True)
         # what every card a delta draws reads of it (`cards.flow_mark`): the flow by team, the acts by id
         got = flow_cache["flows"]
-        cards_mod.FLOWS.clear()
-        cards_mod.FLOWS.update({n: str(v["flow"]) for n, v in got.items() if v.get("flow")})
-        cards_mod.FLOW_ACTS.clear()
-        for v in got.values():
-            for d in v.get("differences") or []:
-                if d.get("id"):
-                    cards_mod.FLOW_ACTS[str(d["id"])] = str(d.get("act") or "")
+        refill(cards_mod.FLOWS, {n: str(v["flow"]) for n, v in got.items() if v.get("flow")})
+        acts = {
+            str(d["id"]): str(d.get("act") or "")
+            for v in got.values()
+            for d in v.get("differences") or []
+            if d.get("id")
+        }
+        refill(cards_mod.FLOW_ACTS, acts)
         return got
 
     async def group_heads(
@@ -977,18 +992,27 @@ def create_app() -> FastAPI:
         rollup's markup (§4.5a *Org: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
         fleet = list(known.values())
         seats, waits = await seats_of(fleet), await person_waits()  # *waiting* (§4.2, TD-428)
-        groups = team_groups(
-            [view(s, fleet, seats=seats, repos=repos, waits=waits) for s in fleet],
-            await team_rows(fleet),
-            repos,
-            doing,
-            await work_marks(),
-            flow_cache["flows"],  # the page load's reading: a delta reads no plan
-            work_cache["balance"],  # the home's balance marks, read beside `work` (TD-330)
-            needs_cache["rows"],  # a member's open ask to the person: its team's *asked you* line (TD-354)
-        )
-        ro = templates.get_template("rollup.html").render(ro=rollup(groups))
-        return {"groups": render_heads(groups), "rollup": ro}
+        rows, marks = await team_rows(fleet), await work_marks()
+        flows, balance, needs = flow_cache["flows"], work_cache["balance"], needs_cache["rows"]
+
+        def build() -> dict[str, Any]:
+            groups = team_groups(
+                [view(s, fleet, seats=seats, repos=repos, waits=waits) for s in fleet],
+                rows,
+                repos,
+                doing,
+                marks,
+                flows,  # the page load's reading: a delta reads no plan
+                balance,  # the home's balance marks, read beside `work` (TD-330)
+                needs,  # a member's open ask to the person: its team's *asked you* line (TD-354)
+            )
+            ro = templates.get_template("rollup.html").render(ro=rollup(groups))
+            return {"groups": render_heads(groups), "rollup": ro}
+
+        # off the loop (TD-670): a view of every record and every header rendered held the loop up to
+        # ~300 ms a regroup on the live home with an Org page open; the events run calls this under
+        # its lock, so no delta changes `repos` or `doing` while the thread reads them
+        return await asyncio.to_thread(build)
 
     work_cache: dict[str, Any] = {"at": 0.0, "work": None, "waiting": None, "balance": None}
 

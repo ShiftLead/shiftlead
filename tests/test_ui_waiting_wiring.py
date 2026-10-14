@@ -101,6 +101,8 @@ def test_the_events_streams_heads_and_rollup_read_waiting(tmp_path, monkeypatch)
     c = client(monkeypatch, tmp_path)
     with c.websocket_connect("/events") as ws:
         ev = json.loads(ws.receive_text())
+        while ev["event"] == "counts":  # the counts may come first: the groups are built off the loop (TD-670)
+            ev = json.loads(ws.receive_text())
     assert ev["event"] == "session" and ev["session"]["pill_word"] == "waiting"  # the card's own view
     (head,) = [g for g in ev["groups"] if g["team"] == "grind"]
     # both waits — the claim's open PR (`repos`) and the ask to the person (`waits`)
