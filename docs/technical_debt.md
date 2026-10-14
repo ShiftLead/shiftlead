@@ -61,6 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
 | TD-686 | Build TD-682 (1): the reading tells a run that never started from a red one — `checks: not_run` with its reason; no order, no `red_since`; the `done` refusal and the promote's checks say *never ran* | Medium | Open |
 | TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
+| TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Open — design first |
 
 ---
 
@@ -1141,3 +1142,26 @@ The other cases:
 **Done when** an account whose PRs (or a default branch's head) read `not_run` shows one *CI not starting* row with them and the billing link, told on Telegram once per spell. **Re-run** asks GitHub to re-run their failed jobs. The row leaves when its spell ends: two successful readings group nothing, and no re-run is pending. `ci_rerun` is in §4.8's person-only list.
 
 **Related:** TD-682 (the design), TD-686 (the reading), TD-613 (the red PR row it sits beside), TD-092 (Telegram).
+
+---
+
+## TD-688: The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-14 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — design first: §4.5a's file buttons and §4.6's *in our repo* bound both change
+**Location:** design §4.6 *A path in the pane is a link* and *The press is two launches* (TD-532), §4.5a rows *Repo page: Open ledger*, *Settings page: Open file*, *Org: team groups* (the team header's **Open file** on its definition's source, `group_head.html`), *New session*, *Focus header: ‹› VS Code* and *Transcript: VS Code*, and the not-yet-built *Director card*'s and *Inbox row: preferences proposed*'s **Open file** (TD-657), §5 `person.open_in` and `person.file_link`; `src/shiftlead/ui/uiconf.py` (`editor_link`, `editor_file`), `src/shiftlead/ui/common.py` (`editor_link`, the template global), `src/shiftlead/ui/templates/repo_part.html:40`, `settings.html:21,27`, `group_head.html:103`, `new.html:9`, `transcript.html:17`, `focus.html:118`, `src/shiftlead/ui/transcript.py` (`transcript_editor`), `src/shiftlead/ui/static/app.js` (`AO.openFile`, `AO.fileUrl`, the `a.editor` click handler), `src/sessionorc/agent.py` (`_resolve_paths`, `rpc_paths`)
+
+**Why:** Paul, 2026-10-14: *Pressing "Open ledger" in the repo page seems to attempt to open the file in vscode but fails, whereas I seem to recall others working (e.g. files linked in a transcript).* The links that work are a path in the pane (TD-501) and the Session card's recent files (TD-525). Both build the editor's **file form** with the line after the path (`AO.fileUrl`: `:1` where none was printed). They open it as **two launches**, the session's folder and then the file (`AO.openFile`, TD-532), so the file lands in the worktree's window. Every other file button is built by `editor_link`, which is the **folder** form with a file's path put in it: no `:line`. VS Code opens a remote path as a file only when it ends in `:digits` (TD-524), so on the ssh-remote form the press opens nothing usable. Those buttons are **Open ledger**, the Settings page's and the team card's **Open file**, the New session form's **Open file**, and the transcript's raw-file button on the transcript page and in Focus. Five of the seven lack the `editor` class, so they navigate the tab itself instead of going through `AO.openEditor`'s hidden frame, and no folder launch goes first. The two transcript buttons have the class. They are one launch on purpose: §4.5a *Focus header: ‹› VS Code* says the file is the tool's, not the worktree's. They still send the folder form with no `:line`. One person pressing two buttons that look alike gets two behaviours. Paul's second ask: *add links in our transcripts to any file that is actually available on the corresponding machine (e.g. ~/.bashrc would not have a link currently).* Today `_resolve_paths` answers only a regular file under the record's `dir` or `repo`, the *in our repo* bound §4.6 names as Paul's, so `~/.bashrc`, a file in `~/.claude`, or a sibling repo's file is text.
+
+**Fix:** a design round first, then the build entries it calls for.
+- **One form for every file button.** Every button `editor_link` now builds for a file takes the editor's file form with its line. So do TD-657's two **Open file** buttons once they are built. The press is §4.6's *two launches*, the folder launch first and then the file, except where the design keeps one launch, as for the transcript (`first: false`, the file form alone). The design names the folder each one opens first. For **Open ledger** that is the repo's checkout, "open worktree then file" in Paul's words. For a file outside any checkout (`~/.shiftlead/settings.yml`, a transcript under `~/.claude/projects/`) the design picks between the file alone (`first: false`) and its directory. The server hands each button its folder link and its file link, as `AO.recentFiles` builds them; `editor_link` stays the folder button's alone.
+- **A check that keeps them alike**: a test that every `‹›`/**Open file** control in the templates is an `a.editor` built from the file form, so a new one cannot fall back to the folder form.
+- **The bound on a pane path.** §4.6's *a regular file under the record's `dir` or its `repo`* becomes *a regular file on the record's host the session's user can read*: the same `paths` RPC, still a stat that opens nothing, with `~` as the session's user's home. The round settles three things. Does a read-only Focus still get these links? A wider bound tells such a viewer which paths exist on the host. Does a symlink out of the checkout now resolve? Do any paths stay text whatever the stat says (`~/.ssh`, a secrets file)?
+
+**Done when** every file button on the pages opens the file in the person's editor by the same two launches as a pane path, on the local, ssh-remote and container forms, held by a test over the templates. A path in the pane or the transcript that names a readable file on the session's host outside its checkout (`~/.bashrc`) is a link under the bound the design writes.
+
+**Related:** TD-501 (a path in the pane is a link), TD-524 and TD-526 (the line after the path), TD-532 (two launches), TD-535 and TD-536 (the recent files, `person.file_link`), TD-148 (the Settings page's **Open file**).
