@@ -12050,3 +12050,23 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Resolved:** 2026-10-14 (the designer) — designed 2026-10-14 (§4.5a *Add entry form: Name*, §4.9 *Add an entry to the ledger*), built by TD-677 (#1746), archived.
 
 **Related:** TD-219 (Add entry's *Open a session*), TD-630 (the form's Attach), §4.5a *New session: name field → holder*.
+
+## TD-678: Build TD-676: **Start session** / **Open session** on the Inbox's ledger rows — one press, the person's interactive session in `td-<n>` with `briefs/work.md` sent, the filled form where it cannot be silent
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-676's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.5a *Inbox row: ledger entry: Start session / Open session*, §4.5 screen 6 *The ledger's entries that wait on you*, §4.5a *Focus (exited / closed)* (**Resume**'s press-or-form rule) and *Add entry form: Name* (the free test); `src/shiftlead/ui/inbox.py` (`ledger_for_you`: the row's `type` and its holder's id), `src/shiftlead/ui/templates/inbox_row.html` (the `ledger` row's controls), `src/shiftlead/ui/static/app.js`, `src/shiftlead/ui/app.py` (a new `/api/ledger/start`; `entry_plan` and `api_entry_session` as the model; `resume_form_url` as the form's), a new `src/shiftlead/briefs/work.md` and its filling beside `repoconfig.entry_text`; `tests/test_ui_inbox_ledger.py`
+
+**Why:** TD-676's design (Paul, 2026-10-14: *it allows the user to work out of the inbox instead of having to jump around*).
+
+**Resolved:** 2026-10-14 (PR #1751) — `POST /api/ledger/start` in `ui/app.py` (a live claimer or a live `td-<n>` answers its Focus; else the interactive create with the `entries:` role, the manager, `lane` the id, worktree and branch `td-<n>`, `briefs/work.md` filled by `repoconfig.work_text` as its prompt; each doubt the filled New session form via `ledger_start_form`, which now takes `prompt` and `press=start`); `ledger_for_you` rows carry `type`, `why`, `holder`; `inbox_row.html` draws Start session / Open session; `work.md` in `NO_NEVER_LIST`. *The team's host is not connected* is read as *the team runs on another host* (§4.5a, design-history). Tests in `tests/test_ui_inbox_ledger.py`.
+
+**Fix:** `briefs/work.md` holds the opening prompt as §4.5a words it, its slots the id, the repo's name, the ledger file and the row's reason (*its owner is me* / *it is blocked by a decision of mine*), filled by a `repoconfig` function as `entry_text` is; like `entry.md` it is an opening text, not a brief, so it joins `NO_NEVER_LIST` in `tests/test_kill_guard.py` (every other `briefs/*.md` must carry the never-list). `ledger_for_you`'s row carries the entry's `type` and, beside `held`'s names, the id of the first live holder. `POST /api/ledger/start {repo, id}` reads the repo facts' entry (refused in words when it is no longer *for you*), then: a live record holding the entry, or a live holder of the name `td-<n>` in the repo, answers `{focus: <its id>}`; else the plan — the team `repo_teams` names, `entry_role` for the type, the free test TD-677 builds for Add entry's Name (the name check, no worktree, no local branch) on `td-<n>`, the role's preset — and a `create` as `api_entry_session` makes one (interactive, worktree `td-<n>`, `lane: [id]`, the manager as controller, the reader as `review`, `prompt` the filled `work.md`, no `start_context`), answering `{id}`; each doubt (no team, not free, a role or profile that does not resolve, the team's host not connected, the create refused) answers `{form: <the New session URL filled with repo, worktree td-<n>, team, role, lane and the prompt>, why}`, as Resume's press does. The row draws **Start session**, or **Open session** while `held` is set; the page follows `focus`, the new id, or `form`.
+
+**Done when** a press on a *ledger · yours* row and on a *ledger · your decision* row each start an interactive session named `td-<n>` on the repo's team, with the `entries:` role for the entry's type, its worktree and branch `td-<n>`, `work.md`'s filled text as its first prompt, and land on its Focus; a second press while it lives (held, or holding the name before the tick derives the claim) opens it and starts nothing; no team, a name held by an exited session, an existing worktree or branch `td-<n>`, and an unconnected host each land on the filled New session form with the reason — each held by a test.
+
+**Related:** TD-676 (the design), TD-677 (the free test, built for Add entry's Name), TD-219 (Add entry's *Open a session*, the model), TD-081 (**Resume**'s press-or-form).

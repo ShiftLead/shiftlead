@@ -913,7 +913,8 @@
    structured field, as a board item's `answers` are (TD-071 item 8) — the default's marked; a press
    sends its **index**, **Go with it** the default, **Reply** the composer's words, each `ledger_decide`,
    which writes one decided line on the repo's board: the row leaves once the reading lists it.
-   **Open** is the Repo page on the id. #}
+   **Start session** (TD-678) is the person's own session on the entry, or the filled New session form;
+   **Open session** while a member holds it, that session's Focus. **Open** is the Repo page on the id. #}
 {% macro ledger(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
@@ -941,6 +942,11 @@
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
   {%- if e.default %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-go="1" data-answer="{{ e.default }}" title="the answer marked default, written on {{ e.name }}'s board as your decision on {{ e.id }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Go with it</button>
+  {%- endif %}
+  {%- if e.held %}
+  <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="{{ e.held }} holds {{ e.id }}: go to its Focus — nothing is started">Open session</button>
+  {%- else %}
+  <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="your own interactive session on {{ e.id }}, {{ e.id|lower }}, in a new worktree on {{ e.team or 'the repo' }}'s team, told to read the entry and wait for you — or the New session form, filled in, where it cannot be one press">Start session</button>
   {%- endif %}
   <a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
 </div>

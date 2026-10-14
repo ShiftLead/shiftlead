@@ -144,8 +144,8 @@ def test_another_tools_command_is_not_read(tmp_path, monkeypatch):
 # The rule's words (design §4.8): the skill and every template brief that carries a never-list.
 RULE = "**Signal only a pid you started and still hold**"
 PACKAGE = Path(shiftlead.__file__).parent
-# the supplements and the entry template carry no never-list of their own
-NO_NEVER_LIST = {"entry.md", "grinder.stage.md", "techlead.stage.md"}
+# the supplements and the opening texts (entry, work) carry no never-list of their own
+NO_NEVER_LIST = {"entry.md", "grinder.stage.md", "techlead.stage.md", "work.md"}
 
 
 def test_the_skill_carries_the_process_rule():

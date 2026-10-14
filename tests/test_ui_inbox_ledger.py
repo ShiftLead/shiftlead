@@ -366,3 +366,175 @@ def test_a_repos_name_goes_with_its_last_row_and_the_poll_puts_later_back():
     assert "AO.maySwapSection(lf, lring ? null : lon)" in swap and "AO.restoreRowErrs(lf, errs);" in swap
     assert "back.focus({ preventScroll: true })" in swap
     assert '!AO.laterHas(lt) && !rail.sec.includes("later")' in js
+
+
+# -- **Start session** / **Open session** (§4.5a *Inbox row: ledger entry*, TD-676 designed, TD-678 built) --
+
+
+def _start_world(tmp_path, monkeypatch, *, fleet=(), team=True, entries=None, checks=None, refuse="", host=""):
+    """`test_ui_entry`'s repo, team and fake host agent, whose repo facts hold TD-9 (*ledger · yours*, a
+    debt), TD-12 (*ledger · your decision*, a feature) and TD-20 (pickable: no longer for you)."""
+    import yaml
+    from test_ui_entry import client, fake, world
+
+    from sessionorc.client import AgentError
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    repo = world(tmp_path, team=team, entries=entries)
+    if host:
+        org = tmp_path / "home" / "org.yml"
+        doc = yaml.safe_load(org.read_text())
+        doc["teams"]["sam-grind"]["host"] = host
+        org.write_text(yaml.safe_dump(doc))
+    root = str(repo.resolve())
+    reading = {"name": "samscrape", "root": root, "ledger": {"entries": [
+        _e("TD-9", type="debt"),
+        _e("TD-12", owner="grinder", type="feature", blocked_by=["decision (paul)"]),
+        _e("TD-20", page="pickable", owner="grinder"),
+    ]}}  # fmt: skip
+    created: list[dict] = []
+
+    class Fake(fake(list(fleet), created=created, checks=checks)):
+        async def call(self, method, **kw):
+            if method == "repos":
+                return {root: reading}
+            if method == "create" and refuse:
+                raise AgentError(refuse)
+            return await super().call(method, **kw)
+
+    return repo, client(monkeypatch, tmp_path, Fake), created
+
+
+def _form(r):
+    from urllib.parse import parse_qs, urlsplit
+
+    got = r.json()
+    assert r.status_code == 200 and got["ok"] is False and got["form"].startswith("/new?"), r.text
+    return {k: v[0] for k, v in parse_qs(urlsplit(got["form"]).query).items()}, got["why"]
+
+
+MANAGER = {"id": "ao-samscrape-manager-sam", "name": "manager-sam", "state": "idle", "team": "sam-grind"}
+
+
+@pytest.mark.parametrize(
+    ("ref", "role", "why"),
+    [("TD-9", "techlead", "its owner is me"), ("TD-12", "designer", "it is blocked by a decision of mine")],
+)
+def test_start_session_starts_the_persons_session_in_td_n_with_work_md_sent(tmp_path, monkeypatch, ref, role, why):
+    """One press: interactive, on the repo's team with the role `entries:` names for the entry's Type,
+    the team's live manager its controller, the entry its lane, in worktree and branch `td-<n>` under
+    that name, `work.md` filled as its first prompt — never a start context or the role's brief."""
+    from shiftlead import repoconfig
+
+    repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[MANAGER], entries={"feature": "designer"})
+    r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": ref})
+    assert r.status_code == 200, r.text
+    name = ref.lower()
+    assert r.json() == {"ok": True, "id": f"ao-samscrape-{name}", "name": name}
+    (kw,) = created
+    root = str(repo.resolve())
+    assert (kw["name"], kw["worktree"], kw["dir"], kw["repo"]) == (name, name, root, root)
+    assert kw["unattended"] is False and kw["role"] == role and kw["team"] == "sam-grind"
+    assert kw["lane"] == [ref] and kw["controllers"] == ["ao-samscrape-manager-sam"]
+    assert "start_context" not in kw and kw["ledger"] == "docs/technical_debt.md"
+    assert kw["prompt"] == repoconfig.work_text(
+        ref, "samscrape", "docs/technical_debt.md", "yours" if role == "techlead" else "decision"
+    )
+    assert kw["prompt"] == (
+        f"I opened this session from the Inbox to work {ref} of samscrape's ledger (docs/technical_debt.md) myself: "
+        f"it waits on me ({why}). Read the entry, check the code and the design for what is already built or "
+        "decided, and tell me in a few lines what it asks of me and what you would do first. Then wait for me: "
+        "I drive this one."
+    )
+
+
+@pytest.mark.parametrize(
+    "holder",
+    [
+        {
+            "id": "ao-samscrape-g1",
+            "name": "grinder-sam-1",
+            "state": "working",
+            "progress": [{"ref": "TD-9", "status": "claimed"}],
+        },
+        {"id": "ao-samscrape-td-9", "name": "td-9", "state": "starting"},  # started, its claim not yet derived
+    ],
+)
+def test_a_live_holder_of_the_entry_or_its_name_is_opened_and_nothing_starts(tmp_path, monkeypatch, holder):
+    _repo, c, created = _start_world(tmp_path, monkeypatch, fleet=[{**holder, "repo": str(tmp_path / "samscrape")}])
+    r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"})
+    assert r.json() == {"ok": True, "focus": holder["id"]} and created == []
+
+
+def test_an_entry_no_longer_for_you_is_refused_in_words(tmp_path, monkeypatch):
+    _repo, c, created = _start_world(tmp_path, monkeypatch)
+    for ref in ("TD-20", "TD-404"):
+        r = c.post("/api/ledger/start", json={"repo": "samscrape", "id": ref})
+        assert r.status_code == 409 and "no longer waits on you" in r.json()["detail"]
+    assert c.post("/api/ledger/start", json={"repo": "nope", "id": "TD-9"}).status_code == 404
+    assert created == []
+
+
+def test_where_it_cannot_be_silent_the_press_lands_on_the_filled_form(tmp_path, monkeypatch):
+    """No team, a name an exited session holds, a worktree or a branch `td-<n>`, a team on another host
+    and a refused create each answer the New session form filled in as the press would have started,
+    with the reason — and the form draws it, its opening prompt in the box."""
+    from test_ui_entry import git
+
+    cases = []
+    _r, c, created = _start_world(tmp_path / "a", monkeypatch, team=False)
+    cases.append((c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"}), "no team services samscrape"))
+    checks = {"td-9": {"verdict": "supersede", "message": "replaces the exited td-9"}}
+    _r, c, created2 = _start_world(tmp_path / "b", monkeypatch, checks=checks)
+    cases.append(
+        (c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"}), "td-9 names an exited session")
+    )
+    repo, c, created3 = _start_world(tmp_path / "c", monkeypatch)
+    (repo / ".claude" / "worktrees" / "td-9").mkdir(parents=True)
+    git(repo, "commit", "-q", "--allow-empty", "-m", "root")
+    git(repo, "branch", "td-12")
+    cases.append(
+        (c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"}), "a worktree named td-9 exists")
+    )
+    cases.append(
+        (c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-12"}), "a branch named td-12 exists")
+    )
+    _r, c, created4 = _start_world(tmp_path / "d", monkeypatch, host="node1")
+    cases.append((c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"}), "sam-grind runs on node1"))
+    _r, c, created5 = _start_world(tmp_path / "e", monkeypatch, refuse="host node1 is not connected")
+    cases.append((c.post("/api/ledger/start", json={"repo": "samscrape", "id": "TD-9"}), "host node1 is not connected"))
+    for r, why in cases:
+        q, said = _form(r)
+        assert said.startswith(why), said
+        assert q["why"] == said and q["press"] == "start" and q["prefilled"] == "1"
+        assert q["where"] == "worktree" and q["worktree"] == q["name"] and q["name"] in ("td-9", "td-12")
+        assert q["lane"] == q["name"].upper() and "unattended" not in q
+        assert q["prompt"].startswith(f"I opened this session from the Inbox to work {q['lane']} of samscrape's")
+        assert q.get("team", "") == ("" if why.startswith("no team") else "sam-grind")
+        assert q.get("role", "") == ("" if why.startswith("no team") else "techlead")
+    assert created == created2 == created3 == created4 == []
+    assert len(created5) == 0
+    # the form draws what it was handed: the reason in Start session's words, the prompt in its box
+    q, said = _form(cases[0][0])
+    html = c.get("/new", params=q).text
+    assert "⚠ Start session could not be one press: no team services samscrape" in html
+    assert "I opened this session from the Inbox to work TD-9 of samscrape&#39;s ledger" in html
+
+
+def test_the_row_draws_start_session_or_open_session_while_held(tmp_path, monkeypatch):
+    """Every ledger row carries the press beside **Open**: **Start session**, or **Open session** while a
+    live record holds the entry — the row's `holder` the first live claimer's id, `type` the entry's,
+    `why` its kind for `work.md`."""
+    from shiftlead.ui.app import ledger_for_you
+
+    lf = ledger_for_you(_repos(tmp_path), _fleet(tmp_path), {})
+    rows = {r["id"]: r for r in lf["groups"][0]["rows"]}
+    assert (rows["TD-319"]["holder"], rows["TD-319"]["why"]) == ("g1", "decision")
+    assert (rows["TD-156"]["holder"], rows["TD-156"]["why"]) == ("", "yours")  # a closed claimer holds nothing
+    html = _render(lf, tmp_path, monkeypatch)
+    held, free = _row(html, "ledger:agentorc:TD-319"), _row(html, "ledger:agentorc:TD-156")
+    assert 'data-act="ledger_start" data-id="person" data-repo="agentorc" data-ref="TD-319"' in held
+    assert ">Open session</button>" in held and ">Start session</button>" not in held
+    assert (
+        'data-act="ledger_start"' in free and ">Start session</button>" in free and "td-156, in a new worktree" in free
+    )

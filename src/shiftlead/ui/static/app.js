@@ -716,7 +716,7 @@
   // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
   const PRESS_VERBS = {
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
-    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", snooze: "snoozing…", attention_snooze: "snoozing…",
+    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
@@ -1022,6 +1022,21 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // design §4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-678): one press —
+      // the session that holds the entry or its name (`focus`), the one it started (`id`), or the New
+      // session form filled in with the reason (`form`), as **Resume**'s press lands
+      if (action === "ledger_start") {
+        pressed();
+        const got = await fetch("/api/ledger/start", {
+          method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref }),
+        });
+        if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
+        const r = await got.json();
+        if (r.form) { say(`start session needs the form: ${r.why}`, true); location.href = r.form; return; }
+        if (!r.focus) say(`started ${r.name || r.id} on ${b.dataset.ref}`, true);
+        location.href = `/focus/${r.focus || r.id}${AO.poppedId ? "?window=1" : ""}`;
+        return;
+      }
       if (action === "board_add") {
         const res = await AO.boardAdd(b, pressed);
         if (!res) return;
@@ -1112,7 +1127,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", "shell-here": "Open shell here" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
