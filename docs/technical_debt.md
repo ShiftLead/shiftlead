@@ -71,6 +71,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-668 | The Add entry form's **What** box is one line high and its hidden error note draws as an empty orange box: `.input`'s 34 px and `.warn`'s `display: flex` beat `rows` and `[hidden]` | Low | Open |
 | TD-669 | Build TD-667: a typed key leaves copy mode first — the bridge's *scrolled* mark, `copy-mode -q` before a printable key, Enter, Tab, Backspace or paste, its tmux commands in order; every host-agent send leaves copy mode first | Medium | Open |
 | TD-670 | A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder | High | Live check — once #1704 is live |
+| TD-671 | `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL` | Low | Open |
 
 ---
 
