@@ -55,6 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-676 | An Inbox ledger row that waits on the person has no **Start session**: working an entry means leaving the Inbox for the New session form | Medium | Designed — TD-678 builds it |
+| TD-679 | Ready to close has no row for the agent itself: a working session's checklist reads all ✓, and the card's *more ▾* **Close** is enabled on it | Low | Open |
 
 ---
 
@@ -948,3 +949,23 @@ with the retired brief).
 **Done when** a press on a ledger row in the Inbox starts the person's session on that entry, on its team, named for it, and opens its Focus, or opens the filled form saying why not; and a second press while that session lives opens it instead of starting another.
 
 **Related:** TD-367 and TD-560 (the rows), TD-565 (drawn as full rows in *Later*).
+
+---
+
+## TD-679: Ready to close has no row for the agent itself: a working session's checklist reads all ✓, and the card's *more ▾* **Close** is enabled on it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 (the `ready_when` checklist), §4.5a *card: Close session*, *Focus header: Close session* and *more ▾*, *Focus side panel* (the Ready to close card); `src/shiftlead/ui/cards.py` (`ready_to_close`, `ready_ok`, `not_ready`), `src/shiftlead/ui/templates/card.html` (*more ▾*'s **Close**), `src/shiftlead/ui/templates/focus.html` and `src/shiftlead/ui/static/app.js` (the side panel's `#checks`, `readyNow`, `ready`), `src/shiftlead/repoconfig.py` (`DEFAULT_READY_WHEN`)
+
+**Why:** Paul, 2026-10-14: *Ready to Close on Focus sessions should also consider whether the agent is currently working. A session with the agent mid-work is not ready to close.* The checklist (`cards.ready_to_close`) reads only git, subagents, outcomes, mail and members, never the session's state. So the Focus side panel's Ready to close card shows every row ✓ on a session that is `working`, while its **Close session** stays disabled with no row that says why. The page hides the mark and the buttons outside `idle` and `exited` by a separate test (`readyNow` and `ready` in app.js, `state in ('idle', 'exited')` in focus.html), and that test is not one of the checks. Where that test is missing, a working session reads as ready: `ready_ok` is the checks alone, so the card's *more ▾* **Close** (card.html) is enabled on a `working`, `needs-you`, `stalled?` or `limited` session whose tree is clean and pushed. One click there kills an agent mid-turn and reaps its worktree. §4.2 says the checklist is evaluated when a session goes `idle` or `exited`, but names no check for it.
+
+**Fix:** add a check for the agent's own state to the checklist, first in the list: it passes on `idle` and `exited`, and fails on any other state, naming it (*agent not working* / *agent working — wait or Wrap up*, the state's own word for `needs-you`, `stalled?`, `limited`). Then `ready_ok` and `not_ready` carry it, so the card's *more ▾* **Close** is disabled with the reason on every surface. The page's separate `state in ('idle', 'exited')` tests (focus.html, app.js `readyNow` and `ready`) become the check's own result, so there is one test. The design changes in the same PR: §4.2's list gains the row. Like the outcomes, mail and members rows it is unconditional, so it needs no name in §5's `ready_when` (which `ready_to_close` does not read today). Leave out a record with no agent, which is closed without the checks (§4.5a *A record with no agent*), and a seat, which is never *ready to close* (§4.5). Test: a `working` view with a clean, pushed tree has `ready_ok` false and the new row in `not_ready`; an `idle` one passes.
+
+**Done when** a working session's Ready to close card shows a ✗ row saying the agent is working, and no surface (the card's *more ▾*, the Focus header, the side panel) offers Close on it as ready. The team header's *n ready to close* already counts only `idle` sessions and is unchanged.
+
+**Related:** TD-156 (the Focus screen's Close session), TD-080 (the one pushed measure), TD-666 (a record with no agent).
