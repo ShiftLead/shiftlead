@@ -1442,7 +1442,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-14 (grinder-ao-2, TD-611's live read)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1 (fix 1) in PR #1702 (2026-10-14, grinder-ao-2): a light stream takes `{event: "repos", root, pr_marks}` (`null` for a dropped repo), the full stream the push whole — on every push, not only when the marks moved as fix 1 said: the host pushes a repo only when its reading changed, and the Inbox re-reads its boards and ledger on that push (review of #1702). Left: fixes 2 and 3.
 **Location:** `src/shiftlead/ui/app.py` (`fan_step`'s `repos`/`doing` branch: `run.to_all(run.live, ev)`; `heads` ~L971, run per regroup on the loop; `counts_now` ~L855), `src/shiftlead/ui/fanout.py` (`to_all`, the `groups` flush ~L157), `src/shiftlead/ui/counts.py` (`_recounter`, `_ticker`), `src/shiftlead/ui/static/app.js` (Focus's `repos` handler ~L4518, the Inbox's re-read ~L3156)
 
 **Why:** TD-611's live read, 2026-10-14 (`9bb725c` live; read-only: a static-file probe of `/static/app.css` every 50 ms beside one `/events` websocket the probe opened, nothing pressed). The bulk polls TD-616 and TD-617 removed are gone, but the loop is not yet what TD-611's *Done when* asks (no request above ~50 ms of loop time with a Focus tab open):

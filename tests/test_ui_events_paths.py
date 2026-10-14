@@ -124,6 +124,32 @@ def test_a_repos_push_carries_the_repos_pr_marks_once_for_every_stream(tmp_path,
     assert [e["pr_marks"] for e in light if e["event"] == "repos"] == [{"811": "merged"}]
 
 
+
+def test_a_light_stream_takes_a_repos_marks_alone(tmp_path, monkeypatch):
+    """TD-670: a light stream (Focus, the Inbox) is sent a repo's root and PR marks, never its facts —
+    which run to most of a megabyte a push — on every push, which the Inbox re-reads on; a dropped
+    repo is `pr_marks: null`. The full stream still takes every push whole."""
+
+    def pushed(g1, g2):
+        root = g1["repo"]
+        merged = {**reading(root), "prs": {"open": [], "recent": [{"number": 811, "state": "merged"}]}}
+        again = {**merged, "ledger": {"moved": True}}  # the facts moved, the marks did not
+        return first_then(
+            {"event": "repos", "root": root, "repo": merged},
+            {"event": "repos", "root": root, "repo": again},
+            {"event": "repos", "root": root, "repo": None},
+        )(g1, g2)
+
+    light = [e for e in received(client(monkeypatch, tmp_path, pushed), "/events?light=1") if e["event"] == "repos"]
+    root = str(tmp_path / "samscrape")
+    assert light == [
+        {"event": "repos", "root": root, "pr_marks": {"811": "merged"}},
+        {"event": "repos", "root": root, "pr_marks": {"811": "merged"}},
+        {"event": "repos", "root": root, "pr_marks": None},
+    ]
+    full = [e for e in received(client(monkeypatch, tmp_path, pushed), "/events") if e["event"] == "repos"]
+    assert [bool(e["repo"]) for e in full] == [True, True, False] and full[1]["repo"]["ledger"] == {"moved": True}
+
 def test_a_reading_equal_to_the_last_one_sent_is_not_sent_again(tmp_path, monkeypatch):
     """g1's tail moves twice: the second marks the groups, the flush reads them, and they are the
     same as the first delta's — so nothing is sent."""

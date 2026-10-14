@@ -4516,8 +4516,9 @@
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
       } else if (ev.event === "repos" && ev.root) {
-        // a repo's PRs moved: its marks replace what the page held, and the Reports panel redraws (TD-617)
-        if (ev.repo) prMarks[ev.root] = ev.pr_marks || {}; else delete prMarks[ev.root];
+        // a repo's PRs moved: its marks replace what the page held, and the Reports panel redraws (TD-617);
+        // a light stream sends the marks alone, `null` for a repo dropped (TD-670)
+        if (ev.pr_marks) prMarks[ev.root] = ev.pr_marks; else delete prMarks[ev.root];
         if (reportsV && reportsV.pr_repo === ev.root) renderReports(reportsV);
       }
       if (ev.event === "gone" && ev.id === id) {

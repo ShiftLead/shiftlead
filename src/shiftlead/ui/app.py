@@ -3551,18 +3551,27 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # (`repo: null` for a checkout the registry dropped), and the groups marked for the flush,
             # so the team cards' summaries redraw (TD-176 slice 3).
             if ev["event"] == "repos":
+                root = str(ev.get("root"))
+                marks: dict[str, str] | None = None
                 if ev.get("repo") is None:
-                    repos.pop(str(ev.get("root")), None)
+                    repos.pop(root, None)
                 else:
-                    repos[str(ev.get("root"))] = ev["repo"]
+                    repos[root] = ev["repo"]
                     # the repo's PR marks, once for every page (§4.4 *Per-session views*, TD-617): a
                     # card looks its PRs up here, no session view carries them
-                    ev = {**ev, "pr_marks": repo_pr_marks(str(ev.get("root")), ev["repo"])}
-            elif isinstance(ev.get("entry"), dict):
-                ring = doing.setdefault(str(ev.get("team")), [])
-                ring.append(ev["entry"])
-                del ring[:-DOING_KEPT]
-            run.to_all(run.live, ev)
+                    marks = repo_pr_marks(root, ev["repo"])
+                    ev = {**ev, "pr_marks": marks}
+                run.to_all(run.full, ev)
+                # a light stream draws a repo's PR marks and nothing else of its facts, which run to
+                # most of a megabyte a push: the root and the marks alone (`pr_marks: null` for a
+                # dropped repo) — still on every push, which the Inbox re-reads its boards on (TD-670)
+                run.to_all(run.light(), {"event": "repos", "root": root, "pr_marks": marks})
+            else:
+                if isinstance(ev.get("entry"), dict):
+                    ring = doing.setdefault(str(ev.get("team")), [])
+                    ring.append(ev["entry"])
+                    del ring[:-DOING_KEPT]
+                run.to_all(run.live, ev)
             if run.full:
                 run.dirty.set()
         elif ev.get("event") == "gone":
