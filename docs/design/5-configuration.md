@@ -239,6 +239,17 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
     leaves the worktree and fails the create with its own words.
   - **`ledger:`** carries, beside the ledger, the `{ledger_check}` the briefs name: `python3
     scripts/ledger.py --check` when that script exists, else the seam's sentence.
+  **The layout slots** a built-in brief names (`repoconfig.layout`, TD-588) are `{gate}` (*no gate: a person
+  merges*; dev-cadence's default `python3 scripts/check_cadence.py --pr {pr}`, the `{pr}` filled as
+  `<n>` after the rest), `{board}` (*no board: the Inbox is the person's channel*), `{ledger}`,
+  `{ledger_check}` (*no ledger check: keep each entry in the shape the ledger's other entries have*),
+  `{test}` (*no test command: run what the repo's README says*), `{lint}` (*no lint command: keep to the
+  style of the code around the change*), and two that are no key, dev-cadence's file or the sentence:
+  `{design_dir}` (`docs/design/` where the checkout holds it, else *no design directory: the README and
+  the code say what is true*) and `{cadence_rules}` (*read docs/cadence.md §1–§4* where it exists, else
+  *no cadence rules: the repo's README says how a change lands*). They are read only when the brief
+  being composed names one — a node's files are asked across the link — and fill a supplement's text as
+  they fill the template's. `commands:` is also read in its older list form, `[{name, run}]`.
   Convention notices (§6 rule 12) and the SessionStart line (§4.3) run only in a dev-cadence repo:
   features of one, never requirements. **Who reads them**: the host agent, at the home, reads
   `ledger:`, `board:`, `gate:` and `worktree_setup:` as it reads `promote:` — for the repo facts
