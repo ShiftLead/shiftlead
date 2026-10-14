@@ -35,7 +35,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import paths
+from sessionorc import paths, workorders
 from sessionorc.models import GRANTS, normalize_context, normalize_review, owner_word
 
 FILE = paths.REPO_FILE
@@ -620,8 +620,10 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
             raise ValueError(f"{where} must be a command, `{{pr}}` where the PR's number goes (design §5 *The seams*)")
         cfg.gate = value.strip()
     elif key == "board":
-        if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"{where} must be the board file's path, from the repo's root (design §5 *The seams*)")
+        if not isinstance(value, str) or not value.strip() or not workorders.inside(Path(value.strip())):
+            raise ValueError(
+                f"{where} must be the board file's path from the repo's root, inside it (design §5 *The seams*)"
+            )
         cfg.board = value.strip()
     elif key == "worktree_setup":
         if not isinstance(value, str) or not value.strip():

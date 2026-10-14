@@ -190,18 +190,24 @@ def board_path(root: Path | str) -> tuple[str, Path | None]:
     """The checkout's board (§5 *The seams* `board:`, TD-587): `("set", path)` for its `.shiftlead.yml`
     `board:`, relative to `root`; `("defaulted", BOARD)` when the key is unset and `docs/user_attention.md`
     exists; `("absent", None)` otherwise — the person's channel is the Inbox alone. A file that cannot be
-    read, or a key that is not a non-empty string, is the key unset: the clients (`shiftlead.repoconfig`)
-    refuse such a file by name."""
+    read, or a key that is not a non-empty string or is not a path inside the repo (absolute, or with a
+    `..`: the write-back edits it in a tree of its own), is the key unset: the clients
+    (`shiftlead.repoconfig`) refuse such a file by name."""
     try:
         doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         doc = None
     got = doc.get("board") if isinstance(doc, dict) else None
-    if isinstance(got, str) and got.strip():
+    if isinstance(got, str) and got.strip() and inside(Path(got.strip())):
         return "set", Path(got.strip())
     if (Path(root) / BOARD).is_file():
         return "defaulted", BOARD
     return "absent", None
+
+
+def inside(rel: Path) -> bool:
+    """Whether `rel` is a path from a repo's root that stays inside it: relative, with no `..`."""
+    return not rel.is_absolute() and ".." not in rel.parts
 
 
 def board_rel(root: Path | str) -> Path:

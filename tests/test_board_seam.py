@@ -148,3 +148,15 @@ async def test_board_edit_takes_the_board_board_names_and_refuses_the_default_pa
     assert got["action"] == "done"
     git(root, "fetch", "-q", "origin")
     assert git(root, "show", f"origin/main:{REL}").splitlines()[4].startswith("- [x] act 2026-10-10")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("named", ["/etc/board.md", "../outside.md", "notes/../../outside.md"])
+def test_a_board_outside_the_repo_is_the_key_unset_so_the_write_back_never_edits_it(tmp_path, named):
+    """The write-back edits the board in a tree of its own (§4.4): a `board:` that is absolute or climbs
+    out of the repo would be a file outside it, so it reads as the key unset — the default, or none."""
+    root = make_repo(tmp_path)
+    (root / ".shiftlead.yml").write_text(f"board: {named}\n")
+    assert workorders.board_path(root) == ("absent", None)
+    assert workorders.board_rel(root) == workorders.BOARD
+    assert workorders.read_boards(root, fetch=False) == {"boards": []}
