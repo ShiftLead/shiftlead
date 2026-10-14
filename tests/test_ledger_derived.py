@@ -161,9 +161,11 @@ def test_the_rule_and_another_repos_entries_through_one_registry(tmp_path):
 def test_a_name_two_checkouts_share_keeps_the_block(tmp_path):
     a = _repo(tmp_path / "a" / "other", "# L\n", "# A\n\n## TD-002: archived\n")
     b = _repo(tmp_path / "b" / "other", "# L\n", "# A\n\n## TD-002: archived\n")
-    assert ledger.Registry([str(a)])("other#TD-002") == "archived"
-    assert ledger.Registry([str(a), str(b)])("other#TD-002") == "unresolved"
-    assert ledger.Registry([str(a)])("other#TD-009") == "unresolved", "an id in neither file"
+    assert ledger.Registry([str(a)])("other#TD-002") == ("archived", "")
+    state, why = ledger.Registry([str(a), str(b)])("other#TD-002")
+    assert (state, "registry" in why) == ("unresolved", True), why
+    state, why = ledger.Registry([str(a)])("other#TD-009")
+    assert (state, "neither" in why) == ("unresolved", True), "an id in neither file, and it says so"
 
 
 def test_a_written_pickable_line_is_not_read():

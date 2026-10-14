@@ -127,7 +127,8 @@ def ids_in(text: str | None) -> set[str]:
 parse_blocked = lb.parse_blocked
 
 
-Resolve = Callable[[str], str]  # a `<repo>#TD-NNN` item → `archived`, `open` or `unresolved`
+# a `<repo>#TD-NNN` item → `(state, why)`, ledgerboard's resolver: `archived`, `open` or `unresolved`
+Resolve = lb.Resolve
 Live = Callable[[int], bool]  # a PR number → whether its squash commit is in the repo's live commit
 
 
@@ -341,9 +342,9 @@ def entries(
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
     unknown), `blocked_by` — what still blocks, as the script lists it: open ids, `decision (<who>)`,
     an unread item quoted — and `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
-    *Repo facts*, TD-228): blocked while `Blocked by:` names an id not in `archive` (open, or in
-    neither file), a decision, or an item it cannot read. A `<repo>#TD-NNN` item asks `resolve`, and
-    anything but `archived` keeps the block; with no `resolve` it is unresolved. A
+    *Repo facts*, TD-228) as ledgerboard's `pickable` derives it (TD-585): blocked while `Blocked by:` names an id not in `archive` (open, or in
+    neither file), a decision, or an item it cannot read. A `<repo>#TD-NNN` item asks `resolve` for
+    `(state, why)`, and anything but `archived` keeps the block; with no `resolve` it is unresolved. A
     written `**Pickable:**` line is not read (TD-228 slice 4): what blocks an entry is said in
     `Blocked by:`. `for_page` is the page's kind. A field is read only from the entry's own
     section. A `Kind: live-check` entry also carries `built`, the PRs its line names, and `live`,
@@ -351,24 +352,13 @@ def entries(
     (§4.9b, TD-323)."""
     t = strip_comments(text)
     heads = list(lb.HEADING_RE.finditer(t))
-    here = {_norm(m.group(1)) for m in heads}
-    archived = ids_in(archive)
+    derived = {r["id"]: r for r in lb.pickable(t, archive or "", resolve)["entries"]}
     out: list[dict[str, Any]] = []
     for m, read in zip(heads, lb.entries(t), strict=True):
         nxt = lb.SECTION_RE.search(t, m.end())
         fields = _header(read["fields"], t[m.end() : nxt.start() if nxt else len(t)])
         etype = (fields.get("type") or "").split()[0].lower() if (fields.get("type") or "").split() else ""
-        blocked_by: list[str] = []
-        raw = fields.get("blocked by") or ""  # an empty line blocks nothing
-        if raw:
-            ids, who, bad = parse_blocked(raw)
-            for b in ids:
-                if "#" in b:
-                    if (resolve(b) if resolve else "unresolved") != "archived":
-                        blocked_by.append(b)
-                elif _norm(b) in here or _norm(b) not in archived:
-                    blocked_by.append(b)
-            blocked_by += [f"decision ({w})" for w in who] + [repr(b) for b in bad]
+        blocked_by = list(derived[m.group(1)]["blocked_by"])
         e = {
             "id": m.group(1),
             "title": read["title"],
@@ -431,7 +421,8 @@ class Registry:
     its origin; that checkout's `docs/technical_debt.md` and its archive are read at
     `origin/<default>`, or in the working tree where that ref is missing. Each repo is read once, and
     only when asked; a name two checkouts share, a checkout not listed, a ledger that cannot be read
-    or an id in neither file is `unresolved`, which keeps the block."""
+    or an id in neither file is `unresolved`, which keeps the block. Each answer is ledgerboard's
+    `(state, why)`, `why` empty unless it is unresolved (TD-585)."""
 
     LEDGER, ARCHIVE = DEFAULT, archive_path(DEFAULT)
 
@@ -470,14 +461,22 @@ class Registry:
             self._read[root] = None if led is None else (ids_in(led), ids_in(read(self.ARCHIVE)))
         return self._read[root]
 
-    def __call__(self, item: str) -> str:
+    def __call__(self, item: str) -> tuple[str, str]:
         m = lb.XREPO_ITEM_RE.match(item)
-        root = self._find(m.group(1)) if m else None
-        got = self._repo(root) if root is not None else None
-        if got is None or m is None:
-            return "unresolved"
+        if m is None:
+            return "unresolved", f"{item!r} is not <repo>#TD-NNN"
+        root = self._find(m.group(1))
+        if root is None:
+            return "unresolved", f"no one checkout named {m.group(1)!r} in the home's registry"
+        got = self._repo(root)
+        if got is None:
+            return "unresolved", f"{root}'s {self.LEDGER} cannot be read"
         tid = _norm(m.group(2))
-        return "archived" if tid in got[1] else "open" if tid in got[0] else "unresolved"
+        if tid in got[1]:
+            return "archived", ""
+        if tid in got[0]:
+            return "open", ""
+        return "unresolved", f"{m.group(2)} is in neither {root.name}'s ledger nor its archive"
 
 
 def ledger_path(root: Path | str) -> str:
