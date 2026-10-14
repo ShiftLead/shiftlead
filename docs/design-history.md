@@ -165,6 +165,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-14 (TD-681, the designer): *A sync PR is the team's at once, unless the home merges it* — a `cadence-sync-*` PR the home does not merge is a `pr:<n>` order (`sync: true`) from the first reading, with no `ORPHAN_AFTER`, green or red, first in the pick order, an idle holder told and passed over on `sync_since` as on `red_since`; a repo no team services has the *Inbox row: red PR*, never a board line; the red-PR rule's *its owner is never nobody* for a sync PR now points here. Built by TD-684.
 - 2026-10-14 (TD-591 slice 1, grinder-ao-1): *Repo facts* **The seams** built as designed, on the repo reading as `seams` (`sessionorc.seams`): the ledger's `{path, state, major, entries, why}` — *ok*, *absent*, *unreadable* or *newer* than the vendored `ledgerboard.py` — and `board`, `gate` and `worktree_setup` each `{state, value}`, read on the reading's five-minute pass. The Repo page's lines and `ao doctor`'s **repos** check, which draw it, are the entry's slice 2.
 - 2026-10-14 (TD-585, last slice, grinder-ao-1): *Board write-back* — the live look's `Not right: <what>` form and a line's bold head are ledgerboard v1.1's (`is_not_right_form`, `fill_not_right`, `bold_head`): a fill that is only a slot (`Not right: <b>`) is refused, a blank `** **` run is no head, and bold inside a reply's words is the person's, never the head. Was: `board.NOT_RIGHT_FORM` and `board.HEAD_RE`, which accepted the slot fill and took the first bold run anywhere on the line.
 - 2026-10-14 (TD-652, grinder-ao-1): *A red PR nobody holds is a work order* — the reading names each held red PR's holders beside the orders, and the pages' *held by <name>* reads them. Was: the Repo page and the facet ran the holding test again over the records they held (`teamrun.pr_holders`, a copy of `workorders.holds_pr`).
@@ -417,6 +418,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-14 (TD-681, the designer): the Settings page's Repos card gains the **sync** switch (`repos.<repo>.sync.auto`, on when absent) with the last sync verdict; *Inbox row: red PR* also carries a sync PR the home did not merge, with its reason. Built by TD-684 (the row) and TD-685 (the switch).
 - 2026-10-14 (TD-678, grinder-ao-2): **Inbox row: ledger entry: Start session** built (`/api/ledger/start`, `briefs/work.md`, `repoconfig.work_text`). *The team's host is not connected* reads *the team runs on another host*: the press creates on this host from this host's checkout, so a node's team lands on the filled form as Add entry's **Attach** refuses it; a refused create lands there too, with the host agent's words. The form says *Start session could not be one press* (`press=start`) and takes the opening prompt in its box.
 - 2026-10-14 (TD-676, the designer; Paul, 2026-10-14, through Add entry: *it allows the user to work out of the inbox instead of having to jump around*): **Inbox row: ledger entry: Start session / Open session** — one press starts the person's interactive session on the entry (the repo's team, the `entries:` role for its Type, worktree and branch `td-<n>` so the claim is derived, a fixed opening prompt from `briefs/work.md`), the filled New session form where it cannot be silent, **Open session** while a live record holds it; both kinds of row. Built by TD-678.
 - 2026-10-14 (TD-675, the designer; Paul, 2026-10-14: *lets add a text box that shows that default name with the option to change it*): **Add entry form: Name** — the box beside **Open a session**, prefilled with `entry-<n>`; a typed name passes the test the default is picked by (free in the repo's scope, no worktree, no branch of that name), checked as typed and again at the press; *Open a session* is named by it. Built by TD-677.
@@ -1231,6 +1233,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-14 (TD-681, the designer): `repos.<repo>.sync: {auto}` joins `promote.auto` and `pull` in `settings.yml`, `true` when absent.
 - 2026-10-14 (TD-588 slice 2, grinder-ao-2): *The seams*' slots taken by the built-in briefs, the five flows' stage texts and `team_skill.md` — the gate step `{gate}`, the board `{board}`, the first reads `{cadence_rules}`, the design `{design_dir}`, the tests `{test}` and `{lint}`, a decided line closed with `ao board edit done` — and `tests/test_briefs_layout.py` fails on the ADR's literals in them. This repo's own moved to its `.shiftlead.yml` (`commands: {test: pdm run test, lint: pdm run lint}`) and, for the anchor, to `docs/briefs/anchor.md` (`roles.anchor.brief`): the scratch home and the ledger script, which a grinder's and the designer's repo parts already named.
 - 2026-10-14 (TD-588 slice 1, grinder-ao-2): *The seams* names the layout slots, each with its sentence, and adds two that the ADR named but no key holds: `{design_dir}` and `{cadence_rules}`, each dev-cadence's file where the checkout holds it. A key for either would be new design. `commands:` is read as the mapping §5 shows; until this date the loader took only a list of `{name, run}` entries, which nothing read, and it still accepts that form. No built-in brief names a slot yet; slice 2 moves them over.
 - 2026-10-14 (TD-587 slice 2, grinder-ao-1): *The seams* `board:` read by every board reader as designed — the host agent's `boards` reading and its clock (`workorders.read_boards`, `board_path` moved there from `board`), the write-back's edit, adds and re-read (`board.board_rel`, `agent_inbox._board_root`), the Inbox's *Put on the board* choices and `ao board show`, which says *no board: the Inbox is the person's channel* for a repo with none (`workorders.NO_BOARD`). Was: `docs/user_attention.md`, fixed, in each.
@@ -1275,6 +1278,14 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-14 (TD-681, the designer): §6 *Sync* — the home merges a mechanical sync PR, one it has checked:
+  - it is not forked, its author is the home's own login, and its repo has a gate (a PR failing any of these is *refused* at once, with nothing posted);
+  - every lock line that differs from the base lock's is checked against dev-cadence's `files/` at `files_commit`, and each changed file's bytes against its line;
+  - it deletes no path the base lock never listed;
+  - the replay at the merge base runs the repo's `post_sync` with a scrubbed environment, and the tree equals the head;
+  - it touches no held path.
+
+  The home then posts a `cadence-review: SHIP · sync-check` comment, runs the gate in the registry checkout, and squash-merges pinned to the head after re-reading the head and the holders. Only a gate fail (exit 1, or a `gate:` non-zero) posts BLOCK and hands the PR to the team; a check with no reading is tried `SYNC_TRIES` times. The entry's board line for a repo no team services became the existing *Inbox row: red PR*, since no policy adds a board line. Built by TD-685.
 - 2026-10-13 (TD-665, the designer): a stop time on a record with no agent kills at the instant, with no wrap-up typed. Built by TD-666.
 - 2026-10-13 (TD-658, the designer): rule 10 now receives only PRs green or merged at the declaration; an older `ci: pending` is still cleared by its read. Built by TD-664.
 - 2026-10-13 (TD-657, the designer): rule 3's director seat is also due by `asks` (a question passed up to it) and `groom` (its groom pass). Built by TD-661 and TD-663.

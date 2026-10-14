@@ -48,7 +48,7 @@ permissions:                                  # TD-636, §4.9b *The director sea
   grinder: {allow: ["Bash(pdm run test:*)", "Bash(gh pr view:*)"], deny: ["Bash(rm -rf:*)"]}
 director: {level: conservative, groom: 7d}    # TD-657, §4.9b *The director answers what is passed up to it*: conservative | extrapolate | liberal; groom every <duration> | off
 repos:                                        # per registered checkout, by its directory name
-  shiftlead: {promote: {auto: false}, pull: true, director: {level: extrapolate}}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent
+  shiftlead: {promote: {auto: false}, pull: true, sync: {auto: true}, director: {level: extrapolate}}   # §6 *Promote*: the one switch a person flips (run and check stay in .shiftlead.yml); §6 *Pull*: the checkout follows origin, on when absent; §6 *Sync*: a mechanical sync PR merged at the home, on when absent
 person:                                       # the person's own — nothing here reaches a policy
   open_in: vscode                             # the editor button, below
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
@@ -70,7 +70,7 @@ reach:                                        # §4.5b *The setting*: the person
 ```
 
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
-  no schedule, no stop time and no priority, and starts the team, or the member, when work appears (`on_work: start`); a repo absent under `repos:` promotes by hand and is pulled (§6 *Pull*: `pull: false` is the opt-out).
+  no schedule, no stop time and no priority, and starts the team, or the member, when work appears (`on_work: start`); a repo absent under `repos:` promotes by hand, is pulled (§6 *Pull*: `pull: false` is the opt-out), and has its mechanical sync PRs merged at the home (§6 *Sync*: `sync: {auto: false}` is the opt-out).
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
   reads that, offline included — *policies that stop run on the node, from its replica* — so the

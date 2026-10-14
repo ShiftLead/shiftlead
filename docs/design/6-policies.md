@@ -1095,6 +1095,113 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   moves a checkout to a branch or a commit (that is the person's, and a rollback's tree is the host
   agent's own, §6 *A rollback*). *The tree is a person's* (§6 *Promote*) stands: the pull is the one
   move the host agent makes in a person's checkout, and only ever a fast-forward.
+- **Sync: a mechanical sync PR is merged at the home** (TD-681; not built, TD-685 builds it; Paul,
+  2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and
+  post_sync would handle it that's even better*). A sync PR (§4.4 *A sync PR is the team's at once*:
+  head branch `cadence-sync-*`, the lock in its diff) changes only what dev-cadence owns, and a
+  mechanical synced-file change needs no repo's judgement (Paul, 2026-09-12), so one the check below
+  finds mechanical needs no session. The policy runs **at the home** (§4.4a), in the promote's pass
+  and on its cadence (five minutes, detached as the `gh` reads are), over every checkout in the
+  home's registry, from the open PRs of the repo's PR reading (§4.4 *Repo facts*: each with its
+  `branch`, `head` and `author`). It looks at a sync PR that no live record holds (§4.4's test),
+  that is not a draft and not `conflicting`, and whose `checks` read *green*. Only one that is
+  **not cross-repository**, whose **author is the home's own `gh` login** (the account `sync-all.sh`
+  pushes as), and whose repo has a gate goes on to the steps.
+
+  It waits on *pending*, and leaves red, conflicting and draft PRs to the team (§4.4). A green sync
+  PR it declines is written as verdict *refused* at its head, and nothing is posted, so the team's
+  order follows at once (§4.4). A branch name alone vouches for nothing. It declines three kinds:
+  - a forked PR: *forked*;
+  - another login's: *author <login> is not the home's*;
+  - one in a repo with **no gate**: *no gate: a person merges*, rule 10. The gate is looked up
+    here, before anything else.
+
+  Each head is checked once:
+  1. **The files are dev-cadence's.** The head lock's `source:` must equal the merge base's lock's,
+     so the PR does not choose its judge. The home finds that repo's clone in its registry: the
+     checkout whose origin is `source:`, fetched once a pass. The lock's `files_commit` must be a
+     commit, not a `+dirty` mark (`sync.sh`'s word for a sync from an unclean clone), and it must be
+     on that clone's `origin/<default>`. Two checks follow:
+     - For every path the PR changes that the head's lock lists, the head's blob hashes, with its
+       mode, to its `file: <path> <sha256> <mode>` line. A path the head's lock lists that the PR
+       deletes has no blob: *<path> deleted but still in the lock*.
+     - Every lock line that differs from the base lock's, for a changed file or not, hashes as the
+       blob at `files/<path>` at `files_commit` does.
+
+     So both the lock and the bytes are dev-cadence's. A lock the PR wrote for itself, or a file
+     edited beside an honest lock, is refused, with one of these reasons:
+     - *<path> differs from its lock line*
+     - *lock not dev-cadence's: <path>*
+     - *the lock's source changed*
+     - *files_commit is +dirty*
+     - *files_commit <sha> is not on dev-cadence's <default>*
+     - *no dev-cadence clone to check the lock against*
+  2. **The replay.** The home keeps a detached worktree of its own per repo,
+     `~/.shiftlead/sync/<repo>/tree` (made as the board's tree is, §4.4 *Board write-back*). It is
+     set to the merge base of the PR's head and `origin/<default>`. From the head it takes the lock
+     and every path the PR changes that the head's lock lists. It deletes every path the PR deletes
+     that the base's lock lists and the head's does not. The PR's paths come from `git diff
+     --name-status <merge base> <head>` in that tree, never from a capped list. Then it runs the
+     repo's **`post_sync`**, where the repo has one. That key belongs to dev-cadence's
+     `docs/cadence.toml` (dev-cadence#TD-113): a string, one shell command run with the tree's root as
+     its working directory, read from the merge base's copy of the file. Until TD-113 lands no repo
+     has the key, and the replay runs nothing. It runs under `SYNC_BOUND` (five minutes), its process
+     killed at the bound, with an environment holding `PATH`, `HOME` and `LANG` alone: no `GH_TOKEN`,
+     no Doppler and no `SHIFTLEAD_*`. It runs only the base's own scripts and the bytes step 1 proved
+     are dev-cadence's. That is the same trust the gate's run already has.
+
+     **Mechanical** means three things. The tree then equals the PR's head (`git add -A`, then `git
+     diff --cached --quiet <head>`). The PR changes no file the lock does not list, other than what
+     `post_sync` wrote. And no path the PR changes matches the repo's held globs (the `held:` of the
+     flow that serves the repo, as `ao pr held` reads it, §4.9b). Otherwise the reason is the first
+     that held: *<path> is not in the lock*, *<path> deleted but not in the base lock* (a file
+     dev-cadence retired that the lock never listed is the team's), *post_sync left <path> unlike the
+     PR*, *post_sync exited <n>*, *post_sync did not end in 5 min*, *<path> is a held path*. The lock's membership is checked
+     before the replay is compared, so a non-lock file the PR changes always reads *not in the
+     lock*. A held path goes to the team,
+     whose member's PR the reader reads as any (rule 11). The check proves the PR is what dev-cadence
+     and the repo's own step wrote. Whether the sync itself was right is dev-cadence's review, at its
+     own merge.
+  3. **The review evidence.** For a mechanical PR the home posts one comment, through
+     `--body-file`, once per head: the entry keeps `posted`, so a retry (step 4) never posts again. Its first line is `cadence-review: SHIP · sync-check · code · 0 findings`. Its
+     body is the lock's `commit:`, the files checked against dev-cadence, *post_sync replayed* or
+     *no post_sync*, and the head it checked. The reviewer is named for what it is, never a model,
+     just as rule 10 never says *verified*.
+  4. **The gate** is rule 10's: `gate:`, else `scripts/check_cadence.py --pr <n>`. It is run in the
+     registry checkout, as rule 10 runs it: the default branch's copy of the script and of `gate:`,
+     never the replay tree, which proves content and never judges. **Its exit decides one of three
+     things.** A pass (exit 0) merges. A **fail** (a configured `gate:`'s non-zero exit, or the
+     script's exit 1) gets a second comment, `cadence-review: BLOCK · sync-check · code · 1
+     findings`, with the gate's line. The script reads the first comment as the review, and a latest
+     BLOCK outvotes it, so the PR stays blocked until a session posts its own review after its fix.
+     The verdict is then *gate*, and the PR goes to the team. **No reading** — the script's exit 2
+     or 3 (nothing could be checked, a row *unknown*), a run past its time, or the home's own error
+     (the tree, `gh`, the clone) — posts nothing and is tried again on the next pass. After
+     `SYNC_TRIES` (three) passes at the same head it is verdict *error* with the last reason, and
+     the PR goes to the team. A repo with no gate never reaches this step (declined above).
+  5. **The merge is pinned.** Just before it, the home reads the PR's head and the holders again
+     (§4.4's test, over the live records). A head that moved means the PR was not checked: the pass
+     drops it, and the next pass checks the new head. A record that now holds it means the merge is
+     dropped and no verdict is written. The PR stays off the home's list while a live record holds
+     it, and comes back only once the claim ends. The merge is then `gh pr merge <n> --squash
+     --match-head-commit <head>`, with no body (cadence §4.2). The forge's head match is the one
+     atomic guard, and a push it refuses is the moved head again. A merge is followed by a `system`
+     note to the person inbox, FYI and uncounted: *merged `<repo>` #<n> — sync of dev-cadence
+     <commit>, n files*.
+
+  The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, posted,
+  at}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, or the reason from step 1
+  or 2), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
+  while a retry is counted. A PR's entry is dropped once it leaves the open list, and a *refused*
+  *no gate* entry is dropped once the repo has a gate, so the PR is judged again. So a head with a
+  verdict is never checked again, a new head is checked again, and the team's order says `why`
+  (§4.4). **The switch** is `repos.<repo>.sync.auto` in `settings.yml` (§5; the Repos card's
+  **sync**, §4.5a), `true` when absent, as `pull` is. `false` checks nothing and merges nothing,
+  every sync PR is the team's at once, and the reading is *off*. **What it is not**: it never pushes
+  a commit to a PR (a sync that needs a step is the team's), never merges a PR that is not a sync,
+  runs nothing from the PR's head except bytes step 1 proved are dev-cadence's, and never moves a
+  checkout. The pull (above) follows the
+  merge on its next pass, and the promote follows main as it always does.
 - **Schedule: a team start at the reset** (not built; TD-133 builds it, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general form
   the run window (below) reduces to. **A schedule is a person's standing press, kept in
