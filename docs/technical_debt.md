@@ -46,7 +46,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
-| TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
 | TD-630 | Pictures and files cannot go into the Add entry form: a screenshot of what is wrong needs a session opened first | Medium | Designed — TD-633 builds it |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
@@ -730,39 +729,6 @@ brief written for it.
 
 **Related:** TD-299, guardians-devenv TD-028 and `docs/briefs/team-setup.md`, TD-055 (archived
 with the retired brief).
-
----
-
-## TD-627: The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-13 (the designer) — each path on the Git card is a link by the Session card's **recent files** form: the editor button's file template with the path joined to the worktree, no `:line`, the two launches unless *opens the folder first* is off, drawn only where the editor button is (text under `open_in: none` and on another host's record); the status code stays text. **Not a file stays text**: a deletion (`D`, nothing to open) and an untracked directory (`?? dir/`, a folder form would open its own window), each with a hover saying why; a rename carries its new path only (the porcelain line's) and links it; a conflict (`UU`) links as any change. §4.5a *Focus side panel, Git card: changed files*. No mockup: the card's text is unchanged but for the links. Built by TD-628. Was: Open.
-**Blocked by:** TD-628
-**Location:** design §4.5 item 4 (the side panel's **Git** card), §4.5a (*Focus side panel* rows: **recent
-files**, **diff / log / PRs**), §4.6 *A path in the pane is a link*, §5 `person.open_in` / `person.file_link`;
-`src/shiftlead/ui/templates/focus.html` (`#gitfiles`), `src/shiftlead/ui/static/app.js` (the `#gitfiles`
-redraw, `AO.recentFiles`, `AO.openFile`, `AO.fileUrl`), `src/sessionorc/gitinfo.py` (`GitInfo.files`:
-porcelain lines, repo-relative).
-
-**Why:** Paul (2026-10-13): *our git card in the focus session screen shows modified files — add links
-to those files so they can be opened in vscode/other (leverage our other open file flows).* The Git
-card draws `GitInfo.files` (up to twenty `M path` / `?? path` lines) as text, while the Session card's
-**recent files**, a terminal path and Settings' **Open file** already open a file in the person's
-editor; the Git card is open by default and the Session card folded, so the file a person sees first
-is the one they cannot open.
-
-**Fix:** design first, since a control is a §4.5a row: each path on the Git card a link by the
-recent files' form — the editor button's file template, the two launches unless *opens the folder
-first* is off, drawn only where the editor button is, text under `open_in: none` — with what a path
-that is not a regular file does (a deleted one, an untracked directory under `--untracked-files=normal`,
-a rename's old side). The build reuses `AO.openFile`; nothing is parsed from the screen. **Done when**
-a click on a changed file on the Git card opens it in the person's editor.
-
-**Related:** TD-525, TD-532, TD-536, TD-538 (recent files and the file link).
 
 ---
 
