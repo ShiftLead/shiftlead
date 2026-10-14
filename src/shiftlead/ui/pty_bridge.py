@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import os
 from collections.abc import Awaitable, Callable
 
@@ -24,6 +25,8 @@ from sessionorc.tmux import attach_argv as tmux_attach_argv
 QUEUE_HIGH = 1 << 20
 QUEUE_LOW = 1 << 18
 JOIN_MAX = 1 << 18
+
+log = logging.getLogger(__name__)
 
 
 class PtySession:
@@ -153,6 +156,31 @@ def scroll_argv(
     return argv + ["send-keys", "-X", "-t", target, "page-down"]
 
 
+def leave_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
+    """Back to the live screen before a typed key (design §4.6 *Typing returns the pane to the live
+    screen*, TD-667): `copy-mode -q` leaves any mode the pane is in, and does nothing when it is in none."""
+    argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
+    return argv + ["copy-mode", "-q", "-t", f"={session_id}:"]
+
+
+LEAVE_WITHIN = 2.0  # seconds a leave may take before the key is written anyway (design §4.6)
+
+_KEYS_THAT_COUNT = (b"\r", b"\t", b"\x7f", b"\b")
+_PASTE_OPENER = b"\x1b[200~"
+
+
+def counts_as_typing(data: bytes) -> bool:
+    """Whether a key frame is typing that leaves copy mode (design §4.6 *What counts as typing*): a
+    bracketed paste (the one ESC-led frame that counts); no other ESC-led frame — arrows, function and
+    Alt keys, and xterm.js's replies to the program's queries; Enter, Tab or Backspace alone; else a
+    frame holding a printable character. Ctrl+C, Escape and every other control byte alone do not."""
+    if data.startswith(b"\x1b"):
+        return data.startswith(_PASTE_OPENER)
+    if data in _KEYS_THAT_COUNT:
+        return True
+    return any(c.isprintable() for c in data.decode(errors="replace"))
+
+
 SCROLL_MAX = 500  # lines in one wheel message: a frame's notches are a handful, so this only bounds a bad client
 
 
@@ -212,12 +240,19 @@ async def pump(
     recv: Callable[[], object],
     scroll: Callable[[str, int | None], Awaitable[None]] | None = None,
     *,
+    leave: Callable[[], Awaitable[None]] | None = None,
     read_only: bool = False,
 ) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
     with `resize: [cols, rows]` or `scroll: "up" | "down"` and, for the wheel, `lines: n`; `send`
     takes raw bytes for xterm.js; `scroll` (optional) is awaited for scroll messages, which need a
     tmux command, not keys.
+
+    `leave` (optional; design §4.6 *Typing returns the pane to the live screen*, TD-667): any scroll
+    message sets the *scrolled* mark, and a key frame that counts as typing (`counts_as_typing`) while
+    it stands awaits `leave()` — bounded at `LEAVE_WITHIN`, a failure logged — and clears the mark
+    before the key is written. Scroll and leave are awaited one at a time in frame order, so a leave
+    never overtakes the scroll before it.
 
     `read_only` (design §4.6 *A read-only attach*, TD-096): key frames are dropped — str and bytes
     alike, every one: the wheel is a scroll message, never a mouse report (TD-174). Resize and
@@ -230,7 +265,10 @@ async def pump(
         except Exception:  # noqa: BLE001 — the socket went away mid-send: that ends the pump, quietly
             return
 
+    scrolled = False
+
     async def up() -> None:
+        nonlocal scrolled
         while True:
             msg = await recv()  # type: ignore[misc]
             if msg is None:
@@ -241,7 +279,9 @@ async def pump(
                     pty.resize(int(cols), int(rows))
                 elif "scroll" in msg and scroll is not None:
                     lines = msg.get("lines")
-                    # returns once the tmux command is spawned, not done; a page when `lines` is absent
+                    scrolled = True
+                    # returns once the tmux command is done, so the leave after it never overtakes it;
+                    # a page when `lines` is absent
                     await scroll(
                         str(msg["scroll"]), lines if isinstance(lines, int) and not isinstance(lines, bool) else None
                     )
@@ -249,6 +289,12 @@ async def pump(
             data = msg.encode() if isinstance(msg, str) else msg
             if read_only:
                 continue
+            if scrolled and leave is not None and counts_as_typing(data):
+                scrolled = False
+                try:
+                    await asyncio.wait_for(leave(), LEAVE_WITHIN)
+                except Exception as e:  # noqa: BLE001 — a slow or failed leave: the key is written anyway
+                    log.warning("leaving copy mode before a typed key failed: %s", type(e).__name__)
             pty.write(data)
 
     d = asyncio.create_task(down())

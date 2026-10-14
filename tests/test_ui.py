@@ -301,6 +301,37 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def test_a_key_typed_into_a_scrolled_back_terminal_reaches_the_program(client, subprocess_agent, tmp_path):
+    """TD-667 / TD-669 slice 1 (design §4.6 *Typing returns the pane to the live screen*): after a
+    scroll up, a typed key leaves copy mode first, so the first key is not copy mode's and the line
+    reaches the shell; an arrow after a scroll leaves the pane in copy mode."""
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "typed"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    tmux = Tmux(socket_name=subprocess_agent.sock_name)
+
+    def mode() -> str:
+        return tmux.run("display", "-p", "-t", f"={sid}:", "#{pane_in_mode}", check=False).stdout.strip()
+
+    with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        ws.send_text("seq 1 200\r")
+        assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
+        ws.send_text(json.dumps({"scroll": "up"}))
+        assert wait_for(lambda: mode() == "1"), "scroll up did not enter copy mode"
+        ws.send_text("\x1b[A")  # an arrow is copy mode's: the pane stays scrolled back
+        time.sleep(0.3)
+        assert mode() == "1"
+        for key in "echo TYPED-$((2+3))\r":
+            ws.send_text(key)
+        buf = b""
+        deadline = time.time() + 8
+        while time.time() < deadline and b"TYPED-5" not in buf:
+            buf += pane_bytes(ws)
+        assert b"TYPED-5" in buf
+        assert mode() == "0"
+    client.post(f"/api/sessions/{sid}/kill")
+
+
 def test_term_tolerates_bad_size_params(client, tmp_path):
     """A garbage size must not reject the handshake (the browser only sees a 1006 for that)."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "sz"}, follow_redirects=False)
