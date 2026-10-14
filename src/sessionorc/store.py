@@ -7,8 +7,10 @@ next tick, so a hook never blocks on the agent and no state transition is lost.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -18,18 +20,32 @@ from sessionorc import paths
 from sessionorc.models import MailEntry, Session
 
 
+def _read_umask() -> int:
+    old = os.umask(0)
+    os.umask(old)
+    return old
+
+
+# read once, at import: `os.umask` is process-wide, so reading it per write would race other threads
+_UMASK = _read_umask()
+
+
 def _atomic_write(path: Path, text: str, *, mode: int | None = None) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    if mode is None:
-        tmp.write_text(text, encoding="utf-8")
-    else:
+    """`text` to `path` through a temporary file of its own in the same directory, then one rename.
+    Each write's temporary is unique (TD-643): two saves of one path on two threads once shared a
+    fixed `<name>.tmp`, and the second rename found it already moved (*No such file or directory*)."""
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
         # A file whose contents are evidence is created with its mode, never chmod'ed after: a
-        # world-readable window, however short, is a window (design §4.8a).
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        # world-readable window, however short, is a window (design §4.8a). mkstemp creates it 0600.
+        os.fchmod(fd, mode if mode is not None else 0o666 & ~_UMASK)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
-        os.chmod(tmp, mode)  # an existing tmp keeps its old mode through O_CREAT
-    os.replace(tmp, path)
+        os.replace(name, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(name)
+        raise
 
 
 class SessionStore:
