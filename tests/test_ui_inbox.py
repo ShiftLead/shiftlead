@@ -2622,6 +2622,10 @@ def test_a_prompt_answered_by_the_persons_rules_draws_dismiss_alone_and_names_th
     assert "your permissions: rules answered" in html and "system answered" not in html
     assert "rule: settings.yml permissions: grinder allow Bash(pdm run test:*) — change it there" in html
     assert "source:" not in html and "answered by your rules — nothing waits on you" in html
+    find = re.search(r'data-find="([^"]*)"', html).group(1)
+    assert "your permissions: rules" in find  # the filter finds the row by what it names
+    hostile = {**fyi, "answered": {**fyi["answered"], "source": "<script>x()</script>"}}
+    assert "<script>" not in rows("answered", [hostile])  # the rule is text
     # a teammate's sourced reply keeps its Overrule
     assert ">Overrule</button>" in rows("answered", [answered_fyi("m-2")])
 
