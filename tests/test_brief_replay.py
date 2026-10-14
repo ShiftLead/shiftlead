@@ -481,3 +481,35 @@ def test_a_template_record_from_before_a_slot_existed_reads_the_file_beside_its_
     # a base no template made (its slots never name `{repo}`) is left as it is
     whole = {"base": str(base), "slots": {"{lane}": {"text": "TD-1"}}}
     assert brief.fill(whole)[0] == "base: {repo} | {stage} | {flow} | TD-1\n"
+
+
+@pytest.mark.unit
+def test_a_record_from_before_the_layout_slots_replays_its_stored_prompt(tmp_path):
+    """TD-588, design §4.9c: a repo's layout cannot come from a file beside the package's template, so
+    a record whose slots predate `{test}`, `{gate}` … — in its base or in a file slot's text — is
+    `Unreadable` and replays the prompt it started with; one that names them fills them as recorded."""
+    from shiftlead import repoconfig
+
+    assert brief.LAYOUT_SLOTS == repoconfig.LAYOUT_SLOTS  # the two packages name the same slots
+    base = tmp_path / "grinder.md"
+    base.write_text("base: {repo} | run {test} | gate {gate} | {lane}\n")
+    sup = tmp_path / "sup.md"
+    sup.write_text("repo\n")
+    made = {"base": str(base), "slots": {"{repo}": {"file": str(sup)}, "{lane}": {"text": "TD-1"}}}
+    with pytest.raises(brief.Unreadable, match=r"\{gate\}, \{test\}"):
+        brief.fill(made)
+    stage = tmp_path / "grinder.stage.md"  # in a file slot's text, the {design_dir} the [a-z] pass misses
+    stage.write_text("read {design_dir}\n")
+    base.write_text("base: {repo} | {stage}\n")
+    made["slots"]["{stage}"] = {"file": str(stage)}
+    with pytest.raises(brief.Unreadable, match=r"\{design_dir\}"):
+        brief.fill(made)
+    made["slots"]["{design_dir}"] = {"text": "docs/design/"}  # as compose records it
+    assert brief.fill(made)[0] == "base: repo | read docs/design/\n"
+    base.write_text("base: {repo} | {gate}\n")  # `{pr}` after `{gate}`, as compose records them
+    made["slots"] = {
+        "{repo}": {"file": str(sup)},
+        "{gate}": {"text": "python3 scripts/check_cadence.py --pr {pr}"},
+        "{pr}": {"text": "<n>"},
+    }
+    assert brief.fill(made)[0] == "base: repo | python3 scripts/check_cadence.py --pr <n>\n"

@@ -22,7 +22,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
     cfg = repoconfig.load(tmp_path)
     assert cfg.path is None and cfg.root == tmp_path
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
-    assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
+    assert cfg.commands == {} and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
     assert [r.name for r in repoconfig.roles(cfg)] == [
         "grinder",
@@ -71,7 +71,7 @@ commands:
     assert cfg.unattended == {"workers": 3, "window": {"weekday": "20:00-06:00", "weekend": "all"}}
     assert cfg.controllers == ["orchestrator-ao-1"] and cfg.ledger == "docs/debt.md"
     assert cfg.teams["grind"]["manager"] == {"role": "manager", "name": "orc"}
-    assert cfg.ready_when[2] == "pr_merged" and cfg.commands == [{"name": "test", "run": "pdm run test"}]
+    assert cfg.ready_when[2] == "pr_merged" and cfg.commands == {"test": "pdm run test"}
     # a repo's `roles:` overrides per key: what it does not say stays built-in
     g = repoconfig.resolve_role(cfg, "grinder")
     assert (g.brief, g.brief_source, g.lane, g.grants, g.profile) == (
@@ -166,6 +166,90 @@ def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
     assert "## This repo's rules" in text and "\n\ngrind TD-001 now\n\n" in text and "**grinder**" in text
     with pytest.raises(ValueError, match="role 'hunter': brief .*briefs/h.md cannot be read"):
         repoconfig.resolve_role(cfg, "hunter").brief_text()
+
+
+def test_a_brief_names_the_repos_layout_through_its_slots(tmp_path):
+    """TD-588, design §5 *The seams*: a supplement's (or a template's) layout slots fill from the repo —
+    its `.shiftlead.yml` keys, else dev-cadence's file where the checkout holds it, else the seam's
+    sentence, never empty — `{pr}` inside `{gate}` after them, each recorded as a text slot."""
+    (tmp_path / "briefs").mkdir()
+    words = "{test} | {lint} | {gate} | {board} | {ledger} | {ledger_check} | {design_dir} | {cadence_rules}"
+    (tmp_path / "briefs" / "g.md").write_text(words + "\n")
+    (tmp_path / ".shiftlead.yml").write_text("roles: {grinder: {brief: briefs/g.md}}\n")
+    bare = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    assert (
+        "\n\n"
+        + " | ".join(
+            (
+                repoconfig.NO_TEST,
+                repoconfig.NO_LINT,
+                repoconfig.NO_GATE,
+                "no board: the Inbox is the person's channel",
+                "docs/technical_debt.md",
+                repoconfig.NO_LEDGER_CHECK,
+                repoconfig.NO_DESIGN_DIR,
+                repoconfig.NO_CADENCE,
+            )
+        )
+        + "\n\n"
+    ) in bare[0]
+    for rel in ("scripts/check_cadence.py", "scripts/ledger.py", "docs/cadence.md", "docs/user_attention.md"):
+        (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / rel).write_text("x\n")
+    (tmp_path / "docs" / "design").mkdir()
+    cadence = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    assert (
+        "no test command: run what the repo's README says | no lint command: keep to the style of the code around"
+        " the change | python3 scripts/check_cadence.py --pr <n> | docs/user_attention.md | docs/technical_debt.md"
+        " | python3 scripts/ledger.py --check | docs/design/ | read docs/cadence.md §1–§4\n"
+    ) in cadence[0]
+    (tmp_path / ".shiftlead.yml").write_text(
+        "roles: {grinder: {brief: briefs/g.md}}\ncommands: {test: make test, lint: make lint}\n"
+        "gate: ./gate {pr}\nboard: notes/board.md\nledger: notes/ledger.md\n"
+    )
+    text, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    assert "make test | make lint | ./gate <n> | notes/board.md | notes/ledger.md | python3" in text
+    assert made["slots"]["{gate}"] == {"text": "./gate {pr}"} and made["slots"]["{pr}"] == {"text": "<n>"}
+    assert list(made["slots"])[-1] == "{pr}"  # after `{gate}`, so a replay fills it the same way
+    # a brief naming none reads nothing for them and records none
+    (tmp_path / "briefs" / "g.md").write_text("plain words\n")
+    _, made = repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder").compose()
+    assert not set(made["slots"]) & {*repoconfig.LAYOUT_SLOTS, "{pr}"}
+
+
+def test_the_layout_across_the_link_is_there_when_refused_by_name_and_fails_otherwise(tmp_path):
+    """Review of #1737: a node's checkout refuses a directory, or a file past its cap, by name — the
+    path is there; any other failure of the link goes up rather than tell the brief a seam is absent."""
+
+    def node(refusal):
+        def read(path):
+            rel = path.relative_to(tmp_path).as_posix()
+            if rel == "docs/design":
+                raise OSError(f"devenv: {rel}: not a regular file")
+            if rel == "docs/cadence.md":
+                raise OSError(f"devenv: {rel}: over 262144 bytes, which is not a repo config or a brief")
+            if refusal and rel == "scripts/ledger.py":
+                raise OSError("devenv: the host is not answering")
+            return None
+
+        return read
+
+    cfg = repoconfig.load_text(None, tmp_path)
+    cfg.read = node(refusal=False)
+    got = repoconfig.layout(cfg)
+    assert got["{design_dir}"] == "docs/design/" and got["{cadence_rules}"] == "read docs/cadence.md §1–§4"
+    assert got["{ledger_check}"] == repoconfig.NO_LEDGER_CHECK  # None: not there
+    cfg.read = node(refusal=True)
+    with pytest.raises(OSError, match="not answering"):
+        repoconfig.layout(cfg)
+
+
+def test_commands_is_a_mapping_or_the_older_list():
+    read = repoconfig.load_text
+    assert read("commands: {test: pdm run test}\n", "/r").commands == {"test": "pdm run test"}
+    assert read("commands: [{name: lint, run: ruff}]\n", "/r").commands == {"lint": "ruff"}
+    with pytest.raises(ValueError, match="`commands`.test must be a command"):
+        read("commands: {test: ''}\n", "/r")
 
 
 def test_discover_walks_up_to_the_file_or_the_git_root(tmp_path):

@@ -27,6 +27,19 @@ DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 PLACEHOLDER_RE = re.compile(r"\{[a-z]+\}")
 # Only a template fills it, so a record whose slots name it was built on a template.
 TEMPLATE_SLOT = "{repo}"
+# A repo's layout as a built-in brief names it (design §4.9c, §5 *The seams*, TD-588): `shiftlead.repoconfig`'s
+# `LAYOUT_SLOTS`, held equal by a test. A record made before a brief named them cannot be told them from a
+# file beside its template — they are one repo's, not the package's — so its replay takes the stored prompt.
+LAYOUT_SLOTS = (
+    "{gate}",
+    "{board}",
+    "{ledger}",
+    "{ledger_check}",
+    "{test}",
+    "{lint}",
+    "{design_dir}",
+    "{cadence_rules}",
+)
 
 
 class Unreadable(Exception):
@@ -92,7 +105,9 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
     what it was told before (§6 rule 7, §4.9c): before any slot is filled, each such placeholder in
     `base`'s own text is filled from the file beside `base` named `<base's stem>.<slot>.md` when
     there is one (read as merged, a source like any other), else with `none`. Only `base`'s text is
-    read for it, so a brace word that arrives in a slot's text is never touched."""
+    read for it, so a brace word that arrives in a slot's text is never touched. A layout slot
+    (`LAYOUT_SLOTS`) left in the filled text that `slots` does not name — in `base` or in a file slot's
+    text — is `Unreadable`: such a record replays the prompt it was started with (TD-588)."""
     base = prompt_from.get("base") if isinstance(prompt_from, dict) else None
     slots = prompt_from.get("slots") if isinstance(prompt_from, dict) else None
     if not isinstance(base, str) or not base or not isinstance(slots, dict):
@@ -101,7 +116,7 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
     sources = [{"path": base, "sha": sha}]
     if TEMPLATE_SLOT in slots:
         for name in dict.fromkeys(PLACEHOLDER_RE.findall(text)):
-            if name in slots:
+            if name in slots or name in LAYOUT_SLOTS:
                 continue
             beside = Path(base).with_name(f"{Path(base).stem}.{name[1:-1]}.md")
             # read as every source is — as merged inside a checkout — and one that is not there, there,
@@ -124,6 +139,8 @@ def fill(prompt_from: dict[str, Any], merged: bool = True) -> tuple[str, list[di
         else:
             raise Unreadable(f"slot {slot} is neither a file nor a text")
         text = text.replace(str(slot), value)
+    if TEMPLATE_SLOT in slots and (unnamed := [n for n in LAYOUT_SLOTS if n in text and n not in slots]):
+        raise Unreadable(f"made before the brief named {', '.join(unnamed)}: told what it was told, the stored prompt")
     prefix = prompt_from.get("prefix")
     return (prefix if isinstance(prefix, str) else "") + text, sources
 

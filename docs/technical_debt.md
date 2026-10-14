@@ -570,8 +570,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-dc-decouple, with Paul)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open.
-**Blocked by:** TD-586, TD-587
+**Status:** Slice 1 (grinder-ao-2, 2026-10-14): `commands:` is read as a mapping (the older list too). `repoconfig.layout` fills the eight layout slots, `{pr}` after `{gate}`, each with its seam's sentence (design §5 *The seams*). They are filled only when a composed brief names one, and recorded as text slots. `sessionorc.brief.fill` replays a record made before them as its stored prompt (§4.9c, §6 rule 7; steer m-92ae452ba903 to the techlead). Left, slice 2: the built-in briefs, the five flows and `team_skill.md` take the slots; the test that bars the literals; this repo's `.shiftlead.yml` `commands:` and its own briefs carrying `pdm run …` and `scripts/look_home.py`; the briefs' board step as `ao board edit`. Was: Open.
 **Location:** `src/shiftlead/briefs/*.md`, `src/shiftlead/flows/**/*.md` (five), `src/shiftlead/team_skill.md`, `repoconfig.py`/`teams.py` (the filling), this repo's `.shiftlead.yml` and own brief
 
 **Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. The built-in briefs hard-code this repo's layout (`pdm run test`, `docs/cadence.md`, `scripts/check_cadence.py`, `scripts/board_edit.py`, `docs/design/`), so a repo without dev-cadence, or with another layout, gets wrong instructions.

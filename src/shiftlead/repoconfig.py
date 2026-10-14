@@ -9,12 +9,12 @@ controllers: [manager-ao-1]           # who may act on a session started here; o
 ledger: docs/technical_debt.md
 teams: {...}                          # §4.9; passed through for the team step
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
-commands: [{name: test, run: pdm run test}]
+commands: {test: pdm run test, lint: pdm run lint}   # `test` and `lint` fill the briefs' {test} and {lint}
 ```
 
-`unattended`, `ready_when` and `commands` are accepted and read by nothing yet: each waits on the
-feature that reads it (§5). `adapter`, `worktrees` and `anchor` are refused, naming where each is
-decided instead (`RETIRED`, TD-149).
+`unattended` and `ready_when` are accepted and read by nothing yet: each waits on the feature that reads
+it (§5); `commands:`' `test` and `lint` fill the built-in briefs' layout slots (`layout`, TD-588).
+`adapter`, `worktrees` and `anchor` are refused, naming where each is decided instead (`RETIRED`, TD-149).
 
 Missing file: the defaults §5 lists. A malformed file: a `ValueError` naming the key. Read on every
 use and cached nowhere (the profiles rule), by the clients only — the host agent never reads it, so
@@ -144,6 +144,77 @@ HANDED_ENTRY = {
     "{type}": "the `type` its `entry` carries",
     "{ledger}": "that repo's ledger file (`.shiftlead.yml`'s `ledger:`, `docs/technical_debt.md` by default)",
 }
+
+
+# The layout slots (design §5 *The seams*, TD-588): what a built-in brief names of a repo's layout, never a
+# literal of one repo's. Each fills with the repo's own (its `.shiftlead.yml` key, else dev-cadence's file
+# where the checkout holds it) or with its seam's fixed sentence, never empty text; `{pr}` inside `{gate}`
+# is filled after them. Recorded as text slots, so a replay fills them as the launch did (§6 rule 7).
+LAYOUT_SLOTS = (
+    "{gate}",
+    "{board}",
+    "{ledger}",
+    "{ledger_check}",
+    "{test}",
+    "{lint}",
+    "{design_dir}",
+    "{cadence_rules}",
+)
+PR_PLACEHOLDER = "{pr}"
+PR_IN_BRIEF = "<n>"
+CHECK_CADENCE = "scripts/check_cadence.py"
+LEDGER_SCRIPT = "scripts/ledger.py"
+DESIGN_DIR = "docs/design/"
+CADENCE_DOC = "docs/cadence.md"
+NO_GATE = "no gate: a person merges"
+NO_LEDGER_CHECK = "no ledger check: keep each entry in the shape the ledger's other entries have"
+NO_TEST = "no test command: run what the repo's README says"
+NO_LINT = "no lint command: keep to the style of the code around the change"
+NO_DESIGN_DIR = "no design directory: the README and the code say what is true"
+NO_CADENCE = "no cadence rules: the repo's README says how a change lands"
+
+
+# How a node's checkout refuses a path that is there (`sessionorc.agent_common._read_capped`): a directory,
+# and a file past its cap.
+THERE_REFUSALS = (": not a regular file", " bytes, which is not a repo config or a brief")
+
+
+def layout(cfg: RepoConfig) -> dict[str, str]:
+    """Each of `LAYOUT_SLOTS` for `cfg`'s repo (design §5 *The seams*): `gate:`, `board:`, `ledger:` and
+    `commands:`'s `test` and `lint` where the file sets them, else dev-cadence's file where the checkout
+    holds it (read the way the file was, `cfg.read`), else the seam's sentence. `{gate}` still holds
+    `{pr}`: the brief's text fills it last."""
+
+    def there(rel: str) -> bool:
+        if cfg.root is None:
+            return False
+        path = cfg.root / rel
+        if cfg.read is None:
+            return path.exists()
+        try:
+            return cfg.read(path) is not None
+        except UnicodeDecodeError:
+            return True  # there, only not text
+        except OSError as e:
+            # across the link a directory, or a file past the cap, is refused by name — and is there;
+            # any other failure (the host unreachable, a timeout) goes up: a brief is never told a
+            # seam is absent because the link failed, since the replay would keep that text
+            if any(why in str(e) for why in THERE_REFUSALS):
+                return True
+            raise
+
+    gate = cfg.gate or (f"python3 {CHECK_CADENCE} --pr {PR_PLACEHOLDER}" if there(CHECK_CADENCE) else NO_GATE)
+    board = cfg.board or (str(workorders.BOARD) if there(str(workorders.BOARD)) else workorders.NO_BOARD)
+    return {
+        "{gate}": gate,
+        "{board}": board,
+        "{ledger}": cfg.ledger,
+        "{ledger_check}": f"python3 {LEDGER_SCRIPT} --check" if there(LEDGER_SCRIPT) else NO_LEDGER_CHECK,
+        "{test}": cfg.commands.get("test") or NO_TEST,
+        "{lint}": cfg.commands.get("lint") or NO_LINT,
+        "{design_dir}": DESIGN_DIR if there(DESIGN_DIR) else NO_DESIGN_DIR,
+        "{cadence_rules}": f"read {CADENCE_DOC} §1–§4" if there(CADENCE_DOC) else NO_CADENCE,
+    }
 
 
 def entry_text(repo: str, type_: str, ledger: str) -> str:
@@ -328,6 +399,8 @@ class Role:
     root: Path | None = None  # the repo the role was resolved in; where a repo brief path is relative to
     defined: Path | None = None  # its directory, for a role defined in one (§4.9c, TD-313): `template.md` is there
     defined_place: str = ""  # `org` or `repo`: where `defined` is — the org's is this host's own disk
+    # the config it was resolved from: the layout slots are read from it when a brief names one (TD-588)
+    config: RepoConfig | None = field(default=None, repr=False, compare=False)
 
     @property
     def display(self) -> str:
@@ -453,6 +526,14 @@ class Role:
         for slot, value in fills:
             text = text.replace(slot, value)
             slots[slot] = {"text": value}
+        # after every other slot, so a layout word in any text that arrived is filled and recorded
+        named = [slot for slot in LAYOUT_SLOTS if slot in text]
+        if named:  # read only when a brief names one: a node's files are asked across the link
+            given = layout(self.config if self.config is not None else RepoConfig(root=self.root))
+            # `{pr}` last, so the `{pr}` a `{gate}` carries is filled too
+            for slot, value in (*((slot, given[slot]) for slot in named), (PR_PLACEHOLDER, PR_IN_BRIEF)):
+                text = text.replace(slot, value)
+                slots[slot] = {"text": value}
         return text, {"base": base, "slots": slots}
 
     def _defined_template(self, path: Path, read: Reader | None, on_call: bool) -> str:
@@ -509,7 +590,7 @@ class RepoConfig:
     controllers: list[str] = field(default_factory=list)
     ledger: str = DEFAULT_LEDGER
     ready_when: list[str] = field(default_factory=lambda: list(DEFAULT_READY_WHEN))
-    commands: list[dict[str, Any]] = field(default_factory=list)
+    commands: dict[str, str] = field(default_factory=dict)  # name → command; `test`, `lint` fill the briefs (§5)
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
     # §5 `promote:` (§6 *Promote*, TD-120): `{run, check}`, accepted and checked now so writing the
     # designed block does not break `ao new` in that repo; `sessionorc.promote` runs it at the home (TD-132)
@@ -697,16 +778,25 @@ def _str_list(value: Any, where: str) -> list[str]:
     return [x.strip() for x in items]
 
 
-def _commands(value: Any, where: str) -> list[dict[str, Any]]:
+def _commands(value: Any, where: str) -> dict[str, str]:
+    """`commands:` (design §5 *The seams*): a mapping of name to command — `test: pdm run test` — or the
+    older list of `{name, run}` entries, read as the same mapping."""
     if value is None:
-        return []
+        return {}
+    if isinstance(value, dict):
+        out: dict[str, str] = {}
+        for name, run in value.items():
+            if not isinstance(run, str) or not run.strip():
+                raise ValueError(f"{where}.{name} must be a command")
+            out[str(name)] = run.strip()
+        return out
     if not isinstance(value, list):
-        raise ValueError(f"{where} must be a list of {{name, run}} entries")
-    out = []
+        raise ValueError(f"{where} must be a mapping of name to command (`test: pdm run test`)")
+    out = {}
     for i, entry in enumerate(value):
         if not isinstance(entry, dict) or not entry.get("name") or not entry.get("run"):
             raise ValueError(f"{where}[{i}] needs `name` and `run`")
-        out.append(dict(entry))
+        out[str(entry["name"])] = str(entry["run"])
     return out
 
 
@@ -972,7 +1062,7 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
         ("repo", cfg.roles.get(name)),
     ]
     spoke = [(src, block) for src, block in layers if block is not None]
-    role = Role(name=name, root=cfg.root)
+    role = Role(name=name, root=cfg.root, config=cfg)
     if found:
         role.defined_place, role.defined = found[0], found[1]
     for src, block in spoke:
