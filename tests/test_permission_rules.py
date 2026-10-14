@@ -305,3 +305,28 @@ def test_the_host_reads_no_tool_name():
     """The core names no tool (design §4.3): the rule step reads `tool` and `input` as given."""
     src = (Path(permits.__file__).parent / "agent_hook.py").read_text()
     assert "Bash" not in src and "AskUserQuestion" not in src
+
+
+@pytest.mark.integration
+async def test_a_node_answers_no_prompt_by_rule(agent, rulestub, tmp_path):
+    """The hook is the node's, but the *Answered for you* FYI is mail, whose one writer is the home
+    (§9 invariant 15): a node matches no rule, so its member's prompt waits for the person and the
+    node's own person inbox is never written (TD-641's review)."""
+    _rules("permissions:\n  grinder: {allow: ['Bash'], deny: ['Bash(ls)']}\n")
+    async with LocalClient() as c:
+        w = (await c.call("create", name="w", dir=str(tmp_path), adapter="rulestub", unattended=True, role="grinder"))[
+            "id"
+        ]
+        agent.mode = "node"
+        try:
+            for tu, command in (("n1", "pdm run test"), ("n2", "ls")):
+                task = asyncio.create_task(_hook(w, "Bash", command, tu))
+                st = await wait_state(c, w, "needs-you")
+                assert st["pending"]["tool_use_id"] == tu
+                agent.mode = "home"  # the person's answer, as the home relays it
+                await c.call("decide", id=w, tool_use_id=tu, behavior="allow")
+                assert await task == {"behavior": "allow", "reason": None}
+                agent.mode = "node"
+        finally:
+            agent.mode = "home"
+        assert not [e for e in agent.person_inbox if e.answered]

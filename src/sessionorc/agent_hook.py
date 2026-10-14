@@ -94,9 +94,11 @@ class HookMixin:
         prompt is one that always reaches the person (`permits.always_the_person`), which goes on to
         the person as today. Every answer is filed to the person as *Answered for you*. None: no rule
         answered, and the prompt waits as before. An interactive record's prompt, and a question
-        (which carries no tool), are never matched."""
+        (which carries no tool), are never matched. **Nor is any prompt on a node** (TD-641's review):
+        the hook is the node's, but the FYI is mail and mail has one writer, the home (§9 invariant
+        15) — an answer filed to a node's own person inbox would go untold, so the prompt waits."""
         tool, tool_input = event.get("tool"), event.get("input")
-        if not s.unattended or not isinstance(tool, str) or not tool:
+        if self.mode != "home" or not s.unattended or not isinstance(tool, str) or not tool:
             return None
         rules = settings_mod.permissions(settings_mod.load())[0].get(s.role or "")
         if not rules:
