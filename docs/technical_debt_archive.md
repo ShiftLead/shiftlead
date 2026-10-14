@@ -11569,3 +11569,25 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Related:** TD-611 (the live check this blocks), TD-617 (the one subscriber), TD-616 (the counts keeper), TD-572 (light streams), TD-614.
 
 **Resolved:** 2026-10-14 (grinder-ao-2, live read; `477e1ef` live, which holds #1702 and #1704) — the *Done when* probe, read-only against the live UI: a GET of `/static/app.css` every 50 ms for 75 s. With no stream: 1406 probes, p99 4.4 ms, max 49 ms. Beside one Focus stream (`light=1&focus=`): 1395 probes, p99 18.6 ms, max 31 ms, **none over 50 ms**; the stream got 1.2 MB in 75 s, and a light `repos` is `{event, root, pr_marks}` alone (7 in 70 s, 27 KB in all, the largest 18 KB). What remains is the fleet's `session` deltas, ~30 KB each, ~1 MB a minute, and the loop is quiet with them. Beside the Org stream: 1383 probes, p99 22.7 ms, max 48 ms, none over 50 ms, with 16 `groups` events in 75 s. TD-611 is read again on the same day and archived.
+
+---
+
+## TD-671: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (grinder-ao-2, met running `pytest` for TD-647)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — tests/conftest.py's session-wide fixture clears `AGENT_MODEL` and `AGENT_MODEL_FILE` beside `SHIFTLEAD_SESSION`.
+**Location:** `tests/test_agent.py` (~L2280, the shell's `[$AGENT_MODEL|$AGENT_MODEL_FILE]`), `src/sessionorc/agent.py` (the shell's launch env, TD-644)
+
+**Why:** since TD-644 (#1705) every launched agent session carries `AGENT_MODEL` and `AGENT_MODEL_FILE`, so a worker that runs `pytest` from its pane hands both to the in-process host agent, and the shell it creates inherits them: the test reads `[claude-code/opus|…/shiftlead-agent-model]` where it wants `[|]`. CI, with neither set, passes. Either the shell's launch should unset both (a shell is no agent: §4.3 *a record with no agent*), or the test should clear them with `monkeypatch.delenv` — which one is the design's.
+
+**Fix:** decide from TD-644's design whether a shell launched under an agent's env must not carry its model; if so, the launch removes `AGENT_MODEL`/`AGENT_MODEL_FILE` from a shell's env, else the test clears them first.
+
+**Done when** the test passes with both variables set in the runner's env.
+
+**Related:** TD-644.
+
+**Resolved:** 2026-10-14 (grinder-ao-1, PR #PRNUM) — the test, not the launch: a shell's env is the tmux server's plus the launch's own variables, and the live server is the host agent's, whose env never carries a session's model, so a shell there never carries one (§4.2 *And the model*, §4.3 *a record with no agent*). Only a test's private server, started from a runner inside a session, inherited it. The suite's session-scoped fixture now clears both variables, as it does `SHIFTLEAD_SESSION`; the full suite (2614) passes with both set in the runner's env.
