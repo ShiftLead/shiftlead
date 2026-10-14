@@ -21,6 +21,7 @@ from collections.abc import Iterator
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from sessionorc import paths
 from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Transcript
@@ -30,6 +31,7 @@ from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.profiles import Profile
 
+from . import rules as rules_mod
 from . import transcript as transcript_mod
 
 HOOK_EVENTS = (
@@ -64,6 +66,7 @@ CONTEXT_WINDOWS = (
     ("claude-haiku-4-5", 200_000),
 )
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+SKIP_FLAG = "--dangerously-skip-permissions"  # added to an unattended launch under `permission_prompts: skip`
 CACHE_TTL_ENV = "CLAUDE_CODE_PROMPT_CACHE_TTL"  # the main conversation's cache lifetime (§4.2a, TD-458)
 log = logging.getLogger("shiftlead.claude-code")
 
@@ -530,7 +533,10 @@ class ClaudeCodeAdapter:
             argv += ["--model", prof.model]
         argv += prof.extra_args
         if unattended:
-            argv += prof.unattended_args or ["--dangerously-skip-permissions"]
+            # the skip flag only under `permission_prompts: skip`, the default (§4.2a, TD-641): under
+            # `ask` the prompts meet the person's rules, the director seat and then the person
+            args = prof.unattended_args or [SKIP_FLAG]
+            argv += args if prof.permission_prompts == "skip" else [a for a in args if a != SKIP_FLAG]
         if start_context:
             # the system prompt's tail, not a turn: the tool keeps it in no file of the session's, so
             # a resume is handed it again (design §4.3, TD-283) — by file, never as prose in the argv,
@@ -549,6 +555,16 @@ class ClaudeCodeAdapter:
             env[CACHE_TTL_ENV] = "1h"
         # the prompt is typed at the composer by the host agent at the first idle, never passed (TD-339)
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id, first_prompt=prompt or None)
+
+    def rule_matches(
+        self, rule: str, tool: str, tool_input: Any, *, cwd: Path | None = None, deny: bool = False
+    ) -> bool:
+        """Whether one of the person's `permissions:` rules covers this prompt (§4.9b, TD-641)."""
+        return rules_mod.matches(rule, tool, tool_input, cwd=cwd, deny=deny)
+
+    def rule_problem(self, rule: str) -> str | None:
+        """Why a `permissions:` rule is not one Claude Code's syntax carries, or None."""
+        return rules_mod.problem(rule)
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
         m = self.explain(tail)

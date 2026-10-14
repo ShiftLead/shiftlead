@@ -355,6 +355,13 @@ class MailMixin:
                     f"copied (design §4.10)"
                 )
             replied = held[0]
+            if replied.answered and replied.answered.get("answerer") == "rules":
+                # a prompt the person's own rules answered (§4.9b, TD-641): nobody asked and nobody
+                # answered who could take an Overrule — the rule is the person's to change
+                raise RpcError(
+                    "your permissions: rule answered that prompt: change the rule in settings.yml's permissions: "
+                    "(design §4.9b *The director seat*)"
+                )
             if replied.from_ == SYSTEM:
                 raise RpcError(
                     "a system note reports what happened to your own message; there is nobody to reply to "

@@ -8,8 +8,9 @@ key is the usage gate's reserves, per profile, per window label as the adapter n
     usage_gate:
       grind: {"5h": 30, wk: {per_day: 10}}
 
-Six keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319): `usage_gate`, `usage` (`max_age`),
-`teams`, `repos`, `person` and `notify` (`telegram`). Each has a reader here that drops whatever is not
+Seven keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319, TD-641): `usage_gate`, `usage`
+(`max_age`), `teams`, `repos`, `person`, `notify` (`telegram`) and `permissions` (hand-edited: the
+host reads it at the hook, and `set_settings` writes none of it). Each has a reader here that drops whatever is not
 valid — a hand edit can put anything in the file, and a malformed entry must act on nothing — and a
 `parse_*` that raises, which is what `set_settings` validates a write with. `person:` is the person's
 own and reaches no policy: the gate and the tick read the file by key and never that one.
@@ -664,6 +665,47 @@ def telegram(doc: dict[str, Any]) -> dict[str, Any] | None:
     if tg.get("on") is not True or not tg.get("secrets"):
         return None
     return {"secrets": tg["secrets"], "link": tg.get("link") or ""}
+
+
+# -- permissions: the person's rules per role (§5 `permissions:`, §4.9b *The director seat*, TD-641) ---
+
+PERMISSION_KEYS = ("allow", "deny")
+
+
+def permissions(doc: dict[str, Any]) -> tuple[dict[str, dict[str, list[str]]], list[str]]:
+    """`permissions:` as `({role: {allow: [rule], deny: [rule]}}, malformed)`: each rule a non-empty
+    string in the adapter's own syntax (§4.3), which this package never reads; whatever is not — a
+    role that is not a mapping, a key other than `allow` and `deny`, a list that is not a list of
+    strings — is named in `malformed` and acts on nothing, as every reader here drops what is not
+    valid. The role is the badge that says which sessions a person's rule is about (§9 invariant 9)."""
+    raw = doc.get("permissions")
+    rules: dict[str, dict[str, list[str]]] = {}
+    bad: list[str] = []
+    if raw is None:
+        return rules, bad
+    if not isinstance(raw, dict):
+        return rules, [f"permissions is a mapping of role to allow and deny lists, not {raw!r}"]
+    for role, value in raw.items():
+        if not isinstance(value, dict):
+            bad.append(f"permissions.{role} is a mapping of allow and deny, not {value!r}")
+            continue
+        bad += [f"permissions.{role}: unknown key {k} (known: allow, deny)" for k in value if k not in PERMISSION_KEYS]
+        mine: dict[str, list[str]] = {}
+        for key in PERMISSION_KEYS:
+            got = value.get(key)
+            if got is None:
+                continue
+            if not isinstance(got, list):
+                bad.append(f"permissions.{role}.{key} is a list of rules, not {got!r}")
+                continue
+            for rule in got:
+                if isinstance(rule, str) and rule.strip():
+                    mine.setdefault(key, []).append(rule.strip())
+                else:
+                    bad.append(f"permissions.{role}.{key}: a rule is a line like Bash(pdm run test:*), not {rule!r}")
+        if mine:
+            rules[str(role)] = mine
+    return rules, bad
 
 
 def team_extra(doc: dict[str, Any], team: str) -> int:
