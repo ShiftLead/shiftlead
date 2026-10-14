@@ -11295,3 +11295,24 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-604 (the design), TD-591 (the Repo page's missing seams), TD-071 (Org page ideas).
 
 **Resolved:** 2026-10-13 (grinder-ao-2, PR #1683) — slice 2: the Repo page's *Recently completed* after Technical debt, one list per window under the page's one picker, each row the closing PR (a link) and who opened it (a session's Focus, else the login), *no PR* for a direct push, folded past eight; the facet's *closed* block links to `/repo/<name>?win=<w>#completed` with the ids and titles on hover, ten at most; `ao repo` prints *completed this week: n*. Checked on a scratch home (the PR's UI check). Slice 1: #1625.
+
+
+## TD-631: §4.4 *Repo facts* says the UI runs a board reader for the Inbox's board counts: the UI runs no board reader since TD-615 slice 2 (#1633)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (docs-audit-ao-1, the auditor, covering #1629–#1639)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/design/4.4-host-agent.md` *Repo facts* (the doing-log paragraph, ~L155–156); `src/shiftlead/ui/app.py` (`board_all`, `board_items`)
+
+**Why:** #1633 (TD-615 slice 2) changed the readers: §4.4 *Each reading has one owner*, *The boards* now says "**the UI runs no board reader**, and `ao` none either" (~L465) and the history line says the UI's `read_boards`, its cache, `board_argv` and `BOARD_TTL` are gone. The sentence under *Repo facts* still reads: "Board counts are not here: the UI has them from the board reader it already runs for the Inbox (`board_items`, per team)." `grep -n "board reader it already runs" docs/design/4.4-host-agent.md` finds it at ~L155–156. `board_items` is now a filter over `board_all`, whose docstring says "the page runs no reader" and which takes its rows from `call("repos")`'s `boards` (`src/shiftlead/ui/app.py:768–787`). Two sentences of one section say opposite things about who runs the reader; the PR changed §4.4's and §4.5's reader paragraphs and not this one.
+
+**Fix:** reword the sentence in the present tense: the UI has the board counts from the host agent's `boards` reading (the `repos` RPC), per team, as `board_items` filters it (§4.4 *The boards*). The design change only; no history line is owed beyond a one-line touch under §4.4 naming #1633. Run the doc-bound tests before pushing.
+
+**Done when** no sentence of `docs/design/` says the UI runs a board reader, and the doc-bound tests pass.
+
+**Related:** TD-615 (the build), TD-614 (the design), #1633.
+
+**Resolved:** 2026-10-13 (grinder-ao-2, PR #1687) — §4.4 *Repo facts* says the UI has the board counts from the host agent's `boards` reading on the `repos` RPC, which `board_items` filters per team, and that the UI runs no reader; a history line under §4.4.
