@@ -3471,7 +3471,10 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             for name, acc in usage_accounts(await call("usage")).items():
                 for p in acc["profiles"]:
                     acct_of[p["name"]] = name
-        return SimpleNamespace(known=known, repos=repos, doing=doing, acct_of=acct_of)
+        # each repo's PR marks as a light stream last took them (TD-670): a push that leaves them as
+        # they were is not sent to one
+        marks = {root: repo_pr_marks(root, r) for root, r in repos.items()}
+        return SimpleNamespace(known=known, repos=repos, doing=doing, acct_of=acct_of, marks=marks)
 
     async def fan_regroup(st: SimpleNamespace) -> dict[str, Any]:
         return await heads(st.known, st.repos, st.doing)
@@ -3551,18 +3554,32 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # (`repo: null` for a checkout the registry dropped), and the groups marked for the flush,
             # so the team cards' summaries redraw (TD-176 slice 3).
             if ev["event"] == "repos":
+                root = str(ev.get("root"))
+                marks: dict[str, str] | None = None
                 if ev.get("repo") is None:
-                    repos.pop(str(ev.get("root")), None)
+                    repos.pop(root, None)
                 else:
-                    repos[str(ev.get("root"))] = ev["repo"]
+                    repos[root] = ev["repo"]
                     # the repo's PR marks, once for every page (§4.4 *Per-session views*, TD-617): a
                     # card looks its PRs up here, no session view carries them
-                    ev = {**ev, "pr_marks": repo_pr_marks(str(ev.get("root")), ev["repo"])}
-            elif isinstance(ev.get("entry"), dict):
-                ring = doing.setdefault(str(ev.get("team")), [])
-                ring.append(ev["entry"])
-                del ring[:-DOING_KEPT]
-            run.to_all(run.live, ev)
+                    marks = repo_pr_marks(root, ev["repo"])
+                    ev = {**ev, "pr_marks": marks}
+                run.to_all(run.full, ev)
+                # a light stream draws a repo's PR marks and nothing else of its facts, which run to
+                # most of a megabyte a push: the root and the marks alone, and only when they moved
+                # (`pr_marks: null` for a dropped repo) — the host pushes every repo each minute (TD-670)
+                if (root in st.marks) != (marks is not None) or st.marks.get(root) != marks:
+                    if marks is None:
+                        st.marks.pop(root, None)
+                    else:
+                        st.marks[root] = marks
+                    run.to_all(run.light(), {"event": "repos", "root": root, "pr_marks": marks})
+            else:
+                if isinstance(ev.get("entry"), dict):
+                    ring = doing.setdefault(str(ev.get("team")), [])
+                    ring.append(ev["entry"])
+                    del ring[:-DOING_KEPT]
+                run.to_all(run.live, ev)
             if run.full:
                 run.dirty.set()
         elif ev.get("event") == "gone":
