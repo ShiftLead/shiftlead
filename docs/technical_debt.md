@@ -588,7 +588,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-12 (ao-dc-decouple, with Paul)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open.
+**Status:** Slice 1 (grinder-ao-1, 2026-10-14, PR #PRNUM): the host agent's reading of the seams, on the repo reading as `seams` (`sessionorc.seams.reading`: the ledger `{path, state: ok|absent|unreadable|newer, major, entries, why}`; `board`, `gate`, `worktree_setup` each `{state: set|defaulted|absent, value}`), read on the five-minute pass. Left, slice 2 — `src/shiftlead/**`, grinder-ao-2's package: `ao doctor`'s **repos** check (§4.7) and the Repo page's missing-seam lines (§4.5a), each drawn from `seams` and reading nothing itself, and `ao repo init`. Was: Open.
 **Blocked by:** TD-586, TD-587, TD-589
 **Location:** `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/cli.py`, §4.5a/§4.7 help (`src/shiftlead/ui/help.py`)
 

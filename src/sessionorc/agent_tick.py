@@ -32,6 +32,7 @@ from sessionorc import conventions as conventions_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import promote as promote_mod
+from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
@@ -2995,6 +2996,12 @@ class TickMixin:
                 if remote:
                     by_remote[remote] = prs
         bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
+        seams = old.get("seams")
+        if due or seams is None:  # §4.4 *The seams*: on the repo reading's own cadence
+            try:
+                seams = seams_mod.reading(root)
+            except Exception:  # noqa: BLE001 — a seam that cannot be read keeps the last reading
+                log.exception("reading the seams of %s failed", root)
         return {
             "name": Path(root).name,
             "root": root,
@@ -3003,6 +3010,7 @@ class TickMixin:
             "prs": prs,
             "boards": bds,
             "work_orders": wos,
+            "seams": seams,
             # what closed, and by which PR (§4.4 *Repo facts*, TD-604): the history's and the PRs' join
             "completed": ledger_mod.completed(led.get("recent"), (prs or {}).get("recent")),
             "at": stamp if due else str(old.get("at") or stamp),
