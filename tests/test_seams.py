@@ -65,6 +65,10 @@ def test_a_ledger_that_is_newer_or_unreadable_says_why(tmp_path):
     got = seams.ledger(root)
     assert got["state"] == "unreadable" and got["why"].startswith("docs/technical_debt.md")
     assert seams.ledger(make(tmp_path, "bare", None))["state"] == "absent"
+    for outside in ("/etc/hostname", "../r/docs/technical_debt.md"):
+        (root / ".shiftlead.yml").write_text(f"ledger: {outside}\n")
+        got = seams.ledger(root)
+        assert got["state"] == "unreadable" and got["why"] == f"ledger: {outside} is not a path inside the repo"
 
 
 @pytest.mark.unit
@@ -80,3 +84,19 @@ def test_the_repo_reading_carries_the_seams_read_on_its_own_cadence(tmp_path):
     # a pass that is not the repo reading's own keeps the last seams; the five-minute one reads them again
     assert TickMixin._read_repos([r], first, set())[r]["seams"]["board"]["state"] == "absent"
     assert TickMixin._read_repos([r], first, {r})[r]["seams"]["board"] == {"state": "set", "value": "notes/board.md"}
+
+
+@pytest.mark.unit
+def test_a_repo_read_that_fails_keeps_the_last_seams(tmp_path, monkeypatch):
+    from sessionorc.agent_tick import TickMixin
+
+    root = make(tmp_path)
+    r = str(root)
+    first = TickMixin._read_repos([r], {}, set())
+
+    def boom(*a, **k):
+        raise RuntimeError("no")
+
+    monkeypatch.setattr(TickMixin, "_read_repo", staticmethod(boom))
+    got = TickMixin._read_repos([r], first, {r})[r]
+    assert got["seams"] == first[r]["seams"] and "error" in got["ledger"]

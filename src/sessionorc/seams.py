@@ -17,10 +17,12 @@ from sessionorc import ledgerboard as lb
 def ledger(root: Path | str) -> dict[str, Any]:
     """The ledger seam: `{path, state, major, entries, why}` — `state` *ok* (it parses and its major is
     one `ledgerboard.py` knows; `entries` its count), *absent* (no file at `ledger:`), *unreadable*
-    (the file could not be read as text) or *newer* (its `Ledgerboard:` major is past the module's),
-    `why` the reader's reason when not *ok*."""
+    (the file could not be read as text, or `ledger:` names a path outside the repo) or *newer* (its
+    `Ledgerboard:` major is past the module's), `why` the reader's reason when not *ok*."""
     rel = ledger_mod.ledger_path(root)
     out: dict[str, Any] = {"path": rel, "state": "ok", "major": None, "entries": None, "why": None}
+    if not workorders.inside(Path(rel)):
+        return {**out, "state": "unreadable", "why": f"ledger: {rel} is not a path inside the repo"}
     path = Path(root) / rel
     if not path.is_file():
         return {**out, "state": "absent", "why": f"no ledger at {rel}"}

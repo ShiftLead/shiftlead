@@ -2953,6 +2953,7 @@ class TickMixin:
                     "remote": str(old.get("remote") or ""),
                     "ledger": {**(old.get("ledger") or {}), "error": why, "failed_at": stamp},
                     "prs": {**(old.get("prs") or {}), "error": why, "failed_at": stamp},
+                    **({"seams": old["seams"]} if old.get("seams") is not None else {}),
                     "at": str(old.get("at") or stamp),
                 }
         return out
