@@ -149,14 +149,38 @@ def test_connect_writes_then_serves_then_probes():
     ]
 
 
+class Clock:
+    """A faked clock: each sleep moves it on by the sleep, each fetch by `fetch_takes` (a handshake that
+    times out takes its whole budget)."""
+
+    def __init__(self, fetch_takes: float = connect.PROBE_WAIT):
+        self.now, self.fetch_takes, self.fetches = 0.0, fetch_takes, 0
+
+    def __call__(self) -> float:
+        return self.now
+
+    def sleep(self, s: float) -> None:
+        self.now += s
+
+    def fetch(self, answers):
+        """A fetch giving each of `answers` in turn, the last for ever after."""
+
+        def got(url):
+            self.now += self.fetch_takes
+            self.fetches += 1
+            return answers[min(self.fetches, len(answers)) - 1]
+
+        return got
+
+
 def test_a_failed_probe_restores_the_setting_and_turns_off_only_what_it_added():
     before = {"route": "tailscale", "url": "https://old.ts.net", "allow": ["p@x.org"]}
     for status, listener, says in (
         (200, "plain", "the plain port"),
         (421, "route", "rewrote Host"),
-        (None, None, "did not answer"),
+        (None, None, "did not answer in 3 minutes"),
     ):
-        ts, reach = Tailscale(), Reach(before)
+        ts, reach, clock = Tailscale(), Reach(before), Clock()
         with pytest.raises(connect.Lacking, match=says):
             connect.connect_tailscale(
                 [],
@@ -166,7 +190,8 @@ def test_a_failed_probe_restores_the_setting_and_turns_off_only_what_it_added():
                 run=ts,
                 ask=_ask(),
                 fetch=lambda u, s=status, li=listener: {"status": s, "listener": li},
-                sleep=lambda s: None,
+                sleep=clock.sleep,
+                clock=clock,
                 say=lambda line: None,
                 which=lambda _: "x",
             )
@@ -226,6 +251,59 @@ def test_a_probe_reads_the_listener_mark():
     assert connect.probe("https://h", lambda u: {"status": 403, "listener": "route"}) is None  # marked: reached
     assert "plain port" in connect.probe("https://h", lambda u: {"status": 403, "listener": "plain"})
     assert "not the UI" in connect.probe("https://h", lambda u: {"status": 200, "listener": None})
+
+
+def test_a_probe_waits_out_a_first_certificate_and_judges_any_answer_at_once():
+    """TD-672: the first `tailscale serve` on a tailnet name fetches its certificate, and the handshake
+    times out until it has one — about a minute live. A fetch nothing answered is tried again up to
+    `PROBE_BOUND`, said once; an answer, even the wrong one, is judged on the spot."""
+    timeout = {"status": None, "why": "_ssl.c:1012: The handshake operation timed out"}
+    clock, said = Clock(), []
+    fetch = clock.fetch([timeout] * 3 + [{"status": 403, "listener": "route"}])
+    assert connect.probe("https://h", fetch, sleep=clock.sleep, clock=clock, say=said.append) is None
+    assert clock.fetches == 4 and clock.now < connect.PROBE_BOUND
+    assert len(said) == 1 and "the first HTTPS certificate can take a minute or two" in said[0]
+    assert "handshake operation timed out" in said[0]
+    clock = Clock()  # never answers: fails at the bound, naming the last reason
+    why = connect.probe("https://h", clock.fetch([timeout]), sleep=clock.sleep, clock=clock)
+    assert why == "https://h did not answer in 3 minutes (_ssl.c:1012: The handshake operation timed out)"
+    assert (
+        connect.PROBE_BOUND - connect.PROBE_WAIT - connect.PROBE_EVERY
+        < clock.now
+        <= connect.PROBE_BOUND + connect.PROBE_WAIT
+    )
+    # the plain port, or a 421, after a timeout: failed at once, no more tries
+    for wrong, says in (
+        ({"status": 200, "listener": "plain"}, "plain port"),
+        ({"status": 421, "listener": "route"}, "421"),
+    ):
+        clock = Clock()
+        assert says in connect.probe("https://h", clock.fetch([timeout, wrong]), sleep=clock.sleep, clock=clock)
+        assert clock.fetches == 2
+
+
+def test_connect_waits_out_a_first_certificate():
+    """TD-672's *Done when*, against a faked provider: the handler added, the first fetches time out
+    while the certificate is fetched, then the route answers — `ao connect` succeeds on its first run
+    and keeps what it wrote."""
+    ts, reach, clock, said = Tailscale(), Reach(), Clock(), []
+    timeout = {"status": None, "why": "The handshake operation timed out"}
+    got = connect.connect_tailscale(
+        [],
+        8766,
+        8765,
+        reach,
+        run=ts,
+        ask=_ask(),
+        fetch=clock.fetch([timeout, timeout, {"status": 200, "listener": "route"}]),
+        sleep=clock.sleep,
+        clock=clock,
+        say=said.append,
+        which=lambda _: "x",
+    )
+    assert got["added"] is True and reach.held["url"] == f"https://{DNS}"
+    assert ts.serve and not ts.ran("tailscale", "serve", "--https=443", "off")
+    assert any("first HTTPS certificate" in line for line in said)
 
 
 def _connect(ts, reach, fetch=lambda u: {"status": 403, "listener": "plain"}, **kw):
