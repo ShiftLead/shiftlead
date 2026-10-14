@@ -51,7 +51,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
 | TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
 | TD-619 | A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record | Medium | Designed — TD-620 builds it |
-| TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Slice 1 of 2 merged — `profile` in `relaunch`; slice 2, the comparison and `ao team flow` |
+| TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Built (#1673) — live check next |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
@@ -72,6 +72,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, Cloudflare second, `ssh -L` always; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
 | TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, cloudflare, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
+| TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
 
 ---
 
