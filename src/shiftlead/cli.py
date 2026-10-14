@@ -1447,8 +1447,9 @@ def _main_checkout(start: str) -> str | None:
 
 def cmd_repo_init(args: argparse.Namespace) -> int:
     """`ao repo init [--repo <name>]` (design §4.7, §5 *The seams*, TD-591): an empty ledger in
-    ledgerboard format at the repo's `ledger:` path and the archive beside it, in this directory's
-    checkout — or the registered repo `--repo` names — committing nothing; refused when either file
+    ledgerboard format at the repo's `ledger:` path and the archive beside it, in the checkout this
+    directory is in — a worktree's own tree, so the files land on its branch — or the registered repo
+    `--repo` names, committing nothing; refused when either file
     is there. A client write: no host agent is asked."""
     if args.all:
         raise AgentError("ao repo init writes one repo's ledger: name it with --repo, not --all")

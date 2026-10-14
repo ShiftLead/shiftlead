@@ -59,7 +59,7 @@ def test_every_seam_there_is_ok_an_unset_one_warns_and_a_missing_ledger_lacks():
             "repo notes — no ledger at docs/technical_debt.md (`ao repo init`) · no gate: a person merges · "
             "no board: the Inbox is the person's channel · no worktree setup",
         ),
-        ("warning", "repo old — seams not read yet (the host agent's first pass, or a build before TD-591)"),
+        ("warning", "repo old — seams not read yet"),
         ("warning", "repo samscrape — no gate: a person merges · no worktree setup"),
         ("ok", "repo shiftlead — ledger 412 entries · board · gate check_cadence.py · worktree setup"),
     ]
@@ -156,3 +156,17 @@ def test_repo_init_names_a_registered_repo_and_refuses_outside_a_git_repo(tmp_pa
     assert "not in a git repo" in capsys.readouterr().err
     assert cli.main(["repo", "--repo", "named"]) == 1
     assert "--repo is `ao repo init`'s" in capsys.readouterr().err
+
+
+def test_on_a_node_the_repos_line_reads_the_nodes_own_checkouts(tmp_path, monkeypatch):
+    mine, theirs = tmp_path / "mine", tmp_path / "theirs"
+    got = {str(mine): repo("mine", seam_reading()), str(theirs): repo("theirs", seam_reading())}
+    monkeypatch.setattr(cli, "call_sync", lambda method, **kw: got)
+
+    class Host:
+        def repos(self):
+            return [str(mine)]
+
+    monkeypatch.setattr(cli.hosts, "local_host", lambda: Host())
+    assert list(cli._doctor_repos(node=True)) == [str(mine)]
+    assert list(cli._doctor_repos(node=False)) == [str(mine), str(theirs)]

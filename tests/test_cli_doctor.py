@@ -1,5 +1,5 @@
 """TD-465 slice 2, design §4.7 **`ao doctor`**: the client's verdicts over the `doctor` RPC's
-readings — seven checks in order, each in `ao org check`'s words, every lack naming its cure, the
+readings — nine checks in order, each in `ao org check`'s words, every lack naming its cure, the
 closing count, exit 1 on a lack and 3 with no host agent, `ao doctor <check>…`, `--json` with each
 check's raw reading, *home only* on a node. The RPC is faked: what is judged is the reading."""
 

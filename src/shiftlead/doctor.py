@@ -357,7 +357,7 @@ def repos(readings: dict[str, Any]) -> list[dict[str, Any]]:
     for r in sorted(readings.values(), key=lambda v: str(v.get("name") or v.get("root") or "")):
         name, seams = r.get("name") or Path(str(r.get("root") or "")).name, r.get("seams")
         if not isinstance(seams, dict):
-            text = f"repo {name} — seams not read yet (the host agent's first pass, or a build before TD-591)"
+            text = f"repo {name} — seams not read yet"  # the host agent's first pass, or an older build
             out.append(_row("repos", WARNING, text, repo=name, seams=None))
             continue
         lack, missing = ledger_lack(seams.get("ledger")), missing_seams(seams)
