@@ -38,7 +38,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
-| TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-636 | A director seat answers permission prompts for the person: routine ones allowed or denied by written rules, the rest escalated | Medium | Designed — TD-641, TD-642 build it |
 | TD-637 | `ao progress done … --pr <n>` is accepted while the PR's required checks are red or missing | Medium | Designed — TD-639, TD-640 build it |
@@ -539,28 +538,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** `git grep -n LEGACY_REPO_FILE` returns nothing, `.agentorc.yml` is left only in `migrate.py` and `tests/test_migrate.py` (the migration's own data) and in §10's answered questions (dated), `ao team list` reads all four teams from `.shiftlead.yml`, and a repo with only `.agentorc.yml` is named by `ao doctor`.
 
 **Related:** TD-060, TD-552.
-
----
-
-## TD-622: #1563's `AO.shellHere` — the *tab* wording of the blocked-pop-up toast, the close on a create that answers without an id, and the placeholder's directory fallback — are held by no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-12 (test-audit-ao-1, auditing #1563)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/static/app.js` (`AO.shellHere`), `tests/test_ui_popout.py` (`SHELL_PROBE`, `test_open_shell_here_opens_beside_the_page_it_was_pressed_on`)
-
-**Why:** #1563 (TD-579) has a node probe and a source-shape test, and its docstring says *a blocked open creates nothing and says so* and that the placeholder *reads "opening a shell in <dir>…"*. Probe: each change below, one at a time, then `PYTHONPATH=$PWD/src pytest -q tests/test_ui_popout.py`: every one still passes (7 passed).
-- `const what = asWindow ? "window" : "tab";` → `const what = "window";`: the probe blocks only the window form (`AO.shellHere("a", "/repo/x", true)`), so a blocked *tab* — the plain press, the common one — saying *the browser blocked the window* is read by no test.
-- `if (!res || !res.id) { …w.close()…; return res; }` removed: a create that answers without an `id` leaves the placeholder tab open at *opening a shell in …* for good; the probe's `AO.act` returns an id or throws, never `{}`.
-- `dir || "this session's directory"` → `dir || "x"`: the probe always passes `/repo/x`, so the fallback sentence (a card whose `data-dir` is empty) is never drawn.
-The window's `w.name` assignment, by contrast, is caught.
-
-**Fix:** extend `SHELL_PROBE`: a blocked open with `asWindow` false (the toast names the tab, nothing created), an `AO.act` that answers `{}` (the placeholder closed, no `href` set), and a press with an empty `dir` (the placeholder names the session's directory). **Done when** each probe above fails a test.
-
-**Related:** TD-577, TD-579 (#1563).
 
 ---
 
