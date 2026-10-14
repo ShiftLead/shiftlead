@@ -73,6 +73,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 | TD-654 | Rule 8's start (and a schedule's replay) replays a team's seats live: an on-call manager or techlead filled for nothing and closed two minutes later | Medium | Open |
+| TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Open |
+| TD-658 | "Green before hand-off" is not enforced: a held PR's `ask` to its reader is taken on a red or pending PR, and `done --pr` is accepted as *checks pending* | Medium | Open |
+| TD-659 | `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why | Low | Open |
 
 ---
 
@@ -1392,5 +1395,71 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the design says what a replay does with a seat, the code does it, and a week of journal after it is live shows no seat closed with nothing due straight after a rule 8 start (TD-413's live check, read again then).
 
 **Related:** TD-410, TD-413 (blocked by this), TD-386 (the held create), TD-227 (rule 8's start), TD-259 (the seat on call).
+
+---
+
+## TD-657: The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-13 (ao-paul, with Paul — after TD-636's round)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9b *The director seat answers permission prompts for the person* (TD-636), *Passing up keeps the thread and the asker* (`pass_up` is *only to the person*), *Its standing context: a primer*, *What it may answer*; §5 (`settings.yml`, `org.yml`); §2 goal 6 (*Jump out*); briefs' layering (`src/shiftlead/briefs/`, `docs/briefs/`)
+
+**Why:** TD-636's design (#1661) makes the director one per org, judging permission prompts by its brief (`director.md`). Paul, the same day, set its larger shape:
+- *"The director would be one per ao instance — so across all teams. The original thought was that techleads would pass questions that they could not answer to it. Challenge is setting context — is this another techlead and it uses the context for the appropriate team … or does it have a higher level view based on user (my) prefs? Would we need an interview to set those up?"*
+- Answered with ao-paul: a second techlead adds little (it reads the docs the first could not answer from); what a director adds is **what the person would say**. So it answers from the person's **written preferences** plus the asking team's primer, cites the line (`--source`), and passes the rest to the person. The techlead stays (Paul: *"agreed have both"*): worker → techlead → director → person.
+- **A level** (Paul: *"Some users may want the director to be conservative (only what is clearly documented), what is reasonably extrapolated, or answer liberally (only ask if there is no related docs/indicators)"*): `conservative` (default) / `extrapolate` / `liberal`, per repo as well. At every level §4.9b's **Never** list and *What always reaches the person* still go to the person, and each answer names the level that produced it.
+- **Preferences in layers** (Paul: *"Should we have preferences per repo (and it lives in each repo) with some set of defaults like we do for briefs?"*): package defaults → **the person's own, across repos** (private, in git; ao-paul's addition, so risk, spending and *always ask me* are not copied into every repo nor shown in a shared one) → a repo's own file, checked in. The most specific wins; nothing overrides the Never list.
+- **Grown and groomed** (Paul: *"we would want the preferences routinely groomed so that it becomes general sentiments instead of specifics"*): seeded from what is already decided (boards' `Decided:` lines, *Paul, <date>:* quotes in the ledger and history), a short interview for the gaps, an answer to a passed-up question offered as an addition (*remember this?*), and a routine grooming pass landed as a change the person reviews.
+- **An Open preferences button** (Paul: *"a button for the user to be able to open the pref file in an editor"*): on the Settings page and on each *Answered for you* row, opening the file the answer cited.
+
+**Fix:** design first, extending TD-636's seat (its rules → director → person order and *What always reaches the person* stand). The round settles: (1) `pass_up` to the director where the org has one, and from it to the person (the thread, `passed_up` once per passer, the recommendation); (2) the preferences files — names, where the person's own lives, the layer order, and the director's first read (the primer's rule: an index, cited at the source); (3) the level — key, where it is set, how an answer shows it; (4) the director's prompt judgement read against the preferences as well as `director.md`; (5) seeding, the interview, *remember this?*, and grooming — who runs each and how each lands; (6) the button. The design names the build entries.
+
+**Done when** the design says what the director answers beyond permission prompts, from which preferences, at which level, and how the preferences grow and are groomed, and the build entries are filed with `Blocked by` lines.
+
+**Related:** TD-636 (the seat), TD-641 / TD-642 (its builds; TD-642's brief and trigger are where this lands), `docs/decisions/2026-10-13-agent-product-lessons.md` (lessons 1 and 7).
+
+---
+
+## TD-658: "Green before hand-off" is not enforced: a held PR's `ask` to its reader is taken on a red or pending PR, and `done --pr` is accepted as *checks pending*
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (ao-paul, with Paul — after TD-637's round)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9b *The reader* (*when a held PR is green and carries its author's own `cadence-review:` comment, the author sends `ao msg --kind ask --pr <n> {techlead}`* — a brief's rule, nothing refuses it), §4.9c (a flow's review stages), §4.8 *A `done` with a PR is told what its checks read* (TD-637, built by TD-639: refused on a failed required check, accepted as *done · checks pending* while one runs)
+
+**Why:** Paul, 2026-10-13, twice: *"I agree an agent should not say its done if its PR is not green"*, and, after TD-637's round, *"I would expect grinders to make the PR green before handing it off to the techlead (or other depending on the workflow)."* TD-637's design accepts a pending head at `done`, and the hand-off to a reader is not checked at all.
+
+**Fix:** design first. The round settles: (1) `ao msg --kind ask --pr <n>` to a reader (the techlead seat, or any stage's reader, §4.9c) refused while the PR's head is not green — required checks failed **or pending** — in words naming them, as `done` names them; (2) whether `done --pr` on a pending head becomes a refusal too, reconciling TD-637's *checks pending* with Paul's words (a merged PR, no CI and an unreadable read keep TD-637's answers); (3) the briefs' wording (grinder, the techlead's *The reader*), which the build's briefs slice changes. The design names the build entries.
+
+**Done when** the design says the hand-off to a reader, and `done` on a pending head, are refused until green (or says why not, with Paul's answer), and the build entries are filed.
+
+**Related:** TD-637 (the design), TD-639 (its build), TD-640, §6 rule 10.
+
+---
+
+## TD-659: `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (ao-paul, PR #1672's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_orphaned.py` (~L173: `_git(repo, "pull", "-q", "--ff-only", "origin", "main")` after the reply route writes the board)
+
+**Why:** PR #1672 (a ledger-only change) failed `test (3.12)` on this one test — `CalledProcessError: … 'pull', '-q', '--ff-only', 'origin', 'main'] returned non-zero exit status 128` — and passed on a re-run of the same commit; 2529 others passed. Exit 128 is git's fatal class (a lock held, a ref that moved, a remote not ready); the test's `_git` raises without the command's stderr, so the log cannot say which. A likely cause, not verified: the home's own pull of the same checkout (§6 *Pull*) racing the test's.
+
+**Fix:** (1) make `_git` include the command's stderr in its error, so the next flake names its cause; (2) if it is the home's pull, wait for the board write's pull to settle (or read the board from `origin/main`) instead of pulling beside it.
+
+**Done when** the test's failure names git's stderr, and the race (if that is the cause) is closed.
+
+**Related:** TD-463 (CI flakes).
 
 ---
