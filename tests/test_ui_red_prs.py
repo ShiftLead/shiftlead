@@ -27,7 +27,7 @@ def order(n: int, **kw) -> dict:
     return {"id": f"pr:{n}", "pr": n, "title": f"PR {n}", "priority": "High", "pr_order": True, "work_order": True, "url": f"https://x/{n}", "author": "eye", "checks": "red", "failing": ["test"], "red_since": _iso(now() - timedelta(hours=3)), **kw}  # fmt: skip
 
 
-def reading(root: str, orders: list[dict] | None = None) -> dict:
+def reading(root: str, orders: list[dict] | None = None, held: dict | None = None) -> dict:
     return {
         "name": "samscrape",
         "root": root,
@@ -42,7 +42,7 @@ def reading(root: str, orders: list[dict] | None = None) -> dict:
             ],
             "windows": {w: {"opened": 1, "closed": 1} for w in ("day", "week", "month")},
         },
-        "pr_orders": {"orders": orders if orders is not None else [order(802)], "told": {}},
+        "pr_orders": {"orders": orders if orders is not None else [order(802)], "told": {}, "held": {"803": ["g1"]} if held is None else held},
         "at": _iso(now()),
     }  # fmt: skip
 
@@ -65,12 +65,10 @@ def test_the_red_prs_say_their_word_and_past_the_bound_whose_they_are():
     )
     assert (got[803]["word"], got[803]["whose"]) == ("conflicting", "held by g1")
     assert got[804]["whose"] == ""  # before ORPHAN_AFTER nobody's order and nobody's to name
-    # a record that ended, or of another repo, holds nothing; a claim on `pr:<n>` does
-    ended = rec("g1", root, git={"branch": "td9"}, state="exited")
-    elsewhere = rec("g2", "/r/other", git={"branch": "td9"})
-    claimed = rec("g3", root, progress=[{"ref": "pr:803", "status": "claimed"}])
-    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [ended, elsewhere], now())}[803] == ""
-    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [claimed], now())}[803] == "held by g3"
+    # the holders are the reading's (`pr_orders.held`, TD-652): the page re-derives nothing from the records
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root, held={}), [holder], now())}[803] == ""
+    two = reading(root, held={"803": ["g3", "g4"]})
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(two, [], now())}[803] == "held by g3, g4"
     # a stamp with no offset is read as UTC, never a page's TypeError (review of #1668)
     naive = reading(root)
     naive["prs"]["open"][1]["red_since"] = (now() - timedelta(hours=3)).replace(tzinfo=None).isoformat()

@@ -427,6 +427,23 @@ def test_a_red_pr_order_is_the_anchor_lanes_and_free_picks_only_with_free_pick()
     assert not ledger_mod.lane_matches(["design-first"], o)
 
 
+@pytest.mark.unit
+def test_the_holders_of_a_red_pr_are_named_past_the_bound():
+    """TD-652: the reading names each red PR's holders, for the pages' *held by <name>*: a live
+    record on its head or with a claim on it, never one that ended or is out of work."""
+    on_head = _rec("ao-h", state="working", git={"branch": "b1573"})
+    claimed = _rec("ao-c", progress=[ProgressEntry(ref="pr:1573")])
+    ended = _rec("ao-e", state="exited", git={"branch": "b1573"})
+    out = _rec("ao-o", git={"branch": "b1573"}, out_of_work={"at": "x"})
+    recs = [on_head, claimed, ended, out]
+    assert workorders.red_holders([_red()], recs, T0 + HOUR, HOUR) == {"1573": ["ao-h", "ao-c"]}
+    assert workorders.red_holders([_red()], recs, T0 + HOUR - timedelta(seconds=1), HOUR) == {}  # before the bound
+    assert workorders.red_holders([_red()], [ended, out], T0 + HOUR, HOUR) == {}  # nobody's: the order names it
+    assert workorders.red_holders([{"number": 9, "checks": "green"}], recs, T0 + HOUR, HOUR) == {}
+    naive = _red(since=T0.replace(tzinfo=None))  # a stamp with no offset is UTC
+    assert workorders.red_holders([naive], [on_head], T0 + HOUR, HOUR) == {"1573": ["ao-h"]}
+
+
 async def test_the_home_tells_an_idle_holder_and_lists_an_unheld_red_pr(agent, tmp_path):
     from conftest import park_ticks
 
@@ -442,6 +459,13 @@ async def test_the_home_tells_an_idle_holder_and_lists_an_unheld_red_pr(agent, t
     po = agent._repos[root]["pr_orders"]
     # PR 2's head is a branch of a session in another repo: it holds nothing here
     assert [o["id"] for o in po["orders"]] == ["pr:2"] and set(po["told"]) == {"1"}
+    assert po["held"] == {"1": ["ao-holder"]}
+    # the page reads the reading's holders and names the one the home found (TD-652)
+    from shiftlead import teamrun
+
+    views = [{**s.to_dict(), "state": s.state} for s in (holder, elsewhere)]
+    whose = {x["number"]: x["whose"] for x in teamrun.red_prs({**agent._repos[root], "root": root}, views, now)}
+    assert whose == {1: "held by ao-holder", 2: "nobody's"}
     (note,) = [e for e in agent.sessions["ao-holder"].inbox if e.from_ == "system"]
     assert note.text.startswith("PR #1 has been red since") and note.uncharged
     await agent._red_prs(now + timedelta(minutes=5))  # once per red spell

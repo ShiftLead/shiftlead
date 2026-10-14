@@ -23,7 +23,7 @@ import re
 import signal
 import subprocess
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -355,6 +355,30 @@ def holds_pr(record: Any, pr: dict[str, Any]) -> bool:
         return True
     branch = (record.git or {}).get("branch")
     return bool(branch) and branch == pr.get("branch")
+
+
+def red_holders(
+    open_prs: list[dict[str, Any]], records: list[Any], now: datetime, after: timedelta
+) -> dict[str, list[str]]:
+    """Who holds each red PR past `after`, by number as a string: the names of the live records
+    `holds_pr` finds, for the pages' *held by <name>* (TD-652; the reading carries them, so no page
+    re-derives the test). A PR nobody holds, or not yet red for `after`, is not listed."""
+    out: dict[str, list[str]] = {}
+    for pr in open_prs:
+        since = pr.get("red_since") if isinstance(pr, dict) else None
+        if not since or not isinstance(pr.get("number"), int):
+            continue
+        try:
+            red_since = datetime.fromisoformat(str(since))
+        except ValueError:
+            continue
+        if red_since.tzinfo is None:  # a stamp with no offset is UTC, as every stamp in the store is
+            red_since = red_since.replace(tzinfo=UTC)
+        if now - red_since < after:
+            continue
+        if held := [str(r.name or r.id) for r in records if holds_pr(r, pr)]:
+            out[str(pr["number"])] = held
+    return out
 
 
 def pr_note(pr: dict[str, Any]) -> str:
