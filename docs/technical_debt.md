@@ -70,6 +70,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Open |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
+| TD-643 | Two writers of `spend.json.tmp` at once: the home's spend save fails with ENOENT, and a link test flakes | Medium | Open |
 
 ---
 
@@ -853,7 +854,7 @@ Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
 **Added:** 2026-10-12 (the designer, TD-613's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 of 3 (grinder-ao-1, 2026-10-12): fix step 1, the reading — `reports.fold_checks`, the open read with `OPEN_PR_FIELDS`, each open PR's `checks`, `failing`, `conflicting` and `red_since` kept by number from the last reading the tick hands `pr_reading` (`old=`). Slice 2: steps 2–4 — `workorders.holds_pr`, `red_prs`, `pr_order` and `is_pr_order` (`is_work_order` stays the board line's id alone), `agent_common.ORPHAN_AFTER`, the home's `_red_prs` step (the reading's `pr_orders: {orders, told}`, carried across re-reads; one `system` note, uncharged, per red spell), the orders in the tick's lanes beside the board's (`agent_tick._orders`), and `lane_matches`: a `pr_order` is the `anchor` lane's, a `free-pick` lane's only when it carries `free_pick`. Left: slice 3 (`src/shiftlead/**`) — `teamrun.work_orders` lists `pr_orders` and sets `free_pick` where no team servicing the repo has an anchor seat (`repo_lanes`), steps 5–6, `ao repo`.
+**Status:** Slice 1 of 3 (grinder-ao-1, 2026-10-12): fix step 1, the reading — `reports.fold_checks`, the open read with `OPEN_PR_FIELDS`, each open PR's `checks`, `failing`, `conflicting` and `red_since` kept by number from the last reading the tick hands `pr_reading` (`old=`). Slice 2: steps 2–4 — `workorders.holds_pr`, `red_prs`, `pr_order` and `is_pr_order` (`is_work_order` stays the board line's id alone), `agent_common.ORPHAN_AFTER`, the home's `_red_prs` step (the reading's `pr_orders: {orders, told}`, carried across re-reads; one `system` note, uncharged, per red spell), the orders in the tick's lanes beside the board's (`agent_tick._orders`), and `lane_matches`: a `pr_order` is the `anchor` lane's, a `free-pick` lane's only when it carries `free_pick`. Slice 2 merged (#1620). Slice 3 in PR #1663 (2026-10-13, grinder-ao-2): `teamrun.pr_orders`, `lane_entries` with them beside the board's lines, `repo_lanes` setting `free_pick` on a copy where no servicing team has a record carrying the `anchor` lane word, and `ao repo`'s count and rows. Left: slice 4 (`src/shiftlead/ui/**`, a UI check) — step 5 (the Inbox *red PR* row for a repo no team services), step 6 (the facet's *· n red*, the Repo page's Open PRs tags), and the Org page's claimed-reference title for `pr:<n>` (`ui/org.py` ~L235, `teamrun.pr_orders` beside `work_orders`).
 **Location:** design §4.4 *Repo facts* (the PR reading) and *A red PR nobody holds is a work order*, §6 rule 6, §4.5 screens 6 and 11, §4.5a *Inbox row: red PR* and *Repo facet*; `src/sessionorc/reports.py` (`PR_FIELDS` ~L271 is shared by both reads through `_gh_prs` ~L274: give `_gh_prs` a fields argument so the open read alone gains `statusCheckRollup,mergeStateStatus`; `pr_reading` ~L300: `checks`, `conflicting`, `red_since` carried across readings by number), `src/sessionorc/workorders.py` (a `pr:<n>` order beside `board:<key>`; `is_work_order` ~L36 and `_REF_RE` ~L31 accepting `pr:\d+`), `src/sessionorc/agent_common.py` (`ORPHAN_AFTER = 3600.0` beside `IDLE_NUDGE`), `src/sessionorc/agent_tick.py` (the repo reading ~L2895: the orders from the PR reading and the records; the one `system` note to an idle holder, marked so it is sent once per red spell), `src/sessionorc/ledger.py` / `teamrun.py` (the lane match: `anchor` takes `pr:` orders; `free-pick` too where no servicing team has an anchor seat), `src/shiftlead/ui/inbox.py` (the *red PR* row for a repo no team services), the team card's Repo facet template and `repo_part.html` (the marks), `src/shiftlead/cli.py` (`ao repo` lists `pr:<n>` orders with the pickable rows, as `board:<key>` ones), `src/shiftlead/ui/help.py`; `tests/test_reports.py`, `tests/test_workorders.py`, `tests/test_tick*.py`, `tests/test_ui_inbox*.py`
 
 **Why:** TD-613: on 2026-10-12 dev-cadence's sync PR #1573 went red, its author idle in another repo and the anchor closed, and nothing noticed until Paul asked hours later; the PR reading had no checks to see it by.
@@ -1359,5 +1360,27 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** an unattended member's prompt no rule covers is answered by the director seat with a reason told to the person, or passed up in words, never touching an interactive session or the always-the-person prompts, and the tests above pass.
 
 **Related:** TD-636 (the design), TD-641 (the rules), TD-151 (the techlead seat), §6 rule 3.
+
+---
+
+## TD-643: Two writers of `spend.json.tmp` at once: the home's spend save fails with ENOENT, and `test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_reading_follows` flakes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2, found running the full suite for TD-617 and TD-618)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_spend.py` (`_save_spend` ~L130: `asyncio.to_thread(self.spend_store.save, …)` reached from the tick's pass and from `_take_spend`, a node's `spend` call), `src/sessionorc/store.py` (`_atomic_write` ~L21: one fixed `<name>.tmp` per path); `tests/test_link.py` (~L2115)
+
+**Why:** `pdm run test` failed twice in three full runs on 2026-10-13 (two branches, neither touching `sessionorc`) at `test_link.py:2115`: `node._spend_link["api"]` was missing because the node's `spend` call failed, the home logging *spend for api did not reach kmaster: [Errno 2] No such file or directory: '…/spend.json.tmp' -> '…/spend.json'*. Two saves on two threads write the same `spend.json.tmp`, and the second `os.replace` finds it already moved. Alone the test passes. In the live home the same race makes a node's spend call fail; the node sends it again on its next pass, so nothing is lost, but each failure is a warning and a dropped link state.
+
+**Fix:**
+1. `_save_spend` holds one `asyncio.Lock` around the compare, the threaded save and `_spend_saved`. Alternatively, `_atomic_write` writes a unique temporary file (`tempfile.mkstemp` in the same directory), which makes every store's save safe against a second writer.
+2. Test: two `_save_spend` calls gathered at once both complete, and `spend.json` holds the last.
+
+**Done when** concurrent spend saves never raise, and the link test passes in repeated full runs.
+
+**Related:** TD-151 (the spend ledger), TD-463 (the CI flakes).
 
 ---
