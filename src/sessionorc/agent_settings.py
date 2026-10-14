@@ -148,6 +148,7 @@ class SettingsMixin:
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             "person": settings_mod.person(doc),
             "notify": settings_mod.notify(doc),
+            "permissions": self._permissions_read(doc),
             "migrate": [],
         }
         if settings_mod.ui_yml().exists():
@@ -155,6 +156,24 @@ class SettingsMixin:
                 f"{settings_mod.ui_yml()}: ui.yml is no longer read — its open_in lives under person:"
             )
         return out
+
+    @staticmethod
+    def _permissions_read(doc: dict[str, Any]) -> dict[str, Any]:
+        """`permissions:` as the host matches it (§4.9b, TD-641), with every malformed entry named:
+        a shape the reader drops, or a rule no adapter's syntax carries (each adapter with a
+        `rule_problem` is asked, and a rule is malformed only when every one of them refuses it)."""
+        rules, bad = settings_mod.permissions(doc)
+        judges = [j for name in adapters.names() if (j := getattr(adapters.get(name), "rule_problem", None))]
+        kept: dict[str, dict[str, list[str]]] = {}
+        for role, lists in rules.items():
+            for key, got in lists.items():
+                for rule in got:
+                    problems = [p for j in judges if (p := j(rule))]
+                    if judges and len(problems) == len(judges):
+                        bad.append(f"permissions.{role}.{key}: {problems[0]}")
+                    else:
+                        kept.setdefault(role, {}).setdefault(key, []).append(rule)
+        return {"rules": kept, "malformed": bad}
 
     async def rpc_set_settings(
         self,

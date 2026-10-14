@@ -122,6 +122,17 @@ class Adapter(Protocol):
     #                                                      only), layers: [{path, commands: [{command, resolves}]}
     #                                                      | {path, error}]}; or one {error} when the profiles
     #                                                      file does not parse
+    #   rule_matches(rule: str, tool: str, input, *, cwd: Path | None, deny: bool) -> bool
+    #                                                      whether one of the person's `permissions:` rules,
+    #                                                      in the tool's own syntax, covers a prompt (design
+    #                                                      §4.9b *The director seat*, TD-641); `deny` reads a
+    #                                                      compound call as covered when any part is. An
+    #                                                      adapter without it has no prompt a rule answers
+    #   rule_problem(rule: str) -> str | None              why a rule is not one the tool's syntax carries
+    #   prompt_strings(tool: str, input) -> list[str] | None
+    #                                                      the command lines and paths a prompt touches, never
+    #                                                      a file's content, for the always-the-person check
+    #                                                      (`permits`); None: every string of the input
     #   billing_for(profile: str) -> dict | None           {"billing": "subscription" | "metered", "prices":
     #                                                      {kind: per million}} as the profile declares it
     #                                                      (§4.2a, TD-151): the home reads it before the cap

@@ -109,6 +109,9 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
             # a question that reaches the hook reads as its question, as the PreToolUse road draws it
             "text": what if tool == "AskUserQuestion" else f"{tool}: {what}",
             "tool_use_id": payload.get("tool_use_id"),
+            # the tool and its input, for the person's `permissions:` rules (§4.9b, TD-641); a
+            # question carries neither, since no rule answers one (§9 invariant 6)
+            **({} if tool == "AskUserQuestion" else {"tool": tool, "input": payload.get("tool_input") or {}}),
         }
     if ev == "PreToolUse" and payload.get("tool_name") == "AskUserQuestion":
         text = first_question(payload.get("tool_input") or {})

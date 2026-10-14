@@ -123,7 +123,14 @@ def test_translate_permission_and_questions():
             "tool_use_id": "tu9",
         }
     )
-    assert p == {"kind": "permission", "text": "Bash: git push origin td-301", "tool_use_id": "tu9"}
+    assert p == {
+        "kind": "permission",
+        "text": "Bash: git push origin td-301",
+        "tool_use_id": "tu9",
+        # the tool and its input, for the person's permissions: rules (TD-641)
+        "tool": "Bash",
+        "input": {"command": "git push origin td-301"},
+    }
     # a question that reaches the PermissionRequest hook reads as its question, not its JSON (TD-629)
     a = translate(
         {

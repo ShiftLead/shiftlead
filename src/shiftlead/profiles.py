@@ -32,6 +32,7 @@ from sessionorc import paths
 DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member with no profile (teams.create_params)
 SHELL_ADAPTER = "shell"  # no agent: a profile may name it, a team session may not (teams.plan, TD-329)
 DEFAULT_PERMISSION_WAIT = 600  # seconds; long enough to reach a phone (design §4.2)
+PERMISSION_PROMPTS = ("skip", "ask")  # §4.2a, TD-641: the first is the default
 BILLINGS = ("subscription", "metered")
 PRICE_KINDS = ("input", "output", "cache_read", "cache_write")
 
@@ -46,6 +47,7 @@ class Profile:
     permission_wait: int = DEFAULT_PERMISSION_WAIT
     extra_args: list[str] = field(default_factory=list)
     unattended_args: list[str] = field(default_factory=list)
+    permission_prompts: str = "skip"  # §4.2a: `ask` launches unattended without the adapter's skip flag
     billing: str = "subscription"  # §4.2a: or `metered` — never guessed from the directory or the environment
     prices: dict[str, float] = field(default_factory=dict)  # per million tokens, by kind; a metered profile's
 
@@ -85,6 +87,17 @@ def _billing(name: str, raw: dict) -> tuple[str, dict[str, float]]:
             raise ValueError(f"profiles.yml: {name}.prices.{kind} is a price per million tokens, not {v!r}")
         out[str(kind)] = float(v)
     return billing, out
+
+
+def _permission_prompts(name: str, raw: dict) -> str:
+    """`permission_prompts: ask | skip` (§4.2a, TD-641), `skip` when absent; anything else is the file's
+    error, named — a guess either way launches a member with or without its prompts."""
+    word = raw.pop("permission_prompts", None)
+    if word is None:
+        return PERMISSION_PROMPTS[0]
+    if word not in PERMISSION_PROMPTS:
+        raise ValueError(f"profiles.yml: {name}.permission_prompts is ask or skip, not {word!r}")
+    return str(word)
 
 
 def _metered_dirs(profiles: dict[str, Profile]) -> None:
@@ -132,6 +145,7 @@ def load(path: Path | None = None) -> tuple[dict[str, Profile], str]:
             permission_wait=int(raw.pop("permission_wait", DEFAULT_PERMISSION_WAIT)),
             extra_args=list(raw.pop("extra_args", []) or []),
             unattended_args=list(raw.pop("unattended_args", []) or []),
+            permission_prompts=_permission_prompts(name, raw),
             billing=billing,
             prices=prices,
         )
