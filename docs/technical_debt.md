@@ -1370,7 +1370,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 ## TD-671: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use` fails when the suite runs inside a session: a shell inherits the runner's `AGENT_MODEL`
 
 **Priority:** Low
-**Type:** test
+**Type:** debt
 **Added:** 2026-10-14 (grinder-ao-2, met running `pytest` for TD-647)
 **Owner:** grinder
 **Kind:** build
