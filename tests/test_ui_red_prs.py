@@ -67,6 +67,10 @@ def test_the_red_prs_say_their_word_and_past_the_bound_whose_they_are():
     claimed = rec("g3", root, progress=[{"ref": "pr:803", "status": "claimed"}])
     assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [ended, elsewhere], NOW)}[803] == ""
     assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [claimed], NOW)}[803] == "held by g3"
+    # a stamp with no offset is read as UTC, never a page's TypeError (review of #1668)
+    naive = reading(root)
+    naive["prs"]["open"][1]["red_since"] = (NOW - timedelta(hours=3)).replace(tzinfo=None).isoformat()
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(naive, [holder], NOW)}[802].startswith("nobody's")
     # where no team services the repo the order is the Inbox's, not the anchor's
     assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [], NOW)}[802] == "nobody's"
 

@@ -1149,6 +1149,8 @@ def red_prs(
             since = datetime.fromisoformat(str(p["red_since"]))
         except ValueError:
             continue
+        if since.tzinfo is None:  # a stamp with no offset is UTC, as every stamp in the store is (`_instant`)
+            since = since.replace(tzinfo=UTC)
         whose = ""
         if now - since >= ORPHAN_AFTER:
             held = [str(s.get("name") or s.get("id")) for s in pr_holders(p, mine)]
