@@ -1021,6 +1021,7 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
     (sent,) = [p for m, p in fleet.calls if m == "relaunch"]
     assert sent["id"] == "ao-shiftlead-grind-1" and sorted(sent["launch"]) == [
         "lane",
+        "profile",
         "prompt",
         "prompt_from",
         "review",
@@ -1046,6 +1047,24 @@ def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(wor
         in head
     )
     assert "flow:" not in head and ">flow changed<" not in head
+
+
+def test_a_live_member_whose_roles_profile_changed_reads_definition_changed_on_the_card(world, client):
+    """§4.9c *Switching*, §4.5a *flow changed — Apply* (TD-619, built by TD-620): a live member whose
+    record runs another profile than its role now names reads *definition changed* on the team card,
+    the line in the mark's title and in Apply's confirm."""
+    tmp_path, fleet = world
+    doc = org_doc(tmp_path)
+    doc.setdefault("roles", {})["grinder"] = {"profile": "paul"}
+    write_org(tmp_path, doc)
+    grind = {**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}
+    fleet.sessions = [{**grind, "profile": ""}]
+    head = _head(client.get("/").text)
+    assert ">definition changed</span>" in head
+    assert "grind-1: profile default → paul (next restart)" in head
+    assert "Apply the definition to ao-grind? orc-ao: starts; grind-1: profile default → paul (next restart)." in head
+    fleet.sessions = [{**grind, "profile": "paul"}]
+    assert "profile default" not in _head(client.get("/").text)
 
 
 def test_the_header_is_one_row_and_the_definition_is_on_its_i_panel(world, client):

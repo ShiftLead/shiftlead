@@ -51,7 +51,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-616 | Build TD-614 (2): the host pushes `inbox` with a revision; the UI keeps the Inbox's counts once and pushes `counts` on every stream; the top bar polls nothing; `ao inbox --counts` from the same function | High | Open |
 | TD-618 | Build TD-613: the open PRs' `checks`, `conflicting`, `red_since`; a red PR nobody holds past `ORPHAN_AFTER` is a `pr:<n>` work order in the anchor's lane, the idle holder told once first; the marks on the facet and the Repo page; the Inbox row for a repo no team services | Medium | Open |
 | TD-619 | A role's profile changed in `org.yml` never reaches a running team: every restart and seat fill replays the old profile from the launch record | Medium | Designed — TD-620 builds it |
-| TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Slice 1 of 2 merged — `profile` in `relaunch`; slice 2, the comparison and `ao team flow` |
+| TD-620 | Build TD-619: a role's profile is a difference Apply relaunches — compared member by member with the session record, `profile` in the `relaunch` RPC and its mark, shown on the card and by `ao team flow` | Medium | Built (#1673) — live check next |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
 | TD-627 | The Focus Git card's changed files are plain text: make each a link that opens it in the person's editor, as the Session card's recent files do | Low | Designed — TD-628 builds it |
@@ -72,6 +72,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, Cloudflare second, `ssh -L` always; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
 | TD-647 | Build TD-646 (1): the UI's route port — a second loopback listener that requires the route's identity on every request and websocket | Medium | Open |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, cloudflare, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Open |
+| TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
+| TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 
 ---
 
@@ -879,8 +881,8 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Type:** debt
 **Added:** 2026-10-12 (the designer, TD-619's round)
 **Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 of 2 (grinder-ao-1, 2026-10-13): fix step 2's home side and its tests (`src/sessionorc/**`) — `RELAUNCH_KEYS` gains `profile`, kept when not handed (`RELAUNCH_KEPT`), refused unless the member's adapter runs it (`doctor_profiles`, a home member only), written into the launch record and the mark `relaunch: {at, lane, review, profile}`; the replay creates under it (`tests/test_relaunch.py`). Left: slice 2 (`src/shiftlead/**`) — step 1's comparison (`teamrun.differences`, `cards.flow_mark`, a closed seat compared too), the client always handing `profile`, step 4's `ao team flow` lines and Apply's confirm, and step 5's comparison, closed-seat-fill and `ao team flow` tests. Was: Open.
+**Kind:** live-check #1673
+**Status:** Built — the live check is next. Slice 2 (grinder-ao-2, 2026-10-13, #1673): `teamrun.differences` compares the profile the definition resolves with what the member runs next (its `relaunch` mark's, else its record's) on every live unattended member and every seat, closed or running, under a flow or none; a profile-only difference reads *<name>: profile <old> → <new> (next restart)* and the team **definition changed — Apply**; `relaunch_params` always hands `profile`. **The check, once #1673 is live** (`ao promote status`), read only: `ao team flow ao-grind` (the bare form presses nothing) prints a *profile … (next restart)* line for each member or seat whose record runs another profile than `org.yml` names, and none where they match; after the person's Apply, the members' `relaunch` marks carry the new profile (`ao status --json`) and a restarted or filled member's record `profile` is it. A difference to Apply is the person's press, never the checker's. Slice 1 (grinder-ao-1, 2026-10-13): fix step 2's home side and its tests (`src/sessionorc/**`) — `RELAUNCH_KEYS` gains `profile`, kept when not handed (`RELAUNCH_KEPT`), refused unless the member's adapter runs it (`doctor_profiles`, a home member only), written into the launch record and the mark `relaunch: {at, lane, review, profile}`; the replay creates under it (`tests/test_relaunch.py`). Left: slice 2 (`src/shiftlead/**`) — step 1's comparison (`teamrun.differences`, `cards.flow_mark`, a closed seat compared too), the client always handing `profile`, step 4's `ao team flow` lines and Apply's confirm, and step 5's comparison, closed-seat-fill and `ao team flow` tests. Was: Open.
 **Location:** design §4.9c *Switching* (the comparison and the `relaunch` RPC), §6 *Keeping a team running* and rule 7, §4.5a *flow changed — Apply*, §4.7 `ao team flow`, §9 invariant 10; `src/sessionorc/agent_common.py` (`RELAUNCH_KEYS` ~L153: add `profile`), `src/sessionorc/agent.py` (`rpc_relaunch` ~L1752: `profile` in its `kinds` map ~L1779 as a `str`, checked against `profiles.yml` as a create checks it; the mark's write ~L1801 gains `profile`; a `closed` seat's record is accepted, as it is today), the client's comparison (`src/shiftlead/teamrun.py` `differences` ~L900–940 and `_next_run`, and `src/shiftlead/ui/cards.py` `flow_mark` ~L622: the profile the member's definition resolves — its `profile:`, else its role's from the `roles:` overlay (`teams.py` ~L842) — against the session record's `profile`, or the `relaunch` mark's when one stands; and for a seat, the profile check runs on a `closed` record too, which `differences` skips today ~L920), `src/shiftlead/cli.py` (`ao team flow`'s difference lines); `tests/test_teamrun*.py`, `tests/test_relaunch*.py` or `tests/test_agent*.py`, `tests/test_ui_org*.py`
 
 **Why:** TD-619: Paul, 2026-10-12 — *I have had to take control of techlead-ao-1 three times now to change it to use opus. Apparently it is defaulting back to fable on restarts?*; `org.yml` moved `techlead` and `designer` to `grind`, and every restart and seat fill replayed `grind-fable` from the launch record.
@@ -1383,5 +1385,46 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** `ao connect tailscale` on a home logged in to Tailscale leaves a phone on the same tailnet opening the UI at the printed URL, and `ao connect cloudflare` refuses a tunnel with no Access in front.
 
 **Related:** TD-646 (the design), TD-647 (the route port), TD-003 (the phone layout).
+
+---
+
+## TD-651: The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2, building TD-620 slice 2)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/group_head.html` (the `definition_changed` Apply button's `title`; the *flow changed* one's says *lane, reader or stage brief*), design §4.5a *flow changed — Apply*
+
+**Why:** since #1673 (TD-620) a member whose role's profile changed reads **definition changed — Apply** where nothing else differs, and Apply relaunches it; the button's title still says only *each seat it names that the run lacks is started*, and the *flow changed* one names the lane, reader and stage brief but not the profile. The mark's own title and the confirm carry the lines, so nothing is hidden; the hover words are short of what the press does.
+
+**Fix:** both titles name the profile relaunch (*a member whose profile differs is relaunched with the definition's, taken at its next restart*); a page test reads them; the UI check on a scratch home (TD-291).
+
+**Done when** both Apply titles say what Apply does to a profile difference and the test holds them.
+
+**Related:** TD-619, TD-620, TD-399.
+
+---
+
+## TD-652: The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (grinder-ao-2; the techlead's note on #1668, TD-618 slice 4)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — needs #1668 merged (it adds `pr_holders`).
+**Blocked by:** TD-618
+**Location:** `src/shiftlead/teamrun.py` (`pr_holders`, added by #1668), `src/sessionorc/workorders.py` (`holds_pr`, the `pr_orders` reading), the Repo page's *held by <name>* tag (`src/shiftlead/ui/repo.py`), design §4.4 *Each reading has one owner* (TD-614), *A red PR nobody holds is a work order*
+
+**Why:** the home's `pr_orders` reading lists only the red PRs nobody holds, so the Repo page, to tag one *held by <name>*, runs `teamrun.pr_holders` — the same test as `workorders.holds_pr`, written again over the records the page holds. Two copies of one rule drift; §4.4 *Each reading has one owner* puts a derivation on the reading, once.
+
+**Fix:** the home's reading carries, per red PR past `ORPHAN_AFTER`, its holders (`holds_pr` over the records, as the orders are derived); the page reads them and `pr_holders` goes; a test that the page and the reading name the same holder.
+
+**Done when** `git grep pr_holders src/` is empty, the Repo page's *held by* tag reads the reading, and the suite passes.
+
+**Related:** TD-613, TD-614, TD-618.
 
 ---
