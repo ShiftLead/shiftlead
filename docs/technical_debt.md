@@ -58,7 +58,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, `ssh -L` always, Cloudflare designed and built when asked; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
 | TD-648 | Build TD-646 (2): `ao connect` (tailscale, off), `reach:` in `settings.yml`, `ao doctor`'s route line, the README guide | Medium | Built (#1720); live check |
-| TD-651 | The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too | Low | Open |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
 | TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Designed — TD-661, TD-662, TD-663 build it |
@@ -1025,26 +1024,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** `ao connect tailscale` on a home logged in to Tailscale leaves a phone on the same tailnet opening the UI at the printed URL.
 
 **Related:** TD-646 (the design), TD-647 (the route port), TD-656 (the Cloudflare route), TD-003 (the phone layout).
-
----
-
-## TD-651: The team card's **definition changed** Apply tooltip names seats alone: a profile relaunch (TD-619) is applied there too
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (grinder-ao-2, building TD-620 slice 2)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/group_head.html` (the `definition_changed` Apply button's `title`; the *flow changed* one's says *lane, reader or stage brief*), design §4.5a *flow changed — Apply*
-
-**Why:** since #1673 (TD-620) a member whose role's profile changed reads **definition changed — Apply** where nothing else differs, and Apply relaunches it; the button's title still says only *each seat it names that the run lacks is started*, and the *flow changed* one names the lane, reader and stage brief but not the profile. The mark's own title and the confirm carry the lines, so nothing is hidden; the hover words are short of what the press does.
-
-**Fix:** both titles name the profile relaunch (*a member whose profile differs is relaunched with the definition's, taken at its next restart*); a page test reads them; the UI check on a scratch home (TD-291).
-
-**Done when** both Apply titles say what Apply does to a profile difference and the test holds them.
-
-**Related:** TD-619, TD-620, TD-399.
 
 ---
 

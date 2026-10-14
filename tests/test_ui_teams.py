@@ -1016,6 +1016,7 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
     assert "grind-1: relaunched — lane none → free-pick; reader none → techlead&#10;" in head
     assert '<span class="meta flowchanged" title="orc-ao: starts under build-review&#10;' in head
     assert 'data-flow-apply="ao-grind"' in head and 'data-confirm="Apply build-review to ao-grind? orc-ao:' in head
+    assert "the members whose lane, reader, stage brief or profile differ are relaunched" in head  # TD-651
     got = client.post("/api/teams/ao-grind/flow/apply").json()
     assert got["ok"] and {d["name"]: d["act"] for d in got["applied"]}["grind-1"] == "relaunch"
     (sent,) = [p for m, p in fleet.calls if m == "relaunch"]
@@ -1063,6 +1064,8 @@ def test_a_live_member_whose_roles_profile_changed_reads_definition_changed_on_t
     assert ">definition changed</span>" in head
     assert "grind-1: profile default → paul (next restart)" in head
     assert "Apply the definition to ao-grind? orc-ao: starts; grind-1: profile default → paul (next restart)." in head
+    # Apply's own title names the relaunch a profile difference takes (TD-651)
+    assert "a member whose profile differs is relaunched with the definition's, taken at its next restart" in head
     fleet.sessions = [{**grind, "profile": "paul"}]
     assert "profile default" not in _head(client.get("/").text)
 
