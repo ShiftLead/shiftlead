@@ -12133,3 +12133,27 @@ The window's `w.name` assignment, by contrast, is caught.
 **Done when** a working session's Ready to close card shows a ✗ row saying the agent is working, and no surface (the card's *more ▾*, the Focus header, the side panel) offers Close on it as ready. The team header's *n ready to close* already counts only `idle` sessions and is unchanged.
 
 **Related:** TD-156 (the Focus screen's Close session), TD-080 (the one pushed measure), TD-666 (a record with no agent).
+
+## TD-683: `ao team --skill` leaves out what a repo's own session needs before its first team
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (the session `ao-dc-decouple`, lessons from the ledgerboard split; Paul agreed the lesson the same day)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/team_skill.md`; its tests (`tests/test_briefs_layout.py` bars repo literals in it)
+
+**Why:** Paul is about to have the pneuma-ops, ledgerboard and guardians-devenv sessions each stand up its repo's first team. The recipe takes them from definition to `ao team start`, and `ao doctor` already reads all three repos as ready. Four things are missing or wrong for a session doing this for the first time:
+(1) No step checks the repo first. `ao doctor`'s **repos** line and `ao repo init` (TD-591) are the readiness check, and the recipe names neither.
+(2) An empty ledger refuses the start. ledgerboard has 0 open entries, so a `free-pick` team there is refused (*every member's lane holds nothing to pick*), and the recipe does not say what a repo with little work should run: an on-call manager alone, or one member and `--anyway`.
+(3) A public repo's `.shiftlead.yml` publishes its team definition, including profile and session names. The recipe's **Which file:** lead-in should say to keep a public repo's team in `org.yml`.
+(4) The closing section is headed *For a Claude session told to do this*, though a session may be another tool's.
+
+**Resolved:** 2026-10-14 (PR #1760) — `team_skill.md` gains step 0b *Is the repo ready?* (`ao doctor repos`, `ao repo init`), *A repo with little or no work* after `lane:` (an on-call manager alone or one member, either started with `--anyway`, since the anchor seat's lane is read too), *A public repo's team goes in `org.yml`* in *Which file*, and the close headed *For an agent session told to do this*; `test_the_recipe_covers_a_repos_first_team` pins the four.
+
+**Fix:** a step 0b, *Is the repo ready?*, with `ao doctor` and `ao repo init`; a sentence on a small repo's team after `lane:`; the public-repo sentence in *Which file*; the heading made tool-neutral.
+
+**Done when** `ao team --skill` prints step 0b, the small-repo sentence, the public-repo sentence and the tool-neutral heading.
+
+**Related:** TD-591, TD-588.

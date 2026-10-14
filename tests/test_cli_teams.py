@@ -1377,6 +1377,23 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
     assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters
 
 
+def test_the_recipe_covers_a_repos_first_team():
+    """TD-683: a repo's own session standing up its first team is told to check the repo first
+    (`ao doctor repos`, `ao repo init`), what a repo with an empty ledger runs, that a public repo's
+    team goes in `org.yml`, and the closing rules are for any tool's agent, not Claude's alone."""
+    from shiftlead.cli import team_skill_text
+    from shiftlead.repoconfig import PRESETS
+
+    text = team_skill_text()
+    step = text[text.index("## 0b. Is the repo ready?") : text.index("## 1. Decide where the team runs")]
+    assert "ao doctor repos" in step and "ao repo init" in step
+    assert "**A repo with little or no work**" in text and "--anyway" in text
+    # the implied anchor seat has a lane, so a manager alone on an empty ledger needs --anyway too
+    assert PRESETS["anchor"]["lane"] and "the team's anchor seat has a lane too" in text
+    assert "**A public repo's team goes in `org.yml`**" in text
+    assert "## For an agent session told to do this" in text and "Claude session" not in text
+
+
 def test_the_recipe_and_every_template_agree_on_the_supplement_slot():
     """TD-114 / TD-113 (c): the recipe tells a repo its brief is filled under *This repo's rules*;
     every built-in template must carry that section and its `{repo}` slot, or the recipe lies."""
