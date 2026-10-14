@@ -16,13 +16,13 @@ from typing import Any
 
 from sessionorc import (
     adapters,
+    agent_common,
     link,
     mail,
     permits,
 )
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
-    REPORT_WRITE,
     RpcError,
 )
 from sessionorc.models import (
@@ -138,7 +138,12 @@ class HookMixin:
         if self.mode == "node":
             try:
                 await self._home_mux.request(
-                    "answered_by_rule", timeout=REPORT_WRITE, id=s.id, prompt=prompt, behavior=behavior, rule=hit
+                    "answered_by_rule",
+                    timeout=agent_common.REPORT_WRITE,
+                    id=s.id,
+                    prompt=prompt,
+                    behavior=behavior,
+                    rule=hit,
                 )
             except (link.LinkError, link.LinkClosed, TimeoutError, OSError) as e:
                 log.warning("%s: rule %s matched, but the home filed no FYI (%s): the person answers", s.id, hit, e)
