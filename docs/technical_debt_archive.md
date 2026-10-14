@@ -11439,3 +11439,23 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-638 (the design), TD-645 (the hook), TD-031 (the model in use), TD-185 (`AGENT_NAME`).
 
 **Resolved:** 2026-10-14 (grinder-ao-1, PR #1705) — the launch spec carries the profile's alias (`LaunchSpec.model`, set by the Claude Code adapter); the host sets `AGENT_MODEL` (`<adapter>/<alias>`) and `AGENT_MODEL_FILE` (`<absolute git-dir>/shiftlead-agent-model`, the record's `model_file`) on an agent's session, neither on a record with no agent, and removes an earlier run's file at the create; `agent_common.write_model_file` writes `<adapter>/<model>` where the hook sets or changes `model` and where the tick's transcript read does, a failed write logged. Tests: `test_the_model_rides_the_env_and_its_file_follows_the_model_in_use`, `test_launch_argv_and_env`.
+
+## TD-659: `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-13 (ao-paul, PR #1672's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_ui_orphaned.py` (~L173: `_git(repo, "pull", "-q", "--ff-only", "origin", "main")` after the reply route writes the board)
+
+**Why:** PR #1672 (a ledger-only change) failed `test (3.12)` on this one test — `CalledProcessError: … 'pull', '-q', '--ff-only', 'origin', 'main'] returned non-zero exit status 128` — and passed on a re-run of the same commit; 2529 others passed. Exit 128 is git's fatal class (a lock held, a ref that moved, a remote not ready); the test's `_git` raises without the command's stderr, so the log cannot say which. A likely cause, not verified: the home's own pull of the same checkout (§6 *Pull*) racing the test's.
+
+**Fix:** (1) make `_git` include the command's stderr in its error, so the next flake names its cause; (2) if it is the home's pull, wait for the board write's pull to settle (or read the board from `origin/main`) instead of pulling beside it.
+
+**Done when** the test's failure names git's stderr, and the race (if that is the cause) is closed.
+
+**Related:** TD-463 (CI flakes).
+
+**Resolved:** 2026-10-14 (grinder-ao-1, PR #1706) — `_git` asserts with git's stderr in its message, so a failure names its cause; the test reads the board from origin's `main` (`git show`), where the write-back lands, instead of pulling the checkout beside the home's own pull of it (§6 *Pull*). Neither cause was reproduced: the race is closed whichever it was.

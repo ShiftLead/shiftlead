@@ -64,7 +64,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-652 | The pages re-derive who holds a red PR (`teamrun.pr_holders`, a copy of `workorders.holds_pr`): the home's reading should carry the holders | Low | Open |
 | TD-656 | Build TD-646 (3): the Cloudflare route — the Access token check on the route port, `ao connect cloudflare`, its doctor line and guide | Low | Open — built when asked |
 | TD-657 | The director seat knows the person only through its brief: it should also answer what techleads pass up, from the person's written preferences in layers, at a level the person sets | Medium | Designed — TD-661, TD-662, TD-663 build it |
-| TD-659 | `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why | Low | Open |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
@@ -1192,26 +1191,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** the design says what the director answers beyond permission prompts, from which preferences, at which level, and how the preferences grow and are groomed, and the build entries are filed with `Blocked by` lines.
 
 **Related:** TD-636 (the seat), TD-641 / TD-642 (its builds; TD-642's brief and trigger are where this lands), `docs/decisions/2026-10-13-agent-product-lessons.md` (lessons 1 and 7).
-
----
-
-## TD-659: `test_the_inbox_row_and_the_reply_route_for_an_orphaned_question` flaked in CI: its `git pull --ff-only` exited 128, and the test keeps no stderr to say why
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-13 (ao-paul, PR #1672's CI)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_ui_orphaned.py` (~L173: `_git(repo, "pull", "-q", "--ff-only", "origin", "main")` after the reply route writes the board)
-
-**Why:** PR #1672 (a ledger-only change) failed `test (3.12)` on this one test — `CalledProcessError: … 'pull', '-q', '--ff-only', 'origin', 'main'] returned non-zero exit status 128` — and passed on a re-run of the same commit; 2529 others passed. Exit 128 is git's fatal class (a lock held, a ref that moved, a remote not ready); the test's `_git` raises without the command's stderr, so the log cannot say which. A likely cause, not verified: the home's own pull of the same checkout (§6 *Pull*) racing the test's.
-
-**Fix:** (1) make `_git` include the command's stderr in its error, so the next flake names its cause; (2) if it is the home's pull, wait for the board write's pull to settle (or read the board from `origin/main`) instead of pulling beside it.
-
-**Done when** the test's failure names git's stderr, and the race (if that is the cause) is closed.
-
-**Related:** TD-463 (CI flakes).
 
 ---
 
