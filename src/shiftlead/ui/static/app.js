@@ -3707,6 +3707,28 @@
       return `<div>${mark}${name}</div>`;
     }).join("");
   };
+  // The Git card's **changed files** (§4.5a *Focus side panel, Git card: changed files*, TD-627, built
+  // by TD-628): `git.files`' lines in their order, the status code as text and the path a link by the
+  // recent files' form — the porcelain path joined to the worktree's top level (`root`, which the page
+  // was served; the directory where it was not), no line. A deletion (a code ending in `D`) and a new
+  // directory (`dir/`) stay text, with why on hover; no file form, every line text. "clean" for none.
+  AO.gitFiles = function (v, editor, root) {
+    const lines = (v.git && v.git.files) || [];
+    if (!lines.length) return '<div class="muted">clean</div>';
+    const file = editor && editor.file;
+    const folder = editor && editor.url && editor.first !== false
+      ? ` data-folder="${esc(editor.url)}"${typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : ""}` : "";
+    const top = String(root || v.dir || "").replace(/\/+$/, "");
+    return lines.map((f) => {
+      const line = String(f), at = line.indexOf(" ");
+      const code = at < 0 ? "" : line.slice(0, at), p = at < 0 ? line : line.slice(at + 1);
+      const why = code.endsWith("D") ? "deleted in the worktree"
+        : p.endsWith("/") ? "a new directory: open it from the worktree's window" : "";
+      if (!file || !top || why) return `<div>${esc(code)} <span${why && file ? ` title="${esc(why)}"` : ""}>${esc(p)}</span></div>`;
+      const full = `${top}/${p}`;
+      return `<div>${esc(code)} <a class="editor" href="${esc(AO.fileUrl(file, full))}"${folder} data-label="${esc(editor.label || "the editor")}" title="${esc(full)}">${esc(p)}</a></div>`;
+    }).join("");
+  };
   // …painted into the Session card's row and its term from the view and each delta: shown with
   // the work's first change, hidden while it has none
   AO.paintRecent = function (v, editor, row, dt) {
@@ -4311,7 +4333,9 @@
         // is *unmerged* and a different question — the template renders the same three parts
         const unpushed = v.git.unpushed ? ` · ${v.git.unpushed} unpushed${v.git.pushed_against ? ` vs ${v.git.pushed_against}` : ""}` : "";
         $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
-        $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
+        // §4.5a *Git card: changed files* (TD-628): each path a link by the recent files' form, joined
+        // to the worktree's top level the page was served (`s.git_root`), the same on load and each delta
+        $("#gitfiles").innerHTML = AO.gitFiles(v, s.editor, s.git_root);
       }
       // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
