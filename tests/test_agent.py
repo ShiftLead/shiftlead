@@ -1031,6 +1031,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                     "branch": None,  # TD-045: only a derived claim records the branch it came from
                     "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
                     "slices": [],  # TD-325: the merged PRs of an entry still held
+                    "ci": None,  # TD-637: set on a `done` with a PR, pending or unknown
                 }
             ]
             s = await worker.call("progress", id=sid, ref="TD-027", status="done", pr="#60")
@@ -1066,6 +1067,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                 "branch": None,
                 "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
                 "slices": [],
+                "ci": None,
             }
         # a foreign session may write a record's channels: reports are not an acting RPC (§4.8)
         async with LocalClient(caller="ao-stranger") as stranger:

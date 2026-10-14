@@ -273,6 +273,7 @@ USAGE_ONLY_EVERY = 3600.0
 # checkout's PRs through `gh` and its ledger's git history, in a thread. The ledger itself is
 # re-read on any tick its file's mtime moved, since that read is a local file.
 REPOS_EVERY = 300.0
+GH_TIMEOUT = 30.0  # one `gh` read the home makes at a request, e.g. a `done`'s checks (TD-637)
 # Seconds between reads of each registered checkout's attention board (design §4.4 *Each reading has
 # one owner*, *The boards*, TD-615): a plain read, and only of a board whose file or day moved since
 # the last; origin's side is read on the `REPOS_EVERY` pass, and at once after a write-back.

@@ -2269,8 +2269,10 @@ def cmd_progress(args: argparse.Namespace) -> int:
     )
     if (held := s.get("lease_overridden")) and not args.json:
         print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
-    # a slice (TD-325): the reply says the entry stays claimed, which the report line cannot
-    return emit(args, s, lambda: print(f"{s['id']}: {s.get('slice') or report_line(s) or args.ref}"))
+    # a slice (TD-325): the reply says the entry stays claimed, which the report line cannot; a `done`
+    # with a PR is told what its checks read (§4.8, TD-637): pending, unknown, closed, not required
+    said = f"\n  {s['checks_said']}" if s.get("checks_said") else ""
+    return emit(args, s, lambda: print(f"{s['id']}: {s.get('slice') or report_line(s) or args.ref}{said}"))
 
 
 def cmd_doing(args: argparse.Namespace) -> int:

@@ -550,6 +550,7 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
         "branch": None,  # a declaration never carries one (TD-045)
         "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
         "slices": [],  # TD-325: a merged PR on the claim, declared with --slice or derived
+        "ci": "unknown",  # TD-637: a record with no checkout reads no checks
         "at": call_sync("get", id=sid)["progress"][0]["at"],
     }
     assert cli.main(["finding", "TD-029", "--priority", "low"]) == 0

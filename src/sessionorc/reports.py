@@ -18,6 +18,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 from sessionorc import ledger
 from sessionorc import ledgerboard as lb
@@ -268,7 +269,7 @@ def _when(v: Any) -> datetime | None:
 
 
 PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft"
-OPEN_PR_FIELDS = f"{PR_FIELDS},statusCheckRollup,mergeStateStatus"  # the open read alone (TD-613)
+OPEN_PR_FIELDS = f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName"  # the open read alone (TD-613)
 
 RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})
 RED_STATES = frozenset({"FAILURE", "ERROR"})  # a commit status's (`StatusContext`) words for red
@@ -303,6 +304,114 @@ def fold_checks(rollup: Any) -> tuple[str, list[str]]:
     return ("red" if failing else "pending" if pending else "green"), failing
 
 
+def _gh_api(directory: Path | str, path: str, timeout: float) -> tuple[Any, str | None]:
+    """One `gh api <path>` read as its JSON, or `(None, why)`; `why` begins *HTTP 404* for a 404."""
+    try:
+        cp = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=timeout, cwd=str(directory))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return None, f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        last = ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
+        return None, ("HTTP 404: " + last) if "HTTP 404" in last else last
+    try:
+        return json.loads(cp.stdout or "null"), None
+    except json.JSONDecodeError:
+        return None, "gh api printed something that is not JSON"
+
+
+def required_checks(directory: Path | str, base: str, timeout: float = 30.0) -> list[str] | str:
+    """The check names base branch `base` requires (design §4.8 *A `done` with a PR is told what its
+    checks read*, TD-637): the union of its protection's required contexts and its rulesets'
+    `required_status_checks`, sorted — or why it could not be read. A protection that answers *not
+    protected* (or *not enabled*) requires none; an empty list is a base that requires nothing."""
+    branch = quote(base, safe="")
+    names: set[str] = set()
+    path = f"repos/{{owner}}/{{repo}}/branches/{branch}/protection/required_status_checks"
+    got, why = _gh_api(directory, path, timeout)
+    if why is not None:
+        if not (why.startswith("HTTP 404") and ("not protected" in why or "not enabled" in why)):
+            return why
+    elif isinstance(got, dict):
+        names.update(str(c) for c in got.get("contexts") or [] if c)
+        names.update(str(c["context"]) for c in got.get("checks") or [] if isinstance(c, dict) and c.get("context"))
+    rules, why = _gh_api(directory, f"repos/{{owner}}/{{repo}}/rules/branches/{branch}", timeout)
+    if why is not None:
+        return why
+    for r in rules if isinstance(rules, list) else []:
+        if isinstance(r, dict) and r.get("type") == "required_status_checks":
+            for c in (r.get("parameters") or {}).get("required_status_checks") or []:
+                if isinstance(c, dict) and c.get("context"):
+                    names.add(str(c["context"]))
+    return sorted(names)
+
+
+def _required_reading(
+    directory: Path | str, bases: set[str], old: dict[str, Any] | None, timeout: float
+) -> tuple[dict[str, list[str]], dict[str, str]]:
+    """`required` and `required_error` for the bases the open PRs name (TD-637): a read that failed
+    keeps the last names with its error; a base never read is absent from `required`."""
+    last = (old or {}).get("required") or {}
+    required: dict[str, list[str]] = {}
+    errors: dict[str, str] = {}
+    for base in sorted(bases):
+        got = required_checks(directory, base, timeout)
+        if isinstance(got, str):
+            errors[base] = got
+            if isinstance(last.get(base), list):
+                required[base] = last[base]
+        else:
+            required[base] = got
+    return required, errors
+
+
+def at_done(view: dict[str, Any], required: list[str] | None) -> dict[str, Any]:
+    """What a `done` naming a PR is told (design §4.8 *A `done` with a PR is told what its checks
+    read*, TD-637), from `gh pr view`'s `state,mergedAt,headRefOid,baseRefName,statusCheckRollup`
+    and its base's required names (None: never read). `{word, sha, failed, other}`: *merged*,
+    *closed* (unmerged), *refused* (a required check red by `fold_checks`'s rule, named in `failed`),
+    *pending* (a required one not completed), else *green* — no checks at all included; `other` the
+    red checks no rule requires. With nothing required, or the set never read, every check counts."""
+    out: dict[str, Any] = {"sha": str(view.get("headRefOid") or ""), "failed": [], "other": []}
+    state = str(view.get("state") or "").upper()
+    if state == "MERGED" or view.get("mergedAt"):
+        return {**out, "word": "merged"}
+    if state == "CLOSED":
+        return {**out, "word": "closed"}
+    wanted = set(required or [])
+    pending = False
+    for c in view.get("statusCheckRollup") or []:
+        if not isinstance(c, dict):
+            continue
+        word, failing = fold_checks([c])
+        if wanted and str(c.get("name") or c.get("context") or "") not in wanted:
+            out["other"].extend(failing)
+        elif word == "red":
+            out["failed"].extend(failing)
+        elif word == "pending":
+            pending = True
+    if out["failed"]:
+        return {**out, "word": "refused"}
+    return {**out, "word": "pending" if pending else "green"}
+
+
+def pr_view(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, Any] | str:
+    """`gh pr view <pr>` with the fields `at_done` reads, or why it could not be read (TD-637)."""
+    try:
+        cp = subprocess.run(
+            ["gh", "pr", "view", str(pr), "--json", "state,mergedAt,headRefOid,baseRefName,statusCheckRollup"],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh pr view failed"])[-1][:200]
+    try:
+        out = json.loads(cp.stdout or "{}")
+    except json.JSONDecodeError:
+        return "gh pr view printed something that is not JSON"
+    return out if isinstance(out, dict) else "gh pr view printed something that is not an object"
+
+
 def _gh_prs(
     directory: Path | str, args: list[str], timeout: float, fields: str = PR_FIELDS
 ) -> list[dict[str, Any]] | str:
@@ -335,6 +444,7 @@ def _gh_prs(
             "state": str(p.get("state") or "").lower(),  # open · closed · merged
             "branch": str(p.get("headRefName") or ""),
             "head": str(p.get("headRefOid") or ""),  # rule 10 reads an open PR's head here (TD-332)
+            "base": str(p.get("baseRefName") or ""),  # whose required checks a `done` reads (TD-637)
             "author": str(author.get("login") or "") if isinstance(author, dict) else "",
             "draft": bool(p.get("isDraft")),
             "created": p.get("createdAt") or None,
@@ -428,6 +538,10 @@ def pr_reading(
     recent.sort(key=lambda p: max(filter(None, (_when(p["created"]), _when(p["closed"])))), reverse=True)
     open_.sort(key=lambda p: p["created"] or "")
     out = {"open": open_, "windows": windows, "recent": recent, "at": now.isoformat()}
+    # each open PR's base branch's required check names (TD-637), read where the PRs are
+    out["required"], errors = _required_reading(directory, {p["base"] for p in open_ if p["base"]}, old, timeout)
+    if errors:
+        out["required_error"] = errors
     return {**out, "recent_cut": True} if len(prs) >= limit else out
 
 

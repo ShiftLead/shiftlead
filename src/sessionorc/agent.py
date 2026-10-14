@@ -41,6 +41,7 @@ from sessionorc import (
     mail,
     naming,
     paths,
+    reports,
     work,
 )
 from sessionorc import balance as balance_mod
@@ -79,6 +80,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     FIRST_PROMPT_NO_HOOK,  # noqa: F401
     FIRST_PROMPT_TRIES,  # noqa: F401
     FLOW_CLAUSE,  # noqa: F401
+    GH_TIMEOUT,
     GIT_EVERY,  # noqa: F401
     HOME_EDITS,  # noqa: F401
     ID_RECHECK,  # noqa: F401
@@ -2513,8 +2515,13 @@ class HostAgent(
         slice is work done*, TD-325): the PR is held in the declared claim's `slices` and the claim
         stays `claimed`, its status, `pr` and `why` as they were."""
         s = self._find(id)  # a node's session reports here (step 5): the field is the home's
+        said = None
+        if status == "done" and _pr(pr) is not None and _source(source) == "declared":
+            # TD-637: the PR's checks read at the declaration, before anything is written
+            said = await self._checks_at_done(s, _ref(ref), int(_pr(pr) or 0), slice)
         if slice:
-            return await self._slice(s, ref, status, pr, source)
+            out = await self._slice(s, ref, status, pr, source)
+            return {**out, "checks_said": said["line"]} if said and said["line"] else out
         if status in ("none", "restart"):
             if ref or pr is not None:
                 raise RpcError(
@@ -2527,6 +2534,8 @@ class HostAgent(
                 f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none, restart"
             )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
+        if said and said["word"] in ("pending", "unknown"):
+            entry.ci = said["word"]
         new_claim = status == "claimed" and entry.source == "declared"
         if new_claim and (words := self._balance_refusal(s, entry.ref, caller)):
             raise RpcError(words, balance=self._balance_of(s))
@@ -2557,7 +2566,50 @@ class HostAgent(
         out = await self._report(s, applied, entry)
         if holder is not None and applied:
             out["lease_overridden"] = holder
+        if said and said["line"]:
+            out["checks_said"] = said["line"]
         return out
+
+    async def _checks_at_done(self, s: Session, ref: str, pr: int, slice: bool) -> dict[str, Any]:
+        """What a declared `done` naming PR `pr` is told of its checks (design §4.8 *A `done` with a
+        PR is told what its checks read*, TD-637): `{word, line}`, the PR read once with `gh` from the
+        record's checkout, off the loop, against its base's required names in the repo reading. A
+        required check red on the head, or a `--slice` on a PR not merged, raises — nothing is
+        written; a read the home could not make is *unknown*, never a refusal."""
+        root = str(s.repo or "")
+        if not root or not Path(root).is_dir():
+            view: dict[str, Any] | str = "the record names no checkout here"
+        else:
+            view = await asyncio.to_thread(reports.pr_view, root, pr, GH_TIMEOUT)
+        if isinstance(view, str):
+            return {"word": "unknown", "line": f"PR #{pr}: checks unknown: {view}"}
+        base = str(view.get("baseRefName") or "")
+        required = ((self._repos.get(root) or {}).get("prs") or {}).get("required") or {}
+        names = required.get(base) if isinstance(required.get(base), list) else None
+        got = reports.at_done(view, names)
+        word, sha7 = got["word"], got["sha"][:7]
+        if slice and word != "merged":
+            raise RpcError(f"a slice is a merged PR — #{pr} is {'closed unmerged' if word == 'closed' else 'open'}")
+        if word == "refused":
+            unknown = " — required set unknown, every check read" if names is None else ""
+            raise RpcError(
+                f"PR #{pr}'s required checks failed on {sha7}: {', '.join(got['failed'])}{unknown} — fix them "
+                f"and report done again (ao progress done {ref} --pr {pr})",
+                failed=got["failed"],
+                sha=got["sha"],
+            )
+        parts = {
+            "merged": "merged",
+            "closed": "closed unmerged",
+            "pending": f"checks pending on {sha7} — the cadence check reads it again",
+            "green": f"checks green on {sha7}" if view.get("statusCheckRollup") else "no checks",
+        }
+        line = f"PR #{pr}: {parts[word]}" if word != "merged" else ""
+        if got["other"]:
+            line += f"; not required, failed: {', '.join(got['other'])}"
+        if names is None and word in ("pending", "green"):
+            line += "; required set unknown — every check read"
+        return {"word": word, "line": line}
 
     async def _slice(self, s: Session, ref: str, status: str, pr: int | None, source: str) -> dict[str, Any]:
         """A slice declared (TD-325): refused but for `done` with a PR, declared, on a reference the
