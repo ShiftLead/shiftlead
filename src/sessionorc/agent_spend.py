@@ -128,10 +128,15 @@ class SpendMixin:
             await self._push_spend_usage(now)
 
     async def _save_spend(self) -> None:
-        text = json.dumps(self._spend, sort_keys=True)
-        if text != self._spend_saved:
-            await asyncio.to_thread(self.spend_store.save, self._spend)
-            self._spend_saved = text
+        """`spend.json` written when the ledger changed. The tick's pass and a node's `spend` call
+        both save (TD-643): one lock makes them one writer, so the compare, the write and
+        `_spend_saved` move together and the file ends as the last ledger; the thread writes a
+        snapshot, never the dict the loop goes on changing."""
+        async with self._spend_lock:
+            text = json.dumps(self._spend, sort_keys=True)
+            if text != self._spend_saved:
+                await asyncio.to_thread(self.spend_store.save, json.loads(text))
+                self._spend_saved = text
 
     async def _spend_at_home(self, groups: dict[str, dict[str, Any]], now: datetime) -> None:
         """The home reads its own transcripts into the ledger, one profile after another."""

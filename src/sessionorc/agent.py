@@ -629,6 +629,7 @@ class HostAgent(
         self.spend_store = spend_mod.SpendStore()
         self._spend: dict[str, dict[str, Any]] = self.spend_store.load()
         self._spend_saved = json.dumps(self._spend, sort_keys=True)
+        self._spend_lock = asyncio.Lock()  # one writer of `spend.json` (TD-643)
         self._spend_pruned = ""
         self._spend_reason: dict[str, str] = {}
         self._metered: set[str] = set()

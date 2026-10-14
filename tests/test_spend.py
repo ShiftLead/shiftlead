@@ -473,3 +473,18 @@ async def test_a_metered_profile_only_a_node_defines_takes_an_amount_at_the_home
     async with LocalClient() as person:
         with pytest.raises(AgentError, match="billed by subscription"):
             await person.call("set_settings", profile="lap", reserves={"day": "$6"})
+
+
+async def test_two_spend_saves_at_once_both_complete_and_the_file_holds_the_last(agent):
+    """TD-643: the tick's pass and a node's `spend` call save at once; both complete, one after the
+    other, and `spend.json` ends as the last ledger."""
+    import asyncio
+
+    await park_ticks(agent)
+    agent._spend = {"api": {"rows": [1]}}
+    first = asyncio.create_task(agent._save_spend())
+    await asyncio.sleep(0)
+    agent._spend = {"api": {"rows": [1, 2]}}
+    await asyncio.gather(first, agent._save_spend())
+    assert agent.spend_store.load() == {"api": {"rows": [1, 2]}}
+    assert agent._spend_saved == json.dumps({"api": {"rows": [1, 2]}}, sort_keys=True)
