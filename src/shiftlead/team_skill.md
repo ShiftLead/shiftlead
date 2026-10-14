@@ -5,7 +5,7 @@ description: How to stand up an shiftlead team — the project, the definition, 
 
 # Stand up a team
 
-One recipe, for a person at a terminal and for a Claude session told *stand up a grind team for
+One recipe, for a person at a terminal and for an agent session told *stand up a grind team for
 repo X*. It is the same text either way: `ao team --skill` prints this file, so a session serves
 itself from the tool rather than from a memory of the design.
 
@@ -36,6 +36,18 @@ and the line says which of two things happened: *the host agent restarted under 
 it again* (it is up; run it again and nothing else), or *host agent not reachable*, which is the
 one a person answers with `shiftlead-agent serve`, or `ao service install` for the units. A session
 that gets exit 3 stops there and says so: **it never starts one** (`ao --skill`).
+
+## 0b. Is the repo ready?
+
+```
+ao doctor repos
+```
+
+One line per registered repo: its ledger and how many entries it holds, its board, its gate and its
+worktree setup — `ok`, or a `warning` naming what is missing. A repo with no ledger yet gets one with
+`ao repo init` in its checkout (or `ao repo init --repo <name>`): an empty ledger and its archive,
+written on the branch you are on and committed by nobody — commit them as any other change. A repo
+the doctor does not list is not registered on this host; that is the person's to fix, not yours.
 
 ## 1. Decide where the team runs
 
@@ -121,13 +133,18 @@ teams:
   brief reads as `TD-041, TD-054` (`{lane}`) and works **in that order, stopping at its end**
   rather than free-picking past it. A member with a named lane is out of work when every item
   on it is `done` or `dropped`.
+- **A repo with little or no work** (`ao doctor repos` reads its ledger's count): a start whose every
+  member's lane holds nothing to pick is refused (step 5), so a `free-pick` team on an empty ledger
+  does not start. Run an on-call manager alone — leave `members:` out; the manager has no lane, so
+  there is nothing to refuse — or one member, started with `ao team start <name> --anyway`.
 
 A team whose only project is one repo can live in **that repo's** `.shiftlead.yml` under `teams:`
 instead, and travels with the checkout. The org file wins a name collision. **Which file:** the
 repo's, when the team works that one repo from its checkout on the machine you start it from —
 its `projects:` defaults to the repo, and the project is made from the checkout it was read in;
 `org.yml`, when the team spans repos or nests another, because only `org.yml` says where a
-checkout is on a host. A repo's team that should run on a node stays in the repo: `org.yml` places
+checkout is on a host. **A public repo's team goes in `org.yml`** whatever its shape: the repo's file
+is published with the repo, and with it the definition's profile and session names. A repo's team that should run on a node stays in the repo: `org.yml` places
 it with `place: {<team>: <host>}`, and its checkout there is that host's registry entry of the
 repo's name (a repo's file never names a host).
 
@@ -316,7 +333,7 @@ the same role, which edits `org.yml` and creates it fresh under the manager.
 
 ---
 
-## For a Claude session told to do this
+## For an agent session told to do this
 
 You are reading this because someone ran `ao team --skill`. The rules of `ao --skill` still apply —
 they are about behaving inside a session; these are about setting one up.
