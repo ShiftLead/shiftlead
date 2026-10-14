@@ -665,7 +665,13 @@ def telegram(doc: dict[str, Any]) -> dict[str, Any] | None:
     tg = notify(doc).get("telegram") or {}
     if tg.get("on") is not True or not tg.get("secrets"):
         return None
-    return {"secrets": tg["secrets"], "link": tg.get("link") or ""}
+    return {"secrets": tg["secrets"], "link": telegram_link(doc)}
+
+
+def telegram_link(doc: dict[str, Any]) -> str:
+    """The address a Telegram note links to (§4.5b *The setting*, TD-648): `notify.telegram.link`, or,
+    absent, `reach.url` — the link a phone opens — or nothing."""
+    return (notify(doc).get("telegram") or {}).get("link") or (reach(doc) or {}).get("url") or ""
 
 
 # -- reach: the person's route to the UI's route port (§5 `reach:`, §4.5b *The setting*, TD-647) ----------

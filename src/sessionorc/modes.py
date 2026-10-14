@@ -35,7 +35,8 @@ from sessionorc.mail import self_decide_refusal
 # **`ledger_decide`** (§4.5a *Inbox row: ledger entry*, TD-565): the entry is read from the home's repo
 # facts, which a node holds none of, and the line lands on the board of a checkout the home's registry names.
 # **`set_settings`** (§4.4a *Settings, replicated*, TD-147): `settings.yml` is the home's, and a node
-# holds the replica the home last sent, which the next frame overwrites.
+# holds the replica the home last sent, which the next frame overwrites. **`set_reach`** (§4.7 `ao connect`,
+# TD-648) writes the same file's `reach:` key, and the route is the home's.
 # **`clear_work`** (§6 rule 8, TD-227): Dismiss writes the members' `lane_seen` and the home's own
 # `host` record, where `work_waiting` lives; at a node both would be the replica's. **`work_start`**
 # (§6 rule 8, TD-466): Start on a running team's row replays its finished members from the home's
@@ -62,6 +63,7 @@ HOME_EDITS = frozenset(
         "promote",
         "clear_promote",
         "set_settings",
+        "set_reach",
         "entry_add",
         "board_reply_hand",
         "ledger_decide",

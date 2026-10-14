@@ -2750,7 +2750,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls")),
                 "you": term,
                 # **Telegram** (§4.5a **You**, §4.10; TD-319 slice 3): the last send is the home's alone
-                "telegram": setmod.telegram(got.get("notify"), None if node else (info or {}).get("notify")),
+                "telegram": setmod.telegram(
+                    got.get("notify"), None if node else (info or {}).get("notify"), reach=got.get("reach")
+                ),
                 "browser_keys": setmod.BROWSER_KEYS,
                 "host_card": setmod.host_card(
                     setmod.local_entry(hosts.hosts_file()), local, hosts.home_name(), hosts.nodes()

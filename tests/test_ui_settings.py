@@ -575,6 +575,18 @@ def test_the_telegram_card_reads_the_setting_and_the_last_send():
     assert not setmod.telegram(tg, {"last_ok": later, "last_error": {"at": at, "reason": "x"}}, NOW)["last_failed"]
 
 
+@pytest.mark.unit
+def test_the_telegram_links_placeholder_is_the_route_else_localhost():
+    """TD-648 (§4.5b *The setting*): an empty link sends `reach.url`, so the placeholder shows it; with no
+    route it is the plain port a browser on the home reaches — never `http://<host>:8765`, which a
+    loopback plain port refuses."""
+    assert setmod.telegram(None, None, NOW)["link_placeholder"] == ""
+    got = setmod.telegram(None, None, NOW, reach={"route": "tailscale", "url": "https://home.tail1.ts.net"})
+    assert got["link_placeholder"] == "https://home.tail1.ts.net"
+    page = pathlib.Path(setmod.__file__).parent / "templates" / "settings.html"
+    assert "placeholder=\"{{ telegram.link_placeholder or 'http://localhost:8765' }}\"" in page.read_text()
+
+
 def test_the_telegram_card_saves_through_set_settings_and_sends_a_test(client, subprocess_agent):
     """**Save** writes `notify.telegram` through `set_settings` — an empty field cleared, `on` with no
     secrets refused in the RPC's words — and **Send a test** is `notify_test`'s answer, refused while no

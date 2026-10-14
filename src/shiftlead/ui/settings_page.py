@@ -535,12 +535,18 @@ TELEGRAM_WHEN = "after a minute, once, and never while a page is visible · no t
 
 
 def telegram(
-    notify: Mapping[str, Any] | None, last: Mapping[str, Any] | None, now: datetime | None = None
+    notify: Mapping[str, Any] | None,
+    last: Mapping[str, Any] | None,
+    now: datetime | None = None,
+    *,
+    reach: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """**You**: **Telegram** (§4.5a, §4.10; TD-319 slice 3): `notify.telegram` as the `settings` read
     keeps it — the switch, the Doppler `project/config` (a name, never a value) and the link — and the
     last send from the home's `host` read (`notify: {last_ok, last_error}`), the later of the two:
-    *last sent 14:02* or *last send failed 14:02: <reason>*; nothing yet, or a node's read, draws none."""
+    *last sent 14:02* or *last send failed 14:02: <reason>*; nothing yet, or a node's read, draws none.
+    The link's placeholder is what an empty link sends (§4.5b *The setting*, TD-648): `reach.url` when a
+    route is set, else `http://localhost:8765`, the plain port a browser on the home reaches."""
     tg = (notify or {}).get("telegram") if isinstance(notify, Mapping) else None
     tg = tg if isinstance(tg, Mapping) else {}
     now = now or datetime.now(UTC)
@@ -557,6 +563,7 @@ def telegram(
         "on": tg.get("on") is True,
         "secrets": str(tg.get("secrets") or ""),
         "link": str(tg.get("link") or ""),
+        "link_placeholder": str((reach or {}).get("url") or "") if isinstance(reach, Mapping) else "",
         "last": said,
         "last_failed": failed,
         "told": TELEGRAM_TOLD,

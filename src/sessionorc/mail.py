@@ -137,6 +137,7 @@ PERSON_ONLY = frozenset(
         "entry_add",
         "settings",
         "set_settings",
+        "set_reach",
         "commit_defs",
         "promote",
         "clear_promote",

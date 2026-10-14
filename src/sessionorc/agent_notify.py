@@ -199,13 +199,14 @@ class NotifyMixin:
         agent_common.person_only(caller, "send a Telegram test", "§4.10", self._graph())
         if self.mode != "home":
             raise RpcError("notify_test runs at the home (design §4.10): this host is a node")
-        tg = settings_mod.notify(settings_mod.load()).get("telegram") or {}
+        doc = settings_mod.load()
+        tg = settings_mod.notify(doc).get("telegram") or {}
         if not tg.get("secrets"):
             raise RpcError(
                 "notify.telegram.secrets is not set: save the Doppler project/config that holds "
                 "TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID first (design §4.10)"
             )
-        link = f"{tg['link']}/inbox" if tg.get("link") else ""
+        link = f"{base}/inbox" if (base := settings_mod.telegram_link(doc)) else ""
         why = await self._notify_run(tg["secrets"], notify.message(notify.test_line(self.home or self.host), link))
         at = now_iso()
         if why is None:
