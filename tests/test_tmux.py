@@ -47,6 +47,25 @@ def test_env_pipe_pane_and_paste(tmux, tmp_path):
     assert info.current_command == "bash" and not info.dead
 
 
+def test_send_prompt_leaves_copy_mode_first(tmux, tmp_path):
+    """TD-667, design §4.3 *Prompt injection*: in copy mode the Enter is the mode's, so the blind send
+    leaves the mode before it pastes; a pane in no mode is left as it is."""
+    log = tmp_path / "cm.log"
+    tmux.new_session("ao-t-cm", str(tmp_path), ["bash", "--norc", "--noprofile"], {})
+    tmux.pipe_pane("ao-t-cm", log)
+
+    def in_mode() -> str:
+        return tmux.run("display-message", "-p", "-t", "=ao-t-cm:", "#{pane_in_mode}").stdout.strip()
+
+    tmux.send_prompt("ao-t-cm", "echo first-$((40+2))")  # no mode: copy-mode -q is no error
+    assert wait_for(lambda: log.exists() and "first-42" in log.read_text())
+    tmux.run("copy-mode", "-u", "-t", "=ao-t-cm:")
+    assert in_mode() == "1"
+    tmux.send_prompt("ao-t-cm", "echo second-$((40+3))")
+    assert wait_for(lambda: "second-43" in log.read_text())
+    assert in_mode() == "0"
+
+
 def test_concurrent_pastes_do_not_share_one_buffer(tmux, tmp_path):
     """TD-043: a fixed buffer name made two concurrent pastes fight over one server-wide buffer —
     the first `paste-buffer -d` deleted it and the others failed `no buffer ao-paste`."""

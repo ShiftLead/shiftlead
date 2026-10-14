@@ -361,7 +361,9 @@ class WakeMixin:
 
     async def _enter_again(self, sid: str, reader: Any) -> None:
         """Enter and C-m on a composer still holding an earlier try's brief, confirmed as `_type`
-        confirms its own (TD-027); `prompt-stuck` when it still holds it."""
+        confirms its own (TD-027); `prompt-stuck` when it still holds it. Copy mode is left first, as
+        `_type` leaves it: a pane scrolled back between tries would take the Enter as the mode's (TD-667)."""
+        await asyncio.to_thread(self.tmux.leave_copy_mode, sid)
         for key in ("Enter", "C-m"):
             await asyncio.to_thread(self.tmux.send_key, sid, key)
             if await self._poll(lambda: _empty(reader, self.tmux, sid), agent_common.SUBMIT_SECONDS):

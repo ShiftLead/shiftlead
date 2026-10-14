@@ -255,6 +255,12 @@ class Tmux:
     def send_literal(self, name: str, text: str) -> None:
         self.run("send-keys", "-t", f"={name}:", "-l", text)
 
+    def leave_copy_mode(self, name: str) -> None:
+        """`copy-mode -q`: a pane a person scrolled back is in copy mode, where a typed Enter is the
+        mode's and the prompt would stick (design §4.3 *Prompt injection*, §4.6, TD-667). Nothing
+        when the pane is in no mode, so its failure is no error."""
+        self.run("copy-mode", "-q", "-t", f"={name}:", check=False)
+
     def paste(self, name: str, text: str) -> None:
         """Bracketed paste via a named buffer: multi-line text lands as one prompt (design §4.3).
 
@@ -276,5 +282,6 @@ class Tmux:
     def send_prompt(self, name: str, text: str) -> None:
         """Paste + Enter, unconfirmed. The host agent's `send` confirms the submit when the adapter
         can read its composer (`HostAgent._submit`, TD-027); this is the blind form."""
+        self.leave_copy_mode(name)
         self.paste(name, text)
         self.send_enter(name)

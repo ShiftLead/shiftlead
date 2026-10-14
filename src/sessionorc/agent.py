@@ -2131,6 +2131,8 @@ class HostAgent(
         the brief's line (§4.1 *The brief is the person's word*, TD-347). A paste refused while that
         line is in the composer — typed now, or by an earlier try (`lead_in`) — raises `LeadTyped`."""
         reader = getattr(adapter, "composer", None)
+        # A pane scrolled back is in copy mode, where the Enter would be the mode's (§4.3, TD-667).
+        await asyncio.to_thread(self.tmux.leave_copy_mode, sid)
         if lead:
             await asyncio.to_thread(self.tmux.send_literal, sid, lead + " ")
         try:
