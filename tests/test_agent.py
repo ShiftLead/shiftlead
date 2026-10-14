@@ -722,6 +722,30 @@ async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypa
         assert any(t.rstrip().endswith(">> stuck prompt") for t in await agent.rpc_tail(s2, 5))
 
 
+async def test_send_into_a_pane_in_copy_mode_submits(agent, composerstubs, tmp_path):
+    """TD-667, design §4.3 *Prompt injection*: a pane a person scrolled back is in tmux's copy mode,
+    where the Enter is the mode's and the prompt would stick. Every send leaves copy mode first."""
+
+    def in_mode(sid: str) -> str:
+        return agent.tmux.run("display-message", "-p", "-t", f"={sid}:", "#{pane_in_mode}").stdout.strip()
+
+    async with LocalClient() as c:
+        (tmp_path / "cm").mkdir()
+        sid = (await c.call("create", name="cm", dir=str(tmp_path / "cm"), adapter="composer0"))["id"]
+        assert await agent._poll(lambda: _any_row(agent, sid, ">>"), 5), "the composer child never painted"
+        agent.tmux.run("copy-mode", "-u", "-t", f"={sid}:")
+        assert in_mode(sid) == "1"
+        await c.call("send", id=sid, text="from a scrolled pane")
+        assert [t for t in await agent.rpc_tail(sid, 20) if t.startswith("SUBMITTED ")] == [
+            "SUBMITTED from a scrolled pane"
+        ]
+        assert in_mode(sid) == "0"
+
+
+async def _any_row(agent, sid: str, prefix: str) -> bool:
+    return any(t.startswith(prefix) for t in await agent.rpc_tail(sid, 3))
+
+
 async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
     """Design §4.8, §9 invariant 11: a session acting on another session needs `control`;
     self, no caller, and every read pass; `set_grants` is a person's (or a granted session's)."""

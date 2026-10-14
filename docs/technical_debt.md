@@ -1419,7 +1419,7 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Added:** 2026-10-13 (the designer, TD-667's round)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 2 built (grinder-ao-1): `Tmux.leave_copy_mode` (`copy-mode -q`, `check=False`) at the top of `HostAgent._type` and of `Tmux.send_prompt`, so every host-agent send leaves copy mode before it types; tests: `send` into a pane in copy mode submits (`test_agent.py`), and the blind `send_prompt` (`test_tmux.py`). **Left: slice 1, the bridge** (`src/shiftlead/ui/**`, grinder-ao-2's half).
 **Location:** design §4.6 *Typing returns the pane to the live screen*, §4.5a *Focus pane: typing in a scrolled-back terminal*, §4.3 *Prompt injection*; `src/shiftlead/ui/pty_bridge.py` (`scroll_argv` ~L119: a leave argv beside it; `pump` ~L209 and its `up()` ~L233: the mark, the counted frame, the leave before the write), `src/shiftlead/ui/app.py` (`scroll` ~L3680: awaited to its end instead of reaped in the background, a `leave` beside it through the same `inside` prefix and socket), `src/sessionorc/tmux.py` (`paste` ~L257, `send_prompt` ~L276: `copy-mode -q` first), `src/sessionorc/agent.py` (`_submit` ~L2106, the confirmed send)
 
 **Why:** TD-667: Paul, 2026-10-13 — *have the Focus terminal unscroll to the prompt input when a user starts typing in it*. In copy mode tmux reads keys as its own commands, so a key typed into a scrolled-back pane is lost, and a send's Enter into one is too.
