@@ -11893,3 +11893,22 @@ a click on a changed file on the Git card opens it in the person's editor.
 **Related:** TD-629 (archived: the waiter a terminal answer ends, and an `AskUserQuestion` permission's text), TD-641 (`rules.NEVER` already keeps a question from the `permissions:` rules).
 
 **Resolved:** 2026-10-14 (grinder-ao-1, PR #1741) — `translate` reports a `PermissionRequest` of `AskUserQuestion` as the `PreToolUse` road does: `needs-you` with a `question` pending (its first question) and no `kind: "permission"`, so `rpc_hook` starts no waiter and the terminal's menu is the one channel; a real permission is unchanged. Held by `tests/test_claude_adapter.py::test_a_question_at_the_permission_hook_waits_on_nothing` (the real hook script against an in-process host agent: it returns at once, no waiter; the card view, the Inbox row and the team's *Answer needed* built from the record draw the text and Focus / Open, no Allow / Deny) and `test_translate_permission_and_questions`. No design change: §4.2 already says it.
+
+## TD-591: `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Blocked by:** TD-586, TD-587, TD-589
+**Location:** `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/cli.py`, §4.5a/§4.7 help (`src/shiftlead/ui/help.py`)
+
+**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Every dev-cadence feature ShiftLead uses switches itself off silently when the file is absent.
+
+**Resolved:** 2026-10-14 (PR #1742) — slice 1 the host agent's `seams` reading (#1736); slice 2 `ao doctor`'s **repos** line (`shiftlead.doctor.repos`), the Repo page's missing seams (`shiftlead.ui.repo.missing_seams`) and `ao repo init` (`shiftlead.repoinit`); design §4.5a *Repo page: missing seams*, §4.7.
+
+**Done when** a repo with only a ledger shows each missing seam on the Repo page and in `ao doctor`, and `ao repo init` on a bare repo makes a ledger ShiftLead reads, with tests.
+
+**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584 (the design: what it draws and from where), TD-585 (the vendored `ledgerboard.py` that `ao repo init`'s ledger and the ledger check read), TD-586 (the missing-gate line).

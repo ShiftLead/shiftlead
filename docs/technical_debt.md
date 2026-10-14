@@ -40,7 +40,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-584 | Design the ledgerboard split into ShiftLead: §4.5a, §4.7, §4.9a, §5, §6 and §8 (the ADR's build 3) | High | Designed — TD-585–TD-591 build it |
 | TD-588 | Briefs, flows and `team_skill.md` name no repo's layout: `commands:`, variables, and a test that bars the literals | Medium | Open |
-| TD-591 | `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger | Low | Open |
 | TD-614 | The UI and `ao` re-derive what the host agent could hold once: inbox counts, the board reading, per-session views — poll-and-render instead of one reading pushed | High | Designed — TD-615, TD-616, TD-617 build it |
 | TD-622 | #1563's `AO.shellHere`: the *tab* blocked-pop-up word, the create-answered-without-an-id close and the directory-less placeholder are held by no test (test audit) | Low | Open |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
@@ -579,27 +578,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Done when** `commands:` is read, the test passes, and a brief filled for this repo reads as it does today.
 
 **Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-586, TD-587.
-
----
-
-## TD-591: `ao doctor` and the Repo page name what a repo lacks; `ao repo init` makes an empty ledger
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-12 (ao-dc-decouple, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 (grinder-ao-1, 2026-10-14, PR #1736): the host agent's reading of the seams, on the repo reading as `seams` (`sessionorc.seams.reading`: the ledger `{path, state: ok|absent|unreadable|newer, major, entries, why}`; `board`, `gate`, `worktree_setup` each `{state: set|defaulted|absent, value}`), read on the five-minute pass. Left, slice 2 — `src/shiftlead/**`, grinder-ao-2's package: `ao doctor`'s **repos** check (§4.7) and the Repo page's missing-seam lines (§4.5a), each drawn from `seams` and reading nothing itself, and `ao repo init`. Was: Open.
-**Blocked by:** TD-586, TD-587, TD-589
-**Location:** `src/shiftlead/doctor.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/cli.py`, §4.5a/§4.7 help (`src/shiftlead/ui/help.py`)
-
-**Why:** Paul, 2026-10-12: dev-cadence must work for any session with no ShiftLead on the machine, and ShiftLead should recommend dev-cadence but not require it, without the two drifting. The [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md) (decided by Paul the same day) puts the ledger and board formats in a third repo, `ShiftLead/ledgerboard`, read by both with no second parser. Every dev-cadence feature ShiftLead uses switches itself off silently when the file is absent.
-
-**Fix:** per the ADR's *Says what is missing*: `ao doctor` gains repo rows and the Repo page a line per unset seam (no gate, no board, no worktree setup, no ledger); `ao repo init` writes an empty ledger in ledgerboard format at `ledger:`.
-
-**Done when** a repo with only a ledger shows each missing seam on the Repo page and in `ao doctor`, and `ao repo init` on a bare repo makes a ledger ShiftLead reads, with tests.
-
-**Related:** [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md); TD-584 (the design: what it draws and from where), TD-585 (the vendored `ledgerboard.py` that `ao repo init`'s ledger and the ledger check read), TD-586 (the missing-gate line).
 
 ---
 
