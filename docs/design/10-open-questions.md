@@ -61,7 +61,9 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       "why" next to Deny steers the next attempt better than a bare refusal. Cost: one input box.
 - [x] **"Allow for this session"?** (decided 2026-09-23: **no, not now**) The hook can update the session's permission rules so the
       same tool does not ask again. If added, it must be a third, smaller button and never the
-      default — it is how a permission prompt stops being an alert.
+      default — it is how a permission prompt stops being an alert. (2026-10-13, TD-636: the director
+      seat and the person's `permissions:` rules answer one prompt at a time and tell every answer,
+      changing no session's settings — not this button; §4.9b.)
 - [x] **Build on, or beside, herdr?** (2026-09-09; decided 2026-09-10): **independent** —
       `sessionorc` stays on tmux, herdr is prior art (§3) with a screen-rule fallback and the
       worktree API shape to borrow later ([ADR](../decisions/2026-09-10-herdr-spike.md), TD-014).
