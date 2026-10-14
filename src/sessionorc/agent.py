@@ -91,6 +91,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     LEASE_TTL,  # noqa: F401
     LINKS_EVERY,  # noqa: F401
     MODEL_EVERY,  # noqa: F401
+    MODEL_FILE,  # noqa: F401
     NODE_ACTS,  # noqa: F401
     NODE_READS,  # noqa: F401
     ORPHAN_AFTER,  # noqa: F401
@@ -183,11 +184,13 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     draft_folder,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
+    model_env,  # noqa: F401
     person_only,  # noqa: F401
     read_checkout,  # noqa: F401
     read_draft_claim,  # noqa: F401
     stat_dir,  # noqa: F401
     tick_ready,  # noqa: F401
+    write_model_file,  # noqa: F401
 )
 from sessionorc.agent_doctor import DoctorMixin
 from sessionorc.agent_hook import HookMixin
