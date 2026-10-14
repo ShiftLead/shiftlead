@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+from pathlib import Path
 
 import pytest
 import yaml
@@ -259,3 +260,46 @@ def test_under_a_flow_a_feature_opens_its_design_stage(tmp_path, monkeypatch):
     got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "feature"}).json()
     assert got["role"] == "designer" and "an interactive designer session" in got["line"]
     assert c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()["role"] == "techlead"
+
+
+def test_each_way_out_hands_on_the_forms_draft_and_none_without_one(tmp_path, monkeypatch):
+    """§4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633): where the form attached
+    files, **Open a session** hands `draft` to the create and **Hand to the techlead** to `entry_add`,
+    each of which claims the folder at the press (§4.4 *The Add entry form's draft*); a form that
+    attached nothing hands none, and a draft that is not a string is refused before either is asked."""
+    world(tmp_path)
+    created: list[dict] = []
+    handed: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], created=created, handed=handed))
+    body = {"repo": "samscrape", "type": "debt", "words": "see /h/attachments/draft-0a1b2c3d/shot.png"}
+    assert c.post("/api/entry/session", json={**body, "draft": "draft-0a1b2c3d"}).status_code == 200
+    assert c.post("/api/entry/hand", json={**body, "draft": "draft-0a1b2c3d"}).status_code == 200
+    assert created[0]["draft"] == "draft-0a1b2c3d" and handed[0]["draft"] == "draft-0a1b2c3d"
+    assert c.post("/api/entry/session", json={**body, "draft": ""}).status_code == 200
+    assert c.post("/api/entry/hand", json=body).status_code == 200
+    assert "draft" not in created[1] and "draft" not in handed[1]
+    r = c.post("/api/entry/hand", json={**body, "draft": 7})
+    assert r.status_code == 400 and "draft is the token" in r.json()["detail"] and len(handed) == 2
+
+
+def test_attach_is_refused_in_place_where_the_team_runs_on_a_node(tmp_path, monkeypatch):
+    """§4.5a *Add entry form: Attach / drop / paste* (TD-630): the plan says why **Attach** refuses —
+    a repo whose servicing team runs on a node, in the words a node session's composer gets — and
+    nothing where the team runs here; the form draws Attach, its picker, its ✕ and the hint under **What**."""
+    world(tmp_path)
+    c = client(monkeypatch, tmp_path, fake([]))
+    assert c.get("/api/entry/plan", params={"repo": "samscrape"}).json()["attach"] == ""
+    org = tmp_path / "home" / "org.yml"
+    doc = yaml.safe_load(org.read_text())
+    doc["teams"]["sam-grind"]["host"] = "node1"
+    org.write_text(yaml.safe_dump(doc))
+    got = c.get("/api/entry/plan", params={"repo": "samscrape"}).json()
+    assert got["attach"] == "sam-grind runs on node1: this call does not cross the link"
+    from shiftlead.ui import app as ui
+
+    html = (Path(ui.__file__).parent / "templates" / "base.html").read_text()
+    form = html[html.index('<dialog id="entrydlg"') : html.index("</dialog>", html.index('<dialog id="entrydlg"'))]
+    what = form.index('id="entrywhat"')
+    assert what < form.index('id="entryattach"') < form.index('name="entrytype"')
+    assert '<input type="file" id="entryattachfile" multiple hidden>' in form
+    assert 'id="entryattachcancel"' in form and "drop a file on the box" in form

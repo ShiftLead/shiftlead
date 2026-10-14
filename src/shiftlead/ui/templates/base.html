@@ -136,6 +136,13 @@
     <div class="meta" id="entrywhere"></div>
     <p class="note">Write what you have: a title, or a page. The number, the header lines and the file locations are found for you, and you are asked only what cannot be found.</p>
     <label class="field">What <textarea class="input" id="entrywhat" rows="6"></textarea></label>
+    {#- §4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633): the composer's road on
+        **What**, into the form's draft folder at the home; each path at the caret, and final. A repo whose
+        team runs on a node refuses it in place, in the words a node session's composer gets -#}
+    <div class="row gap" id="entryattachrow"><button type="button" class="btn sm" id="entryattach" data-piece="{{ attach_piece }}" title="attach files: their paths go into What at the cursor"><svg class="ic" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</button>
+      <input type="file" id="entryattachfile" multiple hidden>
+      <button type="button" class="btn sm ghost hidden" id="entryattachcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
+      <span class="note" id="entryattachnote">or paste a screenshot, or drop a file on the box — its path goes in at the cursor</span></div>
     <div class="row gap wrap" role="radiogroup" aria-label="Type"><span class="field">Type</span>
       <label><input type="radio" name="entrytype" value="debt" checked> debt <span class="meta">something wrong now</span></label>
       <label><input type="radio" name="entrytype" value="feature"> feature <span class="meta">something new</span></label>

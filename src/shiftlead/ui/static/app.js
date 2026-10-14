@@ -344,22 +344,31 @@
       progress(Math.floor((offset * 100) / total), total - offset <= piece);
     }
   };
-  // The upload `AO.wireAttach` is handed, for session `id`: each file in pieces of `piece` bytes to
-  // `/api/sessions/<id>/attach`, a refusal thrown in the host agent's words. One road shared by the
-  // Focus composer and the Message and Reply dialog (§4.5a, TD-530): the file lands under `id`'s
-  // `attachments/`, whichever page sent it.
-  AO.attachUpload = (id, piece) => (f, ctl) => AO.uploadPieces(f, {
+  // Each file in pieces of `piece` bytes to `url`, a refusal thrown in the host agent's words. With
+  // `held`, the Add entry form's draft (TD-630): every piece carries `held.draft` — `""` until an answer
+  // names the token, which is kept there for every later piece and file.
+  const postPieces = (url, piece, held) => (f, ctl) => AO.uploadPieces(f, {
     name: AO.attachName(f, new Date()), piece: piece || 2 * 1024 * 1024,
     progress: ctl.progress, cancelled: ctl.cancelled,
     post: async ({ file, name, ...fields }) => {
       const fd = new FormData();
+      if (held) fd.append("draft", held.draft);
       for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
       if (file) fd.append("file", file, name);
-      const r = await fetch(`/api/sessions/${encodeURIComponent(id)}/attach`, { method: "POST", body: fd });
+      const r = await fetch(url, { method: "POST", body: fd });
       if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
-      return r.json();
+      const got = await r.json();
+      if (held && got && got.draft) held.draft = got.draft;
+      return got;
     },
   });
+  // The upload `AO.wireAttach` is handed, for session `id`: to `/api/sessions/<id>/attach`. One road
+  // shared by the Focus composer and the Message and Reply dialog (§4.5a, TD-530): the file lands under
+  // `id`'s `attachments/`, whichever page sent it.
+  AO.attachUpload = (id, piece) => postPieces(`/api/sessions/${encodeURIComponent(id)}/attach`, piece);
+  // The Add entry form's (§4.5a *Add entry form: Attach / drop / paste*, TD-633): to `/api/entry/attach`,
+  // into the draft folder `held.draft` names at the home (§4.4 *The Add entry form's draft*).
+  AO.draftUpload = (held, piece) => postPieces("/api/entry/attach", piece, held);
 
   // ---- Pop out (design §4.5 screen 2 *Pop out*, §4.5a **Pop out** / **Focus** / **title**, TD-046) ----
   // A session's Focus in its own browser window, for the OS window switcher. Client-side only:
@@ -575,6 +584,41 @@
         button.hidden = !AO.mailTo;
         if (note) { if (AO.mailTo) note.removeAttribute("title"); else note.title = "attach needs a session in the seat"; }
       },
+    };
+  };
+  // §4.5a *Add entry form: Attach / drop / paste* (TD-630, built by TD-633): the composer's road on the
+  // form's **What**, before any session exists — a drop on the box and an image pasted into it too, each
+  // path at the caret. The form's files go to its draft folder at the home (§4.4 *The Add entry form's
+  // draft*), its token held while the form is open: `""` until the first file's answer names it, every
+  // later piece and file naming it, and each opening a new draft. A batch belongs to the opening it was
+  // given in, as the Message dialog's does: once the form closes its file in flight inserts nothing and
+  // the rest are never sent. `refuse(words)` refuses Attach in place (a repo whose team runs on a node:
+  // *this call does not cross the link*) — the note says the words, a drop or a paste attaches nothing.
+  // `draft()` is what a way out hands on, `""` where nothing was attached.
+  AO.wireEntryAttach = function (els, upload) {
+    const { dlg, button, input, cancel, text, note } = els;
+    const hint = note.textContent, tip = button.title;
+    let opened = 0, refused = "", held = { draft: "" };
+    const attach = AO.wireAttach({
+      button, input, compose: text, targets: [text], cancel,
+      composer: { classList: { contains: () => !!refused } },
+      fail: (m) => AO.toast(m), token: () => opened,
+      upload: async (f, ctl) => {
+        if (ctl.token !== opened) return null;
+        const path = await upload(held)(f, ctl);
+        return ctl.token === opened ? path : null;
+      },
+    });
+    dlg.addEventListener("close", () => { opened++; if (!cancel.classList.contains("hidden")) cancel.click(); });
+    const refuse = (words) => {
+      refused = words || "";
+      button.disabled = !!refused; button.title = refused || tip;
+      note.textContent = refused || hint;
+    };
+    return {
+      attach, refuse,
+      open() { opened++; held = { draft: "" }; refuse(""); },
+      draft: () => held.draft,
     };
   };
   let mailAttach = null;
@@ -2831,8 +2875,18 @@
   // composer holding `entry.md`'s lines and the words — kept here as that session's draft until sent
   // (`AO.draftKey`); nothing is typed into the pane. The page writes no file.
   AO.draftKey = (sid) => `ao.draft.${sid}`;
+  let entryAttach = null;
   function openEntry(repo) {
     const dlg = $("#entrydlg"); if (!dlg) return;
+    if (!entryAttach && $("#entryattach")) {
+      const button = $("#entryattach");
+      entryAttach = AO.wireEntryAttach(
+        { dlg, button, input: $("#entryattachfile"), cancel: $("#entryattachcancel"), text: $("#entrywhat"), note: $("#entryattachnote") },
+        (held) => AO.draftUpload(held, Number(button.dataset.piece)),
+      );
+    }
+    if (entryAttach) entryAttach.open();
+    const draft = () => (entryAttach ? entryAttach.draft() : "");
     const err = $("#entryerr");
     const say = (m) => { err.textContent = m || ""; err.hidden = !m; };
     const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
@@ -2867,6 +2921,7 @@
       $("#entryseat").textContent = h.name || h.to || "";
       $("#entryhandwhat").hidden = !!handWhy;
       $("#entrywhen").textContent = handWhy ? `Hand to the techlead: ${handWhy}` : `When it is read: ${h.line}`;
+      if (entryAttach) entryAttach.refuse(v.attach || "");
       handState();
     }
     hand.onclick = async () => {
@@ -2874,7 +2929,7 @@
       busy = true; handState();
       let r, got;
       try {
-        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
+        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft() }) });
         got = await r.json();
       } catch (e) { busy = false; handState(); return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { busy = false; handState(); return say(got.detail || "refused"); }
@@ -2890,7 +2945,7 @@
       $("#entrygo").disabled = true;
       let r, got;
       try {
-        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value }) });
+        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft() }) });
         got = await r.json();
       } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }
