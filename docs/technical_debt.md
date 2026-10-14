@@ -67,7 +67,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-640 | `check_cadence.py`'s `ci` row reads the base branch's required checks, not every run on the head (TD-637) | Low | Open |
 | TD-641 | Build TD-636 (1): the person's `permissions:` rules per role, matched by the host at the hook, the always-the-person list, every answer an *Answered for you* FYI | Medium | Open |
 | TD-642 | Build TD-636 (2): the org's director seat — `director:` in `org.yml`, its trigger and `director.md`, the `permit` grant, the manager's triage standing aside | Medium | Open |
-| TD-643 | Two writers of `spend.json.tmp` at once: the home's spend save fails with ENOENT, and a link test flakes | Medium | Open |
 | TD-644 | Build TD-638 (ShiftLead): the launch sets `AGENT_MODEL` and `AGENT_MODEL_FILE`; the host writes the model in use to the file whenever it is set or changes | Low | Open |
 | TD-645 | `prepare-commit-msg` writes `Agent-Model: <adapter>/<model>` from `AGENT_MODEL_FILE`, else `AGENT_MODEL` (TD-638) | Low | Open |
 | TD-646 | Reachability: the person's own route to the UI — Tailscale first, Cloudflare second, `ssh -L` always; a relay forwards ciphertext only | Medium | Designed — TD-647, TD-648 build it |
@@ -1267,28 +1266,6 @@ pasted into the form reaches the drafting session as a path it can read, by eith
 **Done when** an unattended member's prompt no rule covers is answered by the director seat with a reason told to the person, or passed up in words, never touching an interactive session or the always-the-person prompts, and the tests above pass.
 
 **Related:** TD-636 (the design), TD-641 (the rules), TD-151 (the techlead seat), §6 rule 3.
-
----
-
-## TD-643: Two writers of `spend.json.tmp` at once: the home's spend save fails with ENOENT, and `test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_reading_follows` flakes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-13 (grinder-ao-2, found running the full suite for TD-617 and TD-618)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_spend.py` (`_save_spend` ~L130: `asyncio.to_thread(self.spend_store.save, …)` reached from the tick's pass and from `_take_spend`, a node's `spend` call), `src/sessionorc/store.py` (`_atomic_write` ~L21: one fixed `<name>.tmp` per path); `tests/test_link.py` (~L2115)
-
-**Why:** `pdm run test` failed twice in three full runs on 2026-10-13 (two branches, neither touching `sessionorc`) at `test_link.py:2115`: `node._spend_link["api"]` was missing because the node's `spend` call failed, the home logging *spend for api did not reach kmaster: [Errno 2] No such file or directory: '…/spend.json.tmp' -> '…/spend.json'*. Two saves on two threads write the same `spend.json.tmp`, and the second `os.replace` finds it already moved. Alone the test passes. In the live home the same race makes a node's spend call fail; the node sends it again on its next pass, so nothing is lost, but each failure is a warning and a dropped link state.
-
-**Fix:**
-1. `_save_spend` holds one `asyncio.Lock` around the compare, the threaded save and `_spend_saved`. Alternatively, `_atomic_write` writes a unique temporary file (`tempfile.mkstemp` in the same directory), which makes every store's save safe against a second writer.
-2. Test: two `_save_spend` calls gathered at once both complete, and `spend.json` holds the last.
-
-**Done when** concurrent spend saves never raise, and the link test passes in repeated full runs.
-
-**Related:** TD-151 (the spend ledger), TD-463 (the CI flakes).
 
 ---
 
