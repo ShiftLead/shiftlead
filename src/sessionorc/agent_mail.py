@@ -527,6 +527,9 @@ class MailMixin:
         for sid in named:
             if sid not in records and sid != PERSON:
                 raise RpcError(f"no session {sid}")
+            if sid != PERSON and not adapters.has_agent(records[sid].adapter):
+                # a shell's or a command run's inbox has no reader (§4.3 *A record with no agent*, TD-665)
+                raise RpcError(f"nothing reads {records[sid].name or sid}'s inbox — it runs no agent (design §4.3)")
             if (reason := mail.message_gate(records, sender, sid, controllers=self._ctl)) is not None:
                 raise RpcError(reason)
         cited: list[str] = []

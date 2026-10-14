@@ -15,7 +15,7 @@ import os
 import sys
 from datetime import timedelta
 
-from _stubs import HookFedStub
+from _stubs import AgentShellStub, HookFedStub
 
 from sessionorc import adapters, hosts
 from sessionorc import agent_common as agent_mod
@@ -29,6 +29,7 @@ async def _run(socket_name: str) -> None:
     hosts.DEV_CADENCE_ROSTER = os.path.join(os.environ["SHIFTLEAD_HOME"], "no-roster", "repos.txt")
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
+    adapters.register(AgentShellStub())  # test-only, a shell that counts as an agent
     if settle := os.environ.get("AO_TEST_RESTART_SETTLE"):
         # a crash loop run against the clock: the settle after a restart (TD-186) in seconds, not 60
         agent_mod.RESTART_SETTLE = timedelta(seconds=float(settle))

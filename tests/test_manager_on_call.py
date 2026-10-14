@@ -19,7 +19,7 @@ from sessionorc.models import ProgressEntry
 
 pytestmark = pytest.mark.integration
 
-SHELL = {"adapter": "shell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True, "supervised": True}
+SHELL = {"adapter": "agentshell", "argv": ["bash", "--norc", "--noprofile"], "unattended": True, "supervised": True}
 
 
 def _iso(t: datetime) -> str:

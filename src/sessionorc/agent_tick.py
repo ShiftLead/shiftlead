@@ -313,6 +313,11 @@ class TickMixin:
                 continue  # a scheduled record has nothing running to stop yet (§6 *Start time*)
             if now < _parse(s.run_until):
                 continue
+            if not adapters.has_agent(s.adapter):
+                # a shell or a command run is typed nothing: killed at once, no wrap-up, no grace (§4.3)
+                log.info("%s reached its run_until and runs no agent; stopping it", s.id)
+                await self.rpc_kill(s.id, killer={"by": "tick", "why": "stop time"})
+                continue
             if not s.wrapup_sent_at:
                 if s.pending and s.pending.kind in ("permission", "question"):
                     # A session stopped on a dialog cannot wrap up, and typing at it would answer
@@ -363,9 +368,9 @@ class TickMixin:
         whole = settings_mod.load()
         changed = False
         for s in list(self.sessions.values()):
-            if not s.unattended or s.state in ("exited", "closed", "scheduled"):
+            if not s.unattended or s.state in ("exited", "closed", "scheduled") or not adapters.has_agent(s.adapter):
                 if s.gated:
-                    s.gated = None  # the gate's reach is unattended, live sessions alone (§9 invariant 5)
+                    s.gated = None  # the gate's reach is unattended, live agents alone (§9 invariant 5, §4.3)
                     self.store.save(s)
                     changed = True
                 continue
@@ -2142,6 +2147,8 @@ class TickMixin:
         words would be submitted with it. Recorded on `sends` as the home's own (`system`). False
         when it was not typed: the tick looks again next time."""
         adapter = adapters.get(s.adapter)
+        if not adapters.has_agent(s.adapter):
+            return False  # a policy's line typed into a shell runs as a command line (§4.3)
         if getattr(adapter, "composer", None) is None or self._on_a_dialog(s):
             return False
         typing = self._typing[s.id]
@@ -2480,7 +2487,7 @@ class TickMixin:
                 for r in (self.remote.get(s.host) or {}).values()
                 if r is not s
                 and r.kind == "interactive"
-                and r.adapter != "shell"
+                and adapters.has_agent(r.adapter)
                 and r.state not in ("exited", "closed")
                 and r.dir == s.dir
             ]
@@ -3213,8 +3220,8 @@ class TickMixin:
         holders = reports.holds_directory(self.sessions.values())
         due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
-            if not s.dir or s.state == "closed":
-                continue
+            if not s.dir or s.state == "closed" or not adapters.has_agent(s.adapter):
+                continue  # no claim is derived for a record with no agent (§4.3, §4.4 *Repo facts*)
             if now - self._derived_at.get(s.id, datetime.min.replace(tzinfo=UTC)) <= DERIVE_EVERY:
                 continue
             branch = (s.git or {}).get("branch") if s.id in holders else None
@@ -3404,7 +3411,7 @@ class TickMixin:
         return [
             s
             for s in self.sessions.values()
-            if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
+            if s.kind == "interactive" and adapters.has_agent(s.adapter) and s.state not in ("exited", "closed")
         ]
 
     def _usage_remote_live(self) -> list[Session]:
@@ -3416,7 +3423,7 @@ class TickMixin:
             s
             for recs in self.remote.values()
             for s in recs.values()
-            if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
+            if s.kind == "interactive" and adapters.has_agent(s.adapter) and s.state not in ("exited", "closed")
         ]
 
     def _usage_theirs(self, here: set[str]) -> list[tuple[Session, str]]:

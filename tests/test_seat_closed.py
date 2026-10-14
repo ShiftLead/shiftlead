@@ -17,9 +17,16 @@ from sessionorc.client import LocalClient
 ON_CALL = {"trigger": "team"}
 
 
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 def _mk(person, tmp_path):
     async def mk(n: str, **kw):
-        params = dict(name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True)
+        params = dict(name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"], unattended=True)
         return (await person.call("create", **{**params, **kw}))["id"]
 
     return mk

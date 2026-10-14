@@ -27,7 +27,7 @@ def _later(minutes: int = 30) -> str:
     return _iso(datetime.now(UTC) + timedelta(minutes=minutes))
 
 
-async def _scheduled(person, tmp_path, name="w", adapter="shell", **kw):
+async def _scheduled(person, tmp_path, name="w", adapter="agentshell", **kw):
     return await person.call(
         "create",
         name=name,
@@ -172,7 +172,7 @@ async def _manager(person, tmp_path):
         "create",
         name="mgr",
         dir=str(d),
-        adapter="shell",
+        adapter="agentshell",
         argv=["bash", "--norc", "--noprofile"],
         capabilities=["control"],
     )

@@ -1462,13 +1462,14 @@ def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[st
     — is this entry's outcome, not the stop's: the rest of the team is still wrapped up, and the
     refused one is named with the reason (TD-057 step 4a, the 3b leftover)."""
     try:
-        if now:
+        if now or s.get("agent") is False:  # a record with no agent is killed at once, typed nothing (§4.3)
             call("kill", id=s["id"])
         else:
             call("send", id=s["id"], text=teams.WRAPUP_PROMPT, wrapup=True)
     except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
         return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
-    return {**_entry(s, role), "action": "killed" if now else "wrap-up sent", "state": "killed" if now else "?"}
+    killed = now or s.get("agent") is False
+    return {**_entry(s, role), "action": "killed" if killed else "wrap-up sent", "state": "killed" if killed else "?"}
 
 
 def stays_line(s: dict[str, Any]) -> str:

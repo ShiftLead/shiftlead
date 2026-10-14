@@ -43,7 +43,9 @@ def test_status_empty_and_json(subprocess_agent, capsys):
 
 
 def test_shell_send_tail_status_kill_close(subprocess_agent, tmp_path, capsys):
-    assert cli.main(["shell", "cli sh", "-d", str(tmp_path)]) == 0
+    # a stand-in for an agent: mail and `ao mode unattended` are an agent's (design §4.3); the
+    # shells below are `ao shell`'s own
+    assert cli.main(["new", "cli sh", "-a", "agentshell", "-d", str(tmp_path)]) == 0
     out = capsys.readouterr().out
     sid = out.split()[0]
     assert sid.startswith("ao-") and f"attach: tmux attach -t {sid}" in out
@@ -58,7 +60,7 @@ def test_shell_send_tail_status_kill_close(subprocess_agent, tmp_path, capsys):
     assert wait_for_sync(lambda: any("CLI-21" in line for line in call_sync("get", id=sid)["tail"]))
     assert cli.main(["status", "-v"]) == 0
     out = capsys.readouterr().out
-    assert sid in out and "shell" in out and "│" in out  # the verbose tail rows
+    assert sid in out and "agentshell" in out and "│" in out  # the verbose tail rows
     # the send above is on the record with who typed it (design §4.10 `sends`), and `-v` prints it
     sends = call_sync("get", id=sid)["sends"]
     assert [(e["from"], e["text"]) for e in sends] == [("person", "echo CLI-$((20+1))")]
@@ -166,10 +168,10 @@ def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatc
     def out():
         return json.loads(capsys.readouterr().out)
 
-    assert cli.main(["--json", "shell", "js", "-d", str(tmp_path)]) == 0
+    assert cli.main(["--json", "new", "js", "-a", "agentshell", "-d", str(tmp_path)]) == 0  # `mode` is an agent's
     s = out()
     sid = s["id"]
-    assert s["adapter"] == "shell" and s["dir"] == str(tmp_path)
+    assert s["adapter"] == "agentshell" and s["dir"] == str(tmp_path)
     wait_state(sid, "idle")
     assert cli.main(["send", sid, "--json", "echo", "J-$((40+2))"]) == 0  # flag after the subcommand
     assert out() == {"ok": True, "id": sid}
@@ -366,7 +368,8 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
 
     assert cli.main(["--json", "shell", "ga", "-d", str(tmp_path)]) == 0
     a = out()["id"]
-    assert cli.main(["--json", "shell", "gb", "-d", str(tmp_path)]) == 0
+    (tmp_path / "gb").mkdir()  # an agent stand-in (it is made unattended) in a directory of its own
+    assert cli.main(["--json", "new", "gb", "-a", "agentshell", "-d", str(tmp_path / "gb")]) == 0
     b = out()["id"]
     wait_state(a, "idle")
     wait_state(b, "idle")
@@ -395,7 +398,7 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     monkeypatch.delenv("SHIFTLEAD_SESSION")
     assert cli.main(["--json", "revoke", a, "control"]) == 0
     assert out()["capabilities"] == []
-    assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "control"]) == 0
+    assert cli.main(["--json", "new", "gc", "-a", "agentshell", "-d", str(tmp_path), "--grant", "control"]) == 0
     c = out()
     assert c["capabilities"] == ["control"]
     for sid in (a, c["id"]):
@@ -413,7 +416,8 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     monkeypatch.chdir(tmp_path)  # `ao control orc add w1` resolves bare names against the cwd
     assert cli.main(["--json", "shell", "orc", "-d", str(tmp_path)]) == 0
     orc = out()["id"]
-    assert cli.main(["shell", "w1", "-d", str(tmp_path)]) == 0
+    (tmp_path / "w1").mkdir()  # an agent stand-in (it is made unattended) in a directory of its own
+    assert cli.main(["new", "w1", "-a", "agentshell", "-d", str(tmp_path / "w1")]) == 0
     # the no-controller line, printed once, in the person's own words
     said = capsys.readouterr().out
     assert "starts with no controller: nobody may act on it" in said
@@ -463,13 +467,13 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert call_sync("get", id=w1)["controllers"] == []
 
     # --controller at create, and it is resolved from a name like every other id
-    assert cli.main(["--json", "new", "w2", "-a", "shell", "-d", str(tmp_path), "--controller", "orc"]) == 0
+    assert cli.main(["--json", "new", "w2", "-a", "agentshell", "-d", str(tmp_path), "--controller", "orc"]) == 0
     w2 = out()
     assert w2["controllers"] == [orc]
     # a --controller that resolves to nothing refuses *before* the create RPC, so no session, no
     # pane, and nothing to clean up (review 2026-09-13)
     before = {s_["id"] for s_ in call_sync("list")}
-    assert cli.main(["--json", "new", "w3", "-a", "shell", "-d", str(tmp_path), "--controller", "ghost"]) == 1
+    assert cli.main(["--json", "new", "w3", "-a", "agentshell", "-d", str(tmp_path), "--controller", "ghost"]) == 1
     assert "no session named ghost here" in out()["error"]
     assert {s_["id"] for s_ in call_sync("list")} == before
     for sid in (orc, w1, w2["id"]):
@@ -593,7 +597,7 @@ def test_every_subcommand_takes_a_bare_name(subprocess_agent, tmp_path, capsys, 
     full id always means itself; ambiguity and absence are errors, never a guess."""
     (tmp_path / "one").mkdir()
     (tmp_path / "two").mkdir()
-    assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path / "one")]) == 0
+    assert cli.main(["--json", "new", "w", "-a", "agentshell", "-d", str(tmp_path / "one")]) == 0
     first = json.loads(capsys.readouterr().out)["id"]
     wait_state(first, "idle")
     monkeypatch.chdir(tmp_path / "one")
@@ -608,7 +612,7 @@ def test_every_subcommand_takes_a_bare_name(subprocess_agent, tmp_path, capsys, 
     assert cli.main(["tail", "nobody"]) == 1
     assert "no session named nobody here" in capsys.readouterr().err
     # a second session of that name in a sibling directory: from the parent, both are "here"
-    assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path / "two")]) == 0
+    assert cli.main(["--json", "new", "w", "-a", "agentshell", "-d", str(tmp_path / "two")]) == 0
     second = json.loads(capsys.readouterr().out)["id"]
     wait_state(second, "idle")
     monkeypatch.chdir(tmp_path)
@@ -747,7 +751,7 @@ def test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn(subprocess_ag
     `ao inbox --unread` stays `working` and is never rung, so the reply that found nothing says so —
     on stdout in prose, on stderr under `--json` so the JSON still parses — and a person at a
     terminal, who is never rung, is not told it."""
-    sid = call_sync("create", name="poller", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    sid = call_sync("create", name="poller", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])["id"]
     assert cli.main(["inbox", "--unread"]) == 0  # the person inbox: no line
     assert cli.END_THE_TURN not in capsys.readouterr().out
     monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
@@ -1032,9 +1036,11 @@ def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_
     """TD-139 (design §4.10 *The home warns, never refuses*): `ao msg person` with a 90-word first
     paragraph prints the warning and the mail arrives; a shaped one prints nothing; a message to a
     session is not checked."""
-    sid = call_sync("create", name="shaper", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    sid = call_sync("create", name="shaper", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])["id"]
     (tmp_path / "o").mkdir()
-    other = call_sync("create", name="other", dir=str(tmp_path / "o"), adapter="shell", argv=["bash", "--norc"])["id"]
+    other = call_sync("create", name="other", dir=str(tmp_path / "o"), adapter="agentshell", argv=["bash", "--norc"])[
+        "id"
+    ]
     call_sync("set_controllers", id=other, add=[sid])
     monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     long = " ".join(["word"] * 90)
@@ -1148,7 +1154,9 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     it reads the person inbox."""
 
     def mk(name: str) -> str:
-        return call_sync("create", name=name, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+        (tmp_path / name).mkdir()  # one directory each: the anchor rule (§9 invariant 2)
+        d = str(tmp_path / name)
+        return call_sync("create", name=name, dir=d, adapter="agentshell", argv=["bash", "--norc"])["id"]
 
     lead, worker, peer = mk("lead"), mk("worker"), mk("peer")
     call_sync("set_controllers", id=worker, add=[lead])
@@ -1221,9 +1229,9 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
     """TD-136 slice 1 (design §4.7): `ao inbox --thread <id>` prints the thread oldest first, the
     person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
     refused in the host agent's words; `--unread` does not combine with it."""
-    worker = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", role="worker", argv=["bash", "--norc"])[
-        "id"
-    ]
+    worker = call_sync(
+        "create", name="w", dir=str(tmp_path), adapter="agentshell", role="worker", argv=["bash", "--norc"]
+    )["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", worker)
     assert cli.main(["--json", "msg", "person", "rebase or merge?", "--kind", "ask"]) == 0
     asked = json.loads(capsys.readouterr().out)["entry"]["id"]
@@ -1246,8 +1254,14 @@ def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, t
 def test_msg_verdict_rides_a_readers_reply_to_a_prs_ask(subprocess_agent, tmp_path, capsys, monkeypatch):
     """§4.9c (TD-315 slice 1): `ao msg --reply-to <id> --verdict merged` carries the word; the home
     refuses the reply without it, and argparse a word that is none of the three."""
-    w = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="t")["id"]
-    tl = call_sync("create", name="tl", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="t")["id"]
+    for n in ("w", "tl"):
+        (tmp_path / n).mkdir()  # one directory each: the anchor rule (§9 invariant 2)
+    w = call_sync("create", name="w", dir=str(tmp_path / "w"), adapter="agentshell", argv=["bash", "--norc"], team="t")
+    w = w["id"]
+    tl = call_sync(
+        "create", name="tl", dir=str(tmp_path / "tl"), adapter="agentshell", argv=["bash", "--norc"], team="t"
+    )
+    tl = tl["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", w)
     assert cli.main(["--json", "msg", "--kind", "ask", "--pr", "12", tl, "#12 is green"]) == 0
     asked = json.loads(capsys.readouterr().out)["entry"]["id"]
@@ -1297,7 +1311,7 @@ def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent
     **numbered from 1**, marks the one that is a `steer`'s default word for word, and says which
     one a reply picked; `ao msg --reply-to <id> --pick <n>` takes that same number, sends that
     answer's own text, and says clearly what is not one."""
-    sid = call_sync("create", name="asker", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    sid = call_sync("create", name="asker", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"])["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", sid)
     ask_argv = ["--json", "msg", "person", "merge PR 9?", "--kind", "ask"]
     assert cli.main([*ask_argv, "--answer", "merge it", "--answer", "hold it"]) == 0
@@ -1373,7 +1387,7 @@ def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subp
     """Design §4.10 "Busy for hours: a line on every `ao` reply": present while the calling session
     has unread mail — on a refusal too — absent without it, and on stderr under `--json`, so a
     caller parsing stdout never meets it."""
-    assert cli.main(["--json", "shell", "-d", str(tmp_path), "mailed"]) == 0
+    assert cli.main(["--json", "new", "-a", "agentshell", "-d", str(tmp_path), "mailed"]) == 0  # mail is an agent's
     sid = json.loads(capsys.readouterr().out)["id"]
     line = "[shiftlead] you have 1 unread messages — run ao inbox"
     os.environ["SHIFTLEAD_SESSION"] = sid
@@ -1897,8 +1911,8 @@ def test_inbox_sent_and_the_asks_waiting_line(subprocess_agent, tmp_path, capsys
     `ao status -v` prints `asks waiting: N` under a record with open questions addressed to it."""
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
-    asker = call_sync("create", name="aw-asker", dir=str(tmp_path / "a"), adapter="shell", team="aw-t")["id"]
-    seat = call_sync("create", name="aw-seat", dir=str(tmp_path / "b"), adapter="shell", team="aw-t")["id"]
+    asker = call_sync("create", name="aw-asker", dir=str(tmp_path / "a"), adapter="agentshell", team="aw-t")["id"]
+    seat = call_sync("create", name="aw-seat", dir=str(tmp_path / "b"), adapter="agentshell", team="aw-t")["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["msg", seat, "squash or rebase?", "--kind", "ask"]) == 0
     capsys.readouterr()
@@ -1918,8 +1932,8 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
     the passer with its recommendation, and numbers the answers for `--pick`."""
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
-    asker = call_sync("create", name="up-asker", dir=str(tmp_path / "a"), adapter="shell", team="up-t")["id"]
-    passer = call_sync("create", name="up-passer", dir=str(tmp_path / "b"), adapter="shell", team="up-t")["id"]
+    asker = call_sync("create", name="up-asker", dir=str(tmp_path / "a"), adapter="agentshell", team="up-t")["id"]
+    passer = call_sync("create", name="up-passer", dir=str(tmp_path / "b"), adapter="agentshell", team="up-t")["id"]
     monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["--json", "msg", passer, "delete the old branch?", "--kind", "ask"]) == 0
     q = json.loads(capsys.readouterr().out)["entry"]
@@ -1946,8 +1960,10 @@ def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, c
     and the person's prints the FYI — who asked what, who answered, from where."""
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
-    asker = call_sync("create", name="src-asker", dir=str(tmp_path / "a"), adapter="shell", team="src-t")["id"]
-    answerer = call_sync("create", name="src-answerer", dir=str(tmp_path / "b"), adapter="shell", team="src-t")["id"]
+    asker = call_sync("create", name="src-asker", dir=str(tmp_path / "a"), adapter="agentshell", team="src-t")["id"]
+    answerer = call_sync("create", name="src-answerer", dir=str(tmp_path / "b"), adapter="agentshell", team="src-t")[
+        "id"
+    ]
     monkeypatch.setenv("SHIFTLEAD_SESSION", asker)
     assert cli.main(["--json", "msg", answerer, "is the seat counted in a wind-down?", "--kind", "ask"]) == 0
     q = json.loads(capsys.readouterr().out)["entry"]

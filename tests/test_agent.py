@@ -14,6 +14,14 @@ from sessionorc.agent import WRAPUP_GRACE
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import FindingEntry, Pending, ProgressEntry, Session
 
+
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 pytestmark = pytest.mark.integration
 
 
@@ -59,16 +67,18 @@ async def test_shell_lifecycle(agent, tmp_path):
 
 async def test_anchor_rule_and_shell_exemption(agent, tmp_path):
     async with LocalClient() as c:
-        a = await c.call("create", name="one", dir=str(tmp_path), adapter="command", argv=["sleep", "30"])
+        a = await c.call("create", name="one", dir=str(tmp_path), adapter="agentshell", argv=["sleep", "30"])
         with pytest.raises(AgentError, match="anchor rule"):
-            await c.call("create", name="two", dir=str(tmp_path), adapter="command", argv=["sleep", "30"])
-        # shells are exempt (design §9 invariant 2)
+            await c.call("create", name="two", dir=str(tmp_path), adapter="agentshell", argv=["sleep", "30"])
+        # a record with no agent is exempt: a shell and a command (design §9 invariant 2, §4.3)
         sh = await c.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         assert sh["id"] != a["id"]
+        cmd = await c.call("create", name="cmd", dir=str(tmp_path), adapter="command", argv=["sleep", "30"])
+        assert cmd["id"] not in (a["id"], sh["id"])
         # same name, the holder exited → superseded, id reused, one card (design §4.1, TD-030)
         await c.call("kill", id=a["id"])
         await wait_state(c, a["id"], "exited")
-        b = await c.call("create", name="one", dir=str(tmp_path), adapter="command", argv=["sleep", "30"])
+        b = await c.call("create", name="one", dir=str(tmp_path), adapter="agentshell", argv=["sleep", "30"])
         assert b["id"] == a["id"] and b["previous_run"] == a["run_log"]
 
 
@@ -716,12 +726,21 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
     """Design §4.8, §9 invariant 11: a session acting on another session needs `control`;
     self, no caller, and every read pass; `set_grants` is a person's (or a granted session's)."""
     async with LocalClient() as person:
-        a = (await person.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        a = (
+            await person.call(
+                "create", name="a", dir=_own(tmp_path, "a"), adapter="agentshell", argv=["bash", "--norc"]
+            )
+        )["id"]
         # b is a worker (`unattended`): an interactive b would be refused for a different reason,
         # §9 invariant 5, which has its own test below
         b = (
             await person.call(
-                "create", name="b", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+                "create",
+                name="b",
+                dir=_own(tmp_path, "b"),
+                adapter="agentshell",
+                argv=["bash", "--norc"],
+                unattended=True,
             )
         )["id"]
         assert (await person.call("get", id=a))["capabilities"] == []
@@ -735,7 +754,7 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
                 ("set_mode", {"id": b, "unattended": True}),
                 ("remove", {"id": b}),
                 ("decide", {"id": b, "tool_use_id": "tu", "behavior": "allow"}),  # TD-116
-                ("create", {"name": "c", "dir": str(tmp_path), "adapter": "shell"}),
+                ("create", {"name": "c", "dir": _own(tmp_path, "c"), "adapter": "agentshell"}),
                 ("set_grants", {"id": a, "add": ["control"]}),  # no self-grant
                 ("set_grants", {"id": b, "add": ["control"]}),
             ):
@@ -767,7 +786,12 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             await worker.call("send", id=b, text="echo FROM-A")
             # create adds the creator, so a may act on what it started without a second call
             c = await worker.call(
-                "create", name="c", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+                "create",
+                name="c",
+                dir=_own(tmp_path, "c"),
+                adapter="agentshell",
+                argv=["bash", "--norc"],
+                unattended=True,
             )
             assert c["capabilities"] == []
             assert c["controllers"] == [a]
@@ -782,15 +806,15 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
         d = await person.call(
             "create",
             name="d",
-            dir=str(tmp_path),
-            adapter="shell",
+            dir=_own(tmp_path, "d"),
+            adapter="agentshell",
             argv=["bash", "--norc"],
             capabilities=["control"],
         )
         assert d["capabilities"] == ["control"]
         assert json.loads((paths.sessions_dir() / f"{d['id']}.json").read_text())["capabilities"] == ["control"]
         with pytest.raises(AgentError, match="unknown grant"):
-            await person.call("create", name="e", dir=str(tmp_path), adapter="shell", capabilities=["sudo"])
+            await person.call("create", name="e", dir=_own(tmp_path, "e"), adapter="agentshell", capabilities=["sudo"])
         for sid in (a, c["id"], d["id"]):
             await person.call("kill", id=sid)
 
@@ -804,7 +828,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
     async with LocalClient() as person:
 
         def mk(n: str):
-            return person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            return person.call("create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"])
 
         ui, backend, shared = [(await mk(n))["id"] for n in ("ui", "backend", "shared")]
         await person.call("set_mode", id=shared, unattended=True)  # a worker: §9 invariant 5 is tested apart
@@ -849,14 +873,14 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
         # create: the creator is added, and the child's grants may not exceed the creator's
         async with LocalClient(caller=ui) as ui_orc:
             child = await ui_orc.call(
-                "create", name="child", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]
+                "create", name="child", dir=_own(tmp_path, "child"), adapter="agentshell", argv=["bash", "--norc"]
             )
             assert child["controllers"] == [ui]
             grandchild_ok = await ui_orc.call(
                 "create",
                 name="gkid",
-                dir=str(tmp_path),
-                adapter="shell",
+                dir=_own(tmp_path, "gkid"),
+                adapter="agentshell",
                 argv=["bash", "--norc"],
                 capabilities=["control"],
                 controllers=[backend],
@@ -866,9 +890,11 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
         async with LocalClient(caller=shared) as ungranted:
             await person.call("set_grants", id=shared, remove=["control"])
             with pytest.raises(AgentError, match="needs the control grant"):
-                await ungranted.call("create", name="nope", dir=str(tmp_path), adapter="shell")
+                await ungranted.call("create", name="nope", dir=_own(tmp_path, "nope"), adapter="agentshell")
         # a person's create has no caller, so the new record starts with only what was asked for
-        lone = await person.call("create", name="lone", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        lone = await person.call(
+            "create", name="lone", dir=_own(tmp_path, "lone"), adapter="agentshell", argv=["bash", "--norc"]
+        )
         assert lone["controllers"] == []
         # the list survives the store, like `capabilities` (§4.8: it is reloaded with the record)
         assert json.loads((paths.sessions_dir() / f"{child['id']}.json").read_text())["controllers"] == [ui]
@@ -882,7 +908,9 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
     "no caller" and skip both halves of the gate. Also pins the two ids `_gate` leaves to the
     method: a registry-only record and a missing `id`."""
     async with LocalClient() as person:
-        victim = await person.call("create", name="v", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        victim = await person.call(
+            "create", name="v", dir=_own(tmp_path, "v"), adapter="agentshell", argv=["bash", "--norc"]
+        )
         vid = victim["id"]
 
         async def raw(req: dict) -> dict:
@@ -900,7 +928,11 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
         # absent: a person, and allowed exactly as before
         assert (await raw({"id": 2, "method": "set_mode", "params": {"id": vid, "unattended": True}}))["result"]
         # a granted non-member still cannot reach it through an odd caller either
-        orc = (await person.call("create", name="o", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        orc = (
+            await person.call(
+                "create", name="o", dir=_own(tmp_path, "o"), adapter="agentshell", argv=["bash", "--norc"]
+            )
+        )["id"]
         await person.call("set_grants", id=orc, add=["control"])
         async with LocalClient(caller=orc) as orc_client:
             with pytest.raises(AgentError, match="not in its controllers"):
@@ -923,7 +955,9 @@ async def test_interactive_sessions_are_out_of_every_controller_s_reach(agent, t
     async with LocalClient() as person:
 
         def mk(n: str, **kw):
-            return person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw)
+            return person.call(
+                "create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"], **kw
+            )
 
         orc = (await mk("orc"))["id"]
         await person.call("set_grants", id=orc, add=["control"])
@@ -1234,7 +1268,7 @@ async def test_a_session_past_its_stop_time_is_wrapped_up_then_killed(agent, tmp
     moment it settles."""
     async with LocalClient() as person:
         s = await person.call(
-            "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            "create", name="w", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc", "--noprofile"],
             unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up and exit",
         )  # fmt: skip
         sid = s["id"]
@@ -1275,7 +1309,7 @@ async def test_a_session_that_never_settles_is_stopped_when_the_grace_runs_out(a
     the state under test is the one being asserted and not whatever the pane happens to say."""
     async with LocalClient() as person:
         sid = (await person.call(
-            "create", name="w2", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            "create", name="w2", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc", "--noprofile"],
             unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up",
         ))["id"]  # fmt: skip
         rec = agent.sessions[sid]
@@ -1296,7 +1330,7 @@ async def test_a_stop_time_only_binds_an_unattended_session(agent, tmp_path):
     nothing will ever act on is the TD-026 failure inverted, so `set_stop` refuses it."""
     async with LocalClient() as person:
         sid = (await person.call(
-            "create", name="i", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            "create", name="i", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc", "--noprofile"],
         ))["id"]  # fmt: skip
         with pytest.raises(AgentError, match="interactive"):
             await person.call("set_stop", id=sid, run_until="2026-09-13T06:00:00Z")
@@ -1330,7 +1364,9 @@ async def test_the_tick_retires_a_branch_claim_the_session_abandoned(agent, tmp_
     # "could not ask", which retires nothing (TD-045)
     monkeypatch.setattr(reports, "_prs_for_head", lambda directory, branch, **kw: [])
     async with LocalClient() as person:
-        sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        sid = (await person.call("create", name="w", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
 
         async def claimed():
             """the branch it is on is derived as a claim"""
@@ -1379,7 +1415,9 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         reports, "_prs", lambda directory, **kw: [{"number": 77, "state": "OPEN", "headRefName": "td077-cap"}]
     )
     async with LocalClient() as person:
-        sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        sid = (await person.call("create", name="w", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
 
         async def progress_is(want):
             got = (await person.call("get", id=sid))["progress"]
@@ -1421,7 +1459,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         assert sid not in agent._derived_at  # no key outlives the record
         # a record created with the repo's `ledger:` (read by the client from `.shiftlead.yml`) hands
         # that path to the derivation — the agent itself never reads the file
-        other = (await person.call("create", name="l", dir=str(repo), adapter="shell", argv=["bash", "--norc"],
+        other = (await person.call("create", name="l", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"],
                                    role="grinder", ledger="docs/debt.md"))  # fmt: skip
         assert other["role"] == "grinder" and other["ledger"] == "docs/debt.md"
         ledgers.clear()
@@ -1675,12 +1713,16 @@ async def test_derived_entries_go_to_the_record_that_holds_the_directory(agent, 
     ]
     monkeypatch.setattr(reports, "_prs", lambda directory, **kw: prs)
     async with LocalClient() as person:
-        old = (await person.call("create", name="run-1", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        old = (await person.call("create", name="run-1", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
         # what run 1 was credited with while it held the directory, and then it exits
         await person.call("progress", id=old, ref="TD-070", status="claimed", pr=70, source="derived")
         await person.call("kill", id=old)
         await wait_state(person, old, "exited")
-        new = (await person.call("create", name="run-2", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        new = (await person.call("create", name="run-2", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
 
         async def credited():
             """the live record holds the branch's claim"""
@@ -1741,7 +1783,7 @@ async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_u
     """
     async with LocalClient() as person:
         s = await person.call(
-            "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            "create", name="w", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc", "--noprofile"],
             unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up and exit",
         )  # fmt: skip
         sid = s["id"]
@@ -2115,7 +2157,7 @@ async def test_a_mode_change_is_pushed_at_the_press(agent, tmp_path, monkeypatch
     Called on the agent directly: nothing in the method awaits but the push, so no tick runs inside
     it, and a push counted during the call is the method's own."""
     async with LocalClient() as c:
-        sid = (await c.call("create", name="m", dir=str(tmp_path), adapter="shell"))["id"]
+        sid = (await c.call("create", name="m", dir=str(tmp_path), adapter="agentshell"))["id"]
     pushed = []
     push = agent._push_changes
 

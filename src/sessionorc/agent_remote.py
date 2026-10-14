@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import (
+    adapters,
     agent_common,
     containers,
     hosts,
@@ -410,7 +411,9 @@ class RemoteMixin:
         is not checked: its path is another directory."""
         if host not in containers.container_nodes():
             return
-        if params.get("kind", "interactive") != "interactive" or params.get("adapter", "shell") == "shell":
+        if params.get("kind", "interactive") != "interactive" or not adapters.has_agent(
+            str(params.get("adapter", "shell"))
+        ):
             return
         if params.get("held"):
             return  # a held create makes no pane, and holds no checkout: rule 3's fill checks it (TD-660)

@@ -45,6 +45,10 @@ class Adapter(Protocol):
         ...
 
     # Optional, looked up with getattr:
+    #   agent: bool                                       False when what is typed at it is no prompt an agent
+    #                                                      runs a turn on — `shell` and `command`; True where
+    #                                                      unset. Read through `has_agent`, never an adapter's
+    #                                                      name (design §4.3 *A record with no agent*, TD-665)
     #   start_context: bool                               True when `launch` takes `start_context`, text the
     #                                                      session holds from its start with no turn run for it
     #                                                      (design §4.3, TD-283); `create` hands it only to such
@@ -222,6 +226,16 @@ class Transcript:
         return out
 
 
+def has_agent(adapter: str) -> bool:
+    """Whether a record of this adapter runs an agent (design §4.3 *A record with no agent*, TD-665):
+    the adapter's `agent`, True where unset. An adapter this host does not know is taken at its
+    default, as a node's record of an adapter installed there alone is."""
+    try:
+        return bool(getattr(get(adapter), "agent", True))
+    except KeyError:
+        return True
+
+
 def short_model(adapter: str, model: str | None) -> str:
     """An observed model name as its adapter spells it short (TD-031) — `claude-fable-5-1` reads
     `fable-5-1` on a card. An adapter with no opinion, or none at all: the name as observed."""
@@ -269,6 +283,7 @@ class ShellAdapter:
     name = "shell"
     label = "Shell"  # a display name like any adapter's; a shell reports no quota, so it draws no chip
     state_source: Confidence = "scraped"
+    agent = False  # what is typed at it runs as a command line, never a turn (§4.3, TD-665)
 
     def launch(
         self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""

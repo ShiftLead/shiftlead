@@ -20,6 +20,13 @@ ITEM = (
 BOARD_TEXT = f"# User attention\n\nFormat: `- [ ] …`\n\n## Needs the user\n\n- [ ] {ITEM}\n- [ ] n/a — undated.\n"
 
 
+def _own(tmp_path, name: str) -> str:
+    """A directory of its own: a stand-in for an agent keeps the anchor rule (§9 invariant 2)."""
+    d = tmp_path / name
+    d.mkdir(exist_ok=True)
+    return str(d)
+
+
 def git(root: Path, *args: str) -> str:
     return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=True).stdout.strip()
 
@@ -473,7 +480,7 @@ async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, t
     _registry(tmp_path, repo)
     path = str(repo / board.BOARD)
     async with LocalClient() as me:
-        mk = lambda n: me.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])  # noqa: E731
+        mk = lambda n: me.call("create", name=n, dir=_own(tmp_path, n), adapter="agentshell", argv=["bash", "--norc"])  # noqa: E731
         h, both, idle = [(await mk(n))["id"] for n in ("holder", "both", "idle")]
         for sid, refs in ((h, ["td-122"]), (both, ["#1020", "TD-123"])):
             async with LocalClient(caller=sid) as s:
@@ -504,7 +511,7 @@ async def test_board_reply_hands_a_note_to_each_live_lease_holder(agent, repo, t
 
 async def _orphan(me, repo, tmp_path, text, about, **kw):
     """A question from a session in `repo` that names `about`, orphaned by closing its asker."""
-    w = (await me.call("create", name="asker", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+    w = (await me.call("create", name="asker", dir=str(repo), adapter="agentshell", argv=["bash", "--norc"]))["id"]
     async with LocalClient(caller=w) as s:
         mid = (await s.call("msg", to="person", text=text, about=about, **kw))["entry"]["id"]
     await me.call("close", id=w)
@@ -544,7 +551,9 @@ async def test_an_answer_to_an_orphaned_question_is_written_on_the_board_and_sen
         assert git(repo, "status", "--porcelain") == ""  # committed, never left dirty
 
         # with a holder: the line, and one handed note to the session that holds the reference
-        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
         async with LocalClient(caller=h) as s:
             await s.call("progress", id=h, ref="td-149")
         steer = await _orphan(me, repo, tmp_path, "Drop the key?", "td-149", kind="steer", default="drop it")
@@ -569,7 +578,9 @@ async def test_a_full_closed_askers_mailbox_never_keeps_the_answer_from_the_hold
 
     _registry(tmp_path, repo)
     async with LocalClient() as me:
-        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        h = (await me.call("create", name="holder", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]))[
+            "id"
+        ]
         async with LocalClient(caller=h) as s:
             await s.call("progress", id=h, ref="TD-149")
         q = await _orphan(me, repo, tmp_path, "Which?", "TD-149", kind="ask")

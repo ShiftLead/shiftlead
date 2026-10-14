@@ -35,13 +35,23 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from _stubs import ComposerStub, HookFedStub
+from _stubs import AgentShellStub, ComposerStub, HookFedStub
 
 from sessionorc import paths
 from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 
 HERE = Path(__file__).parent
+
+
+@pytest.fixture(autouse=True)
+def _agentshell(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`agentshell` (tests/_stubs.py) beside the built-ins for every test: a shell that counts as an
+    agent, for a test that drives an agent's path through a bash pane (design §4.3, TD-665)."""
+    from sessionorc import adapters
+
+    adapters.load_all()
+    monkeypatch.setitem(adapters._REGISTRY, AgentShellStub.name, AgentShellStub())
 
 
 @pytest.fixture(autouse=True)

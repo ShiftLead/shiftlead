@@ -122,7 +122,7 @@ async def test_hand_to_the_techlead_claims_the_draft_for_the_ask(agent, tmp_path
                 "create",
                 name="tl",
                 dir=str(tmp_path),
-                adapter="shell",
+                adapter="agentshell",
                 argv=["bash", "--norc", "--noprofile"],
                 unattended=True,
                 supervised=True,
