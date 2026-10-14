@@ -11459,3 +11459,52 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-463 (CI flakes).
 
 **Resolved:** 2026-10-14 (grinder-ao-1, PR #1706) — `_git` asserts with git's stderr in its message, so a failure names its cause; the test reads the board from origin's `main` (`git show`), where the write-back lands, instead of pulling the checkout beside the home's own pull of it (§6 *Pull*). Neither cause was reproduced: the race is closed whichever it was.
+
+## TD-665: A shell's Focus and card draw an agent's controls: Wrap up types the wrap-up prompt into bash, and Message, Reports, Ready to close and the Session card's grants and controllers are agent-shaped
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (Paul, through Add entry; drafted by ao-shiftlead-entry-5)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done
+**Blocked by:** TD-666
+**Location:** `src/shiftlead/ui/templates/focus.html` (the acts line: Message, Wrap up; the composer's *Compose a prompt…*; the side panel: Reports, Ready to close, Session's grants and controllers), `src/shiftlead/ui/templates/card.html` (the card's **more ▾**: Wrap up ~L148), `src/shiftlead/ui/app.py` (`wrapup` sends `WRAPUP_PROMPT` with no adapter check ~L2228), `src/sessionorc/models.py` (`WRAPUP_PROMPT`), `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1032: tree clean, branch pushed, subagents, outcomes, mail), `src/sessionorc/reports.py` (derived claims from the directory's branch); design §4.5a rows *Focus: Wrap up*, *card: more ▾*, *Message*, *Focus: Open shell here*, §4.5 *The Focus screen's anatomy*, §4.1 *A plain shell is an adapter*, §4.8 *The person's own shell is the person* (TD-580)
+
+**Why:** Paul, 2026-10-13, on `dc-paul-shell` (opened by **Open shell here** from `dc-paul`): *"it has items that do not belong — like the "wrap up" button … make sure everything there is specifically for a shell/command instead of an agent."* Screenshot: `docs/mockups/reviews/td-665/shell-focus-2026-10-13.png`. The Focus template and the card draw the same controls for every adapter; only Transcript and its editor link know a shell has no tool session id. What that does on a shell:
+- **Wrap up** types `WRAPUP_PROMPT`, English prose, into bash, which **runs it as a command line** (the screenshot: `-bash: syntax error near unexpected token '('`). Prose with a backtick, `$(` or `;` in it would run something. A shell runs no hooks (§4.3), so nothing can wrap it up: the control can only do harm.
+- **Message** mails an inbox that nothing reads: a shell has no `ao inbox` hook and no agent to run one.
+- **Reports** shows the claims derived from the directory's branch (the screenshot: *TD-104 claimed*), so a shell opened in a worker's worktree shows the worker's claim as its own.
+- **Ready to close** checks an agent's hand-off (tree clean, branch pushed, subagents, outcomes reported, mail read). A shell that shares another session's worktree is never *ready* while that agent's files are dirty, and the confirm says *its worktree reaped* for a shell that holds no worktree.
+- The composer says *Compose a prompt…*; on a shell Send types commands. The Session card draws **grants** and **controllers**, which mean nothing for the person's own shell (§4.8, TD-580: no role, no controller).
+
+**Fix:** design first. A §4.5a reading per adapter capability (no hooks, no tool session id, no mailbox reader), not `adapter == "shell"` checks in templates (§4.3: core names no adapter). The round settles, for a `shell` (and a `kind: command` run): (1) Wrap up left out of Focus and the card, and the `send` RPC with `wrapup` refused for an adapter with no agent (so `ao team stop` and the policy cannot type it either); (2) Message left out, or kept only where something reads the inbox; (3) Reports left out, or derived claims shown only on an agent's record; (4) Ready to close for a shell: Close with a plain confirm (*the shell is killed; the directory is left as it is*), or which checks apply; (5) the composer's words (*Type a command…*) and whether its attach and prompt chips apply; (6) the Session card's rows (grants, controllers, adapter id, context) for a shell. The design names the build entry.
+
+**Done when** §4.5a says which Focus and card controls a shell draws, and why, and the build entry is filed.
+
+**Related:** TD-580 (the person's own shell), TD-577 (Open shell here), TD-112 (adapter neutrality), TD-156 (the Focus review).
+
+**Resolved:** 2026-10-14 (grinder-ao-2, PR #1707) — designed 2026-10-13 (§4.3 *A record with no agent*, §4.5a *Focus, card: A record with no agent*, §4.10, §6 *Stop time*), built by TD-666 (#1701, #1707, archived below).
+
+## TD-666: Build TD-665: a record with no agent — the adapter's `agent` on the view; no prose typed, no mail, no derived claim; Focus and the card draw a shell's controls
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-13 (the designer, TD-665's round)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.3 *A record with no agent*, §4.5a *Focus, card: A record with no agent* (and *more ▾*, *Wrap up*, *Message*), §4.10, §6 *Stop time*; `src/sessionorc/adapters.py` (`Adapter`'s optional attributes ~L47; `ShellAdapter` ~L254, `CommandAdapter` ~L273: `agent = False`), `src/sessionorc/agent_serve.py` (`_view` ~L49, which already reads `adapters.get(s.adapter)`; `agent` set before the early return for a node's own records ~L76), `src/sessionorc/agent.py` (`rpc_send` ~L2008: `wrapup` refused), the stop-time and team-stop kill, `src/sessionorc/agent_wake.py` (the doorbell), `agent_tick.py` (nudges, pause and resume prompts, fills), `agent_mail.py` (`rpc_msg`: an addressee with no agent refused), `src/sessionorc/reports.py` (`derive` ~L67: skip it); `src/shiftlead/ui/templates/focus.html` (~L100 Wrap up, Message, the composer, Reports, Inbox, Working, the Session card), `card.html` (~L148), `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1032), `src/shiftlead/ui/app.py` (~L2228 `wrapup`)
+
+**Why:** TD-665: Paul, 2026-10-13, on `dc-paul-shell` — *make sure everything there is specifically for a shell/command instead of an agent*; Wrap up typed English prose into bash, which ran it (`docs/mockups/reviews/td-665/shell-focus-2026-10-13.png`).
+
+**Fix:** two slices.
+1. **The host** (`src/sessionorc/**`, held): `agent` on the adapter (`getattr(adapter, "agent", True)`), `False` on `shell` and `command`, put on the view in `agent_serve._view`, a node's included; every existing `adapter == "shell"` check converted to `agent` (so a `command` run is covered too) — `agent.py` ~L1063, ~L1593, `agent_tick.py` ~L2483, ~L3407, ~L3419, `agent_spend.py` ~L345, ~L369, `agent_settings.py` ~L60, `agent_remote.py` ~L413 — or left in words where it means the adapter itself (the tick's adoption of a hand-started session as `shell`, `agent_tick.py` ~L3712); `set_mode` to `unattended` refused for a record with no agent; `send` with `wrapup` refused in §4.3's words; the stop time and `ao team stop` kill a record with no agent at once; no doorbell, nudge, pause/resume prompt or fill typed into one; `msg` refuses it as an addressee (*nothing reads `<name>`'s inbox — it runs no agent*), the person included; `reports.derive` skips it.
+2. **The pages** (`src/shiftlead/ui/**`): every control in §4.5a's row read from the view's `agent` — Wrap up, Message, Reports, Inbox, Working, Told at start, the grants and controllers chips, the adapter id, context and rounds lines, the ready-to-close caption and checklist, and prompt chips and the mode toggle (Take over, Hand back, *Switch to unattended*) not drawn; the composer's *Type a command…*, Send never *Steer*; Close offered without the checks, its confirm *the shell is killed; the directory is left as it is*, reaping nothing. No template names an adapter. A look by the builder (§4.9b *A UI change is verified by its builder*): Focus and the card of a shell beside an agent's, shots committed under `docs/mockups/reviews/`.
+3. Tests: the view carries `agent` false for `shell` and `command` and true for `claude-code`; `send` with `wrapup` refused on a shell; a shell's stop time kills it with nothing typed; `msg` to a shell refused, from a session and from the person; `derive` gives a shell in a worker's worktree no claim; the Focus and card renders of a shell lack each control the row names and draw *Type a command…*; Close on a shell reaps no worktree; `set_mode` unattended refused on a shell; a `command` run is spared the pause, nudge and fill as a shell is.
+
+**Done when** nothing types prose into a shell or a command run, mail to one is refused, no claim is derived for one, Focus and the card draw only a shell's controls (looked at, shots in the PR), and the tests above pass.
+
+**Related:** TD-665 (the design), TD-580 (the person's own shell), TD-577 (Open shell here), TD-112 (adapter neutrality).
+
+**Resolved:** 2026-10-14 (grinder-ao-2, PR #1707) — slice 1 (#1701, grinder-ao-1): the host keys on the adapter's `agent` — no wrap-up, mail, doorbell, fill or derived claim for a record with none, a stop time kills it at once. Slice 2 (#1707): Focus and the card read the view's `agent` and draw a shell's controls — no Wrap up, Message, mode toggle, Reports, Inbox, Working, Told at start, grants, controllers, adapter id, context, rounds or Ready to close; *Type a command…*, Send never Steer, Close without the checks under *the shell is killed; the directory is left as it is*. Looked at on a scratch home, shots in `docs/mockups/reviews/2026-10-14-td666-*.png`.
