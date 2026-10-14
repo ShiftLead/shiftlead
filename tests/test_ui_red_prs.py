@@ -121,6 +121,19 @@ def test_red_pr_rows_are_for_a_repo_no_team_services_alone():
     assert s["needs"] == [] and [e["row"] for e in s["snoozed"]] == ["red_pr"]
 
 
+def test_a_sync_prs_row_says_sync_and_its_reason_green_or_red():
+    """TD-684, §4.5a *Inbox row: red PR*: a sync PR the home did not merge has the row at once, its
+    reason in place of the failing checks."""
+    from shiftlead.ui.app import red_pr_rows
+
+    root = "/r/samscrape"
+    sync = order(1728, checks="green", failing=[], red_since=None, sync=True, sync_since=_iso(now()), reason="green: review and merge it")  # fmt: skip
+    (row,) = red_pr_rows({root: reading(root, orders=[sync])}, [], now())
+    assert row["text"] == "samscrape #1728 · sync · green: review and merge it · eye"
+    assert row["sid"] == "red_pr:samscrape:1728" and row["at"] == sync["sync_since"]
+    assert red_pr_rows({root: reading(root, orders=[sync])}, [rec("g1", root)], now()) == []  # serviced: a lane's
+
+
 def fake(repos, fleet):
     class Fake:
         def __init__(self, *a, **k):

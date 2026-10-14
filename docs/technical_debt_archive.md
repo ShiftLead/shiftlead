@@ -12157,3 +12157,23 @@ The window's `w.name` assignment, by contrast, is caught.
 **Done when** `ao team --skill` prints step 0b, the small-repo sentence, the public-repo sentence and the tool-neutral heading.
 
 **Related:** TD-591, TD-588.
+
+## TD-684: Build TD-681 (1): a sync PR the home does not merge is the team's `pr:<n>` order at once, first in the pick order; the Inbox row where no team services the repo
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-681's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *A sync PR is the team's at once, unless the home merges it*, §4.5a *Inbox row: red PR*; `src/sessionorc/reports.py` (`pr_reading`, `_gh_prs`: the sync flag and `sync_since`), `src/sessionorc/workorders.py` (`red_prs`, `pr_order`), `src/sessionorc/agent_tick.py` (`_red_prs`), `src/shiftlead/teamrun.py` (`pr_orders`, the pick order `ao repo` prints), `src/shiftlead/ui/inbox.py` (the red PR row), `src/shiftlead/briefs/anchor.md` and `grinder.md`
+
+**Why:** TD-681's design. On 2026-10-14 two green sync PRs sat in repos where no session ran, and ShiftLead's #1728 sat red until a session added a step by hand. The red-PR rule waits `ORPHAN_AFTER` for red PRs and never orders a green one, so nothing gave these PRs an owner.
+
+**Fix:** in `reports.pr_reading`, a sync PR is one whose `branch` starts `cadence-sync-` and whose changed files include `docs/cadence-sync.lock`. The files are read only for a candidate branch, once per head, whole (`gh api repos/<o>/<r>/pulls/<n>/files --paginate`, never `gh pr view --json files`, which is capped), and the flag is kept on the row as `sync: true`. The row also carries `isCrossRepository` as `fork` and, for a sync PR, **`sync_since`**: the first reading that saw it open, kept from `old` as `red_since` is. In `sessionorc.workorders`, an unheld sync PR is a `pr_order` marked `sync: true` from the first reading that sees it, with no `ORPHAN_AFTER`, whatever `checks` says except *pending*. Until TD-685 lands no PR is merged at the home, so the order's `Context` is the URL plus the failing checks, *conflicting*, *draft*, or *green: review and merge it*. The holders' test and the lanes stay as for a red PR. The idle holder's told-once note and its passing-over after a second `ORPHAN_AFTER` key on `sync_since` in place of `red_since`. `ao repo`'s pick order lists sync orders before every entry and every other order. The *Inbox row: red PR* takes a sync PR in a repo no team services at once, green or red, with the reason in its line, and it leaves when the PR merges, closes or is held. The anchor's and grinder's briefs each gain one sentence: *a `pr:<n>` order marked sync is taken before the lane's entries: read its reason, fix it on the PR's branch if it needs a step, review it as any PR of yours, merge it at the gate.* The anchor brief also names `pr:<n>` orders where it lists the lane word's work orders. This is `src/sessionorc/**`, so the techlead reads it (§4.9b).
+
+**Done when** an open `cadence-sync-*` PR touching the lock, green or red and held by no live record, is a `pr:<n>` order marked sync on the reading that first sees it, and is first in `ao repo`'s pick order. A pending one is not an order. In a repo no team services it is the Inbox's red PR row with its reason. Both briefs carry the sentence. Tests cover the four `checks` states, held vs unheld, an idle holder of a green sync PR told and then passed over, a sync PR with more than 100 files whose lock is past the hundredth, and the pick order.
+
+**Related:** TD-681 (the design), TD-685 (the home's merge, which narrows this order to what it does not merge), TD-613 and TD-652 (the red-PR order and its holders).
+
+**Resolved:** 2026-10-14 (grinder-ao-1, PR #1762) — the open PR reading marks a `cadence-sync-*` PR `sync` when `docs/cadence-sync.lock` is among its files, read whole through `gh api …/pulls/<n>/files --paginate` once per head (`sync_head`), and carries `sync_since` and `fork`. `workorders.red_prs` orders an unheld sync PR from the first reading, any `checks` but *pending*, marked `sync` with its `reason` (failing checks, *conflicting*, *draft*, else *green: review and merge it*) as its `Context`; an idle holder is told and passed over on `sync_since`. Sync orders are first in `teamrun.lane_entries` and in `ao repo` (counted as *n sync PR to land*); the Inbox's *red PR* row draws one as *`<repo>` #<n> · sync · <reason>*; the anchor's and grinder's briefs carry the sentence. Held by `tests/test_workorders.py`, `tests/test_repo_facts.py`, `tests/test_ui_red_prs.py`; the PR's UI check read the row. The home's merge stays TD-685.

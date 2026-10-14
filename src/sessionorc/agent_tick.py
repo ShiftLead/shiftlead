@@ -2713,7 +2713,9 @@ class TickMixin:
         repo's open PRs that have read red or conflicting for `ORPHAN_AFTER` are read against the live
         records of that repo — an unheld one is a `pr:<n>` order under the reading's `pr_orders`, an
         idle holder is told once per red spell (a `system` note, outside the wake budget), and `after`
-        that, still idle, no longer holds it. A change is saved and pushed as a `repos` event."""
+        that, still idle, no longer holds it. A sync PR is an order from the first reading that sees
+        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684). A change is saved and
+        pushed as a `repos` event."""
         records = [r for r in self._graph().values() if r.repo]
         for root, r in list(self._repos.items()):
             try:

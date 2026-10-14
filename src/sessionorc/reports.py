@@ -269,7 +269,13 @@ def _when(v: Any) -> datetime | None:
 
 
 PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,headRefOid,author,isDraft"
-OPEN_PR_FIELDS = f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName"  # the open read alone (TD-613)
+OPEN_PR_FIELDS = (
+    f"{PR_FIELDS},statusCheckRollup,mergeStateStatus,baseRefName,isCrossRepository"  # the open read alone (TD-613)
+)
+# a sync PR (design §4.4 *A sync PR is the team's at once*, TD-684): its head branch as dev-cadence's
+# `sync-all.sh` names it, and the lock among its changed files
+SYNC_BRANCH = "cadence-sync-"
+SYNC_LOCK = "docs/cadence-sync.lock"
 
 RED_CONCLUSIONS = frozenset({"FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"})
 RED_STATES = frozenset({"FAILURE", "ERROR"})  # a commit status's (`StatusContext`) words for red
@@ -454,8 +460,42 @@ def _gh_prs(
             row["checks"], row["failing"] = fold_checks(p.get("statusCheckRollup"))
             row["merge_state"] = str(p.get("mergeStateStatus") or "").upper()
             row["conflicting"] = row["merge_state"] == "DIRTY"
+            row["fork"] = bool(p.get("isCrossRepository"))
         prs.append(row)
     return prs
+
+
+def pr_files(directory: Path | str, pr: int, timeout: float) -> list[str] | str:
+    """Every file an open PR changes, read whole — the forge's paginated list, never `gh pr view
+    --json files`, which stops at 100 — or why it could not be read (TD-684)."""
+    try:
+        cp = subprocess.run(
+            ["gh", "api", f"repos/{{owner}}/{{repo}}/pulls/{pr}/files", "--paginate", "--jq", ".[].filename"],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh api failed"])[-1][:200]
+    return [line.strip() for line in (cp.stdout or "").splitlines() if line.strip()]
+
+
+def _sync_flag(directory: Path | str, p: dict[str, Any], was: dict[str, Any], timeout: float) -> None:
+    """Sets `sync` on an open PR (design §4.4 *A sync PR is the team's at once*, TD-684): whether its
+    branch is `SYNC_BRANCH`-named and `SYNC_LOCK` among its files, and `sync_head`, the head its files
+    were read at — once per head, the last reading's word kept while the head is the same. A read
+    that failed keeps the last word and its head, so the next reading asks again; never read, no
+    flag. Not a candidate: neither."""
+    if not p["branch"].startswith(SYNC_BRANCH):
+        return
+    if isinstance(was.get("sync"), bool) and (was.get("sync_head") == p["head"] or not p["head"]):
+        p["sync"], p["sync_head"] = was["sync"], was.get("sync_head")
+        return
+    files = pr_files(directory, p["number"], timeout)
+    if not isinstance(files, str):
+        p["sync"], p["sync_head"] = SYNC_LOCK in files, p["head"]
+    elif isinstance(was.get("sync"), bool):
+        p["sync"], p["sync_head"] = was["sync"], was.get("sync_head")
 
 
 def _gh_counts(directory: Path | str, now: datetime, timeout: float) -> dict[str, dict[str, int]] | str:
@@ -513,7 +553,10 @@ def pr_reading(
     why}`**, never an empty reading: for a count, *no PRs* and *could not look* must not read the
     same — `merged_prs`'s rule, not `_prs`'s. Each open PR carries `checks`, `failing`, `conflicting`
     and, while it is red or conflicting, `red_since`: the first reading that saw it so, taken from
-    `old` (the last reading) by number and dropped the reading it is neither (TD-613)."""
+    `old` (the last reading) by number and dropped the reading it is neither (TD-613); `fork`, whether
+    its head is another repository's; and on a `cadence-sync-*` branch `sync`, whether it is a sync PR
+    (`_sync_flag`), and for one `sync_since`, the first reading that saw it open, kept as `red_since`
+    is (TD-684)."""
     if not Path(directory).is_dir():
         return {"error": f"{directory} is not a directory here"}
     since = now - PR_WINDOWS["month"]
@@ -527,6 +570,10 @@ def pr_reading(
             p["conflicting"] = True
         if p["checks"] == "red" or p["conflicting"]:
             p["red_since"] = olds.get(p["number"], {}).get("red_since") or now.isoformat()
+        was = olds.get(p["number"]) or {}
+        _sync_flag(directory, p, was, timeout)
+        if p.get("sync"):
+            p["sync_since"] = was.get("sync_since") or now.isoformat()
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):

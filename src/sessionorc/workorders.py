@@ -419,8 +419,28 @@ def red_holders(
     return out
 
 
+def is_sync_order(pr: dict[str, Any]) -> bool:
+    """A sync PR the reading can order (design §4.4 *A sync PR is the team's at once*, TD-684): any
+    `checks` but *pending*, which waits — unless it is conflicting, when no check will run. Until the
+    home merges one (TD-685), every other is an order."""
+    waits = pr.get("checks") == "pending" and not pr.get("conflicting")
+    return bool(pr.get("sync")) and bool(pr.get("sync_since")) and not waits
+
+
+def sync_reason(pr: dict[str, Any]) -> str:
+    """Why a sync PR waits on someone, in its order's words: the failing checks, *conflicting*,
+    *draft*, else *green: review and merge it*."""
+    why = [*(pr.get("failing") or []), *(["conflicting"] if pr.get("conflicting") else [])]
+    why += ["draft"] if pr.get("draft") else []
+    return ", ".join(why) or "green: review and merge it"
+
+
 def pr_note(pr: dict[str, Any]) -> str:
-    """The one line an idle holder of a red PR is told."""
+    """The one line an idle holder of a red PR, or of a sync PR, is told."""
+    if is_sync_order(pr):
+        return (
+            f"sync PR #{pr['number']} has been open since {pr.get('sync_since')}: {sync_reason(pr)} — fix it or say why"
+        )
     why = ", ".join(pr.get("failing") or []) or ("conflicting with its base" if pr.get("conflicting") else "red")
     return f"PR #{pr['number']} has been red since {pr.get('red_since')}: {why} — fix it or say why"
 
@@ -429,11 +449,13 @@ def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
     """A red PR nobody holds as the lanes and the pages read an entry: `pr:<n>`, the PR's title, High,
     pickable, its `Context` the URL and the failing checks. `pr_order` marks it: the `anchor` lane
     takes it, a `free-pick` lane only where it carries `free_pick` (no servicing team has an anchor
-    seat, which only the team context can tell)."""
+    seat, which only the team context can tell). A sync PR's (TD-684) is marked `sync`, with
+    `sync_since` and its `reason` (`sync_reason`), which is its `Context` beside the URL."""
     failing = list(pr.get("failing") or [])
-    context = " · ".join(
-        filter(None, [str(pr.get("url") or ""), ", ".join(failing), "conflicting" * bool(pr.get("conflicting"))])
-    )
+    sync = is_sync_order(pr)
+    why = sync_reason(pr) if sync else ""
+    red = [", ".join(failing), "conflicting" * bool(pr.get("conflicting"))]
+    context = " · ".join(filter(None, [str(pr.get("url") or ""), *([why] if sync else red)]))
     return {
         "id": f"{PR_PREFIX}{pr['number']}",
         "title": str(pr.get("title") or ""),
@@ -456,6 +478,7 @@ def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
         "context": context,
         "refs": [],
         "text": "",
+        **({"sync": True, "sync_since": pr.get("sync_since"), "reason": why} if sync else {}),
     }
 
 
@@ -471,25 +494,38 @@ def red_prs(
 
     A PR red or conflicting for `after` (from `red_since`) with no holder is an order. Held, and
     every holder `idle`: each is told once, and `after` later, still red and the holders still idle,
-    they no longer count and it is an order. A holder at work keeps it off the list."""
+    they no longer count and it is an order. A holder at work keeps it off the list.
+
+    A sync PR (`is_sync_order`, TD-684) is an order from the first reading, with no `after`: unheld,
+    at once, whatever its checks but *pending*; its idle holders are told and passed over as a red
+    PR's, keyed on `sync_since` in place of `red_since`. Sync orders come first in the list."""
     orders: list[dict[str, Any]] = []
     kept: dict[str, dict[str, str]] = {}
     notes: list[tuple[str, dict[str, Any]]] = []
     for pr in open_prs:
-        since = pr.get("red_since") if isinstance(pr, dict) else None
-        if not since or not isinstance(pr.get("number"), int):
+        if not isinstance(pr, dict) or not isinstance(pr.get("number"), int):
+            continue
+        sync = is_sync_order(pr)
+        since = pr.get("sync_since") if sync else pr.get("red_since")
+        if not since:
             continue
         try:
             red_since = datetime.fromisoformat(str(since))
         except ValueError:
             continue
+        if red_since.tzinfo is None:  # a stamp with no offset is UTC, as every stamp in the store is
+            red_since = red_since.replace(tzinfo=UTC)
         key = str(pr["number"])
+        # the memory's key is `red_since` whatever the spell: a sync PR's is its `sync_since`
         was = told.get(key) if (told.get(key) or {}).get("red_since") == since else None
         if was:
             kept[key] = was  # this red spell's memory stays while it lasts
+        holders = [r for r in records if holds_pr(r, pr)]
+        if not holders and sync:
+            orders.append(pr_order(pr))
+            continue
         if now - red_since < after:
             continue
-        holders = [r for r in records if holds_pr(r, pr)]
         if not holders:
             orders.append(pr_order(pr))
             continue
@@ -500,4 +536,5 @@ def red_prs(
             notes.extend((r.id, pr) for r in holders)
         elif now - datetime.fromisoformat(was["at"]) >= after:
             orders.append(pr_order(pr))
+    orders.sort(key=lambda o: not o.get("sync"))  # a sync order first (a stable sort)
     return orders, kept, notes

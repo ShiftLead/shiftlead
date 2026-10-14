@@ -1508,7 +1508,10 @@ def _repo_line(r: dict[str, Any]) -> str:
         decided = f", {len(orders)} decided board line{'' if len(orders) == 1 else 's'}" if orders else ""
         # a red PR nobody holds is a work order too (§4.4, TD-613), counted pickable as a decided line is
         reds = teamrun.pr_orders(r)
-        decided += f", {len(reds)} red PR{'' if len(reds) == 1 else 's'} nobody holds" if reds else ""
+        syncs = [e for e in reds if e.get("sync")]  # a sync PR's order, counted apart (TD-684)
+        n = len(reds) - len(syncs)
+        decided += f", {len(syncs)} sync PR{'' if len(syncs) == 1 else 's'} to land" if syncs else ""
+        decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         orders = [*orders, *reds]
         # the page's seven kinds as the kind bar names them (§4.4 *Repo facts*, §4.7, TD-418)
         led_part = (
@@ -1769,7 +1772,13 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
                 if st := (r.get("standing") or {}).get(str(p["number"])):
                     print(f"         {st}")
-            # a decided board line first among the pickable rows (§4.7, TD-384): the person has answered
+            # a sync PR's order before everything (§4.4 *A sync PR is the team's at once*, TD-684): the
+            # cadence's own files wait behind it
+            for e in teamrun.pr_orders(r):
+                if e.get("sync"):
+                    said = f" · sync since {e.get('sync_since') or '?'}: {e.get('reason') or ''}"
+                    print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'anchor':<11}  {e.get('title') or ''}{said}")
+            # then a decided board line (§4.7, TD-384): the person has answered
             for e in teamrun.work_orders(r):
                 d = e.get("decided") or {}
                 said = f" · decided {d.get('text') or '?'} {d.get('date') or ''}".rstrip()
@@ -1777,6 +1786,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
             # then a red PR nobody holds (§4.7, TD-613): the anchor seat's, a free-pick lane's where the
             # repo's teams have no anchor seat
             for e in teamrun.pr_orders(r):
+                if e.get("sync"):
+                    continue
                 why = ", ".join(e.get("failing") or []) or ("conflicting" if e.get("conflicting") else "red")
                 said = f" · red since {e.get('red_since') or '?'}: {why}"
                 print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'anchor':<11}  {e.get('title') or ''}{said}")
