@@ -306,6 +306,34 @@ def test_ready_to_close_reads_the_agent_itself_first(monkeypatch, tmp_path):
     assert "ready to close ✓" in templates.get_template("card.html").render(s=view({**base, "state": "idle"}, []))
 
 
+def test_focus_offers_close_only_when_the_checklist_passes(monkeypatch, tmp_path):
+    """TD-679: Focus holds no state test of its own beside the checklist — on a working agent with a
+    clean, pushed tree the *ready to close ✓* mark and the acts line's Close session are hidden and
+    more ▾'s Close is disabled; on an idle one all three are offered. A record with no agent whose
+    pane is gone is offered no Close session (§4.5a *A record with no agent*: Close where Close is)."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import templates, view
+
+    clean = {"dirty": 0, "ahead": 0, "upstream": "origin/x", "branch": "x"}
+    base = {"id": "ao-w", "name": "w", "dir": "/tmp/a", "kind": "agent", "git": clean, "tail": [],
+            "created": "2026-10-14T20:00:00Z", "host": "h"}  # fmt: skip
+
+    def focus(**rec):
+        v = view({**base, **rec}, [])
+        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+
+    def tag(html, ident):
+        return re.search(rf'<[a-z]+ [^>]*id="{ident}"[^>]*>', html, re.S).group(0)
+
+    working, idle = focus(state="working"), focus(state="idle")
+    assert "hidden" in tag(working, "fready") and "hidden" in tag(working, "fclose")
+    assert "disabled" in tag(working, "fclosemenu")
+    assert "hidden" not in tag(idle, "fready") and "hidden" not in tag(idle, "fclose")
+    assert "disabled" not in tag(idle, "fclosemenu")
+    gone = focus(state="exited", agent=False, pane=False)
+    assert "hidden" in tag(gone, "fclose") and "disabled" in tag(gone, "fclosemenu")
+
+
 def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph(monkeypatch, tmp_path):
     """Design §4.2 (2026-09-17): a lead idle between rounds, log pushed, used to read *ready to
     close ✓* over working members. The item comes from `controllers`, not a role — and a session
