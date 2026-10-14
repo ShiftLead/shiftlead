@@ -31,6 +31,7 @@ from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.containers import attach_argv_in, container_nodes
 from sessionorc.models import (
     GRANTS,
+    PERSON,
     has_control,
     start_note,
     stop_note,
@@ -753,7 +754,7 @@ class Readings:
         if self.waits_cache["waits"] is None or now - self.waits_cache["at"] > DEFS_TTL:
             got: dict[str, Any] = {}
             with contextlib.suppress(Exception):
-                got = dict(await self.call("inbox"))
+                got = dict(await self.call("inbox", id=PERSON))
             self.waits_cache.update(at=now, waits=waits_of(got.get("entries") or []))
         return self.waits_cache["waits"] or {}
 
@@ -766,7 +767,9 @@ class Readings:
         sender gets the name it is known by, and `from_open` the id **Open** goes to while that
         record still exists (§4.5 screen 6: a row opens the session that needs the person).
         `watching`: the read is from a visible page, which the home keeps (§4.10 *Looking*, TD-319)."""
-        got = await self.call("inbox", watching=True) if watching else await self.call("inbox")
+        # names `person` (TD-634): no caller's own inbox ever stands in for it — a caller the host reads
+        # as a session is refused the person's, and marks nothing
+        got = await (self.call("inbox", id=PERSON, watching=True) if watching else self.call("inbox", id=PERSON))
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
         records = {o.get("id"): o for o in fleet}
         # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board is the sender's

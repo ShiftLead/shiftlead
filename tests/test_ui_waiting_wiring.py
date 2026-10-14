@@ -83,7 +83,8 @@ def client(monkeypatch, tmp_path):
 
         async def call(self, method, **kw):
             if method == "inbox":
-                return {"entries": [] if kw.get("id") else [ask]}
+                # the person's read names `person` or nothing (TD-634); any other id is a session's
+                return {"entries": [] if kw.get("id") not in (None, "person") else [ask]}
             return replies.get(method, {})
 
         async def subscribe(self):
