@@ -119,17 +119,16 @@ def test_a_repos_push_carries_the_repos_pr_marks_once_for_every_stream(tmp_path,
 
     evs = received(client(monkeypatch, tmp_path, pushed), "/events")
     (rep,) = [e for e in evs if e["event"] == "repos"]
-    # once at the run's seed (what a light stream last took, TD-670), once for the push
-    assert rep["pr_marks"] == {"811": "merged"} and calls == [rep["root"]] * 2
+    assert rep["pr_marks"] == {"811": "merged"} and calls == [rep["root"]]  # once for the push
     light = received(client(monkeypatch, tmp_path, pushed), "/events?light=1")
     assert [e["pr_marks"] for e in light if e["event"] == "repos"] == [{"811": "merged"}]
 
 
 
-def test_a_light_stream_takes_a_repos_marks_alone_and_only_when_they_moved(tmp_path, monkeypatch):
+def test_a_light_stream_takes_a_repos_marks_alone(tmp_path, monkeypatch):
     """TD-670: a light stream (Focus, the Inbox) is sent a repo's root and PR marks, never its facts —
-    which run to most of a megabyte a push — and nothing when a push leaves the marks as they were;
-    a dropped repo is `pr_marks: null`. The full stream still takes every push whole."""
+    which run to most of a megabyte a push — on every push, which the Inbox re-reads on; a dropped
+    repo is `pr_marks: null`. The full stream still takes every push whole."""
 
     def pushed(g1, g2):
         root = g1["repo"]
@@ -144,6 +143,7 @@ def test_a_light_stream_takes_a_repos_marks_alone_and_only_when_they_moved(tmp_p
     light = [e for e in received(client(monkeypatch, tmp_path, pushed), "/events?light=1") if e["event"] == "repos"]
     root = str(tmp_path / "samscrape")
     assert light == [
+        {"event": "repos", "root": root, "pr_marks": {"811": "merged"}},
         {"event": "repos", "root": root, "pr_marks": {"811": "merged"}},
         {"event": "repos", "root": root, "pr_marks": None},
     ]

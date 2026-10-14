@@ -3471,10 +3471,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             for name, acc in usage_accounts(await call("usage")).items():
                 for p in acc["profiles"]:
                     acct_of[p["name"]] = name
-        # each repo's PR marks as a light stream last took them (TD-670): a push that leaves them as
-        # they were is not sent to one
-        marks = {root: repo_pr_marks(root, r) for root, r in repos.items()}
-        return SimpleNamespace(known=known, repos=repos, doing=doing, acct_of=acct_of, marks=marks)
+        return SimpleNamespace(known=known, repos=repos, doing=doing, acct_of=acct_of)
 
     async def fan_regroup(st: SimpleNamespace) -> dict[str, Any]:
         return await heads(st.known, st.repos, st.doing)
@@ -3566,14 +3563,9 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     ev = {**ev, "pr_marks": marks}
                 run.to_all(run.full, ev)
                 # a light stream draws a repo's PR marks and nothing else of its facts, which run to
-                # most of a megabyte a push: the root and the marks alone, and only when they moved
-                # (`pr_marks: null` for a dropped repo) — the host pushes every repo each minute (TD-670)
-                if (root in st.marks) != (marks is not None) or st.marks.get(root) != marks:
-                    if marks is None:
-                        st.marks.pop(root, None)
-                    else:
-                        st.marks[root] = marks
-                    run.to_all(run.light(), {"event": "repos", "root": root, "pr_marks": marks})
+                # most of a megabyte a push: the root and the marks alone (`pr_marks: null` for a
+                # dropped repo) — still on every push, which the Inbox re-reads its boards on (TD-670)
+                run.to_all(run.light(), {"event": "repos", "root": root, "pr_marks": marks})
             else:
                 if isinstance(ev.get("entry"), dict):
                     ring = doing.setdefault(str(ev.get("team")), [])
