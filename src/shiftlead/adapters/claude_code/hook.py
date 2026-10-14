@@ -102,15 +102,16 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         return {**out, "model": payload["to_model"]} if payload.get("to_model") else None
     if ev == "PermissionRequest":
         tool = payload.get("tool_name", "?")
+        what = describe_tool_input(tool, payload.get("tool_input") or {})
         return {
             **out,
             "kind": "permission",
-            "text": f"{tool}: {describe_tool_input(tool, payload.get('tool_input') or {})}",
+            # a question that reaches the hook reads as its question, as the PreToolUse road draws it
+            "text": what if tool == "AskUserQuestion" else f"{tool}: {what}",
             "tool_use_id": payload.get("tool_use_id"),
         }
     if ev == "PreToolUse" and payload.get("tool_name") == "AskUserQuestion":
-        qs = (payload.get("tool_input") or {}).get("questions") or []
-        text = qs[0].get("question", "") if qs and isinstance(qs[0], dict) else "question"
+        text = first_question(payload.get("tool_input") or {})
         return {**out, "state": "needs-you", "pending": {"kind": "question", "text": text}}
     if ev in TOOL_EVENTS and payload.get("agent_id"):
         # A subagent's tool (the tool sets `agent_id` only inside one) says nothing about the main
@@ -145,7 +146,10 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         return {**out, "subagent_delta": -1}
     if ev in TOOL_EVENTS:
         tool = payload.get("tool_name")
-        return {**out, "state": STATE_EVENTS[ev], "pending": None, "event": f"{ev}:{tool}" if tool else ev}
+        # the call it names (`tool_use_id`) ends only that call's permission waiter, if one is live:
+        # its dialog was answered in the terminal (design §4.2, TD-629)
+        call = {"tool_use_id": tid} if (tid := payload.get("tool_use_id")) else {}
+        return {**out, "state": STATE_EVENTS[ev], "pending": None, "event": f"{ev}:{tool}" if tool else ev, **call}
     if ev == "UserPromptSubmit":
         # `prompt`: a prompt went in, which is what the host agent's typed brief waits on (§4.1 *No
         # prose in the argv*, TD-339) — a word, not the prompt's text
@@ -155,7 +159,15 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
     return None
 
 
+def first_question(ti: dict[str, Any]) -> str:
+    """An `AskUserQuestion`'s first question, its pending text on either road."""
+    qs = ti.get("questions") or []
+    return qs[0].get("question", "") if qs and isinstance(qs[0], dict) else "question"
+
+
 def describe_tool_input(tool: str, ti: dict[str, Any]) -> str:
+    if tool == "AskUserQuestion":
+        return first_question(ti)[:200]
     for key in ("command", "file_path", "path", "url", "pattern", "description", "prompt"):
         if v := ti.get(key):
             return str(v)[:200]

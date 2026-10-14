@@ -172,6 +172,55 @@ async def test_permission_timeout_falls_to_terminal(agent, hookstub, tmp_path):
         assert st["state"] == "needs-you" and st["pending"]["kind"] == "question"
 
 
+async def test_a_permission_answered_in_the_terminal_ends_its_waiter(agent, hookstub, tmp_path):
+    """TD-629, design §4.2: a permission answered in the terminal used to ring again at the hook's
+    timeout — the waiter stayed live and its timeout set *needs you* over the record's later `idle`.
+    A later event of the same call (its `PostToolUse`), or one with no call (a `Stop`), ends it: the
+    hook returns no decision, and past the wait the record still reads `idle` with no pending, the
+    trail *answered in the terminal*. A parallel tool's event, naming another call, ends nothing and
+    leaves the buttons up; a permission that named no call is ended by any later event."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
+
+        async def hook(tid):
+            async with LocalClient() as h:
+                return await h.call(
+                    "hook", session=sid, kind="permission", text="Bash: git push", tool_use_id=tid, wait_seconds=1
+                )
+
+        task = asyncio.create_task(hook("tu1"))
+        await wait_state(c, sid, "needs-you")
+        await agent.tick()
+        agent._attention[f"{sid}|state"] = ("permission", "2026-09-20T00:00:00Z", "Bash: git push")
+        async with LocalClient() as h:
+            await h.call("hook", session=sid, state="working", event="PostToolUse:Read", tool_use_id="tu0")
+            assert not task.done() and (await c.call("get", id=sid))["pending"]["tool_use_id"] == "tu1"
+            await h.call("hook", session=sid, state="working", event="PostToolUse:Bash", tool_use_id="tu1")
+        assert await task is None
+        st = await c.call("get", id=sid)
+        assert st["state"] == "working" and st["pending"] is None
+        await agent.tick()
+        got = (await c.call("inbox"))["trail"]
+        assert [(e["kind"], e["how"]) for e in got] == [("permission", "answered in the terminal")]
+        # a turn's end names no call: it ends the waiter too, and the wait running out changes nothing
+        task = asyncio.create_task(hook("tu2"))
+        await wait_state(c, sid, "needs-you")
+        async with LocalClient() as h:
+            await h.call("hook", session=sid, state="idle")
+        assert await task is None
+        await asyncio.sleep(1.2)
+        st = await c.call("get", id=sid)
+        assert st["state"] == "idle" and st["pending"] is None
+        assert not agent._permission_waiting(sid)
+        async with LocalClient() as h:
+            task = asyncio.create_task(h.call("hook", session=sid, kind="permission", text="Edit: x", wait_seconds=1))
+            await wait_state(c, sid, "needs-you")
+            async with LocalClient() as h2:
+                await h2.call("hook", session=sid, state="working", event="PostToolUse:Edit", tool_use_id="tu3")
+            assert await task is None
+        assert (await c.call("get", id=sid))["state"] == "working"
+
+
 async def test_subscribe_streams_changes(agent, tmp_path):
     async with LocalClient() as c, LocalClient() as sub:
         events = sub.subscribe()

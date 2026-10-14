@@ -124,6 +124,19 @@ def test_translate_permission_and_questions():
         }
     )
     assert p == {"kind": "permission", "text": "Bash: git push origin td-301", "tool_use_id": "tu9"}
+    # a question that reaches the PermissionRequest hook reads as its question, not its JSON (TD-629)
+    a = translate(
+        {
+            "hook_event_name": "PermissionRequest",
+            "tool_name": "AskUserQuestion",
+            "tool_input": {"questions": [{"question": "Which db?", "options": [{"label": "pg"}]}]},
+            "tool_use_id": "tu8",
+        }
+    )
+    assert a == {"kind": "permission", "text": "Which db?", "tool_use_id": "tu8"}
+    # a tool event names its call, which ends that call's waiter if its dialog was answered in the terminal
+    done = translate({"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_use_id": "tu9"})
+    assert done == {"state": "working", "pending": None, "event": "PostToolUse:Bash", "tool_use_id": "tu9"}
     q = translate(
         {
             "hook_event_name": "PreToolUse",
