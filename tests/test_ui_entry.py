@@ -326,7 +326,8 @@ def test_the_forms_what_is_tall_and_a_hidden_warning_draws_nothing():
 
 
 def git(repo, *args):
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+    who = ["-c", "user.name=t", "-c", "user.email=t@example.invalid"]  # CI has no git identity
+    subprocess.run(["git", "-C", str(repo), *who, *args], check=True, capture_output=True)
 
 
 def test_a_free_typed_name_starts_the_session_its_worktree_and_its_branch_under_it(tmp_path, monkeypatch):
