@@ -433,7 +433,8 @@ class InboxMixin:
     ) -> dict[str, Any]:
         """**Reply** on a board row (design §4.4 *Board write-back*, §4.5a *Due strip / Inbox board
         row → Reply*; TD-142 slice 1): the person's words appended to the item's own line as
-        ` — <name>, <date>: <reply>` and committed as `shiftlead: reply on <head> (session <name>)`,
+        ` — <name>, <date>: <reply>` and committed as ledgerboard's
+        `shiftlead: reply <head> (session <name>)`,
         refused as `board_edit` refuses, and found by `key` as it finds one. The line stays open and
         counted: a reply is not Done.
 
@@ -596,7 +597,7 @@ class InboxMixin:
         context = mail_entry.about if mail_entry is not None else None
         try:
             done = await asyncio.to_thread(
-                board_mod.add, root, text, str(due or ""), entry=entry, session=name, host=host, context=context
+                board_mod.add, root, text, str(due or ""), session=name, host=host, context=context
             )
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
@@ -669,7 +670,6 @@ class InboxMixin:
                 root,
                 first,
                 today,
-                entry=e.id,
                 session=str(o.get("name") or "") or None,
                 host=str(o.get("host") or "") or self.host,
                 context=e.about,
@@ -754,7 +754,7 @@ class InboxMixin:
         entries that wait on you*, §4.5a *Inbox row: ledger entry*, TD-565): one of its answers by
         index (`answer`), its default (`go`, **Go with it**) or the Reply's `words`, written as one
         decided line at the top of the repo's open board items by the second add's road (§4.4 *Board
-        write-back*) — `Context:` the id, committed as `shiftlead: board decide <id> (person)` — so it
+        write-back*) — `Context:` the id, committed as `shiftlead: append <title> (session n/a)` — so it
         is a work order at once. `repo` is the checkout the home's repo facts key it by; the entry is
         read from that reading, and refused when it no longer sorts *for you* or an open decided line
         already names it. The ledger itself is never written. The repo's work orders are read again
@@ -802,7 +802,7 @@ class InboxMixin:
             today = datetime.now().date().isoformat()
             try:
                 line = board_mod.decided_line(str(e.get("title") or ""), id, answers, default, said, today)
-                done = await asyncio.to_thread(board_mod.add_decided, root, line, id)
+                done = await asyncio.to_thread(board_mod.add_decided, root, line)
             except board_mod.Refused as err:
                 raise RpcError(str(err)) from None
             log.info("board %s: %s", root, done["message"])
