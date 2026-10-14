@@ -2440,6 +2440,6 @@ def test_the_grinder_preset_takes_a_decided_board_line_first_with_its_four_outco
         "asks the person something back",
     ):
         assert f"**the answer {outcome}**" in text, outcome
-    done = re.search(r"`(python3 scripts/board_edit\.py done [^`]*)`", text).group(1)
-    assert all(f in done for f in ("--board", "--line", "--expect", "--why"))
+    done = re.search(r"`(ao board edit done [^`]*)`", text).group(1)  # TD-588: no repo's script
+    assert all(f in done for f in ("--line", "--expect", "--why"))
     assert "the board holds no decided line nobody has claimed" in text

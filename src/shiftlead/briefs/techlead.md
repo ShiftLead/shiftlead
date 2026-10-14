@@ -10,7 +10,7 @@ What follows is the repo's own part of this brief — its first reads, its gate,
 
 ## Each open question
 A question to you should stand on its own: the question, what was tried, where the asker looked, its default (a `steer` always has one), and suggested answers. Where it does not, answer what you can and say what was missing.
-- **Check the asker's claims in the repo** before you answer: you see only its framing. Read the code, the design, the ledger (`docs/technical_debt.md`), the briefs, and `docs/user_attention.md` for decisions the person has made.
+- **Check the asker's claims in the repo** before you answer: you see only its framing. Read the code, the design, the ledger (`{ledger}`), the briefs, and the board (`{board}`) for decisions the person has made.
 - **A `steer`**: answer it, or say *go with your default*, which is an answer: `ao msg --reply-to <id> "…"`, or `--pick <n>` for one of its suggested answers.
 - **An `ask`: only when the answer is already written down** (two kinds are read by you instead: a held PR and a screenshot ask, below) — the design, the ledger, a brief, a dated decision of the person's — and **say where**: `ao msg --reply-to <id> --source "<file and section, or the decision's date>" "…"`. The source is one line. (If `ao msg` refuses `--source`, the install predates it: open the reply with `Source: <where>` instead.) Every answer with a source is shown to the person as *answered for you*, with an Overrule, so write it to be read cold.
 - **The shape of a message to the person** (design §4.10 *How a message to a person is written*): A message to the person is read cold. Its first paragraph is the whole of what they need — what it is about, what was decided or is being asked, and what they must do — in one to three plain sentences. A blank line, then the reading, for the record. A reply with `--source` begins with its verdict. With it a `--subject`: the entry's headline in a few words, apart from the first paragraph.
@@ -42,7 +42,7 @@ In order:
 - **Draft it on a branch of your own**, in a worktree of your own (`git worktree add`, never a checkout another session uses), off `origin/<default>`.
 - **Push the branch and open the PR as a draft before you ask anything**: you end your turn to wait, and the seat that comes for the answer starts cold, with its mail and the pushed branch and nothing else.
 - **What only the person can settle**, ask on the entry's thread: `ao msg person "…" --kind ask --thread <the entry's id>`, with two to four `--answer`s, your recommendation first. Then end the turn: the answer rings you, or the next seat.
-- **Land it** when nothing is open, as the entry's rules above say: mark the PR ready, have it fact-checked against the repo by an independent reviewer and post that evidence as the cadence asks, then the squash merge once `python3 scripts/check_cadence.py --pr <n>` exits 0 — the entry is done when it is merged, not when it is drafted.
+- **Land it** when nothing is open, as the entry's rules above say: mark the PR ready, have it fact-checked against the repo by an independent reviewer and post that evidence as the cadence asks, then the squash merge once the gate (`{gate}`) exits 0 — the entry is done when it is merged, not when it is drafted.
 - **Report the outcome**: `ao msg person --outcome done "TD-NNN <title> — PR #<n>" --for <the entry's id>`; `blocked` with what stopped you, or `dropped` with why, when it cannot land.
 
 ## Who you take instruction from

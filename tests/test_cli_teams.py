@@ -472,7 +472,15 @@ def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
     assert cli.main(["team", "start", "ao-grind"]) == 0
     asked = [p for m, p in state["calls"] if m == "host_files"]
     assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
-    assert {x for p in asked for x in p["paths"]} == {".shiftlead.yml", "docs/grind.md"}
+    # the repo's file and brief, then the dev-cadence files the layout slots look for (TD-588)
+    layout = {
+        "scripts/check_cadence.py",
+        "scripts/ledger.py",
+        "docs/cadence.md",
+        "docs/user_attention.md",
+        "docs/design",
+    }
+    assert {x for p in asked for x in p["paths"]} == {".shiftlead.yml", "docs/grind.md", *layout}
     made = {p["name"]: p for p in creates(state)}
     assert "grind on the node: free-pick" in made["grind-1"]["prompt"] and made["grind-1"]["profile"] == "repo-grind"
     assert all(p["host"] == "devenv" and p["dir"] == there for p in made.values())

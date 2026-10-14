@@ -133,11 +133,12 @@ repo's name (a repo's file never names a host).
 
 `.shiftlead.yml` takes these keys and refuses any other: `ledger`, `roles`, `controllers`,
 `teams` and `promote` (read by the home's promote, design §6), `gate` (the merge gate's command,
-`{pr}` filled; unset, `scripts/check_cadence.py` where it exists, design §5 *The seams*),
-`worktree_setup` (a command run in each new worktree; unset, `scripts/hydrate_worktree.sh` where it
-exists, design §5 *The seams*), `board` (the person's board, from the repo's root; unset,
-`docs/user_attention.md` where it exists, design §5 *The seams*), `held` (the paths a flow's review stage waits for, design §4.9c), and
-`unattended`, `ready_when` and `commands`, which nothing reads yet — **never `projects`**, which is the org's (design §5).
+`{pr}` filled; unset, dev-cadence's `check_cadence.py` where the checkout holds it, design §5 *The seams*),
+`worktree_setup` (a command run in each new worktree; unset, dev-cadence's `hydrate_worktree.sh` where
+the checkout holds it, design §5 *The seams*), `board` (the person's board, from the repo's root; unset,
+dev-cadence's `user_attention.md` where the checkout holds it, design §5 *The seams*), `held` (the paths a flow's review stage waits for, design §4.9c),
+`commands` (a mapping, `test: …` and `lint: …` filling the briefs' `{test}` and `{lint}`, design §5 *The seams*), and
+`unattended` and `ready_when`, which nothing reads yet — **never `projects`**, which is the org's (design §5).
 
 **Ignore `.claude/worktrees/`** in the repo's `.gitignore` before the first start: every team
 session works in `<repo>/.claude/worktrees/<name>`, and a repo that does not ignore it leaves
@@ -171,7 +172,8 @@ roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
   manager: {brief: docs/briefs/manager.md, grants: [control]}
 controllers: [manager-cm]
-ledger: docs/technical_debt.md
+ledger: notes/ledger.md          # unset: dev-cadence's ledger path
+commands: {test: make test, lint: make lint}
 ```
 
 Resolution is lowest first: the package's built-ins, then an org-wide `roles:` overlay in
@@ -210,11 +212,13 @@ ao roles
 
 The built-in templates hold every shiftlead mechanic — the lane loop, claims and leases, the
 cadence review and merge, asking and outcomes, the declarations a run ends with, the usage gate's
-pause, the never-list of `ao` verbs — and move with the package on every promote. They also assume
-shiftlead's own layout: `CLAUDE.md` and `docs/cadence.md` as first reads, `pdm run test` and
-`pdm run lint`, `/cadence` and `scripts/check_cadence.py` as the gate, `docs/technical_debt.md`
-and `docs/user_attention.md` as ledger and board. **A repo whose layout, gate or standing rules
-differ says so in its own brief**, and only that. Wherever it is given — a member's or manager's
+pause, the never-list of `ao` verbs — and move with the package on every promote. They name no
+repo's layout: where a brief needs one it holds a slot — `{gate}`, `{board}`, `{ledger}`,
+`{ledger_check}`, `{test}`, `{lint}`, `{design_dir}`, `{cadence_rules}` — filled at the start from the
+repo's `.shiftlead.yml` (`gate`, `board`, `ledger`, `commands`), else dev-cadence's file where the
+checkout holds it, else the seam's own sentence (*no gate: a person merges*), never empty (design §5
+*The seams*). **A repo whose standing rules, scratch tools or reviewers differ says so in its own
+brief**, and only that. Wherever it is given — a member's or manager's
 `brief:` in the team definition (which takes the slot in place of the role's), a repo's
 `roles.<name>.brief`, or `ao new --role <r> --brief <path>` — it is filled under *This repo's
 rules*, and **where it and the template disagree, the repo's wins**, except that it may add to the
@@ -224,10 +228,10 @@ brief whole.
 
 A skeleton — one short section each, and nothing the template already says:
 
-- **First reads** — the files to read before anything, if not `CLAUDE.md` and `docs/cadence.md`.
+- **First reads** — the files to read before anything, beyond `CLAUDE.md` and the cadence rules.
 - **Where it works** — the branch naming, the default branch, anything about worktrees the repo
   does differently.
-- **The gate** — the test and lint commands, the merge check, who reviews and who merges which
+- **The gate** — what a PR needs beyond `commands:` and `gate:`: who reviews and who merges which
   PRs (e.g. *anything under `src/core/` waits for the anchor*).
 - **Standing rules** — what is never done here: deploys, destructive data operations, files with
   their own line endings, what waits on the person, whole areas the team leaves alone.
