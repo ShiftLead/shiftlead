@@ -100,25 +100,6 @@ def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_i
 
 
 @pytest.mark.unit
-def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypatch):
-    """TD-278: a copy older than a field the Inbox draws is said in the board note, the rows still
-    drawn — never a board that silently has no answers. A current reader, or no item, says nothing."""
-    from shiftlead.ui.app import reader_lacks
-
-    root = tmp_path / "r"
-    stale = report(root, {"line": 3, "text": "a. Due: 2026-09-20.", "due": "2026-09-20"})
-    note = reader_lacks(stale)
-    assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)")
-    assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue"))) == ""
-    assert reader_lacks(report(root)) == "" and reader_lacks("junk") == ""
-    # through the reading: the rows drawn, the note beside them, naming the repo's own reader
-    from shiftlead.ui.app import board_reading
-
-    rows, note = board_reading(reading(stale))
-    assert len(rows) == 1 and "without `answers`" in note and "the board reader predates it" in note
-
-
-@pytest.mark.unit
 def test_a_board_row_carries_its_repo_team_due_words_text_and_the_board_at_its_line(tmp_path, monkeypatch):
     host(tmp_path, monkeypatch)
     from shiftlead.ui.app import board_rows
@@ -769,35 +750,17 @@ def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_p
     assert all(r["source"] for r in rows) and rows[0]["fetch_note"].startswith("fetched; local clone is behind")
 
 
-def _reader_phrases():
-    """Every `Origin` sentence the host agent's board read can write (`workorders._against_origin`,
-    TD-585), with its case, the f-string holes filled."""
-    import re
-
+def test_the_origin_note_knows_every_case_the_reading_gives():
+    """§4.5 screen 6 (TD-585): the note is chosen by the reading's own `fetch_case`, never by its
+    sentence, so a case the host agent's read gains that the Inbox does not map fails here."""
     from sessionorc import workorders
+    from shiftlead.ui.inbox import origin_case
 
-    src = pathlib.Path(workorders.__file__).read_text()
-    out = []
-    for m in re.finditer(r'Origin\(\s*"(\w+)",\s*f?"([^"]*)"', src):
-        out.append((m.group(1), re.sub(r"\{[^}]*\}", "origin/main", m.group(2))))
-    return out
-
-
-@pytest.mark.unit
-def test_the_phrase_table_knows_every_sentence_the_reader_writes():
-    """§4.5 screen 6: the note is chosen by the fixed phrases of the reader's `fetch_note` — the
-    reader gives the cases no field — so a phrase the reader gains that the table does not know
-    fails here rather than drawing no note on the page."""
-    from shiftlead.ui.inbox import ORIGIN_PHRASES
-
-    phrases = _reader_phrases()
-    assert len(phrases) >= 9
-    # each sentence's case as the table reads it: `behind` is the board's `source`, never a phrase
-    want = {"skipped": "unreached", "none": None, "matches": None, "behind": None, "local": "local", "both": "both"}
-    for case, ph in phrases:
-        known = [c for o, p, c in ORIGIN_PHRASES if ph.startswith(o) and (not p or p in ph)]
-        assert known, f"the origin note's table does not know the reader's phrase {ph!r}"
-        assert known[0] == want[case] or (case == "behind" and known[0] == "behind"), (case, ph)
+    want = {"skipped": "unreached", "none": None, "matches": None, "behind": "behind", "local": "local", "both": "both"}
+    assert set(workorders.FETCH_CASES) == set(want)
+    for case, drawn in want.items():
+        assert origin_case("", case) == drawn, case
+    assert origin_case("origin/main", "") == "behind" and origin_case("", "") is None
 
 
 @pytest.mark.unit
@@ -806,23 +769,22 @@ def test_the_origin_note_says_each_case_in_the_designs_words():
     reached with its reason; none when the board matches, origin has none, or the read was plain."""
     from shiftlead.ui.inbox import origin_note
 
-    def note(fetch_note, source=""):
-        return origin_note({"source": source, "fetch_note": fetch_note})
+    def note(case, source="", why=""):
+        return origin_note({"source": source, "fetch_case": case, "fetch_why": why})
 
-    behind = note("fetched; local clone is behind — showing origin/main's board (pull to catch up)", "origin/main")
+    behind = note("behind", "origin/main")
     assert behind == {"text": "read from origin/main: this checkout has not pulled it yet", "warn": False}
-    local = note("fetched; board DIFFERS from origin/main (local edits not pushed) — push for the cross-machine view")
-    assert local == {"text": "board edits made here are not on origin", "warn": False}
-    for paren in ("(both sides changed)", "(no common history to compare)"):
-        both = note(f"fetched; board DIFFERS from origin/main {paren} — pull/push; showing local")
-        assert both["warn"] and both["text"].startswith("this checkout's board and origin's have both changed")
-        assert both["text"].endswith("what origin added is not shown — pull")
-    assert note("fetch skipped (timeout)") == {
+    assert note("local") == {"text": "board edits made here are not on origin", "warn": False}
+    both = note("both")
+    assert both["warn"] and both["text"].startswith("this checkout's board and origin's have both changed")
+    assert both["text"].endswith("what origin added is not shown — pull")
+    assert note("skipped", why="timeout") == {
         "text": "origin could not be reached (timeout): showing the checkout's board as of its last pull",
         "warn": False,
     }
-    assert "(fatal: could not read (x))" in note("fetch skipped (fatal: could not read (x))")["text"]
-    for none in ("fetched; board matches origin/main", "fetched; no board at origin/main", "", "something new"):
+    assert "(fatal: could not read (x))" in note("skipped", why="fatal: could not read (x)")["text"]
+    assert "(no reason given)" in note("skipped")["text"]
+    for none in ("matches", "none", ""):
         assert note(none) is None
 
 
@@ -859,13 +821,10 @@ def test_a_board_read_from_origin_has_its_note_once_and_its_rows_are_live(tmp_pa
 
     a, b, c = tmp_path / "behind", tmp_path / "same", tmp_path / "both"
     rep = report(a, item(3, "one. Due: 2026-09-20.", "2026-09-20", "2d overdue"), item(4, "two.", "2026-09-20", "x"))
-    rep["boards"][0].update(source="origin/main", fetch_note="fetched; local clone is behind — showing …")
-    for root, fn in (
-        (b, "fetched; board matches origin/main"),
-        (c, "fetched; board DIFFERS from origin/main (both sides changed) — pull/push; showing local"),
-    ):
+    rep["boards"][0].update(source="origin/main", fetch_case="behind")
+    for root, case in ((b, "matches"), (c, "both")):
         more = report(root, item(7, f"{root.name} line.", "2026-09-20", "2d overdue"))["boards"][0]
-        more["fetch_note"] = fn
+        more["fetch_case"] = case
         rep["boards"].append(more)
     rows = board_rows(rep)
     assert [r["source"] for r in rows] == ["origin/main", "origin/main", "", ""]
@@ -1344,8 +1303,9 @@ def test_fold_head_cuts_after_the_bold_head_and_its_sentence():
 @pytest.mark.unit
 def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
     """The review's cases (TD-279): a reply the reader's `replies` missed keeps every tail in the text
-    and draws none twice; a `Context:` after the `Due:` still closes the fold; a bold or mid-sentence
-    *Context:* is text."""
+    and draws none twice; a `Context:` after the `Due:` still closes the fold. A mid-sentence
+    *Context:* is the field, as ledgerboard reads it (`CONTEXT_RE`, its `refs` too): the Inbox cuts the
+    line where ledgerboard finds the field, with no pattern of its own (TD-585)."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui.app import board_rows
 
@@ -1358,7 +1318,7 @@ def test_a_board_rows_text_loses_nothing_on_the_odd_line(tmp_path, monkeypatch):
     assert (row["lead"], row["rest"]) == ("act — Rotate it.", "Context: TD-9")
     text = "act — See the Context: of this. **Context:** bold. Due: 2026-10-05."
     (row,) = board_rows(report(root, item(3, text, "2026-10-05", "x")))
-    assert (row["lead"], row["rest"]) == ("act — See the Context: of this. **Context:** bold.", "")
+    assert (row["lead"], row["rest"]) == ("act — See the", "Context: of this. **Context:** bold")
 
 
 @pytest.mark.unit

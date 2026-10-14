@@ -168,14 +168,11 @@ from .fanout import FAILED, Fanout, Stream
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
-    BOARD_FIELDS,  # noqa: F401
     BOARD_FILE,  # noqa: F401
     BOARD_WAIT_DAYS,  # noqa: F401
-    CONTEXT_RE,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
     LOOK_KINDS,  # noqa: F401
     NEEDS_YOU_ROWS,  # noqa: F401
-    ORIGIN_PHRASES,  # noqa: F401
     OWING_CLOSES,  # noqa: F401
     OWING_KINDS,  # noqa: F401
     PERSON_ASK_KINDS,  # noqa: F401
@@ -186,7 +183,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     RAIL_SECTION_NAMES,  # noqa: F401
     RAIL_SECTIONS,  # noqa: F401
     RAIL_UNDER,  # noqa: F401
-    REPLY_MARK_RE,  # noqa: F401
     RESTART_SUBJECTS,  # noqa: F401
     SHOT_DIR,  # noqa: F401
     SHOT_NAME,  # noqa: F401
@@ -194,7 +190,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     SHOT_WAIT,  # noqa: F401
     SHOTS_MAX,  # noqa: F401
     STATE_SUBJECTS,  # noqa: F401
-    SUBHEAD_RE,  # noqa: F401
     WORK_IDS,  # noqa: F401
     WORKS,  # noqa: F401
     _added_words,  # noqa: F401
@@ -264,7 +259,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     rail_kind,  # noqa: F401
     rail_picks,  # noqa: F401
     rail_rows,  # noqa: F401
-    reader_lacks,  # noqa: F401
     restart_mark,  # noqa: F401
     restart_subject,  # noqa: F401
     review_pr,  # noqa: F401

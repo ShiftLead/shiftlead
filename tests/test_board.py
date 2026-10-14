@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from sessionorc import board
+from sessionorc import board, ledgerboard
 from sessionorc.client import AgentError, LocalClient
 
 ITEM = (
@@ -669,7 +669,7 @@ def test_a_decide_writes_the_field_at_the_lines_end_and_its_message():
     line = f"- [ ] {ASKED}\n"
     got = board.edit_line(line, ASKED, "decide", answer="Lift  it", today="2026-10-01")
     assert got == f"- [ ] {ASKED} Decided: Lift it (2026-10-01).\n"
-    assert board.DECIDED_RE.search(got.rstrip("\n")).group("text", "date") == ("Lift it", "2026-10-01")
+    assert ledgerboard.DECIDED_RE.search(got.rstrip("\n")).group("text", "date") == ("Lift it", "2026-10-01")
     # an item that ends no sentence is ended first: the field starts one, as the reader asks
     assert board.edit_line("- [ ] n/a — undated", "n/a — undated", "decide", answer="Yes", today="2026-10-01") == (
         "- [ ] n/a — undated. Decided: Yes (2026-10-01)."
@@ -747,7 +747,7 @@ def test_a_decide_is_committed_and_refused_where_every_edit_is(repo):
         on_origin(repo, "log", "-1", "--format=%s", "origin/main") == f"{got['message']} (#{got['pr']})"
         and git(repo, "status", "--porcelain") == ""
     )
-    assert board.DECIDED_RE.search(origin_board(repo).splitlines()[8]).group("text") == "Keep it"
+    assert ledgerboard.DECIDED_RE.search(origin_board(repo).splitlines()[8]).group("text") == "Keep it"
     head = on_origin(repo, "rev-parse", "origin/main")
     git(repo, "pull", "-q", "--ff-only", "origin", "main")  # the checkout catches up (§6 *Pull*)
     for line, text in ((9, ASKED), (6, "not an item")):  # already decided; moved
@@ -786,8 +786,8 @@ async def test_board_edit_decides_only_with_one_of_the_items_answers(agent, repo
                             answer="Not right: the ring is amber", answers=pair)  # fmt: skip
         assert got["answer"] == "Not right: the ring is amber"
     lines = origin_board(repo).splitlines()
-    assert board.DECIDED_RE.search(lines[8]).group("text") == "Keep it"
-    assert board.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber"
+    assert ledgerboard.DECIDED_RE.search(lines[8]).group("text") == "Keep it"
+    assert ledgerboard.DECIDED_RE.search(lines[9]).group("text") == "Not right: the ring is amber"
 
 
 @pytest.mark.unit
