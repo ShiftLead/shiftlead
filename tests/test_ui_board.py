@@ -78,7 +78,7 @@ def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_i
     """§4.4 *Each reading has one owner*, *The boards* (TD-615): the page's board rows are the
     `boards` of the host agent's repo readings — every repo's, each row its reading's id — and the
     page runs no reader. What could not be read is said (§4.5 *no silent failure path*): a failed
-    read keeps its last items, and a board in a repo with no reader is named."""
+    read keeps its last items, and says since when."""
     from shiftlead.ui.app import board_reading
 
     assert board_reading({}) == ([], "") and board_reading(None) == ([], "")
@@ -93,9 +93,6 @@ def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_i
         "its rows are the last reading"
     )
     assert "no row is shown" in board_reading(reading(report(a), error="x"))[1]
-    unread = repo(tmp_path, "unread", "- [ ] z. Due: 2026-09-01.\n", reader=False)
-    rows, note = board_reading({str(unread): {"name": "unread", "root": str(unread), "boards": {"boards": []}}})
-    assert rows == [] and "unread" in note and "nudge_user_attention.py" in note
     # a reading taken before its first board read: said, not drawn as an empty board
     assert board_reading({str(a): {"name": "a", "root": str(a)}}) == ([], "the board of a has not been read yet")
     bare = repo(tmp_path, "bare", reader=False)  # no board anywhere is not a fault: nothing to say
@@ -110,15 +107,15 @@ def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypat
 
     root = tmp_path / "r"
     stale = report(root, {"line": 3, "text": "a. Due: 2026-09-20.", "due": "2026-09-20"})
-    note = reader_lacks(stale, "/r/scripts/nudge_user_attention.py")
-    assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)") and "/r/scripts" in note
-    assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue")), "/x") == ""
-    assert reader_lacks(report(root), "/x") == "" and reader_lacks("junk") == ""
+    note = reader_lacks(stale)
+    assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)")
+    assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue"))) == ""
+    assert reader_lacks(report(root)) == "" and reader_lacks("junk") == ""
     # through the reading: the rows drawn, the note beside them, naming the repo's own reader
     from shiftlead.ui.app import board_reading
 
     rows, note = board_reading(reading(stale))
-    assert len(rows) == 1 and "without `answers`" in note and str(root / "scripts") in note
+    assert len(rows) == 1 and "without `answers`" in note and "the board reader predates it" in note
 
 
 @pytest.mark.unit
@@ -773,13 +770,16 @@ def test_a_board_line_only_on_origin_is_read_from_origin_on_a_clone_behind(tmp_p
 
 
 def _reader_phrases():
-    """Every `FetchResult` sentence the reader can write, its f-string holes filled."""
+    """Every `Origin` sentence the host agent's board read can write (`workorders._against_origin`,
+    TD-585), with its case, the f-string holes filled."""
     import re
 
-    src = READER.read_text()
+    from sessionorc import workorders
+
+    src = pathlib.Path(workorders.__file__).read_text()
     out = []
-    for m in re.finditer(r'FetchResult\(\s*f?"([^"]*)"', src):
-        out.append(re.sub(r"\{[^}]*\}", "origin/main", m.group(1)))
+    for m in re.finditer(r'Origin\(\s*"(\w+)",\s*f?"([^"]*)"', src):
+        out.append((m.group(1), re.sub(r"\{[^}]*\}", "origin/main", m.group(2))))
     return out
 
 
@@ -792,9 +792,12 @@ def test_the_phrase_table_knows_every_sentence_the_reader_writes():
 
     phrases = _reader_phrases()
     assert len(phrases) >= 9
-    for ph in phrases:
+    # each sentence's case as the table reads it: `behind` is the board's `source`, never a phrase
+    want = {"skipped": "unreached", "none": None, "matches": None, "behind": None, "local": "local", "both": "both"}
+    for case, ph in phrases:
         known = [c for o, p, c in ORIGIN_PHRASES if ph.startswith(o) and (not p or p in ph)]
         assert known, f"the origin note's table does not know the reader's phrase {ph!r}"
+        assert known[0] == want[case] or (case == "behind" and known[0] == "behind"), (case, ph)
 
 
 @pytest.mark.unit
@@ -1637,13 +1640,9 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     assert board_waiting_on(row, [], now) == nobody
     # a record whose repo will not resolve is passed over, never the page's error
     assert board_waiting_on(row, [{**g1, "repo": "bad\x00path"}, g1], now) == "pickable by grind"
-    # a repo with no reader names no order; a reader that will not load is loaded once, not per row
+    # a repo no team services names nobody; the id is ledgerboard's, the same with no script in the repo
     assert board_waiting_on({**row, "root": str(tmp_path)}, [g1], now) == nobody
-    broken = tmp_path / "broken"
-    (broken / "scripts").mkdir(parents=True)
-    (broken / "scripts" / "nudge_user_attention.py").write_text("raise SystemExit(3)\n")
-    assert workorders.ref(broken, text) == ""
-    assert workorders._readers[str(broken / "scripts" / "nudge_user_attention.py")][1] is None
+    assert workorders.ref(tmp_path / "nowhere", text) == ref
 
 
 def test_a_decided_lines_teams_skip_a_resumed_away_record_and_read_live_from_any_one(tmp_path):

@@ -1,9 +1,8 @@
 """Work orders (design §4.4 *Board write-back*, §6 rules 6 and 8, TD-380; built — TD-384): the
-board's open decided lines, read by the repo's own reader, as `board:<key>` in the lanes."""
+board's open decided lines, read in-process through ledgerboard (TD-585), as `board:<key>` in the lanes."""
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -13,7 +12,6 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import workorders
 from sessionorc.models import Session
 
-READER = Path(__file__).resolve().parent.parent / "scripts" / "nudge_user_attention.py"
 FORMAT = (
     "Format: `- [ ] YYYY-MM-DD (session <first-8-of-session-uuid> on <host>, or n/a) — what's needed."
     " Context: TD-NNN / PR #N / branch. Due: YYYY-MM-DD.`"
@@ -28,10 +26,7 @@ FYI = "- [ ] fyi 2026-10-01 (session n/a) — **The mirror moved.** Due: 2026-10
 
 def _repo(tmp_path: Path, *lines: str) -> Path:
     root = tmp_path / "repo"
-    (root / "docs").mkdir(parents=True)
-    (root / "scripts").mkdir()
-    shutil.copy2(READER, root / "scripts" / "nudge_user_attention.py")
-    shutil.copy2(READER.with_name("ledgerboard.py"), root / "scripts" / "ledgerboard.py")  # the reader imports it
+    (root / "docs").mkdir(parents=True)  # no `scripts/`: a repo with a board needs no dev-cadence
     board = ["# User Attention Board", "", FORMAT, "", "## Needs the user", "", *lines, ""]
     (root / "docs" / "user_attention.md").write_text("\n".join(board), encoding="utf-8")
     return root
@@ -49,9 +44,13 @@ def test_a_decided_line_is_a_work_order_and_an_open_or_fyi_line_is_not(tmp_path)
 
 
 @pytest.mark.unit
-def test_the_key_survives_a_snooze_a_reply_and_the_decide_and_is_the_readers_item_key(tmp_path):
-    """`board:<key>` is the first eight hex of a sha256 of the line's `item_key()` — the reader's own,
-    loaded from its file — so the tick's next read names the same line the same way."""
+def test_the_key_survives_a_snooze_a_reply_and_the_decide_and_is_ledgerboards_item_key(tmp_path):
+    """`board:<key>` is the first eight hex of a sha256 of the line's `item_key()` — ledgerboard's —
+    so the tick's next read names the same line the same way."""
+    import hashlib
+
+    from sessionorc import ledgerboard
+
     first = workorders.read(_repo(tmp_path / "a", DECIDED), fetch=False)["orders"][0]["id"]
     moved = DECIDED.replace("Due: 2026-10-02", "Due: 2026-10-09").replace(
         ". Answers:", " — paul, 2026-10-03: keep both. Answers:"
@@ -60,14 +59,16 @@ def test_the_key_survives_a_snooze_a_reply_and_the_decide_and_is_the_readers_ite
     assert first == again
     other = workorders.read(_repo(tmp_path / "c", DECIDED.replace("nightly", "weekly")), fetch=False)
     assert other["orders"][0]["id"] != first
+    assert first == "board:" + hashlib.sha256(ledgerboard.item_key(DECIDED).encode()).hexdigest()[:8]
 
 
 @pytest.mark.unit
-def test_no_board_or_no_reader_is_no_work_orders_and_a_failed_read_says_so(tmp_path):
+def test_no_board_is_no_work_orders_and_a_board_that_will_not_read_says_so(tmp_path):
     assert workorders.read(tmp_path, fetch=False) == {"orders": []}
     root = _repo(tmp_path, DECIDED)
-    (root / "scripts" / "nudge_user_attention.py").write_text("import sys\nsys.exit(3)\n")
-    assert "error" in workorders.read(root, fetch=False)
+    (root / "docs" / "user_attention.md").write_bytes(b"- [ ] \xff\xfe not text\n")
+    got = workorders.read(root, fetch=False)
+    assert got == {"error": f"{root / 'docs' / 'user_attention.md'} could not be read (UnicodeDecodeError)"}
 
 
 @pytest.mark.unit
@@ -92,35 +93,40 @@ def test_rule_eight_counts_a_work_order_as_a_gain():
 
 @pytest.mark.unit
 def test_the_fetch_read_falls_back_to_a_plain_one(tmp_path, monkeypatch):
-    """No origin to fetch (a scratch repo): the reader's `--fetch` read is answered or not, and a
-    plain read follows when it is not — the line is listed either way."""
+    """No origin to fetch (a scratch repo): the fetch fails, the checkout's board is read, and the
+    line is listed either way."""
     root = _repo(tmp_path, DECIDED)
     subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
     assert len(workorders.read(root)["orders"]) == 1
+    (b,) = workorders.read_boards(root)["boards"]
+    assert b["fetch_case"] == "skipped" and b["fetch_note"].startswith("fetch skipped (")
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("stop", "why"),
     [
-        (lambda argv, kw: (_ for _ in ()).throw(subprocess.TimeoutExpired(argv, kw["timeout"])), "timeout"),
-        (lambda argv, kw: subprocess.CompletedProcess(argv, 2, "", "fatal: no remote\n"), "exit 2: fatal: no remote"),
+        (lambda argv, t: (_ for _ in ()).throw(subprocess.TimeoutExpired(argv, t)), "timeout"),
+        (lambda argv, t: subprocess.CompletedProcess(argv, 2, b"", b"fatal: no remote\n"), "fatal: no remote"),
     ],
 )
-def test_a_stopped_fetching_read_marks_the_plain_reads_boards_unreached(tmp_path, monkeypatch, stop, why):
-    """TD-626: the fetching run stopped at our bound, or failed, and the plain read that follows
-    carries *fetch skipped (<why>)* on each board, so the Inbox draws *origin could not be reached*."""
+def test_a_stopped_fetch_marks_the_checkouts_board_unreached(tmp_path, monkeypatch, stop, why):
+    """TD-626: the fetch stopped at our bound, or failed, and the checkout's board is read with
+    *fetch skipped (<why>)* on it, so the Inbox draws *origin could not be reached*."""
     from shiftlead.ui.inbox import origin_note
 
-    real = subprocess.run
+    real = workorders._git
 
-    def run(argv, **kw):
-        return stop(argv, kw) if "--fetch" in argv else real(argv, **kw)
+    def git(root, args, timeout):
+        return stop(args, timeout) if args[0] == "fetch" else real(root, args, timeout)
 
-    monkeypatch.setattr(workorders.subprocess, "run", run)
+    monkeypatch.setattr(workorders, "_git", git)
     got = workorders.read_boards(_repo(tmp_path, DECIDED))
     (b,) = got["boards"]
-    assert (b["source"], b["fetch_note"]) == (None, f"fetch skipped ({why})")
+    assert (b["source"], b["fetch_note"], b["fetch_case"], b["fetch_why"]) == (
+        None, f"fetch skipped ({why})", "skipped", why
+    )  # fmt: skip
+    assert len(b["items"]) == 1
     assert origin_note(b)["text"].startswith(f"origin could not be reached ({why}): showing the checkout's board")
     plain = workorders.read_boards(_repo(tmp_path / "plain", DECIDED), fetch=False)["boards"][0]
     assert not str(plain.get("fetch_note") or "").startswith("fetch skipped")
@@ -147,13 +153,102 @@ def test_the_repo_reading_lists_them_on_a_full_read_and_keeps_them_between(tmp_p
 
 
 @pytest.mark.unit
-def test_reading_the_reader_writes_nothing_into_the_checkout(tmp_path):
-    """TD-386: the reader's `item_key` is compiled from its text, never imported, so no
-    `scripts/__pycache__` lands in the repo — which the anchor's gate would read as the person's work."""
+def test_a_plain_read_runs_nothing_and_writes_nothing_into_the_checkout(tmp_path, monkeypatch):
+    """TD-585: the board is parsed in-process by the vendored ledgerboard — a plain read starts no
+    process (no dev-cadence script, no git) and leaves the checkout as it was (TD-386's gate)."""
     root = _repo(tmp_path, DECIDED)
-    workorders._readers.clear()
+    before = sorted(p.relative_to(root) for p in root.rglob("*"))
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: pytest.fail(f"a process was started: {a}"))
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail(f"a process was run: {a}"))
     assert workorders.read(root, fetch=False)["orders"]
-    assert not (root / "scripts" / "__pycache__").exists()
+    assert sorted(p.relative_to(root) for p in root.rglob("*")) == before
+
+
+def _git(*args: str, cwd: Path) -> None:
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
+
+
+@pytest.mark.unit
+def test_the_default_branch_is_origin_heads_then_init_default_branch_then_main(tmp_path):
+    """The branch the board is compared against: origin/HEAD's target; with none, `init.defaultBranch`
+    where origin has it; else `main` or `master`, else `main` (review of TD-585 slice 3)."""
+    origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "clone"
+    _git("init", "-q", "--bare", "-b", "trunk", str(origin), cwd=tmp_path)
+    _git("clone", "-q", str(origin), str(seed), cwd=tmp_path)
+    _git("config", "user.email", "t@t", cwd=seed)
+    _git("config", "user.name", "t", cwd=seed)
+    _git("checkout", "-q", "-b", "trunk", cwd=seed)
+    _git("commit", "-q", "--allow-empty", "-m", "first", cwd=seed)
+    _git("push", "-q", "origin", "trunk", cwd=seed)
+    _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
+    assert workorders.default_branch(clone) == "trunk"  # origin/HEAD, set by the clone
+    _git("remote", "set-head", "origin", "-d", cwd=clone)
+    assert workorders.default_branch(clone) == "main"  # nothing names it, and origin has no main
+    _git("config", "init.defaultBranch", "trunk", cwd=clone)
+    assert workorders.default_branch(clone) == "trunk"
+
+
+@pytest.mark.unit
+def test_each_case_of_the_read_against_origin(tmp_path):
+    """§4.5 screen 6 *Boards are read against origin* (TD-585): the checkout's board against
+    `origin/<default>` and their merge-base's, real git — *matches*; *behind*, origin's copy read and
+    named as the source; *local*; *both*; *none* for an origin with no board — each case a word
+    (`fetch_case`) and a sentence in the phrases the Inbox's origin note reads."""
+    from shiftlead.ui.inbox import origin_case
+
+    origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "clone"
+    _git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    _git("clone", "-q", str(origin), str(seed), cwd=tmp_path)
+    _git("config", "user.email", "t@t", cwd=seed)
+    _git("config", "user.name", "t", cwd=seed)
+    (seed / "README").write_text("x\n")
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-qm", "first", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
+    (clone / "docs").mkdir()
+    board = clone / "docs" / "user_attention.md"
+    board.write_text(f"{OPEN}\n")
+
+    def case():
+        (b,) = workorders.read_boards(clone)["boards"]
+        return b["fetch_case"], origin_case(b["source"] or "", b["fetch_note"]), b
+
+    assert case()[:2] == ("none", None)
+    (seed / "docs").mkdir()
+    (seed / "docs" / "user_attention.md").write_text(f"{OPEN}\n")
+    _git("add", "-A", cwd=seed)
+    _git("commit", "-qm", "board", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    board.unlink()
+    _git("pull", "-q", "origin", "main", cwd=clone)
+    assert case()[:2] == ("matches", None)
+    with (seed / "docs" / "user_attention.md").open("a") as f:
+        f.write(f"{DECIDED}\n")
+    _git("commit", "-qam", "a decided line", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    got, note, b = case()
+    assert (got, note, b["source"]) == ("behind", "behind", "origin/main")
+    assert [it["line"] for it in b["items"]] == [1, 2] and b["items"][1]["key"] == workorders.ref("", DECIDED[6:])
+    _git("pull", "-q", "origin", "main", cwd=clone)
+    board.write_text(board.read_text() + f"{FYI}\n")
+    assert case()[:2] == ("local", "local")
+    with (seed / "docs" / "user_attention.md").open("a") as f:
+        f.write("- [ ] act 2026-10-02 (session n/a) — **Another.** Due: 2026-10-03.\n")
+    _git("commit", "-qam", "another", cwd=seed)
+    _git("push", "-q", "origin", "main", cwd=seed)
+    got, note, b = case()
+    assert (got, note, b["source"]) == ("both", "both", None)
+    assert [it["text"].split("**")[1] for it in b["items"]] == [
+        "Rotate the token.",
+        "Keep the nightly backup?",
+        "The mirror moved.",
+    ]  # the checkout's
+    # the write-back's tree: read as the checkout's board read from origin, no fetch
+    tree = tmp_path / "tree.md"
+    tree.write_text(f"{OPEN}\n")
+    (b,) = workorders.read_boards(clone, board=tree)["boards"]
+    assert (b["board"], b["source"], b["fetch_case"], len(b["items"])) == (str(board), "origin", "behind", 1)
 
 
 @pytest.mark.unit
@@ -209,8 +304,8 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     monkeypatch.setattr(cli, "call_sync", lambda method, **k: repos if method == "repos" else pytest.fail(method))
     real_run = subprocess.run
 
-    def run(argv, *a, **k):  # git finds the checkout; neither the reader nor a fetch is run
-        assert not any("nudge_user_attention" in str(x) or x == "fetch" for x in argv), argv
+    def run(argv, *a, **k):  # git finds the checkout; no fetch is run
+        assert "fetch" not in argv, argv
         return real_run(argv, *a, **k)
 
     monkeypatch.setattr(subprocess, "run", run)
@@ -245,9 +340,7 @@ def test_ao_board_show_finds_a_line_by_its_id_and_refuses_one_no_line_holds(tmp_
     assert cli.main(["board", "show", key, "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["line"] == 7
     assert cli.main(["board", "show", "TD-607"]) == 2
-    (root / "scripts" / "nudge_user_attention.py").unlink()  # no reader: said, never *reworded or closed*
-    assert cli.main(["board", "show", key]) == 1
-    assert "has no board reader (scripts/nudge_user_attention.py)" in capsys.readouterr().err
+    assert not (root / "scripts").exists()  # the line is found with no dev-cadence script in the repo
 
 
 # -- a red PR nobody holds (design §4.4, TD-613) ---------------------------------------------------
