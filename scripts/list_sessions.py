@@ -36,7 +36,8 @@ person or the sweeping session to judge; it decides nothing.
 markdown overview table plus per-session detail sections (what the
 generate_session_index.sh cron wrapper writes to docs/session_index.md).
 
-Resume a listed session with the line each block prints (Claude Code: claude --resume <session-uuid>).
+Resume a listed session with the line each block prints (Claude Code: claude --resume <session-uuid>;
+Gemini CLI: gemini --resume <session-uuid>, run from the directory the block names).
 A tool the `agents` setting lists that the adapter cannot read is named on stderr, not skipped.
 """
 
@@ -166,6 +167,15 @@ def scan_session(path: Path, chars: int) -> dict | None:
     if not (info["first_user"] or info["last_assistant"] or info["recap"]):
         return None  # empty/degenerate session file
     return info
+
+
+def _clipped(s: "dict | None", chars: int) -> "dict | None":
+    """Another tool's scan (agent_sessions.scan) in scan_session's shape: texts clipped,
+    the keys only Claude Code writes (branch, slug, recap) empty."""
+    if not s:
+        return None
+    return {**s, "branch": None, "slug": None, "recap": "",
+            **{k: _clip(s.get(k) or "", chars) for k in ("first_user", "last_assistant", "summary")}}
 
 
 def _try_json(line: str):
@@ -437,7 +447,7 @@ def main() -> int:
                 if needles and not mentions(f, needles):
                     continue
                 scanned += 1
-                s = scan_session(f, args.chars)
+                s = scan_session(f, args.chars) if tool == "claude" else _clipped(agent_sessions.scan(tool, f), args.chars)
                 if s:
                     s["where"] = short_path(run_dir)
                     s["tool"] = tool

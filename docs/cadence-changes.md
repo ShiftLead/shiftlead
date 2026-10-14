@@ -12,6 +12,14 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-14 — Gemini CLI sessions are seen: `agents = "claude,gemini"`
+Do: in a repo where Gemini CLI sessions run, list `gemini` in `docs/cadence.toml`'s `agents`; the anchor guard, the reaper, `list_sessions.py` (`gemini --resume <uuid>`) and the sweep row then see them, and "cannot see gemini" means no readable `~/.gemini` (or `/proc`) here.
+See: cadence.md §1.13, §9.18; TD-109.
+
+## 2026-10-14 — GitLab repos are read: `glab`, ff + always-squash, the squash template
+Do: on GitLab, run `scripts/adopt_repo_settings.sh --apply` (merge_method ff, squash_option always, delete source branch, the `(!N)` template); `/cadence`, the open-MR line and `sync-all.sh` then read it through `glab`. A host not named gitlab sets `forge = "gitlab"`.
+See: cadence.md §4.2, §4.7, §9.18; TD-104.
+
 ## 2026-10-12 — `forge = "none"`: the review line goes in the squash commit's body
 Do: in a repo with no PR API (a bare repo over ssh), set `forge = "none"` in `docs/cadence.toml`, put the `cadence-review:` line in each squash commit's body, and audit with `check_cadence.py --since 7d`; the nudge says "no forge" once instead of "PRs not checked".
 See: cadence.md §4.9, §9.18; TD-105.

@@ -1,4 +1,4 @@
-# ledgerboard v1.0 sha256:e38e170ffd8c8f0f84c80d02055cd3ab3752f91a0c7c9ccc1ef515a828747b2f
+# ledgerboard v1.1 sha256:cb51bf752484cec8fff844715e6b9be3615e24523c6550faac3692dc7a9fad68
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard.py (vendored by dev-cadence as files/scripts/ledgerboard.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -357,6 +357,12 @@ KIND_RE = re.compile(r"^(?P<kind>decide|act|look|watch|fyi)\s+(?=\d{4}-\d{2}-\d{
 DEFAULT_MARK_RE = re.compile(r"\s*\(default\)$", re.IGNORECASE)
 # A live look's (a `look`'s) answers, in exactly these words, so a tool can draw the same two buttons.
 LIVE_LOOK_ANSWERS = ("Works", "Not right: <what>")
+# The second of them is a FORM, its slot the person's words: offered as `Not right:` alone or with
+# one `<…>` placeholder. `Not right: wrong repo` is a complete answer, not the form.
+NOT_RIGHT = "Not right:"
+NOT_RIGHT_FORM_RE = re.compile(r"Not right:\s*(?:<[^<>]*>)?")
+# An item's bold head: its first `**…**` run, the line's title where it has one.
+BOLD_RE = re.compile(r"\*\*(?P<bold>.+?)\*\*")
 # The head: `[kind] YYYY-MM-DD (session <name> on <host>…)`, name and host optionally backticked.
 # Boards also write `(session `ab12cd34` / `worker-2` on host, branch x)`: the session is the
 # first name, the host the first word after ` on ` anywhere inside the parentheses.
@@ -637,6 +643,35 @@ def edit_head(text: str) -> str:
     what = text.split(" — ", 1)[1] if " — " in text else text
     what = FIELDS_RE.split(what, 1)[0].replace("*", "").strip() or text
     return what if len(what) <= EDIT_HEAD_CHARS else what[: EDIT_HEAD_CHARS - 1] + "…"
+
+
+def bold_head(text: str) -> str | None:
+    """The item's bold head — its first `**…**` run, whitespace collapsed — or None. A reply's
+    words are the person's, never the head; the fallback and any clipping are the caller's."""
+    span = reply_span(text)
+    if span:
+        text = text[: span[0]] + text[span[1] :]
+    m = BOLD_RE.search(text)
+    head = " ".join(m.group("bold").split()) if m else ""
+    return head or None
+
+
+def is_not_right_form(answer: str) -> bool:
+    """Whether an offered answer is the live look's `Not right: <what>` form — `Not right:` alone
+    or with one `<…>` placeholder, whitespace collapsed — rather than a complete answer."""
+    return bool(NOT_RIGHT_FORM_RE.fullmatch(" ".join(str(answer).split())))
+
+
+def fill_not_right(said: str, offered: list[str]) -> str | None:
+    """`said`, whitespace collapsed, when it fills a `Not right: <what>` form among `offered`;
+    None when no form is offered or `said` does not start `Not right:`. Refused when it says
+    nothing past the form — `Not right:` alone, or the form as offered."""
+    said = " ".join(str(said or "").split())
+    if not said.startswith(NOT_RIGHT) or not any(is_not_right_form(a) for a in offered):
+        return None
+    if is_not_right_form(said):
+        raise Refused("Not right needs its words: say what is off")
+    return said
 
 
 def _sentence(body: str) -> str:

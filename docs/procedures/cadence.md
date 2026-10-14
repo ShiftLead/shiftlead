@@ -13,7 +13,7 @@ skipped check is found, not prevented.
 
 ## Steps
 
-The commands are GitHub's (`gh`), with GitLab's (`glab`, a PR is a merge request) beside them to verify (cadence.md, *Forges*). The script asks through `scripts/forge.py`, whose one backend today is GitHub's: on another forge its PR rows say *PRs not checked* (TD-098) until that forge has a backend (TD-104), and a GitHub under another host name sets `forge = "github"` in `docs/cadence.toml` (cadence.md §9.18).
+The commands are GitHub's (`gh`), with GitLab's (`glab`, a PR is a merge request, `!N`) beside them (cadence.md, *Forges*). The script asks through `scripts/forge.py`, which has a GitHub and a GitLab backend (TD-104): on any other forge its PR rows say *PRs not checked* (TD-098), and a GitHub or GitLab under another host name sets `forge = "github"` or `"gitlab"` in `docs/cadence.toml` (cadence.md §9.18). On GitLab the `ci` row reads the pipelines on the head commit, and one that failed with no jobs (it never ran) is *unknown*, not red.
 
 **No forge** (`forge = "none"` in `docs/cadence.toml`, cadence.md §4.9, TD-105): there is no PR, so `--pr` exits 2. Run the review the same way, put the `cadence-review:` line (step 3's form) in the squash commit's body, and land it on the default branch; `python3 scripts/check_cadence.py --since 7d` then reads every commit from git, and a commit with neither that line nor a carve-out fails.
 
@@ -28,7 +28,7 @@ The commands are GitHub's (`gh`), with GitLab's (`glab`, a PR is a merge request
    repo's review model (`python3 scripts/cadence_config.py get review-model`; default
    `sonnet`, cadence §9.18), started however your tool starts another agent on a chosen
    model (a subagent, or a separate session) and never the session that wrote the diff, reviews the diff for correctness (code) or fact-checks it
-   against the repo (docs). Fix the findings, re-verify, and then post the evidence comment (§4; on GitLab the same body through `glab mr note <n> -m`, to verify):
+   against the repo (docs). Fix the findings, re-verify, and then post the evidence comment (§4; on GitLab the same body through `glab mr note <n> -m`, which glab 1.123 marks deprecated but runs; a fine-grained token needs the notes permissions):
 
    ```
    gh pr comment <n> --body "$(cat <<'MSG'
