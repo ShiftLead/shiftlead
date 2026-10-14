@@ -16,6 +16,7 @@ reading has one owner*, TD-615), and the orders are a filter over that reading (
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
@@ -111,26 +112,29 @@ def _git(root: Path, args: list[str], timeout: float) -> subprocess.CompletedPro
         try:
             out, err = p.communicate(timeout=max(timeout, 0.0))
         except subprocess.TimeoutExpired:
+            # the group this call started, and nothing else: SIGTERM, a grace for git, then SIGKILL to
+            # whatever of the group is left — an ssh that ignored the SIGTERM outlives git otherwise
             for sig in (signal.SIGTERM, signal.SIGKILL):
                 try:
-                    os.killpg(p.pid, sig)  # the group this call started, and nothing else
+                    os.killpg(p.pid, sig)
                 except (ProcessLookupError, PermissionError):
                     break
-                try:
-                    p.wait(timeout=TERM_GRACE)
-                    break
-                except subprocess.TimeoutExpired:
-                    continue
+                if sig == signal.SIGTERM:
+                    with contextlib.suppress(subprocess.TimeoutExpired):
+                        p.wait(timeout=TERM_GRACE)
+            p.wait()
             raise subprocess.TimeoutExpired(argv, timeout) from None
         return subprocess.CompletedProcess(argv, p.returncode, out, err)
 
 
 def default_branch(root: Path) -> str:
-    """The repo's default branch: origin/HEAD's target, else `main` or `master` where origin has
-    it, else `main`."""
+    """The repo's default branch: the first of origin/HEAD's target, `init.defaultBranch`, `main`
+    and `master` that origin has, else `main` (dev-cadence's rule, cadence §9)."""
     got = _git(root, ["symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD"], READ_TIMEOUT)
     named = got.stdout.decode().strip().removeprefix("origin/") if got.returncode == 0 else ""
-    for b in (named, "main", "master"):
+    cfg = _git(root, ["config", "init.defaultBranch"], READ_TIMEOUT)
+    configured = cfg.stdout.decode().strip() if cfg.returncode == 0 else ""
+    for b in (named, configured, "main", "master"):
         if b and _git(root, ["rev-parse", "--verify", "-q", f"refs/remotes/origin/{b}"], READ_TIMEOUT).returncode == 0:
             return b
     return "main"

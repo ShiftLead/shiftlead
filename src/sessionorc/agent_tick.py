@@ -2982,10 +2982,10 @@ class TickMixin:
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         """The checkout's board and the work orders derived from it (§4.4 *Each reading has one owner*,
         *The boards*, TD-615): `boards` — `workorders.read_boards`' reading, with `file` the checkout's
-        board as last read (its mtime and size), `today` the reader's day and `at` — and the lanes'
+        board as last read (its mtime and size), `today` the reading's day and `at` — and the lanes'
         `work_orders`, its decided open lines (TD-384), never a second read.
 
-        `due` (the `REPOS_EVERY` pass) reads against origin with the reader's own `--fetch`; `clock`
+        `due` (the `REPOS_EVERY` pass) reads against origin (`workorders._against_origin`); `clock`
         (`BOARD_EVERY`) reads the checkout plainly, and only when its board's file or the day moved
         since the last reading, so a board read from origin stays so until the checkout pulls; `tree`
         reads that file — the write-back's tree — as the checkout's board read from origin. A failed
@@ -2996,7 +2996,7 @@ class TickMixin:
             file: list[int] | None = [st.st_mtime_ns, st.st_size]
         except OSError:
             file = None
-        today = datetime.now().date().isoformat()  # the reader's own day, local
+        today = datetime.now().date().isoformat()  # the reading's own day, local
         new_day = bds is not None and bds.get("today") != today
         moved = bds is None or "error" in bds or bds.get("file") != file or new_day
         if not (due or tree is not None or (clock and moved)):

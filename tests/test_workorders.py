@@ -169,6 +169,26 @@ def _git(*args: str, cwd: Path) -> None:
 
 
 @pytest.mark.unit
+def test_the_default_branch_is_origin_heads_then_init_default_branch_then_main(tmp_path):
+    """The branch the board is compared against: origin/HEAD's target; with none, `init.defaultBranch`
+    where origin has it; else `main` or `master`, else `main` (review of TD-585 slice 3)."""
+    origin, seed, clone = tmp_path / "origin.git", tmp_path / "seed", tmp_path / "clone"
+    _git("init", "-q", "--bare", "-b", "trunk", str(origin), cwd=tmp_path)
+    _git("clone", "-q", str(origin), str(seed), cwd=tmp_path)
+    _git("config", "user.email", "t@t", cwd=seed)
+    _git("config", "user.name", "t", cwd=seed)
+    _git("checkout", "-q", "-b", "trunk", cwd=seed)
+    _git("commit", "-q", "--allow-empty", "-m", "first", cwd=seed)
+    _git("push", "-q", "origin", "trunk", cwd=seed)
+    _git("clone", "-q", str(origin), str(clone), cwd=tmp_path)
+    assert workorders.default_branch(clone) == "trunk"  # origin/HEAD, set by the clone
+    _git("remote", "set-head", "origin", "-d", cwd=clone)
+    assert workorders.default_branch(clone) == "main"  # nothing names it, and origin has no main
+    _git("config", "init.defaultBranch", "trunk", cwd=clone)
+    assert workorders.default_branch(clone) == "trunk"
+
+
+@pytest.mark.unit
 def test_each_case_of_the_read_against_origin(tmp_path):
     """§4.5 screen 6 *Boards are read against origin* (TD-585): the checkout's board against
     `origin/<default>` and their merge-base's, real git — *matches*; *behind*, origin's copy read and

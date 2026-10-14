@@ -584,8 +584,8 @@ def origin_firsts(rows: Collection[Mapping[str, Any]]) -> set[str]:
 templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_firsts)
 
 
-def reader_lacks(report: Any, script: str = "") -> str:
-    """The page's note when the reader run gives no field the Inbox draws (TD-278): its items carry
+def reader_lacks(report: Any) -> str:
+    """The page's note when the board reading gives no field the Inbox draws (TD-278): its items carry
     no `answers`, say, so no row would draw its answers and nothing would say why. "" when every
     field is there, or there is no item to tell by."""
     items = [
@@ -600,7 +600,7 @@ def reader_lacks(report: Any, script: str = "") -> str:
     gone = [f for f in BOARD_FIELDS if not any(f in it for it in items)]
     if not gone:
         return ""
-    whose = f"the reader at {script}" if script else "the board reader"
+    whose = "the board reader"
     since = ", ".join(f"`{f}` ({BOARD_FIELDS[f]})" for f in gone)
     return f"board rows are drawn without {since}: {whose} predates it — sync dev-cadence's files into that repo"
 

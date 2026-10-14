@@ -107,10 +107,10 @@ def test_a_reader_that_gives_no_answers_is_named_on_the_page(tmp_path, monkeypat
 
     root = tmp_path / "r"
     stale = report(root, {"line": 3, "text": "a. Due: 2026-09-20.", "due": "2026-09-20"})
-    note = reader_lacks(stale, "/r/scripts/nudge_user_attention.py")
-    assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)") and "/r/scripts" in note
-    assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue")), "/x") == ""
-    assert reader_lacks(report(root), "/x") == "" and reader_lacks("junk") == ""
+    note = reader_lacks(stale)
+    assert note.startswith("board rows are drawn without `answers` (dev-cadence TD-036)")
+    assert reader_lacks(report(root, item(3, "a.", "2026-09-20", "overdue"))) == ""
+    assert reader_lacks(report(root)) == "" and reader_lacks("junk") == ""
     # through the reading: the rows drawn, the note beside them, naming the repo's own reader
     from shiftlead.ui.app import board_reading
 
