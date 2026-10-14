@@ -3427,6 +3427,22 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the view's rank: unseen idle sorts above idle
         return {"event": "session", "id": s["id"], "state": s["state"], "rank": v["rank"], "session": v}
 
+    async def fan_kin(run: Any, s: dict[str, Any], was: dict[str, Any]) -> None:
+        """Focus's members and its *under* chip are read across records (§4.4 *Per-session views*,
+        TD-617): a Focus page is sent its own record's delta again when the record that moved, or
+        went, is one of its controllers or members, from the fleet the run keeps — so the page reads
+        no `/api/sessions` on a peer's delta. `was` is the record before this delta, so a member
+        just released still redraws the list it left."""
+        st = run.state
+        for f in sorted({x.focus for x in run.light(other=s["id"]) if x.focus}):
+            mine = st.known.get(f)
+            if mine and (
+                s["id"] in (mine.get("controllers") or [])
+                or f in (s.get("controllers") or [])
+                or f in (was.get("controllers") or [])
+            ):
+                run.to_all(run.light(focus=f), await card_delta(mine, st))
+
     async def fan_step(run: Any, ev: dict[str, Any]) -> None:
         st = run.state
         known, repos, doing, acct_of = st.known, st.repos, st.doing, st.acct_of
@@ -3447,6 +3463,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # now looks like: they re-read what they draw (TD-572)
             if stirred:
                 run.to_all(run.light(other=s["id"]), {"event": "session", "id": s["id"], "state": s["state"]})
+                await fan_kin(run, s, was)
             focused = run.light(focus=s["id"])
             if not focused and not run.full:
                 return
@@ -3484,8 +3501,10 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # only a `gone` names a session; a `usage` event carries a profile, and popping on it
             # would one day evict a live session by coincidence
             went = str(ev.get("id") or "")
-            known.pop(went, None)
+            gone_rec = known.pop(went, None)
             run.to_all(run.light(), ev)
+            if gone_rec:
+                await fan_kin(run, gone_rec, gone_rec)
             if not run.full:
                 return
             await run.to_full(ev, always=True)

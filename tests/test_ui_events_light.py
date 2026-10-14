@@ -158,3 +158,56 @@ def test_the_focus_and_inbox_pages_ask_for_the_light_stream():
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert '}, "light=1");' in js  # the Inbox
     assert "}, `light=1&focus=${encodeURIComponent(id)}`);" in js  # Focus
+
+
+def test_a_focus_page_takes_its_members_and_controllers_from_its_own_stream(tmp_path, monkeypatch):
+    """§4.4 *Per-session views* (TD-617 fix 3): Focus's members and *under* chip are read across
+    records, so when a member moves, a member is released, or a controller goes, the server sends the
+    focused record's delta again from the fleet it keeps; a peer that is neither moves nothing of it."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    root = str(tmp_path / "samscrape")
+    lead = member("lead", root, controllers=["boss"], capabilities=["control"])
+    w, other, boss = member("w", root, controllers=["lead"]), member("x", root), member("boss", root)
+    pushed = [
+        {"event": "session", "session": {**w, "state": "working"}},  # a member moves
+        {"event": "session", "session": {**other, "state": "working"}},  # a stranger moves
+        {"event": "session", "session": {**w, "state": "working", "controllers": []}},  # released
+        {"event": "gone", "id": "boss"},  # the controller goes
+    ]
+    replies = {"repos": {root: reading(root)}, "doing_log": {}, "list": [lead, w, other, boss], "usage": {}, "host": {}}
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            return {"entries": []} if method == "inbox" else replies.get(method, {})
+
+        async def subscribe(self):
+            for ev in pushed:
+                yield ev
+
+    from shiftlead.ui import app as ui
+
+    monkeypatch.setattr(ui, "LocalClient", Fake)
+    evs = received(TestClient(ui.create_app()), "/events?light=1&focus=lead")
+    mine = [e["session"] for e in evs if e.get("id") == "lead"]
+    assert len(mine) == 3, evs  # the member's move, its release, the controller's going — not the stranger
+    assert mine[0]["members"][0]["id"] == "w" and mine[0]["members"][0]["state"] == "working"
+    assert mine[1]["members"] == []
+    assert mine[2]["under"] == [{"id": "boss", "name": "boss", "gone": True}]
+
+
+def test_the_focus_page_reads_no_sessions_list():
+    """TD-617 fix 3: Focus re-reads nothing on a peer's delta; its own stream carries its membership."""
+    import pathlib
+    import re
+
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
+    assert not re.search(r"""fetch\(["'`]/api/sessions["'`]""", js)
