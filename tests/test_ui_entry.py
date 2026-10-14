@@ -38,7 +38,7 @@ def world(tmp_path, *, team: bool = True, entries: dict | None = None, seat: boo
     return repo
 
 
-def fake(fleet, taken=(), created=None, handed=None):
+def fake(fleet, taken=(), created=None, handed=None, checks=None):
     class Fake:
         def __init__(self, *a, **k):
             pass
@@ -51,6 +51,8 @@ def fake(fleet, taken=(), created=None, handed=None):
 
         async def call(self, method, **kw):
             if method == "name_check":
+                if checks and kw["name"] in checks:
+                    return checks[kw["name"]]
                 return {"verdict": "live" if kw["name"] in taken else "free"}
             if method == "entry_add":
                 handed.append(kw)
@@ -318,3 +320,103 @@ def test_the_forms_what_is_tall_and_a_hidden_warning_draws_nothing():
     css = (root / "static" / "app.css").read_text()
     assert ".warn[hidden] { display: none; }" in css
     assert "#entrywhat.tall { height: 132px; }" in css
+
+
+# -- the **Name** box (§4.5a *Add entry form: Name*, TD-675 designed, TD-677 built) -------------------------
+
+
+def git(repo, *args):
+    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+
+
+def test_a_free_typed_name_starts_the_session_its_worktree_and_its_branch_under_it(tmp_path, monkeypatch):
+    world(tmp_path)
+    created: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], created=created))
+    # the box's prefill: the default, which the plan answers beside the name the press would take
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()
+    assert (got["name"], got["default"], got["name_why"]) == ("entry-1", "entry-1", "")
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt", "name": "inbox-counts"}).json()
+    assert (got["name"], got["default"], got["name_why"]) == ("inbox-counts", "entry-1", "")
+    assert got["line"] == "an interactive techlead session, inbox-counts, in a new worktree"
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "words": "", "name": "inbox-counts"})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert (kw["name"], kw["worktree"]) == ("inbox-counts", "inbox-counts")
+
+
+def test_an_emptied_box_takes_the_default(tmp_path, monkeypatch):
+    world(tmp_path)
+    created: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], created=created))
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt", "name": ""}).json()
+    assert (got["name"], got["name_why"]) == ("entry-1", "")
+    assert c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "name": ""}).status_code == 200
+    assert created[0]["name"] == "entry-1"
+
+
+SLUG_WHY = "lowercase letters and digits, with single - between them: the name is the session's, its worktree's"
+SLUG_WHY += " and its branch's"  # §4.5a's words, written out rather than imported
+
+
+@pytest.mark.parametrize(
+    "name, why",
+    [
+        ("Entry-2", SLUG_WHY),
+        ("my entry", SLUG_WHY),
+        ("entry-", SLUG_WHY),
+        ("a--b", SLUG_WHY),
+        ("x" * 33, SLUG_WHY),
+        ("held", "held is running — switch to it, or pick another name"),
+        ("gone", "gone names an exited session — pick another name"),
+        ("alarm", "alarm was suspended by a person"),
+        ("tree", "a worktree named tree exists — pick another name"),
+        ("twig", "a branch named twig exists — the session would start on it; pick another name"),
+    ],
+)
+def test_a_name_that_is_not_free_is_refused_in_the_boxs_words_at_the_check_and_at_the_press(
+    tmp_path, monkeypatch, name, why
+):
+    repo = world(tmp_path)
+    git(repo, "commit", "-q", "--allow-empty", "-m", "root")
+    git(repo, "branch", "twig")
+    (repo / ".claude" / "worktrees" / "tree").mkdir(parents=True)
+    checks = {
+        "held": {"verdict": "live", "message": "held is running — switch to it, or pick another name"},
+        "gone": {"verdict": "supersede", "message": "replaces the exited gone — run log kept"},
+        "alarm": {"verdict": "suspended", "message": "alarm was suspended by a person at … — no session may take it"},
+    }
+    created: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], created=created, checks=checks))
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt", "name": name}).json()
+    assert got["name_why"].startswith(why) and got["default"] == "entry-1"
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "name": name})
+    assert r.status_code == 409 and r.json()["detail"].startswith(why)
+    assert created == []  # refused, never replaced by another name
+
+
+def test_the_defaults_loop_skips_a_number_whose_branch_or_worktree_or_holder_is_there(tmp_path, monkeypatch):
+    repo = world(tmp_path)
+    git(repo, "commit", "-q", "--allow-empty", "-m", "root")
+    git(repo, "branch", "entry-1")  # a leftover local branch: ensure_worktree would check it out
+    (repo / ".claude" / "worktrees" / "entry-2").mkdir(parents=True)
+    checks = {"entry-3": {"verdict": "supersede", "message": "replaces the exited entry-3 — run log kept"}}
+    c = client(monkeypatch, tmp_path, fake([], checks=checks))
+    got = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()
+    assert (got["name"], got["default"]) == ("entry-4", "entry-4")
+
+
+def test_the_form_draws_the_name_box_beside_open_a_session_and_sends_what_it_holds():
+    """The template's box and the page's three rules for it: untouched it follows the default, a
+    typed name rides on every read (so a changed Type keeps it), and an emptied one sends nothing."""
+    from shiftlead.ui import app as ui
+
+    root = Path(ui.__file__).parent
+    html = (root / "templates" / "base.html").read_text()
+    go = html.index('id="entrygo"')
+    assert go < html.index('id="entryname" maxlength="32"') < html.index('id="entryline"')
+    js = (root / "static" / "app.js").read_text()
+    assert 'const typed = () => (named && nameBox.value.trim() ? nameBox.value : "");' in js
+    assert "if (!named) nameBox.value = v.default" in js and 'nameBox.placeholder = v.default || "";' in js
+    assert re.search(r"/api/entry/plan\?repo=.*\$\{q\}", js) and "name: typed() })" in js
+    assert '$("#entrygo").disabled = !!v.name_why;' in js

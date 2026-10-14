@@ -150,7 +150,9 @@
     <div class="col gap"><div class="row gap wrap"><button class="btn primary" type="button" id="entryhand" disabled>Hand to the techlead</button>
         <span class="mono" id="entryseat"></span><span class="meta" id="entryhandwhat">drafts the entry and lands it by PR. Its questions come to your Inbox; the entry's id and PR come back as the outcome.</span></div>
       <span class="meta" id="entrywhen"></span></div>
-    <div class="col gap"><div class="row gap"><button class="btn" type="button" id="entrygo">Open a session</button></div>
+    <div class="col gap"><div class="row gap"><button class="btn" type="button" id="entrygo">Open a session</button>
+        {#- §4.5a *Add entry form: Name* (TD-675, built by TD-677): the session's, its worktree's and its branch's name -#}
+        <span class="note">named</span><input class="input mono" id="entryname" maxlength="32" autocomplete="off" spellcheck="false" aria-label="Name" title="the session's name, its worktree's and its branch's"></div>
       <span class="meta" id="entryline"></span></div>
     <p class="note warn" id="entryerr" hidden></p>
   </form>

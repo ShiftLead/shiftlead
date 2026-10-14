@@ -335,6 +335,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     COMPLETED_FOLD,  # noqa: F401
     COMPLETED_WORD,  # noqa: F401
     ENTRY_PREFIX,
+    ENTRY_SLUG_WHY,
     ENTRY_TRIES,
     LEDGER_FLAG,  # noqa: F401
     LEDGER_FOLD,  # noqa: F401
@@ -343,6 +344,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     compact_in,  # noqa: F401
     completed_rows,
     doing_chips,  # noqa: F401
+    entry_branch_exists,
     entry_hand,
     entry_line,
     entry_role,
@@ -2075,10 +2077,34 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) ---
 
-    async def entry_plan(repo: str, type_: str) -> dict[str, Any]:
+    async def entry_name_why(root: str, name: str) -> str:
+        """§4.5a *Add entry form: Name* (TD-675, built by TD-677): why `name` cannot be **Open a
+        session**'s, or `""` when it is free — the one test for the default and a typed name alike. The
+        name is the session's, its worktree's and its branch's unchanged, so §4.1's slug must leave it
+        as it is; then the name check in the repo's scope (an exited holder is not free here: an
+        entry's session is new work), no worktree of that name, and no local branch of that name
+        (`ensure_worktree` would start the session on it)."""
+        if naming.slug(name) != name:
+            return ENTRY_SLUG_WHY
+        got = await call("name_check", dir=root, name=name, repo=root)
+        verdict = got.get("verdict")
+        if verdict in ("live", "suspended"):
+            return str(got.get("message") or f"{name} is running — switch to it, or pick another name")
+        if verdict == "supersede":
+            return f"{name} names an exited session — pick another name"
+        with contextlib.suppress(gitinfo.WorktreeError):
+            if (await asyncio.to_thread(gitinfo.worktree_path, Path(root), name)).exists():
+                return f"a worktree named {name} exists — pick another name"
+        if await asyncio.to_thread(entry_branch_exists, root, name):
+            return f"a branch named {name} exists — the session would start on it; pick another name"
+        return ""
+
+    async def entry_plan(repo: str, type_: str, name: str = "") -> dict[str, Any]:
         """What **Open a session** would start for `repo` (a registered checkout's name) and `type_`:
         the team whose projects hold the checkout, the role its `entries:` names (§4.9), the first
-        `entry-<n>` free in the repo, the team's live manager, and the line under the button."""
+        `entry-<n>` free in the repo (`default`), the name the press takes — `name` as typed in the
+        **Name** box, else the default — and `name_why`, why that name is not free (TD-677), the
+        team's live manager, and the line under the button."""
         if type_ not in orgmod.ENTRY_TYPES:
             raise HTTPException(400, f"type is {' or '.join(orgmod.ENTRY_TYPES)}, not {type_!r}")
         root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
@@ -2092,17 +2118,16 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             cfg = await asyncio.to_thread(repoconfig.discover, root)
         except ValueError as e:
             raise HTTPException(400, str(e).strip('"')) from None
-        name = ""
+        default = ""
         for n in range(1, ENTRY_TRIES + 1):
             cand = f"{ENTRY_PREFIX}-{n}"
-            with contextlib.suppress(gitinfo.WorktreeError):
-                if (await asyncio.to_thread(gitinfo.worktree_path, Path(root), cand)).exists():
-                    continue
-            if (await call("name_check", dir=root, name=cand, repo=root)).get("verdict") == "free":
-                name = cand
+            if not await entry_name_why(root, cand):
+                default = cand
                 break
-        if not name:
+        if not default:
             raise HTTPException(409, f"no {ENTRY_PREFIX}-<n> up to {ENTRY_TRIES} is free in {repo}")
+        name_why = await entry_name_why(root, name) if name.strip() else ""
+        name = name if name.strip() else default
         manager, records, attach = "", {}, ""
         with contextlib.suppress(HTTPException):  # no list: the hand line reads as a seat nobody fills
             records = {r["id"]: r for r in await call("list")}
@@ -2121,6 +2146,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "team": team,
             "role": role,
             "name": name,
+            "default": default,  # the **Name** box's prefill and placeholder (§4.5a, TD-677)
+            "name_why": name_why,  # stands in place of the line, and disables **Open a session**
             "manager": manager,
             "line": entry_line(role, name, team),
             "teams": servicing,  # what `entry_add` is handed (TD-218), in definition order
@@ -2129,9 +2156,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         }
 
     @app.get("/api/entry/plan")
-    async def api_entry_plan(repo: str = "", type: str = "debt"):
-        """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes."""
-        return await entry_plan(repo, type)
+    async def api_entry_plan(repo: str = "", type: str = "debt", name: str = ""):
+        """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes, and the
+        **Name** box's verdict as the person types (`name=`, TD-677)."""
+        return await entry_plan(repo, type, name)
 
     @app.post("/api/entry/attach")
     async def api_entry_attach(
@@ -2180,10 +2208,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/entry/session")
     async def api_entry_session(request: Request):
-        """§4.5a Add entry form → **Open a session** (TD-219 slice 3): `{repo, type, words}` starts an
-        **interactive** session in a new worktree `entry-<n>` of the repo, in its team as a person's own
-        session is (§4.9 *A person in the team*) with the role `entries:` names for the Type — `plain`
-        with no badge where no team services the repo — at the prompt: no opening prompt and no brief.
+        """§4.5a Add entry form → **Open a session** (TD-219 slice 3): `{repo, type, words, name}` starts
+        an **interactive** session in a new worktree of the repo, named what the **Name** box holds
+        (`name`, else the plan's `entry-<n>`; a name not free is refused 409 in the box's words, TD-677),
+        in its team as a person's own session is (§4.9 *A person in the team*) with the role `entries:`
+        names for the Type — `plain` with no badge where no team services the repo — at the prompt: no
+        opening prompt and no brief.
         `entry.md`'s lines, filled, are the session's **start context** (§4.3, TD-283 part 2): it holds
         them from its start with no turn run for them, and Focus draws them under **Told at start**.
         Answers `{id, text}`: the composer's text — the person's words alone — which the page keeps in
@@ -2192,7 +2222,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, type, words}")
-        plan = await entry_plan(str(body.get("repo") or ""), str(body.get("type") or "debt"))
+        repo, type_, name = (str(body.get(k) or "") for k in ("repo", "type", "name"))
+        plan = await entry_plan(repo, type_ or "debt", name)
+        if plan["name_why"]:  # taken between the check and the press: refused, never replaced by another
+            raise HTTPException(409, plan["name_why"])
         root, team = plan["root"], plan["team"]
         try:
             cfg = await asyncio.to_thread(repoconfig.discover, root)

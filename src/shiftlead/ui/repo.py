@@ -6,6 +6,7 @@ each name from the app as before.
 
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,6 +40,24 @@ from .org import (
 
 ENTRY_PREFIX = "entry"  # the session and its worktree: `entry-<n>`, the first number free in the repo
 ENTRY_TRIES = 200  # how far the first free number is looked for before the press is refused
+# §4.5a *Add entry form: Name* (TD-677): a typed name §4.1's slug would change — the name check would
+# read the slug while the worktree and its branch took the name raw
+ENTRY_SLUG_WHY = (
+    "lowercase letters and digits, with single - between them: "
+    "the name is the session's, its worktree's and its branch's"
+)
+
+
+def entry_branch_exists(root: str, name: str) -> bool:
+    """Whether `root` has the local branch `name` — `git worktree add` would check it out rather than
+    start a new one, so **Open a session** takes no such name (§4.5a *Add entry form: Name*, TD-677)."""
+    try:
+        cp = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--verify", "-q", f"refs/heads/{name}"], capture_output=True, timeout=5
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return cp.returncode == 0
 
 
 def entry_role(org: orgmod.Org, team: str, type_: str) -> str:
