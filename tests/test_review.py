@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import pytest
 
+from sessionorc import reports
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import normalize_review, review_links
 from shiftlead import repoconfig, teams
@@ -261,3 +262,9 @@ async def test_pr_reads_says_where_each_ask_stands_to_its_author_its_readers_and
             assert [a["verdict"] for a in got["asks"]] == ["pass", "merged"]
         for sid in (w, ui, tl, other):
             await person.call("kill", id=sid)
+
+
+@pytest.fixture(autouse=True)
+def _no_gh(monkeypatch):
+    """An `ask` carrying `pr` reads the PR's checks (TD-658): never a real `gh` here."""
+    monkeypatch.setattr(reports, "pr_view", lambda root, pr, timeout=30.0: "no gh in tests")

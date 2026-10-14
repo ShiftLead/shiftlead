@@ -118,6 +118,12 @@ class MailMixin:
         try:
             # TD-658: a PR handed to its reader is green first — read before anything is written
             said = await self._checks_at_ask(sender, kind, pr)
+            if key and key in self._nonces:
+                # a retry of this nonce landed while the read was out: the first send's verdict stands
+                result, error = self._nonces[key]
+                if error is not None:
+                    raise error
+                return dict(result or {})
             result = await self._msg(
                 sender,
                 text,

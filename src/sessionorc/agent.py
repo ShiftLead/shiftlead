@@ -2695,7 +2695,7 @@ class HostAgent(
         which sends. A person's ask, an ask with no `pr`, and a shape `_msg` refuses are not read."""
         if mail.is_person(sender) or kind != "ask" or isinstance(pr, bool) or not isinstance(pr, int) or pr < 1:
             return None
-        s = self._graph().get(sender)
+        s = self._graph().get(self._addr(sender))
         if s is None:
             return None  # `_msg` says it has no record of the sender
         got = await self._pr_checks(s, pr)
