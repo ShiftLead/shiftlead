@@ -11508,3 +11508,64 @@ Taking control and picking a model should not be the way. **Done when** a role's
 **Related:** TD-665 (the design), TD-580 (the person's own shell), TD-577 (Open shell here), TD-112 (adapter neutrality).
 
 **Resolved:** 2026-10-14 (grinder-ao-2, PR #1707) — slice 1 (#1701, grinder-ao-1): the host keys on the adapter's `agent` — no wrap-up, mail, doorbell, fill or derived claim for a record with none, a stop time kills it at once. Slice 2 (#1707): Focus and the card read the view's `agent` and draw a shell's controls — no Wrap up, Message, mode toggle, Reports, Inbox, Working, Told at start, grants, controllers, adapter id, context, rounds or Ready to close; *Type a command…*, Send never Steer, Close without the checks under *the shell is killed; the directory is left as it is*. Looked at on a scratch home, shots in `docs/mockups/reviews/2026-10-14-td666-*.png`.
+
+## TD-611: The UI's single event loop stalls the Focus terminal: two bulk polls render megabytes synchronously several times a minute, and both grow with the inbox, the fleet and the PR count
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-12 (ao-paul; measured by two read-only agents on the live UI)
+**Owner:** grinder
+**Kind:** live-check #1660
+**Status:** Done
+**Location:** `src/shiftlead/ui/static/app.js` (`refreshInboxCount` ~L1198 and the 20 s interval ~L1259 that runs it, or the Inbox's `refreshInboxPage`; Focus's `refreshMembership` ~L4370, called on a peer's event ~L4436); `src/shiftlead/ui/app.py` (`api_person_inbox` ~L3025–3105, `api_sessions` ~L2359, `events` ~L3381–3570); `src/shiftlead/ui/cards.py` (the `pr_marks` map ~L327); `src/shiftlead/ui/pty_bridge.py` (the queue ~L27, the pump ~L185)
+
+**Why:** Paul, 2026-10-12: the Focus terminal lags again, better after TD-572 (#1544) and slower by the day since. The pty bridge shares `shiftlead-ui`'s one asyncio loop with every handler, so any synchronous render holds every keystroke and output frame. Measured on the live UI (about an hour after a promote):
+- `shiftlead-ui` averages ~17% of a core. The journal shows ~540 `GET /api/person/inbox` and ~200 `GET /api/sessions` an hour, and almost nothing else.
+- `/api/person/inbox` is **2.74 MB** and costs ~0.5 s of loop CPU per call. Six concurrent calls all finish at ~2.7 s, so they serialise, and a static file went from 3 ms to 102 ms behind one. Every page polls it every 20 s (`refreshInboxCount`) only to read the top bar's counts. The handler renders every section's markup each time: *answered for you* 1.23 MB for 168 rows, *needs* 418 KB, horizon 175 KB, ledger 120 KB, and `entries` 673 KB besides. It grows with the retained person inbox (193 entries, 25–45 a day).
+- On Focus, every other-session event calls `refreshMembership`, which fetches the whole `/api/sessions`: **456 KB**, ~0.29 s, a `view()` of all 24 sessions plus `repo_facts`. That is ~200 an hour, in bursts of 6–14 a minute. 214 KB of it is `pr_marks`, a per-session map of every PR, which grows without bound.
+- The Org page's full `/events` stream runs `view()`, `compact_in` and `render_card` per delta, per connected client, inline, plus `fresh_heads` on every reshaping delta. Seven connections were open.
+- The pty bridge queues frames in an unbounded `asyncio.Queue` and sends one chunk per frame. Whenever the loop stalls, output arrives late and in a burst.
+
+Together that is roughly 6–10 minutes of loop stall an hour, and it grows.
+
+**Fix:** in slices, each its own PR, the first alone taking the stall off Focus:
+1. **A counts-only read.** One function computes the top bar's numbers (`needs`, `fyi_n`, overdue, `answered_marks`, the build chip) without rendering anything. `/api/person/inbox?counts=1` serves it, and `refreshInboxCount` uses it on every page but the Inbox. `ao inbox --counts` prints the same numbers: no shell command counts the person inbox's sections today, and a session's `ao inbox --unread` marks what it reads.
+2. **The Inbox's own render off the loop.** Run it in `asyncio.to_thread`, or cache it keyed on the inbox's revision and the boards' reading. Add `GZipMiddleware`. Cap *answered for you* at the newest N, with a *show more*.
+3. **Focus membership without `/api/sessions`.** Read it from the `focus=` stream's fleet, or from a one-session endpoint. Trim the list view's `pr_marks` to the PRs drawn and drop `tail`.
+4. **The Org stream.** Compute heads and card renders once per delta and fan them out to the clients, or coalesce deltas to about one a second. *Built as TD-617 (TD-614's design), with slice 3's Focus membership and `pr_marks`; slice 1's counts read is TD-616's fallback.*
+5. **The bridge.** Bound the queue, and join every drained chunk into one send.
+- Tests: the counts read renders no template and equals the full read's counts; Focus issues no `/api/sessions` on a peer's delta; the bridge coalesces queued chunks.
+
+**Done when** a Focus tab sees no request above ~50 ms of loop time in steady state, `/api/person/inbox` is fetched only by the Inbox page, the UI's CPU falls well under today's ~17%, and the tests above pass. A re-measurement after the promote, journal counts and a static-file latency probe during a poll, is the live check.
+
+**Related:** TD-572 (archived: the light events stream for Focus), TD-599 / TD-602 (archived: *answered for you*'s Dismiss all; pressing it shrinks the largest section today), TD-131 (whole-file reads, a later scale).
+
+**Resolved:** 2026-10-14 (grinder-ao-2, live read; `477e1ef` live) — *Done when*, read-only. **Loop:** TD-670's probe beside one Focus stream found no request over 50 ms (p99 18.6 ms, max 31 ms over 75 s). **The bulk polls:** in the journal's last four hours, the full `/api/person/inbox` was fetched 3 times, each the Inbox page's own read (`refreshInboxCount(full)`, a hidden tab, so no `watching=1`). Every other page read `?counts=1` (13 in four hours). No `GET /api/sessions` list read at all; only 6 per-session `/api/sessions/<id>/…` reads. **CPU:** `shiftlead-ui` used 28 s of CPU in 2441 s since its start, about 1.1% of a core, against ~17% at the entry's measurement. The tests merged with each slice (#1610, #1615, #1619, TD-616, TD-617).
+
+## TD-670: A Focus stream is sent every repo's whole facts on each `repos` push to read its PR marks, and the loop still holds 45–300 ms with a stream open: TD-611's remainder
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-14 (grinder-ao-2, TD-611's live read)
+**Owner:** grinder
+**Kind:** live-check #1704
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (`fan_step`'s `repos`/`doing` branch: `run.to_all(run.live, ev)`; `heads` ~L971, run per regroup on the loop; `counts_now` ~L855), `src/shiftlead/ui/fanout.py` (`to_all`, the `groups` flush ~L157), `src/shiftlead/ui/counts.py` (`_recounter`, `_ticker`), `src/shiftlead/ui/static/app.js` (Focus's `repos` handler ~L4518, the Inbox's re-read ~L3156)
+
+**Why:** TD-611's live read, 2026-10-14 (`9bb725c` live; read-only: a static-file probe of `/static/app.css` every 50 ms beside one `/events` websocket the probe opened, nothing pressed). The bulk polls TD-616 and TD-617 removed are gone, but the loop is not yet what TD-611's *Done when* asks (no request above ~50 ms of loop time with a Focus tab open):
+- With no stream open: 1397 probes, p99 5 ms, max 20 ms.
+- With one Focus stream (`light=1&focus=…`): 8 of 1383 over 50 ms, max 139 ms. The stream received 1.6 MB in 75 s, almost all `repos`: the host pushes every repo's facts about once a minute (7 repos, ~1.2 MB a burst; shiftlead 755 KB, samscrape 246 KB, dev-cadence 128 KB — their `prs`, `ledger`, `completed` and `boards`), and `fan_step` forwards each event whole to every live stream, light ones included, though Focus reads only `root` and `pr_marks` from it and the Inbox page only re-reads on it. A ~70 ms hold follows each burst.
+- Holds of 45–85 ms also come every few seconds with no event on the Focus stream: work the one subscriber does for the fleet (another record's delta, the counts keeper's recount, which awaits the person inbox, the board and the build chip on the loop before its `to_thread`) — not attributed yet.
+- With the Org stream open: 33 of 1340 over 50 ms in 75 s, and up to ~300 ms in a 150 s run. Each regroup ships `groups` of ~200 KB, built by `heads`, which runs `view()` over the whole fleet and renders every header and the rollup on the loop.
+
+**Fix:**
+1. A light stream's `repos` is `{event, root, pr_marks}` and a mark that the repo is held or dropped — never the repo's facts — and is sent only when that repo's marks changed (the Inbox page re-reads on it, so an unchanged minute is a re-read for nothing). The full stream keeps the whole event.
+2. Find the 45–85 ms holds: run `scripts/look_home.py` with repo facts and a person inbox the live size (or profile the subscriber's steps with timings) and name each step over ~20 ms; move what is pure computation (`heads`'s views and renders, the decode of a large host reply, the counts' pre-thread reads) to a worker thread, or coalesce it.
+3. The Org stream's `groups`: computed off the loop, and sent only when they changed.
+- Tests: a light stream's `repos` carries no `repo` facts and is not sent when the marks did not change; Focus's handler still replaces its marks and drops a repo's on `repo: null`.
+
+**Done when** the probe above — a static file every 50 ms for 75 s beside one Focus stream, and again beside the Org stream — finds no probe over ~50 ms in steady state, and the tests pass; then TD-611's live check is read again.
+
+**Related:** TD-611 (the live check this blocks), TD-617 (the one subscriber), TD-616 (the counts keeper), TD-572 (light streams), TD-614.
+
+**Resolved:** 2026-10-14 (grinder-ao-2, live read; `477e1ef` live, which holds #1702 and #1704) — the *Done when* probe, read-only against the live UI: a GET of `/static/app.css` every 50 ms for 75 s. With no stream: 1406 probes, p99 4.4 ms, max 49 ms. Beside one Focus stream (`light=1&focus=`): 1395 probes, p99 18.6 ms, max 31 ms, **none over 50 ms**; the stream got 1.2 MB in 75 s, and a light `repos` is `{event, root, pr_marks}` alone (7 in 70 s, 27 KB in all, the largest 18 KB). What remains is the fleet's `session` deltas, ~30 KB each, ~1 MB a minute, and the loop is quiet with them. Beside the Org stream: 1383 probes, p99 22.7 ms, max 48 ms, none over 50 ms, with 16 `groups` events in 75 s. TD-611 is read again on the same day and archived.
