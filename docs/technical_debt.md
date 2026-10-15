@@ -6,9 +6,9 @@ Known issues, compromises, and deferred work. Add an entry any time a problem is
 
 IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never reused. Priority is a field, never part of the ID.
 
-Two header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`anchor`, `designer`, `grinder`, `paul`, `dev-cadence`); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`). Every open entry carries them; keep them true when the Status changes. **Pickable is derived, never written** (cadence §2.4, TD-228): an entry is pickable while its `**Blocked by:**` names nothing still open and no decision, so what waits on another entry or on a person's word says so there, with its pointer; what nothing blocks and a grinder still cannot build — a live look, an evaluation, the anchor's edit — is said by its **Kind** or its **Owner**, and the Status says what is next. A `live-check` is followed on its line by its build's last merged PR — `**Kind:** live-check #<n>`, written by the PR that makes the entry a live check — and once that PR is live (`ao promote status`) the check is in a `free-pick` lane whose owner it has (design §4.9b, TD-320); cadence's script reads the word alone. A grinder's pick list is therefore `ao repo` (its pickable entries, a live check whose build is live among them), and `python3 scripts/ledger.py --list --pickable yes --owner grinder --kind build` lists the builds alone; the designer's is `--owner designer --kind design-first`. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the two lines' shape, so a new word is added there and nowhere else.
+Two header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`anchor`, `designer`, `grinder`, `paul`, `dev-cadence`); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`). Every open entry carries them; keep them true when the Status changes. A third, **Waits**, is written only on an entry that is pickable and still waits on something no `Blocked by:` item names (TD-715, design §4.4 *An entry says what it waits for*): `until <date>` (*`**Waits:** until 2026-10-16 — CI runs on or after 10-16`*) or `event` (*`**Waits:** event — the next cadence-sync PR`*). What waits on the person is `Blocked by: decision (paul) — <what they must do>`, or `Owner: paul`, never a `Waits:` line. **Pickable is derived, never written** (cadence §2.4, TD-228): an entry is pickable while its `**Blocked by:**` names nothing still open and no decision, so what waits on another entry or on a person's word says so there, with its pointer; what nothing blocks and a grinder still cannot build — a live look, an evaluation, the anchor's edit — is said by its **Kind** or its **Owner**, and the Status says what is next. A `live-check` is followed on its line by its build's last merged PR — `**Kind:** live-check #<n>`, written by the PR that makes the entry a live check — and once that PR is live (`ao promote status`) the check is in a `free-pick` lane whose owner it has (design §4.9b, TD-320); cadence's script reads the word alone. A grinder's pick list is therefore `ao repo` (its pickable entries, a live check whose build is live among them), and `python3 scripts/ledger.py --list --pickable yes --owner grinder --kind build` lists the builds alone; the designer's is `--owner designer --kind design-first`. The line below is the one list of the **Owner** and **Kind** words (cadence §2.12): `scripts/ledger.py` flags a value outside it, and `tests/test_ledger.py` reads its sets from it and checks the two lines' shape, so a new word is added there and nowhere else.
 
-Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build | design-first | live-check | evaluation | decision
+Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build | design-first | live-check | evaluation | decision; Waits = until | event
 
 ---
 
@@ -61,7 +61,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
-| TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Open |
+| TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
+| TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
 
 ---
 
@@ -1142,7 +1143,8 @@ The other cases:
 **Added:** 2026-10-15 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — for the design.
+**Status:** Designed 2026-10-15 (the designer; no mockup: one mark and one count in rows the pages draw already) — §4.4 *An entry says what it waits for*: a repo-declared `**Waits:**` line, `until <date>` or `event`, which the agent's settle pass marks `waiting`, so no lane takes the entry and `in_lanes` counts it apart. A member out of work whose lane only waits reads *its lane waits: …*, never *out of work with n*. What waits on the person is `decision (paul)` or `Owner: paul`, already *for you*. The session that reads such an entry writes the line before it declares. Built by TD-716. Was: Open.
+**Blocked by:** TD-716
 **Location:** design §4.4 *Repo facts* and *In a team's lanes* (the *out of work with n* line, the card's solid count), §4.7 `ao repo`, §6 rule 6 (the `anchor` lane), `sessionorc/ledger.py` (`in_lanes`, `for_page`)
 
 **Why:** on 2026-10-15 Paul asked what blocks the ao-grind team. `ao repo` read *ao-grind-anchor is out of work with 9 in its lane: TD-005, TD-112, TD-292, TD-413, TD-460, TD-463, TD-641, TD-672, TD-685*, and listed seven of them as pickable live checks, so the closed anchor seat looked like the team's biggest block and a restart its cure. It was neither. The seat had run at 2026-10-14 20:58 MDT and declared `ao progress none`, naming a reason for seven of the nine (and TD-297, a live check not among them): TD-460, TD-463 and TD-413 wait for a date (a trial ending about 10-15, CI runs on or after 10-16, a week of journal to 10-20); TD-685 and TD-292 wait for an event nobody can cause (the next sync PR, a look being handed); TD-672 and TD-641 wait on the person (a first certificate on a fresh tailnet name; a `permissions:` rule and a profile's `permission_prompts: ask`); and the two it did not name, TD-112 and TD-005, are evaluations that need an attended session with Paul — TD-112 by his decision of 2026-10-10 (the Gemini spike), TD-005 by its own Fix (the trust-dialog test) — which no seat can do. What the seat knew lives only in its `out_of_work.why` and in each entry's prose. The reader counts a live check *pickable* the moment its build is live, and an evaluation pickable whenever it is unblocked, so the line, the card's solid count and the pick list all say "work waiting" where there is none. A person — or a session answering one — then restarts a seat to read the same nine again, or misses what is really theirs to do (three of the nine).
@@ -1156,5 +1158,54 @@ The other cases:
 **Done when** a seat that declares out of work with nothing it can take reads as *waiting* on `ao repo`, the card and the Repo page, each waiting entry says on what, and what waits on the person is counted *for you*.
 
 **Related:** TD-707 (a settle window, the other "not pickable yet" reason), TD-112, TD-005, TD-641, TD-672.
+
+---
+
+## TD-716: Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-715's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-710
+**Location:** design §4.4 *An entry says what it waits for* and *In a team's lanes*, §4.7 `ao repo`, §4.8 *A claim is a lease*, §6 rule 6, §4.5a *team card: Repo facet* (the lanes line), *card: compact* (the count) and *Repo page: waits mark*; `src/sessionorc/ledger.py` (`entries`, `lane_matches`, `in_lanes`, `flags`), `src/sessionorc/settle.py` (`mark`, TD-710's), `src/sessionorc/agent_tick.py` (`_read_repo`), the claim refusal in `rpc_progress`, `src/shiftlead/cli.py` (`ao repo`), `src/shiftlead/ui/org.py` and `templates/lanes_line.html`, `repo_part.html`, the card's count in `cards.py`; the role briefs `src/shiftlead/briefs/anchor.md`, `grinder.md` and `designer.md`
+
+**Why:** TD-715's design. On 2026-10-15 `ao repo` read *ao-grind-anchor is out of work with 9 in its lane*, and every one of the nine was waiting on a date, an event or the person, so the closed seat looked like the team's block and a restart like its cure.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). It is blocked by TD-710 because it marks entries in TD-710's settle pass. Slices, each its own PR:
+1. **The reading and the lanes** (`sessionorc`).
+   - `ledger.entries` reads `**Waits:**` (in the header block, after `Kind:`; one below the block draws ledgerboard's ℹ) into `waits: {on, date, why}`: `on` is the first word, `until` or `event`, `date` the first `YYYY-MM-DD` after `until` (or none), and `why` the rest. A first word outside the two is not read; `ledger.py --check` already flags it against the `Fields:` vocabulary.
+   - `flags` gains *TD-NNN: Waits: until names no date* for an `until` with no date. Such an entry waits with no end.
+   - TD-710's marking pass (`settle.mark`, on every reading it carries, and at the declaration-time reading rule 6 uses, its `then` clock) adds `waiting: {on, until}` while the wait stands, whatever `spans` holds (a repo with no `settle:` still marks waits). An `until` stands while the home's local date is before the date; an `event` always stands.
+   - `lane_matches` reads `waiting` as no lane's, as it reads `settling` and `held`, so rule 6's `lane_seen` and rule 8's news wait the same.
+   - `in_lanes` gains `waiting: {until: [ids], event: [ids]}`: the entries a lane would take but for the mark. They are kept out of the kinds' counts and out of `rest`. Each member gains `waiting` ids beside `ids`. `out_of_work` is unchanged (count above 0), and a new `out_of_work_waiting` lists `[{id, name, waiting}]` for a member carrying `out_of_work` whose `ids` is empty and whose `waiting` is not.
+   - `rpc_progress`'s claim on a `waiting` reference is refused, *TD-463 waits until 2026-10-16* or *TD-685 waits: the next cadence-sync PR*, and `force` passes it.
+2. **The words** (`shiftlead`).
+   - `ao repo` prints *waits until 2026-10-16* or *waits: <words>* after a row's owner, and the line *<name> is out of work; its lane waits: 2 until a date (the first 2026-10-16), 2 on an event: <ids>*. `--json` carries `waiting`.
+   - The lanes line adds *· n waiting*, its hover the ids and what each waits on, and *· <name> out of work, its lane waiting*.
+   - The card's count draws *n waiting* in grey in place of 0, never solid, with the design's hover.
+   - The Repo page's row draws the **waits** mark.
+   - The role briefs (`anchor.md`, `grinder.md`, `designer.md`), in their *Out of work* paragraph: an entry your lane takes that you cannot take because it waits on a date or an event gets a `**Waits:**` line, one waiting on the person gets `Blocked by: decision (paul) — <what they must do>`, and an evaluation only the person can run with a session gets `Owner: paul`. Write them in one ledger PR before `ao progress none`, only on entries that do not yet say so.
+3. **This ledger's nine** (a ledger PR, after slice 1 is live). The entries `ao-grind-anchor` named on 2026-10-15, as each still stands then:
+   - TD-460, TD-463 and TD-413: `Waits: until <date>`.
+   - TD-685 and TD-292: `Waits: event — …`.
+   - TD-672 and TD-641: `decision (paul) — …`.
+   - TD-112 and TD-005: `Owner: paul`.
+   A date already passed is not written.
+- **Tests:**
+  - An entry with `Waits: until <tomorrow>` matches no lane and is in `in_lanes`' `waiting`. On its date it matches and is told by rule 6 as new.
+  - `Waits: event` waits until the line goes.
+  - An `until` with no date is flagged (*Waits: until names no date*) and waits.
+  - A member's `waiting` ids are not in its `ids`; rule 8's news waits as rule 6's does.
+  - A member whose lane only waits is in `out_of_work_waiting` and not in `out_of_work`.
+  - A claim on a waiting entry is refused, and `--force` passes.
+  - `ao repo`'s two lines. The lanes line's *waiting* count.
+  - `ledger.py --check` passes this ledger with the new `Fields:` line.
+
+**Done when** a seat that declares out of work while every entry in its lane waits reads as waiting on `ao repo`, the card and the Repo page, each waiting entry says on what, what waits on the person is counted *for you*, and every listed test passes.
+
+**Related:** TD-715 (the design), TD-710 (the marking pass it extends), TD-707 (settling, the other withheld reason).
 
 ---
