@@ -775,7 +775,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      members' half is `ao team stop --close`'s (§4.9a) — each finished member is closed under the
      wrap-up's own safety check, one with uncommitted or unpushed work left open and the Inbox row
      it is after any wrap-up — and the manager's half is this rule's own; and the home takes the team's manager out of the
-     repo's anchor seat's `controllers`, winding the seat down when none is left (§4.9b). The manager, if live and
+     repo's anchor seat's `controllers`, winding the seat down when none is left and no live record
+     of any team names the seat's repo (§4.9b), a person-led team's sessions keeping it running. The manager, if live and
      on the home, gets **one** send of fixed text, *[shiftlead] your team is finished: every member
      has declared. Make your last acts — `ao progress none`, the note to the person — then `ao
      close` yourself*, typed only into an idle composer as rule 4's line is, and
@@ -1268,7 +1269,9 @@ teams:
   team-wide form of a session's `run_until`. On every tick, each live session carrying the team's
   badge — members and seats — whose `run_until` is unset or later than the team's takes the team's
   instant (the repo's anchor seat, which carries no badge, only once every team its `controllers`
-  name has an instant, and then the latest, §4.9b), exactly as `set_stop` would give it (`wrapup_sent_at` reset, the wrap-up then the kill
+  name has an instant, and then the latest, or with empty `controllers` the latest among the
+  repo's teams; a move or a Clear re-derives the seat's instant from its teams' as they stand,
+  §4.9b), exactly as `set_stop` would give it (`wrapup_sent_at` reset, the wrap-up then the kill
   as the stop time's own rule says), and a start the team makes after the instant is set stamps it
   on what it creates — while the instant is still ahead: a session created after it has passed is
   not given it, since starting the team again after its stop time is the person's word. It runs at

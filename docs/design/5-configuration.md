@@ -55,7 +55,7 @@ person:                                       # the person's own — nothing her
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a; default on)
-  inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (drawn by the Inbox and the Repo page, picked on the Settings page's You)
+  inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per repo | due | <n>d | all (drawn by the Inbox and the Repo page, picked on the Settings page's You)
   composer: folded                            # §4.5a *Focus composer* **the bar**: folded (the default) | open — whether Focus draws the composer as one bar under the terminal or open under it (TD-491)
   attach: {max: "256M"}                       # §4.4 *Attachment drop*: the most a Focus attachment may be, 1M to 4G (TD-473; built by TD-478); read by the attach RPC on each call
 notify:                                       # §4.10 *Told on Telegram when nobody is looking*: read by the home's tick, and by the watch (§4.10 *When the home itself is down*)
@@ -283,7 +283,7 @@ teams:
     manager: {role: manager, name: manager-ao-1}
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
-anchors:                                     # §4.9b: the anchor seat of a repo whose teams are all this file's (TD-722); a repo's own anchor: wins
+anchors:                                     # §4.9b: the anchor seat of any repo whose .shiftlead.yml has no anchor: (TD-722); where both set one, the repo's wins and ao org check warns
   guardians-api: false
 roles:
   grinder: {profile: grind}
