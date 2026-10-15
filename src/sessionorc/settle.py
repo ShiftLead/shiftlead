@@ -151,16 +151,21 @@ def _load() -> dict[str, Any]:
 def observe(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now: datetime) -> list[dict[str, Any]]:
     """Record a fresh reading of origin `key` and mark its entries in place (§4.4 *The clock*): an id
     first seen is recorded at `now`, except that **a repo's first reading records every id at the
-    epoch**, settled; an edit (a changed `sig`) to an entry still settling, or held, restarts its
-    window from `now` and ends the hold, and one to a settled entry only records the new `sig`. An id
-    the reading does not hold keeps its record — a partial reading, or a second checkout of the origin
-    behind the first, must not drop a hold or bring a settled entry back as new — so the record grows
-    by one line per id the ledger ever held. Returns `entries`."""
+    epoch**, settled — the first being the first that finds no record with an `at` under the key, so an
+    id pre-held by `ao td next --held` (`prehold`) does not make every other id settle as new. An edit
+    (a changed `sig`) to an entry still settling restarts its window from `now`; one to a held entry
+    records the new `sig` and the entry stays held (TD-731), and one to a settled entry only records the
+    new `sig`. A pre-held id is held from its first reading, its `sig` recorded, and never settles. An
+    id the reading does not hold keeps its record — a partial reading, or a second checkout of the
+    origin behind the first, must not drop a hold or bring a settled entry back as new — so the record
+    grows by one line per id the ledger ever held. Returns `entries`."""
     stamp = now.isoformat()
     with _STORE:
         store = _load()
-        first = not isinstance(store.get(key), dict)
-        old: dict[str, Any] = {} if first else store[key]
+        read = isinstance(store.get(key), dict)
+        old: dict[str, Any] = store[key] if read else {}
+        # no reading yet, or only `prehold`'s records (an empty ledger's first reading leaves `{}`, a reading)
+        first = not read or (bool(old) and not any(isinstance(r, dict) and r.get("at") for r in old.values()))
         seen: dict[str, Any] = dict(old)
         for e in entries:
             i, sig = str(e.get("id") or ""), str(e.get("sig") or "")
@@ -171,10 +176,12 @@ def observe(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now:
                 seen[i] = {"at": EPOCH if first else stamp, "sig": sig}
                 continue
             rec = dict(rec)
-            if rec.get("sig") != sig:
+            if isinstance(rec.get("held"), dict):
+                rec.setdefault("at", EPOCH if first else stamp)  # landed held (`prehold`): its first reading
+                rec["sig"] = sig  # an edit keeps the hold: only the person's Release ends it
+            elif rec.get("sig") != sig:
                 at = _when(rec.get("at"))
-                settled = at is not None and at + timedelta(seconds=spans.get(_kind(e), 0)) <= now
-                if isinstance(rec.get("held"), dict) or not settled:
+                if at is None or at + timedelta(seconds=spans.get(_kind(e), 0)) > now:
                     rec = {"at": stamp, "sig": sig}  # the person still adding thoughts: the window again
                 else:
                     rec["sig"] = sig
@@ -204,11 +211,11 @@ def hold(
     key: str, entry: dict[str, Any], spans: dict[str, int], now: datetime, *, by: str, release: bool = False
 ) -> dict[str, Any]:
     """The person's **Hold** or **Release** of one entry of origin `key` (design §4.4 *Hold*, TD-707,
-    built by TD-710 slice 2): a hold writes `held: {at, by}` on the id's record, the home's and not a
-    ledger edit, so it holds at once, and only while the entry settles — a settled entry is taken out
-    of a lane by its `Blocked by:`; holding a held one changes nothing. A release ends the hold and
-    makes the entry pickable at once (its record settled, at the epoch), so a later edit changes
-    nothing. Returns the record as written; raises `Refused`."""
+    built by TD-710 slice 2, TD-731): a hold writes `held: {at, by}` on the id's record, the home's and
+    not a ledger edit, so it holds at once, on any entry the clock holds, settling or settled; holding a
+    held one changes nothing. A release ends the hold and makes the entry pickable at once (its record
+    settled, at the epoch), so a later edit changes nothing. Returns the record as written; raises
+    `Refused`."""
     i = str(entry.get("id") or "")
     with _STORE:
         store = _load()
@@ -224,16 +231,26 @@ def hold(
         elif held:
             return dict(rec)
         else:
-            at = _when(rec.get("at"))
-            if at is None or at + timedelta(seconds=spans.get(_kind(entry), 0)) <= now:
-                raise Refused(
-                    f"{i} has settled, and a hold is a settling entry's (design §4.4 *Hold*): take a settled "
-                    "entry out of a lane with its Blocked by: line"
-                )
             rec = {**rec, "held": {"at": now.isoformat(), "by": by}}
         seen[i] = rec
         _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
     return dict(rec)
+
+
+def prehold(key: str, ids: list[str], by: str, now: datetime) -> None:
+    """`ao td next --held` (design §4.4 *An entry can land held*, TD-731): each id handed out is held on
+    origin `key`'s clock before any reading holds it — `{held: {at, by}}`, no `at` or `sig` yet — so its
+    entry is held from its first reading and never settles on its own. A record is not a reading: the
+    repo's first reading is still the first that finds a record with an `at` (`observe`)."""
+    with _STORE:
+        store = _load()
+        seen = store[key] if isinstance(store.get(key), dict) else {}
+        for i in ids:
+            rec = dict(seen[i]) if isinstance(seen.get(i), dict) else {}
+            rec.setdefault("held", {"at": now.isoformat(), "by": by})
+            seen[i] = rec
+        store[key] = seen
+        _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
 
 
 def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
@@ -247,7 +264,7 @@ def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
     if isinstance(entry.get("held"), dict):
         at = _when(entry["held"].get("at"))
         since = f" since {at.astimezone():%H:%M}" if at else ""
-        return f"{i} is held by the person{since}: no lane takes it until they release it or its text changes {tail}"
+        return f"{i} is held by the person{since}: no lane takes it until they release it {tail}"
     until = _when((entry.get("settling") or {}).get("until")) if isinstance(entry.get("settling"), dict) else None
     if until is not None and until > now:
         return f"{i} settles until {until.astimezone():%H:%M}: the person's window to change or hold it {tail}"

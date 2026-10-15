@@ -15,6 +15,7 @@ from sessionorc import ledger, modes, paths, settle
 from sessionorc.agent_common import RpcError
 from sessionorc.agent_tick import TickMixin
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import PERSON, MailEntry, ProgressEntry, Session
 
 T0 = datetime(2026, 10, 15, 6, 0, tzinfo=UTC)
 SPANS = settle.durations(None, None)  # the built-in: design-first 5m, the rest 0
@@ -87,7 +88,7 @@ def test_an_edit_inside_the_window_restarts_it_and_one_after_settling_does_not()
     assert seen["at"] == t2.isoformat() and seen["sig"] == got["TD-002"]["sig"]
 
 
-def test_a_held_entry_is_withheld_past_its_window_until_an_edit_ends_the_hold():
+def test_a_held_entry_is_withheld_past_its_window_and_an_edit_keeps_the_hold():
     settle.observe(_ledger(), "o/r", SPANS, T0)
     settle.observe(_ledger(_entry(2)), "o/r", SPANS, T0)
     store = json.loads(paths.ledger_seen_file().read_text())
@@ -98,10 +99,9 @@ def test_a_held_entry_is_withheld_past_its_window_until_an_edit_ends_the_hold():
     assert got["TD-002"]["held"] == {"at": T0.isoformat()} and "settling" not in got["TD-002"]
     assert not ledger.lane_matches(DESIGNER, got["TD-002"])
     got = _by_id(settle.observe(_ledger(_entry(2, body="the person's edit landed")), "o/r", SPANS, much_later))
-    assert (
-        "held" not in got["TD-002"]
-        and got["TD-002"]["settling"]["until"] == (much_later + timedelta(minutes=5)).isoformat()
-    )
+    assert got["TD-002"]["held"] == {"at": T0.isoformat()} and "settling" not in got["TD-002"], "TD-731"
+    rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
+    assert rec["sig"] == got["TD-002"]["sig"] and rec["held"]["at"] == T0.isoformat(), "the new sig, the hold kept"
 
 
 def test_in_lanes_counts_a_settling_entry_in_no_lane_and_not_in_the_rest():
@@ -207,17 +207,56 @@ def test_a_hold_withholds_past_the_window_and_a_release_makes_it_pickable_at_onc
     assert "settling" not in edited["TD-004"] and ledger.lane_matches(DESIGNER, edited["TD-004"])
 
 
-def test_a_settled_entry_cannot_be_held_and_an_unheld_one_cannot_be_released():
+def test_a_settled_entry_is_held_and_released_and_an_unheld_one_cannot_be_released():
+    """TD-731 (design §4.4 *Hold*): any open entry the clock holds is held, settling or settled."""
     got = _settling_two()
-    with pytest.raises(settle.Refused, match="TD-003 has settled, and a hold is a settling entry's"):
-        settle.hold("o/r", got["TD-003"], SPANS, T0, by="person")  # a build: settled at once
-    with pytest.raises(settle.Refused, match="TD-002 has settled"):
-        settle.hold("o/r", got["TD-002"], SPANS, T0 + timedelta(minutes=6), by="person")
     with pytest.raises(settle.Refused, match="TD-002 is not held"):
         settle.hold("o/r", got["TD-002"], SPANS, T0, by="person", release=True)
     with pytest.raises(settle.Refused, match="TD-009 is not in the home's clock"):
         settle.hold("o/r", {"id": "TD-009"}, SPANS, T0, by="person")
     assert "held" not in json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
+    rec = settle.hold("o/r", got["TD-003"], SPANS, T0, by="person")  # a build: settled at once
+    assert rec["held"] == {"at": T0.isoformat(), "by": "person"}
+    later = T0 + timedelta(minutes=6)
+    settle.hold("o/r", got["TD-002"], SPANS, later, by="person")  # past its window
+    marked = _by_id(settle.mark(list(got.values()), "o/r", SPANS, later))
+    assert "held" in marked["TD-002"] and "held" in marked["TD-003"]
+    assert not ledger.lane_matches(GRINDER, marked["TD-003"]) and not ledger.lane_matches(DESIGNER, marked["TD-002"])
+    settle.hold("o/r", got["TD-003"], SPANS, later, by="person", release=True)
+    assert ledger.lane_matches(GRINDER, _by_id(settle.mark(list(got.values()), "o/r", SPANS, later))["TD-003"])
+
+
+def test_a_landed_held_id_is_held_at_its_first_reading_and_never_settles():
+    """TD-731 (design §4.4 *An entry can land held*): `prehold` records `{held}` before any reading holds
+    the id; its first reading records its `sig` and keeps the hold, and no window ever runs."""
+    settle.observe(_ledger(_entry(1)), "o/r", SPANS, T0)
+    settle.prehold("o/r", ["TD-002"], "ao-i", T0)
+    rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
+    assert rec == {"held": {"at": T0.isoformat(), "by": "ao-i"}}
+    t1 = T0 + timedelta(minutes=1)
+    got = _by_id(settle.observe(_ledger(_entry(1), _entry(2, "build")), "o/r", SPANS, t1))
+    assert got["TD-002"]["held"] == {"at": T0.isoformat()} and "settling" not in got["TD-002"]
+    assert not ledger.lane_matches(GRINDER, got["TD-002"])
+    rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
+    assert rec["sig"] == got["TD-002"]["sig"] and rec["at"] == t1.isoformat()
+    much_later = T0 + timedelta(days=3)
+    got = _by_id(settle.observe(_ledger(_entry(1), _entry(2, "build", "amended")), "o/r", SPANS, much_later))
+    assert "held" in got["TD-002"] and "settling" not in got["TD-002"], "amended, still held"
+    settle.hold("o/r", got["TD-002"], SPANS, much_later, by="person", release=True)
+    got = _by_id(settle.observe(_ledger(_entry(1), _entry(2, "build", "amended")), "o/r", SPANS, much_later))
+    assert "held" not in got["TD-002"] and ledger.lane_matches(GRINDER, got["TD-002"])
+
+
+def test_pre_holding_an_id_leaves_a_repos_first_reading_recording_every_other_id_settled():
+    settle.prehold("o/r", ["TD-009"], "person", T0)
+    got = _by_id(settle.observe(_ledger(_entry(1), _entry(2), _entry(9)), "o/r", SPANS, T0 + timedelta(minutes=1)))
+    seen = json.loads(paths.ledger_seen_file().read_text())["o/r"]
+    assert seen["TD-001"]["at"] == settle.EPOCH and seen["TD-002"]["at"] == settle.EPOCH, "still a first reading"
+    assert "settling" not in got["TD-001"] and "settling" not in got["TD-002"]
+    assert got["TD-009"]["held"] == {"at": T0.isoformat()}
+    # the next reading is not a first: a new id settles from now
+    got = _by_id(settle.observe(_ledger(_entry(1), _entry(3)), "o/r", SPANS, T0 + timedelta(minutes=2)))
+    assert "settling" in got["TD-003"]
 
 
 def test_the_claim_refusal_names_the_window_or_the_hold():
@@ -228,7 +267,9 @@ def test_the_claim_refusal_names_the_window_or_the_hold():
     assert settle.claim_refusal(got["TD-002"], T0 + timedelta(minutes=5)) is None, "a stale mark past its until"
     assert settle.claim_refusal(got["TD-003"], T0) is None and settle.claim_refusal(None, T0) is None
     words = settle.claim_refusal({"id": "TD-002", "held": {"at": T0.isoformat()}}, T0)
-    assert words.startswith(f"TD-002 is held by the person since {T0.astimezone():%H:%M}: no lane takes it")
+    assert words.startswith(
+        f"TD-002 is held by the person since {T0.astimezone():%H:%M}: no lane takes it until they release it (design"
+    ), "TD-731: an edit no longer ends a hold"
 
 
 async def _home_with(agent, tmp_path, *, now: datetime) -> tuple[str, list[dict]]:
@@ -250,8 +291,8 @@ async def test_td_hold_is_the_persons_and_marks_the_reading_at_once(agent, tmp_p
     assert "held" in _by_id(entries)["TD-002"], "the reading is marked now, not at the next pass"
     got = await agent.rpc_td_hold(repo=root, id="TD-002", release=True)
     assert got["held"] is None and got["settling"] is None and "held" not in _by_id(entries)["TD-002"]
-    with pytest.raises(RpcError, match="TD-003 has settled"):
-        await agent.rpc_td_hold(repo=root, id="TD-003")
+    got = await agent.rpc_td_hold(repo=root, id="TD-003")  # settled: held all the same (TD-731)
+    assert got["held"]["at"] and got["told"] == [] and got["untold"] == []
     with pytest.raises(RpcError, match="TD-404 is not an open entry of r's ledger"):
         await agent.rpc_td_hold(repo=root, id="TD-404")
     with pytest.raises(RpcError, match="elsewhere is not a repo this home reads"):
@@ -302,3 +343,83 @@ async def test_the_claimer_of_an_entry_the_person_then_holds_still_reports_on_it
             await person.call("progress", id=g, ref="TD-002", status="claimed")  # a claim is still refused
         await person.call("progress", id=g, ref="TD-002", status="done", why="built")
         assert next(e for e in agent.sessions[g].progress if e.ref == "TD-002").status == "done"
+
+
+# -- TD-731: a claimed entry is held all the same (§4.4 *A claimed entry is held all the same*) -------------
+
+
+def _put(agent, sid: str, *, unattended: bool, claim: str | None = None, pr: int | None = None) -> Session:
+    s = Session(
+        id=sid, name=sid.removeprefix("ao-"), kind="agent", adapter="claude-code", dir="", unattended=unattended
+    )
+    if claim:
+        s.progress.append(ProgressEntry(ref=claim, pr=pr))
+    agent.sessions[sid] = s
+    return s
+
+
+def _notes(s: Session, tid: str) -> list[str]:
+    return [e.text for e in s.inbox if e.kind == "note" and e.from_ == PERSON and e.about == tid]
+
+
+async def test_a_hold_on_a_claimed_entry_tells_its_unattended_holder_and_its_prs_reader_once(agent, tmp_path):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003", pr=1840)
+    mine = _put(agent, "ao-gi", unattended=False, claim="TD-003")  # interactive: the person's own
+    reader = _put(agent, "ao-tl", unattended=True)
+    reader.inbox.append(MailEntry(id="m-a1", from_="ao-gw", to=["ao-tl"], at="t", kind="ask", text="read", pr=1840))
+    other = _put(agent, "ao-tl2", unattended=True)
+    other.inbox.append(MailEntry(id="m-a2", from_="ao-x", to=["ao-tl2"], at="t", kind="ask", text="read", pr=99))
+    got = await agent.rpc_td_hold(repo=root, id="TD-003")
+    assert got["untold"] == []
+    assert got["held"]["at"] and got["told"] == ["ao-gw", "ao-tl"] and got["readers"] == ["ao-tl"]
+    assert _notes(worker, "TD-003") == [
+        "TD-003 is held by the person: stop at the step in hand, push, leave its PR open and unmerged, and drop "
+        'the entry: `ao progress drop TD-003 --why "held by the person"`. A Release makes it pickable again.'
+    ]
+    assert _notes(reader, "TD-003") == ["TD-003 is held by the person: leave PR #1840 unmerged until they release it."]
+    assert _notes(mine, "TD-003") == [] and _notes(other, "TD-003") == []
+    assert next(p for p in worker.progress if p.ref == "TD-003").status == "claimed", "the claim stands"
+    again = await agent.rpc_td_hold(repo=root, id="TD-003")  # held already: nobody is told again
+    assert again["told"] == [] and len(_notes(worker, "TD-003")) == 1 and len(_notes(reader, "TD-003")) == 1
+    released = await agent.rpc_td_hold(repo=root, id="TD-003", release=True)
+    assert released["told"] == [] and len(_notes(worker, "TD-003")) == 1
+
+
+async def test_a_note_that_cannot_be_sent_leaves_the_hold_written_and_names_the_holder(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    _put(agent, "ao-gw", unattended=True, claim="TD-003")
+
+    async def refuse(*a, **kw):
+        raise RpcError("ao-gw's inbox is full")
+
+    monkeypatch.setattr(agent, "_msg", refuse)
+    got = await agent.rpc_td_hold(repo=root, id="TD-003")
+    assert got["held"]["at"] and got["told"] == [] and got["untold"] == ["could not tell ao-gw: ao-gw's inbox is full"]
+    assert "held" in json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]
+    assert "held" in _by_id(entries)["TD-003"]
+
+
+async def test_a_reviewers_pr_and_a_live_seat_are_read_once_and_a_holder_is_not_told_twice(agent, tmp_path):
+    """Review of #1861: a claim's `review_pr` names its PR as `pr` does; an exited seat is not told; a seat
+    with two asks on the PR gets one note; a holder that is also a reader gets only the holder's."""
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True)
+    worker.progress.append(ProgressEntry(ref="TD-003", review_pr=1841))
+    worker.inbox.append(MailEntry(id="m-a0", from_="ao-x", to=["ao-gw"], at="t", kind="ask", text="read", pr=1841))
+    reader = _put(agent, "ao-tl", unattended=True)
+    for n in (1, 2):
+        reader.inbox.append(
+            MailEntry(id=f"m-a{n}", from_="ao-gw", to=["ao-tl"], at="t", kind="ask", text="read", pr=1841)
+        )
+    gone = _put(agent, "ao-tl3", unattended=True)
+    gone.state = "exited"
+    gone.inbox.append(MailEntry(id="m-a3", from_="ao-gw", to=["ao-tl3"], at="t", kind="ask", text="read", pr=1841))
+    got = await agent.rpc_td_hold(repo=root, id="TD-003")
+    assert got["told"] == ["ao-gw", "ao-tl"] and got["readers"] == ["ao-tl"] and got["untold"] == []
+    assert len(_notes(worker, "TD-003")) == 1 and "drop the entry" in _notes(worker, "TD-003")[0]
+    assert _notes(reader, "TD-003") == ["TD-003 is held by the person: leave PR #1841 unmerged until they release it."]
+    assert _notes(gone, "TD-003") == []
