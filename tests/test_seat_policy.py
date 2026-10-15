@@ -170,9 +170,39 @@ async def test_an_idle_seat_with_nothing_due_and_nothing_left_is_closed(agent, t
         agent.sessions[fresh].since = _iso(now)
         await agent._keep_running(now)
         assert agent.sessions[done].state == "closed"
-        for sid in (dirty, due, fresh):
+        assert agent.sessions[due].state == "closed", "an `every` due met while it ran is the next fill's (TD-700)"
+        for sid in (dirty, fresh):
             assert agent.sessions[sid].state == "idle", sid
             await person.call("kill", id=sid)
+        await person.call("kill", id=due)
+
+
+async def test_a_prs_seat_that_came_due_mid_run_is_closed_once_idle_and_pushed_then_filled(agent, tmp_path):
+    """TD-700: a `prs` seat whose `seat_due` was met while it ran sat idle forever — `_seat_done`
+    read the due as work left for that run, so the tick never closed it and so never filled it."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _seat(person, tmp_path, name="audit", trigger="prs", after="10")
+        unpushed = await _seat(person, tmp_path, name="left", trigger="prs", after="10")
+        rec, left = agent.sessions[sid], agent.sessions[unpushed]
+        for r in (rec, left):
+            r.seat_count = {"prs": 10, "at": _iso(now)}
+        await agent._keep_running(now)
+        assert rec.seat_due and rec.seat_due["by"] == "prs" and rec.state != "closed", "due while it runs"
+        assert left.seat_due and left.seat_due["by"] == "prs"
+        _idle(agent, sid, now)
+        _idle(agent, unpushed, now, unpushed=1)
+        assert agent._seat_done(rec), "the due is the next run's, not this one's"
+        await agent._keep_running(now)
+        assert rec.state == "closed" and rec.seat_due, "closed with its due standing"
+        assert agent.sessions[unpushed] is left and left.state == "idle", "a seat that left work is the board's"
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["fill"], "filled on the next tick"
+        assert new.seat_due is None and new.seat_count is None, "the count starts again at the fill"
+        for s in (sid, unpushed):
+            await person.call("kill", id=s)
 
 
 async def test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_holds_it_or_the_wait_runs_out(
@@ -223,7 +253,7 @@ async def test_an_idle_seat_waiting_on_its_own_pr_is_left_open_until_a_reader_ho
                 pr=1202,
             )
         )
-        agent.sessions[sids["reader"]].seat_due = {"at": _iso(now), "by": "every"}  # not this test's to close
+        agent.sessions[sids["reader"]].git["dirty"] = 1  # not this test's to close
         agent.sessions[sids["closedpr"]].progress = [ProgressEntry(ref="TD-363", pr=1200, why=PR_CLOSED)]
         late = agent.sessions[sids["late"]]
         late.git["branch"] = "td363-gaps"

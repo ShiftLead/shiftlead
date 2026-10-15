@@ -2357,8 +2357,9 @@ class TickMixin:
         TD-259). A question waiting is the idle seat's own to read, as the techlead's is."""
         if not s.seat_due:
             return True
-        # the anchor's (TD-386): ids its lane gained while it sat idle are the next fill's, from cold
-        if (s.seat or {}).get("trigger") == "work":
+        # the anchor's (TD-386): ids its lane gained while it sat idle are the next fill's, from cold;
+        # and a `prs` or `every` due met while the seat ran is the next run's cause (TD-700)
+        if (s.seat or {}).get("trigger") in ("work", "prs", "every"):
             return True
         return (s.seat or {}).get("trigger") == "team" and s.seat_due.get("by") != "asks"
 
