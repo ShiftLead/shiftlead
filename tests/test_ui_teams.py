@@ -1178,3 +1178,29 @@ def test_a_member_closed_for_a_sit_out_keeps_its_card_saying_so(world, client):
     me = {**badged("ao-shiftlead-des", "ao-grind", state="idle", unattended=False), "name": "des", "tail": []}
     fleet.sessions = [me, {**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     assert "interactive · sits out under build-review — close it yourself" in client.get("/").text
+
+
+def test_a_stopped_teams_rename_reads_definition_changed_beside_start_and_on_the_cards(world, client):
+    """§4.5a *flow changed — Apply*, *team groups* (§4.9 *A member renamed or removed*, TD-703, built by
+    TD-706 slice 1): a stopped team whose definition renamed or dropped a member reads **definition
+    changed — Apply** beside Start, the title saying a start by the tick brings back the old names, and
+    each member's card its own line; nothing else is read on a team with nothing live."""
+    from shiftlead.ui import cards
+
+    tmp_path, fleet = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"] = [dict(doc["teams"]["ao-grind"]["members"][0], name="mill", count=1)]
+    write_org(tmp_path, doc)
+    old = {**badged("ao-shiftlead-grind-1", "ao-grind", state="closed"), "name": "grind-1", "tail": []}
+    hunt = {**badged("ao-shiftlead-hunt", "ao-grind", state="closed"), "name": "hunt", "tail": []}
+    fleet.sessions = [{**old, "role": "grinder", "created": "1"}, {**hunt, "role": "hunter", "created": "2"}]
+    head = _head(client.get("/").text)
+    title = "grind-1 → mill: renamed&#10;hunt: removed from the definition&#10;"
+    title += "until Apply or Start, a start by the tick brings back the old names"
+    assert f'<span class="meta flowchanged" title="{title}">definition changed</span>' in head
+    at = head.index(">definition changed</span>")
+    assert head.index('data-flow-apply="ao-grind"', at) < head.index('data-team-act="start"', at)  # beside Start
+    assert "orc-ao: starts" not in head  # a seat the run lacks is a live team's difference alone
+    assert cards.FLOW_ACTS == {"ao-shiftlead-grind-1": "rename", "ao-shiftlead-hunt": "removed"}
+    assert cards.flow_mark({**old, "role": "grinder"})["text"] == "grind-1 → mill: renamed"
+    assert cards.flow_mark(hunt)["text"] == "removed from the definition"

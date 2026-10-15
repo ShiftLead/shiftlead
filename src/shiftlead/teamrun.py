@@ -778,7 +778,10 @@ class Difference:
     """One member whose record differs from what the team's current flow compiles to (§4.9c): `act`
     is what Apply does — `sit_out` (wind it down by the home's `relaunch {sit_out}`), `start` (create
     it as **Members…**'s add does), `relaunch` (hand the home its new launch) — or `left`, what Apply
-    never touches (a person's session the flow sits out). `what` names each field that differs."""
+    never touches (a person's session the flow sits out). `what` names each field that differs. Two
+    acts are the definition's, read on a stopped team too (§4.9 *A member renamed or removed in the
+    definition*, TD-703): `rename`, a record the definition no longer names paired with the newcomer
+    `launch` that takes its place, and `removed`, one left over with no newcomer (`renames`)."""
 
     name: str
     act: str
@@ -788,6 +791,10 @@ class Difference:
     seat: bool = False  # a seat the definition names that the run has no record of (§4.9c, TD-399)
 
     def line(self, flow: str | None) -> str:
+        if self.act == "rename" and self.launch is not None:
+            return f"{self.name} → {self.launch.name}: renamed"
+        if self.act == "removed":
+            return f"{self.name}: removed from the definition"
         if self.act == "sit_out":
             return f"{self.name}: sits out under {flow}"
         if self.act == "start":
@@ -802,7 +809,9 @@ class Difference:
     def definition(self) -> bool:
         """A relaunch whose one difference is the profile the definition names (§4.9c *Switching*,
         TD-619): the definition's, which a flow does not compile, so the mark reads **definition
-        changed** where nothing else differs."""
+        changed** where nothing else differs. A rename and a removal are the definition's too (TD-703)."""
+        if self.act in MOVED:
+            return True
         return self.act == "relaunch" and bool(self.what) and all(w.startswith("profile ") for w in self.what)
 
     def as_dict(self, flow: str | None) -> dict[str, Any]:
@@ -815,7 +824,13 @@ class Difference:
             "line": self.line(flow),
             "seat": self.seat,
             "definition": self.definition,
+            **({"to": self.launch.name} if self.act == "rename" and self.launch is not None else {}),
         }
+
+
+# the acts a definition's rename or removal reads as (§4.9 *A member renamed or removed*, TD-703): the
+# one difference read on a team with nothing live, since rule 8 replays its ended records
+MOVED = ("rename", "removed")
 
 
 def definition_changed(diffs: list[dict[str, Any]], flow: str | None) -> bool:
@@ -916,6 +931,57 @@ def _review_key(review: Any) -> Any:
     return ("reader", review.get("reader"), frozenset(review.get("held") or ()), bound)
 
 
+def _pairing(
+    plan: teams.Plan, sessions: list[dict[str, Any]]
+) -> tuple[list[tuple[dict[str, Any], teams.Launch]], list[dict[str, Any]], set[str]]:
+    """`renames`, with the newcomers an applied orphan already holds (its `relaunch` mark's `name`)."""
+    mine = crew(plan.team, sessions)
+    names = {x.name for x in plan.launches} | set(plan.sit_out)
+    gone = [n for n in dict.fromkeys(str(r.get("name") or "") for r in mine) if n and n not in names]
+    orphans = [
+        r
+        for n in gone
+        if (r := _current(n, mine)) is not None and not (r.get("sit_out") or sat_out(r) or r.get("superseded_by"))
+    ]
+    carried = {str(r.get("name")) for r in badged(plan.team, sessions) if not r.get("superseded_by")}
+    newcomers = [x for x in plan.launches if x.name not in carried]
+    held: set[str] = set()
+    for r in list(orphans):
+        mark = r.get("relaunch")
+        to = mark.get("name") if isinstance(mark, dict) else None
+        if to and any(x.name == to for x in newcomers):
+            held.add(str(to))
+            orphans.remove(r)
+    newcomers = [x for x in newcomers if x.name not in held]
+    orphans.sort(key=lambda r: str(r.get("created") or ""))
+    pairs: list[tuple[dict[str, Any], teams.Launch]] = []
+    removals: list[dict[str, Any]] = []
+    for r in orphans:
+        x = next((x for x in newcomers if x.role == str(r.get("role") or "")), None)
+        if x is None:
+            removals.append(r)
+            continue
+        newcomers.remove(x)
+        pairs.append((r, x))
+    return pairs, removals, held
+
+
+def renames(
+    plan: teams.Plan, sessions: list[dict[str, Any]]
+) -> tuple[list[tuple[dict[str, Any], teams.Launch]], list[dict[str, Any]]]:
+    """A team's records the definition renamed or dropped (design §4.9 *A member renamed or removed in
+    the definition*, TD-703), as `(renames, removals)`. The **orphans** are the team's crew records
+    (`crew`: never a person's session) that are current (not superseded) and not sat out, whose name the
+    definition no longer holds; the **newcomers** the launches whose name no current record of the team
+    carries. Within one role (the record's `role` against the launch's) the orphans, by `created`, are
+    paired with the newcomers, in the definition's order: each pair `(record, launch)` is a rename, an
+    orphan left over a removal, and a newcomer left over the start it already is. An orphan whose
+    `relaunch` mark already carries a newcomer's `name` was applied: it is neither, and the newcomer is
+    held by it. The card, `ao team list`, `ao team flow`, Apply and Start read this one pairing."""
+    pairs, removals, _ = _pairing(plan, sessions)
+    return pairs, removals
+
+
 def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Difference]:
     """How a live team's records differ from what its current flow compiles to (design §4.9c
     *Switching*), member by member: lane, `review`, the `{stage}` file's path, and who should be
@@ -925,15 +991,22 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     TD-399), and a team that runs no flow is compared on its seats alone. The profile the definition
     resolves is compared too, on every live unattended member and every seat, running or closed
     between fills (TD-619) — under a flow or none, since it is the definition's: a closed seat's next
-    fill replays its record. Empty with nothing live."""
+    fill replays its record. A record the definition renamed or dropped (`renames`, TD-703) is a
+    `rename` or a `removed`, first, and the one difference read with nothing live."""
     mine = badged(plan.team, sessions)
+    pairs, removals, held = _pairing(plan, sessions)
+    moved = [Difference(str(r.get("name")), "rename", record=r, launch=x) for r, x in pairs]
+    moved += [Difference(str(r.get("name")), "removed", record=r) for r in removals]
     if not live(crew(plan.team, sessions)):
-        return []
+        return moved
+    taken = held | {x.name for _, x in pairs}  # a paired or held newcomer is no start of its own
     on_call_lead = plan.lead if plan.lead is not None and on_call_gate(plan.lead) else None
     seats = {x.name for x in (plan.techlead, plan.anchor, on_call_lead, *plan.seats) if x is not None}
     if plan.flow is None:
-        out = []
+        out = list(moved)
         for x in plan.launches:
+            if x.name in taken:
+                continue
             rec = _current(x.name, mine)
             if rec is None:
                 if x.name in seats:
@@ -945,7 +1018,7 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
             if what := _profile_moved(rec, x):
                 out.append(Difference(x.name, "relaunch", what, record=rec, launch=x))
         return out
-    out: list[Difference] = []
+    out: list[Difference] = list(moved)
     for name in plan.sit_out:
         rec = _current(name, mine)
         if rec is None or rec.get("state") == "closed" or rec.get("sit_out") or sat_out(rec):
@@ -954,6 +1027,8 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
             continue  # the home never sits one out (`_sit_out`)
         out.append(Difference(name, "left" if persons(rec) else "sit_out", record=rec))
     for x in plan.launches:
+        if x.name in taken:
+            continue
         rec = _current(x.name, mine)
         if rec is None or sat_out(rec):
             # a seat the run lacks — the anchor a team predates among them — is Apply's to create (TD-399)
@@ -989,11 +1064,11 @@ def flow_changed(
 ) -> list[dict[str, Any]]:
     """What a client that reads a live team says of its records against its current flow (§4.9c
     *Switching*: the Org page, `ao team list`, `ao team flow`), one `Difference.as_dict` per member;
-    empty with nothing live, which compiles nothing until its next start; a team with no `flows:` is
-    read on its seats alone (TD-399). Raises what `teams.plan` raises: the caller says why the records
-    were not compared."""
+    with nothing live only the definition's renames and removals (TD-703), since a stopped team
+    compiles nothing until its next start; a team with no `flows:` is read on its seats alone
+    (TD-399). Raises what `teams.plan` raises: the caller says why the records were not compared."""
     t = org.teams.get(name)
-    if t is None or not live(crew(name, sessions)):
+    if t is None or not crew(name, sessions):
         return []
     plan = teams.plan(org, name, host, files=files_via(call))
     return [d.as_dict(plan.flow) for d in differences(plan, sessions)]
@@ -1247,13 +1322,19 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
     a person's own, since the home's `relaunch` is. A member that cannot be reached, or whose call is
     refused, is skipped and said; the others are applied. Returns `{team, flow, applied, skipped}`,
     each entry `{name, act, line}`, and `stays`, the PRs already asked of a reader, which stay its
-    (`stays_with`); nothing applied for a stopped team, whose next start compiles the flow."""
+    (`stays_with`); nothing applied for a stopped team, whose next start compiles the flow. A rename or
+    a removal (TD-703) is skipped and said, a stopped team's too: the home's half of it is TD-706's
+    next slice, and until then nothing is created beside the record it would succeed."""
     team = teams.find(org, name)
     sessions = call("list")
     stays = stays_with(name, sessions)
     if not live(crew(name, sessions)):  # a stopped team: its next start compiles the flow
         flow = teams.current_flow(team)
-        return {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays}
+        out = {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays}
+        if crew(name, sessions):
+            plan = teams.plan(org, name, host, files=files_via(call))
+            out["skipped"] = [_not_yet(d, plan.flow) for d in differences(plan, sessions)]
+        return out
     plan = teams.plan(org, name, host, files=files_via(call))
     diffs = differences(plan, sessions)
     # a manager on call is the controller closed as live (TD-269): the members Apply starts name it
@@ -1272,6 +1353,9 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         rec = d.record or {}
         if d.act == "left":
             out["skipped"].append(row)
+            continue
+        if d.act in MOVED:
+            out["skipped"].append(_not_yet(d, plan.flow))
             continue
         if rec.get("state") == "unreachable":
             row["line"] = f"{d.name}: {rec.get('host') or 'its host'} is not answering — applied to the others"
@@ -1310,6 +1394,13 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
             continue
         out["applied"].append(row)
     return out
+
+
+def _not_yet(d: Difference, flow: str | None) -> dict[str, Any]:
+    """Apply's line for a rename or a removal the home cannot take yet (TD-706 slice 1)."""
+    row = d.as_dict(flow)
+    row["line"] += " — not applied yet: the home takes a rename or a removal from TD-706's next slice"
+    return row
 
 
 def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]]) -> list[dict[str, Any]]:

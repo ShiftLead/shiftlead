@@ -1144,7 +1144,7 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                         print(f"{'':<{w}}  {line}")
                 if unread:  # a node's checkout this host cannot read: not judged here
                     print(f"{'':<{w}}  flows not read from here: {unread}")
-            if r.get("differences"):  # …and a seat the run lacks, under a flow or none (§4.9c, TD-399)
+            if r.get("differences"):  # …a seat the run lacks, under a flow or none (§4.9c, TD-399), a rename (TD-703)
                 word = "definition" if teamrun.definition_changed(r["differences"], r.get("flow")) else "flow"
                 print(f"{'':<{w}}  {word} changed — Apply (ao team flow {r['name']} --apply):")
                 for d in r["differences"]:
@@ -1998,7 +1998,7 @@ def cmd_team_flow(args: argparse.Namespace) -> int:
             applied = teamrun.apply(call_sync, org, name, here, caller=os.environ.get("SHIFTLEAD_SESSION") or None)
             out["apply"] = applied
         else:
-            # empty for a stopped team: its next start compiles the flow
+            # a stopped team's renames and removals alone (TD-703): its next start compiles the flow
             out["differences"] = teamrun.flow_changed(call_sync, org, name, here, call_sync("list"))
     except (teams.TeamError, ValueError, OSError, AgentError) as e:
         if not args.apply:

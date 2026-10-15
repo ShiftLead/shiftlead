@@ -1487,3 +1487,125 @@ def test_a_team_with_no_flows_is_compared_on_its_profiles_too(world, tmp_path, c
     assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
     handed = [p["launch"]["profile"] for m, p in state["calls"] if m == "relaunch"]
     assert handed == ["repo-grind", "repo-grind"]
+
+
+# ── a member renamed or removed in the definition (§4.9, TD-703, built by TD-706 slice 1) ─────────
+
+
+def _renamed(world, tmp_path, monkeypatch):  # noqa: F811
+    """ao-grind started with no flows, its records carrying the `role` and `created` the home writes;
+    then its grinders renamed (`grind` → `mill`) and its hunter dropped from the definition."""
+    from shiftlead import cli, teamrun
+
+    _, state = world
+    plan, _ = teamrun.start(cli.call_sync, orgmod.load(), "ao-grind", HOST)
+    for i, (x, rec) in enumerate(zip(plan.launches, state["sessions"], strict=True)):
+        rec.update(role=x.role, created=f"2026-10-14T00:00:0{i}Z")
+    doc = _team_doc(tmp_path)
+    t = doc["teams"]["ao-grind"]
+    t["members"] = [dict(t["members"][0], name="mill")]
+    _write(tmp_path, doc)
+    fake = cli.call_sync
+
+    def call(method, **params):
+        if method == "relaunch":
+            state["calls"].append((method, params))
+            return next(s for s in state["sessions"] if s["id"] == params["id"])
+        return fake(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    state["calls"].clear()
+    return state
+
+
+def test_a_renamed_member_reads_renamed_and_a_dropped_one_removed_and_apply_creates_neither(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """§4.9 *A member renamed or removed in the definition*: the records the definition no longer names
+    are paired with the names no record carries, within a role, in order — each pair *renamed*, an
+    orphan left over *removed from the definition* — the team reads **definition changed**, and the
+    newcomer is no `start` of its own, so Apply never creates it beside the old record (until the
+    home's half lands it says so and touches nothing)."""
+    from shiftlead import cli, teamrun
+
+    state = _renamed(world, tmp_path, monkeypatch)
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    diffs = json.loads(capsys.readouterr().out)["differences"]
+    assert [d["line"] for d in diffs] == [
+        "grind-1 → mill-1: renamed",
+        "grind-2 → mill-2: renamed",
+        "hunt: removed from the definition",
+    ]
+    assert [d.get("to") for d in diffs] == ["mill-1", "mill-2", None]
+    assert all(d["definition"] for d in diffs) and teamrun.definition_changed(diffs, None)
+    assert cli.main(["team", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "definition changed — Apply (ao team flow ao-grind --apply):" in out
+    assert "    grind-1 → mill-1: renamed" in out and "    hunt: removed from the definition" in out
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    applied = json.loads(capsys.readouterr().out)["apply"]
+    assert applied["applied"] == [] and len(applied["skipped"]) == 3
+    assert applied["skipped"][0]["line"].startswith("grind-1 → mill-1: renamed — not applied yet")
+    assert not [m for m, _ in state["calls"] if m in ("create", "relaunch")]
+
+
+def test_a_stopped_team_reads_its_renames_and_an_applied_orphan_is_no_difference(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """A stopped team is read for renames and removals alone (rule 8 replays its ended records); an
+    orphan whose `relaunch` mark already carries a newcomer's `name` is that newcomer's — neither is a
+    difference; a superseded record and a sat-out one are never orphans."""
+    from shiftlead import cli
+
+    state = _renamed(world, tmp_path, monkeypatch)
+    for s in state["sessions"]:
+        s["state"] = "closed"
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    lines = [d["line"] for d in json.loads(capsys.readouterr().out)["differences"]]
+    assert lines == ["grind-1 → mill-1: renamed", "grind-2 → mill-2: renamed", "hunt: removed from the definition"]
+    by = {s["name"]: s for s in state["sessions"]}
+    by["grind-1"]["relaunch"] = {"at": "x", "name": "mill-1"}  # applied: held until its replay runs
+    by["grind-2"]["superseded_by"] = "ao-shiftlead-other"
+    by["hunt"]["closed_for"] = {"why": "sit_out"}
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    assert json.loads(capsys.readouterr().out)["apply"]["skipped"] == []
+
+
+def test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_one(world, tmp_path):  # noqa: F811
+    """`teamrun.renames`: the orphans by `created`, the newcomers in the definition's order, paired within
+    one role; an orphan of a role with no newcomer is a removal, and a newcomer no orphan matches (the
+    designer) is left to the start it already is; a person's session is never an orphan, whatever its name."""
+    from shiftlead import cli, teamrun
+
+    _, state = world
+    doc = _team_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"] = [
+        {"role": "grinder", "count": 2, "name": "mill", "home": "shiftlead"},
+        {"role": "designer", "name": "design", "home": "shiftlead"},
+    ]
+    org = _write(tmp_path, doc)
+    plan = teams.plan(org, "ao-grind", HOST, files=teamrun.files_via(cli.call_sync))
+    rec = lambda name, role, created, **kw: {  # noqa: E731
+        "id": f"ao-{name}", "name": name, "role": role, "created": created, "state": "closed",
+        "team": "ao-grind", "unattended": True, **kw,
+    }  # fmt: skip
+    sessions = [
+        rec("orc-ao", "manager", "2026-10-14T00:00:00Z"),
+        rec("grind-b", "grinder", "2026-10-14T00:00:01Z"),
+        rec("grind-a", "grinder", "2026-10-14T00:00:02Z"),
+        rec("hunt", "hunter", "2026-10-14T00:00:03Z"),
+        rec("paul-ao", "", "2026-10-14T00:00:04Z", unattended=False),
+    ]
+    pairs, removals = teamrun.renames(plan, sessions)
+    assert [(r["name"], x.name) for r, x in pairs] == [("grind-b", "mill-1"), ("grind-a", "mill-2")]
+    assert [r["name"] for r in removals] == ["hunt"]
+    lines = [d.line(None) for d in teamrun.differences(plan, sessions)]
+    assert lines == ["grind-b → mill-1: renamed", "grind-a → mill-2: renamed", "hunt: removed from the definition"]

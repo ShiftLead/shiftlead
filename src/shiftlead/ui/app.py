@@ -53,6 +53,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     DEAD,  # noqa: F401
     DEFS_TTL,  # noqa: F401
     FLOW_ACTS,  # noqa: F401
+    FLOW_RENAMES,  # noqa: F401
     FLOWS,  # noqa: F401
     NO_TEAM,  # noqa: F401
     NODE_RESTART,  # noqa: F401
@@ -1021,6 +1022,8 @@ def create_app() -> FastAPI:
             if d.get("id")
         }
         refill(cards_mod.FLOW_ACTS, acts)
+        to = {str(d["id"]): str(d["to"]) for v in got.values() for d in v.get("differences") or [] if d.get("to")}
+        refill(cards_mod.FLOW_RENAMES, to)
         return got
 
     async def group_heads(
