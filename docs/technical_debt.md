@@ -1184,7 +1184,7 @@ The other cases:
 **Status:** Open
 **Location:** `tests/test_link.py` (`test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on_it`, ~L1024–1033)
 
-**Why:** CI run 38693877522, test (3.12), on #1810: `tests/test_link.py:1032: Failed: DID NOT RAISE AgentError`. 1 failed and 2906 passed; 3.13 passed on the same commit. The test closes the node's link (`node._home_mux.close("the lid closed")`) with `link.BACKOFF_FIRST` and `BACKOFF_MAX` set to 2.0, then makes three calls to the home: `until(... unreachable)`, a `msg` and a `get`. Only then does it expect `as_w.call("inbox")` to be refused as *unreachable*. On a slow runner those calls take longer than the 2-second backoff, the link is back first, and the `inbox` succeeds. The fix is in the test, not the link.
+**Why:** CI run 38693877522, test (3.12), on #1810: `tests/test_link.py:1032: Failed: DID NOT RAISE AgentError`. 1 failed and 2906 passed; 3.13 passed on the same commit. The test closes the node's link (`node._home_mux.close("the lid closed")`) with `link.BACKOFF_FIRST` and `BACKOFF_MAX` set to 2.0, then waits for the home to read it unreachable and makes two calls, a `msg` and a `get`. Only then does it expect `as_w.call("inbox")` to be refused as *unreachable*. On a slow runner those steps take longer than the 2-second backoff, the link is back first, and the `inbox` succeeds. The fix is in the test, not the link.
 
 **Fix:** keep the link down until the refusal has been read. Either hold the reconnect (a backoff far longer than the steps, or a patched dial that waits on an event the test sets after the `pytest.raises`), or take the refusal before the home-side asserts. The test still checks the return afterwards (`until(... != "unreachable")`, `home_reachable`).
 
