@@ -8,6 +8,7 @@ read through it: the suite patches both there.
 from __future__ import annotations
 
 import functools
+import subprocess
 import time
 from collections.abc import Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -760,6 +761,108 @@ def red_pr_rows(
                 }
             )
     return out
+
+
+CI_BILLING_REASON = "billing or spending limit"  # §4.5a *Inbox row: CI not starting*: a `billing` kind's words
+ORG_BILLING = "https://github.com/organizations/{owner}/settings/billing"
+USER_BILLING = "https://github.com/settings/billing"
+GH_USER_TTL = 600.0  # an account that could not be read is asked again after this long, not on every poll
+GH_USER_WAIT = 10.0
+_gh_user_type: dict[str, tuple[float, str]] = {}  # owner (lower) → (when read, `Organization` | `User` | "")
+
+
+def _gh_user_type_read(owner: str) -> str:
+    """`gh api users/<owner> --jq .type`, bounded: *Organization*, *User*, or "" when it cannot be read."""
+    try:
+        cp = subprocess.run(
+            ["gh", "api", f"users/{owner}", "--jq", ".type"],
+            capture_output=True,
+            text=True,
+            timeout=GH_USER_WAIT,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return cp.stdout.strip() if cp.returncode == 0 else ""
+
+
+def billing_url(owner: str) -> str:
+    """**Open** on the *CI not starting* row (§4.5a): the owner's billing page — the org's for an
+    organisation, the person's own for a user — told apart once with `gh api users/<owner>`'s `type`
+    and kept for the process's life. An account that cannot be read is asked again after
+    `GH_USER_TTL`, and meanwhile is the person's own billing page: a page that always opens, where
+    GitHub's settings switch to the org, rather than an org page that is a 404 for a user. Blocking:
+    the page reads it off the loop (`ci_not_run_kinds`)."""
+    key, now = owner.lower(), time.monotonic()
+    at, kind = _gh_user_type.get(key, (0.0, ""))
+    if not kind and (key not in _gh_user_type or now - at > GH_USER_TTL):
+        kind = _gh_user_type_read(owner)
+        _gh_user_type[key] = (now, kind)
+    return ORG_BILLING.format(owner=owner) if kind == "Organization" else USER_BILLING
+
+
+def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = None) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: CI not starting** (§4.4 *CI that never started is the person's*, TD-687):
+    one row per spell the home keeps (`ci_spells` on `host`), under *Needs you*, counted: *GitHub
+    Actions does not start in <owner>: billing or spending limit · samscrape #1097, #1099, samscrape
+    main*, each PR a link, the reason GitHub's when it is not billing. The row stands for the spell's
+    life, its items empty while the spell clears; it reads *re-run asked <age>* while a **Re-run**'s
+    runs are pending. Keyed `ci_not_run:<owner in lower case>` — the attention store's snooze key and
+    the Telegram line's `?row=`. **Open** is `billing_url`, filled by the page (`url`)."""
+    at = now or datetime.now(UTC)
+    out: list[dict[str, Any]] = []
+    if not isinstance(spells, Mapping):  # a host record a hand or another build left odd costs the rows, not the page
+        return out
+    for key, spell in sorted(spells.items()):
+        if not isinstance(spell, Mapping):
+            continue
+        owner = str(spell.get("owner") or key)
+        row = spell.get("row") if isinstance(spell.get("row"), Mapping) else {}
+        reason = CI_BILLING_REASON if row.get("kind") == "billing" else str(row.get("reason") or "")
+        items = []
+        for it in row.get("items") or []:
+            if not isinstance(it, Mapping):
+                continue
+            repo = str(it.get("repo") or "")
+            if isinstance(it.get("pr"), int):
+                url = str(it.get("url") or "")  # GitHub's `html_url`; anything but https is drawn as text
+                url = url if url.startswith("https://") else ""
+                items.append({"repo": repo, "label": f"{repo} #{it['pr']}", "url": url})
+            else:
+                items.append({"repo": repo, "label": f"{repo} main", "url": ""})
+        rerun = spell.get("rerun") if isinstance(spell.get("rerun"), Mapping) else {}
+        pending = workorders_mod.ci_rerun_pending(dict(spell))
+        head = f"GitHub Actions does not start in {owner}" + (f": {reason}" if reason else "")
+        text = " · ".join(x for x in (head, ", ".join(i["label"] for i in items)) if x)
+        since = str(spell.get("since") or "")
+        sid = f"ci_not_run:{key.lower()}"
+        out.append(
+            {
+                "row": "ci_not_run",
+                "sid": sid,
+                "id": sid,
+                "name": owner,
+                "owner": owner,
+                "head": head,
+                "parts": items,  # not `items`: the template would read the dict's method
+                "url": "",
+                "rerun_pending": pending,
+                "rerun_at": str(rerun.get("at") or "") if pending else "",
+                "rerun_age": _age(str(rerun.get("at") or ""), at) if pending else "",
+                "subject": kind_subject("CI not starting", owner),
+                "team": "",
+                "at": since,
+                "age": _age(since, at),
+                "text": text,
+                "find": " ".join(x for x in (owner, "CI not starting", text) if x),
+            }
+        )
+    return out
+
+
+def ci_not_run_kinds(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The rows with **Open**'s `url`, each owner's billing page (`billing_url`). Blocking on a first read."""
+    return [{**r, "url": billing_url(str(r.get("owner") or ""))} for r in rows]
 
 
 WORK_IDS = 5  # §4.5a *Inbox row: team start*: five ids at most, then *and n more*

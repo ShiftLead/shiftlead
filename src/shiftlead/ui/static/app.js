@@ -722,7 +722,7 @@
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
-    suspend: "suspending…", promote: "promoting…", work_start: "starting…", restart: "restarting…",
+    suspend: "suspending…", promote: "promoting…", ci_rerun: "re-running…", work_start: "starting…", restart: "restarting…",
     resume: "resuming…", "reopen-push": "resuming…", "resume-form": "resuming…", pause: "pausing…",
   };
   const PRESS_NOT = {
@@ -885,6 +885,8 @@
       // design §4.5a **Inbox row: promote** (TD-132 slice 3, TD-226 slice 3): **Promote** and a failure
       // or held row's **Dismiss**, the person's own, to `/api/person/<action>` with the repo alone
       if (action === "promote" || action === "clear_promote") body = { repo: b.dataset.repo };
+      // design §4.5a **Inbox row: CI not starting** (TD-687): **Re-run**, the person's own, with the account alone
+      if (action === "ci_rerun") body = { owner: b.dataset.owner };
       // design §4.5a **Inbox row: team start** (§6 rule 8, TD-227): **Dismiss** is `clear_work` with the
       // team alone; **Start** is the team card's Start — the same route, its refusal in its own words
       if (action === "clear_work") body = { team: b.dataset.team };
@@ -1093,6 +1095,8 @@
       if (action === "identity_log") say(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "promote") say(`promoting ${res.repo} to ${String(res.sha || "").slice(0, 7)}${res.checks && res.checks !== "green" ? ` — checks read ${res.checks}, pressed through` : ""}: a note says when it is live`, true);
       if (action === "clear_promote") say(res.which === "held" ? "the hold is ended: live stays where it is, and promoting goes on" : res.cleared && b.dataset.held ? "the failure is cleared; the rollback's hold still stands — Dismiss again to end it" : res.cleared ? "the failure is cleared: promoting goes on" : "no failure or hold stood", true);
+      if (action === "ci_rerun") say(`re-run asked of ${res.asked} run${res.asked === 1 ? "" : "s"} in ${res.owner || b.dataset.owner}${res.refused ? ` — GitHub refused ${res.refused}${res.why ? `: ${res.why}` : ""}` : ""}; the row stays while they run`, !res.refused);
+      if (action === "ci_rerun" && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       if (action === "clear_work") say(res.cleared ? `dismissed — ${(res.ids || []).join(", ") || "those entries"} will not ask again; a later entry does` : "nothing was waiting any more", true);
       if (action === "clear_mark") say(!(res.cleared || []).length ? "nothing was standing any more" : res.kind === "held" ? "dismissed — the crossings stay on the record; the next one is a note again" : "dismissed — the read stays on the record; a later failing read is a row again", true);
       if (action === "suspend") say(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
