@@ -57,19 +57,23 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Built (#1802, #1807, #1818); live check |
-| TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
 | TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Slice 1 built by #1843 |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
-| TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check of #1838 |
+| TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-732 builds it |
 | TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 — TD-724, TD-725, TD-733 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the repo's anchor seat, names unique per repo, the old keys refused | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet and the anchor seat on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
+| TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
+| TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Open |
+| TD-732 | `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837) | Medium | Open |
+| TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
+| TD-737 | Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body | Medium | Open |
 | TD-732 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-733 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
 
@@ -1050,26 +1054,6 @@ The other cases:
 
 ---
 
-## TD-711: TD-706's summary row says *Open* while its entry says slice 1 was built by #1802
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (docs-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt.md` (the summary table's TD-706 row, and TD-706's **Status**)
-
-**Why:** #1802 merged 2026-10-15T05:39Z and changed TD-706's **Status** to *Slice 1 built 2026-10-14 (grinder-ao-2) … Slices 2 (the home's half, `src/sessionorc/`) and 3 (Apply and Start) open*, but left the summary row `| TD-706 | Build TD-703: … | Medium | Open |`. A reader of the table alone (the grinder's pick, `ao repo`) sees the whole entry as untouched and may start slice 1 again. The file's own rule is that the table lists the entry's state, one row each; a partly built entry reads as such there (TD-052: *Partly done — steps 1–8 done*).
-
-**Fix:** the row's status reads *Slice 1 built (#1802); slices 2 and 3 open*.
-
-**Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
-
-**Related:** TD-706, TD-703.
-
----
-
 ## TD-712: A renamed lead is not in a node member's `controllers` until that member's next create
 
 **Priority:** Low
@@ -1216,9 +1200,9 @@ The other cases:
 **Priority:** High
 **Type:** debt
 **Added:** 2026-10-15 (the designer, building TD-717's design)
-**Owner:** grinder
+**Owner:** anchor
 **Kind:** live-check #1838
-**Status:** Built — slice 1 (recovery of the send: `hook_seen_at`, the seeding at load, the scraped road on the composer, the mark) by #1834; slice 2 (the replay: `_lost_brief`, a seat's fill context, the senders told, *brief lost twice*) by #1837; slice 3 (the hook's traceback: `shiftlead.hook_entry`, `hook-errors.log`, `paths.hook_errors_file`) by #1838, with #1837's review leftovers: a test holds the fill ceiling's `tripped` to a `why: fill` ceiling, and a seat's ceiling with no `why` reads *restarts exhausted*, not *fills exhausted*. **Live check** once #1838 is live (`ao promote status`), read-only: `~/.local/share/shiftlead-venv/bin/shiftlead-hook` imports `shiftlead.hook_entry`, and no live record carries `first_prompt_error` *no hook since launch* without a `lost-brief` entry in its `restarts` or a `restart_ceiling` (`ao status -v --json`). The replay itself waits for the next lost first hook, an event nobody can cause: if none has come, write what was read here and make the **Owner** `anchor`.
+**Status:** Built — slice 1 (recovery of the send: `hook_seen_at`, the seeding at load, the scraped road on the composer, the mark) by #1834; slice 2 (the replay: `_lost_brief`, a seat's fill context, the senders told, *brief lost twice*) by #1837; slice 3 (the hook's traceback: `shiftlead.hook_entry`, `hook-errors.log`, `paths.hook_errors_file`) by #1838, with #1837's review leftovers: a test holds the fill ceiling's `tripped` to a `why: fill` ceiling, and a seat's ceiling with no `why` reads *restarts exhausted*, not *fills exhausted*. **Live check** once #1838 is live (`ao promote status`), read-only: `~/.local/share/shiftlead-venv/bin/shiftlead-hook` imports `shiftlead.hook_entry`, and no live record carries `first_prompt_error` *no hook since launch* without a `lost-brief` entry in its `restarts` or a `restart_ceiling` (`ao status -v --json`). The replay itself waits for the next lost first hook, an event nobody can cause: if none has come, write what was read here and make the **Owner** `anchor`. **Read 2026-10-15 (grinder-ao-1, live `96c68ac`):** the live `shiftlead-hook` imports `shiftlead.hook_entry` (`from shiftlead.hook_entry import main`, the module present in the venv); `ao status -v --json` lists 20 records, every one carrying the `hook_seen_at` field (set on the seven that have had a hook), none with `first_prompt_error`, no `lost-brief` in any `restarts`, and the only `restart_ceiling` is docs-audit-ao-1's `why: fill`. No lost first hook has come since #1838 went live, so the replay is unread: the anchor reads it at the next *brief not sent* mark — the record replayed once with `lost-brief`, its askers told — and archives the entry.
 **Location:** design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1 (*A lost brief*), §4.5a *brief not sent* mark and *Inbox row: restart*; `src/sessionorc/agent_wake.py` (`_first_prompt_road`, `_send_first_prompts`, `_first_prompt_typing`), `src/sessionorc/agent.py` (`_last_hook`'s seeding at load ~L629), `src/sessionorc/agent_hook.py` and `agent_tick.py` ~L3943 (where a hook is applied), `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent_tick.py` (`_keep_running`, `_replay`), `src/shiftlead/adapters/claude_code/hook.py` (`main`), a new `src/shiftlead/hook_entry.py` and `pyproject.toml`'s `shiftlead-hook`, `src/sessionorc/paths.py` (`hook_errors_file`), `src/shiftlead/ui/inbox.py` (`restart_mark`), `src/shiftlead/ui/cards.py` (~L913, ~L951: a seat's `restart_ceiling` words)
 
 **Why:** TD-717's design. On 2026-10-15 a techlead seat filled five seconds before an auto promote lost its first hook and sat at an empty composer for eight hours, while two held-PR asks lapsed to the person.
@@ -1444,6 +1428,118 @@ The other cases:
 
 ---
 
+## TD-730: A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Blocked by:** decision (paul) — the amendment to TD-722's design (a per-repo anchor, names unique per repo), from the 2026-10-15 interactive round, lands first; this entry's teams are the teams of one repo it defines
+**Location:** `docs/design/4.4-host-agent.md` (*Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
+
+**Why:** Paul, 2026-10-15: *when a TD is added to the ledger in shiftlead we can require that a team is selected (by the techlead if not beforehand by the user) … If TDs are added outside shiftlead, the host agent can identify them and send them to a techlead to have them resolved … We should also have a check for stale entries, e.g. team1 is assigned entries but is no longer defined.* Under TD-722 a repo has any number of teams (a db team and a compliance team), each with its own lanes, but an entry names only an `Owner:` role word. So two teams' grinders both take every pickable `Owner: grinder` entry. A claim keeps them off the same entry at once, but nothing keeps compliance work with the compliance team.
+
+**Fix:** a design round. What Paul and the session proposed (2026-10-15), for the designer to check against the design:
+1. **A `Team:` header field, not `Owner: <team>:<role>`.** `Owner:` is read by dev-cadence's synced `scripts/ledger.py` against a fixed word list in every cadence repo, ShiftLead or not. A field declared on the ledger's `Fields:` line is how `Waits` joined (TD-715), and dev-cadence reads past it. Its values are the repo's team names.
+2. **Required only where the repo has two or more teams**; one team is implied, so no existing entry is edited. `Owner: paul` and `Owner: anchor` entries carry none, since the anchor is the repo's (TD-722's amendment).
+3. **Set at Add entry**: the form's team pick, optional. Left blank, the techlead that drafts the entry writes it.
+4. **An entry with no `Team:` on a repo of several teams, or one naming a team no definition holds any more (stale)**, is withheld from every lane, as a waiting entry is (TD-715). The home hands it to a techlead of the repo's teams to tag. The Repo page lists it as *needs a team*, and `ao org check` names the stale ones.
+5. The lanes reader (`lane_matches` over `repo_lanes`) takes an entry only into its `Team:`'s lanes.
+
+**Done when** the design says how an entry names its team, how an untagged or stale one is found and resolved, and how the lanes read it, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-722, TD-721, TD-715, TD-707, TD-731.
+
+---
+
+## TD-731: The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.4-host-agent.md` (*A new entry settles before it is pickable*, its **Hold** bullet: *refused for an id that has settled and is not held … a settled entry is taken out of a lane by its `Blocked by:`*); `docs/design/4.5a-controls.md` (*Repo page: Hold / Release on a settling entry*); `docs/design/4.7-cli.md` (`ao td hold`); `src/sessionorc/settle.py` (the hold and its refusal)
+
+**Why:** 2026-10-15. TD-722 (`design-first`) merged at 12:44 MDT while Paul and an interactive session were still reviewing its proposal with Fable. It settled at 12:54, and Paul's `ao td hold TD-722` at about 12:56 was refused: *TD-722 has settled, and a hold is a settling entry's … take a settled entry out of a lane with its Blocked by: line*. designer-ao-1 designed it as #1832 by 13:30. Its build TD-724 (`Kind: build`, which settles 0 minutes) was claimed at once and under review as #1840 before the round's findings were adopted, and had to be stopped by hand. A `Blocked by:` line is a PR: minutes at best, and only after the person has a session write it. So the window is the person's only press, and a build has none.
+
+**Fix:** a design round, Paul's direction (2026-10-15):
+1. **The person may hold any unclaimed entry, settled or not**: the same `held: {at, by}` record, the same Hold and Release on the Repo page row (now on every pickable row, not only a settling one) and `ao td hold`. A held entry is withheld until Release or until its `sig` changes, as now.
+2. **A claimed entry** is refused with its holder's name, since a hold does not take a lease. The person's way there is the claimer's manager or the claimer. Or, the round decides, the hold also asks the claimer to drop it.
+3. **An entry filed during a conversation with the person** (Add entry from a session working with the person, `ao td add` with a flag) may land held, so the conversation ends before any lane looks.
+
+**Done when** the design says when the person may hold an entry, what a hold on a claimed entry does, and how an entry can land held; its build entries are filed; and this entry's `Blocked by:` names them.
+
+**Related:** TD-707, TD-710, TD-722, TD-724, TD-730.
+
+---
+
+## TD-732: `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1831–#1841)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_lost_brief`, the `continue` at its call in `_keep_running`); `tests/test_lost_brief.py` (four tests)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1837 (TD-720 slice 2) one line at a time and running `tests/test_lost_brief.py test_first_prompt.py test_hook_entry.py test_seat_policy.py test_ui_org.py test_ui_inbox.py test_card_volatile.py` (206 passed unmutated). Each of these edits left all 206 passing: the guard `or s.wrapup_at or s.wrapup_sent_at` dropped; `or s.suspended or s.sit_out` dropped; `(s.run_until and now >= _parse(s.run_until))` dropped; `if s.gated or self._profile_gated(...)` made `if False`; `or s.state in ("exited", "closed")` dropped; `or len(recent) >= RESTART_CEILING` dropped (the ceiling branch is reached only through `again`); `and not last.get("error")` dropped; `new.lane_seen = dict(s.lane_seen)` made `pass`; the `or e.from_ in told` dedupe, the `e.from_ in (PERSON, SYSTEM)` exclusion and the `e.open` filter each dropped; the failed-close entry `restarts = [..., {"error": ...}]` made `pass`, the `if s.state == "closed": self._mark_closed(...)` made `pass`, and `retry = self._closed_by_tick(...)` made `retry = False`; and `if await self._lost_brief(s, now): continue` made `pass` (the rest of the pass then acts on the closed run). Each is a behaviour the docstring and design §4.1 state; a regression would relaunch a seat in wrap-up, a gated profile, a suspended or sat-out record, or twice in one tick, or tell the person and the system about a lost brief. The four tests cover the one-replay path, the second-loss ceiling, the seat's `seat_filled` and launch-prompt context, and what the replay leaves alone.
+
+**Fix:** Tests in `tests/test_lost_brief.py`, each failing with its line mutated: a marked record with each of `wrapup_at`, `suspended`, `sit_out`, a past `run_until`, `gated`, and state `exited` is not replayed and not given a ceiling; `RESTART_CEILING` counted replays in the window put the ceiling `{count}` with no `why`; a seat on `trigger: work` keeps `lane_seen`; two open asks from one sender and one from the person tell the sender once and the person never; `rpc_close` raising leaves a `restarts` entry with `error`, and the next tick replays without a second close; two records marked in one tick are each replayed once.
+
+**Done when** each case has a test and fails under its mutation.
+
+**Related:** TD-717, TD-720, #1837.
+
+---
+
+## TD-734: A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.2-state-feed.md` (*Waiting*); `docs/design/4.5-ui.md` (*The card's anatomy*, the *waiting* pill, TD-418); `docs/design/4.5a-controls.md` (the **waiting** mark); `src/shiftlead/ui/cards.py` (`review_wait`, and the pill's composition where `d["pill_word"] = "waiting"`); `src/sessionorc/agent_tick.py` (the record's `subagents` count, from `SubagentStart` / `SubagentStop`)
+
+**Why:** Paul, 2026-10-15: *when an agent is running /cadence it shows as WAITING but it should really be shown as WORKING since the session is still moving forward and in full control of the direction of the work. I would expect WAITING to only apply when a session needs input from the user or another session (something outside of its own purview).* The design draws an `idle` session *waiting* when a claim's PR is open in the repo reading (*waiting · review #N*), whoever moves that PR next (§4.2 *Waiting*). During `/cadence` the author ends turns while its own work goes on — a background reviewer subagent, a CI run it will re-check (`docs/procedures/cadence.md`, exit 3: *wait for a running CI and re-run*) — so its record reads `idle`, and with the PR open the pill reads *waiting*. The pill then says *someone else holds this* when nobody does, and the person cannot tell an author mid-cadence from one stuck on a reader or on them. *with the techlead*, and *waiting on you: TD-NNN*, are true waits and stay.
+
+**Fix:** a design round on §4.2 *Waiting*, with Paul's rule as its premise: *waiting* means the session needs a person or another session.
+1. **An `idle` record with live subagents** (`subagents` > 0) is not *waiting*: it reads as working on its own work (the pill *working*, or a composed word the round names). The count is already on the record, and Ready to close reads it (§4.2's *No live subagents*).
+2. **`waiting · review #N` alone** — a PR no reader holds (no seat's `prs_waiting.asks` names it) — the round decides: drawn as `idle` (the author's own next move: cadence, CI, merge), or kept while a required check runs, since CI is outside the session. Paul's words lean to the first.
+3. **A background shell task** (Claude Code's `run_in_background`, `Monitor`) is invisible to the hooks: the round says whether it is read at all, or left as the gap it is.
+
+**Done when** the design says that *waiting* is drawn only for a wait on a person or another session, the card follows it, and a test holds an idle record with a live subagent and an unheld open PR not drawn *waiting*.
+
+**Related:** TD-418, TD-428, TD-201, TD-271.
+
+---
+
+## TD-737: Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/base.html` (`app.css` in `<head>`, `app.js` loaded at the end of `<body>`); `src/shiftlead/ui/static/app.js` (`applyTheme`, its first lines: `ao.theme` from `localStorage`, else `prefers-color-scheme`, written to `html[data-theme]`); `src/shiftlead/ui/static/app.css` (`:root` holds the light tokens, `html[data-theme="dark"]` the dark ones, and no `prefers-color-scheme` rule); `docs/design/2-goals.md` (goal 12, *Dark mode*); `docs/design/4.5-ui.md` (*Browser mechanics*)
+
+**Why:** Paul, 2026-10-15: *often when switching pages Repo<->Org<->Inbox there is a flash of the light mode version of the page and then it resolves to the dark mode. If this flash is necessary, it should flash the dark page then resolve to the light mode page so that people using dark mode are not blinded by the light. There is likely work we can do to render these pages more quickly as well.* Each page is a full navigation, server-rendered (§4.5 *Browser mechanics*). The CSS's defaults are the light tokens, and the dark ones apply only once `html` carries `data-theme="dark"`. That attribute is written by `applyTheme`, and `app.js` runs only after the whole body has been parsed. So the browser can paint the parsed page light before the script turns it dark, and the slower the page, the longer the flash. Goal 12 says the terminal panes are dark whatever the theme, *so light chrome is the jarring case at night*: the flash is that case on every page change.
+
+**Fix:**
+1. **The theme before the first paint.** A small inline script in `base.html`'s `<head>`, before the stylesheet, does `applyTheme`'s read (`ao.theme`, else `prefers-color-scheme`) and sets `html[data-theme]`. `applyTheme` in `app.js` stays for the toggle. Add `<meta name="color-scheme" content="dark light">` so the browser's own canvas, before any CSS, is dark, and set `color-scheme` per `html[data-theme]` in `app.css`, so scrollbars and native controls follow the chosen theme rather than the system's. A theme stored as light then paints light from the first frame; Paul's *flash dark, then light* is needed only if the read itself can fail, and then the default is dark.
+2. **A line in §4.5 *Browser mechanics*** in the same PR: the theme is set in `<head>`, before the first paint, so a page change never shows the other theme.
+3. **The render time, measured first.** Time each page's server render (Org, Repo, Inbox, on the live home's data) and its first paint, and say in the PR where the time goes. File each slow part found as its own entry, not in this one.
+
+**Done when** a page change on a dark browser shows no light frame (checked by the builder in a headless browser on a scratch home: a screenshot at first paint is dark), the *Browser mechanics* line is written, and the render-time measurement is in the PR, with any slow part filed.
+
+**Related:** TD-372 (the *host agent unreachable* banner that flashed on every page change).
 ## TD-732: Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick
 
 **Priority:** Medium
