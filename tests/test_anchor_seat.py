@@ -426,6 +426,8 @@ def test_a_seat_on_a_node_asks_that_hosts_occupancy_and_a_held_one_is_written_al
                 return {"files": {k: None for k in params["paths"]}}
             if method == "name_check":
                 return {"name": params["name"], "verdict": "free"}
+            if method == "list":  # the definition's renames and removals, read by every Start (TD-706): none here
+                return []
             if method == "checkout_held":
                 held = {"by": occupants[0].split(" ")[0], "why": f"held by {occupants[0]}"} if occupants else None
                 return {"host": params["host"], "dir": params["dir"], "held": held}
