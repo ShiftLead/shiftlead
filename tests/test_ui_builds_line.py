@@ -175,3 +175,26 @@ def test_the_page_draws_the_line_and_the_back_link(tmp_path, monkeypatch):
     # a build's row says *builds TD-n* after its owner and before any *blocked by*
     back = '· grinder</span><span class="meta">· builds <a href="#TD-100">TD-100</a></span>'
     assert back + '<span class="meta">· blocked by' in html
+
+
+def test_an_id_named_twice_is_listed_once():
+    # `TD-5` and `TD-005` are one id: the design's line lists the build once, where it is first written
+    assert ledger.blocked_ids("TD-5, TD-101, TD-005, TD-101") == ["TD-005", "TD-101"]
+
+
+def test_a_build_in_review_links_its_pr(tmp_path, monkeypatch):
+    root = tmp_path / "samscrape"
+    r = {
+        "name": "samscrape",
+        "root": str(root),
+        "remote": "git@github.com:o/samscrape.git",
+        "ledger": _reading(root),
+        "prs": {"open": []},
+    }
+    fleet = [rec("g2", str(root), progress=[{"ref": "TD-102", "status": "claimed", "pr": 815}])]
+    c = client(monkeypatch, tmp_path, fake({str(root): r}, fleet))
+    html = c.get("/repo/samscrape").text
+    line = html[html.index("buildsline", html.index('id="TD-100"')) :]
+    line = line[: line.index("</div>")]
+    want = '<span class="bstate">in review <a href="https://github.com/o/samscrape/pull/815" target="_blank"'
+    assert want in line and ">#815</a>" in line
