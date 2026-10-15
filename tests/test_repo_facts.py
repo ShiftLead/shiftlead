@@ -614,6 +614,51 @@ def test_ao_repo_marks_a_design_first_row_that_is_a_designer_decision(repo, monk
     assert "design       TD-230  High    designer     a question" in out
 
 
+def test_ao_repo_says_a_settling_or_held_entry_after_its_owner_and_counts_it_not_pickable(repo, monkeypatch, capsys):
+    """TD-710 slice 2 (design §4.7, §4.4 *A new entry settles before it is pickable*): *settles in 7m* or
+    *held 2h* after the owner, and the first line's pickable count leaves both out."""
+    from datetime import UTC, datetime, timedelta
+
+    from shiftlead import cli
+
+    now = datetime.now(UTC)
+    entries = [
+        {"id": "TD-001", "title": "a build", "for_page": "pickable", "priority": "medium", "owner": "grinder"},
+        {"id": "TD-002", "title": "new", "for_page": "pickable", "priority": "medium", "owner": "grinder",
+         "settling": {"until": (now + timedelta(minutes=7, seconds=30)).isoformat()}},
+        {"id": "TD-003", "title": "held", "for_page": "pickable", "priority": "medium", "owner": "grinder",
+         "held": {"at": (now - timedelta(hours=2, minutes=5)).isoformat()}},
+    ]  # fmt: skip
+    reading = {str(repo): {"name": "r", "root": str(repo), "prs": {"open": []},
+                           "ledger": {"entries": entries, "by_kind": {"pickable": 3}}}}  # fmt: skip
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": [], "doing_log": {}, "inbox": {}}[rpc]
+    )
+    monkeypatch.chdir(repo)
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    assert "3 open entries: 1 pickable," in out
+    assert "pickable     TD-001  Medium  grinder      a build" in out
+    assert "pickable     TD-002  Medium  grinder settles in 7m  new" in out
+    assert "pickable     TD-003  Medium  grinder held 2h  held" in out
+
+
+def test_ao_td_hold_sends_the_main_checkout_and_says_what_it_did(repo, monkeypatch, capsys):
+    """TD-710 slice 2 (design §4.7 `ao td hold`): the repo's main checkout by path, the id upper-cased."""
+    from shiftlead import cli
+
+    sent = []
+    monkeypatch.setattr(cli, "_td_repo", lambda r: ("r", str(repo)))
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"]})
+    assert cli.main(["td", "hold", "td-707"]) == 0
+    assert cli.main(["td", "hold", "TD-707", "--release"]) == 0
+    out = capsys.readouterr().out
+    assert sent == [("td_hold", {"repo": str(repo), "id": "TD-707", "release": False}),
+                    ("td_hold", {"repo": str(repo), "id": "TD-707", "release": True})]  # fmt: skip
+    assert "TD-707 held: no lane takes it until you release it or its text changes" in out
+    assert "TD-707 released: pickable now" in out
+
+
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
     """Review of PR #595: a read that raises (not a `gh` outage — a surprise) is that checkout's
     error, its last reading kept; the other checkouts are read; and the clock does not advance past

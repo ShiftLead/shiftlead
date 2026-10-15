@@ -18,6 +18,7 @@ from typing import Any
 import yaml
 
 from sessionorc import paths
+from sessionorc import settings as settings_mod
 from sessionorc.store import _atomic_write
 
 # The built-in layer under the install's `settle:` and the repo's (§5): a Kind no layer lists settles 0.
@@ -64,6 +65,12 @@ def durations(install: Any, repo: Any) -> dict[str, int]:
     """`{kind: seconds}`: the repo's `settle:` wins key by key over the install's, which wins over
     `DEFAULT` (§4.4, §5)."""
     return {**_layer(DEFAULT), **_layer(install), **_layer(repo)}
+
+
+def spans(root: Path | str) -> dict[str, int]:
+    """The durations a checkout's entries settle by: its `.shiftlead.yml` `settle:` over the install's
+    `settings.yml` `settle:` over the built-in."""
+    return durations(settings_mod.load().get("settle"), repo_settle(root))
 
 
 def _when(value: Any) -> datetime | None:
@@ -154,3 +161,61 @@ def mark(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now: da
         seen = _load().get(key)
     _marks(entries, seen if isinstance(seen, dict) else {}, spans, now)
     return entries
+
+
+class Refused(ValueError):
+    """A hold or a release the clock will not write, in the words the person reads."""
+
+
+def hold(
+    key: str, entry: dict[str, Any], spans: dict[str, int], now: datetime, *, by: str, release: bool = False
+) -> dict[str, Any]:
+    """The person's **Hold** or **Release** of one entry of origin `key` (design §4.4 *Hold*, TD-707,
+    built by TD-710 slice 2): a hold writes `held: {at, by}` on the id's record, the home's and not a
+    ledger edit, so it holds at once, and only while the entry settles — a settled entry is taken out
+    of a lane by its `Blocked by:`; holding a held one changes nothing. A release ends the hold and
+    makes the entry pickable at once (its record settled, at the epoch), so a later edit changes
+    nothing. Returns the record as written; raises `Refused`."""
+    i = str(entry.get("id") or "")
+    with _STORE:
+        store = _load()
+        seen = store.get(key)
+        rec = seen.get(i) if isinstance(seen, dict) else None
+        if not isinstance(rec, dict):
+            raise Refused(f"{i} is not in the home's clock yet: the ledger's next reading records it")
+        held = isinstance(rec.get("held"), dict)
+        if release:
+            if not held:
+                raise Refused(f"{i} is not held: there is nothing to release")
+            rec = {"at": EPOCH, "sig": rec.get("sig") or ""}
+        elif held:
+            return dict(rec)
+        else:
+            at = _when(rec.get("at"))
+            if at is None or at + timedelta(seconds=spans.get(_kind(entry), 0)) <= now:
+                raise Refused(
+                    f"{i} has settled, and a hold is a settling entry's (design §4.4 *Hold*): take a settled "
+                    "entry out of a lane with its Blocked by: line"
+                )
+            rec = {**rec, "held": {"at": now.isoformat(), "by": by}}
+        seen[i] = rec
+        _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
+    return dict(rec)
+
+
+def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
+    """Why a declared claim on this entry of the home's reading is refused (design §4.8 *A claim is a
+    lease*, §4.4 *What settling withholds*), or None: it settles, or the person holds it. `--force`
+    does not pass it — the window is the person's, not another session's lease."""
+    if not isinstance(entry, dict):
+        return None
+    i = str(entry.get("id") or "")
+    tail = "(design §4.4 *A new entry settles before it is pickable*); --force does not pass it"
+    if isinstance(entry.get("held"), dict):
+        at = _when(entry["held"].get("at"))
+        since = f" since {at.astimezone():%H:%M}" if at else ""
+        return f"{i} is held by the person{since}: no lane takes it until they release it or its text changes {tail}"
+    until = _when((entry.get("settling") or {}).get("until")) if isinstance(entry.get("settling"), dict) else None
+    if until is not None and until > now:
+        return f"{i} settles until {until.astimezone():%H:%M}: the person's window to change or hold it {tail}"
+    return None

@@ -79,7 +79,7 @@ from sessionorc.agent_common import (
     backup_store,
     log,
 )
-from sessionorc.agent_ids import origin_key
+from sessionorc.agent_ids import settle_key
 from sessionorc.agent_spend import _metered_of
 from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
 from sessionorc.gitinfo import changed_files, git_info, work_left
@@ -3071,8 +3071,8 @@ class TickMixin:
         nothing, and says so in the log: entries go at once."""
         if not remote:
             fresh = False
-        key = origin_key(remote) if remote else str(root)
-        spans = settle_mod.durations(settings_mod.load().get("settle"), settle_mod.repo_settle(root))
+        key = settle_key(root, remote)
+        spans = settle_mod.spans(root)
         got = [e for e in entries if isinstance(e, dict)]
         try:
             (settle_mod.observe if fresh else settle_mod.mark)(got, key, spans, now)
