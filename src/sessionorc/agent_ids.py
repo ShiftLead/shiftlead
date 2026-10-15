@@ -133,7 +133,7 @@ class IdsMixin:
             await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, release=bool(release))
         except settle_mod.Refused as e:
             raise RpcError(str(e)) from None
-        await asyncio.to_thread(settle_mod.mark, entries, key, spans, now)
+        settle_mod.mark(entries, key, spans, now)  # on the loop: the lanes and a claim read these dicts there
         return {"repo": name, "id": tid, "held": entry.get("held"), "settling": entry.get("settling")}
 
     async def rpc_td_next(self, repo: str = "", count: int = 1, caller: Any = None) -> dict[str, Any]:
