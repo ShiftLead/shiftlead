@@ -172,9 +172,13 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
     BOARD_WAIT_DAYS,  # noqa: F401
+    CI_BILLING_REASON,  # noqa: F401
+    GH_USER_TTL,  # noqa: F401
+    GH_USER_WAIT,  # noqa: F401
     INBOX_SECTIONS,  # noqa: F401
     LOOK_KINDS,  # noqa: F401
     NEEDS_YOU_ROWS,  # noqa: F401
+    ORG_BILLING,  # noqa: F401
     OWING_CLOSES,  # noqa: F401
     OWING_KINDS,  # noqa: F401
     PERSON_ASK_KINDS,  # noqa: F401
@@ -192,6 +196,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     SHOT_WAIT,  # noqa: F401
     SHOTS_MAX,  # noqa: F401
     STATE_SUBJECTS,  # noqa: F401
+    USER_BILLING,  # noqa: F401
     WORK_IDS,  # noqa: F401
     WORKS,  # noqa: F401
     _added_words,  # noqa: F401
@@ -204,6 +209,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _decided,  # noqa: F401
     _entry_open,  # noqa: F401
     _find_text,  # noqa: F401
+    _gh_user_type,  # noqa: F401
+    _gh_user_type_read,  # noqa: F401
     _needs_key,  # noqa: F401
     _next_due,  # noqa: F401
     _order_teams,  # noqa: F401
@@ -220,6 +227,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _shot_seen,  # noqa: F401
     _trail_rows,  # noqa: F401
     _with_subject,  # noqa: F401
+    billing_url,  # noqa: F401
     board_answered,  # noqa: F401
     board_body,  # noqa: F401
     board_choices,  # noqa: F401
@@ -237,6 +245,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     board_waiting_on,  # noqa: F401
     board_waits,  # noqa: F401
     cadence_marks,  # noqa: F401
+    ci_not_run_kinds,
+    ci_not_run_rows,
     find_matches,  # noqa: F401
     find_words,  # noqa: F401
     handed_rows,  # noqa: F401
@@ -795,6 +805,8 @@ class Readings:
             + work_rows(work, self.wound_of(fleet) if work else None, records=fleet)
             # §4.5a *Inbox row: red PR* (TD-613): a repo no team services, from the repo readings
             + red_pr_rows(repos, fleet)
+            # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
+            + await asyncio.to_thread(ci_not_run_kinds, ci_not_run_rows(home.get("ci_spells")))
         )
 
     def wound_of(self, fleet: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1200,6 +1212,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             work, {r["name"]: r["wound_down"] for r in strip["teams"] if r.get("wound_down")}, records=sessions
         )
         promos += red_pr_rows(repos, sessions)  # …and a red PR of a repo no team services (§4.5a, TD-613)
+        # …and an account whose CI never starts (§4.5a *Inbox row: CI not starting*, TD-687)
+        promos += ci_not_run_rows(None if agent_down else (info or {}).get("ci_spells"))
         h.needs_cache["rows"] = []  # the host agent down, or nothing waiting: no *asked you* line (TD-354)
         if entries or handed or vs or boards or promos:
             secs = inbox_sections(
@@ -3588,6 +3602,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if not repo:
                 raise HTTPException(400, f"{action} names the repo")
             got = await call(action, repo=repo)
+            return JSONResponse({"ok": True, **got})
+        if action == "ci_rerun":
+            # design §4.5a **Inbox row: CI not starting** (TD-687): **Re-run** is the person's own, served
+            # by the home alone, which re-runs every run the row names and answers how many it asked for
+            # and how many GitHub refused; a refusal (no row, nothing to re-run, a node) in its words
+            owner = str(body.get("owner") or "").strip()
+            if not owner:
+                raise HTTPException(400, "ci_rerun names the account")
+            got = await call("ci_rerun", owner=owner)
             return JSONResponse({"ok": True, **got})
         if action == "work_start":
             # design §4.5a **Inbox row: team start** for a team that runs on (§6 rule 8 *A member that
