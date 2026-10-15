@@ -29,7 +29,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import ledgerboard, paths
+from sessionorc import ledgerboard, paths, reports
 
 BOARD = Path("docs") / "user_attention.md"  # `board:`'s default (§5 *The seams*)
 NO_BOARD = "no board: the Inbox is the person's channel"  # the seam's fixed words (§5)
@@ -541,3 +541,39 @@ def red_prs(
             orders.append(pr_order(pr))
     orders.sort(key=lambda o: not o.get("sync"))  # a sync order first (a stable sort)
     return orders, kept, notes
+
+
+def ci_not_run(repos: dict[str, dict[str, Any]], promotes: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """Everything the home's registry holds whose CI never started, by account (design §4.4 *The person
+    is told once per account*, TD-686): `repos` the repo readings by root (each open PR reading
+    `checks: not_run`), `promotes` the promote readings by repo (each default branch whose reading
+    carries `checks_not_run`). Keyed by the `origin` owner in lower case — a GitHub login, else the
+    repo is left out — each `{owner, reason, kind, items}`, `reason` and `kind` the first item's and
+    each item `{repo, root, runs}` with `pr` and `url` for a PR or `main` (its sha) for a default
+    branch. TD-687's Inbox row and Telegram line read it."""
+    out: dict[str, dict[str, Any]] = {}
+
+    def add(owner: str | None, why: dict[str, Any], item: dict[str, Any]) -> None:
+        if not owner:
+            return
+        got = out.setdefault(owner.lower(), {"owner": owner, "reason": "", "kind": "", "items": []})
+        if not got["items"]:
+            got["reason"], got["kind"] = str(why.get("reason") or ""), str(why.get("kind") or "other")
+        got["items"].append({**item, "runs": list(why.get("runs") or [])})
+
+    for root in sorted(repos):
+        reading = repos[root] if isinstance(repos[root], dict) else {}
+        for pr in (reading.get("prs") or {}).get("open") or []:
+            if not isinstance(pr, dict) or pr.get("checks") != "not_run" or not isinstance(pr.get("not_run"), dict):
+                continue
+            url = str(pr.get("url") or "")
+            m = re.search(r"github\.com/[^/]+/([^/]+)/pull/", url)
+            repo = m[1] if m else Path(root).name
+            item = {"repo": repo, "root": root, "pr": pr.get("number"), "url": url}
+            add(reports.github_owner(url), pr["not_run"], item)
+    for name in sorted(promotes):
+        r = promotes[name] if isinstance(promotes[name], dict) else {}
+        if isinstance(r.get("checks_not_run"), dict) and r.get("main"):
+            item = {"repo": name, "root": str(r.get("root") or ""), "main": r["main"]}
+            add(reports.github_owner(r.get("origin")), r["checks_not_run"], item)
+    return out

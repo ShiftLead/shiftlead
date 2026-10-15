@@ -2641,8 +2641,10 @@ class HostAgent(
         """PR `pr` read once for its checks (design §4.8 *A `done` with a PR is told what its checks
         read*, TD-637, TD-658): `gh pr view` from the record's checkout, off the loop, folded by
         `reports.at_done` against its base's required names in the repo reading — `{word, sha, failed,
-        other, running, names, rollup}`, or `{word: unknown, why}` for a read the home could not make.
-        One read for a `done` and for an `ask` carrying `pr`, so the two never disagree."""
+        not_run, other, running, names, rollup, owner}`, or `{word: unknown, why}` for a read the home
+        could not make. A failing required Actions job is judged by the reading's `jobs` for the PR when
+        they are for this head, else read here (`reports.done_verdicts`, design §4.4 *A `done`'s read*,
+        TD-686). One read for a `done` and for an `ask` carrying `pr`, so the two never disagree."""
         root = str(s.repo or "")
         if not root or not Path(root).is_dir():
             view: dict[str, Any] | str = "the record names no checkout here"
@@ -2651,9 +2653,32 @@ class HostAgent(
         if isinstance(view, str):
             return {"word": "unknown", "why": view}
         base = str(view.get("baseRefName") or "")
-        required = ((self._repos.get(root) or {}).get("prs") or {}).get("required") or {}
+        reading = (self._repos.get(root) or {}).get("prs") or {}
+        required = reading.get("required") or {}
         names = required.get(base) if isinstance(required.get(base), list) else None
-        return {**reports.at_done(view, names), "names": names, "rollup": bool(view.get("statusCheckRollup"))}
+        row = next((p for p in reading.get("open") or [] if isinstance(p, dict) and p.get("number") == pr), {})
+        verdicts = await asyncio.to_thread(reports.done_verdicts, root, view, names, row.get("jobs"), GH_TIMEOUT)
+        got = reports.at_done(view, names, verdicts)
+        if got["word"] == "not_run":
+            got["owner"] = reports.github_owner(row.get("url")) or reports.github_owner(
+                await asyncio.to_thread(reports.git_origin, root)
+            )
+        return {**got, "names": names, "rollup": bool(view.get("statusCheckRollup"))}
+
+    @staticmethod
+    def _not_run_refusal(pr: int, ref: str, got: dict[str, Any]) -> RpcError:
+        """The refusal of a `done` on a head whose required checks never started (design §4.8, §4.4 *CI
+        that never started is the person's*, TD-686): the PR, the head, the reason and the person."""
+        why = got.get("not_run_why") or {}
+        reason = "billing or spending limit" if why.get("kind") == "billing" else (why.get("reason") or "unknown")
+        where = f" in {got['owner']}" if got.get("owner") else ""
+        return RpcError(
+            f"PR #{pr}'s checks never started on {got['sha'][:7]}: {reason}{where} — the person's to fix (the "
+            f"Inbox says so); push nothing for it, report done again once CI runs, or drop the claim with "
+            f'`ao progress drop {ref} --why "CI never ran"` and take other work',
+            not_run=got["not_run"],
+            sha=got["sha"],
+        )
 
     @staticmethod
     def _not_green(pr: int, got: dict[str, Any], failed: str, running: str) -> RpcError | None:
@@ -2671,8 +2696,7 @@ class HostAgent(
                 sha=got["sha"],
             )
         return RpcError(
-            f"PR #{pr}'s required checks are still running on {sha7}: {', '.join(got['running'])}{unknown} — "
-            f"{running}",
+            f"PR #{pr}'s required checks are still running on {sha7}: {', '.join(got['running'])}{unknown} — {running}",
             running=got["running"],
             sha=got["sha"],
         )
@@ -2692,6 +2716,8 @@ class HostAgent(
         again = f"report done again (ao progress done {ref} --pr {pr})"
         if refusal := self._not_green(pr, got, again, f"report done once they pass (`gh pr checks {pr} --watch`)"):
             raise refusal
+        if word == "not_run":  # after a real failure, before one still running (TD-686)
+            raise self._not_run_refusal(pr, ref, got)
         parts = {
             "merged": "merged",
             "closed": "closed unmerged",
@@ -2719,6 +2745,9 @@ class HostAgent(
             return f"PR #{pr}: checks unknown: {got['why']}"
         if refusal := self._not_green(pr, got, "ask again", f"ask again once they pass (`gh pr checks {pr} --watch`)"):
             raise refusal
+        if got["word"] == "not_run":  # §4.9b names no refusal for it: the ask sends, saying so (TD-686)
+            reason = (got.get("not_run_why") or {}).get("reason") or "unknown"
+            return f"PR #{pr}: checks never started on {got['sha'][:7]}: {reason}"
         return None
 
     async def _slice(self, s: Session, ref: str, status: str, pr: int | None, source: str) -> dict[str, Any]:

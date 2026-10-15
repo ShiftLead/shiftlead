@@ -12229,3 +12229,45 @@ The window's `w.name` assignment, by contrast, is caught.
 **Done when** a path in a transcript turn that the host resolves is a Ctrl+click link opening the file as the pane's does.
 
 **Related:** TD-688 (the design), TD-690 (the bound it reads), TD-501.
+
+## TD-686: Build TD-682 (1): the reading tells a run that never started from a red one — `checks: not_run` with its reason; no order, no `red_since`; the `done` refusal and the promote's checks say *never ran*
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-682's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *CI that never started is the person's, not a lane's*, §4.8 *A `done` with a PR is told what its checks read*, §6 *Promote* (**checks**); `src/sessionorc/reports.py` (`fold_checks`, `pr_reading`, `_gh_api`), `src/sessionorc/workorders.py` (`red_prs`, `red_holders`), `src/sessionorc/agent.py` (`_pr_checks`, near *required checks failed on*), `reports.at_done`, `src/sessionorc/promote.py` (`read_checks`), and the other readers of `checks`: `src/shiftlead/teamrun.py` (`red_prs`), `src/shiftlead/ui/inbox.py`, `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/org.py`
+
+**Why:** TD-682's design. On 2026-10-14 every Actions job in ContractMatch/samscrape failed without starting, for billing. The reading called the PRs red, and `ao repo` gave samscrape's #1097 to a lane that could do nothing.
+
+**Fix:** this is `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **The jobs.** These are read only in a repo whose `origin` is GitHub. In `pr_reading`, for each open PR `fold_checks` calls *red*, take the failing CheckRuns whose `detailsUrl` matches `/actions/runs/<run>/job/<job>`, in order, fifty at most. For each one, read `gh api repos/<o>/<r>/actions/jobs/<job>` and, for a `completed` job with `steps: []` and an empty `runner_name`, `gh api repos/<o>/<r>/check-runs/<job>/annotations`. Stop at the first job that started. A PR past the cap with none started stays *red*. Keep the verdicts on the row by job id (`jobs: {head, read: {<job>: {started, reason}}}`): a job is read once, a new head replaces the map, a Re-run's new attempt (new job ids on the same head) is read afresh, and an unreadable job is not kept.
+- **Never started.** A job never started only when it is completed, has no steps and no runner, and an annotation begins *The job was not started because*. That message is the reason. `kind` is *billing* when it names *account payments* or *spending limit*, else *other*. With no such annotation the job is a real failure (a job cancelled while queued looks the same otherwise).
+- **The fold.** A PR whose failing items all are Actions jobs that never started gets `checks: not_run`, even with checks still pending. A failing `StatusContext`, a failing non-Actions check run, or a job of any conclusion that fails the three-part test keeps it *red*. A PR turning `not_run` loses its `red_since`, unless it is conflicting, which keeps `red_since` from the conflict so `red_prs` orders it by the conflict alone. The PR carries `not_run: {reason, kind, runs}`, `runs` being the run ids. With one real failure beside them it stays *red*, and the not-started names are left out of `failing`. A job read that fails is no evidence.
+- **Every reader of `checks`.** `not_run` is its own word. `red_since` is set only for *red* or conflicting PRs, so `not_run` gets none. `workorders.red_prs`, `red_holders` and `teamrun.red_prs` read it as not red. `ui/inbox.py`'s red PR row leaves it out. `ui/repo.py` and `ui/org.py` count it apart and draw it *CI never ran*. A test walks every switch on `checks` with `not_run` and asserts none falls through to red, green or pending.
+- **The declaration.** `_pr_checks` takes the reading's `jobs` for that head when it holds it. Otherwise it reads the failing required checks' jobs alone, bounded as above. `at_done` puts a required check that never started in a `not_run` list beside `failed`. A real failure still refuses as today and wins. `not_run` alone refuses with §4.8's words, naming the PR, the head and the person.
+- **The promote.** `promote.read_checks` classifies main's head the same way, from the check runs of `commits/<sha>/check-runs` (a check run's id is its job's), the verdict cached per sha. Its return widens to carry a structured `checks_not_run: {reason, kind, runs}`, kept on the promote reading beside `checks`. All failing runs never started → *unknown — CI never ran: <reason>*. A real failure beside them → *failed*. No failure and some pending → *pending*.
+- **`workorders.ci_not_run(repos)`.** In `sessionorc`, it groups, by `origin` owner (a GitHub login, `[A-Za-z0-9-]+`, else the repo is left out), every open PR reading `not_run` and every default branch whose promote reading carries `checks_not_run`. Owners are compared and keyed in lower case. TD-687's row and Telegram line read it.
+- **Tests**, against a recorded fixture of the API's answers for #1097's jobs (0 steps, no runner, the billing annotation):
+  - a billing PR;
+  - another reason;
+  - a cancelled-while-queued job with no annotation, which reads red;
+  - a failing commit status beside a not-started job, which reads red;
+  - a conflicting `not_run` PR becoming an order after `ORPHAN_AFTER`;
+  - a Re-run's new attempt on the same head, read afresh;
+  - a mix with one real failure;
+  - fifty-one failing jobs with none started;
+  - an unreadable job;
+  - a new head read again;
+  - `red_prs` making no order;
+  - the `done` refusal from the cache and from its own read;
+  - the promote's three cases;
+  - `ci_not_run` grouping two owners and leaving out a non-GitHub origin.
+
+**Done when** a PR whose Actions jobs all failed without starting reads `checks: not_run` with its reason and is neither an order nor *red* anywhere. A `done` on it is refused naming the person. The promote reads *unknown — CI never ran*. A PR with one real failure stays red.
+
+**Related:** TD-682 (the design), TD-687 (the row), dev-cadence#TD-115 (the same mapping in `forge.py`, for the cadence check), TD-613 and TD-637.
+
+**Resolved:** 2026-10-14 (PR #1766, slice 1; PR #1768, slice 2) — slice 1: the reading tells an Actions job that never started (`checks: not_run`, `not_run: {reason, kind, runs}`, verdicts kept as `jobs` by job id per head), every reader of `checks` and the pages. Slice 2: `reports.at_done`/`done_verdicts` and `_checks_at_done`'s `not_run` refusal in §4.8's words, an `ask`'s *checks never started* line, `promote.read_checks`' third value `checks_not_run` (cached per sha; a rollback's read keeps main's), and `workorders.ci_not_run(repos, promotes)` for TD-687. Left for the next design PR on §4.5a (the techlead's note on #1766): the *team card: Repo facet* row describes *· n red* but not *· n CI never ran*.

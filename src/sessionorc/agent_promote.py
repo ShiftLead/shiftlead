@@ -207,7 +207,7 @@ class PromoteMixin:
                 )
             if (u := promote_mod.unmet(r, press=True, kind="rollback")) is not None:
                 raise RpcError(f"promote {name} --sha refused — {u[1]} (design §6 A rollback, precondition: {u[0]})")
-            checks, checks_why = await asyncio.to_thread(promote_mod.read_checks, root, full)
+            checks, checks_why, _ = await asyncio.to_thread(promote_mod.read_checks, root, full, False)
             block = await asyncio.to_thread(promote_mod.block, root)
             assert block is not None  # survey read it a moment ago
             frm = None if r.get("live_why") else r.get("live")
