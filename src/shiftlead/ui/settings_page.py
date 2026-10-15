@@ -412,6 +412,8 @@ def repo_cards(
             _row("roles", sorted(cfg.roles), is_default=not cfg.roles),
             _row("controllers", cfg.controllers, is_default=not cfg.controllers),
             _row("teams", sorted(cfg.teams), is_default=not cfg.teams),
+            # wins over the install's **settle** key by key (§4.4, §5 `settle:`, TD-710)
+            _row("settle", cfg.settle, is_default=not cfg.settle),
         ]
         if cfg.promote:
             card["rows"] += [

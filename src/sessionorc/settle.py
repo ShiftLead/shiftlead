@@ -113,9 +113,7 @@ def _load() -> dict[str, Any]:
     return raw if isinstance(raw, dict) else {}
 
 
-def observe(
-    entries: list[dict[str, Any]], key: str, spans: dict[str, int], now: datetime
-) -> list[dict[str, Any]]:
+def observe(entries: list[dict[str, Any]], key: str, spans: dict[str, int], now: datetime) -> list[dict[str, Any]]:
     """Record a fresh reading of origin `key` and mark its entries in place (§4.4 *The clock*): an id
     first seen is recorded at `now`, except that **a repo's first reading records every id at the
     epoch**, settled; an edit (a changed `sig`) to an entry still settling, or held, restarts its
@@ -219,3 +217,53 @@ def claim_refusal(entry: dict[str, Any] | None, now: datetime) -> str | None:
     if until is not None and until > now:
         return f"{i} settles until {until.astimezone():%H:%M}: the person's window to change or hold it {tail}"
     return None
+
+
+def _span(secs: int) -> str:
+    """A span in its largest whole unit: `45s`, `7m`, `2h`, `3d`."""
+    for unit, n in (("d", 86400), ("h", 3600), ("m", 60)):
+        if secs >= n:
+            return f"{secs // n}{unit}"
+    return f"{max(0, secs)}s"
+
+
+def words(entry: dict[str, Any], now: datetime) -> str:
+    """What the settle clock's mark on a reading's entry says where the entry is drawn — after its owner
+    in `ao repo` and on the Repo page's row (design §4.4 *Shown where it is read*, TD-710): *settles in
+    7m*, *held 2h*, else ''."""
+    if isinstance(entry.get("held"), dict):
+        at = _when(entry["held"].get("at"))
+        return f"held {_span(int((now - at).total_seconds()))}" if at else "held"
+    until = _when((entry.get("settling") or {}).get("until")) if isinstance(entry.get("settling"), dict) else None
+    left = int((until - now).total_seconds()) if until else 0
+    return f"settles in {_span(left)}" if left > 0 else ""
+
+
+def parse(value: Any) -> dict[str, str]:
+    """A `settle:` mapping as `set_settings` writes it (§5): `{kind: duration}`, each Kind a word and each
+    duration `parse_duration`'s, kept as written; raises ValueError naming the first that is not."""
+    if not isinstance(value, dict):
+        raise ValueError("settle is a mapping of Kind to duration, like {design-first: 5m}")
+    out: dict[str, str] = {}
+    for k, v in value.items():
+        kind = str(k or "").strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", kind):
+            raise ValueError(f"settle: {k!r} is not a Kind (a word like design-first)")
+        parse_duration(v)
+        out[kind] = str(v).strip()
+    return out
+
+
+def parse_text(text: str) -> dict[str, str]:
+    """The Settings page's **settle** field (§4.5a): Kind and duration pairs, `design-first 5m,
+    live-check 0` — commas or new lines between pairs — as `parse`'s mapping; empty is `{}`."""
+    pairs = [p.split() for p in re.split(r"[,\n;]+", str(text or "")) if p.strip()]
+    for p in pairs:
+        if len(p) != 2:
+            raise ValueError(f"settle: {' '.join(p)!r} is not a Kind and a duration, like design-first 5m")
+    return parse(dict(pairs))
+
+
+def text_of(value: Any) -> str:
+    """A `settle:` mapping as the **settle** field and a Repos card draw it: `design-first 5m, …`."""
+    return ", ".join(f"{k} {v}" for k, v in value.items()) if isinstance(value, dict) else ""

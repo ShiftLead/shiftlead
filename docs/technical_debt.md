@@ -58,14 +58,18 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Slices 1–2 built (#1802, #1807); slice 3 open |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
-| TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Slices 1–2 built; slice 3 open |
+| TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Built (#1811, #1823, #1829); live check |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
 | TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
-| TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Open |
+| TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-718 | `agent_tick`'s rule-6 declaration reading is marked by the settle clock, and no test would notice if it were not (#1811) | Medium | Open |
-| TD-720 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
+| TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
+| TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Open |
+| TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
+| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Open |
+| TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 
 ---
 
@@ -1075,8 +1079,8 @@ The other cases:
 **Type:** feature
 **Added:** 2026-10-14 (the designer, building TD-707's design)
 **Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 built 2026-10-15 (grinder-ao-1): `sessionorc.settle` keeps `ledger_seen.json` (`paths.ledger_seen_file`) — `observe` records a fresh reading (a repo's first at the epoch; an edit while settling or held restarts the window and ends the hold, one after settling records the new `sig`), `mark` re-marks a carried reading, so a window ends on time — and `durations` layers the repo's `.shiftlead.yml` `settle:` over `settings.yml`'s over the built-in `{design-first: 5m}`. `ledger.entries` gives each entry `sig`; the tick's `_read_repo` marks every reading (`_settle`), and rule 6's reading at the declaration too; `lane_matches` reads `settling`/`held` as no lane's and `in_lanes` leaves them out of the rest. Slice 2 built 2026-10-15 (grinder-ao-1): `settle.hold` writes `held: {at, by}` on a settling entry's record and refuses a settled one, and a release settles the record at the epoch, so it is pickable at once; the home's `td_hold {repo, id, release}` (`agent_ids`, in `PERSON_ONLY` and `modes.HOME_EDITS`) marks the reading at once; `rpc_progress` refuses a declared claim on a settling or held entry before the lease, `--force` too (`settle.claim_refusal`); `ao td hold <id> [--repo] [--release]`, and `ao repo` says *settles in 7m* / *held 2h* after the owner and counts neither pickable. Slice 3 (the pages, this repo's `settle:`) open. Was: Open.
+**Kind:** live-check #1829
+**Status:** Slice 1 built 2026-10-15 (grinder-ao-1): `sessionorc.settle` keeps `ledger_seen.json` (`paths.ledger_seen_file`) — `observe` records a fresh reading (a repo's first at the epoch; an edit while settling or held restarts the window and ends the hold, one after settling records the new `sig`), `mark` re-marks a carried reading, so a window ends on time — and `durations` layers the repo's `.shiftlead.yml` `settle:` over `settings.yml`'s over the built-in `{design-first: 5m}`. `ledger.entries` gives each entry `sig`; the tick's `_read_repo` marks every reading (`_settle`), and rule 6's reading at the declaration too; `lane_matches` reads `settling`/`held` as no lane's and `in_lanes` leaves them out of the rest. Slice 2 built 2026-10-15 (grinder-ao-1): `settle.hold` writes `held: {at, by}` on a settling entry's record and refuses a settled one, and a release settles the record at the epoch, so it is pickable at once; the home's `td_hold {repo, id, release}` (`agent_ids`, in `PERSON_ONLY` and `modes.HOME_EDITS`) marks the reading at once; `rpc_progress` refuses a declared claim on a settling or held entry before the lease, `--force` too (`settle.claim_refusal`); `ao td hold <id> [--repo] [--release]`, and `ao repo` says *settles in 7m* / *held 2h* after the owner and counts neither pickable. Slice 3 built 2026-10-15 (grinder-ao-1, #1829): the Repo page's row draws *settles in 7m* / *held 2h* with **Hold** / **Release** (`/api/ledger/hold` → `td_hold`), and `teamrun.lane_kinds` counts a withheld entry not pickable; the Settings page's **settle** field writes `set_settings {settle}` (the whole map; `{}` removes it) and each Repos card shows its `settle:`; `repoconfig` accepts and checks `settle:`; this repo's `.shiftlead.yml` carries `settle: {design-first: 10m}`. **Live check** once #1829 is live: read `~/.shiftlead/ledger_seen.json` for the next `design-first` entry filed here — `at` its landing, and no lane's claim on it for ten minutes (`ao repo` says *settles in …*) — and a designer's `build` entries claimed with no wait; a Hold is checked on a scratch home (done for #1829's UI check). Was: Open.
 **Location:** design §4.4 *A new entry settles before it is pickable*, §4.7 `ao td hold` and `ao repo`, §4.8 *A claim is a lease*, §5 `settle:`, §6 rule 6, §4.5a *Repo page: Hold / Release on a settling entry* and *Settings page: settle*; `src/sessionorc/ledger.py` (`entries`, `reading`, `lane_matches`, `in_lanes`), `src/sessionorc/paths.py` (beside `ids_file`), `src/sessionorc/agent_ids.py` (beside `rpc_td_next`), `src/sessionorc/mail.py` (`PERSON_ONLY`), `src/sessionorc/agent.py` (`rpc_progress`'s claim), `src/sessionorc/agent_tick.py` (rule 6's `lane_seen` ~L1353), `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py` (`cmd_repo` ~L1710, a `cmd_td_hold` beside `cmd_td_next`), `src/shiftlead/ui/templates/repo_part.html`, the Settings page
 
 **Why:** TD-707's design. TD-702 was designed and merged within 18 minutes of being filed, while Paul was still deciding whether he wanted it, and a ledger PR is too slow to stop that.
@@ -1220,7 +1224,8 @@ The other cases:
 **Added:** 2026-10-15 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-15 (the designer; no mockup: one mark's words and one Inbox reason) — §4.1 *A launch whose hook never comes is recovered*. The scraped send keys on the composer reading empty, whatever the record's state. A record keeps `hook_seen_at`, and only that seeds the agent's fresh-hook table at load: the cause of the 47-minute mark was that a new Claude Code record is `confidence: hook` from its create, so a restart counted its missing hook as fresh. A supervised record marked *no hook since launch*, a seat included, is replayed once (`why: lost-brief`), and the senders of its open asks are told; a second loss is the person's. Neither a promote nor a fill waits for the other. `shiftlead-hook` keeps its traceback in `hook-errors.log`. Built by TD-720. Was: Open.
+**Blocked by:** TD-720
 **Location:** design §4.1 *A brief whose first hook is lost*, §4.5a *brief not sent* mark, §6 (seat fill and promote); `src/sessionorc/agent_wake.py` (`_first_prompt_road`, `_send_first_prompts`), `src/sessionorc/agent_tick.py` (`_observe`), `src/shiftlead/adapters/claude_code/screen_rules.toml`
 
 **Why:** on 2026-10-15 at 00:42:07 MDT the home filled `ao-shiftlead-techlead-ao-1` for the held-PR ask on #1807; the ask on #1811 (opened 00:42:30) reached the same seat moments later. At 00:42:12 an auto promote restarted the host agent. The new pane's `SessionStart` hook failed with a traceback (run log `ao-shiftlead-techlead-ao-1-20261015T064207Z.log`), and no hook reached the agent. The seat sat at an empty composer, read `stalled?`, until Paul killed it at 08:37. Both asks passed their bound (`ao pr held` reads *bound 2h*) and lapsed to the person. Both PRs, each with a SHIP review, waited unread until Paul killed the seat at 08:37 and grinder-ao-1 asked again at 11:33, and grinder-ao-2's stacked #1818 waited with them. TD-348's fallback did not help, for three reasons:
@@ -1260,7 +1265,76 @@ The other cases:
 
 ---
 
-## TD-720: The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams
+## TD-719: `TickMixin._settle`'s two fallbacks — a clock that cannot be written, and a checkout with no origin — are held by no test (#1811)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1811–#1821)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_settle`: `except OSError as e: log.warning(...)`, and `key = origin_key(remote) if remote else str(root)`); `tests/test_settle.py` (`test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1811 and running `tests/test_settle.py tests/test_lane_news.py tests/test_repo_facts.py` (63 passed unmutated). Two mutations pass all 63: (1) `except OSError as e:` changed to `except ZeroDivisionError as e:` — the docstring's *a clock that cannot be written marks nothing, and says so in the log: entries go at once* has no test, and an unwritable home would raise out of `_read_repo` and the tick; (2) `key = origin_key(remote) if remote else str(root)` changed to `... else 'x'` — the only test of a checkout with no origin asserts that `ledger_seen.json` does not exist, and `fresh` is forced false there, so the key `mark` reads under is never looked at. (A third, deleting `if not remote: fresh = False`, is caught.)
+
+**Fix:** one test that makes `paths.ledger_seen_file()` unwritable (a directory in its place, so `_atomic_write` raises OSError) and reads a repo with an origin: the reading returns, no entry carries a mark, and a warning is logged; and one that gives a no-origin checkout a record under its path as key and sees a new entry marked from it. Each fails with its line mutated as above.
+
+**Done when** both tests exist and fail under those mutations.
+
+**Related:** TD-710, TD-718, #1811.
+
+---
+
+## TD-720: Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-717's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1 (*A lost brief*), §4.5a *brief not sent* mark and *Inbox row: restart*; `src/sessionorc/agent_wake.py` (`_first_prompt_road`, `_send_first_prompts`, `_first_prompt_typing`), `src/sessionorc/agent.py` (`_last_hook`'s seeding at load ~L629), `src/sessionorc/agent_hook.py` and `agent_tick.py` ~L3943 (where a hook is applied), `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent_tick.py` (`_keep_running`, `_replay`), `src/shiftlead/adapters/claude_code/hook.py` (`main`), a new `src/shiftlead/hook_entry.py` and `pyproject.toml`'s `shiftlead-hook`, `src/sessionorc/paths.py` (`hook_errors_file`), `src/shiftlead/ui/inbox.py` (`restart_mark`), `src/shiftlead/ui/cards.py` (~L913, ~L951: a seat's `restart_ceiling` words)
+
+**Why:** TD-717's design. On 2026-10-15 a techlead seat filled five seconds before an auto promote lost its first hook and sat at an empty composer for eight hours, while two held-PR asks lapsed to the person.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). Slices, each its own PR:
+1. **Recovery of the send** (`sessionorc`).
+   - **`hook_seen_at`.** `Session` gains `hook_seen_at`, written by the pane's host at the first hook event applied to the record, live or drained from the queue. It is kept across saves and carried by nothing a replay copies.
+   - **Seeding at load.** `_last_hook` is seeded for a `confidence == "hook"` record only when it carries `hook_seen_at` or its brief is not `_first_prompt_due`. Today every `confidence == "hook"` record is seeded. The second test keeps every record from before the field seeded as today.
+   - **The scraped road.** `_first_prompt_road`'s `scraped` road no longer needs `state == "idle"`. It needs:
+     - no `hook_seen_at`;
+     - no entry in `_last_hook`;
+     - no try made;
+     - age at least `FIRST_PROMPT_HOOK_WAIT`;
+     - a state that is not `needs-you`, `exited` or `closed`, and not `superseded_by`.
+
+     `_first_prompt_typing` already insists on the composer reading empty for this road. An adapter with no `composer` reader keeps needing a scraped `idle`.
+   - **The mark.** `_send_first_prompts`' *no hook since launch* mark reads `hook_seen_at`, not `_last_hook`, so it is written at `FIRST_PROMPT_BOUND` across restarts.
+2. **The replay** (`sessionorc`).
+   - **Who is replayed.** The tick replays a supervised record (a team member or a seat) whose `first_prompt_error` is *no hook since launch*, on the next tick. It first closes the live record, through `rpc_close` with closer `{by: tick, why: lost-brief}` and `_mark_closed`, as rules 2 and 7 do before `_replay` (agent_tick.py ~L785–L925); the run never started, so no `restart_blocked` applies. It then replays it as rule 1's replay does: `create` with `keep_mail`, `restarts` gaining `{at, why: "lost-brief"}`, counted in `RESTART_CEILING`.
+   - **A second loss.** A record whose newest `restarts` entry is `lost-brief` and that is marked again is not replayed. It is written `restart_ceiling: {at, count, why: "lost-brief"}`, with `count` the record's `lost-brief` replays (so 1), and `ui/inbox.py`'s `restart_mark` and `cards.py`'s seat words (~L913, ~L951, which today read any seat ceiling as *fills exhausted*) read that `why` as *brief lost twice*, with no count. The fill ceiling's `tripped` test (~L2610) counts only a `why: "fill"` ceiling. The *brief not sent* mark stays.
+   - **A seat's replay** passes the fill's `closing` (`filled_for(seat_due)`) again and sets `seat_filled`, as rule 3's fill does (agent_tick.py ~L2605–L2630). `lost-brief` is not counted by the fill ceiling (`why == "fill"`). A failed close is the replay entry's `error`.
+   - **The senders.** After the replay, each sender of an `ask` or `steer` still open in the moved inbox gets a system note in the design's words. Bounds are unchanged.
+   - **Who is left alone.** A person's own session, unsupervised, is never replayed.
+3. **The hook's traceback** (`shiftlead`). `pyproject.toml`'s `shiftlead-hook` points at a new `shiftlead.hook_entry:main`, a module of the standard library alone (`src/shiftlead/__init__.py` is empty; `shiftlead.adapters.claude_code`'s `__init__` imports `sessionorc`, so the hook module cannot be the entry). It imports `shiftlead.adapters.claude_code.hook` inside a `try` and calls its `main`. An exception in the import is appended to `<home>/hook-errors.log`, the home read from `SHIFTLEAD_HOME` else `~/.shiftlead` without `sessionorc.paths` (cut to its last 256 KB when it passes it; `paths.hook_errors_file()` names the same file for readers), with the time, `SHIFTLEAD_SESSION` and the event name. The hook still exits 0.
+- **Tests:**
+  - A Claude Code record created with no hook, reading `working` with an empty composer, gets its brief by the scraped send after `FIRST_PROMPT_HOOK_WAIT`.
+  - The same record with a dialog on screen does not.
+  - A live hook-fed record from before the field (no `hook_seen_at`, brief sent) is seeded at load.
+  - An agent restarted after the launch does not seed it, sends it, and marks it at `FIRST_PROMPT_BOUND` when the composer never reads empty.
+  - A record with `hook_seen_at` is seeded as before.
+  - A marked seat is replayed once with `lost-brief`, its open ask moved and its sender told.
+  - A second loss is not replayed and reads *brief lost twice*.
+  - An unsupervised marked record is left alone.
+  - The hook's import failure writes `hook-errors.log` and exits 0.
+
+**Done when** a seat launched with its first hook lost gets its brief within `FIRST_PROMPT_HOOK_WAIT` of its composer reading empty, or is replayed once with its askers told, no record waits past `FIRST_PROMPT_BOUND` unmarked across an agent restart, and every listed test passes.
+
+**Related:** TD-717 (the design), TD-348 (the scraped send and the mark), TD-342, TD-062 (the promote).
+
+---
+
+## TD-721: The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams
 
 **Priority:** Medium
 **Type:** feature
@@ -1268,7 +1342,7 @@ The other cases:
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Blocked by:** decision (paul) — Paul's conversation on how a team and its repos relate and how work is displayed, held after this entry was filed (2026-10-15); this entry's shape may change with it
+**Blocked by:** TD-722
 **Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
 
 **Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
@@ -1278,10 +1352,58 @@ The other cases:
 3. **The member cards** (`card.html` compact, with their state pills and the lane's count) and the **+** card.
 4. **A repo two teams service** names both in its *serviced by* line but draws only the first team's facets (`serving[0]`); the second team's card on the Org has nothing on the page that is meant to expand it.
 
-**Fix:** a design round on screen 11: the page opens with the servicing team's whole Org card — header, controls, facets, member cards — drawn by the same templates, so the page cannot drift from the card, and the lists below expand it. It decides: one card per servicing team, or the first with the others named; whether the member cards fold as on the Org; and how the page keeps the header and cards current, since the Org takes them from `/events` deltas and the Repo page re-reads `?part=1` on a 30 s poll. Then one or more build entries.
+**Fix:** a design round on screen 11: the page opens with the servicing team's whole Org card — header, controls, facets, member cards — drawn by the same templates, so the page cannot drift from the card, and the lists below expand it. Two teams on one repo are two cards, listed together and never combined (Paul, 2026-10-15, TD-722). It decides whether the member cards fold as on the Org; and how the page keeps the header and cards current, since the Org takes them from `/events` deltas and the Repo page re-reads `?part=1` on a 30 s poll. Then one or more build entries.
 
 **Done when** screen 11 says the page carries everything the team's Org card shows, its build entries are filed, and this entry's `Blocked by:` names them.
 
-**Related:** TD-176 (slice 5 built the page), TD-418, TD-604, TD-693.
+**Related:** TD-722, TD-176 (slice 5 built the page), TD-418, TD-604, TD-693.
+
+---
+
+## TD-722: One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.9-org-team-project.md` (*Projects*, *Teams*: `projects: [...]`, `manager.home`, a member's `home`, the guardians example with a nested team; *Home and reach*); `docs/design/4.10-messages.md` (*across teams, by project*: the `project` badge, *the first of its team's projects that lists its home repo*); `docs/design/4.5-ui.md` (screen 1 *The Org, team-first*, screen 6 `repo_teams`, screen 11); `docs/design/4.5a-controls.md` (*team groups*: the header's place, *mixed*); `docs/design/4.9b-techlead.md` (*The director seat*); `docs/design/5-configuration.md` (`org.yml`, a repo's `.shiftlead.yml`); [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md) (*a team may span projects*)
+
+**Why:** Paul, 2026-10-15, in the conversation TD-721 waited on: *one repo per team, declared. We still want to be able to have multiple teams per repo (e.g. db team, compliance team) and those can be listed together (per repo) but not auto-combined* — and of a grouping such as Guardians, *a project heading*, placed **on the repo** (*project on the repo*). The design today lets a team span projects and a project hold several repos, and infers a team's repo from where its live members sit (`team_repo`); every project in the org file holds one repo, and no team spans two. The inference is what leaves the header's *mixed* place, `repo_teams`' first-team-in-definition-order rule, and a Repo page that can expand only one team's card (TD-721). The cases for a team over several repos each split by repo: a function across repos (docs, audits, dependency bumps) is a role or flow stage in each repo's team; a product over several repos is one team per repo, sequenced by cross-repo `Blocked by: <repo>#TD-NNN`; the cost a team per repo adds is its seats, which an on-call seat and a team managed by the person already keep small.
+
+**Fix:** a design round:
+1. **A team declares one repo** — `repo:` in its definition, replacing `projects: [...]`, `manager.home` and a member's `home`; a repo's `.shiftlead.yml` team's repo is that repo. A repo has any number of teams.
+2. **A project is a heading on repos** — `projects:` in the org file keeps listing repos, and a repo sits in at most one project; a team's project is its repo's. A repo in no project is its own heading. Nothing acts on a project but the mail gate and the brief's Project block.
+3. **Mail and reach stay as they are**, read off the repo: *across teams, by project* (TD-582) keys on the repo's project, so two teams on one repo always share one; the Project block names the project's other repos.
+4. **The director** (TD-636, TD-642, TD-657) is the org's, above every heading: what it reads of the org's repos (an org-wide Project block: every registered repo's checkout) and where it is drawn (with the person, at the top of the Org page).
+5. **The Org page groups project → repo → team cards**: a repo's teams listed together, each its own whole card, never combined; the *mixed* place and `repo_teams`' first-team rule go. The Repo page is one repo group expanded (TD-721).
+6. **What goes**: §4.9's guardians example (one team over several repos, a nested team) becomes several teams under a Guardians heading; the ADR's *a team may span projects* is superseded, with a dated line in the history.
+7. **Migration**: a definition carrying `projects:` or `home:` on a team — refused by name, or read for a release with a warning — and the backfill (TD-723). Then build entries.
+
+**Done when** the design says the above, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-721, TD-723, TD-582, TD-636, TD-642, TD-657, TD-040.
+
+---
+
+## TD-723: Backfill TD-722: samscrape and contractmatch under one ContractMatch project
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** anchor
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-722
+**Location:** `~/.shiftlead/org.yml` (`projects:` — today `samscrape` and `contractmatch`, one repo each); `~/samscrape/.shiftlead.yml`, `~/contractmatch/.shiftlead.yml` (their teams, defined there since 2026-10-03)
+
+**Why:** Paul, 2026-10-15: *file a backfill to have samscrape and contractmatch both be on the ContractMatch project.* The two repos are one product; once a project is a heading on repos (TD-722), they share one, which draws them together on the Org page, lets their teams settle things by mail (§4.10 *across teams, by project*) and gives each session the other repo in its Project block.
+
+**Fix:** once TD-722's build is live, one project, `contractmatch` (drawn *ContractMatch* if the design gives a heading a display name), listing both repos with their checkouts per host, in place of the two one-repo projects; the teams in each repo's `.shiftlead.yml` changed only as TD-722's migration says. The org file is the person's: written by the anchor in a session with Paul, or by Paul.
+
+**Done when** the Org page draws samscrape and contractmatch under one ContractMatch heading, and a samscrape session's brief names contractmatch's checkout in its Project block.
+
+**Related:** TD-722.
 
 ---

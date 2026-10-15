@@ -27,6 +27,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 
 from sessionorc import gitinfo, hosts, mail, naming, paths
+from sessionorc import settle as settle_mod
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.containers import attach_argv_in, container_nodes
 from sessionorc.models import (
@@ -370,6 +371,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     missing_seams,
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
+    settle_mark,  # noqa: F401
     team_groups,  # noqa: F401
     who_for_what,  # noqa: F401
 )
@@ -1372,7 +1374,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "g": {"team": summary["team"], "summary": summary},
             "teams": teams,
             "prs": pr_rows(r, members, standing, now, sessions),
-            "lists": ledger_lists(r, summary["motion"], lanes),
+            "lists": ledger_lists(r, summary["motion"], lanes, now),
             # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
             "completed": completed_rows(r, sessions, now),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
@@ -2316,6 +2318,20 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)
         return {"ok": True, "id": s["id"], "name": s.get("name") or plan["name"], "text": text}
 
+    @app.post("/api/ledger/hold")
+    async def api_ledger_hold(request: Request):
+        """§4.5a *Repo page: Hold / Release on a settling entry* (TD-707, built by TD-710 slice 3):
+        `{repo, id, release?}` — the repo by its name, as the page names it — to the home's `td_hold`,
+        the person's own act on its settle clock, no ledger edit. A refusal (*TD-707 has settled*) is
+        the toast's, a 400 in its words; the row's mark moves on the next repo reading's push."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        repo, ref = (str(body.get("repo") or ""), str(body.get("id") or "")) if isinstance(body, dict) else ("", "")
+        if not repo or not ref:
+            raise HTTPException(400, "send {repo, id, release?}")
+        # the home resolves the repo by the name its reading carries, the page's own (a refusal is the 400)
+        got = await call("td_hold", repo=repo, id=ref, release=bool(body.get("release")))
+        return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+
     @app.post("/api/ledger/start")
     async def api_ledger_start(request: Request):
         """§4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-676, built by
@@ -2955,6 +2971,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             {
                 "usage_groups": setmod.usage_cards(profiles, got.get("usage_gate"), usage),
                 "max_age": str((got.get("usage") or {}).get("max_age") or ""),
+                # **settle** (§4.5a *Settings page: settle*, TD-710): the install's map as the field writes it
+                "settle": settle_mod.text_of(got.get("settle")),
+                "settle_default": settle_mod.text_of(settle_mod.DEFAULT),
                 "profiles_file": str(profiles_mod.profiles_file()),
                 "teams": setmod.team_cards(
                     org.teams,
@@ -3024,6 +3043,18 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
         return answer(await call("set_settings", profile=str(body.get("profile") or ""), reserves=reserves))
+
+    @app.post("/api/settings/settle")
+    async def settings_settle(request: Request):
+        """§4.5a *Settings page: settle* (TD-707, built by TD-710 slice 3): `{settle: text}` — Kind and
+        duration pairs, `design-first 5m`, empty for the built-in — refused in place when a pair is not
+        one, then `set_settings {settle}`, the whole map replaced."""
+        body = await body_of(request)
+        try:
+            settle = settle_mod.parse_text(str(body.get("settle") or ""))
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return answer(await call("set_settings", settle=settle))
 
     @app.post("/api/settings/max_age")
     async def settings_max_age(request: Request):

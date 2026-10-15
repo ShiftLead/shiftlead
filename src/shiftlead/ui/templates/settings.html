@@ -148,6 +148,14 @@
   <section class="isec" id="sec-repos">
     <div class="row gap sechead"><span class="h2">Repos</span>{{ imark("repos", "Repos", info_repos) }}</div>
     {{ panel("repos", info_repos) }}
+    {#- **settle** (§4.5a *Settings page: settle*, §4.4 *A new entry settles before it is pickable*; TD-710):
+        the install's `settle:`, one field above the cards, each card's `.shiftlead.yml` `settle:` winning key by key -#}
+    <form class="card pad setcard" data-section="settle" id="setsettle">
+      <label class="setrow"><span class="setlabel" title="how long a new ledger entry of each Kind waits, holdable, before a lane may take it; a repo's .shiftlead.yml settle: below wins key by key (design §4.4)">settle</span>
+        <input class="input setin" name="settle" value="{{ settle }}" placeholder="{{ settle_default }}" autocomplete="off" spellcheck="false">
+        <span class="note">{% if settle %}a new entry of a Kind listed waits that long before a lane takes it{% else %}the built-in: {{ settle_default }}{% endif %}; a Kind not listed goes at once</span></label>
+      {{ saverow("Kind and duration pairs, design-first 5m · empty for the built-in · a repo's settle: wins key by key") }}
+    </form>
     {% for r in repos %}
     <div class="card pad setcard" data-section="repos" data-repo="{{ r.name }}">
       <div class="row gap wrap"><span class="h2 mono">{{ r.name }}</span><span class="note mono">repo · {{ r.path }}</span></div>

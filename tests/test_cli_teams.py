@@ -1434,6 +1434,7 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
         "worktree_setup": "scripts/hydrate_worktree.sh",
         "board": "docs/user_attention.md",
         "held": ["src/sessionorc/**"],
+        "settle": {"design-first": "10m"},
     }
     assert named == set(accepted)
     for key, value in accepted.items():
