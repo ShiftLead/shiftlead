@@ -14,8 +14,12 @@ from shiftlead import hook_entry
 
 
 def _fail_import(monkeypatch) -> None:
-    # `None` in sys.modules makes the import raise ImportError, as a half-replaced install would
+    # `None` in sys.modules makes the import raise ImportError, as a half-replaced install would; the
+    # package's attribute goes too, or `from … import hook` finds a module an earlier test imported
+    import shiftlead.adapters.claude_code as pkg
+
     monkeypatch.setitem(sys.modules, "shiftlead.adapters.claude_code.hook", None)
+    monkeypatch.delattr(pkg, "hook", raising=False)
 
 
 def test_an_import_failure_is_logged_with_the_session_and_the_event(tmp_path, monkeypatch, capsys):
