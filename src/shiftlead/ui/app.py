@@ -53,6 +53,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     DEAD,  # noqa: F401
     DEFS_TTL,  # noqa: F401
     FLOW_ACTS,  # noqa: F401
+    FLOW_RENAMES,  # noqa: F401
     FLOWS,  # noqa: F401
     NO_TEAM,  # noqa: F401
     NODE_RESTART,  # noqa: F401
