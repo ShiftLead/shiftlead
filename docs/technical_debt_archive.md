@@ -12915,3 +12915,102 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
 
 **Related:** TD-706, TD-703.
+
+## TD-719: `TickMixin._settle`'s two fallbacks — a clock that cannot be written, and a checkout with no origin — are held by no test (#1811)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1811–#1821)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_settle`: `except OSError as e: log.warning(...)`, and `key = origin_key(remote) if remote else str(root)`); `tests/test_settle.py` (`test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1811 and running `tests/test_settle.py tests/test_lane_news.py tests/test_repo_facts.py` (63 passed unmutated). Two mutations pass all 63: (1) `except OSError as e:` changed to `except ZeroDivisionError as e:` — the docstring's *a clock that cannot be written marks nothing, and says so in the log: entries go at once* has no test, and an unwritable home would raise out of `_read_repo` and the tick; (2) `key = origin_key(remote) if remote else str(root)` changed to `... else 'x'` — the only test of a checkout with no origin asserts that `ledger_seen.json` does not exist, and `fresh` is forced false there, so the key `mark` reads under is never looked at. (A third, deleting `if not remote: fresh = False`, is caught.)
+
+**Fix:** one test that makes `paths.ledger_seen_file()` unwritable (a directory in its place, so `_atomic_write` raises OSError) and reads a repo with an origin: the reading returns, no entry carries a mark, and a warning is logged; and one that gives a no-origin checkout a record under its path as key and sees a new entry marked from it. Each fails with its line mutated as above.
+
+**Resolved:** 2026-10-15 — `tests/test_settle.py` gains `test_a_clock_that_cannot_be_written_marks_no_settling_says_so_and_still_marks_waits` (`ledger_seen.json` a directory: `_settle` returns, no entry settles, the warning is logged, and a `Waits: event` entry is still marked `waiting`) and `test_a_checkout_with_no_origin_is_marked_from_the_record_under_its_path` (a record under the checkout's path marks its new design-first entry settling, and nothing is written). Each fails under its mutation: `except ZeroDivisionError`, and `settle_key`'s fallback (now in `agent_ids.py`) returning `'x'`.
+
+**Done when** both tests exist and fail under those mutations.
+
+**Related:** TD-710, TD-718, #1811.
+
+## TD-727: `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1818–#1830)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_hold`: `if not remote: raise RpcError(... origin is not read yet ...)`); `tests/test_settle.py` (`test_td_hold_is_the_persons_and_marks_the_reading_at_once`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1823 and running `tests/test_settle.py tests/test_person_only.py tests/test_repo_facts.py tests/test_settle_pages.py tests/test_cli_teams.py` (164 passed unmutated). Replacing `if not remote:` with `if False:` passes all 164: no test calls `td_hold` on a repo whose reading carries no `remote`. Without the refusal the hold is looked up under `settle_key(root, "")`, the checkout's path, a key the clock records for no origin-read repo, so the person gets *not in the home's clock yet* instead of the words that say to ask again.
+
+**Fix:** One test: a repo view with a `ledger` and no `remote`; `rpc_td_hold` raises RpcError naming the origin, and `ledger_seen.json` is unchanged. It fails with the guard removed.
+
+**Resolved:** 2026-10-15 — `tests/test_settle.py` gains `test_td_hold_on_a_repo_whose_origin_is_not_read_yet_is_refused_and_writes_nothing`: the repo view keeps its ledger with `remote` emptied, `rpc_td_hold` raises *r's origin is not read yet: its clock is keyed by it, so ask again*, and `ledger_seen.json` is unchanged. With `if not remote:` read as `if False:` it fails (the hold is refused instead as *not in the home's clock yet*).
+
+**Done when** the test exists and fails under that mutation.
+
+**Related:** TD-710, #1823.
+
+## TD-712: A renamed lead is not in a node member's `controllers` until that member's next create
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-1, building TD-706 slice 2; the techlead's read of #1807)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.9 *A member renamed or removed in the definition* (the succeeds carry); `src/sessionorc/agent.py` (`_carry`, `rpc_set_controllers`), `src/sessionorc/agent_remote.py` (`_route_act`), `src/sessionorc/agent_tick.py` (`_replay`)
+
+**Why:** §4.9 says a rename's create rewrites every record's `controllers` that named the old address. `_carry` rewrites this host's records and every launch record, but a node's record keeps the old address: `controllers` is the node's field (not in `HOME_OWNED`), so a rewrite of the home's copy is lost to the node's next report. Until the member's next create reads its rewritten launch record, the renamed manager or techlead cannot act on it.
+
+**Fix:** in the rename's carry, for each node record whose `controllers` (read through `_ctl`) holds the old address, route `set_controllers {id, add: [new], remove: [old]}` to its node as `rpc_set_controllers` routes a person's edit (`_route_act`, a `HOME_EDITS` act), awaited after the create; a link that is down leaves the record for the next tick to retry, said in the log. Then drop the exception from §4.9 and its history line's *until TD-712*.
+- **Tests:** a node member under a renamed manager names the new manager in its record's `controllers` after the rename's replay (a fake node link, as `tests/test_link*.py` build one); a node that is down is retried.
+
+**Resolved:** 2026-10-15 by #1856 — `TickMixin._carry_controllers` (home only, each tick and awaited after a rename's replay) routes `set_controllers {add: [new], remove: [old]}` to a node member whose launch record names the successor of a controller its record still holds; a node with no link is passed over and a failed act logged, both tried again next tick. The node appends, so the lead stands last until the member's next create (§4.9 says so). `tests/test_rename_node_controllers.py` holds the carry, the retry and the resume left alone.
+
+**Done when** a node member's record names the renamed lead in `controllers` after the rename, and the tests pass.
+
+**Related:** TD-706 (slice 2 built the carry), TD-703 (the design).
+
+## TD-737: Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/templates/base.html` (`app.css` in `<head>`, `app.js` loaded at the end of `<body>`); `src/shiftlead/ui/static/app.js` (`applyTheme`, its first lines: `ao.theme` from `localStorage`, else `prefers-color-scheme`, written to `html[data-theme]`); `src/shiftlead/ui/static/app.css` (`:root` holds the light tokens, `html[data-theme="dark"]` the dark ones, and no `prefers-color-scheme` rule); `docs/design/2-goals.md` (goal 12, *Dark mode*); `docs/design/4.5-ui.md` (*Browser mechanics*)
+
+**Why:** Paul, 2026-10-15: *often when switching pages Repo<->Org<->Inbox there is a flash of the light mode version of the page and then it resolves to the dark mode. If this flash is necessary, it should flash the dark page then resolve to the light mode page so that people using dark mode are not blinded by the light. There is likely work we can do to render these pages more quickly as well.* Each page is a full navigation, server-rendered (§4.5 *Browser mechanics*). The CSS's defaults are the light tokens, and the dark ones apply only once `html` carries `data-theme="dark"`. That attribute is written by `applyTheme`, and `app.js` runs only after the whole body has been parsed. So the browser can paint the parsed page light before the script turns it dark, and the slower the page, the longer the flash. Goal 12 says the terminal panes are dark whatever the theme, *so light chrome is the jarring case at night*: the flash is that case on every page change.
+
+**Resolved:** 2026-10-15 (PR #1855) — an inline script in `base.html`'s `<head>`, before the stylesheet, writes `html[data-theme]` with `applyTheme`'s read (dark when the read fails); `<meta name="color-scheme" content="dark light">` and a `color-scheme` per theme in `app.css`; design §4.5 *Browser mechanics* says so. Checked in headless Chromium with `app.js` held back: main painted `/inbox` light (`rgb(244, 245, 247)`) on a dark browser, the change paints it dark (`docs/mockups/reviews/2026-10-15-td737-first-frame-*.png`). The render-time measurement is in the PR; its slow parts are TD-738 (the Inbox's repeated line text) and TD-739 (the routes' server render).
+
+**Done when** a page change on a dark browser shows no light frame (checked by the builder in a headless browser on a scratch home: a screenshot at first paint is dark), the *Browser mechanics* line is written, and the render-time measurement is in the PR, with any slow part filed.
+
+**Related:** TD-372 (the *host agent unreachable* banner that flashed on every page change).
+
+## TD-732: `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1831–#1841)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent_tick.py` (`_lost_brief`, the `continue` at its call in `_keep_running`); `tests/test_lost_brief.py` (four tests)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1837 (TD-720 slice 2) one line at a time and running `tests/test_lost_brief.py test_first_prompt.py test_hook_entry.py test_seat_policy.py test_ui_org.py test_ui_inbox.py test_card_volatile.py` (206 passed unmutated). Each of these edits left all 206 passing: the guard `or s.wrapup_at or s.wrapup_sent_at` dropped; `or s.suspended or s.sit_out` dropped; `(s.run_until and now >= _parse(s.run_until))` dropped; `if s.gated or self._profile_gated(...)` made `if False`; `or s.state in ("exited", "closed")` dropped; `or len(recent) >= RESTART_CEILING` dropped (the ceiling branch is reached only through `again`); `and not last.get("error")` dropped; `new.lane_seen = dict(s.lane_seen)` made `pass`; the `or e.from_ in told` dedupe, the `e.from_ in (PERSON, SYSTEM)` exclusion and the `e.open` filter each dropped; the failed-close entry `restarts = [..., {"error": ...}]` made `pass`, the `if s.state == "closed": self._mark_closed(...)` made `pass`, and `retry = self._closed_by_tick(...)` made `retry = False`; and `if await self._lost_brief(s, now): continue` made `pass` (the rest of the pass then acts on the closed run). Each is a behaviour the docstring and design §4.1 state; a regression would relaunch a seat in wrap-up, a gated profile, a suspended or sat-out record, or twice in one tick, or tell the person and the system about a lost brief. The four tests cover the one-replay path, the second-loss ceiling, the seat's `seat_filled` and launch-prompt context, and what the replay leaves alone.
+
+**Fix:** Tests in `tests/test_lost_brief.py`, each failing with its line mutated: a marked record with each of `wrapup_at`, `suspended`, `sit_out`, a past `run_until`, `gated`, and state `exited` is not replayed and not given a ceiling; `RESTART_CEILING` counted replays in the window put the ceiling `{count}` with no `why`; a seat on `trigger: work` keeps `lane_seen`; two open asks from one sender and one from the person tell the sender once and the person never; `rpc_close` raising leaves a `restarts` entry with `error`, and the next tick replays without a second close; two records marked in one tick are each replayed once.
+
+**Resolved:** 2026-10-15 by #1859 — nine tests (fifteen cases) in `tests/test_lost_brief.py` (the guards parametrised over seven cases, the ceiling, the failed entry, a work seat's `lane_seen`, the senders told, the two failed closes, two records in one tick, and the pass the replay ends — an `every` seat still due, filled on top of its replay without the `continue`); each of the entry's fifteen mutations, run one at a time, fails at least one.
+
+**Done when** each case has a test and fails under its mutation.
+
+**Related:** TD-717, TD-720, #1837.

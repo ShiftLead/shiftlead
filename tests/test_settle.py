@@ -138,6 +138,37 @@ def test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs(tmp_
     assert datetime.fromisoformat(got["TD-003"]["settling"]["until"]) - datetime.now(UTC) <= timedelta(minutes=1)
 
 
+def test_a_clock_that_cannot_be_written_marks_no_settling_says_so_and_still_marks_waits(tmp_path, caplog):
+    paths.ledger_seen_file().mkdir(parents=True)  # a directory in its place: the write raises OSError
+    root = tmp_path / "r"
+    root.mkdir()
+    got = _ledger(
+        _entry(1),
+        _entry(2).replace("**Kind:** design-first\n", "**Kind:** design-first\n**Waits:** event — the next sync PR\n"),
+    )
+    with caplog.at_level("WARNING", logger="shiftlead.agent"):
+        TickMixin._settle(str(root), "https://github.com/o/r.git", got, T0, fresh=True)  # does not raise (TD-719)
+    assert all("settling" not in e and "held" not in e for e in got)  # entries go at once
+    assert _by_id(got)["TD-002"]["waiting"] == {"on": "event", "until": ""}  # a wait needs no clock
+    assert "the settle clock of" in caplog.text and "could not be kept" in caplog.text
+
+
+def test_a_checkout_with_no_origin_is_marked_from_the_record_under_its_path(tmp_path):
+    root = tmp_path / "r"
+    root.mkdir()
+    got = _ledger(_entry(1), _entry(2))
+    now = datetime.now(UTC)
+    rec = {
+        "TD-001": {"at": settle.EPOCH, "sig": got[0]["sig"]},
+        "TD-002": {"at": now.isoformat(), "sig": got[1]["sig"]},
+    }
+    paths.ledger_seen_file().write_text(json.dumps({str(root): rec}))
+    TickMixin._settle(str(root), "", got, now, fresh=True)  # no origin: marked, never recorded (TD-719)
+    assert "settling" not in got[0]
+    assert got[1]["settling"] == {"until": (now + timedelta(minutes=5)).isoformat()}
+    assert json.loads(paths.ledger_seen_file().read_text()) == {str(root): rec}
+
+
 def test_a_partial_reading_keeps_the_records_it_does_not_hold():
     settle.observe(_ledger(), "o/r", SPANS, T0)
     settle.observe(_ledger(_entry(2)), "o/r", SPANS, T0)
@@ -226,6 +257,16 @@ async def test_td_hold_is_the_persons_and_marks_the_reading_at_once(agent, tmp_p
     with pytest.raises(RpcError, match="elsewhere is not a repo this home reads"):
         await agent.rpc_td_hold(repo="elsewhere", id="TD-002")
     assert modes.offline_refusal("td_hold", None, {}, host="laptop", home="kmaster")
+
+
+async def test_td_hold_on_a_repo_whose_origin_is_not_read_yet_is_refused_and_writes_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    agent._repos[root]["remote"] = ""  # read before its origin was: the clock's key is not known (TD-727)
+    before = paths.ledger_seen_file().read_text()
+    with pytest.raises(RpcError, match="r's origin is not read yet: its clock is keyed by it, so ask again"):
+        await agent.rpc_td_hold(repo=root, id="TD-002")
+    assert paths.ledger_seen_file().read_text() == before
 
 
 async def test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too(agent, tmp_path):

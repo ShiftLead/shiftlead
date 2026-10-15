@@ -121,6 +121,24 @@ rank the levers.
   week, and the bound stays or goes back.
 - A member that is restarted more often loses more of its conversation. That is acceptable only
   because rule 5 already restarts between entries, never mid-entry.
+- **The trial's reading (the anchor, 2026-10-15, TD-460): flat.** Same data and weights as above,
+  ao-grind's grinders only; a merged PR is one a grinder reported with `ao progress done --pr` (all
+  342 such PRs are merged). The trial week is 2026-10-09 04:26Z (the bound's merge) to 10-16 04:26Z,
+  read about nine hours short of its end.
+
+  | grinders | 10-01–08 (this ADR's week) | 10-02 04:26–10-09 04:26 (the week before) | trial week |
+  |---|---|---|---|
+  | merged PRs | 99 | 119 | 124 |
+  | weighted cost per merged PR | 1.86M | 1.54M | 1.52M |
+  | requests per merged PR | 121 | 102 | 117 |
+  | runs per merged PR | 0.90 | 0.56 | 0.89 |
+  | mean context per request | 185k | 191k | 153k |
+
+  The bound cut the mean context by a fifth, and the extra restarts and their re-orientation took the
+  saving back: per merged PR the cost is the week before's, within 1%. The fall from this ADR's week
+  came before the trial began. The weekly window, the measure the decision named, is account-wide
+  and keeps no history, so it cannot be split per grinder. Paul, 2026-10-15: run another week. The
+  line stays, and a second trial week (to 10-23 04:26Z) is read the same way before it stays or goes.
 
 ## Revisit triggers
 

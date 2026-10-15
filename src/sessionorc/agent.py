@@ -1456,10 +1456,10 @@ class HostAgent(
         """The home's half of a succession across names (design §4.9, TD-706): `old`'s claims in progress
         and its `lane_seen` copied onto `new`, so the lease and rule 6's memory hold across the name;
         every record of this host and every launch record whose `controllers` name the old address name
-        the new one, so a renamed lead is still each member's controller (a node's own records carry
-        theirs from their launch record at their next create). `old`'s launch record is the caller's to
-        drop, once `new`'s is written (`_drop_launch`). Saves what it touched but `old` and `new`, which
-        the caller saves."""
+        the new one, so a renamed lead is still each member's controller (a node's own records take
+        theirs at their node, routed by `_carry_controllers` from the rewritten launch record, TD-712).
+        `old`'s launch record is the caller's to drop, once `new`'s is written (`_drop_launch`). Saves
+        what it touched but `old` and `new`, which the caller saves."""
         a, b = self._address(old), self._address(new)
         old.superseded_by = b
         held = {e.ref for e in new.progress}

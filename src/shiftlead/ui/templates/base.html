@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}ShiftLead{% endblock %}</title>
+{#- design §4.5 *Browser mechanics* (TD-737): the theme is set here, before the stylesheet and the first
+    paint, with `applyTheme`'s read in `app.js` — so a page change never paints the other theme first.
+    Dark when the read itself fails; the canvas before any CSS is dark too. -#}
+<meta name="color-scheme" content="dark light">
+<script>(function () { var t; try { t = JSON.parse(localStorage.getItem("ao.theme")); } catch (e) {} if (t !== "dark" && t !== "light") { try { t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch (e) { t = "dark"; } } document.documentElement.dataset.theme = t; })();</script>
 <link rel="stylesheet" href="{{ static_url('app.css') }}">
 {% block head %}{% endblock %}
 </head>

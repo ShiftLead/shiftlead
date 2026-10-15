@@ -8,6 +8,7 @@
 .xterm .xterm-rows { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 /* shiftlead — tokens seeded from docs/mockups/gen.py; dark mode is a token swap (design §2.12). */
 :root {
+  color-scheme: light;
   --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --line2: #eceef1;
   --card: #fff; --input: #fff; --border: #cbd0d6; --hover: #eef0f3;
   --link: #1f5fa8; --top: #1c2128; --topfg: #e6e9ee; --topdim: #aab3bf; --tab-on: #2b323b;
@@ -46,6 +47,7 @@
   --row: 22px; --row1: 26px; --slot: 72px; --foot: 26px;
 }
 html[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --line2: #222831;
   --card: #171b21; --input: #11151a; --border: #3a424d; --hover: #232a33;
   --link: #7fb2f0; --top: #0b0e12; --topfg: #e6e9ee; --topdim: #8b95a3; --tab-on: #232a33;

@@ -210,6 +210,7 @@ class TickMixin:
             # pass sends its turns home over the link (slice 4)
             self._spend_task = asyncio.create_task(self._refresh_spend())
         await self._team_stop_times(snapshot_at)
+        await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
         await self._keep_running(snapshot_at)
@@ -253,6 +254,56 @@ class TickMixin:
                     log.warning("%s: the team's stop time did not reach %s: %s", s.id, s.host, e)
         if changed:
             await self._push_changes()
+
+    async def _carry_controllers(self) -> None:
+        """The node half of a rename's carry (design §4.9 *A member renamed or removed in the definition*,
+        TD-712): a node member's own record whose `controllers` still name a lead the rename succeeded,
+        where `_carry` already rewrote its launch record to the new address, takes the rewrite at its
+        node — `set_controllers` routed as a person's edit is (`_route_act`), since `controllers` is the
+        node's field and a rewrite of the home's copy would be lost to its next report. **At the home**;
+        a node whose link is down is passed over and tried again on the next tick, and a refused or lost
+        act is said in the log and ends that node's pass, so a stuck link holds the tick once. The launch
+        record is what makes it the carry's: a resume under another id rewrites none, so it moves no
+        controller."""
+        if self.mode != "home":
+            return
+        graph = self._graph()
+        for host, recs in list(self.remote.items()):
+            if host not in self._link_muxes:
+                continue
+            for rid, r in list(recs.items()):
+                if r.state == "closed" or r.superseded_by:
+                    continue
+                try:
+                    launch = json.loads((paths.launch_dir() / f"{rid}@{host}.json").read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    continue
+                named = launch.get("controllers") if isinstance(launch, dict) else None
+                if not isinstance(named, list):
+                    continue
+                add: list[str] = []
+                remove: list[str] = []
+                for c in r.controllers:
+                    if c in named:
+                        continue
+                    was, now, seen = self._from_host(c, host), None, 0
+                    t = graph.get(was)
+                    while t is not None and t.superseded_by and seen < 16:  # a lead renamed twice, too
+                        now, seen = t.superseded_by, seen + 1
+                        t = graph.get(now)
+                    if now and self._to_host(now, host) in named:
+                        add.append(now)
+                        remove.append(was)
+                if not add:
+                    continue
+                try:
+                    await self._route_act(
+                        "set_controllers", {"id": f"{rid}@{host}", "add": add, "remove": remove}, None, host
+                    )
+                    log.info("%s@%s: controllers carried across the rename: %s", rid, host, ", ".join(add))
+                except Exception as e:  # noqa: BLE001 — tried again on the next tick
+                    log.warning("%s@%s: the rename's controllers did not reach %s: %s", rid, host, host, e)
+                    break  # the rest of this node's wait for the next tick: one stuck act, not one each
 
     def _team_stamp(self, team: str, unattended: bool, run_until: str | None) -> str | None:
         """What a create's `run_until` is under its team's stop time (§6 *Team stop time*): the
@@ -2374,6 +2425,8 @@ class TickMixin:
             self._carry(s, new)  # a node's create moved what it holds; the rest is the home's (§4.9)
             self._drop_launch(self._address(s))  # `_route_act` wrote the new id's
             self._save(s)
+        if new is not None and renamed:
+            await self._carry_controllers()  # a node member's own record takes the new lead now (TD-712)
         if new is not None:
             new.restarts = history
             # the files as this replay read them, not as the create's check did; a replay of the stored
