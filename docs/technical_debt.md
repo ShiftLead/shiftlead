@@ -64,7 +64,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
-| TD-718 | `agent_tick`'s rule-6 declaration reading is marked by the settle clock, and no test would notice if it were not (#1811) | Medium | Open |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Open |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
@@ -1242,26 +1241,6 @@ The other cases:
 **Done when** a seat launched with its first hook lost gets its brief within minutes, or is relaunched or closed with its askers told, and no seat sits with its brief unsent past `FIRST_PROMPT_BOUND`.
 
 **Related:** TD-348 (the scraped send and the mark, built), TD-342 (its design), TD-341, TD-062 (the promote), TD-706 and TD-710 (the PRs that waited).
-
----
-
-## TD-718: `agent_tick`'s rule-6 declaration reading is marked by the settle clock, and no test would notice if it were not (#1811)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1811–#1821)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`both()` in rule 6's `lane_seen` read: `for got, when in ((then, at), (tip, datetime.now(UTC))): TickMixin._settle(str(root), remote, got, when, fresh=False)`); `tests/test_lane_news.py` (`test_an_entry_still_settling_is_told_only_once_it_settles`), `tests/test_settle.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1811 and running `tests/test_settle.py tests/test_lane_news.py tests/test_repo_facts.py` (63 passed unmutated) and then the 20 modules that name `lane_seen` or `_keep_running` (291 passed). Replacing the `TickMixin._settle(str(root), remote, got, when, fresh=False)` call in `both()` with `pass` still passes all of them. The one test that names rule 6 and settling hands `agent._repos[...]["ledger"]["entries"]` entries that already carry `settling` — the *checkout's* reading — so it exercises rule 8's `_lane_news` and `lane_matches`; the two readings `both()` builds (`then`, read at the declaration, and `tip`, read from the tip) come from `ledger_mod.entries_before`, which never writes a mark, and no test reads them. TD-710's own **Tests** list names *rule 6 tells a member of the entry only once it settles*; what is held is rule 8's news, not the declaration's `lane_seen` baseline. Without the marking, an entry still settling at the declaration is recorded in `lane_seen` as seen, and is then never told when it settles — the very case the call's comment says it is there for.
-
-**Fix:** a test in `tests/test_lane_news.py` or `tests/test_settle.py` where a seat declares out of work while a ledger entry the clock records as settling is in its lane at the declaration (the record written through `settle.observe`, the entries read through `entries_before` in a git checkout), and after the window the seat is told it; it fails with the `_settle` call in `both()` removed.
-
-**Done when** that test exists and fails with the call removed.
-
-**Related:** TD-710, TD-707, #1811.
 
 ---
 
