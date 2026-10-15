@@ -184,7 +184,11 @@ def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_
     assert html.count('data-act="') == acts + 1 and html.count('data-act="board_reply"') == 1
     assert html.count('data-board-act="snooze"') == 3 and html.count('data-board-act="done"') == 1
     assert html.count('data-line="9"') == 5 and html.count(f'data-board="{root}/docs/user_attention.md"') == 5
-    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;. Due: 2026-09-20."') == 5
+    # the line's text is written once, on the row, and every press reads it there (TD-738)
+    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;. Due: 2026-09-20."') == 1
+    row = html[html.index('class="mailrow boardrow"') :].split(">")[0]
+    assert 'data-text="&lt;b&gt;Allow&lt;/b&gt;' in row
+    assert all("data-text=" not in t.split(">")[0] for t in html.split("<button")[1:])
     assert 'data-when="1d"' in html and 'data-when="1w"' in html and 'data-when="pick"' in html
     done = html[html.index('data-board-act="done"') :]
     assert "data-confirm=" in done.split(">")[0]
