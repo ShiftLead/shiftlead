@@ -67,7 +67,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
 | TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed — TD-724, TD-725 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
-| TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings | Medium | Open |
+| TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings | Medium | Open — paused for the TD-722 amendment |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
 
@@ -1340,7 +1340,8 @@ The other cases:
 **Added:** 2026-10-15 (the designer, building TD-722's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — paused 2026-10-15 (Paul): TD-722's design is being amended (the anchor a per-repo seat, names unique per repo, old keys refused, a team named on ledger entries), so this build's scope changes; grinder-ao-2's #1840 is a draft until then
+**Blocked by:** decision (paul) — the amendment to TD-722's design, from an interactive session with Paul; the amendment's PR replaces this line with its own entry
 **Location:** design §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The org is an aggregate*, §4.10 *across teams, by project*, §4.5a *Add entry form: Hand to the techlead*, §5 `org.yml`; `src/shiftlead/org.py` (`TeamDef.projects` ~L184, `ManagerDef`/`TechleadDef`/`AnchorDef`/`SeatDef`/`MemberDef.home`, `MANAGER_KEYS` ~L628, `MEMBER_KEYS`, `TEAM_KEYS` ~L631, `TECHLEAD_KEYS`, `ANCHOR_KEYS`, `SEAT_KEYS`, `_project` ~L580, `_team` ~L675, `_validate` ~L858, `_home` ~L903, `team_repos` ~L273, `anchor_first` ~L282, `merge_repo_teams` ~L338, `_land` ~L415), `src/shiftlead/teams.py` (`project_of` ~L214, `project_block` ~L222, `reach_block` ~L244, `entry_teams` ~L481, `_launch` ~L784, `plan` ~L971), `src/shiftlead/teams.py` (the other readers of `team.projects` and `.home`, ~L330, ~L344, ~L352, ~L492, ~L541, ~L868, and the anchor message at ~L1041 that names `anchor.home`), `src/shiftlead/ui/common.py` (~L757, ~L775, which read `t.projects`), `src/shiftlead/ui/templates/group_head.html` (~L20, `g.projects`), `src/shiftlead/ui/app.py` (`repo_teams` ~L383), `src/shiftlead/teamrun.py` (`rows` ~L457), `src/shiftlead/orgcheck.py` (`view` ~L100), `src/shiftlead/cli.py` (`cmd_team_list` ~L1072), `src/shiftlead/ui/settings_page.py` (`org_cards` ~L481)
 
 **Why:** TD-722's design. A team that may span projects leaves its repo to be read from where its members sit, and that inference is what leaves the Org header's *mixed* place, `repo_teams`' first-team rule and a Repo page that can expand only one team (TD-721).
