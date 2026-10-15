@@ -154,9 +154,11 @@ BRIEF_CLAUSE = 'your brief changed — finish what you hold, then `ao progress r
 FLOW_CLAUSE = 'your team\'s flow changed — finish what you hold, then `ao progress restart --why "flow changed"`'
 # What a relaunch replaces in a launch record (§4.9c): each as handed, an absent one removed; the rest stands.
 # `profile` (TD-619) is replaced as handed and **kept** when absent: a launch without one is the default
-# profile's, so a client that does not hand it yet must not move a member onto the default
-RELAUNCH_KEYS = ("prompt", "prompt_from", "lane", "review", "profile")
-RELAUNCH_KEPT = ("profile",)
+# profile's, so a client that does not hand it yet must not move a member onto the default. `name` (TD-703,
+# built by TD-706) is kept the same way: handed, it is a rename, and the record's next replay creates
+# under it, succeeding the old record (§4.9 *A member renamed or removed in the definition*)
+RELAUNCH_KEYS = ("prompt", "prompt_from", "lane", "review", "profile", "name")
+RELAUNCH_KEPT = ("profile", "name")
 # A round-log line (design §4.8 *A session's round log*, TD-191): one line, a manager's round says
 # who did what, so it is allowed more than `doing`'s 200 characters.
 ROUND_LINE_CAP = 500
