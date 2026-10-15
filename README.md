@@ -1,5 +1,9 @@
 # ShiftLead
 
+> **Not ready for use yet.** ShiftLead is under active development and is not yet meant for anyone
+> outside the project to install or run: interfaces, names and on-disk state still change without
+> notice, and there is no support. Please hold off on sharing it until a release is announced.
+
 *The project is **ShiftLead** ([shiftlead.dev](https://shiftlead.dev)), decided 2026-09-21; the command is `ao`.
 The packages, the state directory, the units and the config file carry the name since 2026-10-10 (TD-060;
 `ao migrate` moves a machine from the old names once), and the repo is `ShiftLead/shiftlead` since 2026-10-11.
