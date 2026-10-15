@@ -93,6 +93,73 @@ def test_unpushed_is_one_measure_of_exists_only_on_this_machine(tmp_path):
     assert info and (info.unpushed, info.pushed_against) == (1, "remote branches")
 
 
+def test_a_squash_merged_branch_tracking_origin_main_reads_pushed(tmp_path):
+    """TD-701: a branch cut with `git switch -c … origin/main` tracks `origin/main`; squash-merged
+    under another sha and its remote branch deleted, rule 2's porcelain *ahead* read it *1 unpushed*
+    for ever. A commit whose content the upstream holds is not unpushed; one it lacks still is."""
+    origin = tmp_path / "origin.git"
+    run("git", "init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    repo, other = tmp_path / "r", tmp_path / "o"
+    run("git", "clone", "-q", str(origin), str(repo), cwd=tmp_path)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "f").write_text("1\n")
+    (repo / "g").write_text("a\n")
+    run("git", "add", ".", cwd=repo)
+    run("git", "commit", "-q", "-m", "one", cwd=repo)
+    run("git", "push", "-q", "-u", "origin", "main", cwd=repo)
+    run("git", "clone", "-q", str(origin), str(other), cwd=tmp_path)
+    run("git", "config", "user.email", "o@o", cwd=other)
+    run("git", "config", "user.name", "o", cwd=other)
+
+    def squash_on_origin(*branch_files: tuple[str, str]) -> None:
+        """What GitHub's squash merge does: the branch's content as one commit on main, by
+        someone else, then another PR merged after it."""
+        run("git", "pull", "-q", "--rebase", "origin", "main", cwd=other)
+        for name, text in branch_files:
+            (other / name).write_text(text)
+        run("git", "commit", "-q", "-am", "squash", cwd=other)
+        later = other / "later"
+        later.write_text(later.read_text() + "x" if later.exists() else "x")
+        run("git", "add", "later", cwd=other)
+        run("git", "commit", "-q", "-m", "a later PR", cwd=other)
+        run("git", "push", "-q", "origin", "main", cwd=other)
+        run("git", "fetch", "-q", "origin", cwd=repo)
+
+    # one commit, squash-merged: its patch is on main under another sha
+    run("git", "switch", "-q", "-c", "td-one", "origin/main", cwd=repo)
+    (repo / "f").write_text("2\n")
+    run("git", "commit", "-q", "-am", "two", cwd=repo)
+    info = git_info(repo)
+    assert info and (info.unpushed, info.pushed_against) == (1, "origin/main"), "not merged yet: only here"
+    squash_on_origin(("f", "2\n"))
+    info = git_info(repo)
+    assert info and info.ahead == 1 and info.behind == 2
+    assert (info.unpushed, info.pushed_against) == (0, "origin/main"), "its content is on main"
+    (repo / "g").write_text("z\n")
+    run("git", "commit", "-q", "-am", "never pushed", cwd=repo)
+    info = git_info(repo)
+    assert info and info.ahead == 2 and (info.unpushed, info.pushed_against) == (1, "origin/main"), "only that one"
+    run("git", "reset", "-q", "--hard", "HEAD~1", cwd=repo)
+
+    # two commits, squashed into one: no single patch matches, the content does
+    run("git", "switch", "-q", "-c", "td-two", "origin/main", cwd=repo)
+    (repo / "f").write_text("3\n")
+    run("git", "commit", "-q", "-am", "three", cwd=repo)
+    (repo / "g").write_text("b\n")
+    run("git", "commit", "-q", "-am", "four", cwd=repo)
+    squash_on_origin(("f", "3\n"), ("g", "b\n"))
+    info = git_info(repo)
+    assert info and info.ahead == 2 and info.unpushed == 0
+
+    # a commit that never reached the remote on top of a squash of several is not pushed: no single
+    # patch matches and the content is not whole upstream, so the three are counted (never 0)
+    (repo / "g").write_text("c\n")
+    run("git", "commit", "-q", "-am", "five", cwd=repo)
+    info = git_info(repo)
+    assert info and info.ahead == 3 and (info.unpushed, info.pushed_against) == (3, "origin/main")
+
+
 def test_ensure_worktree_creates_reuses_and_validates(tmp_path):
     from sessionorc.gitinfo import WorktreeError, ensure_worktree
 

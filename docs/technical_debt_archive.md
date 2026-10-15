@@ -12622,3 +12622,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Resolved:** 2026-10-14 — built and archived with its last build (§4.9c *A design entry archives with its last build*): TD-698 (#1790, the td flow's briefs), TD-696 (#1794, `td_next` and `ao td next`), TD-697 (#1793, the Repo page's builds line).
 
 **Related:** TD-585 (ledgerboard is ShiftLead's parser), TD-228 (pickable from `Blocked by`), TD-682 / #1777 (an archive-only PR).
+
+## TD-701: Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.2 (*branch pushed*); `src/sessionorc/gitinfo.py` (`_unpushed`), `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1047)
+
+**Why:** `docs-audit-ao-1`'s Focus, 2026-10-14 21:53 MDT (Paul's screenshot, `~/.shiftlead/attachments/ao-shiftlead-ao-paul/paste-20261014-215450.png`): *✗ branch pushed (vs origin/main)*, Git *td632-git-card-deletion-code · 1 unpushed vs origin/main · 1 ahead · 147 behind · clean*, so the seat would not close. Its one commit, `5f7161ab`, is #1643's head, merged 2026-10-13T15:46Z by squash, and its branch deleted from origin. The branch was cut with `git switch -c … origin/main`, so its upstream is `origin/main`; a squash leaves the commit on no remote-tracking ref, and `_unpushed` counts it. Every worker and seat that cuts its branch this way and merges by squash reads *not pushed* once the remote branch is deleted.
+
+**Resolved:** 2026-10-14 (PR #1800) — `gitinfo._not_in_upstream`: rule 2 counts only the commits ahead whose patch the upstream lacks (`--cherry-pick --right-only`), and reads 0 when `git merge-tree --write-tree` of the upstream and `HEAD` is the upstream's tree (a squash of several); `test_a_squash_merged_branch_tracking_origin_main_reads_pushed` holds both halves of *Done when*.
+
+**Fix:** a commit whose content is in its upstream, or that is the head of a merged PR the reading already holds, is not unpushed: count only commits whose patch is absent from the upstream (`git cherry` / `--cherry-pick` over the range), and failing that, a branch whose PR is merged at the same head is pushed.
+
+**Done when** a test holds a branch with upstream `origin/main`, one commit squash-merged into it under another sha, and its remote branch gone, reading 0 unpushed; and a commit that never reached the remote still reads 1.
+
+**Related:** TD-700, TD-080 (one measure, computed by the host agent).

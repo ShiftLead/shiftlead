@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Built (#1798); live check |
-| TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
 | TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
@@ -1011,26 +1010,6 @@ The other cases:
 **Done when** a test holds a `prs` seat whose `seat_due` is set mid-run: idle and pushed, it is closed and then filled, and `_seat_done` says so; and on the live copy an auditor that came due mid-run is filled again within a tick of its going idle.
 
 **Related:** TD-701 (the close it needs can be blocked), TD-702, TD-386 (the anchor's `work` trigger), TD-660.
-
----
-
-## TD-701: Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-14 (ao-paul, with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.2 (*branch pushed*); `src/sessionorc/gitinfo.py` (`_unpushed`), `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1047)
-
-**Why:** `docs-audit-ao-1`'s Focus, 2026-10-14 21:53 MDT (Paul's screenshot, `~/.shiftlead/attachments/ao-shiftlead-ao-paul/paste-20261014-215450.png`): *✗ branch pushed (vs origin/main)*, Git *td632-git-card-deletion-code · 1 unpushed vs origin/main · 1 ahead · 147 behind · clean*, so the seat would not close. Its one commit, `5f7161ab`, is #1643's head, merged 2026-10-13T15:46Z by squash, and its branch deleted from origin. The branch was cut with `git switch -c … origin/main`, so its upstream is `origin/main`; a squash leaves the commit on no remote-tracking ref, and `_unpushed` counts it. Every worker and seat that cuts its branch this way and merges by squash reads *not pushed* once the remote branch is deleted.
-
-**Fix:** a commit whose content is in its upstream, or that is the head of a merged PR the reading already holds, is not unpushed: count only commits whose patch is absent from the upstream (`git cherry` / `--cherry-pick` over the range), and failing that, a branch whose PR is merged at the same head is pushed.
-
-**Done when** a test holds a branch with upstream `origin/main`, one commit squash-merged into it under another sha, and its remote branch gone, reading 0 unpushed; and a commit that never reached the remote still reads 1.
-
-**Related:** TD-700, TD-080 (one measure, computed by the host agent).
 
 ---
 
