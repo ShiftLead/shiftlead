@@ -703,6 +703,9 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .tag.red { border-color: var(--stalled); color: var(--stalled-fg); background: var(--stalled-bg); }  /* a red or conflicting PR (TD-613) */
 .repopage .tag.notrun { border-color: var(--alarm); color: var(--alarm-fg); background: var(--alarm-bg); cursor: help; }  /* CI never ran: the person's (TD-686) */
 .repopage .rrow .p-high { color: var(--stalled-fg); }
+.repopage .rrow.buildsline { border-top: 0; padding: 0 14px 8px 76px; margin-top: -6px; font-size: var(--t-small); }  /* a design's builds line, under its row (TD-693) */
+.repopage .rrow.buildsline > .meta { white-space: normal; flex: 1 1 auto; min-width: 0; }
+.repopage .rrow.buildsline .bstate { color: var(--muted); }
 .repopage .imark { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; }
 .repopage .secinfo { margin: -4px 0 8px; }
 .repopage .dchips { margin-bottom: 8px; }

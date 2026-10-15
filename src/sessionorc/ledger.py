@@ -117,6 +117,17 @@ def _norm(tid: str) -> str:
     return f"TD-{int(tid[3:]):03d}"
 
 
+def blocked_ids(raw: str | None) -> list[str]:
+    """An entry's whole `Blocked by:` ids, in order (§4.5 screen 11 *Its builds*, TD-693): the local
+    `TD-NNN` items alone, no `<repo>#` item, no decision, each written `TD-NNN` as the archive's are,
+    archived ones kept — unlike `blocked_by`, which is what still blocks."""
+    out: list[str] = []
+    for item in lb.parse_blocked(raw)[0] if raw else []:
+        if "#" not in item and (tid := _norm(item)) not in out:
+            out.append(tid)
+    return out
+
+
 def ids_in(text: str | None) -> set[str]:
     """The ids with a `## TD-NNN:` heading in a ledger or an archive, comments dropped."""
     return {f"TD-{n:03d}" for n in lb.heading_nums(text)}
@@ -336,7 +347,8 @@ def entries(
     """Every entry of one version of the file, in file order: `id`, `title`, the header fields
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
     unknown), `blocked_by` — what still blocks, as the script lists it: open ids, `decision (<who>)`,
-    an unread item quoted — and `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
+    an unread item quoted — `blocked_ids`, the whole line's local ids, archived ones kept — and
+    `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
     *Repo facts*, TD-228) as ledgerboard's `pickable` derives it (TD-585): blocked while `Blocked by:`
     names an id not in `archive` (open, or in neither file), a decision, or an item it cannot read;
     an id headed twice is blocked by what blocks either (ledgerboard keys its reading by id). A
@@ -366,6 +378,7 @@ def entries(
             "kind": _word(fields.get("kind", "")),
             "type": etype if etype in TYPES else TYPES[0],
             "blocked_by": blocked_by,
+            "blocked_ids": blocked_ids(read["blocked_raw"]),
             "pickable": "no" if blocked_by else "yes",
         }
         if e["kind"] == "live-check":
@@ -620,13 +633,14 @@ def reading(
     live: Live | None = None,
 ) -> dict[str, Any]:
     """The ledger reading of one checkout (§4.4 *Repo facts*): `{path, entries, by_priority,
-    by_kind, windows, recent, at}`, or `{path, error}` when the file cannot be read. The archive
+    by_kind, archived, windows, recent, at}`, or `{path, error}` when the file cannot be read. The archive
     beside the ledger (`archive_path`; none there, nothing archived) and `resolve` — the home's
     `Registry` — derive each entry's `pickable`; `live` — the home's `LiveReader` — a live check's
     `live`. `windows` is `{day|week|month: {opened, closed}}`
     from the history and `recent` the entries opened or closed in the longest window, newest first —
     both absent when the history was not read, and marked `history_error` when git could not be
-    asked."""
+    asked. `archived` is the archived ids some entry's `blocked_ids` names, never the whole archive
+    (§4.5 screen 11 *Its builds*, TD-693)."""
     rel = rel or ledger_path(root)
     try:
         text = (Path(root) / rel).read_text(encoding="utf-8")
@@ -642,6 +656,7 @@ def reading(
         "entries": got,
         "by_priority": {p: sum(1 for e in got if e["priority"] == p) for p in PRIORITIES},
         "by_kind": {k: sum(1 for e in got if e["for_page"] == k) for k in KINDS},
+        "archived": sorted(ids_in(archive) & {b for e in got for b in e["blocked_ids"]}),
         "at": now.isoformat(),
     }
     if not with_history:

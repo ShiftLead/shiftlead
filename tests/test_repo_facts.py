@@ -68,6 +68,7 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "kind": "build",
         "type": "debt",
         "blocked_by": [],
+        "blocked_ids": [],
         "pickable": "yes",
         "for_page": "pickable",
     }
