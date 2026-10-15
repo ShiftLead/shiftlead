@@ -317,6 +317,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-15 (TD-722, the designer): screen 1 — the team header says the host alone, the repo being the heading it sits under; a repo two teams share is on both teams' cards. Built by TD-725.
 - 2026-10-14 (TD-697, grinder-ao-2): *Its builds* — built. *in review #n* reads the PR the entry's *TDs in motion* row shows, so the two agree: the claim's `pr` or `review_pr`, else an open PR whose branch names the entry (the techlead's reading of #1793). Was: the claim's `pr` or `review_pr` alone.
 - 2026-10-14 (TD-693, the designer): Screen 11 *Technical debt* — *Its builds*: a design entry's row carries its builds and their states; a build's row says *builds TD-n*. Built by TD-697.
 - 2026-10-14 (TD-694, grinder-ao-2): *A reconnect reloads once, never in a loop* — built. The reproduction on a scratch home (a UI whose `fan.join` raises) reloaded the Org, the repo page and Focus about twice a second, two `/events` opens a load, and logged nothing; built, the same pages load once and reconnect with backoff. One sentence added: a reload is counted once, since `location.reload()` does not stop the page at once and the messages still arriving on the socket each counted another (the scratch home showed three times a few milliseconds apart from one reload).
@@ -433,6 +434,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-15 (TD-722, the designer): *team groups* are grouped project → repo → team; *Hand to the techlead* goes to the first of the repo's teams with a techlead seat. Built by TD-724 and TD-725.
 - 2026-10-15 (TD-717, the designer): *brief not sent* on a team's record is replayed once; the restart Inbox row gains *brief lost twice*. Built by TD-720.
 - 2026-10-15 (TD-715, the designer): the Repo page's **waits** mark, the lanes line's *· n waiting*, and the card's *n waiting* in grey for a member whose lane only waits. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): **Hold** / **Release** on a settling entry's Repo page row, and the Settings page's **settle**. Built by TD-710.
@@ -953,6 +955,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-15 (TD-722, the designer; Paul, 2026-10-15, in an interactive session: *one repo per team, declared*, and a project as *a heading*, placed *on the repo*): *Projects* and *Teams*. A team declares one `repo:`, which replaces `projects:` and every `home:`, and a repo has any number of teams. A project is a heading on repos, a repo in at most one and a repo in none its own heading, with an optional `title`. Nesting is refused, and teams that work together are teams under one heading. A definition with the old keys is read for one release with a warning where it names one repo, and refused where it spans. The Org page groups project → repo → team, the *mixed* place goes, and a team's repo is its definition's, never read from where its members sit. The ADR's *a team may span projects* is superseded. Built by TD-724 and TD-725; the org file's backfill is TD-723.
 - 2026-10-15 (TD-706 slice 3, grinder-ao-2): *A member renamed or removed in the definition* — Start creates a newcomer an earlier Apply marked on its orphan succeeding that orphan, as it does a paired one, and refuses, before anything is marked or created, while an orphan still runs on a team not concluded and when a session rather than a person starts a team with a rename or a removal (`relaunch` and `succeeds` are a person's acts).
 - 2026-10-15 (TD-706 slice 2, grinder-ao-1; the techlead's read of #1807): *A member renamed or removed in the definition* — a node member's own record keeps a renamed lead's old address in `controllers` until its next create: `controllers` is the node's field, which a home-side rewrite would lose to the node's next report, so the carry rewrites the node member's launch record alone. Routing the rewrite to the node is TD-712.
 - 2026-10-14 (TD-703, the designer; Paul, 2026-10-14, after renaming dev-cadence's members: *we should also make sure members are not duplicated on changes as well (e.g. dc-grinder alongside grinder-dc-1)*): *A member renamed or removed in the definition* — the client pairs the records the definition no longer names with the names no record carries, within a role, in order; a rename is a relaunch under the new name whose create succeeds the old record, a removal the sit-out form; read on a stopped team too; Members…'s Remove marks the record sat out instead of Wrap up's wind-down, which left a declared record rule 8 replayed. Rejected: an explicit `was:` key on the member line (the edit as Paul made it would not take). Built by TD-706.
@@ -1043,6 +1046,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-15 (TD-722, the designer): the director seat is the org's, above every heading: an org-wide Project block, and a card at the top of the Org page. Built with TD-642.
 - 2026-10-14 (TD-686 slice 2, grinder-ao-1): *How the reader hears of a PR* — an `ask` carrying a PR whose required checks never started is sent, with *PR #<n>: checks never started on <head>: <reason>* in the reply (the techlead's finding on #1768).
 - 2026-10-14 (TD-641, grinder-ao-1): *The director seat answers permission prompts* — a node answers by rule again, but only while its link is up and only once the home has filed the *Answered for you* FYI over it (`answered_by_rule`, a request, not a notification); a link that is down or a filing refused leaves the prompt for the person, so no answer goes untold. This lifts the 2026-10-13 *a node matches no rule*.
 - 2026-10-13 (TD-641, grinder-ao-1; the techlead's read of #1697): *The director seat answers permission prompts* — a node matches no rule: its hook is the node's, but the *Answered for you* FYI is mail, whose one writer is the home (§9 invariant 15), and one filed to a node's own person inbox went untold. Carrying it over the link is left on TD-641.
@@ -1152,6 +1156,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-15 (TD-722, the designer): *across teams, by project* — the `project` badge is the team's repo's project, the repo's own name where no project lists it, so two teams on one repo always share one. Built by TD-724.
 - 2026-10-13 (TD-665, the designer): mail to a record with no agent is refused. Built by TD-666.
 - 2026-10-12 (TD-582, the designer; Paul, 2026-10-12, through Add entry: *a way to allow sessions from separate teams (or the same team) to coordinate via messages so that they can come to a consensus on solutions*): the gate gains **across teams, by project** — two sessions with the same `project` badge, mail only; *An agreement between peers* — a `steer` to the peer, binding once written in the shared entry, the PR or the design, a disagreement up each side's own path, no copies to controllers. Was: no edge between teams, and a peer's agreement bound nothing. Built by TD-601.
 - 2026-10-12 (TD-574, grinder-ao-2; the docs audit of #1536–#1546): *A subject on every entry*'s **Drawn** names the two rows that draw no subject line, a ledger row and a trail row, whose subject is already their first text — as TD-566 built them.
@@ -1271,6 +1276,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-15 (TD-722, the designer): `org.yml`'s example — `projects:` headings with a `title`, `teams.<name>.repo`. Built by TD-724.
 - 2026-10-14 (TD-707, the designer): `settle:` in `settings.yml` and in a repo's `.shiftlead.yml`, the repo's winning key by key; the host agent reads the repo's as it reads `ledger:`. Built by TD-710.
 - 2026-10-14 (TD-681, the designer): `repos.<repo>.sync: {auto}` joins `promote.auto` and `pull` in `settings.yml`, `true` when absent.
 - 2026-10-14 (TD-588 slice 2, grinder-ao-2): *The seams*' slots taken by the built-in briefs, the five flows' stage texts and `team_skill.md` — the gate step `{gate}`, the board `{board}`, the first reads `{cadence_rules}`, the design `{design_dir}`, the tests `{test}` and `{lint}`, a decided line closed with `ao board edit done` — and `tests/test_briefs_layout.py` fails on the ADR's literals in them. This repo's own moved to its `.shiftlead.yml` (`commands: {test: pdm run test, lint: pdm run lint}`) and, for the anchor, to `docs/briefs/anchor.md` (`roles.anchor.brief`): the scratch home and the ledger script, which a grinder's and the designer's repo parts already named.

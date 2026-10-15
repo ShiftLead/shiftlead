@@ -1,6 +1,9 @@
 # ADR 2026-09-13: Org, Team, Project, Role — how a person organises agents
 
 Status: decided 2026-09-13 (Paul, with the anchor session), vocabulary and relationships only.
+**Amended 2026-10-15 (TD-722, Paul):** *a team may span projects* is superseded. A team works
+one repo, a repo has any number of teams, and a project is a heading on repos, a repo in at most
+one (design §4.9 *Projects*, *Teams*).
 The design changes it implies are ledgered as TD-040 and sequenced after TD-036; nothing here
 changes behaviour until they are written into design §4.5, §4.8 and §5.
 

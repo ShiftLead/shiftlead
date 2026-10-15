@@ -263,7 +263,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   and the rest of the file are the clients' alone.
 
 - Org (§4.9): the teams each registered repo defines in its own `.shiftlead.yml`, aggregated with
-  the org file, which holds what no one repo can: projects and teams that span repos, `place:`
+  the org file, which holds what no one repo can: the project headings over repos, a team kept out of its repo's file, `place:`
   and the install's `roles:` overlay; `org.yml`, `profiles.yml` and `settings.yml` (and the
   person's `preferences.md`, §4.9b, TD-657) are tracked by a git work tree in `~/.shiftlead/` at the home (§4.9 *The org is an aggregate*, *What is
   left at the home has a history*).
@@ -272,12 +272,12 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   exactly as a repo's `roles:` is. Read by the clients on every use, never by the host agent:
 
 ```yaml
-projects:
-  shiftlead: {repos: {shiftlead: {kmaster: ~/shiftlead}}}
+projects:                                    # §4.9: headings on repos (TD-722); a repo in at most one, a repo in none its own heading
+  contractmatch: {title: ContractMatch, repos: {samscrape: {kmaster: ~/samscrape}, contractmatch: {kmaster: ~/contractmatch}}}
   guardians: {repos: {guardians: {devenv: /workspaces/guardians}, guardians-api: {devenv: /workspaces/guardians/api}}}
 teams:
   ao-grind:
-    projects: [shiftlead]
+    repo: shiftlead                            # one repo per team (TD-722); unsaid in a repo's own .shiftlead.yml
     manager: {role: manager, name: manager-ao-1}
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
