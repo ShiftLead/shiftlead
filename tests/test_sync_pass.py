@@ -121,6 +121,11 @@ def test_mark_the_homes_prs_are_no_order_and_a_verdicts_why_is_the_context():
     assert workorders.is_sync_order(got[2]) and workorders.is_sync_order(got[4])
     off = {p["number"]: p for p in sync.mark(prs, {}, False)}
     assert not any(p.get("sync_home") for p in off.values()), "switch off: every sync PR is the team's"
+    # *off* at the head is the order's Context; a stale *off* under a switch on again is the home's
+    offs = {"1": {"head": HEAD, "verdict": "off", "why": "sync is off"}, "2": {"head": "0" * 40, "verdict": "off"}}
+    off = {p["number"]: p for p in sync.mark(prs, offs, False)}
+    assert workorders.sync_reason(off[1]) == "sync is off" and not off[2].get("sync_why")
+    assert sync.mark(prs, offs, True)[0]["sync_home"] and not sync.mark(prs, offs, True)[0].get("sync_why")
 
 
 def test_the_ship_comment_is_the_cadence_line_and_what_was_checked():
@@ -247,7 +252,7 @@ async def test_the_switch_off_merges_nothing_and_every_sync_pr_is_the_teams(agen
     await agent._sync_pass()
     assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "off" and gh["calls"] == []
     (order,) = await _orders(agent)
-    assert "green: review and merge it" in order["context"]
+    assert order["context"].endswith("sync is off")  # the verdict's why is the order's Context
     # on again: *off* is no verdict, so the PR is judged
     settings_mod.save({"repos": {"samscrape": {"sync": {"auto": True}}}})
     await agent._sync_pass()
@@ -307,4 +312,11 @@ def test_held_globs_reads_the_repo_file(tmp_path):
     (tmp_path / ".shiftlead.yml").write_text("held: src/x\n")
     assert sync.held_globs(tmp_path) is None
     (tmp_path / ".shiftlead.yml").write_text("held: [\n")
+    assert sync.held_globs(tmp_path) is None
+    # a mapping of named sets (§4.9c) is their union, a glob once
+    (tmp_path / ".shiftlead.yml").write_text(
+        'held:\n  core: ["src/x/**", "docs/b/**"]\n  ui: ["src/y/**", "docs/b/**"]\n'
+    )
+    assert sync.held_globs(tmp_path) == ["src/x/**", "docs/b/**", "src/y/**"]
+    (tmp_path / ".shiftlead.yml").write_text("held:\n  core: src/x\n")
     assert sync.held_globs(tmp_path) is None

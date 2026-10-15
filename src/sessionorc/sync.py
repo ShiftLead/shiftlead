@@ -420,8 +420,9 @@ def merge(root: Path | str, number: int, head: str) -> str | None:
 
 def held_globs(root: Path | str) -> list[str] | None:
     """The repo's `held:` from its `.shiftlead.yml` (§4.9c *What is the repo's*): what every review stage
-    holds, so a sync PR touching one is the team's. No file holds nothing; a file that cannot be read, or a
-    `held:` that is not a list, is None — no reading, never *nothing held*."""
+    holds, so a sync PR touching one is the team's: the list, or the union of its named sets (§4.9c *A repo
+    names its path sets*). No file holds nothing; a file that cannot be read, or a `held:` that is neither
+    a list nor a mapping of lists, is None — no reading, never *nothing held*."""
     f = paths.repo_file(root)
     if not f.exists():
         return []
@@ -430,9 +431,13 @@ def held_globs(root: Path | str) -> list[str] | None:
     except (OSError, yaml.YAMLError):
         return None
     got = doc.get("held", []) if isinstance(doc, dict) else [] if doc is None else None
+    if isinstance(got, dict):
+        if not all(isinstance(v, list) for v in got.values()):
+            return None
+        got = [g for globs in got.values() for g in globs]
     if not isinstance(got, list):
         return None
-    return [str(g) for g in got if isinstance(g, str) and g.strip()]
+    return list(dict.fromkeys(str(g) for g in got if isinstance(g, str) and g.strip()))
 
 
 def _no_reading(entry: dict[str, Any], why: str, at: str) -> dict[str, Any]:
@@ -481,7 +486,8 @@ def mark(prs: list[dict[str, Any]], sync: dict[str, Any], auto: bool) -> list[di
     """The open PRs as TD-684's order reads them once the home merges (§6 *Sync*): a sync PR the home
     holds — merged at its head, or green with no verdict at its head while the switch is on — carries
     `sync_home`, and is no order; one with a verdict at its head carries `sync_why`, its order's
-    `Context`. Copies; the reading is never changed."""
+    `Context`, and so does one *off* at its head the home does not hold (*sync is off*). Copies; the
+    reading is never changed."""
     out = []
     for pr in prs:
         if not isinstance(pr, dict) or pr.get("sync") is not True:
@@ -493,5 +499,7 @@ def mark(prs: list[dict[str, Any]], sync: dict[str, Any], auto: bool) -> list[di
             pr = {**pr, "sync_home": True} if e["verdict"] == "merged" else {**pr, "sync_why": str(e.get("why") or "")}
         elif auto and pr.get("checks") == "green" and not pr.get("draft") and not pr.get("conflicting"):
             pr = {**pr, "sync_home": True}
+        elif e and e.get("verdict") == "off" and e.get("head") == head:
+            pr = {**pr, "sync_why": str(e.get("why") or "sync is off")}
         out.append(pr)
     return out
