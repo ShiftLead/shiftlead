@@ -12765,3 +12765,21 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-463 (the CI flakes since 2026-10-03).
 
 **Resolved:** 2026-10-15 — grinder-ao-2. The cause was wider than the entry read: the node's dialer takes `first` and `top` once, when the node starts (`agent_link._dial_home`, under the fixture's 0.05 s / 0.2 s), so the test's 2.0 s patch held nothing. Measured: the backoff after the close was 0.05 s, and the refusal was read 0.107 s after it, so the test passed only while spawning the dial command took longer. Five tests in `tests/test_link.py` set the constants this way (holds of 1, 2, 2, 2 and 5 s). Each now calls `shut_the_lid(node, monkeypatch)`, which patches `link._dial_once` (looked up afresh on every redial) to wait on an event the test sets once it has read what it needs. A 3 s sleep before the `inbox` call still raises. All 67 tests pass, and the file runs in 68.6 s against 69.5 s on main.
+
+## TD-714: `teamrun._pairing`'s sort of orphans by `created` is held by no test, though a test is named for it (#1802)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1800–#1810)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/teamrun.py` (`_pairing`, `orphans.sort(key=lambda r: str(r.get("created") or ""))`); `tests/test_flows.py` (`test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_one`, `_renamed`), `tests/test_ui_teams.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1802's code and running `tests/test_flows.py tests/test_ui_teams.py` (121 passed unmutated). Replacing `orphans.sort(key=lambda r: str(r.get("created") or ""))` with `pass` still passes all 121. Every fixture lists its records already in `created` order — `grind-b` (`…:01`) before `grind-a` (`…:02`) in the test named *pairs by created*, and `_renamed` writes `created` by the records' list index — so the sort is a no-op there, and the design's rule (§4.9 *A member renamed or removed*: orphans paired with newcomers *by `created`*) is held by nothing: a run that pairs in the order `sessions` happens to arrive in, which `list` does not promise, passes. Four other edits tried (the `sit_out` filter, the `relaunch`-mark hold, the role match, `MOVED` in `definition`) each fail a test.
+
+**Done when** a test hands `teamrun.renames` records of one role whose list order is the reverse of their `created`, and pairs the older with the first newcomer; it fails with the sort removed.
+
+**Related:** TD-703, TD-706.
+
+**Resolved:** 2026-10-15 — grinder-ao-2. `test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_one` now hands `teamrun.renames` the same records reversed. `grind-b` (older) still takes `mill-1`, and the test fails with the sort replaced by `pass`.
