@@ -17,6 +17,7 @@ from datetime import UTC, datetime, timedelta
 from importlib import resources
 from typing import Any
 
+from sessionorc import agent_ids as ids_mod
 from sessionorc import board as board_mod
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming, promote, workorders
@@ -2760,6 +2761,57 @@ def cmd_board_edit(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _td_repo(repo: str | None) -> tuple[str, str]:
+    """`(raw, root)` for `ao td add` and `ao td next`: the registry's own spelling of the repo — `--repo`, or
+    the one this directory is in, by its **main checkout** (a worktree's path is not in the registry) — and
+    its resolved path. The registry's spelling names a repo, as `ao repo` and the form read it (a symlinked
+    checkout is named by its link)."""
+    by_raw = {str(r): str(pathlib.Path(r).expanduser().resolve()) for r in hosts.local_host().repos()}
+    if repo:
+        want = str(pathlib.Path(repo).expanduser().resolve())
+        found = [
+            (raw, path)
+            for raw, path in by_raw.items()
+            if repo in (pathlib.Path(raw).expanduser().name, raw) or path == want
+        ]
+        if not found:
+            raise AgentError(f"no registered repo is named {repo!r}; ao repo --all lists them")
+        return found[0]
+    root = _main_checkout(os.getcwd()) or ""
+    for raw, path in by_raw.items():
+        if path == root:
+            return raw, path
+    raise AgentError("this directory is not in a registered repo; name one with --repo, or ao repo --all")
+
+
+def _origin_key(root: str) -> str:
+    try:
+        cp = subprocess.run(
+            ["git", "-C", root, "remote", "get-url", "origin"], capture_output=True, text=True, timeout=10
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return ids_mod.origin_key(cp.stdout) if cp.returncode == 0 and cp.stdout.strip() else ""
+
+
+def cmd_td_next(args: argparse.Namespace) -> int:
+    """`ao td next [--repo <name>] [--count <n>]` (design §4.7 *Entries*, §4.4 *A ledger entry's id is
+    handed out by the home*; TD-696): the next free ledger id of the repo, or `n` in a row, from the home's
+    `td_next`, one a line. Open to every session and the person. The repo goes by its registered name, or by
+    its origin's `owner/repo` when checkouts of different origins share that name; an open PR the home could
+    not read is said on standard error."""
+    raw, root = _td_repo(args.repo)
+    name = pathlib.Path(raw).expanduser().name
+    peers = [r for r in hosts.local_host().repos() if pathlib.Path(r).expanduser().name == name]
+    if len(peers) > 1 and len({_origin_key(str(pathlib.Path(r).expanduser())) for r in peers}) > 1:
+        name = _origin_key(root) or name  # a shared name: the origin picks the one
+    got = call_sync("td_next", repo=name, count=args.count)  # the home's budget, 45 s, is under the client's 120
+    for line in got.get("unread") or ():
+        print(line, file=sys.stderr)
+    out = {"repo": got.get("repo"), "ids": got.get("ids") or [], "unread": got.get("unread") or []}
+    return emit(args, out, lambda: print("\n".join(out["ids"])))
+
+
 def cmd_td_add(args: argparse.Namespace) -> int:
     """`ao td add [--repo <name>] [--type debt|feature] ["<words>"]` (design §4.7 *Entries*, §4.9 *Add
     an entry to the ledger*; TD-218 slice 4): the terminal's form of **Hand to the techlead**. The
@@ -2776,24 +2828,7 @@ def cmd_td_add(args: argparse.Namespace) -> int:
             f"{sid} cannot add an entry this way: it is a person's own act (design §4.9 *Add an entry to the "
             "ledger*) — a session writes the entry on its branch (cadence §2), or files `ao finding`"
         )
-    # the registry's own spelling names a repo, as `ao repo` and the form read it (a symlinked
-    # checkout is named by its link); the resolved path is what is handed
-    by_raw = {str(r): str(pathlib.Path(r).expanduser().resolve()) for r in hosts.local_host().repos()}
-    roots = list(by_raw.values())
-    if args.repo:
-        want = str(pathlib.Path(args.repo).expanduser().resolve())
-        found = [
-            path
-            for raw, path in by_raw.items()
-            if args.repo in (pathlib.Path(raw).expanduser().name, raw) or path == want
-        ]
-        if not found:
-            raise AgentError(f"no registered repo is named {args.repo!r}; ao repo --all lists them")
-        root = found[0]
-    else:
-        root = _main_checkout(os.getcwd()) or ""
-        if root not in roots:
-            raise AgentError("this directory is not in a registered repo; name one with --repo, or ao repo --all")
+    root = _td_repo(args.repo)[1]
     try:
         org = _org_here()
     except ValueError as e:
@@ -4044,7 +4079,7 @@ def build_parser() -> argparse.ArgumentParser:
     )  # fmt: skip
     q.set_defaults(fn=cmd_board_edit)
 
-    p = add("td", help="hand the techlead an entry for the ledger (design §4.9; a person's own)")
+    p = add("td", help="the ledger's entries: hand the techlead one, or take the next free id (design §4.7)")
     dsub = p.add_subparsers(dest="action", required=True)
     q = dsub.add_parser("add", help="the words go to the repo's techlead seat as an ask it owes an outcome on")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
@@ -4052,6 +4087,13 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--type", choices=orgmod.ENTRY_TYPES, default="debt", help="the ledger's Type (default: debt)")
     q.add_argument("words", nargs="*", metavar='"words"', help="what the entry is; standard input when there is none")
     q.set_defaults(fn=cmd_td_add)
+    q = dsub.add_parser(
+        "next", help="the next free ledger id, handed out by the home and recorded (§4.4); open to every session"
+    )
+    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="{repo, ids, unread}")
+    q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
+    q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
+    q.set_defaults(fn=cmd_td_next)
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")
     # `nargs="*"`: `--pick <n>` sends the suggested answer's own text, so the words are optional
