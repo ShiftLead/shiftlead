@@ -149,6 +149,7 @@ PERSON_ONLY = frozenset(
         "notify_test",
         "forget_host",
         "attach",
+        "ci_rerun",
     }
 )
 

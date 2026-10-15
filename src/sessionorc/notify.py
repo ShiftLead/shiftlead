@@ -72,6 +72,13 @@ def work_line(team: str, n: int, finished: list[str] | None = None) -> str:
     return f"{PREFIX} · {team}{who} and has work: {n} entr{'y' if n == 1 else 'ies'}"
 
 
+def ci_line(owner: str, n: int) -> str:
+    """An account whose CI never starts (§4.4 *CI that never started is the person's*, TD-687), its owner a
+    GitHub login and the count of PRs and default branches waiting: *shiftlead · GitHub Actions does not
+    start in ContractMatch · 3 waiting*."""
+    return f"{PREFIX} · GitHub Actions does not start in {owner} · {n} waiting"
+
+
 def test_line(home: str) -> str:
     """**Send a test**: *shiftlead · a test from kmaster*."""
     return f"{PREFIX} · a test from {home}"

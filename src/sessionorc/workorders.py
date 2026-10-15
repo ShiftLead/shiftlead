@@ -577,3 +577,62 @@ def ci_not_run(repos: dict[str, dict[str, Any]], promotes: dict[str, dict[str, A
             item = {"repo": name, "root": str(r.get("root") or ""), "main": r["main"]}
             add(reports.github_owner(r.get("origin")), r["checks_not_run"], item)
     return out
+
+
+CI_SPELL_CLEAR = 2  # successful readings in a row that group nothing for an owner, with no re-run pending
+RUN_DONE = "completed"  # an Actions run's `status` once it has ended; every other status is pending
+
+
+def ci_failed_owners(repos: dict[str, dict[str, Any]]) -> set[str]:
+    """The owners, in lower case, of every repo whose last PR read failed (design §4.4 *Its spell*): for
+    them this reading is no reading, and their spells' clear counts are left as they were (TD-687)."""
+    out: set[str] = set()
+    for reading in repos.values():
+        prs = (reading or {}).get("prs") if isinstance(reading, dict) else None
+        if isinstance(prs, dict) and prs.get("error") and (owner := reports.github_owner(reading.get("remote"))):
+            out.add(owner.lower())
+    return out
+
+
+def ci_rerun_pending(spell: dict[str, Any]) -> bool:
+    """Whether any run a **Re-run** asked for is still queued or running, as last read (a failed read
+    is pending, design §4.4 *A Re-run's runs are read*)."""
+    return any(r.get("pending") for r in ((spell.get("rerun") or {}).get("runs") or []) if isinstance(r, dict))
+
+
+def ci_spells(
+    spells: dict[str, dict[str, Any]], grouped: dict[str, dict[str, Any]], failed: set[str], now: str
+) -> dict[str, dict[str, Any]]:
+    """One successful reading's step of every **spell** (design §4.4 *Its spell*, TD-687): `spells` as the
+    home keeps them, `{<owner>: {owner, since, clear, row, rerun?}}`, keyed in lower case; `grouped`
+    `ci_not_run`'s reading; `failed` the owners `ci_failed_owners` names. An owner grouped begins a spell
+    at `now` or keeps its own, its `clear` back to 0 and its `row` the grouping's; one not grouped counts
+    the reading toward `CI_SPELL_CLEAR` — unless its reading failed (no change) or a re-run's run is
+    pending (back to 0) — and its spell ends at the count. Never mutates `spells`."""
+    out: dict[str, dict[str, Any]] = {}
+    for key, row in grouped.items():
+        old = spells.get(key) or {"owner": row.get("owner") or key, "since": now}
+        out[key] = {**old, "clear": 0, "row": {k: row.get(k) for k in ("owner", "reason", "kind", "items")}}
+    for key, old in spells.items():
+        if key in out:
+            continue
+        if key in failed:
+            out[key] = dict(old)
+            continue
+        clear = 0 if ci_rerun_pending(old) else int(old.get("clear") or 0) + 1
+        if clear < CI_SPELL_CLEAR:
+            out[key] = {**old, "clear": clear}
+    return out
+
+
+def ci_rerun_runs(spell: dict[str, Any]) -> list[tuple[str, int]]:
+    """Every `(root, run)` the spell's row names, once each and in the row's order: what **Re-run** asks
+    GitHub to re-run (design §4.5a *Inbox row: CI not starting*)."""
+    seen: dict[tuple[str, int], None] = {}
+    for item in (spell.get("row") or {}).get("items") or []:
+        if not isinstance(item, dict) or not item.get("root"):
+            continue
+        for run in item.get("runs") or []:
+            with contextlib.suppress(TypeError, ValueError):
+                seen.setdefault((str(item["root"]), int(run)), None)
+    return list(seen)

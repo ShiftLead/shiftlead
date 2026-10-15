@@ -51,6 +51,8 @@ from sessionorc.mail import self_decide_refusal
 # are the home's, a node member's too.
 # **`notify_test`** (§4.10 *Told on Telegram*, TD-319): only the home sends, so a node's Send a test is
 # sent from the home.
+# **`ci_rerun`** (§4.5a *Inbox row: CI not starting*, TD-687): the spells and readings it names are the home's,
+# and the spell it writes is on the home's `host` record.
 HOME_EDITS = frozenset(
     {
         "set_controllers",
@@ -74,6 +76,7 @@ HOME_EDITS = frozenset(
         "restart",
         "relaunch",
         "notify_test",
+        "ci_rerun",
     }
 )
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the

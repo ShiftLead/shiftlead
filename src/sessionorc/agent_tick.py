@@ -2705,6 +2705,8 @@ class TickMixin:
                 await self._broadcast({"event": "repos", "root": r, "repo": self._repo_view(r)})
             for r in gone:
                 await self._broadcast({"event": "repos", "root": r, "repo": None})
+            if due:  # one reading of the PRs, a step of the *CI not starting* spells (§4.4 *Its spell*, TD-687)
+                await self._ci_spells_step()
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("reading the repo facts failed")
 

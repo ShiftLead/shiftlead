@@ -188,7 +188,8 @@ class RepoStore:
 
 class HostStore:
     """The home's own `host` record (design §6 *Balance*, TD-239), `{teams: {<team>: {...}},
-    last_tick?}` — `last_tick` the agent's newest tick (§4.5 row 5 (b), TD-490) — written whole each
+    last_tick?, ci_spells?}` — `last_tick` the agent's newest tick (§4.5 row 5 (b), TD-490), `ci_spells`
+    the *CI not starting* rows' spells by owner (§4.4, TD-687) — written whole each
     time it changes. A missing or unreadable file is an empty record, never a crash: the
     next tick writes what stands."""
 
@@ -207,6 +208,9 @@ class HostStore:
         }
         if isinstance(raw, dict) and isinstance(raw.get("last_tick"), str):
             rec["last_tick"] = raw["last_tick"]
+        spells = raw.get("ci_spells") if isinstance(raw, dict) else None
+        if isinstance(spells, dict) and (kept := {str(k): v for k, v in spells.items() if isinstance(v, dict)}):
+            rec["ci_spells"] = kept
         return rec
 
     def save(self, record: dict[str, Any]) -> None:
