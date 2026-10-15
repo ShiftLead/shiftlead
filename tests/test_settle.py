@@ -122,10 +122,25 @@ def test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs(tmp_
     led = root / "docs" / "technical_debt.md"
     led.write_text("# Ledger\n\n" + _entry(1))
     _git(root, "init", "-q")
-    first = TickMixin._read_repos([str(root)], {}, set())
+    # no origin known yet: the clock records nothing, so a later first reading is not under another key
+    assert "settling" not in TickMixin._read_repos([str(root)], {}, set())[str(root)]["ledger"]["entries"][0]
+    assert not paths.ledger_seen_file().exists()
+    _git(root, "remote", "add", "origin", "https://github.com/o/r.git")
+    first = TickMixin._read_repos([str(root)], {}, {str(root)})
     assert "settling" not in first[str(root)]["ledger"]["entries"][0]  # the first reading: settled
     led.write_text("# Ledger\n\n" + _entry(1) + "\n" + _entry(2) + "\n" + _entry(3, "build"))
-    got = _by_id(TickMixin._read_repos([str(root)], first, set())[str(root)]["ledger"]["entries"])
+    got = _by_id(TickMixin._read_repos([str(root)], first, {str(root)})[str(root)]["ledger"]["entries"])
     until = datetime.fromisoformat(got["TD-002"]["settling"]["until"])
     assert timedelta(minutes=9) < until - datetime.now(UTC) <= timedelta(minutes=10)  # the repo's 10m
     assert datetime.fromisoformat(got["TD-003"]["settling"]["until"]) - datetime.now(UTC) <= timedelta(minutes=1)
+
+
+def test_a_partial_reading_keeps_the_records_it_does_not_hold():
+    settle.observe(_ledger(), "o/r", SPANS, T0)
+    settle.observe(_ledger(_entry(2)), "o/r", SPANS, T0)
+    store = json.loads(paths.ledger_seen_file().read_text())
+    store["o/r"]["TD-002"]["held"] = {"at": T0.isoformat(), "by": "person"}
+    paths.ledger_seen_file().write_text(json.dumps(store))
+    settle.observe(_ledger(_entry(3, "build")), "o/r", SPANS, T0 + timedelta(minutes=1))  # TD-002 missing
+    got = _by_id(settle.observe(_ledger(_entry(2)), "o/r", SPANS, T0 + timedelta(days=1)))
+    assert got["TD-002"]["held"] == {"at": T0.isoformat()}, "the hold survived the reading that lacked it"

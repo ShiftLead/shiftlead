@@ -1413,10 +1413,11 @@ class TickMixin:
                     tip = ledger_mod.entries_before(root, str(rel), None, resolve=resolve, live=live)[0]
                     # both marked by the settle clock as it stands, so an entry still settling is not
                     # seen now and is told once it settles (§4.4, TD-710)
+                    # `then` as the clock stood at the declaration, so one settling then is told when it settles
                     remote = str((self._repos.get(s.repo or "") or {}).get("remote") or "")
-                    for got in (then, tip):
+                    for got, when in ((then, at), (tip, datetime.now(UTC))):
                         if got is not None:
-                            TickMixin._settle(str(root), remote, got, datetime.now(UTC), fresh=False)
+                            TickMixin._settle(str(root), remote, got, when, fresh=False)
                     return then, why, tip
 
                 then, why, tip = await asyncio.to_thread(both)
@@ -3050,8 +3051,12 @@ class TickMixin:
     def _settle(root: str, remote: str, entries: list[Any], now: datetime, *, fresh: bool) -> None:
         """Mark a ledger reading's entries `settling` or `held` from the home's clock (`sessionorc.settle`,
         §4.4, TD-710), keyed by the checkout's origin (its path where it has none); `fresh` records the
-        reading first. The durations are the repo's `settle:` over the install's over the built-in. A
-        clock that cannot be written marks nothing, and says so in the log: entries go at once."""
+        reading first — never while the checkout's origin is not yet known, since the clock is keyed by it
+        and a first reading under another key would settle everything at the epoch. The durations are the
+        repo's `settle:` over the install's over the built-in. A clock that cannot be written marks
+        nothing, and says so in the log: entries go at once."""
+        if not remote:
+            fresh = False
         key = origin_key(remote) if remote else str(root)
         spans = settle_mod.durations(settings_mod.load().get("settle"), settle_mod.repo_settle(root))
         got = [e for e in entries if isinstance(e, dict)]

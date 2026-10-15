@@ -112,14 +112,16 @@ def observe(
     """Record a fresh reading of origin `key` and mark its entries in place (§4.4 *The clock*): an id
     first seen is recorded at `now`, except that **a repo's first reading records every id at the
     epoch**, settled; an edit (a changed `sig`) to an entry still settling, or held, restarts its
-    window from `now` and ends the hold, and one to a settled entry only records the new `sig`. Ids
-    the reading no longer holds leave the record. Returns `entries`."""
+    window from `now` and ends the hold, and one to a settled entry only records the new `sig`. An id
+    the reading does not hold keeps its record — a partial reading, or a second checkout of the origin
+    behind the first, must not drop a hold or bring a settled entry back as new — so the record grows
+    by one line per id the ledger ever held. Returns `entries`."""
     stamp = now.isoformat()
     with _STORE:
         store = _load()
         first = not isinstance(store.get(key), dict)
         old: dict[str, Any] = {} if first else store[key]
-        seen: dict[str, Any] = {}
+        seen: dict[str, Any] = dict(old)
         for e in entries:
             i, sig = str(e.get("id") or ""), str(e.get("sig") or "")
             if not i:
