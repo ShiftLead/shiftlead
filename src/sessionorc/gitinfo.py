@@ -294,7 +294,9 @@ def _unpushed(directory: Path | str, branch: str, upstream: str | None, ahead: i
        the upstream is, because *ahead of `origin/main`* is *unmerged* and that is a different
        question (a launch branch tracking `origin/main` and pushed to its own ref read *308
        unpushed* for ever, TD-080);
-    2. no such ref but an upstream — the porcelain's *ahead*, as before;
+    2. no such ref but an upstream — the commits ahead of it whose patch it does not hold, and 0
+       when it holds the branch's content whole: a branch cut from `origin/main` and squash-merged,
+       its remote branch deleted, is pushed (TD-701);
     3. neither — a detached `HEAD`, or a branch never pushed — the commits on no remote-tracking
        branch at all, which is 0 exactly when `HEAD` is contained in one (a worker that merged and
        sits on a detached `origin/main`) and otherwise **not pushed**, which is the stranded work
@@ -308,8 +310,28 @@ def _unpushed(directory: Path | str, branch: str, upstream: str | None, ahead: i
             if out is not None and out.strip().isdigit():
                 return int(out.strip()), f"origin/{branch}"
     if upstream:
-        return ahead, upstream
+        return _not_in_upstream(directory, upstream, ahead, timeout), upstream
     out = _git(directory, "rev-list", "--count", "HEAD", "--not", "--remotes", timeout=timeout)
     if out is not None and out.strip().isdigit():
         return int(out.strip()), "remote branches"
     return ahead, ""
+
+
+def _not_in_upstream(directory: Path | str, upstream: str, ahead: int, timeout: float) -> int:
+    """Rule 2's count (TD-701): of the commits ahead of `upstream`, those whose patch it does not
+    hold — a squash merge lands one under another sha. A squash of several commits matches no
+    single patch, so when some remain, the branch is 0 if merging `HEAD` into the upstream would
+    leave its tree as it is; a commit of its own on top of such a squash leaves the patch count,
+    which is never 0 then. A read that cannot be made leaves the porcelain's *ahead*."""
+    if not ahead:
+        return 0
+    out = _git(directory, "rev-list", "--count", "--cherry-pick", "--right-only", f"{upstream}...HEAD", timeout=timeout)
+    if out is None or not out.strip().isdigit():
+        return ahead
+    left = int(out.strip())
+    if left:
+        merged = _git(directory, "merge-tree", "--write-tree", upstream, "HEAD", timeout=timeout)
+        tree = _git(directory, "rev-parse", f"{upstream}^{{tree}}", timeout=timeout)
+        if merged and tree and merged.split("\n", 1)[0].strip() == tree.strip():
+            return 0
+    return left
