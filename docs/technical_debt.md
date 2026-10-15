@@ -69,7 +69,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings | Medium | Open |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
-| TD-726 | `rpc_progress`'s settle refusal runs on every status, not only a claim, and no test notices (#1823) | Medium | Open |
 | TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
 
 ---
@@ -1413,26 +1412,6 @@ The other cases:
 **Done when** the Org page draws every team under its repo and every repo under its project heading, two teams on one repo stand side by side as whole cards, no header says *mixed* for a repo, and every listed test passes.
 
 **Related:** TD-722 (the design), TD-724 (the definition), TD-721 (the Repo page as the repo group expanded), TD-642 (the director's card).
-
----
-
-## TD-726: `rpc_progress`'s settle refusal runs on every status, not only a claim, and no test notices (#1823)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1818–#1830)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`rpc_progress`: `if new_claim and (words := self._settle_refusal(s, entry.ref)):`); `tests/test_settle.py` (`test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too`)
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1823 and running `tests/test_settle.py tests/test_person_only.py tests/test_repo_facts.py tests/test_settle_pages.py tests/test_cli_teams.py` (164 passed unmutated). Changing `if new_claim and (words := self._settle_refusal(` to `if (words := self._settle_refusal(` passes all 164. The refusal is a *claim's* (design §4.8 *A claim is a lease*), and the tests only ever send `status="claimed"`. With the guard gone, a worker whose entry the person then holds is refused its own `progress done`, `blocked` or `working` for a reason that is about claiming: it cannot report.
-
-**Fix:** One test: claim a settled entry, have the person hold it (`rpc_td_hold`), then `progress` the same ref with `status="done"` as the claimer — accepted and recorded. It fails with the `new_claim and` guard removed.
-
-**Done when** the test exists and fails under that mutation.
-
-**Related:** TD-710, #1823.
 
 ---
 
