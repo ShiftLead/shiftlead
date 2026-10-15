@@ -242,6 +242,37 @@ async def test_a_listing_cut_at_3000_files_is_unread(home, gh, tmp_path):
 
 
 @pytest.mark.integration
+async def test_a_list_that_fills_its_limit_is_unread_and_one_short_of_it_is_not(home, gh, tmp_path, monkeypatch):
+    """TD-708: an open PR past `--limit` would go unread silently, so a list exactly at it is named."""
+    monkeypatch.setattr(agent_ids, "PR_LIMIT", 3)
+    _one(tmp_path, gh)
+    gh["prs"] = {n: [] for n in (5, 6)}
+    assert (await home.rpc_td_next(repo="shiftlead"))["unread"] == []
+    gh["prs"] = {n: [] for n in (5, 6, 7)}
+    got = await home.rpc_td_next(repo="shiftlead")
+    assert got["unread"] == ["open PRs not read: the list filled its 3"] and got["ids"] == ["TD-004"]
+    assert all(c[c.index("--limit") + 1] == "3" for c in gh["calls"] if c[:3] == ["gh", "pr", "list"])
+
+
+@pytest.mark.integration
+async def test_a_non_github_origin_reads_no_prs_and_names_why(home, gh, tmp_path):
+    _one(tmp_path, gh, url="https://gitlab.com/a/b.git")
+    got = await home.rpc_td_next(repo="shiftlead")
+    assert got["origin"] == "https://gitlab.com/a/b" and got["ids"] == ["TD-003"]
+    assert got["unread"] == ["open PRs not read: the origin https://gitlab.com/a/b is not GitHub's"]
+    assert not [c for c in gh["calls"] if c[:1] == ["gh"]], "no gh call against a non-GitHub origin"
+
+
+@pytest.mark.integration
+async def test_a_repo_with_no_origin_remote_is_refused(home, gh, tmp_path):
+    root = _one(tmp_path, gh)
+    del gh["urls"][str(root)]
+    with pytest.raises(RpcError, match="shiftlead has no origin remote"):
+        await home.rpc_td_next(repo="shiftlead")
+    assert not paths.ids_file().exists(), "no id is given"
+
+
+@pytest.mark.integration
 async def test_a_lock_not_taken_by_30_seconds_refuses_busy(home, gh, tmp_path, monkeypatch):
     _one(tmp_path, gh)
     monkeypatch.setattr(agent_ids, "LOCK_BY", 0.2)
