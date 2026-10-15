@@ -61,6 +61,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
+| TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Open |
 
 ---
 
@@ -1131,5 +1132,29 @@ The other cases:
 **Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
 
 **Related:** TD-706, TD-703.
+
+---
+
+## TD-715: A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — for the design.
+**Location:** design §4.4 *Repo facts* and *In a team's lanes* (the *out of work with n* line, the card's solid count), §4.7 `ao repo`, §6 rule 6 (the `anchor` lane), `sessionorc/ledger.py` (`in_lanes`, `for_page`)
+
+**Why:** on 2026-10-15 Paul asked what blocks the ao-grind team. `ao repo` read *ao-grind-anchor is out of work with 9 in its lane: TD-005, TD-112, TD-292, TD-413, TD-460, TD-463, TD-641, TD-672, TD-685*, and listed seven of them as pickable live checks, so the closed anchor seat looked like the team's biggest block and a restart its cure. It was neither. The seat had run at 2026-10-14 20:58 MDT and declared `ao progress none`, naming a reason for seven of the nine (and TD-297, a live check not among them): TD-460, TD-463 and TD-413 wait for a date (a trial ending about 10-15, CI runs on or after 10-16, a week of journal to 10-20); TD-685 and TD-292 wait for an event nobody can cause (the next sync PR, a look being handed); TD-672 and TD-641 wait on the person (a first certificate on a fresh tailnet name; a `permissions:` rule and a profile's `permission_prompts: ask`); and the two it did not name, TD-112 and TD-005, are evaluations that need an attended session with Paul — TD-112 by his decision of 2026-10-10 (the Gemini spike), TD-005 by its own Fix (the trust-dialog test) — which no seat can do. What the seat knew lives only in its `out_of_work.why` and in each entry's prose. The reader counts a live check *pickable* the moment its build is live, and an evaluation pickable whenever it is unblocked, so the line, the card's solid count and the pick list all say "work waiting" where there is none. A person — or a session answering one — then restarts a seat to read the same nine again, or misses what is really theirs to do (three of the nine).
+
+**Fix** (for the designer to decide):
+- A way for an entry to say what it waits for, read by the reader: a `**Waits:**` line (or `Blocked by:` items) of three shapes — a date (*not before 2026-10-16*, pickable from then), an event (*the next cadence-sync PR*, never pickable until the line is edited), and the person (counted *for you*, with what they must do).
+- An entry the person must run with a session (TD-112, TD-005) leaves the seat's lane: `Owner: paul` with what it needs, or a word the `anchor` lane does not take.
+- `ao repo`, the team card and the Repo page count a waiting entry apart (*9 in its lane, all waiting: 3 on a date, 2 on an event, 4 on you*), and the *out of work with n* line names only what the seat could take; the person-shaped ones join *for you*.
+- Whether the seat's `ao progress none --why` writes those lines back (a PR of its own each run would be churn), or the brief tells it to write each as it reads it.
+
+**Done when** a seat that declares out of work with nothing it can take reads as *waiting* on `ao repo`, the card and the Repo page, each waiting entry says on what, and what waits on the person is counted *for you*.
+
+**Related:** TD-707 (a settle window, the other "not pickable yet" reason), TD-112, TD-005, TD-641, TD-672.
 
 ---
