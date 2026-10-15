@@ -921,6 +921,15 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             f"{text}: no hook reached it at its launch, nor after the host agent relaunched it once "
             "(design §4.1) — it is yours now: send it its brief, Resume it, or Forget it"
         )
+    elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict) and d["restart_ceiling"].get("why") != "fill":
+        # a seat's lost-brief replays count in `RESTART_CEILING` and are no fill (§4.1, TD-720): the
+        # restart ceiling's words, as the Inbox row reads a ceiling with no `why`
+        n = d["restart_ceiling"].get("count")
+        kind, text = "bad", f"restarts exhausted · {n if isinstance(n, int) else '?'} in 2 h"
+        full = (
+            f"{text}: the host agent relaunched this seat up to its ceiling (design §6) — it is yours now: "
+            "Resume it, or Forget it"
+        )
     elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict):
         # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled six times
         # in the hour, and this one's fill tripped it — an ending, as the crash ceiling's is
