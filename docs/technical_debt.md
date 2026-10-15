@@ -63,8 +63,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
-| TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-732 builds it |
-| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 — TD-724, TD-725, TD-733 build it |
+| TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-740 builds it |
+| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 — TD-724, TD-725, TD-741 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the repo's anchor seat, names unique per repo, the old keys refused | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet and the anchor seat on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
@@ -74,8 +74,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-732 | `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837) | Medium | Open |
 | TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
 | TD-737 | Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body | Medium | Open |
-| TD-732 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
-| TD-733 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
+| TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
+| TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
 
 ---
 
@@ -1251,8 +1251,8 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-15 in TD-722's amendment (an interactive round with Paul, PR #1850) — §4.5 screen 11: the page is the repo's group of the Org expanded: the repo's line with its Repo facet once, the anchor seat's card, every servicing team's whole card by the Org's own partials and kept by `/events`, the no-team strip, then the lists; Doing with team chips; *Waiting on you* linking `?repo=`; Add entry's optional **Team** pick. Built by TD-732. Was: Open, blocked by TD-722.
-**Blocked by:** TD-732
+**Status:** Designed 2026-10-15 in TD-722's amendment (an interactive round with Paul, PR #1850) — §4.5 screen 11: the page is the repo's group of the Org expanded: the repo's line with its Repo facet once, the anchor seat's card, every servicing team's whole card by the Org's own partials and kept by `/events`, the no-team strip, then the lists; Doing with team chips; *Waiting on you* linking `?repo=`; Add entry's optional **Team** pick. Built by TD-740. Was: Open, blocked by TD-722.
+**Blocked by:** TD-740
 **Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
 
 **Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
@@ -1277,8 +1277,8 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed, amended 2026-10-15 (an interactive round with Paul after Fable's review, PR #1850): the anchor seat is the repo's, shared by its teams (`anchor:` in the repo's `.shiftlead.yml`, the org file's `anchors:`), its controllers the repo's managers; an agent's name is unique across a repo's teams; the old keys and a team's `anchor:` are refused, not read with a warning; the director carries an Org block from the registry and a directory of its own; the Org page's headings follow the org file's order with liveness inside a repo, the Repo facet and the anchor's card on the repo's line, a no-team strip per repo and *No repo*; a board row carries its repo; `--project` and the Project picker go. Built by TD-724, TD-725 and TD-733; the Repo page is TD-721's, built by TD-732. Was: designed by the designer in #1832 — Designed 2026-10-15 (the designer; no mockup: the Org page keeps every card as it is and adds a heading per project and a line per repo above them) — §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The Org page*. A team declares one `repo:` (required in the org file, unsaid in a repo's own), and every `home:` and `projects:` on a team goes. A project is a heading on repos with an optional `title`, a repo in at most one, and a repo in none is its own heading. The `project` badge is the repo's project, so two teams on one repo always share one, and mail is unchanged. The director is the org's, with the org-wide block (a step added to TD-642). The Org page groups project → repo → team, cards whole and never combined. The old keys are read for one release where they name one repo, and refused where a team spans. §4.9's guardians example is two teams under one heading, and the ADR is amended. Built by TD-724 and TD-725. Was: Open.
-**Blocked by:** TD-724, TD-725, TD-733
+**Status:** Designed, amended 2026-10-15 (an interactive round with Paul after Fable's review, PR #1850): the anchor seat is the repo's, shared by its teams (`anchor:` in the repo's `.shiftlead.yml`, the org file's `anchors:`), its controllers the repo's managers; an agent's name is unique across a repo's teams; the old keys and a team's `anchor:` are refused, not read with a warning; the director carries an Org block from the registry and a directory of its own; the Org page's headings follow the org file's order with liveness inside a repo, the Repo facet and the anchor's card on the repo's line, a no-team strip per repo and *No repo*; a board row carries its repo; `--project` and the Project picker go. Round 2 (Fable's eleven findings, adopted by Paul): the home ties the anchor seat to its teams by `controllers`; one seat per repo per host; its review the first controller team's chain; the repo's lanes include the seat's; the Org page's repo line, ring, hiding and strip heading. Built by TD-724, TD-725 and TD-741; the Repo page is TD-721's, built by TD-740. Was: designed by the designer in #1832 — Designed 2026-10-15 (the designer; no mockup: the Org page keeps every card as it is and adds a heading per project and a line per repo above them) — §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The Org page*. A team declares one `repo:` (required in the org file, unsaid in a repo's own), and every `home:` and `projects:` on a team goes. A project is a heading on repos with an optional `title`, a repo in at most one, and a repo in none is its own heading. The `project` badge is the repo's project, so two teams on one repo always share one, and mail is unchanged. The director is the org's, with the org-wide block (a step added to TD-642). The Org page groups project → repo → team, cards whole and never combined. The old keys are read for one release where they name one repo, and refused where a team spans. §4.9's guardians example is two teams under one heading, and the ADR is amended. Built by TD-724 and TD-725. Was: Open.
+**Blocked by:** TD-724, TD-725, TD-741
 **Location:** `docs/design/4.9-org-team-project.md` (*Projects*, *Teams*: `projects: [...]`, `manager.home`, a member's `home`, the guardians example with a nested team; *Home and reach*); `docs/design/4.10-messages.md` (*across teams, by project*: the `project` badge, *the first of its team's projects that lists its home repo*); `docs/design/4.5-ui.md` (screen 1 *The Org, team-first*, screen 6 `repo_teams`, screen 11); `docs/design/4.5a-controls.md` (*team groups*: the header's place, *mixed*); `docs/design/4.9b-techlead.md` (*The director seat*); `docs/design/5-configuration.md` (`org.yml`, a repo's `.shiftlead.yml`); [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md) (*a team may span projects*)
 
 **Why:** Paul, 2026-10-15, in the conversation TD-721 waited on: *one repo per team, declared. We still want to be able to have multiple teams per repo (e.g. db team, compliance team) and those can be listed together (per repo) but not auto-combined* — and of a grouping such as Guardians, *a project heading*, placed **on the repo** (*project on the repo*). The design today lets a team span projects and a project hold several repos, and infers a team's repo from where its live members sit (`team_repo`); every project in the org file holds one repo, and no team spans two. The inference is what leaves the header's *mixed* place, `repo_teams`' first-team-in-definition-order rule, and a Repo page that can expand only one team's card (TD-721). The cases for a team over several repos each split by repo: a function across repos (docs, audits, dependency bumps) is a role or flow stage in each repo's team; a product over several repos is one team per repo, sequenced by cross-repo `Blocked by: <repo>#TD-NNN`; the cost a team per repo adds is its seats, which an on-call seat and a team managed by the person already keep small.
@@ -1332,7 +1332,7 @@ The other cases:
 
 **Why:** TD-722's design, as amended 2026-10-15 (§4.9 *Teams* `anchor`, *Names are the org's*, *A definition written before TD-722*, *Home and reach*; §4.9b *The anchor seat*). A team that may span projects leaves its repo to be read from where its members sit, and that inference is what leaves the Org header's *mixed* place, `repo_teams`' first-team rule and a Repo page that can expand only one team (TD-721).
 
-**Fix:** this touches no `src/sessionorc/**` (the badge stays a plain string there, and `mail.message_edge` is unchanged). Slices, each its own PR:
+**Fix:** slices 1–5 touch no `src/sessionorc/**` (the badge stays a plain string there, and `mail.message_edge` is unchanged); slice 6 is held (`src/sessionorc/**`, reviewed by the techlead seat). Slices, each its own PR:
 1. **The definition** (`org.py`).
    - `TeamDef.repo` (one name) replaces `TeamDef.projects`. `home` leaves every `*_KEYS` set and dataclass, `TEAM_KEYS` gains `repo`, and `_home` goes. In the org file `repo:` is required and resolves through a project's repos or the registry's directory names. In a repo's `.shiftlead.yml` it is that repo: `merge_repo_teams` writes it in place of `raw["projects"] = [rname]`, and a written `repo:` there is refused outright, as `host:` is. `repo:` resolves to a path in §4.9's order: the listing project's path for the host, else the host registry's one entry of that name (`_land`), else refused in `_land`'s words.
    - `Project` gains an optional `title`. A repo listed by two projects is an error naming both, at load.
@@ -1349,6 +1349,16 @@ The other cases:
    - `team_repo` (`ui/org.py`, the inference) stays only for a badge no definition holds; TD-725 removes its other callers.
 4. **The anchor seat's start and stop** (`teams.py`, `teamrun.py`). A team's start writes the repo's anchor record when none holds `<repo>-anchor`, after its techlead seat, with no `team` badge, the repo's `project` badge and `controllers` that team's manager; a later team's start on the repo adds its manager (`control`), and a team's stop or wind-down removes it, the last live team on the repo winding the seat down. Its occupancy and clean-tree gate is as today.
 5. **No `--project`** (`cli.py`, `ui/app.py`, the New session form). `ao new --project` and the form's **Project** picker go; a hand-started session in a registered repo gets its repo's badge and Project block from its directory (`project_of`, `reach_block`), as a team session does. The tests that pin the flag and the picker (`grep -ln -- "--project\|Project picker\|project=" tests/`: `test_cli.py`, `test_ui_teams.py`, `test_cli_teams.py`, `test_prompt_from.py`, `test_notify.py`, `test_watch.py` — the last three may only pass `project` through a record) are rewritten or removed.
+6. **The home ties the anchor seat to its teams by `controllers`** (held: `src/sessionorc/**`; design §4.9b *The anchor seat*, §6 rules 8 and 9, *Team stop time*, §4.9a). Where a reading asks which records are a team's, a seat whose `controllers` name the team's manager is the team's seat, keyed on the edge (§9 invariant 9):
+   - `sessionorc/work.py`: `wound_down` and `finished` count the repo's anchor seat as a seat of every team whose manager its `controllers` name.
+   - `sessionorc/agent_tick.py` `_finished_pass` (rule 9): the home's wind-down takes the wound-down team's manager out of the seat's `controllers`, and winds the seat down (rule 3's close) when the list is empty.
+   - `_work_marks` (rule 8): the seat's lane news goes into each wound-down team's `work_waiting` on the repo; `_replay` / `_work_start` replay the seat for the team whose replay finds it ended, with that team's manager as its controller.
+   - `_team_stop_times`: the seat takes a team's instant only when every team its `controllers` name has one, the latest of them.
+   - A seat with empty `controllers` (a repo whose teams are all the person's) reports to the person and is never wound down by rule 9.
+   - **Tests**: `tests/test_finished.py`, `test_finished_tick.py`, `test_work_waiting.py`, `test_work_start.py`, `test_anchor_tick.py`, `test_seat_policy.py`, and the team stop time's tests (`grep -ln _team_stop_times tests/`), each gaining a two-team case: the seat holds both teams' wind-down; the first wind-down removes one manager and the second winds the seat down; one team's replay brings the seat back with its manager; news lands in each wound-down team's `work_waiting`; the stop time applies only once both teams have one.
+   - The anchor seat is **one per repo per host**: a repo whose teams land on two hosts gets a seat on each, its controllers the managers landing there (`id@host` keeps the two apart).
+   - **The anchor's review** is the first controller team's chain, rewritten by the edit that changes `controllers` (`teams.py`), read again from the next team when that one leaves.
+   - **The repo's lanes** (§4.4 *In a team's lanes*): `teamrun.repo_lanes` gains the anchor seat's lane beside the teams', and `ledger.in_lanes` reads it; the Repo facet's *i* draws its line first (TD-725). §4.4's and §6 rule 6's *where the repo has no anchor seat* replaces *where no team servicing the repo has an anchor seat* in `lane_matches`' work-order rule, if the code says it per team.
 - **Tests:** in `tests/test_org.py`, `test_cli_teams.py`, `test_cli_org.py`, `test_anchor_seat.py`, `test_ui_board.py` and `test_ui_teams.py`, rewrite the tests that pin `projects`, `home` and the first-team rule (`test_projects_and_checkout_expand_home`, `test_home_is_required_above_one_repo`, `test_merge_repo_teams`, `test_the_project_block_names_every_repo_on_this_host_and_which_is_home`, `test_a_repo_maps_to_the_first_team_whose_projects_hold_it`, `test_home_is_the_managers_and_required_only_where_written`, and the `MEMBER_KEYS` assertion). New tests:
   - `repo:` is required in the org file and implied in a repo's.
   - A repo in two projects is an error.
@@ -1383,10 +1393,11 @@ The other cases:
 **Fix:** design §4.9 *The Org page* as amended 2026-10-15, §4.5 screen 1, §4.5a *team groups*, *team card: summary*, *team card: Repo facet*, *team header: seat held*.
 - **Headings** in the org file's order: each project (its `title`, else its name) with its repos in its list's order, then the repos no project lists, in the registry's order. A project of one repo draws one heading, the repo's. Headings do not fold.
 - **Under each repo**, in order:
-  - **the repo's line**: its name linked to `/repo/<name>`, and the **Repo facet**, moved off the team card (`team_summary`'s `repo` facet becomes the repo line's, drawn once; `drawn_facets` and the stopped-team rule keep two facets on a team card). Its lanes *i* carries every servicing team's lanes line, one each; a team card's own lanes line is the *i* beside its TDs in motion heading. The Repo facet's entries selector is remembered per repo.
+  - **the repo's line**: its name linked to `/repo/<name>`, and the **Repo facet**, moved off the team card (`team_summary`'s `repo` facet becomes the repo line's, drawn once; `drawn_facets` and the stopped-team rule keep two facets on a team card). Its lanes *i* carries the repo's lanes: the anchor seat's line first, then one per servicing team (`teamrun.repo_lanes` over the teams and the seat, `ledger.in_lanes` for each, TD-724 slice 6); a team card's own lanes line is the *i* beside its TDs in motion heading. The Repo facet's entries selector is remembered per repo.
   - **the repo's anchor seat's card** (TD-724's seat), with the *anchor held* mark moved here from the team header (`group_head.html`'s `g.seat_held` for the anchor).
   - **its teams' cards**: the live and concluded first, then those with nothing live, each in definition order within its kind; two teams on one repo two whole cards.
-  - **a no-team strip**: the full cards of the repo's sessions with no team badge.
+  - **a no-team strip**, headed *n sessions, no team*: the full cards of the repo's sessions with no team badge.
+- **The anchor seat's card** is the compact card with the seat's slot, and its marks (✉ n, *ready to close*, needs you, *anchor held*) sit on the repo's line after the Repo facet's name (§4.5a *repo line*, *repo line: seat held*). **A heading or repo line hides** when the filter hides everything under it. **The ring** runs repo line → anchor card → team cards → no-team strip.
 - **A registered repo with no team** is drawn as its line and Repo facet.
 - **Top and bottom**: the person's row and, only where `director:` is defined, the director's card in a row of its own (TD-642 writes the seat), no Start or Wind down on it; at the end **No repo**, the sessions in no registered repo (the old *No team*, renamed in the template and the filter's words).
 - **A team's repo is its `repo:`** (TD-724). A `team` badge no definition holds is drawn under the repo its records sit in, which is `team_repo`'s one remaining use. `team_summary` and `compact_in` read the definition's repo.
@@ -1540,7 +1551,7 @@ The other cases:
 **Done when** a page change on a dark browser shows no light frame (checked by the builder in a headless browser on a scratch home: a screenshot at first paint is dark), the *Browser mechanics* line is written, and the render-time measurement is in the PR, with any slow part filed.
 
 **Related:** TD-372 (the *host agent unreachable* banner that flashed on every page change).
-## TD-732: Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick
+## TD-740: Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick
 
 **Priority:** Medium
 **Type:** feature
@@ -1557,9 +1568,9 @@ The other cases:
 - **The page is the repo's group** as TD-725 draws it on the Org, by the same partials: the repo's line with its Repo facet, the anchor seat's card, every servicing team's whole card (header, marks, controls, *i* panel, TDs in motion, Answer needed / Doing, member cards, + card) in the Org's order within a repo, then the no-team strip; the lists below unchanged. `serving[0]` goes.
 - **Kept by `/events`**: the cards and headers take the Org's deltas through the Org's own client code; the lists keep the `?part=1` poll and the `repos` / `doing` events. A team card folds by the same per-team choice as on the Org.
 - **Doing** is every servicing team's kept calls, newest first; where two or more teams service the repo a team chip per team comes first (*db (12)*), then *all (n)* and the agent chips; a team pick and an agent pick AND.
-- **Waiting on you**'s heading links `/inbox?repo=<repo>&kind=board` (TD-733's filter).
+- **Waiting on you**'s heading links `/inbox?repo=<repo>&kind=board` (TD-741's filter).
 - **Add entry**'s form gains an optional **Team** pick where two or more teams service the repo: blank hands to the first in definition order with a techlead seat, a pick to that team's seat, and the form names the seat. TD-730 later says how the entry names its team.
-- **Tests:**
+- **Tests** (in `tests/test_ui_repo*.py`, beside the Repo page's own):
   - A repo two teams service draws both teams' whole cards, each with its header controls and member cards, and the Repo facet once.
   - A repo no team services draws its line and facet alone, with the lists.
   - A delta on a member re-renders its card on the Repo page as on the Org.
@@ -1568,11 +1579,11 @@ The other cases:
 
 **Done when** the Repo page shows everything the Org shows for the repo's group, for every servicing team, kept live by the Org's deltas, and every listed test passes.
 
-**Related:** TD-721 (the design), TD-722, TD-725, TD-733, TD-730, TD-176.
+**Related:** TD-721 (the design), TD-722, TD-725, TD-741, TD-730, TD-176.
 
 ---
 
-## TD-733: Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo
+## TD-741: Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo
 
 **Priority:** Medium
 **Type:** feature
@@ -1590,10 +1601,11 @@ The other cases:
 - The rail gains a **Repos** group after *Teams*, each repo a row on the page carries, with its count; the pick is the URL's `repo`. A **team** pick narrows board items to the team's repo.
 - `next:<n>` is per repo: each board's n soonest open items, the board counted once whichever teams work its repo. The setting keeps its word.
 - `repo_teams` keeps its other callers (Add entry's hand-to default, the start-on-work row), and stops badging board rows.
-- **Tests:** a board row of a repo two teams service carries the repo and no team; `?repo=` narrows to it; a team pick shows its repo's board rows; `next:3` draws three per repo; a repo in a multi-repo project reads *Project · repo*.
+- A team's rail count includes the board rows of the team's repo, so the count and the narrowed page agree.
+- **Tests** (in `tests/test_ui_board.py` and the Inbox tests, `tests/test_ui_inbox*.py`): a team's rail count includes its repo's board rows; a board row of a repo two teams service carries the repo and no team; `?repo=` narrows to it; a team pick shows its repo's board rows; `next:3` draws three per repo; a repo in a multi-repo project reads *Project · repo*.
 
 **Done when** board rows carry their repo, the rail filters by repo, the horizon counts per repo, and every listed test passes.
 
-**Related:** TD-722, TD-724, TD-732, TD-207, TD-220.
+**Related:** TD-722, TD-724, TD-740, TD-207, TD-220.
 
 ---
