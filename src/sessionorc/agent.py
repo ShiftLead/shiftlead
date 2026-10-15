@@ -736,7 +736,7 @@ class HostAgent(
         self._promote_task: asyncio.Task[None] | None = None
         self._promote_lock = asyncio.Lock()
         self._pulls: dict[str, dict[str, Any]] = {}  # the pull's readings by repo (design §6 *Pull*)
-        # the last fifty `ao doing` calls per team (design §4.8 *the doing log*, TD-176 slice 2)
+        # per team, the last fifty `ao doing` calls and each doer's newest five (design §4.8 *the doing log*)
         self.doing_log = DoingLogStore()
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
@@ -855,8 +855,9 @@ class HostAgent(
 
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty
-        `ao doing` calls, oldest first — `{team, id, text, at}` each; one team's with `team`. The
-        home's; a node forwards it (§4.4a). A read, and not the `doing` RPC, which writes the line."""
+        `ao doing` calls and each doer's newest five (TD-702), oldest first — `{team, id, text, at}`
+        each; one team's with `team`. The home's; a node forwards it (§4.4a). A read, and not the
+        `doing` RPC, which writes the line."""
         rings = self.doing_log.rings
         if team is not None:
             return {team: list(rings.get(team, []))}

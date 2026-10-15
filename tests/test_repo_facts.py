@@ -673,6 +673,58 @@ def test_the_doing_log_keeps_the_last_calls_per_team_and_compacts_its_file(tmp_p
     ]
 
 
+def _at(minutes: float) -> str:
+    from datetime import UTC, datetime, timedelta
+
+    return (datetime.now(UTC) - timedelta(minutes=minutes)).isoformat().replace("+00:00", "Z")
+
+
+def test_the_doing_log_keeps_each_doers_newest_five_beside_the_teams_last_fifty():
+    """TD-705 (TD-702, §4.8 *the doing log*): three busy doers' sixty calls kept a fourth doer's
+    lines out of the fifty; its newest five stay, its sixth goes, and a doer quiet for thirty days
+    keeps nothing beyond the fifty. An entry with no `id`, or an `at` that is no instant, is no crash."""
+    from datetime import UTC, datetime
+
+    from sessionorc.store import kept
+
+    now = datetime.now(UTC)
+    auditor = [{"team": "a", "id": "audit", "text": f"audit {i}", "at": _at(600 - i)} for i in range(6)]
+    gone = [{"team": "a", "id": "gone", "text": f"gone {i}", "at": _at(31 * 24 * 60 + 10 - i)} for i in range(5)]
+    busy = [{"team": "a", "id": f"g{i % 3}", "text": f"busy {i}", "at": _at(300 - i)} for i in range(60)]
+    got = kept(gone + auditor + busy, now)
+    texts = [e["text"] for e in got]
+    assert [t for t in texts if t.startswith("audit")] == [f"audit {i}" for i in range(1, 6)], "its sixth goes"
+    assert not [t for t in texts if t.startswith("gone")], "quiet thirty days: nothing beyond the fifty"
+    assert texts[-50:] == [f"busy {i}" for i in range(10, 60)] and len(got) == 55, "the fifty, in the ring's order"
+    odd = [{"team": "a", "text": "no id", "at": _at(1)}, {"team": "a", "id": "x", "text": "bad at", "at": "soon"}]
+    assert kept(odd + busy, now, keep=50)[:1] == odd[:1], "no id is one doer of its own, recent: kept"
+    assert "bad at" not in [e["text"] for e in kept(odd + busy, now)], "an unreadable `at` is quiet"
+
+
+def test_the_doing_logs_load_append_and_compaction_agree_and_an_old_file_gives_the_quiet_lines_back(tmp_path):
+    """TD-705: `doing.jsonl` written under the old rule still holds a seldom doer's lines (the 31
+    auditor lines live today), so a load under the new one gives its newest five back; an append
+    and a compaction keep what the load keeps."""
+    from datetime import UTC, datetime
+
+    from sessionorc.store import DoingLogStore, kept
+
+    f = tmp_path / "doing.jsonl"
+    auditor = [{"team": "a", "id": "audit", "text": f"audit {i}", "at": _at(600 - i)} for i in range(7)]
+    busy = [{"team": "a", "id": f"g{i % 3}", "text": f"busy {i}", "at": _at(300 - i)} for i in range(80)]
+    f.write_text("".join(json.dumps(e) + "\n" for e in auditor + busy))
+    log = DoingLogStore(f, compact_at=100)
+    assert log.rings["a"] == kept(auditor + busy, datetime.now(UTC))
+    assert [e["text"] for e in log.rings["a"]][:5] == [f"audit {i}" for i in range(2, 7)]
+    more = [{"team": "a", "id": "g0", "text": f"more {i}", "at": _at(0)} for i in range(20)]
+    for e in more:
+        log.append(e)
+    want = kept(auditor + busy + more, datetime.now(UTC))
+    assert log.rings["a"] == want, "an append keeps what a load of everything would"
+    assert len(f.read_text().splitlines()) < 100, "compacted to the rings"
+    assert DoingLogStore(f).rings["a"] == want, "and the compacted file loads the same"
+
+
 async def test_a_team_members_doing_calls_are_logged_pushed_and_read(agent, tmp_path):
     import asyncio
 

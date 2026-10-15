@@ -13,6 +13,7 @@ import os
 import tempfile
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -217,16 +218,46 @@ class HostStore:
         _atomic_write(self.path, json.dumps(record, indent=1))
 
 
-class DoingLogStore:
-    """The doing log (design §4.8 *the doing log*, TD-176 slice 2): the last `keep` `ao doing` calls
-    per team, in memory and in `doing.jsonl` — one line appended per call, the file rewritten from
-    the rings once it holds `compact_at` lines, so it stays bounded without a rewrite per call. A
-    missing file is an empty log; an unreadable line is skipped, never a crash."""
+def _instant(at: Any) -> datetime | None:
+    """An entry's `at` as an aware instant, or None where it cannot be read as one."""
+    try:
+        t = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t if t.tzinfo else None
 
-    def __init__(self, path: Path | None = None, keep: int = 50, compact_at: int = 2000):
+
+def kept(
+    ring: list[dict[str, Any]], now: datetime, keep: int = 50, per_doer: int = 5, quiet_days: int = 30
+) -> list[dict[str, Any]]:
+    """What a team's doing log keeps (design §4.8 *the doing log*, TD-702): its last `keep` calls,
+    and beside them each doer's newest `per_doer` — a doer is the call's `id`, `""` for none — for
+    every doer whose newest call is younger than `quiet_days`, in the ring's order. *Newest* is the
+    latest position; `at` is read only to judge quiet, and one that cannot be read is quiet."""
+    keep_at = set(range(max(0, len(ring) - keep), len(ring)))
+    by: dict[str, list[int]] = {}
+    for i, e in enumerate(ring):
+        by.setdefault(str(e.get("id") or ""), []).append(i)
+    quiet = timedelta(days=quiet_days)
+    for at in by.values():
+        newest = _instant(ring[at[-1]].get("at"))
+        if newest is not None and now - newest < quiet:
+            keep_at.update(at[-per_doer:])
+    return [ring[i] for i in sorted(keep_at)]
+
+
+class DoingLogStore:
+    """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, the last `keep` `ao
+    doing` calls and each doer's newest `per_doer` (`kept`, TD-702), in memory and in `doing.jsonl`
+    — one line appended per call, the file rewritten from the rings once it holds `compact_at`
+    lines, so it stays bounded without a rewrite per call. The rule is applied at load and to a
+    team's ring at each of its calls, by the home's clock. A missing file is an empty log; an
+    unreadable line is skipped, never a crash."""
+
+    def __init__(self, path: Path | None = None, keep: int = 50, compact_at: int = 2000, per_doer: int = 5):
         self.path = path or paths.doing_log_file()
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.keep, self.compact_at = keep, compact_at
+        self.keep, self.compact_at, self.per_doer = keep, compact_at, per_doer
         self.rings: dict[str, list[dict[str, Any]]] = {}
         self._lines = 0
         try:
@@ -241,17 +272,17 @@ class DoingLogStore:
                 continue
             if isinstance(e, dict) and e.get("team"):
                 self._ring(str(e["team"])).append(e)
+        now = datetime.now(UTC)
         for team, ring in self.rings.items():
-            self.rings[team] = ring[-self.keep :]
+            self.rings[team] = kept(ring, now, self.keep, self.per_doer)
         self._lines = len(lines)
 
     def _ring(self, team: str) -> list[dict[str, Any]]:
         return self.rings.setdefault(team, [])
 
     def append(self, entry: dict[str, Any]) -> None:
-        ring = self._ring(str(entry["team"]))
-        ring.append(entry)
-        del ring[: -self.keep]
+        team = str(entry["team"])
+        self.rings[team] = kept([*self._ring(team), entry], datetime.now(UTC), self.keep, self.per_doer)
         if self._lines + 1 >= self.compact_at:
             _atomic_write(self.path, "".join(json.dumps(e) + "\n" for r in self.rings.values() for e in r))
             self._lines = sum(len(r) for r in self.rings.values())

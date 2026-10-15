@@ -25,7 +25,6 @@ from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 # -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
 
 PHASES = ("add", "design", "grind", "review")
-DOING_KEPT = 50  # the doing log's ring per team (§4.8), as the host agent keeps it
 # The events stream's groups (§4.5a *team groups*, TD-572): a delta that changes one of these fields on
 # its record — or names a record the stream has not seen — carries the groups with it, since it can
 # move a card or change a count; any other delta (a pane's tail, a context reading) leaves them to one
