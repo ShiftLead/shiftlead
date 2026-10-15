@@ -11,7 +11,12 @@
 
   // ---- theme (token swap; system default, manual toggle remembered) ----
   function applyTheme() {
-    const t = store.get("theme", null) || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    // the same read as `base.html`'s `<head>` makes before the first paint (TD-737): a stored value that
+    // is not a theme is the system's, and a system that cannot be read is dark — else the two disagree
+    let t = store.get("theme", null);
+    if (t !== "dark" && t !== "light") {
+      try { t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch (e) { t = "dark"; }
+    }
     document.documentElement.dataset.theme = t;
   }
   applyTheme();
