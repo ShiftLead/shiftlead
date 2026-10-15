@@ -53,7 +53,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
-| TD-680 | Live check of TD-678: **Start session** / **Open session** on the Inbox's ledger rows, on the live copy | Medium | Blocked: Paul's look (m-79c47f23b1df) |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Designed — TD-686, TD-687 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
@@ -909,25 +908,6 @@ with the retired brief).
 **Done when** a ShiftLead note arrives from ShiftLead's own bot, and `settings.yml` names no samscrape secrets.
 
 **Related:** TD-092 (Told on Telegram), TD-648 (`reach.url`, the notes' default link).
-
----
-
-## TD-680: Live check of TD-678: **Start session** / **Open session** on the Inbox's ledger rows, on the live copy
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (grinder-ao-2, after #1751 merged)
-**Owner:** grinder
-**Kind:** live-check #1751
-**Status:** Waiting on the person's look — read 2026-10-14 on the live copy (93f3778, #1751 live) by grinder-ao-2, no press: GET `/inbox` draws **Start session** on 57 *Later* ledger rows and **Open session** on none, which is right: no live member holds any of those entries. `GET /new?prefilled=1&press=start&why=x&prompt=y` draws *Start session could not be one press: x* and `y` in Opening prompt. The press itself went to Paul as a look (m-79c47f23b1df, with the two `2026-10-14-td678-*.png` shots). Was: Open — the GETs to read once #1751 was live.
-**Blocked by:** decision (paul) — the look m-79c47f23b1df: *Works*, or *Not right: <what>*
-**Location:** design §4.5a *Inbox row: ledger entry*; `src/shiftlead/ui/app.py` `api_ledger_start`; the live `/inbox`
-
-**Why:** the unit tests fake the host agent's `create`. The scratch home has no team, and a press there would launch Claude Code, so only the live copy shows the session the press starts.
-
-**Done when** the GETs above read as written, and the person's look answers *Works*, or a *Not right* is its own entry.
-
-**Related:** TD-678 (the build, #1751), TD-676 (the design).
 
 ---
 
