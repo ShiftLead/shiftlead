@@ -58,7 +58,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Designed — TD-696, TD-697, TD-698 build it |
 | TD-696 | Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule | Medium | Open |
 | TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
-| TD-698 | Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so | Medium | Open |
 | TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
 | TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
@@ -1108,31 +1107,6 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** a design entry's row on the Repo page shows its builds and their states, and every listed test passes.
 
 **Related:** TD-693 (the design), TD-652 (*held by*), TD-228 (pickable from `Blocked by`).
-
----
-
-## TD-698: Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so, and the designer's says when it is the fallback
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (the designer, building TD-693's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.9c *A design entry archives with its last build*; `src/shiftlead/flows/td/build.md`, `src/shiftlead/flows/td/design.md`, `src/shiftlead/briefs/grinder.md`, `src/shiftlead/briefs/designer.md`; `docs/briefs/designer-ao-1.md` (a held path, `docs/briefs/**`)
-
-**Why:** TD-693's design. A design entry needed a PR of its own to archive it once its builds were archived (#1755, #1777, #1780). Also, `design.md` says a design *ends when its entry is archived with the build entries*, which is no longer how a design is left: it stays *Designed*, blocked by its builds.
-
-**Fix:**
-- **`build.md`** (and `grinder.md` where it says how an entry is archived): when the entry your PR archives is the last build still in the ledger on `origin/<default>` of a design entry's `Blocked by:`, and that `Blocked by:` names builds alone (no `decision (…)`, no other repo's item), move that design entry to the archive in the same PR. Give it a `**Resolved:**` line naming each build and the PR that merged it (`gh pr list --state merged --search "TD-n in:title"`). Read it again at the rebase before the merge.
-- **`build.md`'s opening** (*those are yours once it is archived*) becomes: once the design entry names them in its `Blocked by:`.
-- **`design.md`**: a design ends when its entry reads *Designed* and its `Blocked by:` names its builds. This replaces *a design ends when its entry is archived with the build entries*. It archives with its last build. A design entry in your lane whose builds are all archived is the fallback, and you archive it as an item of its own.
-- **`docs/briefs/designer-ao-1.md`**: the same sentence, in the round's last step. That file is a held path, so the techlead reads it.
-- **Tests:** the briefs' doc-bound tests, where any read these lines, and `tests/test_briefs_layout.py`.
-
-**Done when** the briefs say it and the next design whose last build merges is archived in that build's PR.
-
-**Related:** TD-693 (the design), TD-682 / #1777 and TD-688 / #1780 (archive-only PRs).
 
 ---
 
