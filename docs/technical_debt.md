@@ -1138,7 +1138,7 @@ The other cases:
 ## TD-715: A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for
 
 **Priority:** Medium
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-15 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
