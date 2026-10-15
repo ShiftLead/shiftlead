@@ -1211,7 +1211,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   judges nothing and covers nothing, and so does one whose read of the repo failed, so a home that
   stopped judging leaves the PR the team's rather than hiding it. **The switch** is `repos.<repo>.sync.auto` in `settings.yml` (§5; the Repos card's
   **sync**, §4.5a), `true` when absent, as `pull` is. `false` checks nothing and merges nothing,
-  every sync PR is the team's at once, and the reading is *off*. **What it is not**: it never pushes
+  every sync PR is the team's at once, and the reading is *off*. Beside the switch the card names
+  the newest entry with a verdict, by its `at` (the kept *merged* one among them), and *no sync PR*
+  only when no entry has a verdict and the PR reading holds no open sync PR. An open one still
+  waiting for its checks or its retries, or a PR reading that failed, says nothing. **What it is not**: it never pushes
   a commit to a PR (a sync that needs a step is the team's), never merges a PR that is not a sync,
   runs nothing from the PR's head except bytes step 1 proved are dev-cadence's, and never moves a
   checkout. The pull (above) follows the
