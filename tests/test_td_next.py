@@ -363,3 +363,51 @@ def test_the_cli_sends_owner_repo_when_the_name_is_shared(tmp_path, monkeypatch)
     monkeypatch.chdir(roots[1])
     assert cli.main(["td", "next"]) == 0
     assert sent["repo"] == "two/tools"
+
+
+@pytest.mark.integration
+async def test_two_origins_at_once_keep_each_others_record(home, gh, tmp_path):
+    a = _repo(tmp_path, "one", {LEDGER: _ledger(1)})
+    b = _repo(tmp_path, "two", {LEDGER: _ledger(50)})
+    gh["urls"] = {str(a): "git@github.com:O/one.git", str(b): "git@github.com:O/two.git"}
+    _register(a, b)
+    gh["prs"] = {1: [(LEDGER, "+x")]}
+    gh["slow"] = {1: 0.1}
+    await asyncio.gather(*(home.rpc_td_next(repo=r) for r in ("one", "two", "one", "two")))
+    store = json.loads(paths.ids_file().read_text())
+    assert (store["o/one"]["last"], store["o/two"]["last"]) == (3, 52)
+    assert len(store["o/one"]["given"]) == len(store["o/two"]["given"]) == 2
+
+
+@pytest.mark.integration
+async def test_a_persons_call_forwarded_from_a_node_is_served_at_the_home(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    resp = await home._forwarded("laptop", {"rpc": "td_next", "params": {"repo": "shiftlead"}, "caller": None})
+    assert resp["result"]["ids"] == ["TD-003"], resp
+    assert json.loads(paths.ids_file().read_text())["shiftlead/shiftlead"]["given"][0]["by"] == "person"
+
+
+@pytest.mark.integration
+async def test_a_listing_line_that_is_no_file_is_unread(home, gh, tmp_path, monkeypatch):
+    _one(tmp_path, gh)
+    gh["prs"] = {5: [(LEDGER, "+## TD-009: x\n")]}
+    real = agent_ids._run
+
+    async def null(argv, cwd, timeout):
+        rc, out, err = await real(argv, cwd, timeout)
+        return (0, "null\n", "") if argv[:2] == ["gh", "api"] else (rc, out, err)
+
+    monkeypatch.setattr(agent_ids, "_run", null)
+    got = await home.rpc_td_next(repo="shiftlead")
+    assert got["ids"] == ["TD-003"] and got["unread"] == ["open PR #5 not read: its listing is not a list of files"]
+
+
+@pytest.mark.unit
+def test_the_cli_passes_an_origins_owner_repo_through(tmp_path, monkeypatch):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    sent = {}
+    monkeypatch.setattr(cli, "call_sync", lambda m, **p: sent.update(p) or {"ids": ["TD-001"], "unread": []})
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
+    assert sent == {"repo": "ShiftLead/shiftlead", "count": 1}

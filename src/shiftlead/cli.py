@@ -2800,11 +2800,20 @@ def cmd_td_next(args: argparse.Namespace) -> int:
     `td_next`, one a line. Open to every session and the person. The repo goes by its registered name, or by
     its origin's `owner/repo` when checkouts of different origins share that name; an open PR the home could
     not read is said on standard error."""
+    if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
+        try:
+            _td_repo(args.repo)
+        except AgentError:  # an origin's owner/repo, not a registered name: the home resolves it (§4.7)
+            return _td_next_send(args, args.repo)
     raw, root = _td_repo(args.repo)
     name = pathlib.Path(raw).expanduser().name
     peers = [r for r in hosts.local_host().repos() if pathlib.Path(r).expanduser().name == name]
     if len(peers) > 1 and len({_origin_key(str(pathlib.Path(r).expanduser())) for r in peers}) > 1:
         name = _origin_key(root) or name  # a shared name: the origin picks the one
+    return _td_next_send(args, name)
+
+
+def _td_next_send(args: argparse.Namespace, name: str) -> int:
     got = call_sync("td_next", repo=name, count=args.count)  # the home's budget, 45 s, is under the client's 120
     for line in got.get("unread") or ():
         print(line, file=sys.stderr)
@@ -4091,7 +4100,7 @@ def build_parser() -> argparse.ArgumentParser:
         "next", help="the next free ledger id, handed out by the home and recorded (§4.4); open to every session"
     )
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="{repo, ids, unread}")
-    q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
+    q.add_argument("--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)")
     q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
     q.set_defaults(fn=cmd_td_next)
 

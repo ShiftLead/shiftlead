@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import json
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -121,7 +122,11 @@ class IdsMixin:
 
         async def key_of(root: str) -> str:
             rc, out, err = await _run(["git", "-C", root, "remote", "get-url", "origin"], None, by - time.monotonic())
-            return origin_key(out) if rc == 0 and out.strip() else ""
+            if rc == 0 and out.strip():
+                return origin_key(out)
+            if err == "timed out":
+                raise RpcError(f"{root}'s origin could not be read in time: busy, ask again")
+            return ""
 
         if "/" in want and not want.startswith(("/", "~", ".")):
             wanted = origin_key(want) if "github.com" in want else want.lower()
@@ -153,7 +158,7 @@ class IdsMixin:
         if rc != 0:
             raise RpcError(f"the fetch of {Path(root).name}'s origin failed ({_why(err, 'git fetch failed')}): "
                            "main's ids are the floor, so none is given")  # fmt: skip
-        ref = await asyncio.to_thread(ledger_mod.default_ref, root, max(1.0, start + BUDGET - time.monotonic()))
+        ref = await asyncio.to_thread(ledger_mod.default_ref, root, max(0.1, start + BUDGET - time.monotonic()))
         if ref is None:
             raise RpcError(f"{Path(root).name} has no origin/<default> after the fetch: main's ids are the floor")
         main: set[int] = set()
@@ -162,17 +167,8 @@ class IdsMixin:
             if rc == 0:
                 main |= {int(t[3:]) for t in ledger_mod.ids_in(out)}
         # 4. the highest of the three and the last given, then 5. the record
-        store = await asyncio.to_thread(_load)
-        rec = store.get(key) if isinstance(store.get(key), dict) else {}
-        last = rec.get("last") if isinstance(rec.get("last"), int) else 0
-        floor = max([last, *prs, *main])
-        ids = [f"TD-{n:03d}" for n in range(floor + 1, floor + 1 + count)]
         by = PERSON if caller is None or mail.is_person(caller) else str(caller)
-        at = now_iso()
-        given = [g for g in rec.get("given") or [] if isinstance(g, dict)]
-        given += [{"id": i, "by": by, "at": at} for i in ids]
-        store[key] = {"last": floor + count, "given": given[-GIVEN_KEEP:]}
-        await asyncio.to_thread(_save, store)
+        ids = await asyncio.to_thread(_record, key, max([*prs, *main], default=0), count, by)
         return ids, unread
 
     async def _ids_prs(self, root: str, key: str, files: tuple[str, ...], by: float) -> tuple[set[int], list[str]]:
@@ -211,6 +207,8 @@ class IdsMixin:
                     f = json.loads(ln)
                 except ValueError:
                     return "its listing is not JSON"
+                if not isinstance(f, dict):
+                    return "its listing is not a list of files"
                 if f.get("p") is None:
                     return f"{f.get('f')} has no patch (too large a diff)"
                 got |= added_ids(f["p"])
@@ -232,6 +230,26 @@ class IdsMixin:
                 ids |= res
         await asyncio.gather(*tasks.values(), return_exceptions=True)
         return ids, unread
+
+
+_STORE = threading.Lock()  # `ids.json` is one file for every origin, and each origin has its own lock
+
+
+def _record(key: str, floor: int, count: int, by: str) -> list[str]:
+    """Take `count` ids over the highest of `floor` and the origin's `last`, and record them — the read, the
+    take and the write as one step under `_STORE`, so two origins handed out at once never drop each other's."""
+    with _STORE:
+        store = _load()
+        rec = store.get(key) if isinstance(store.get(key), dict) else {}
+        last = rec.get("last") if isinstance(rec.get("last"), int) else 0
+        top = max(floor, last)
+        ids = [f"TD-{n:03d}" for n in range(top + 1, top + 1 + count)]
+        at = now_iso()
+        given = [g for g in rec.get("given") or [] if isinstance(g, dict)]
+        given += [{"id": i, "by": by, "at": at} for i in ids]
+        store[key] = {"last": top + count, "given": given[-GIVEN_KEEP:]}
+        _save(store)
+        return ids
 
 
 def _load() -> dict[str, Any]:
