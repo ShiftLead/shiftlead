@@ -56,10 +56,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
-| TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
+| TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Slices 1–2 built (#1802, #1807); slice 3 open |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Slice 1 built; slices 2 and 3 open |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
+| TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Open |
@@ -1023,14 +1024,14 @@ The other cases:
 **Added:** 2026-10-14 (the designer, building TD-703's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 built 2026-10-14 (grinder-ao-2): `teamrun.renames` pairs the orphans with the newcomers; `differences` reads `rename` and `removed` (a stopped team's too, alone), first, and a paired or held newcomer is no `start`; the card's mark (beside Start on a stopped team), the member's `flow_mark`, `ao team list` and `ao team flow` print the lines. Until slice 2 Apply skips a rename or a removal and says so (*— not applied yet*), creating nothing. Slices 2 (the home's half, `src/sessionorc/`) and 3 (Apply and Start) open. Was: Open.
+**Status:** Slice 1 built 2026-10-14 (grinder-ao-2): `teamrun.renames` pairs the orphans with the newcomers; `differences` reads `rename` and `removed` (a stopped team's too, alone), first, and a paired or held newcomer is no `start`; the card's mark (beside Start on a stopped team), the member's `flow_mark`, `ao team list` and `ao team flow` print the lines. Slice 2 built 2026-10-14 (grinder-ao-1): `RELAUNCH_KEYS` gains `name` (kept when absent, as `profile`), a rename marked `relaunch.name`; `_replay` creates a renamed record under the launch record's new name with `succeeds: <old id>` (rule 7's restart, rule 8's start, rule 3's fill — a held seat's `_schedule` too); `create`'s `succeeds` is admitted as `keep_mail` is (`_check_succeeds`) and `_succeed` moves the mail, writes `superseded_by` and, at the home, `_carry` copies claims in progress and `lane_seen`, rewrites this host's records' and every launch record's `controllers`, and drops the old launch record (a node's own record waits for its next create, design §4.9, TD-712); `_sit_out` takes `dropped`, which lifts its seat refusal and is kept on the mark; `_seat_pass` never fills a sat-out seat. Until slice 3 Apply skips a rename or a removal and says so (*— not applied yet*), creating nothing. Slice 3 (Apply and Start, `src/shiftlead/`) open. Was: slice 1 built.
 **Location:** design §4.9 *A member renamed or removed in the definition* and *Add or remove a member from the team card*, §4.9c *Switching*, §6 *Keeping a team running*, §4.5a *team card: flow changed — Apply*, *team groups* (Apply beside Start on a stopped team) and *Members dialog: Remove*; `src/shiftlead/teamrun.py` (`differences`, `flow_changed`, `flow_view`, `apply`, `start`, `remove_member`, `Difference`), `src/shiftlead/ui/cards.py` (`flow_mark`), `src/shiftlead/ui/org.py` and `src/shiftlead/ui/templates/group_head.html` (the mark and Apply, whose title and confirm name renames and removals, beside Start on a stopped team), `src/shiftlead/cli.py` (`ao team list` ~L1146, `ao team flow` ~L1972), `src/sessionorc/agent_common.py` (`RELAUNCH_KEYS`), `src/sessionorc/agent.py` (`rpc_relaunch`, `_sit_out`, `rpc_create`, `_move_mail`), `src/sessionorc/agent_tick.py` (`_replay`, `_seat_pass`)
 
 **Why:** TD-703's design. Paul renamed dev-cadence's members on 2026-10-14 and nothing changed: rule 8 replays ended records under their own names, a person's Start would create the new names beside the old records, and Members…'s Remove sends a wrap-up that leaves a declared record rule 8 replays at the next wind-down.
 
 **Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). Slices, each its own PR:
 1. **The pairing** — `teamrun.renames(plan, sessions) -> (renames, removals)` as §4.9 says: orphans (crew, current, not sat out, name not in the definition) against newcomers (definition names no current record carries), paired within a role — a seat with the same seat — orphans by `created`, newcomers in definition order. `differences` gains `Difference` kinds `rename` (record, launch) and `removed` (record), read on a stopped or wound-down team too (renames and removals only there); an orphan whose `relaunch` mark already carries a newcomer's `name` is no difference, and the newcomer reads as held by it. Apply's and Start's confirm list each pair. `flow_mark`, `ao team list` and `ao team flow` print *grinder-dc-1 → dc-grinder: renamed* and *grinder-dc-2: removed from the definition*; the stopped team's card draws **definition changed — Apply** beside Start with the title §4.5a gives.
-2. **The home's half** — `RELAUNCH_KEYS` gains `name`; a relaunch whose `name` differs is replayed (rule 7's restart, rule 8's start, rule 3's fill) as a `create` under the new name with **`succeeds: <old id>`**: the old record's mail moved (`_move_mail`), `superseded_by` written on it, its `claimed` progress entries and `lane_seen` copied to the new record, every record's `controllers` and every launch record's naming the old address rewritten to the new, the launch record moved to the new id. `succeeds` is admitted as `keep_mail` is (`_check_keep_mail`: the person, the home's replay, or a controller of the old record) and refused otherwise. `_sit_out` takes `dropped: true`, which lifts its seat refusal; `_seat_pass` never fills a sat-out seat.
+2. **The home's half** — `RELAUNCH_KEYS` gains `name`; a relaunch whose `name` differs is replayed (rule 7's restart, rule 8's start, rule 3's fill) as a `create` under the new name with **`succeeds: <old id>`**: the old record's mail moved (`_move_mail`), `superseded_by` written on it, its `claimed` progress entries and `lane_seen` copied to the new record, every record's `controllers` and every launch record's naming the old address rewritten to the new, the launch record moved to the new id. `succeeds` is admitted as `keep_mail` is (`_check_keep_mail`: the person, the home's replay, or a controller of the old record) and refused otherwise. `_sit_out` takes `dropped: true`, which lifts its seat refusal; `_seat_pass` never fills a sat-out seat. A node member's own record is rewritten by TD-712.
 3. **Apply and Start** — `apply` hands each rename's launch with `name` and each removal as `relaunch {id, sit_out: true, dropped: true}`; `start` reads the same pairing after its checks and a concluded team's closes, creates each paired newcomer with `succeeds`, marks each removal, and lists both in its result and confirm. `remove_member` uses the sit-out form (with `dropped`) for a live or an ended member instead of `_stop_one`.
 - **Tests:** a renamed member on a live team relaunches under the new name with its mail, claims and `lane_seen`, and the old record superseded; a renamed manager's members name the new id in their `controllers` and launch records; a stopped team's rename by Apply is replayed by rule 8 under the new name and the old never; a person's Start after a rename leaves one current record per name; a removed member (Apply or Members…'s Remove) is marked sat out and `_work_replays` skips it; a dropped seat is marked and never filled; two orphans and two newcomers of one role pair in order, and the confirm lists the pairs; after Apply on a stopped team the card offers the rename no more; a person's session is never an orphan; the doc-bound §4.5a tests pass.
 
@@ -1116,6 +1117,27 @@ The other cases:
 
 ---
 
+## TD-712: A renamed lead is not in a node member's `controllers` until that member's next create
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-1, building TD-706 slice 2; the techlead's read of #1807)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.9 *A member renamed or removed in the definition* (the succeeds carry); `src/sessionorc/agent.py` (`_carry`, `rpc_set_controllers`), `src/sessionorc/agent_remote.py` (`_route_act`), `src/sessionorc/agent_tick.py` (`_replay`)
+
+**Why:** §4.9 says a rename's create rewrites every record's `controllers` that named the old address. `_carry` rewrites this host's records and every launch record, but a node's record keeps the old address: `controllers` is the node's field (not in `HOME_OWNED`), so a rewrite of the home's copy is lost to the node's next report. Until the member's next create reads its rewritten launch record, the renamed manager or techlead cannot act on it.
+
+**Fix:** in the rename's carry, for each node record whose `controllers` (read through `_ctl`) holds the old address, route `set_controllers {id, add: [new], remove: [old]}` to its node as `rpc_set_controllers` routes a person's edit (`_route_act`, a `HOME_EDITS` act), awaited after the create; a link that is down leaves the record for the next tick to retry, said in the log. Then drop the exception from §4.9 and its history line's *until TD-712*.
+- **Tests:** a node member under a renamed manager names the new manager in its record's `controllers` after the rename's replay (a fake node link, as `tests/test_link*.py` build one); a node that is down is retried.
+
+**Done when** a node member's record names the renamed lead in `controllers` after the rename, and the tests pass.
+
+**Related:** TD-706 (slice 2 built the carry), TD-703 (the design).
+
+---
+
 ## TD-715: A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for
 
 **Priority:** Medium
@@ -1187,7 +1209,6 @@ The other cases:
 **Done when** a seat that declares out of work while every entry in its lane waits reads as waiting on `ao repo`, the card and the Repo page, each waiting entry says on what, what waits on the person is counted *for you*, and every listed test passes.
 
 **Related:** TD-715 (the design), TD-710 (the marking pass it extends), TD-707 (settling, the other withheld reason).
-
 ---
 
 ## TD-717: A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark

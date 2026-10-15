@@ -15,6 +15,7 @@ import asyncio
 import base64
 import binascii
 import contextlib
+import copy
 import fnmatch
 import json
 import logging
@@ -948,6 +949,7 @@ class HostAgent(
         held_reason: dict[str, Any] | None = None,
         team_start: bool = False,
         draft: str = "",
+        succeeds: str | None = None,
     ) -> dict[str, Any]:
         """`draft` (design §4.4 *The Add entry form's draft*, TD-630): the Add entry form's draft
         folder, which **Open a session** hands to the create — claimed for the new session once it
@@ -958,6 +960,16 @@ class HostAgent(
         `team_start` marks a create that is part of `ao team start`: the dispatcher reads it at
         the home, before any routing, to keep the start's usage reading (`_mark_team_start`, §4.9a
         *The home's note says more*, TD-468); the create itself does nothing more with it.
+
+        `succeeds` (design §4.9 *A member renamed or removed in the definition*, TD-706): a fresh start
+        under a new name that **succeeds** the ended record `succeeds` names, across names — the replay
+        of a renamed member, or a person's Start pairing a newcomer with its orphan. As a resume under
+        another id does (§4.4a), the old record's mail moves to the new one and the old one records
+        `superseded_by`; at the home its claims in progress and its `lane_seen` are copied over, every
+        record's and every launch record's `controllers` naming the old address name the new one, and
+        its launch record goes (`_carry`). Admitted as `keep_mail` is — the person, the home's own
+        replay, or a controller of the old record — and refused beside `resume`, `keep_mail` or
+        `start_of`, or when the old record is live, superseded, or holds this name already.
 
         `held` (design §4.9b *The anchor seat*, TD-386): a seat's record written alone, `closed`
         with no pane, for a team's start whose seat's checkout is not free — held by another session,
@@ -1116,6 +1128,7 @@ class HostAgent(
             holder = starting if starting is not None else await self._name_holder(directory, repo, name)
             if isinstance(holder, Session):
                 self._refuse_suspended(holder, caller, "a create under that name")
+            succeeding = self._check_succeeds(succeeds, name, caller, resume, keep_mail, starting) if succeeds else None
             if keep_mail:
                 self._check_keep_mail(holder, caller, resume)
             if resume:
@@ -1259,6 +1272,8 @@ class HostAgent(
                 # session it becomes (§6 *Start time*): mail sent to it before the instant is its own
                 self._move_mail(holder, s)
                 self.store.save(s)
+            if succeeding is not None:
+                self._succeed(succeeding, s)
             self._adopt_orphans(self._address(s))  # its name's orphaned questions are its own again (§4.10)
             if self.mode != "node":
                 if prompt_from:  # what the prompt was made from, as this create's client read it (§6 rule 7)
@@ -1268,6 +1283,8 @@ class HostAgent(
                     self._write_launch(s.id, s, launch_params(locals()))
                 else:
                     self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
+                if succeeding is not None:  # the launch record moves to the new id: dropped once that is written
+                    self._drop_launch(self._address(succeeding))
         return s.view()
 
     async def _schedule(
@@ -1342,10 +1359,14 @@ class HostAgent(
         self.sessions[sid] = s
         if kept:
             self._move_mail(holder, s)
+        if given.get("succeeding") is not None:  # a held seat renamed: the record rule 3 fills is the new name's
+            self._succeed(given["succeeding"], s)
         self.store.save(s)
         self._remember_dir(directory)
         if self.mode != "node":
             self._write_launch(s.id, s, launch_params(given))
+            if given.get("succeeding") is not None:
+                self._drop_launch(self._address(given["succeeding"]))
         if starts:
             log.info("%s scheduled to start at %s", sid, starts)
         else:
@@ -1375,6 +1396,92 @@ class HostAgent(
                 f"{caller} is not a controller of {holder.id}: handing a record's mailbox to a successor is an act "
                 "on that record, open to a person and to its own controllers (design §4.9b, §9 invariant 11)"
             )
+
+    def _check_succeeds(
+        self, succeeds: str, name: str, caller: Any, resume: str | None, keep_mail: bool, starting: Session | None
+    ) -> Session:
+        """`create(succeeds=<old id>)`'s refusals, each naming the rule (design §4.9 *A member renamed or
+        removed in the definition*, TD-706), and the record it succeeds when none applies."""
+        rule = "(design §4.9 A member renamed or removed in the definition)"
+        if resume or keep_mail or starting is not None:
+            raise RpcError(
+                f"succeeds is a fresh start under a new name: not beside resume, keep_mail or start_of {rule}"
+            )
+        old = self.sessions.get(str(succeeds))
+        if old is None:
+            raise RpcError(f"no record {succeeds} on {self.host} to succeed {rule}")
+        if old.superseded_by:
+            raise RpcError(f"{old.name} was succeeded already, by {old.superseded_by} {rule}")
+        if old.state not in ("exited", "closed"):
+            raise RpcError(f"{old.name} is {old.state}: a record is succeeded once it has ended {rule}")
+        if old.name == name:
+            raise RpcError(
+                f"{old.name} holds this name already: keep_mail is how a start under it keeps the mail {rule}"
+            )
+        self._refuse_suspended(old, caller, "a create that succeeds it")
+        if not mail.is_person(caller) and self._addr(str(caller)) not in self._ctl(old):
+            raise RpcError(
+                f"{caller} is not a controller of {old.id}: succeeding a record takes its mailbox, an act on that "
+                "record, open to a person and to its own controllers (design §4.9b, §9 invariant 11)"
+            )
+        return old
+
+    def _succeed(self, old: Session, new: Session) -> None:
+        """A create under a new name succeeding `old` (design §4.9, TD-706): the old record's mail moves
+        to the new one and the old one records `superseded_by`, as a resume under another id does
+        (§4.4a) — an exited one is closed, its dead pane dropped — and, at the home, the rest of the
+        carry (`_carry`). A node keeps the move on its own records; the home moves the mail it holds
+        when the node reports the supersession (`_take_supersession`) and carries the rest at its replay."""
+        if old.state == "exited":
+            with contextlib.suppress(Exception):
+                self.tmux.kill_session(old.id)
+            old.set_state("closed", confidence=old.confidence)
+            old.closed_at = now_iso()
+        new.supersedes = [*new.supersedes, {"id": old.id, "mail": True, "at": new.created}]
+        self._move_mail(old, new)
+        old.superseded_by = self._address(new)
+        if self.mode != "node":
+            self._carry(old, new)
+        self._save(old)
+        self._save(new)
+        log.info("%s succeeds %s across names", self._address(new), self._address(old))
+
+    def _carry(self, old: Session, new: Session) -> None:
+        """The home's half of a succession across names (design §4.9, TD-706): `old`'s claims in progress
+        and its `lane_seen` copied onto `new`, so the lease and rule 6's memory hold across the name;
+        every record of this host and every launch record whose `controllers` name the old address name
+        the new one, so a renamed lead is still each member's controller (a node's own records carry
+        theirs from their launch record at their next create). `old`'s launch record is the caller's to
+        drop, once `new`'s is written (`_drop_launch`). Saves what it touched but `old` and `new`, which
+        the caller saves."""
+        a, b = self._address(old), self._address(new)
+        old.superseded_by = b
+        held = {e.ref for e in new.progress}
+        new.progress = [
+            *new.progress,
+            *(copy.deepcopy(e) for e in old.progress if e.status == "claimed" and e.ref not in held),
+        ]
+        if old.lane_seen is not None:
+            new.lane_seen = copy.deepcopy(old.lane_seen)
+        for r in self.sessions.values():
+            if r is not old and a in r.controllers:
+                r.controllers = list(dict.fromkeys(b if c == a else c for c in r.controllers))
+                if r is not new:
+                    self._save(r)
+        for path in sorted(paths.launch_dir().glob("*.json")):
+            with contextlib.suppress(OSError, ValueError):
+                record = json.loads(path.read_text(encoding="utf-8"))
+                rid, host = naming.split_address(path.stem)
+                ctl = record.get("controllers") if isinstance(record, dict) else None
+                was, now = (a, b) if not host or host == self.host else (self._to_host(a, host), self._to_host(b, host))
+                if not isinstance(ctl, list) or was not in ctl:
+                    continue
+                record["controllers"] = list(dict.fromkeys(now if c == was else c for c in ctl))
+                tmp = path.with_suffix(".json.tmp")
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w", encoding="utf-8") as f:
+                    json.dump(record, f, indent=1)
+                tmp.replace(path)
 
     async def rpc_name_check(
         self, dir: str, name: str, repo: str | None = None, host: str | None = None
@@ -1832,7 +1939,12 @@ class HostAgent(
         return self._view(new)
 
     async def rpc_relaunch(
-        self, id: str, launch: dict[str, Any] | None = None, sit_out: bool = False, caller: Any = None
+        self,
+        id: str,
+        launch: dict[str, Any] | None = None,
+        sit_out: bool = False,
+        dropped: bool = False,
+        caller: Any = None,
     ) -> dict[str, Any]:
         """A person's Apply, one member (design §4.9c *Switching*, TD-309 slice 5): the client composed
         the member under the team's current flow and hands its launch here — `prompt`, `prompt_from`,
@@ -1854,23 +1966,35 @@ class HostAgent(
         down as **Members…**'s remove winds one down — the wrap-up sent now, a working member finishing
         what it holds — but by the home, which writes `sit_out: {at}` and, once the member is settled,
         closes it itself and marks it `closed_for: {why: sit_out}` (the tick's `_sit_out_close`). It
-        takes no launch; never a seat (rule 3 fills one when it is due) or a scheduled record."""
+        takes no launch; never a seat (rule 3 fills one when it is due) or a scheduled record.
+
+        **A rename** (design §4.9 *A member renamed or removed in the definition*, TD-706): a launch that
+        hands `name` — kept when absent, as `profile` is — and differs from the launch record's is
+        marked on `relaunch` as `name`, and the record's next replay (rule 7's restart, rule 8's start,
+        rule 3's fill) creates under it, succeeding this record (`create`'s `succeeds`). **`dropped:
+        true`** beside `sit_out` is a removal from the definition: it lifts the sit-out's seat refusal,
+        since a seat the definition drops is marked as any member is, and rule 3 never fills a sat-out
+        seat; it is marked on `sit_out`."""
         agent_common.person_only(caller, "relaunch a session", "§4.9c", self._graph())
         if self.mode != "home":
             raise RpcError("relaunch runs at the home (design §4.9c): this host is a node")
         s = self._find(id)
         rule = "(design §4.9c *Switching*)"
         if sit_out:
-            return await self._sit_out(s, launch, rule)
+            return await self._sit_out(s, launch, rule, dropped=bool(dropped))
+        if dropped:
+            raise RpcError(f"dropped is the sit-out form's: a removal from the definition {rule}")
         if not isinstance(launch, dict):
             raise RpcError(f"relaunch needs the member's composed launch {rule}")
         stray = sorted(k for k in launch if k not in RELAUNCH_KEYS)
         if stray:
             raise RpcError(f"a relaunch replaces {', '.join(RELAUNCH_KEYS)} alone, not {', '.join(stray)} {rule}")
-        kinds = {"prompt": str, "prompt_from": dict, "lane": list, "review": dict, "profile": str}
+        kinds = {"prompt": str, "prompt_from": dict, "lane": list, "review": dict, "profile": str, "name": str}
         for k, v in launch.items():
             if v is not None and not isinstance(v, kinds[k]):
                 raise RpcError(f"a relaunch's {k} is a {kinds[k].__name__}, not {type(v).__name__} {rule}")
+        if launch.get("name") is not None and not str(launch["name"]).strip():
+            raise RpcError(f"a relaunch's name is the member's new name, never blank {rule}")
         if not s.unattended:
             raise RpcError(f"{s.name} is interactive: its lane and brief are the person's, never relaunched {rule}")
         if s.superseded_by:
@@ -1886,10 +2010,17 @@ class HostAgent(
             raise RpcError(f"{s.name} has no launch record, so there is nothing to relaunch {rule}") from None
         if launch.get("profile") is not None and s.host == self.host:
             await self._relaunch_profile(s, str(launch["profile"]), rule)
+        before = params.get("name")
         for k in RELAUNCH_KEYS:
             if k not in RELAUNCH_KEPT or launch.get(k) is not None:
                 params.pop(k, None)
         params.update({k: v for k, v in launch.items() if v is not None})
+        # a rename is the launch record's name moved off the record's, by this Apply or one before it
+        # whose replay has not run yet — a second Apply keeps the first one's rename, and one that hands
+        # the record's own name back cancels it (the review of TD-706 slice 2)
+        pending = s.relaunch.get("name") if isinstance(s.relaunch, dict) else None
+        final = params.get("name")
+        renamed = final if final and final != s.name and (final != before or pending == final) else None
         made = params.get("prompt_from")
         # a node member's files are that host's, which rule 7 never reads here (as the replay)
         read = await asyncio.to_thread(brief.record, made, False) if made and s.host == self.host else None
@@ -1901,6 +2032,7 @@ class HostAgent(
             "lane": launch.get("lane"),
             "review": launch.get("review"),
             "profile": str(params.get("profile") or ""),
+            **({"name": str(renamed)} if renamed else {}),
         }
         self._save(s)
         await self._push_changes()
@@ -1926,17 +2058,18 @@ class HostAgent(
             names = ", ".join(known) or "none"
             raise RpcError(f"no profile {profile!r} in profiles.yml (known: {names}): nothing relaunched {rule}")
 
-    async def _sit_out(self, s: Session, launch: Any, rule: str) -> dict[str, Any]:
+    async def _sit_out(self, s: Session, launch: Any, rule: str, dropped: bool = False) -> dict[str, Any]:
         """`relaunch`'s sit-out form: refused, touching nothing, on a launch handed with it, an interactive
         record, a superseded one, a seat or a scheduled one, and when the wrap-up cannot be sent (a
-        pending prompt, a link down); said again of a record already sitting out, it does nothing more."""
+        pending prompt, a link down); said again of a record already sitting out, it does nothing more.
+        `dropped` (a removal from the definition, TD-706) lifts the seat refusal and is kept on the mark."""
         if launch is not None:
             raise RpcError(f"a sit-out takes no launch: the member stops, it is not composed again {rule}")
         if not s.unattended:
             raise RpcError(f"{s.name} is interactive: a team act never stops a person's session {rule}")
         if s.superseded_by:
             raise RpcError(f"{s.name} was resumed as {s.superseded_by}: that is the record to sit out {rule}")
-        if s.seat is not None:
+        if s.seat is not None and not dropped:
             raise RpcError(f"{s.name} is a seat: rule 3 fills it when it is due, and a flow never sits one out {rule}")
         if s.state == "scheduled":
             raise RpcError(f"{s.name} is scheduled and has not started: Cancel it instead {rule}")
@@ -1953,7 +2086,7 @@ class HostAgent(
                     f"{s.name}: the wrap-up could not be sent ({str(e) or type(e).__name__}), "
                     f"so it is not sat out {rule}"
                 ) from None
-        s.sit_out = {"at": now_iso()}
+        s.sit_out = {"at": now_iso(), **({"dropped": True} if dropped else {})}
         self._save(s)
         await self._push_changes()
         log.info("%s sat out by the person's Apply: the wrap-up sent", self._address(s))

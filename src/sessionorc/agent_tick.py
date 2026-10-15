@@ -2251,10 +2251,18 @@ class TickMixin:
         history = [*s.restarts, entry]
         address = self._address(s)
         read: dict[str, Any] | None = None
+        renamed: str | None = None
         try:
             params = {**self._read_launch(address), **extra, "supervised": True}
             if held:
                 params["held"] = True
+            mark_name = s.relaunch.get("name") if isinstance(s.relaunch, dict) else None
+            if mark_name and params.get("name") == mark_name and mark_name != s.name:
+                # a rename (§4.9, TD-706): the create under the new name succeeds this record, and a
+                # name it never held has no mail to keep under it
+                params.pop("keep_mail", None)
+                params["succeeds"] = s.id
+                renamed = mark_name
             read = await self._refill_prompt(s, params, entry)
             if params.get("prompt"):
                 # the launch record keeps the prompt as this create hands it, so a stored prompt carries
@@ -2275,6 +2283,10 @@ class TickMixin:
             return
         rid, _h = naming.split_address(str((view or {}).get("id") or ""))
         new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
+        if new is not None and renamed and s.host != self.host:
+            self._carry(s, new)  # a node's create moved what it holds; the rest is the home's (§4.9)
+            self._drop_launch(self._address(s))  # `_route_act` wrote the new id's
+            self._save(s)
         if new is not None:
             new.restarts = history
             # the files as this replay read them, not as the create's check did; a replay of the stored
@@ -2330,6 +2342,8 @@ class TickMixin:
         left unpushed."""
         if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
             return
+        if s.sit_out or work_mod.sat_out(s):
+            return  # a seat the definition dropped (TD-706): `_sit_out_close` ends it, and nothing fills it
         filled, seen = s.seat_filled, s.lane_seen
         due = self._seat_due(s, now, records)
         held = s.seat_held if due else None  # nothing due, nothing waits on the checkout
