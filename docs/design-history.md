@@ -167,6 +167,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-15 (TD-715, the designer; Paul asked what blocked ao-grind, and `ao repo` read *ao-grind-anchor is out of work with 9 in its lane* when all nine waited): *An entry says what it waits for*. It is a repo-declared `**Waits:**` line, `until <date>` or `event`, rather than new `Blocked by:` items, because that rule is ledgerboard's and cadence's and an unreadable item fails `ledger.py --check`. The agent's settle pass marks a standing wait `waiting`, so no lane takes the entry and `in_lanes` counts it apart. What waits on the person stays `decision (paul)` or `Owner: paul`, already *for you*. The session that reads the entry writes the line, and `ao progress none --why` is never parsed. Built by TD-716.
 - 2026-10-14 (TD-707, the designer; Paul, 2026-10-14: *Lets talk about adding a wait for new TDs, Im thinking 5min default and we can use 10min … we would only want to require a settle on new items we generate. The idea is to give the user time to change their mind / add thoughts. Items from a designer should go immediately*; prompted by TD-702, designed and merged within 18 minutes of its filing while Paul was still deciding whether he wanted it): *A new entry settles before it is pickable* — `settle:` per Kind (built-in `{design-first: 5m}`), the home's clock in `ledger_seen.json` from the first reading that holds the id (a repo's first reading records every id as settled), an edit while settling restarting it, `settling`/`held` on the reading withholding the entry from every lane reader and refusing a claim, `--force` included; **Hold** as the home's record, ended by Release or by the entry's text changing. Decided: no Inbox row (the window is minutes long); `settle:` lives in `settings.yml` and the repo's `.shiftlead.yml`, not `org.yml` as first agreed, because the home applies it and reads no `org.yml` (§4.9); a Hold is a person's own act in `PERSON_ONLY`, refused to every session (an interactive session's carve-out was weighed and left out: the gate reads one list, §4.8). Built by TD-710.
 - 2026-10-14 (TD-693, the designer): *A ledger entry's id is handed out by the home* — `td_next` and `ids.json`: above main, the archive, the open PRs' added headings and the last id given; never given twice. Was: each filer took main's highest plus one. Built by TD-696.
 - 2026-10-15 (TD-687 slice 1, grinder-ao-1): *Its spell* built at the home, the Inbox row left to slice 2. The spells are kept on the `host` record as `ci_spells`, by owner in lower case, each with its `since`, its `clear` count, the last grouping as `row` and the last **Re-run** as `rerun: {at, runs, asked, refused}`, and served on the `host` read. They are stepped after each full PR reading (`workorders.ci_spells`), after the pending re-run runs are read; an owner with a failed PR read is skipped for that reading (`ci_failed_owners`). `ci_rerun {owner}` is a person's own act served at the home, and is in `HOME_EDITS`. The Telegram row is keyed `ci_not_run:<owner>`, told once per spell. A snooze set before its first telling marks it told, so it is not told when the snooze runs out.
@@ -431,6 +432,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-15 (TD-715, the designer): the Repo page's **waits** mark, the lanes line's *· n waiting*, and the card's *n waiting* in grey for a member whose lane only waits. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): **Hold** / **Release** on a settling entry's Repo page row, and the Settings page's **settle**. Built by TD-710.
 - 2026-10-14 (TD-703, the designer): *team card: flow changed — Apply* draws a member renamed or dropped by the definition, on a stopped team too, beside Start (*team groups* says so); the Members dialog's **Remove** winds a live member down by the sit-out form and marks an ended one. Built by TD-706.
 - 2026-10-14 (TD-687 slice 2, grinder-ao-2): *Inbox row: CI not starting* built from the home's `ci_spells`, one row per spell keyed `ci_not_run:<owner>`, its PRs links and a default branch *<repo> main*. **Open** tells an organisation from a user with `gh api users/<owner>` once per account, and an account it cannot read opens the person's own billing page, asked again after ten minutes. **Re-run** is `ci_rerun` through `/api/person`, and the row reads *re-run asked <age>* while its runs are pending. The help list gains the row's three paragraphs.
@@ -764,6 +766,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-15 (TD-715, the designer): `ao repo` says *waits until <date>* / *waits: <words>* after the owner, and *<name> is out of work; its lane waits: …* in place of *out of work with n*. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): `ao td hold <id> [--repo] [--release]`; `ao repo` says *settles in 7m* / *held 2h*. Built by TD-710.
 - 2026-10-14 (TD-693, the designer): `ao td next [--repo] [--count]`, open to every session. Built by TD-696.
 - 2026-10-14 (TD-591 slice 2, grinder-ao-2): `ao doctor`'s **repos** line built as its ninth check, before **route** (`shiftlead.doctor.repos`, over the `repos` RPC's `seams`; a reading with none yet is a warning), and **`ao repo init [--repo <name>]`** (`shiftlead.repoinit`): the empty ledger with `Ledgerboard: 1`, the lanes' `Fields:` line and the summary header, and its archive, in this directory's checkout or the named registered repo.
@@ -854,6 +857,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-15 (TD-715, the designer): a claim on a waiting entry is refused, and `--force` passes it, since the session may know the event has come. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): a claim on a settling or held entry is refused, `--force` or not. Built by TD-710.
 - 2026-10-14 (TD-702, the designer): *The doing log* keeps each doer's newest five beside the team's last fifty; a doer quiet for 30 days keeps nothing beyond the fifty. Was: the team's last fifty alone, which three busy members filled in under a day, so an auditor was never seen. Built by TD-705.
 - 2026-10-14 (TD-682, the designer): *A `done` with a PR is told what its checks read*: a required check that never started is refused with its reason and the person named, not as a failure to fix. Built by TD-686.
@@ -1309,6 +1313,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-15 (TD-715, the designer): rule 6 — a waiting entry matches no lane and is told when its date comes or its line goes. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): rule 6 — a settling or held entry matches no lane until it settles or is released, so its news and rule 8's wait with it. Built by TD-710.
 - 2026-10-14 (TD-700, grinder-ao-1): rule 3 closes an idle seat whose `prs` or `every` due was met while it ran, and fills it on the next tick. Until this date `_seat_done` read any `seat_due` as work left for that run, so a seat that came due mid-run was never closed and never filled: ao-grind's docs-audit and test-audit seats sat idle for two days (2026-10-13/14) until Paul closed one by hand.
 - 2026-10-14 (TD-703, the designer): *Keeping a team running* — a member renamed or dropped is replayed under its old name until a person's Apply or Start. Built by TD-706.
