@@ -59,6 +59,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-696 | Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule | Medium | Open |
 | TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
 | TD-698 | Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so | Medium | Open |
+| TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
 
 ---
 
@@ -1129,3 +1130,24 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-693 (the design), TD-682 / #1777 and TD-688 / #1780 (archive-only PRs).
 
 ---
+
+## TD-699: #1786's *held-back reload takes the stream as its own* — `reconnected = false` in `connectEvents` — is held by no test (test audit)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1786)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open.
+**Location:** `tests/test_ui_reload_loop.py` (`test_three_reloads_in_a_minute_hold_back_the_fourth_and_draw_the_banner`, `test_after_a_held_back_reload_later_messages_patch_and_no_second_banner`), `src/shiftlead/ui/static/app.js` (`connectEvents`' `onmessage`, the `reconnected = false;  // held back` line)
+
+**Why:** Design §4.5 *A reconnect reloads once, never in a loop* says of a held-back reload: "The page then takes the stream as its own: it clears its *reconnected* mark, draws the *reload-loop banner* once, and patches from that message on." Delete the one line `reconnected = false;  // held back: this stream is the page's own from here on` in `app.js` and `pdm run pytest -q tests/test_ui_reload_loop.py tests/test_ui_counts.py` still passes (21 passed): the PR's scenario 5 (`out.after`) sends its next messages inside the 60 s window, where `reloadOnReturn()` is held back again whether or not the mark was cleared. With the line gone, the mark stays set and the first message that arrives after the recorded times age out (more than 60 s on) reloads the page — a reload the design says the page no longer makes on that stream — and the line was the only thing between a held-back page and one more reload. Not shown by the tests: a message more than `AO.RELOADS_WINDOW` after the held-back one, on the same stream, must patch and not reload.
+
+**Fix:** extend the probe in `tests/test_ui_reload_loop.py` after scenario 5: `advance(61000)`, `say(REAL)`, and assert `reloads` is still 3 and `handled` grew. Check it fails with the line deleted.
+
+**Done when** that assertion exists and fails against the reverted line.
+
+**Related:** TD-692 (the design), TD-694 (the build, #1786).
+
+---
+
