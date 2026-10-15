@@ -258,3 +258,34 @@ async def test_a_snoozed_row_is_not_told_and_a_snooze_that_runs_out_inside_the_s
     assert sent == [], "the snooze ran out inside the spell: not told again"
     with pytest.raises(RpcError, match="cannot snooze"):
         await agent.rpc_attention_snooze("ci_not_run:contractmatch", "ci_not_run", until, caller="ao-x-w")
+
+
+@pytest.mark.integration
+async def test_a_press_during_a_steps_run_reads_is_kept(agent, monkeypatch, reruns):
+    """The press waits for the step in hand and is never overwritten by it (the review of slice 1)."""
+    import time
+
+    agent._repos = _repos(_pr(1097))
+    await agent._ci_spells_step()
+    spell = agent._host_rec["ci_spells"]["contractmatch"]
+    agent._host_rec["ci_spells"]["contractmatch"] = {
+        **spell,
+        "rerun": {"at": "T0", "runs": [{"root": "/r/samscrape", "run": 9, "pending": True}], "asked": 1, "refused": 0},
+    }
+    monkeypatch.setattr(reports, "run_status", lambda root, run, timeout=30.0: time.sleep(0.3) or "queued")
+    step = asyncio.create_task(agent._ci_spells_step())
+    await asyncio.sleep(0.05)  # the step is inside its run reads
+    got = await agent.rpc_ci_rerun("ContractMatch")
+    await step
+    assert got["asked"] == 2
+    rerun = agent._host_rec["ci_spells"]["contractmatch"]["rerun"]
+    assert [r["run"] for r in rerun["runs"]] == [11, 12] and rerun["asked"] == 2
+
+
+@pytest.mark.integration
+async def test_a_snooze_with_telegram_off_is_seen_all_the_same(agent):
+    t0 = datetime.now(UTC)
+    _spell(agent, t0)
+    await agent.rpc_attention_snooze("ci_not_run:contractmatch", "ci_not_run", _z(t0 + timedelta(minutes=2)))
+    await _pass(agent, t0 + timedelta(seconds=10))
+    assert "ci_not_run:contractmatch" in agent.attention_store.notified

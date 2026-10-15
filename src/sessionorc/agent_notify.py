@@ -164,13 +164,13 @@ class NotifyMixin:
         tg = settings_mod.telegram(settings_mod.load())
         due: list[tuple[str, str]] = []
         due_seen = False
+        for key, row in rows.items():
+            if row.snooze_is_seen and key not in store.notified and self._notify_snoozed(row, now):
+                store.notified[key] = now_iso()  # seen, as if told, Telegram on or off: never told in this life
+                due_seen = True
         if tg is not None:
             for key, row in sorted(rows.items(), key=lambda kv: kv[1].began):
                 if key in store.notified:
-                    continue
-                if row.snooze_is_seen and self._notify_snoozed(row, now):
-                    store.notified[key] = now_iso()  # seen, as if told: not told when the snooze runs out
-                    due_seen = True
                     continue
                 try:
                     stood = now - _parse(row.began)

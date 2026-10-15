@@ -16,22 +16,24 @@ from sessionorc.agent_common import GH_TIMEOUT, RpcError, log
 from sessionorc.models import now_iso
 
 
-def _read_runs(spells: dict[str, dict[str, Any]], timeout: float) -> dict[str, dict[str, Any]]:
-    """Each spell's pending re-run runs read again (`gh api …/actions/runs/<run>`, bounded), in a thread:
-    a run read `completed` is no longer pending, and one that cannot be read stays pending."""
-    out: dict[str, dict[str, Any]] = {}
-    for key, spell in spells.items():
-        rerun = spell.get("rerun") if isinstance(spell.get("rerun"), dict) else None
-        if not rerun or not workorders.ci_rerun_pending(spell):
-            out[key] = spell
-            continue
-        runs = []
-        for r in rerun.get("runs") or []:
-            if isinstance(r, dict) and r.get("pending"):
-                status = reports.run_status(str(r.get("root") or ""), int(r.get("run") or 0), timeout)
-                r = {**r, "pending": status != workorders.RUN_DONE}
-            runs.append(r)
-        out[key] = {**spell, "rerun": {**rerun, "runs": runs}}
+async def _read_runs(spells: dict[str, dict[str, Any]], timeout: float) -> dict[str, dict[str, Any]]:
+    """Each spell's pending re-run runs read again (`gh api …/actions/runs/<run>`, each bounded, all at
+    once): a run read `completed` is no longer pending, and one that cannot be read stays pending."""
+    pending = [
+        (key, i, r)
+        for key, spell in spells.items()
+        for i, r in enumerate(((spell.get("rerun") or {}).get("runs") or []) if isinstance(spell, dict) else [])
+        if isinstance(r, dict) and r.get("pending")
+    ]
+    got = await asyncio.gather(
+        *(asyncio.to_thread(reports.run_status, str(r.get("root") or ""), int(r.get("run") or 0), timeout)
+          for _, _, r in pending)
+    )  # fmt: skip
+    out = {key: dict(spell) for key, spell in spells.items()}
+    for (key, i, r), status in zip(pending, got, strict=True):
+        rerun = out[key]["rerun"] = dict(out[key]["rerun"])
+        runs = rerun["runs"] = list(rerun["runs"])
+        runs[i] = {**r, "pending": status != workorders.RUN_DONE}
     return out
 
 
@@ -47,24 +49,30 @@ class CiMixin:
         if self.mode != "home":
             return
         try:
-            old = self._host_rec.get("ci_spells") or {}
-            read = await asyncio.to_thread(_read_runs, old, GH_TIMEOUT)
-            grouped = workorders.ci_not_run(self._repos, self._promotes)
-            failed = workorders.ci_failed_owners(self._repos)
-            new = workorders.ci_spells(read, grouped, failed, now_iso())
-            # a press that landed while the runs were read is the newer: its rerun stands
-            for key, spell in (self._host_rec.get("ci_spells") or {}).items():
-                if key in new and spell.get("rerun") != old.get(key, {}).get("rerun"):
-                    new[key] = {**new[key], "rerun": spell["rerun"], "clear": 0}
-            if new == self._host_rec.get("ci_spells", {}):
-                return
-            for key in new.keys() - old.keys():
-                log.info("CI not starting in %s: a spell begins", new[key].get("owner") or key)
-            for key in old.keys() - new.keys():
-                log.info("CI not starting in %s: the spell ends", old[key].get("owner") or key)
-            self._ci_spells_save(new)
+            async with self._ci_lock():  # a press and a step never interleave: neither loses the other's write
+                await self._ci_spells_step_locked()
         except Exception:  # noqa: BLE001 — one reading's surprise is a log line; the next reading steps again
             log.exception("stepping the CI spells failed")
+
+    def _ci_lock(self) -> asyncio.Lock:
+        lock = getattr(self, "_ci_lock_obj", None)
+        if lock is None:
+            lock = self._ci_lock_obj = asyncio.Lock()
+        return lock
+
+    async def _ci_spells_step_locked(self) -> None:
+        old = self._host_rec.get("ci_spells") or {}
+        read = await _read_runs(old, GH_TIMEOUT)
+        grouped = workorders.ci_not_run(self._repos, self._promotes)
+        failed = workorders.ci_failed_owners(self._repos)
+        new = workorders.ci_spells(read, grouped, failed, now_iso())
+        if new == old:
+            return
+        for key in new.keys() - old.keys():
+            log.info("CI not starting in %s: a spell begins", new[key].get("owner") or key)
+        for key in old.keys() - new.keys():
+            log.info("CI not starting in %s: the spell ends", old[key].get("owner") or key)
+        self._ci_spells_save(new)
 
     def _ci_spells_save(self, spells: dict[str, dict[str, Any]]) -> None:
         if spells:
@@ -83,6 +91,10 @@ class CiMixin:
         agent_common.person_only(caller, "re-run an account's CI", "§4.5a *Inbox row: CI not starting*", self._graph())
         if self.mode != "home":
             raise RpcError("ci_rerun runs at the home (design §4.4a): this host is a node")
+        async with self._ci_lock():  # one press at a time, never inside a step
+            return await self._ci_rerun_locked(owner)
+
+    async def _ci_rerun_locked(self, owner: str) -> dict[str, Any]:
         key = str(owner or "").strip().lower()
         spells = self._host_rec.get("ci_spells") or {}
         if key not in spells:
@@ -99,9 +111,9 @@ class CiMixin:
             if why is None
         ]
         refused = [why for why in results if why is not None]
-        spell = {**(self._host_rec.get("ci_spells") or {}).get(key, spells[key]), "clear": 0}
+        spell = {**spells[key], "clear": 0}
         spell["rerun"] = {"at": now_iso(), "runs": taken, "asked": len(runs), "refused": len(refused)}
-        self._ci_spells_save({**(self._host_rec.get("ci_spells") or {}), key: spell})
+        self._ci_spells_save({**spells, key: spell})
         log.info("CI not starting in %s: re-run asked of %d run(s), %d refused", owner, len(runs), len(refused))
         return {"owner": spell.get("owner") or owner, "asked": len(runs), "refused": len(refused),
                 "why": refused[0] if refused else None}  # fmt: skip
