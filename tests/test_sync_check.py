@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -241,3 +242,29 @@ def test_origins_compare_as_one_repository():
     n = sync._norm_url
     assert n("git@github.com:ShiftLead/dev-cadence.git") == n("https://github.com/shiftlead/dev-cadence/")
     assert n("/tmp/x/dc.git") == n("/tmp/x/dc")
+
+
+def test_a_lock_line_dropped_while_dev_cadence_still_has_the_file_is_refused(world):
+    """A PR that drops a guard script's line and deletes it is not dev-cadence's retirement."""
+    head = world.pr({DOC: None, sync.LOCK: lock(world.source, world.fc0, {})})
+    assert world.check(head)["why"] == f"lock not dev-cadence's: {DOC}"
+
+
+def test_a_mode_only_change_differs_from_its_lock_line(world):
+    world.honest()
+    g(world.repo, "checkout", "-q", "cadence-sync-1")
+    (world.repo / DOC).chmod(0o755)
+    g(world.repo, "commit", "-q", "-am", "x")
+    g(world.repo, "push", "-q", "origin", "cadence-sync-1")
+    head = g(world.repo, "rev-parse", "HEAD")
+    g(world.repo, "checkout", "-q", "main")
+    assert world.check(head)["why"] == f"{DOC} differs from its lock line"
+
+
+def test_what_post_sync_leaves_running_is_killed(tmp_path):
+    """Its leader exits 0 at once; the child it backgrounded is killed with its group, so nothing
+    writes the tree after the read."""
+    (tmp_path / "t").mkdir()
+    assert sync.run_post_sync(tmp_path / "t", "(sleep 1; echo late > late.txt) & exit 0", bound=5) is None
+    time.sleep(1.5)
+    assert not (tmp_path / "t" / "late.txt").exists()

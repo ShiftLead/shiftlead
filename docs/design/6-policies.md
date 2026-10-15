@@ -1132,7 +1132,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        mode, to its `file: <path> <sha256> <mode>` line. A path the head's lock lists that the PR
        deletes has no blob: *<path> deleted but still in the lock*.
      - Every lock line that differs from the base lock's, for a changed file or not, hashes as the
-       blob at `files/<path>` at `files_commit` does.
+       blob at `files/<path>` at `files_commit` does, and a line the head's lock drops names no file
+       there: dev-cadence retired it too.
 
      So both the lock and the bytes are dev-cadence's. A lock the PR wrote for itself, or a file
      edited beside an honest lock, is refused, with one of these reasons:

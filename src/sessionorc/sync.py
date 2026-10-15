@@ -11,6 +11,7 @@ the home's own failure (a fetch, the tree, git), which is no reading."""
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
@@ -63,8 +64,13 @@ def _out(root: Path | str, *args: str, timeout: float = GIT_TIMEOUT) -> str:
 
 def _blob(root: Path | str, rev: str, path: str) -> bytes | None:
     """The bytes of `path` at `rev`, or None where it has none."""
-    cp = _git(root, "show", f"{rev}:{path}")
+    cp = _git(root, "cat-file", "blob", f"{rev}:{path}")
     return cp.stdout if cp.returncode == 0 else None
+
+
+def _lit(path: str) -> str:
+    """A path as git reads it literally: no glob, no pathspec magic in a name the PR chose."""
+    return f":(literal){path}"
 
 
 def _text(root: Path | str, rev: str, path: str) -> str | None:
@@ -74,7 +80,7 @@ def _text(root: Path | str, rev: str, path: str) -> str | None:
 
 def _mode(root: Path | str, rev: str, path: str) -> str | None:
     """`path`'s mode at `rev` as the lock writes it (`644`, `755`), or None where it has none."""
-    line = _out(root, "ls-tree", rev, "--", path).strip()
+    line = _out(root, "ls-tree", rev, "--", _lit(path)).strip()
     return line.split(" ", 1)[0][-3:] if line else None
 
 
@@ -172,21 +178,19 @@ def run_post_sync(tree: Path, command: str, bound: float = SYNC_BOUND) -> str | 
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True,
     ) as p:  # fmt: skip
         try:
-            code = p.wait(timeout=bound)
+            code: int | None = p.wait(timeout=bound)
         except subprocess.TimeoutExpired:
-            for sig in (signal.SIGTERM, signal.SIGKILL):
-                try:
-                    os.killpg(p.pid, sig)
-                except (ProcessLookupError, PermissionError):
-                    break
-                if sig == signal.SIGTERM:
-                    try:
-                        p.wait(timeout=TERM_GRACE)
-                        break
-                    except subprocess.TimeoutExpired:
-                        pass
-            p.wait()
-            return f"post_sync did not end in {bound / 60:g} min"
+            code = None
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(p.pid, signal.SIGTERM)
+            with contextlib.suppress(subprocess.TimeoutExpired):
+                p.wait(timeout=TERM_GRACE)
+        # whatever it left running is killed on every road, so nothing writes the tree after the read
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(p.pid, signal.SIGKILL)
+        p.wait()
+    if code is None:
+        return f"post_sync did not end in {bound / 60:g} min"
     return None if code == 0 else f"post_sync exited {code}"
 
 
@@ -228,7 +232,7 @@ def _check(
     out: dict[str, Any],
 ) -> str | None:  # fmt: skip
     want = default_branch(root)
-    _out(root, "fetch", "-q", "origin", branch, timeout=FETCH_TIMEOUT)
+    _out(root, "fetch", "-q", "origin", f"refs/heads/{branch}", timeout=FETCH_TIMEOUT)
     if _out(root, "rev-parse", "FETCH_HEAD").strip() != head:
         raise _Moved(f"#{number}'s head moved from {head[:7]}: the PR was not checked")
     _out(root, "fetch", "-q", "origin", want, timeout=FETCH_TIMEOUT)
@@ -260,6 +264,9 @@ def _check(
         data = _blob(root, head, path) or b""
         if (hashlib.sha256(data).hexdigest(), _mode(root, head, path)) != listed[path]:
             return f"{path} differs from its lock line"
+    for path in sorted(set(was) - set(listed)):  # a line dropped: dev-cadence retired the file too
+        if _blob(clone, fc, f"files/{path}") is not None:
+            return f"lock not dev-cadence's: {path}"
     for path, line in listed.items():
         if was.get(path) == line:
             continue
@@ -269,10 +276,10 @@ def _check(
     # -- step 2: the replay ----------------------------------------------------------------------------
     tree = _tree(root, base)
     take = [LOCK, *(p for s, p in changes if p in listed and s != "D")]
-    _out(tree, "checkout", head, "--", *dict.fromkeys(take))
+    _out(tree, "checkout", head, "--", *(_lit(p) for p in dict.fromkeys(take)))
     for status, path in changes:
         if status == "D" and path in was and path not in listed:
-            _out(tree, "rm", "-q", "--", path)
+            _out(tree, "rm", "-q", "--", _lit(path))
     _out(tree, "add", "-A")
     command = post_sync_command(root, base)
     failed = run_post_sync(tree, command, bound) if command else None
@@ -286,12 +293,12 @@ def _check(
                 return f"{path} deleted but not in the base lock"
         elif path not in wrote:
             return f"{path} is not in the lock"
-    if failed:
-        return failed
     _out(tree, "add", "-A")
     unlike = [p for p in _out(tree, "diff", "--cached", "--name-only", "-z", head).split("\0") if p]
-    if unlike:
+    if unlike:  # §6's order: the comparison's reason, then post_sync's own failure
         return f"post_sync left {unlike[0]} unlike the PR"
+    if failed:
+        return failed
     for _, path in changes:
         if any(held_mod.matches(path, g) for g in held):
             return f"{path} is a held path"
