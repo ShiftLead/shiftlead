@@ -18,6 +18,7 @@ from sessionorc import (
     defs,
 )
 from sessionorc import settings as settings_mod
+from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
 from sessionorc import usage as usage_mod
 from sessionorc.agent_common import (
@@ -146,6 +147,8 @@ class SettingsMixin:
             "teams": teams,
             "repos": settings_mod.repos(doc),
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
+            # the install's `settle:` as written, `{}` for the built-in alone (§4.4, TD-710)
+            "settle": doc["settle"] if isinstance(doc.get("settle"), dict) else {},
             "person": settings_mod.person(doc),
             "notify": settings_mod.notify(doc),
             "reach": settings_mod.reach(doc),
@@ -185,6 +188,7 @@ class SettingsMixin:
         person: dict[str, Any] | None = None,
         usage: dict[str, Any] | None = None,
         notify: dict[str, Any] | None = None,
+        settle: dict[str, Any] | None = None,
         reach: Any = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -209,14 +213,17 @@ class SettingsMixin:
           trust*, TD-233), None clearing it back to the default hour.
         - `notify`: `{telegram: {on?, secrets?, link?} | None}` (§4.10 *Told on Telegram when nobody is
           looking*, TD-319), a field set to None cleared; `on: true` with no secrets is refused.
+        - `settle`: `{kind: duration}` (§4.4 *A new entry settles before it is pickable*, TD-710), the
+          whole map replaced — `{}` removes the key, so the built-in `{design-first: 5m}` holds; a Kind
+          that is not a word or a duration that is not `5m`, `1h`, `0` is refused.
 
         `reach` is refused, naming `ao connect`: `set_reach` is the one RPC that writes it (§4.7, TD-648)."""
         agent_common.person_only(caller, "change the settings", "§5 settings.yml", self._graph())
         if reach is not None:
             raise RpcError("set_settings does not write reach: — `ao connect` does, through set_reach (design §4.7)")
-        if all(v is None for v in (reserves, teams, repos, person, usage, notify)):
+        if all(v is None for v in (reserves, teams, repos, person, usage, notify, settle)):
             raise RpcError(
-                "set_settings needs reserves, teams, repos, person, usage or notify (design §5 settings.yml)"
+                "set_settings needs reserves, teams, repos, person, usage, notify or settle (design §5 settings.yml)"
             )
         doc = settings_mod.load()
         before = copy.deepcopy(doc)
@@ -276,7 +283,13 @@ class SettingsMixin:
         if notify is not None:
             doc["notify"] = self._notify_change(doc.get("notify"), notify)
             out["notify"] = settings_mod.notify(doc)
-        for key in ("teams", "repos", "person", "usage", "notify"):
+        if settle is not None:
+            try:
+                doc["settle"] = settle_mod.parse(settle)
+            except ValueError as e:
+                raise RpcError(str(e)) from None
+            out["settle"] = doc["settle"]
+        for key in ("teams", "repos", "person", "usage", "notify", "settle"):
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
@@ -288,7 +301,7 @@ class SettingsMixin:
                     (before_teams.get(str(name)) or {}).get("until"),
                     (after.get(str(name)) or {}).get("until"),
                 )
-        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person", "notify") if k in doc]
+        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person", "notify", "settle") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
         # detached, as the tick's hand-edit commit is: a wedged git must not hold Save up to its

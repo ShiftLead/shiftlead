@@ -24,6 +24,7 @@ from sessionorc import hosts, naming, promote, workorders
 from sessionorc import ledger as ledger_mod
 from sessionorc import mail as mailmod
 from sessionorc import settings as settings_mod
+from sessionorc import settle as settle_mod
 from sessionorc.adapters import short_model
 from sessionorc.cadence import said as cadence_said
 from sessionorc.client import AgentError, AgentUnavailable
@@ -2849,19 +2850,7 @@ def cmd_td_hold(args: argparse.Namespace) -> int:
 def _settle_mark(e: dict[str, Any], now: datetime | None = None) -> str:
     """`ao repo`'s words after an entry's owner while the home's settle clock withholds it (design §4.7,
     §4.4 *A new entry settles before it is pickable*, TD-710): *settles in 7m*, *held 2h*, else ''."""
-    now = now or datetime.now(UTC)
-    if isinstance(e.get("held"), dict):
-        try:
-            at = datetime.fromisoformat(str(e["held"].get("at")))
-        except ValueError:
-            return "held"
-        return f"held {_span(max(0, int((now - at).total_seconds())))}"
-    try:
-        until = datetime.fromisoformat(str((e.get("settling") or {}).get("until")))
-    except (ValueError, AttributeError):
-        return ""
-    left = (until - now).total_seconds()
-    return f"settles in {_span(int(left))}" if left > 0 else ""
+    return settle_mod.words(e, now or datetime.now(UTC))
 
 
 def cmd_td_add(args: argparse.Namespace) -> int:
@@ -4146,9 +4135,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)")
     q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
     q.set_defaults(fn=cmd_td_next)
-    q = dsub.add_parser(
-        "hold", help="hold an entry while it settles, or release a held one (§4.4); the person's own"
-    )
+    q = dsub.add_parser("hold", help="hold an entry while it settles, or release a held one (§4.4); the person's own")
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="{repo, id, held, settling}")
     q.add_argument("entry", metavar="id", help="the entry's id, TD-NNN")  # `id` is resolved as a session's
     q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
