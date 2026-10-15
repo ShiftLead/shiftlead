@@ -564,6 +564,8 @@ class TickMixin:
             try:
                 await self._scheduled_start(s, now)
                 await self._crash_restart(s, now)
+                if await self._lost_brief(s, now):
+                    continue  # replayed: the record is the closed run's, and no other rule acts on it now
                 await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
                 await self._sit_out_close(s)
@@ -715,6 +717,91 @@ class TickMixin:
             return
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
         await self._replay(s, "crash", keep_mail=True)
+
+    async def _lost_brief(self, s: Session, now: datetime) -> bool:
+        """A lost brief (design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1, TD-717,
+        built by TD-720 slice 2): a supervised, unattended record — a member or a seat — marked *no hook
+        since launch* never started its run, so the tick closes it (closer `{by: tick, why: lost-brief}`)
+        and replays it once as rule 1 does, `create` with `keep_mail`, `why: lost-brief`, counted in
+        `RESTART_CEILING` and never in the fill ceiling; nothing is dirty, so no `restart_blocked` is read.
+        A seat's replay repeats its fill's context: the fill's *why it came* line and `seat_filled`. Each
+        sender of an `ask` or `steer` still open in the moved inbox is told by a system note. A record
+        that came from a `lost-brief` replay and is marked again is not replayed: it is written
+        `restart_ceiling: {at, count, why: lost-brief}` and is the person's (*brief lost twice*). A replay
+        that failed after its close is retried on the next tick (`_closed_by_tick`). True when the tick
+        closed the record, so the rest of the pass leaves the closed run alone (a seat is never filled
+        twice)."""
+        retry = self._closed_by_tick(s, "lost-brief")
+        if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.sit_out:
+            return False
+        if not retry and (s.first_prompt_error != agent_common.FIRST_PROMPT_NO_HOOK or s.state in ("exited", "closed")):
+            return False
+        if s.restart_ceiling or (s.run_until and now >= _parse(s.run_until)) or s.wrapup_at or s.wrapup_sent_at:
+            return False
+        if s.gated or self._profile_gated(s.profile, now, s.team):
+            return False
+        if s.host != self.host and s.host not in self._link_muxes:
+            return False  # its link is down: left as it is, looked at again next tick (§4.4a)
+        last = s.restarts[-1] if s.restarts and isinstance(s.restarts[-1], dict) else {}
+        recent = agent_common._counted(s.restarts, now)
+        # a record a lost-brief replay made, marked again; a failed close's entry, with its `error`, is retried
+        again = not retry and last.get("why") == "lost-brief" and not last.get("error")
+        if again or len(recent) >= RESTART_CEILING:
+            count = sum(1 for r in s.restarts if isinstance(r, dict) and r.get("why") == "lost-brief")
+            s.restart_ceiling = {"at": now_iso(), "count": count if again else len(recent)}
+            if again:
+                s.restart_ceiling["why"] = "lost-brief"
+            how = "again" if again else "at the ceiling"
+            log.warning("%s: its brief was lost %s — it is a person's now", s.id, how)
+            self._save(s)
+            await self._push_changes()
+            return False
+        if not retry:
+            log.info("%s: no hook reached it since its launch and its brief was not sent: relaunching it", s.id)
+            try:
+                closer = {"by": "tick", "why": "lost-brief"}
+                if s.host == self.host:
+                    await self.rpc_close(s.id, closer=closer)
+                else:
+                    await self._route_act("close", {"id": s.id, "closer": closer}, None, s.host)
+                self._mark_closed(s, "lost-brief")
+            except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
+                if s.state == "closed":  # a close that failed before it marked the record leaves no mark
+                    self._mark_closed(s, "lost-brief")
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": "lost-brief", "error": f"close: {e}"}]
+                log.warning("%s: the close before a lost-brief replay failed: %s", s.id, e)
+                self._save(s)
+                await self._push_changes()
+                return s.state == "closed"
+        closing = None
+        if s.seat:
+            # the fill's *why it came* line, as rule 3's fill wrote it into the launch record (TD-410)
+            with contextlib.suppress(Exception):
+                stored = str(self._read_launch(self._address(s)).get("prompt") or "")
+                if f"\n\n{FILLED_FOR}" in stored:
+                    closing = FILLED_FOR + stored.split(f"\n\n{FILLED_FOR}", 1)[1]
+        await self._replay(s, "lost-brief", closing=closing, keep_mail=True)
+        new = self.sessions.get(s.id) if s.host == self.host else self.remote.get(s.host, {}).get(s.id)
+        if new is None or new is s:
+            return True  # the replay failed: its entry says so, and the next tick retries it
+        if s.seat:
+            new.seat_filled = list(s.seat_filled)
+            if (s.seat or {}).get("trigger") == "work" and s.lane_seen is not None:
+                new.lane_seen = dict(s.lane_seen)  # the stretch it was filled for is the new run's
+            self._save(new)
+        at = datetime.now().astimezone().strftime("%H:%M")
+        told: set[str] = set()
+        for e in new.inbox:
+            if not (e.open and e.kind in ("ask", "steer")) or e.from_ in (PERSON, SYSTEM) or e.from_ in told:
+                continue
+            told.add(e.from_)
+            self._system_note(
+                e.from_,
+                f"the brief of {s.name} was lost at its launch; it was relaunched at {at} and reads your {e.kind} now",
+            )
+        if told:
+            await self._push_changes()
+        return True
 
     async def _scheduled_start(self, s: Session, now: datetime) -> None:
         """Design §6 *Start time* (TD-152): a `scheduled` record whose instant has passed is created
@@ -2610,6 +2697,7 @@ class TickMixin:
             tripped = any(
                 r is not s
                 and isinstance(r.restart_ceiling, dict)
+                and r.restart_ceiling.get("why") == "fill"  # a lost brief's ceiling is no fill's (TD-720)
                 and _recent(r.restart_ceiling.get("at"), now, FILL_WINDOW)
                 for r in fellows
             )
