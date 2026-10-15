@@ -848,6 +848,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-14 (TD-702, the designer): *The doing log* keeps each doer's newest five beside the team's last fifty; a doer quiet for 30 days keeps nothing beyond the fifty. Was: the team's last fifty alone, which three busy members filled in under a day, so an auditor was never seen. Built by TD-705.
 - 2026-10-14 (TD-682, the designer): *A `done` with a PR is told what its checks read*: a required check that never started is refused with its reason and the person named, not as a failure to fix. Built by TD-686.
 - 2026-10-13 (TD-658, the designer; Paul, 2026-10-13, after TD-637's round: *I would expect grinders to make the PR green before handing it off to the techlead (or other depending on the workflow)*): a `done --pr` on a head whose required checks are still running is **refused**, as a failed one is — TD-637 had accepted it as *checks pending* (`ci: pending`). Built by TD-664.
 - 2026-10-13 (TD-639, grinder-ao-1): *A `done` with a PR is told what its checks read* built — the read at the declaration (`reports.pr_view`, `reports.at_done`), the entry's `ci: pending` / `unknown`, rule 10's read at the head clearing it, the report line's *· checks pending*, and `--slice` refused on a PR not merged.
