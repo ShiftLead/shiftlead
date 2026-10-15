@@ -65,6 +65,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Open |
 | TD-718 | `agent_tick`'s rule-6 declaration reading is marked by the settle clock, and no test would notice if it were not (#1811) | Medium | Open |
+| TD-720 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
 
 ---
 
@@ -1256,5 +1257,31 @@ The other cases:
 **Done when** that test exists and fails with the call removed.
 
 **Related:** TD-710, TD-707, #1811.
+
+---
+
+## TD-720: The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Blocked by:** decision (paul) — Paul's conversation on how a team and its repos relate and how work is displayed, held after this entry was filed (2026-10-15); this entry's shape may change with it
+**Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
+
+**Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
+
+1. **The header** (`group_head.html`, §4.5a *team groups*): the flow chip and *flow changed* / *definition changed* with **Apply**, ✉ *n* unread, *anchor held*, the *answered for you* mark, *n PRs waiting*, *n ready to close*, the *needs you* pill, the run's state (*concluded*, *wound down … by …*, *stopped*, *work waiting*), and the notes under it (*over its line*, *stops*, *started … for*).
+2. **The controls**: Start, Wind down, Stop now, Forget all, and the ***i*** panel (Definition, Members…, Open file, Flow on Settings →, who for what, *not concluded:*).
+3. **The member cards** (`card.html` compact, with their state pills and the lane's count) and the **+** card.
+4. **A repo two teams service** names both in its *serviced by* line but draws only the first team's facets (`serving[0]`); the second team's card on the Org has nothing on the page that is meant to expand it.
+
+**Fix:** a design round on screen 11: the page opens with the servicing team's whole Org card — header, controls, facets, member cards — drawn by the same templates, so the page cannot drift from the card, and the lists below expand it. It decides: one card per servicing team, or the first with the others named; whether the member cards fold as on the Org; and how the page keeps the header and cards current, since the Org takes them from `/events` deltas and the Repo page re-reads `?part=1` on a 30 s poll. Then one or more build entries.
+
+**Done when** screen 11 says the page carries everything the team's Org card shows, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-176 (slice 5 built the page), TD-418, TD-604, TD-693.
 
 ---
