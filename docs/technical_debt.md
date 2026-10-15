@@ -69,9 +69,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
-| TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Open |
+| TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-732 | `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837) | Medium | Open |
 | TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
+| TD-735 | Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held | Medium | Open |
+| TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
 | TD-737 | Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body | Medium | Open |
 
 ---
@@ -1432,8 +1434,9 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** `docs/design/4.4-host-agent.md` (*A new entry settles before it is pickable*, its **Hold** bullet: *refused for an id that has settled and is not held … a settled entry is taken out of a lane by its `Blocked by:`*); `docs/design/4.5a-controls.md` (*Repo page: Hold / Release on a settling entry*); `docs/design/4.7-cli.md` (`ao td hold`); `src/sessionorc/settle.py` (the hold and its refusal)
+**Status:** Designed (2026-10-15, the designer): §4.4 *Hold*, *A claimed entry is held all the same*, *An entry can land held*; §4.5 screen 6; §4.5a *Repo page: Hold / Release on an entry*, *Inbox row: held entry*; §4.7 `ao td hold`, `ao td next --held`. A hold ends only at Release (an edit no longer ends it); a hold on a claimed entry mails each unattended lease holder to stop and drop it. Built by TD-735 (the home and the CLI) and TD-736 (the pages).
+**Blocked by:** TD-735, TD-736
+**Location:** `docs/design/4.4-host-agent.md` (*A new entry settles before it is pickable*: *Hold*, *A claimed entry is held all the same*, *An entry can land held*); `docs/design/4.5a-controls.md` (*Repo page: Hold / Release on an entry*, *Inbox row: held entry*); `docs/design/4.7-cli.md` (`ao td hold`, `ao td next --held`); `src/sessionorc/settle.py` (the hold and its refusal)
 
 **Why:** 2026-10-15. TD-722 (`design-first`) merged at 12:44 MDT while Paul and an interactive session were still reviewing its proposal with Fable. It settled at 12:54, and Paul's `ao td hold TD-722` at about 12:56 was refused: *TD-722 has settled, and a hold is a settling entry's … take a settled entry out of a lane with its Blocked by: line*. designer-ao-1 designed it as #1832 by 13:30. Its build TD-724 (`Kind: build`, which settles 0 minutes) was claimed at once and under review as #1840 before the round's findings were adopted, and had to be stopped by hand. A `Blocked by:` line is a PR: minutes at best, and only after the person has a session write it. So the window is the person's only press, and a build has none.
 
@@ -1488,6 +1491,60 @@ The other cases:
 **Done when** the design says that *waiting* is drawn only for a wait on a person or another session, the card follows it, and a test holds an idle record with a live subagent and an unheld open PR not drawn *waiting*.
 
 **Related:** TD-418, TD-428, TD-201, TD-271.
+
+---
+
+## TD-735: Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-731's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *A new entry settles before it is pickable* (*Hold*, *A claimed entry is held all the same*, *An entry can land held*), §4.7 `ao td hold` and `ao td next`; `src/sessionorc/settle.py` (`hold`, `observe`, `claim_refusal`), `src/sessionorc/agent_ids.py` (`rpc_td_hold`, `rpc_td_next`, `_ids_give`), `src/sessionorc/agent_inbox.py` (`_lease_holders`), `src/shiftlead/cli.py` (`cmd_td_hold`, `ao td next`'s parser), `src/shiftlead/briefs/entry.md`; `tests/test_settle.py`, `tests/test_td_next.py`
+
+**Why:** TD-731's design. On 2026-10-15 Paul's `ao td hold TD-722` was refused two minutes after TD-722 settled, and its build TD-724 was claimed and under review as #1840 before the design round's findings were in; it had to be stopped by hand.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- `settle.hold`: drop the *has settled* refusal, so any id the clock holds can be held. `rpc_td_hold` still refuses an id that is not an open entry of the reading.
+- `settle.observe`: a sig change on a held record keeps `held` and records the new `sig`; it no longer restarts the window or ends the hold. A held record with no `at` or `sig` (landed held) is read as held on its first reading, its `sig` recorded, and never marked `settling`. An unheld settling entry's edit still restarts its window, as now. A repo's *first* reading is the first that finds no record with an `at` under its key, so a `--held` pre-record does not make every existing id settle as new.
+- `claim_refusal`: the held wording drops *or its text changes* (*no lane takes it until they release it*).
+- `rpc_td_hold` on an entry with live declared leases (`_lease_holders(id)`): the hold is written as on any entry, and each holder whose record is `unattended` gets a `note` from the person, `about` the id, with §4.4's fixed text. Where an unattended holder's claim names a PR (`pr` or `review_pr`), each seat whose inbox holds an open `ask` with that `pr` (a scan of the inboxes of the graph's live records, the states `_lease_holders` skips skipped) gets the second note, once per seat; none where the reader is the person. `rpc_td_hold` reads `entry.get("held")` before the call (`settle.hold` keeps its return), and a hold on an already-held entry mails nobody (`told: []`). The hold is written before any note; a note that fails is collected as *could not tell <name>: <why>* in the reply (as `board_reply_hand` collects its refusals) and never refuses the hold. The reply gains `told: [names]` and `untold: [lines]`. `ao td hold` prints them.
+- `ao td hold`'s parser help (*hold an entry while it settles…*) and its printed line (*…or its text changes*) take §4.7's words; a test holds each.
+- `rpc_td_next(held=True)` (`ao td next --held`): refused to a caller whose record is `unattended`, and to a caller the graph does not hold, in its own words (§4.4 *An entry can land held*), not `person_only`'s. For the person, the person's shell and an interactive session, each id handed out also gets `{held: {at, by}}` written on the settle clock by a new `settle.prehold(key, ids, by, now)` under `_STORE`, keyed by `settle_key(root, remote)` (refused, as `td_hold` is, while the origin is not read), before the reply. `--json` carries `held: true`.
+- `entry.md`: one sentence, *if you are an interactive session and the person is still deciding on the entry, take its id with `ao td next --held`: it lands held until they release it*.
+- Tests, each failing with its line reverted: a settled entry held and then released; a held entry edited stays held and takes the new `sig`; a landed-held id is held at its first reading and never settles; a hold on a claimed entry writes the hold, mails one note to an unattended holder and none to an interactive one, and names the holder in `told`; `td_next --held` from an unattended caller is refused and writes nothing; `claim_refusal`'s new words.
+
+**Done when** each bullet above is built and tested, and `ao td hold` on a settled, a claimed and a held entry, and `ao td next --held`, say what §4.7 says; the tests live in `tests/test_settle.py` and `tests/test_td_next.py`, among them: pre-holding id X leaves a repo's first reading recording every other id settled; a second hold of a claimed entry sends no note; a failed note leaves the hold written and names the holder in `untold`. Two existing tests assert what this removes and are rewritten: `tests/test_settle.py` ~L90 (an edit ends the hold) and ~L181 (the *has settled* refusal).
+
+**Related:** TD-707, TD-710, TD-731, TD-736.
+
+---
+
+## TD-736: Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release**
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-731's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-735
+**Location:** design §4.5 screen 6 (*The ledger's entries that wait on you*, *A held entry waits on the person too*), §4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry*; `src/shiftlead/ui/repo.py` and `templates/repo_part.html` (the row's button), `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `ledger_rows`), the Inbox's ledger row template, `src/sessionorc/ledger.py` (`added`/`detail` on every open entry); `tests/test_settle_pages.py`, `tests/test_ui_inbox_ledger.py`
+
+**Why:** TD-731's design. With TD-735 a hold has no end but the person's Release, so the Repo page must offer Hold where a lane can take the entry, and a hold must be drawn where the person reads what waits on them, or a forgotten one holds the entry for good.
+
+**Fix:** blocked by TD-735, since a Hold on a settled row is refused until it lands. Its `ledger.py` bullet touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- The Repo page draws **Hold** at the end of every settled row of a `LANE_KINDS` kind (*pickable*, *design*, *live-check*) and every row drawn *held by <name>*. It draws none on *for you*, *blocked*, *evaluation* or *other* rows. The toast reads the reply's `told` (*TD-724 held · grinder-ao-2 told to drop it*).
+- The reading carries `added` and `detail` on every open entry (`ledger.entries`, ~L448, today only on *for you*), since `held` is marked after the parse; the repo facts grow by that much.
+- `ledger_for_you` gains held entries as rows of kind *ledger · held*, in the same groups and order. Each says *claimed by <name>* (not *held by*) while a claim stands, has its age from `held.at`, **Release** (`td_hold {repo, id, release: true}`) and **Open**, and no answers, **Reply** or **Start session**. A held *for you* entry stays one row, the *for you* row, with **Release** beside **Open**. The rail and the find box treat these rows as ledger rows. They are counted nowhere.
+- The UI change is verified by its builder on a scratch home (§4.9b), with a screenshot of a held row on the Inbox and a **Hold** on a settled Repo page row.
+- Tests: the Hold button on each row kind as listed; a held row's kind, age and buttons; a held *for you* entry drawn once with Release; Release removes the row on the reply.
+
+**Done when** the two §4.5a rows draw as written and the tests above pass.
+
+**Related:** TD-707, TD-731, TD-735.
 
 ---
 
