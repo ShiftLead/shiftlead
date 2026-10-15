@@ -250,3 +250,7 @@ def test_private_matches_whole_components_only():
     assert not _path_private("/home/u/.config/ghost/x") and not _path_private("/home/u/.docker/other.json")
     assert _path_private("/home/u/.claude.json") and _path_private("/home/u/.claude/.credentials.json")
     assert not _path_private("/home/u/.claude/settings.json") and not _path_private("/r/.envrc")
+    # a container node's token file (§4.4a), and nothing else of its directory
+    assert _path_private("/home/u/.shiftlead/nodes/cm/env")
+    assert not _path_private("/home/u/.shiftlead/nodes/cm/.devcontainer/devcontainer.json")
+    assert not _path_private("/home/u/.shiftlead/nodes/env") and not _path_private("/home/u/.shiftlead/env")

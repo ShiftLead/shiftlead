@@ -194,14 +194,14 @@ PATHS_RUN_CHARS = 512  # and the length of each
 # TD-688): matched on the real path, so a symlink into one is text too. A floor, not a guarantee —
 # extend it here. Three tuples: whole trees by prefix; a credential directory anywhere, by component
 # or component pair (a pair is two components in a row); a credential file by name (`fnmatch`).
-# ShiftLead itself keeps no token file under `~/.shiftlead`: the Telegram secret is Doppler's, and
-# settings hold only its project/config's name (§4.10).
+# ShiftLead's own token file is a container node's `nodes/<name>/env` (§4.4a, `ContainerNode.env_file`:
+# a `GH_TOKEN` and a `DOPPLER_TOKEN`); the Telegram secret is Doppler's, the settings hold its name (§4.10).
 PATHS_PRIVATE = (
     ("/proc", "/sys", "/dev"),
     (".ssh", ".gnupg", ".aws", ".doppler", ".kube", ".password-store")
     + (".config/doppler", ".config/gcloud", ".config/gh"),
     (".netrc", ".git-credentials", ".npmrc", ".pypirc", ".claude.json", ".credentials.json", ".docker/config.json")
-    + (".bash_history", ".zsh_history", "*.pem", "*.key", ".env", ".env.*"),
+    + (".bash_history", ".zsh_history", "*.pem", "*.key", ".env", ".env.*", "nodes/*/env"),
 )
 
 
