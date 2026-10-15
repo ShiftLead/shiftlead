@@ -12442,3 +12442,23 @@ The window's `w.name` assignment, by contrast, is caught.
 **Resolved:** 2026-10-14 (the designer) — designed 2026-10-14 (§4.5 *Browser mechanics*, *A reconnect reloads once, never in a loop*; #1782), built by TD-694 (#1786), archived.
 
 **Related:** TD-372 (a close the page caused by leaving is no outage), TD-539 (build chip: *this page* differs from the agent), TD-062 (promote restarts both units).
+
+## TD-695: `test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not` flakes: the promote's own sync task may run a pass inside the test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (grinder-ao-1, from grinder-ao-2's note m-ff4ef0883a87)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved. Seen once on py3.12 in PR #1779's run 38671055081, at `tests/test_sync_pass.py:286` (*no login: no cover, the team's*); it passed on rerun.
+**Location:** `tests/test_sync_pass.py` (the cover test, lines ~277–286), `src/sessionorc/agent_promote.py:60` (`_sync_task`), `src/sessionorc/agent_sync.py` (where `_sync_ran` and `_sync_login` are used; declared at `agent.py:723-725`)
+
+**Why:** A flaky test in the sync pass (TD-685 slice 2, #1771) costs every PR a rerun. The likely cause is that the `agent` fixture is a running host agent: its promote watch starts `_sync_pass` as a background task (`agent_promote.py:60`) on a full reading. The first tick is a full reading, because `_promote_read_at` starts at `-inf`. After that, `PROMOTE_EVERY` is 300 s, so the race is between the fixture's first tick and the test body, never a repeating one. `_sync_pass` walks `self._repos`, which the test has just set. That first-tick task could run between the test's `_sync_ran.clear()` (with the login cleared) and its assert, re-reading the login through the `gh` fake and setting `_sync_ran[ROOT]` again. A second cause to rule out is `_red_prs` reading a stamp the background pass moved.
+
+**Resolved:** 2026-10-14 (PR #1787) — the race was the first tick's full reading, still in flight when the test began on a slow runner: its `_sync_pass` task ran beside the test's pass and set `_sync_ran` again after the test cleared it (reproduced by slowing `promote.survey` 20 ms). `tests/test_sync_pass.py`'s module-level `agent` fixture awaits that first task and holds a never-done future in `_sync_task`, so the watch starts no pass during any test of the module. The check of the module's other tests found a second race of the same kind: each tick's `_refresh_repos` drops the test's `ROOT`, which no registry lists (a test that sleeps through a tick loses it), so the fixture holds `_repos_task` the same way. 800 runs of the test under 0–50 ms of delay, and every integration test of the module, pass.
+
+**Fix:** reproduce it first (`pytest --count` or a loop of the one test under `-p no:randomly`). Then either stop the promote's watch from starting a sync task in these tests (a fixture that sets `_sync_task` to a done task, or a monkeypatched `_sync_pass` guard), or make the test assert on a pass it awaits alone. Check the other `agent_sync` integration tests for the same race.
+
+**Done when** the test passes 200 runs in a row, and the fix names the race it closed.
+
+**Related:** TD-685 (the sync pass).
