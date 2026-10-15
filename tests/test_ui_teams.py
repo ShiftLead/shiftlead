@@ -1204,3 +1204,6 @@ def test_a_stopped_teams_rename_reads_definition_changed_beside_start_and_on_the
     assert cards.FLOW_ACTS == {"ao-shiftlead-grind-1": "rename", "ao-shiftlead-hunt": "removed"}
     assert cards.flow_mark({**old, "role": "grinder"})["text"] == "grind-1 → mill: renamed"
     assert cards.flow_mark(hunt)["text"] == "removed from the definition"
+    # Start reads the same pairing, and its confirm says so first (TD-706 slice 3)
+    moved = "It first applies the definition: grind-1 → mill: renamed; hunt: removed from the definition."
+    assert f'data-confirm="Start ao-grind? {moved}" data-moved="{moved}">Start</button>' in head
