@@ -129,6 +129,8 @@ def _fake(held: dict | None = None):
         calls.append((method, params))
         if method == "name_check":
             return {"name": params["name"], "verdict": "free"}
+        if method == "list":  # the definition's renames and removals, read by every Start (TD-706): none here
+            return []
         if method == "checkout_held":
             return {"dir": params["dir"], "host": params["host"] or HOST, "held": held}
         if method == "create":
@@ -261,6 +263,8 @@ def _applying(tmp_path, monkeypatch, held):
             return live
         if method == "name_check":
             return {"name": params["name"], "verdict": "free"}
+        if method == "list":  # the definition's renames and removals, read by every Start (TD-706): none here
+            return []
         if method == "checkout_held":
             return {"held": held}
         if method == "create":

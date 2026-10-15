@@ -724,6 +724,7 @@ def start(
         except AgentError as e:
             raise teams.TeamError(
                 f"team {name} was not started — {r.get('name')} could not be marked removed: {e}"
+                + (f" ({', '.join(moved[len(succeeds) :])} marked already)" if len(moved) > len(succeeds) else "")
             ) from e
         moved.append(f"{r.get('name')} removed")
 
@@ -1764,7 +1765,7 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, h
         call("relaunch", id=s["id"], sit_out=True, dropped=True)
     except AgentError as e:  # the file is edited either way: what the record could not take is said
         out["wound_down"] = {**_entry(s, "member"), "action": f"refused: {e}", "state": s.get("state") or "?"}
-        out["text"] += f" — {gone} could not be marked sat out ({e}): a start by the tick may bring it back"
+        out["text"] += f" — {gone} could not be marked sat out ({e})"
         return out
     out["wound_down"] = {**_entry(s, "member"), "action": "marked" if ended else "wrap-up sent", "state": "?"}
     out["text"] += (
