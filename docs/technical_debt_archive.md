@@ -13042,3 +13042,51 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** each bullet above is built and tested, and `ao td hold` on a settled, a claimed and a held entry, and `ao td next --held`, say what §4.7 says; the tests live in `tests/test_settle.py` and `tests/test_td_next.py`, among them: pre-holding id X leaves a repo's first reading recording every other id settled; a second hold of a claimed entry sends no note; a failed note leaves the hold written and names the holder in `untold`. Two existing tests assert what this removes and are rewritten: `tests/test_settle.py` ~L90 (an edit ends the hold) and ~L181 (the *has settled* refusal).
 
 **Related:** TD-707, TD-710, TD-731, TD-736.
+
+## TD-716: Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-715's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *An entry says what it waits for* and *In a team's lanes*, §4.7 `ao repo`, §4.8 *A claim is a lease*, §6 rule 6, §4.5a *team card: Repo facet* (the lanes line), *card: compact* (the count) and *Repo page: waits mark*; `src/sessionorc/ledger.py` (`entries`, `lane_matches`, `in_lanes`, `flags`), `src/sessionorc/settle.py` (`mark`, TD-710's), `src/sessionorc/agent_tick.py` (`_read_repo`), the claim refusal in `rpc_progress`, `src/shiftlead/cli.py` (`ao repo`), `src/shiftlead/ui/org.py` and `templates/lanes_line.html`, `repo_part.html`, the card's count in `cards.py`; the role briefs `src/shiftlead/briefs/anchor.md`, `grinder.md` and `designer.md`
+
+**Why:** TD-715's design. On 2026-10-15 `ao repo` read *ao-grind-anchor is out of work with 9 in its lane*, and every one of the nine was waiting on a date, an event or the person, so the closed seat looked like the team's block and a restart like its cure.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). It is blocked by TD-710 because it marks entries in TD-710's settle pass. Slices, each its own PR:
+1. **The reading and the lanes** (`sessionorc`).
+   - `ledger.entries` reads `**Waits:**` (in the header block, after `Kind:`; one below the block draws ledgerboard's ℹ) into `waits: {on, date, why}`: `on` is the first word, `until` or `event`, `date` the first `YYYY-MM-DD` after `until` (or none), and `why` the rest. A first word outside the two is not read; `ledger.py --check` already flags it against the `Fields:` vocabulary.
+   - `flags` gains *TD-NNN: Waits: until names no date* for an `until` with no date. Such an entry waits with no end.
+   - TD-710's marking pass (`settle.mark`, on every reading it carries, and at the declaration-time reading rule 6 uses, its `then` clock) adds `waiting: {on, until}` while the wait stands, whatever `spans` holds (a repo with no `settle:` still marks waits). An `until` stands while the home's local date is before the date; an `event` always stands.
+   - `lane_matches` reads `waiting` as no lane's, as it reads `settling` and `held`, so rule 6's `lane_seen` and rule 8's news wait the same.
+   - `in_lanes` gains `waiting: {until: [ids], event: [ids]}`: the entries a lane would take but for the mark. They are kept out of the kinds' counts and out of `rest`. Each member gains `waiting` ids beside `ids`. `out_of_work` is unchanged (count above 0), and a new `out_of_work_waiting` lists `[{id, name, waiting}]` for a member carrying `out_of_work` whose `ids` is empty and whose `waiting` is not.
+   - `rpc_progress`'s claim on a `waiting` reference is refused, *TD-463 waits until 2026-10-16* or *TD-685 waits: the next cadence-sync PR*, and `force` passes it.
+2. **The words** (`shiftlead`).
+   - `ao repo` prints *waits until 2026-10-16* or *waits: <words>* after a row's owner, and the line *<name> is out of work; its lane waits: 2 until a date (the first 2026-10-16), 2 on an event: <ids>*. `--json` carries `waiting`.
+   - The lanes line adds *· n waiting*, its hover the ids and what each waits on, and *· <name> out of work, its lane waiting*.
+   - The card's count draws *n waiting* in grey in place of 0, never solid, with the design's hover.
+   - The Repo page's row draws the **waits** mark.
+   - The role briefs (`anchor.md`, `grinder.md`, `designer.md`), in their *Out of work* paragraph: an entry your lane takes that you cannot take because it waits on a date or an event gets a `**Waits:**` line, one waiting on the person gets `Blocked by: decision (paul) — <what they must do>`, and an evaluation only the person can run with a session gets `Owner: paul`. Write them in one ledger PR before `ao progress none`, only on entries that do not yet say so.
+3. **This ledger's nine** (a ledger PR, after slice 1 is live). The entries `ao-grind-anchor` named on 2026-10-15, as each still stands then:
+   - TD-460, TD-463 and TD-413: `Waits: until <date>`.
+   - TD-685 and TD-292: `Waits: event — …`.
+   - TD-672 and TD-641: `decision (paul) — …`.
+   - TD-112 and TD-005: `Owner: paul`.
+   A date already passed is not written.
+- **Tests:**
+  - An entry with `Waits: until <tomorrow>` matches no lane and is in `in_lanes`' `waiting`. On its date it matches and is told by rule 6 as new.
+  - `Waits: event` waits until the line goes.
+  - An `until` with no date is flagged (*Waits: until names no date*) and waits.
+  - A member's `waiting` ids are not in its `ids`; rule 8's news waits as rule 6's does.
+  - A member whose lane only waits is in `out_of_work_waiting` and not in `out_of_work`.
+  - A claim on a waiting entry is refused, and `--force` passes.
+  - `ao repo`'s two lines. The lanes line's *waiting* count.
+  - `ledger.py --check` passes this ledger with the new `Fields:` line.
+
+**Resolved:** 2026-10-15 — slice 1 (the reading, the `waiting` mark, the lanes, the claim refusal) by #1843; slice 2 (`ao repo`'s words, the lanes line, the card's grey count, the Repo page's **waits** mark, the role briefs) by #1860 (grinder-ao-2); slice 3 by this PR: `Waits: until` on TD-460 (2026-10-23), TD-463 (2026-10-16) and TD-413 (2026-10-21), `Waits: event` on TD-685 and TD-292, `decision (paul)` on TD-641, `Owner: paul` on TD-112 and TD-005. TD-672 was archived before slice 3 and needs no line. Untested slice-1 behaviours are TD-742.
+
+**Done when** a seat that declares out of work while every entry in its lane waits reads as waiting on `ao repo`, the card and the Repo page, each waiting entry says on what, what waits on the person is counted *for you*, and every listed test passes.
+
+**Related:** TD-715 (the design), TD-710 (the marking pass it extends), TD-707 (settling, the other withheld reason).
