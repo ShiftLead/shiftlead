@@ -51,7 +51,9 @@ class HookMixin:
             return None
         self._last_hook[session] = datetime.now(UTC)
         self._live_hook_at[session] = time.time()
-        s.hook_seen_at = s.hook_seen_at or now_iso()  # saved with the permission's state below
+        if not s.hook_seen_at:  # the first hook (§4.1, TD-720): saved now, since a rule's answer saves nothing
+            s.hook_seen_at = now_iso()
+            self.store.save(s)
         if (ruled := await self._by_rule(s, event)) is not None:
             await self._push_changes()
             return ruled
