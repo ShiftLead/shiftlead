@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import ledger, mail
+from sessionorc import settle as settle_mod
 from sessionorc.models import (
     has_control,
     stop_note,
@@ -280,7 +281,10 @@ def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) ->
 
 
 def ledger_lists(
-    r: Mapping[str, Any], motion: Collection[dict[str, Any]], lanes: Mapping[str, Mapping[str, Any]] | None = None
+    r: Mapping[str, Any],
+    motion: Collection[dict[str, Any]],
+    lanes: Mapping[str, Mapping[str, Any]] | None = None,
+    now: datetime | None = None,
 ) -> list[dict[str, Any]]:
     """**Technical debt** (§4.5 screen 11): the open entries in seven lists by the page's kind, each
     row id, title, priority and owner, *held by <name>* when a member claims it and *blocked by …*
@@ -292,7 +296,11 @@ def ledger_lists(
     The board's open decided lines, the lanes' work orders
     (§4.5a *Repo page: decided lines*, TD-384), come first in *pickable*, each with its `decided`
     and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it, None
-    where the ledger was not read and the lanes could not be (`lanes` None or the entries unread)."""
+    where the ledger was not read and the lanes could not be (`lanes` None or the entries unread).
+    An entry the home's settle clock withholds carries `settle`, *settles in 7m* or *held 2h*, and
+    `settle_mark`, `settling` or `held`, which the row draws with **Hold** or **Release** (§4.5a *Repo
+    page: Hold / Release on a settling entry*, TD-710); `held` is the claim's, as ever."""
+    now = now or datetime.now(UTC)
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
     builds, builds_of = design_builds(
@@ -319,6 +327,8 @@ def ledger_lists(
                 {
                     **e,
                     "held": held.get(e["id"], ""),
+                    "settle": settle_mod.words(e, now),
+                    "settle_mark": settle_mark(e, now),
                     **({"flag": LEDGER_FLAG} if key == "other" else {}),
                     "builds": builds.get(e["id"]),
                     "builds_of": builds_of.get(e["id"], []),
@@ -332,6 +342,14 @@ def ledger_lists(
             rows = orders + rows  # the person has answered: nothing in a ledger outranks it
         out.append({"key": key, "label": label, "rows": rows, "fold": max(0, len(rows) - LEDGER_FOLD)})
     return out
+
+
+def settle_mark(e: Mapping[str, Any], now: datetime) -> str:
+    """Which press the settle clock's mark on an entry gives its Repo page row (§4.5a, TD-710): `held`
+    (**Release**), `settling` (**Hold**) while its window runs, else ''."""
+    if isinstance(e.get("held"), dict):
+        return "held"
+    return "settling" if settle_mod.words(dict(e), now).startswith("settles") else ""
 
 
 def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -1184,9 +1184,17 @@ def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
 def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
     """The ledger's counts by the page's kind, a work order — a decided line (§4.5a *Repo page:
     decided lines*, TD-384) or a red PR nobody holds (TD-613) — counted *pickable*, as the lanes take
-    them; never in the priorities, which are the ledger's alone."""
-    kinds = dict(((r or {}).get("ledger") or {}).get("by_kind") or {})
-    if n := len(work_orders(r)) + len(pr_orders(r)):
+    them; never in the priorities, which are the ledger's alone. An entry the home's settle clock
+    withholds (`settling` or `held`, §4.4 *What settling withholds*, TD-710) is not counted pickable,
+    as `ao repo` counts it; its page kind is unchanged."""
+    led = (r or {}).get("ledger") or {}
+    kinds = dict(led.get("by_kind") or {})
+    withheld = sum(
+        1
+        for e in led.get("entries") or ()
+        if isinstance(e, dict) and e.get("for_page") == "pickable" and (e.get("settling") or e.get("held"))
+    )
+    if n := len(work_orders(r)) + len(pr_orders(r)) - withheld:
         kinds["pickable"] = int(kinds.get("pickable") or 0) + n
     return kinds
 

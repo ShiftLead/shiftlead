@@ -3232,6 +3232,23 @@
         }
       } finally { busy = false; }
     }
+    async function holdEntry(b) {
+      const id = b.dataset.tdhold, release = !!b.dataset.release;
+      b.disabled = true;
+      const w = AO.toast(`${release ? "releasing" : "holding"} ${id}…`, false, "", true);
+      try {
+        const r = await fetch("/api/ledger/hold", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo: b.dataset.repo, id, release }),
+        });
+        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
+        w.settle(release ? `${id} released: pickable now` : `${id} held: no lane takes it until you release it`, true);
+        reread();
+      } catch (err) {
+        b.disabled = false;
+        w.settle(`${id}: ${err.message}`);
+      }
+    }
     function unfold(key) {
       $$(`.rrow.folded[data-list="${CSS.escape(key)}"]`, box).forEach((r) => r.classList.remove("folded"));
       const b = $(`[data-unfold="${CSS.escape(key)}"]`, box); if (b) { b.hidden = true; b.dataset.unfolded = key; }
@@ -3251,6 +3268,9 @@
       if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
       const more = e.target.closest("[data-unfold]");
       if (more) return unfold(more.dataset.unfold);
+      // **Hold** / **Release** on a settling entry (§4.5a, TD-710): the home's clock, no ledger edit
+      const hold = e.target.closest("[data-tdhold]");
+      if (hold && !hold.disabled) return holdEntry(hold);
       // a board row's team badge: here it opens the Org filtered to that team (in the Inbox it picks the rail)
       const badge = e.target.closest(".mailrow .badge.team[data-team]");
       if (badge && badge.dataset.team) { location.href = "/?team=" + encodeURIComponent(badge.dataset.team); return; }
@@ -5032,6 +5052,7 @@
     const forms = {
       usage: (f) => ["usage", { profile: f.dataset.profile, reserves: Object.fromEntries($$(".setin", f).map((i) => [i.name, i.value.trim()])) }],
       max_age: (f) => ["max_age", { max_age: f.elements.max_age.value.trim() }],  // **trust a reading for** (TD-233)
+      settle: (f) => ["settle", { settle: f.elements.settle.value.trim() }],  // **settle** (§4.5a, TD-710)
       teams: (f) => {
         const body = { team: f.dataset.team, reserve: f.elements.reserve.value.trim() };
         if (f.elements.until.value.trim()) body.until = f.elements.until.value.trim();

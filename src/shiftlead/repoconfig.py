@@ -36,6 +36,7 @@ from typing import Any
 import yaml
 
 from sessionorc import paths, workorders
+from sessionorc import settle as settle_mod
 from sessionorc.models import GRANTS, normalize_context, normalize_review, owner_word
 
 FILE = paths.REPO_FILE
@@ -619,6 +620,9 @@ class RepoConfig:
     # §5 *The seams* `board:` (TD-587): the person's board, relative to the repo; `sessionorc.board.board_path`
     # reads it. None: unset — the default is `docs/user_attention.md` where it exists
     board: str | None = None
+    # §5 `settle:` (§4.4 *A new entry settles before it is pickable*, TD-710): Kind → duration as written,
+    # read by the home (`sessionorc.settle.repo_settle`) over the install's key by key; `{}` when unset
+    settle: dict[str, str] = field(default_factory=dict)
     # §4.9c (TD-309): the repo's held paths, top level — what a flow's review stage waits for. None:
     # the key is absent (a review stage then has nothing to hold); never an empty list
     held: list[str] | None = None
@@ -725,6 +729,11 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{where} must be a command, run in each new worktree (design §5 *The seams*)")
         cfg.worktree_setup = value.strip()
+    elif key == "settle":
+        try:
+            cfg.settle = settle_mod.parse(value if value is not None else {})
+        except ValueError as e:
+            raise ValueError(f"{where}: {e} (design §5 `settle:`)") from None
     elif key == "held" and isinstance(value, dict):
         sets: dict[str, list[str]] = {}
         for name, globs in value.items():
