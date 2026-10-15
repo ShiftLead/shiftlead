@@ -1195,7 +1195,7 @@ def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
         if isinstance(e, dict) and e.get("for_page") == "pickable" and (e.get("settling") or e.get("held"))
     )
     if n := len(work_orders(r)) + len(pr_orders(r)) - withheld:
-        kinds["pickable"] = int(kinds.get("pickable") or 0) + n
+        kinds["pickable"] = max(0, int(kinds.get("pickable") or 0) + n)
     return kinds
 
 
