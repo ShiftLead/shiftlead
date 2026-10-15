@@ -1039,9 +1039,9 @@ The other cases:
 **Priority:** Medium
 **Type:** debt
 **Added:** 2026-10-14 (session `promote_check`, from Paul's report that ShiftLead had looked down for 30 minutes)
-**Owner:** grinder
+**Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Open — Owner was `grinder` until 2026-10-14, which put a `design-first` entry in no lane (the design lane is `[design-first, owner:designer]`, design §4.9c); the design round is the designer's.
 **Location:** `src/shiftlead/ui/static/app.js` `connectEvents` (*a reconnect reloads the snapshot once*); design §4.5 *Browser mechanics*
 
 **Why:** On 2026-10-14 Paul's laptop showed ShiftLead as down for at least 30 minutes, though Tailscale was connected. On kmaster both units were up and answering 200s, and the route port refused nothing from the laptop. In the UI's journal, three open tabs (`/repo/shiftlead`, Focus `ao-shiftlead-ao-connect`, Focus `ao-shiftlead-ao-dc-decouple`) each loaded the page, opened `/events`, and loaded the page again a second or two later. Together that was about 90 `/events` opens a minute, from 16:28:31 until Paul's hard refresh at 18:22:56. The loop lasted through five restarts (16:33, 16:59, 17:26, 17:57 and 18:18), each one an `auto` promote. Nothing in the journal flags it, and no error was logged. It began with no restart or promote at 16:28. After the hard refresh it fell to 0–14 opens a minute.
