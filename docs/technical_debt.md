@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Designed — TD-696, TD-697, TD-698 build it |
 | TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
-| TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
 | TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
 | TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
@@ -1059,26 +1058,6 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** a design entry's row on the Repo page shows its builds and their states, and every listed test passes.
 
 **Related:** TD-693 (the design), TD-652 (*held by*), TD-228 (pickable from `Blocked by`).
-
----
-
-## TD-699: #1786's *held-back reload takes the stream as its own* — `reconnected = false` in `connectEvents` — is held by no test (test audit)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1786)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `tests/test_ui_reload_loop.py` (`test_three_reloads_in_a_minute_hold_back_the_fourth_and_draw_the_banner`, `test_after_a_held_back_reload_later_messages_patch_and_no_second_banner`), `src/shiftlead/ui/static/app.js` (`connectEvents`' `onmessage`, the `reconnected = false;  // held back` line)
-
-**Why:** Design §4.5 *A reconnect reloads once, never in a loop* says of a held-back reload: "The page then takes the stream as its own: it clears its *reconnected* mark, draws the *reload-loop banner* once, and patches from that message on." Delete the one line `reconnected = false;  // held back: this stream is the page's own from here on` in `app.js` and `pdm run pytest -q tests/test_ui_reload_loop.py tests/test_ui_counts.py` still passes (21 passed): the PR's scenario 5 (`out.after`) sends its next messages inside the 60 s window, where `reloadOnReturn()` is held back again whether or not the mark was cleared. With the line gone, the mark stays set and the first message that arrives after the recorded times age out (more than 60 s on) reloads the page — a reload the design says the page no longer makes on that stream — and the line was the only thing between a held-back page and one more reload. Not shown by the tests: a message more than `AO.RELOADS_WINDOW` after the held-back one, on the same stream, must patch and not reload.
-
-**Fix:** extend the probe in `tests/test_ui_reload_loop.py` after scenario 5: `advance(61000)`, `say(REAL)`, and assert `reloads` is still 3 and `handled` grew. Check it fails with the line deleted.
-
-**Done when** that assertion exists and fails against the reverted line.
-
-**Related:** TD-692 (the design), TD-694 (the build, #1786).
 
 ---
 

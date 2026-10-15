@@ -137,6 +137,9 @@ out.loop = { reloads, shown, handled: handled.length, stored: JSON.parse(store["
 say({ event: "session", session: { id: "s2" } });
 sock().close(); advance(1000); say(REAL);
 out.after = { reloads, shown, handled: handled.length };
+// 5b. a message past the window, on the same stream, patches too: the page took the stream as its own (TD-699)
+advance(61000); say(REAL);
+out.later = { reloads, shown, handled: handled.length };
 // 6. **Reload** clears the count
 btn.fire("click");
 out.reload_button = { reloads, stored: store["ao.reloads:/focus/s1"] === undefined,
@@ -209,6 +212,13 @@ def test_three_reloads_in_a_minute_hold_back_the_fourth_and_draw_the_banner(prob
 @pytest.mark.unit
 def test_after_a_held_back_reload_later_messages_patch_and_no_second_banner(probe):
     assert probe["after"] == {"reloads": 3, "shown": 1, "handled": 4}
+
+
+@pytest.mark.unit
+def test_a_held_back_page_keeps_the_stream_past_the_window(probe):
+    """TD-699: the held-back page clears its *reconnected* mark, so a message more than a minute on,
+    when the recorded reloads have aged out, patches the page rather than reloading it."""
+    assert probe["later"] == {"reloads": 3, "shown": 1, "handled": 5}
 
 
 @pytest.mark.unit
