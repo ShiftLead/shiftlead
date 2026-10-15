@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .common import editor_file_link
+from . import uiconf
+from .common import editor_file, editor_file_link, editor_link
 
 TRANSCRIPT_TURNS = 20  # the page opens on the last twenty turns, and *earlier turns* asks for twenty more
 
@@ -88,3 +89,20 @@ def transcript_editor(path: str, here: bool) -> dict[str, Any] | None:
     another host's file is not at that path here, and a container's reach link names a directory,
     not a file. None under `open_in: none`."""
     return editor_file_link(path, folder=False) if here and path else None
+
+
+def transcript_paths(directory: str) -> dict[str, Any] | None:
+    """What a path in a turn presses (§4.6 *A path in a transcript is a link too*, TD-691): the editor's
+    file form (`file`, `{path}` unfilled) and the session's folder link sent first (`url`, `editor_link`
+    of the record's `dir`; none with `folder_first: false`, so the press is one launch), as the pane's
+    `editor`. The caller asks it only where the page draws its **VS Code** button; None for no links."""
+    file = editor_file()
+    if not file:
+        return None
+    folder = editor_link(directory) if directory and uiconf.file_link()["folder_first"] else None
+    return {
+        "label": uiconf.open_in().label,
+        "file": file,
+        "url": folder["url"] if folder else None,
+        "wait": uiconf.file_link()["wait"],
+    }

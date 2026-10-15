@@ -12205,3 +12205,27 @@ The window's `w.name` assignment, by contrast, is caught.
 **Done when** **Open ledger**, **Open board** (at the item's line), every **Open file** and the transcript buttons open the file in VS Code on the local, ssh-remote and container forms (the ledger in the repo's window), and the template test holds them.
 
 **Related:** TD-688 (the design), TD-532 (two launches), TD-536 (`person.file_link`), TD-662 and TD-663 (TD-657's **Open file** buttons).
+
+## TD-691: Build TD-688 (3): a path in the Transcript page's turns is a link, by the same `paths` RPC and press
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-688's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.6 *A path in a transcript is a link too*, §4.5a *Transcript*; `src/shiftlead/ui/transcript.py` (the route's folder link), `src/shiftlead/ui/templates/transcript.html`, `src/shiftlead/ui/static/app.js` (the pane's path shape and `fetchPaths`, `AO.fileUrl`, `AO.openFile`), the `/api/sessions/<id>/paths` route
+
+**Why:** TD-688's design: Paul asked for links in transcripts, and the Transcript page links no path today.
+
+**Resolved:** 2026-10-14 (PR #1767) — the route serves `data-paths` (`transcript.transcript_paths`: the file form, the session's folder link, the wait) where **VS Code** is drawn; `AO.transcriptBlock` asks on a block's first hover through `AO.pathsAsker` (eight runs per ask, one in flight, answers kept for the page's life, a run left out asked again) and `AO.pathLinksHtml` draws each resolved run as an `a.editor` opened on Ctrl or Cmd alone; `tests/test_ui_transcript_paths.py`.
+
+**Fix:**
+- **The shape.** The pane's path shape is factored into one function the Transcript page also calls, over a turn's text, a tool line's input and a tool result's text, as they render.
+- **The ask.** Each turn block, on its first hover, asks `/api/sessions/<id>/paths` once with its runs, eight at most per ask (more runs, more asks). One ask is in flight at a time, and each run's answer is cached for the page's life. Each run that answered is wrapped in an `a.editor`. Its `href` is `AO.fileUrl` of the editor's file form, and its `data-folder` and `data-wait` are the record's folder link, as `AO.recentFiles` builds them. The route (`transcript.py`) passes that link beside the transcript's own file link: `editor_link` for the record's `dir`, or none under `open_in: none` or with `folder_first: false`, in which case the press is one launch. A block is asked once, and a failed ask leaves it as text.
+- **Where.** The links are drawn only where the page draws its **VS Code** button, for a record on this host, and absent with it (`open_in: none`, a node's or a container's record).
+- **Tests:** in the page's JS tests, a turn with a resolving path and one without, a block asked once on its first hover, a run met twice asked once, and no ask before a hover.
+
+**Done when** a path in a transcript turn that the host resolves is a Ctrl+click link opening the file as the pane's does.
+
+**Related:** TD-688 (the design), TD-690 (the bound it reads), TD-501.

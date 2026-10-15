@@ -4,8 +4,10 @@
 {# design §4.5 screen 9 **Transcript** (TD-154, built by TD-166): what a session said and did, read
    from the file its tool wrote, without resuming it. A snapshot at the moment it was opened —
    reload reads what came after; the terminal is the live view. The only controls are the folds,
-   *earlier turns* and the editor button (§4.5a *Transcript*). #}
-<div class="page transcript" id="transcript" data-id="{{ s.id }}">
+   *earlier turns* and the editor button (§4.5a *Transcript*). A path in a turn is a link as a path in
+   the pane is (§4.6 *A path in a transcript is a link too*, TD-691): `data-paths` is what a press
+   sends, drawn where the editor button is and absent with it; the page asks on a block's first hover. #}
+<div class="page transcript" id="transcript" data-id="{{ s.id }}"{% if paths %} data-paths='{{ paths | tojson }}'{% endif %}>
   <div class="row gap thead">
     <a class="muted" href="/focus/{{ s.id }}">← Focus</a>
     <span class="mono title">{{ s.place }} / {{ s.name }}</span>
