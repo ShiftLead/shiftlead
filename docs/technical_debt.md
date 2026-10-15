@@ -62,9 +62,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
 | TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
 | TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
-| TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Open |
+| TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Open |
+| TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
 
 ---
 
@@ -1199,7 +1200,8 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-14 (the designer; no mockup: the card's mark draws its lines as it does) — §4.9 *A member renamed or removed in the definition*: the client pairs the records the definition no longer names with the names no record carries, within a role, in order; a pair is a rename, applied by a relaunch under the new name whose create succeeds the old record (mail, open claims, `lane_seen` and every `controllers` carried), a leftover record a removal, marked sat out (`dropped` lets it mark a seat). Read on a stopped team too, and reached only by a person's Apply or Start; Members…'s Remove marks the record the same way. Built by TD-706. Was: Open.
+**Blocked by:** TD-706
 **Location:** design §4.9 *Where definitions live*, §4.9c *Apply*, §6 rule 8; `src/sessionorc/agent_tick.py` (`_work_start` ~L1670, `_work_replays` ~L1730), `src/sessionorc/work.py` (`crew`), `src/shiftlead/teamrun.py` (`start`, `apply`)
 
 **Why:** Paul renamed dev-cadence's members on 2026-10-14 (dev-cadence `1145d97`: `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`, `grinder-dc-1` → `dc-grinder`) and saw nothing change. The definition is read — `ao team list` shows *manager: dc-manager (on call) techlead: dc-techlead* — but dc-grind is stopped, and its cards are the closed records of the last run under the old names. Rule 8's start replays a team's ended crew records (`_work_replays`) with their own names and launch records and never reads the definition (§6 *Keeping a team running*), so the team would come back as `grinder-dc-1`. Only a person's Start creates records under the new names, and `crew` is every unattended record of the team: the old ones stay closed, not superseded, and a later rule 8 start could replay them beside the new ones (read in the code, not seen live). Paul: *we should also make sure members are not duplicated on changes as well (e.g. dc-grinder alongside grinder-dc-1)*. The design says nothing of a rename.
@@ -1260,5 +1262,29 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** an auditor that calls `ao doing` once a day stays in its team's feed and chips while busier members call hourly, and every listed test passes.
 
 **Related:** TD-702 (the design), TD-176 (the doing log), TD-700 (why the auditors also stopped writing).
+
+---
+
+## TD-706: Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-703's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.9 *A member renamed or removed in the definition* and *Add or remove a member from the team card*, §4.9c *Switching*, §6 *Keeping a team running*, §4.5a *team card: flow changed — Apply*; `src/shiftlead/teamrun.py` (`differences`, `flow_changed`, `flow_view`, `apply`, `start`, `remove_member`, `Difference`), `src/shiftlead/ui/cards.py` (`flow_mark`), `src/shiftlead/ui/org.py` and `src/shiftlead/ui/templates/group_head.html` (the mark and Apply, whose title and confirm name renames and removals, beside Start on a stopped team), `src/shiftlead/cli.py` (`ao team list` ~L1146, `ao team flow` ~L1972), `src/sessionorc/agent_common.py` (`RELAUNCH_KEYS`), `src/sessionorc/agent.py` (`rpc_relaunch`, `_sit_out`, `rpc_create`, `_move_mail`), `src/sessionorc/agent_tick.py` (`_replay`, `_seat_pass`)
+
+**Why:** TD-703's design. Paul renamed dev-cadence's members on 2026-10-14 and nothing changed: rule 8 replays ended records under their own names, a person's Start would create the new names beside the old records, and Members…'s Remove sends a wrap-up that leaves a declared record rule 8 replays at the next wind-down.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). Slices, each its own PR:
+1. **The pairing** — `teamrun.renames(plan, sessions) -> (renames, removals)` as §4.9 says: orphans (crew, current, not sat out, name not in the definition) against newcomers (definition names no current record carries), paired within a role — a seat with the same seat — orphans by `created`, newcomers in definition order. `differences` gains `Difference` kinds `rename` (record, launch) and `removed` (record), read on a stopped or wound-down team too (renames and removals only there). `flow_mark`, `ao team list` and `ao team flow` print *grinder-dc-1 → dc-grinder: renamed* and *grinder-dc-2: removed from the definition*; the stopped team's card draws **definition changed — Apply** beside Start with the title §4.5a gives.
+2. **The home's half** — `RELAUNCH_KEYS` gains `name`; a relaunch whose `name` differs is replayed (rule 7's restart, rule 8's start, rule 3's fill) as a `create` under the new name with **`succeeds: <old id>`**: the old record's mail moved (`_move_mail`), `superseded_by` written on it, its `claimed` progress entries and `lane_seen` copied to the new record, every record's `controllers` and every launch record's naming the old address rewritten to the new, the launch record moved to the new id. `succeeds` is refused to a session that is neither the person nor the home, as `keep_mail`'s check is. `_sit_out` takes `dropped: true`, which lifts its seat refusal; `_seat_pass` never fills a sat-out seat.
+3. **Apply and Start** — `apply` hands each rename's launch with `name` and each removal as `relaunch {id, sit_out: true, dropped: true}`; `start` reads the same pairing after its checks and a concluded team's closes, creates each paired newcomer with `succeeds`, marks each removal, and lists both in its result and confirm. `remove_member` uses the sit-out form (with `dropped`) for a live or an ended member instead of `_stop_one`.
+- **Tests:** a renamed member on a live team relaunches under the new name with its mail, claims and `lane_seen`, and the old record superseded; a renamed manager's members name the new id in their `controllers` and launch records; a stopped team's rename by Apply is replayed by rule 8 under the new name and the old never; a person's Start after a rename leaves one current record per name; a removed member (Apply or Members…'s Remove) is marked sat out and `_work_replays` skips it; a dropped seat is marked and never filled; two orphans and two newcomers of one role pair in order; a person's session is never an orphan; the doc-bound §4.5a tests pass.
+
+**Done when** dev-cadence's rename (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`) reads as three renames on dc-grind's stopped card, Apply or Start brings the team back under the new names with no old record replayed beside them, and every listed test passes.
+
+**Related:** TD-703 (the design), TD-619 (a profile change reaches the team by Apply), TD-163 (Members…), TD-654.
 
 ---
