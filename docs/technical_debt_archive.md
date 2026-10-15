@@ -12658,3 +12658,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** a ledger reading with a repeated build id lists it once, and the rendered line carries the PR's `url` as a link, each held by a test that fails without its line.
 
 **Resolved:** 2026-10-15 — two tests in `tests/test_ui_builds_line.py`: `test_an_id_named_twice_is_listed_once` (fails without `blocked_ids`' `not in out` guard) and `test_a_build_in_review_links_its_pr` (fails with the PR link replaced by plain `#{{ b.pr }}`).
+
+## TD-700: A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** grinder
+**Kind:** live-check #1798
+**Status:** Done — built by #1798 (grinder-ao-1, 2026-10-14), read live by grinder-ao-2 on 2026-10-15. Before that read: `_seat_done` reads a `prs` or `every` due as the next fill's, and the test half of *Done when* passes. To read once #1798 is live (`ao promote status`): an auditor seat (`ao-shiftlead-docs-audit-ao-1` or `ao-shiftlead-test-audit-ao-1`) whose `seat_due` came while it ran is, once idle and pushed past `SEAT_IDLE_GRACE`, closed by the tick (`closer: {by: tick, why: seat}`) and filled on the next one (`ao status --json`: `restarts[-1].why == "fill"` within a tick of its going idle, `seat_count` starting again).
+**Location:** design §6 rule 3, §4.9b *Seats with a trigger*; `src/sessionorc/agent_tick.py` (`_seat_pass` ~L2315, `_seat_done` ~L2353, `_seat_due` ~L2400)
+
+**Why:** ao-grind's two auditors stopped running for two days with nobody told. `ao status --json`, 2026-10-14: `ao-shiftlead-docs-audit-ao-1` created 2026-10-13T15:26:54Z, `seat_due: {at: 2026-10-13T16:15:47Z, by: prs}`, `seat_count.prs: 100`, idle since 2026-10-14T00:00Z; `ao-shiftlead-test-audit-ao-1` created 2026-10-12T21:00:36Z, `seat_due` at 22:27:10Z, idle the same. Each came due 49 and 87 minutes into its run, as ten PRs merged under it. `_seat_pass` fills a seat only when it is `exited` or `closed` with `seat_due` set, and closes an idle one only when `_seat_done` — which is `not s.seat_due` for a `prs` or `every` trigger. A seat due while it runs is therefore never closed, so never filled. Paul's Close of test-audit on 2026-10-14 ~21:50 MDT let the tick fill it at once (`restarts[-1]: {why: fill, at: 2026-10-15T03:52:03Z}`). Its symptom on the page: no auditor line in the Doing feed (TD-702 is the other half).
+
+**Fix:** a `prs` or `every` seat that is idle, has run, and is pushed closes as a done seat does, and the standing `seat_due` fills it on the next tick — the due that came during the run is the next run's cause, as the anchor's `work` trigger already reads it (`_seat_done`'s `work` branch). The count the run covered is not counted twice: `seat_count` is read from the fill on.
+
+**Done when** a test holds a `prs` seat whose `seat_due` is set mid-run: idle and pushed, it is closed and then filled, and `_seat_done` says so; and on the live copy an auditor that came due mid-run is filled again within a tick of its going idle.
+
+**Related:** TD-701 (the close it needs can be blocked), TD-702, TD-386 (the anchor's `work` trigger), TD-660.
+
+**Resolved:** 2026-10-15 — the live check holds (grinder-ao-2, read-only, `ao status --json`, `ao promote status`, the auditor's transcript, `gh pr list`). `ao-shiftlead-docs-audit-ao-1` (`seat: {trigger: prs, after: 10}`) was filled at 04:05:14Z, finished its turn at 04:06:04Z and sat idle with its run open. Its tenth merged PR after the fill was #1798 itself, at 05:22:43Z, so it came due mid-run under the code without the fix. The live copy moved to 16972df, which holds #1798, and the record then reads `restarts[-1]: {why: fill, at: 2026-10-15T06:10:24Z}`, `created: 06:10:24Z`, `seat_due: null`, `seat_count: {prs: 0, at: 06:15:24Z}`. The tick closed the idle, due seat and filled it, and the count starts again from the fill. Nobody pressed a Close this time. Paul's Close of test-audit at 03:52Z was the only way out before.
