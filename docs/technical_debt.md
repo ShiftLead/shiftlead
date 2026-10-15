@@ -51,7 +51,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-661 | Build TD-657 (1): a pass goes to the director where the org has one — `passes` once per passer, the director's `asks` cause, its pass to the person, both recommendations on the row | Medium | Open |
 | TD-662 | Build TD-657 (2): the preference layers and the level — the package's `preferences.md`, `{preferences}` in `director.md`, `director.level` per org and repo, `answered.level`, the Settings page's Director card, `ao prefs` | Medium | Open |
 | TD-663 | Build TD-657 (3): the groom pass, the seed, Remember this, the interview — `ao prefs propose`, the *preferences proposed* row's Accept and Discard, the home's commit | Medium | Open |
-| TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
@@ -868,26 +867,6 @@ with the retired brief).
 **Done when** the director grooms the person's file on its interval and on a press, seeding it the first time, a remembered answer reaches the next pass, the interview proposes, every change reaches the file only by the person's Accept or hand edit, and the tests above pass.
 
 **Related:** TD-657 (the design), TD-661, TD-662, TD-210 (the home's work tree).
-
----
-
-## TD-672: `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live)
-
-**Priority:** High
-**Type:** debt
-**Added:** 2026-10-14 (ao-connect, Paul's first `ao connect tailscale` on kmaster)
-**Owner:** anchor
-**Kind:** live-check #1730
-**Status:** Waiting 2026-10-14 (grinder-ao-2): #1730 is live (`ao promote status`: live e018c3f, which contains it). The live install's `shiftlead/connect.py` has `PROBE_BOUND = 180.0` and `PROBE_EVERY = 5.0`. What is still unread waits for an event no session can cause: a first `ao connect tailscale` on a tailnet name that has never had a certificate. kmaster's name has one cached since 09:15:39 today, so a run there no longer shows it. The next new home, or a node renamed on the tailnet, shows it, and only the person can run it (`set_reach` is refused to a session). The owner is now the anchor, so no grinder re-picks the entry each run. Was: Built 2026-10-14 (grinder-ao-2, #1730): `connect.probe` retries a fetch that got no answer every `PROBE_EVERY` (5 s), up to `PROBE_BOUND` (180 s), and says once that the first certificate can take a minute or two. Any answer is judged at once. Design §4.7 *The probe* gives the retry and its bound. The cure that asks tailscaled first was not taken (the design history says why). What to read once #1730 is live (`ao promote status`): the person's own first `ao connect tailscale` on a tailnet name that has never had a certificate. Their terminal shows the *first HTTPS certificate* line and then the phone line; `settings.yml` keeps `reach:`; `tailscale serve status` shows the 443 handler. Only the person can run it (`set_reach` is refused to a session), so the reading is theirs or their transcript's. Was: Open.
-**Location:** design §4.7 `ao connect` (*The probe*); `src/shiftlead/connect.py` (`PROBE_AFTER`, `PROBE_WAIT`, `probe`, `connect_tailscale`)
-
-**Why:** the first `tailscale serve --https=443` on a tailnet name has no certificate yet; tailscaled starts fetching one from Let's Encrypt (dns-01 through Tailscale's control plane, its `tls-cert-pending` health warning standing meanwhile) the moment the handler is added, and a rollback cancels that fetch. On kmaster, 2026-10-14, Paul ran `ao connect tailscale --allow eyecantell@github`: the handler was added at 09:14:41, the probe went out 10 s later with a 15 s budget, and failed with *lacking: route — the probe failed: https://kmaster.tailc00dac.ts.net did not answer (_ssl.c:1012: The handshake operation timed out)*. The rollback ran correctly (no `reach:`, *No serve config*). tailscaled's log shows the fetch started with the handler, was cancelled by the rollback (*context canceled*), started again at once and finished at 09:15:39; each attempt's DNS step took about 30 s, so an uninterrupted fetch would have needed 30–40 s, more than the probe's 25. Every new home meets this on its first run, and a person is told the route failed when it only needed to wait. A second run works, since the certificate is then cached.
-
-**Fix:** the probe waits for a first certificate before it judges the route. Either `ao connect` asks tailscaled before probing (the `tls-cert-pending` health warning in `tailscale status --json`, or a `tailscale cert` of the name, which blocks until it has one, given `--cert-file`/`--key-file` in a scratch directory so it leaves no files behind; the design step checks that the warning shows in `status --json` during a fetch) and says *fetching the HTTPS certificate — the first can take a minute or two*; or the probe retries an answer that did not come, up to a bound of about three minutes, saying so. The design's §4.7 *The probe* names which, and the bound. A probe that answers with the wrong listener, or `421`, still fails at once. Test: a fake fetch that times out for the first few tries and then answers `route` passes inside the bound, and one that never answers fails at it, with the rollback.
-
-**Done when** `ao connect tailscale` on a home whose tailnet name has never had a certificate succeeds on its first run.
-
-**Related:** TD-648 (`ao connect`, archived: its live check passed on the second run), TD-646 (the design).
 
 ---
 
