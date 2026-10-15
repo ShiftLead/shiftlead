@@ -62,6 +62,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
+| TD-708 | `td_next`'s three refusal/unread branches are held by no test: a filled `--limit 200`, a non-GitHub origin, a repo with no origin remote | Low | Open |
+| TD-709 | The builds line's de-duplication and its PR link are held by no test (#1793) | Low | Open |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
 
 ---
@@ -1154,6 +1156,38 @@ The other cases:
 **Done when** the design says the settle map, its clock, the Hold and its release, and what never settles, and build entries carry it.
 
 **Related:** TD-702 (the case that prompted it), TD-693 / TD-696 (the home hands out ids, `ao td next`), TD-223 (pickable is derived).
+
+---
+
+## TD-708: `td_next`'s three refusal/unread branches are held by no test: a filled `--limit 200`, a non-GitHub origin, a repo with no origin remote
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (test-audit-ao-1, auditing #1793, #1794)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_ids.py` (`_ids_prs`, `_ids_repo`); `tests/test_td_next.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-14, mutating #1794's code with `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_td_next.py` (23 passed unmutated). Each of these three edits still passes all 23: (1) `len(numbers) >= PR_LIMIT` → `len(numbers) > PR_LIMIT`, so a list that exactly fills `--limit 200` is no longer named *the list filled its 200* (an open PR beyond it, whose heading would raise the floor, goes unread silently); (2) `if not is_github(key):` → `if False:`, so a non-GitHub origin runs `gh pr list --repo <url>` instead of naming *open PRs not read: the origin … is not GitHub's*; (3) `if not any(keys.values()):` → `if False:`, so a repo with no origin remote is no longer refused with *has no origin remote*. `test_td_next.py` names none of these messages (`grep -n 'filled\|not GitHub\|origin remote' tests/test_td_next.py` finds only `is_github`'s unit assert at L128).
+
+**Done when** each of the three has a test that fails when its line is reverted: a fake `gh pr list` of exactly `PR_LIMIT` numbers, a GitLab origin, and a checkout with no `origin` remote.
+
+---
+
+## TD-709: The builds line's de-duplication and its PR link are held by no test (#1793)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (test-audit-ao-1, auditing #1793, #1794)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/ledger.py` (`blocked_ids`), `src/shiftlead/ui/templates/repo_part.html` (builds line); `tests/test_ui_builds_line.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-14, mutating #1793's code and running `tests/test_ui_builds_line.py tests/test_repo_facts.py` (44 passed unmutated). Two edits still pass all 44: (1) `blocked_ids` without its `not in out` guard, so a `Blocked by:` line that names `TD-5, TD-005` lists the build twice on the design's line, against the docstring's *each written `TD-NNN`*, in order, one entry (`test_ids_written_either_way_are_one_entry` is about `_tid` equality, not a repeated id); (2) the template's `{% if b.url %}<a href=…>#{{ b.pr }}</a>{% else %}#{{ b.pr }}{% endif %}` replaced by plain `#{{ b.pr }}`, so the *in review #N* link to the PR is gone and no test sees it (§4.5a *Repo page: its builds line* draws it as a link).
+
+**Done when** a ledger reading with a repeated build id lists it once, and the rendered line carries the PR's `url` as a link, each held by a test that fails without its line.
 
 ---
 
