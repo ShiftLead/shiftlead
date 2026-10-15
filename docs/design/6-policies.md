@@ -611,8 +611,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      and `WORK_SETTLE` (ten minutes) has passed since the home first read the newest of them — a
      time the home keeps in memory, so a restart of the home starts the settle again — the home
      writes **`work_waiting: {at, repo, members: {<name>: [ids]}}`**, `repo` being the ledger's, on
-     its own `host` record under the team's name — for the first registry root, in sort order, where
-     the team's news is in two, the other's waiting for the next wind-down. It is removed when every
+     its own `host` record under the team's name — for its repo, the one registry root its records name (a team works
+     one repo, §4.9, TD-722). It is removed when every
      member it names is live again (a wound-down team's: any crew session live again), when no id is
      new, and under `off`; a member's ledger that cannot be read removes nothing, since *could not
      look* is not *no id new*: what stands stands, its `at` and the settle's memory kept; while more
@@ -642,8 +642,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
        keeps `work_started: [at]` beside `work_waiting`); a start by this rule inside the last
        **`WORK_EARLY`** (thirty minutes); and its repo **over the team's balance line** (§6
        *Balance*), read here by the rule itself, since the mark goes with the team's last live
-       member: the team's `balance` against every registry root its records name, either crossing
-       counting as for a live team, and `review` against the queue its ended seats keep. A reading
+       member: the team's `balance` against the registry root its records name — one, since a team works
+       one repo (§4.9, TD-722) — and `review` against the queue its ended seats keep. A reading
        that cannot be told writes no new hold and lifts none, and a standing hold whose repo, lines
        and limits are unchanged is kept as it stands, so its numbers are the crossing's. A standing
        balance hold that an earlier bound displaces is kept beside it, as `held.balance`, and read
@@ -1403,8 +1403,8 @@ teams:
   see the reader's queue (§4.7), and nothing mechanical waits on a round (*Keeping a team
   running*). After every repo reading and on every tick for the queue, the home reads the
   lines for each team that has the key, the team's repo being the registry root its live
-  members' records name (`repo`; a team over two repos is read against each, either crossing
-  counts, and every member is refused whichever repo it sits in). A team with no live member
+  members' records name (`repo`) — one, since a team works one repo (§4.9, TD-722), and read off
+  the records because the home reads no definition. A team with no live member
   is not read, and a mark it carried goes: there is nobody to refuse. A team whose live members
   name no registry root has no repo to read, so `prs` and `oldest` cross nothing for it and only
   `review` can mark it (with `repo` empty) — never *cannot be told*, which would keep a mark
