@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Built (#1802, #1807, #1818); live check |
-| TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
 | TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Slice 1 built by #1843 |
@@ -1045,26 +1044,6 @@ The other cases:
 **Done when** dev-cadence's rename (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`) reads as three renames on dc-grind's stopped card, Apply or Start brings the team back under the new names with no old record replayed beside them, and every listed test passes.
 
 **Related:** TD-703 (the design), TD-619 (a profile change reaches the team by Apply), TD-163 (Members…), TD-654.
-
----
-
-## TD-711: TD-706's summary row says *Open* while its entry says slice 1 was built by #1802
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (docs-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt.md` (the summary table's TD-706 row, and TD-706's **Status**)
-
-**Why:** #1802 merged 2026-10-15T05:39Z and changed TD-706's **Status** to *Slice 1 built 2026-10-14 (grinder-ao-2) … Slices 2 (the home's half, `src/sessionorc/`) and 3 (Apply and Start) open*, but left the summary row `| TD-706 | Build TD-703: … | Medium | Open |`. A reader of the table alone (the grinder's pick, `ao repo`) sees the whole entry as untouched and may start slice 1 again. The file's own rule is that the table lists the entry's state, one row each; a partly built entry reads as such there (TD-052: *Partly done — steps 1–8 done*).
-
-**Fix:** the row's status reads *Slice 1 built (#1802); slices 2 and 3 open*.
-
-**Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
-
-**Related:** TD-706, TD-703.
 
 ---
 
