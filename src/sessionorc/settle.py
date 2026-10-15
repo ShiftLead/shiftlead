@@ -85,9 +85,44 @@ def _kind(entry: dict[str, Any]) -> str:
     return str(entry.get("kind") or "").lower() or "build"  # no `Kind:` line reads as `build` (§4.4)
 
 
+def mark_waits(entries: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+    """Each entry's `waiting: {on, until}` while its `**Waits:**` line stands (design §4.4 *What a wait
+    does*, TD-716), dropping a stale one: an `until` stands while the home's local date is before its
+    date — one that names no date waits with no end — and an `event` while the line is there. It needs
+    no record and no `settle:` span, so a repo with neither, or a clock that cannot be written, still
+    marks waits. Returns `entries`."""
+    today = now.astimezone().date().isoformat()
+    for e in entries:
+        e.pop("waiting", None)
+        w = e.get("waits")
+        if not isinstance(w, dict) or w.get("on") not in ("until", "event"):
+            continue
+        date = str(w.get("date") or "")
+        if w["on"] == "until" and date and date <= today:
+            continue  # its day has begun: the line reads as unwritten
+        e["waiting"] = {"on": w["on"], "until": date}
+    return entries
+
+
+def wait_refusal(entry: dict[str, Any] | None) -> str | None:
+    """Why a declared claim on a waiting entry is refused (design §4.4 *What a wait does*, TD-716), or
+    None: *TD-463 waits until 2026-10-16*, *TD-685 waits: the next cadence-sync PR*. `--force` passes
+    it, since the session may know the event has come; that session's PR removes the line."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("waiting"), dict):
+        return None
+    i, w = str(entry.get("id") or ""), entry.get("waits") if isinstance(entry.get("waits"), dict) else {}
+    if entry["waiting"].get("on") == "until" and entry["waiting"].get("until"):
+        said = f"{i} waits until {entry['waiting']['until']}"
+    else:
+        said = f"{i} waits: {w.get('why') or entry['waiting'].get('on') or 'an event'}"
+    return f"{said} (design §4.4 *An entry says what it waits for*); claim it anyway with --force if the wait is over"
+
+
 def _marks(entries: list[dict[str, Any]], seen: dict[str, Any], spans: dict[str, int], now: datetime) -> None:
     """Each entry's `settling` or `held` from its record, dropping a stale one: a held entry is held
-    whatever the clock says; an unsettled one settles at `at` plus its Kind's duration."""
+    whatever the clock says; an unsettled one settles at `at` plus its Kind's duration. Each entry's
+    `waiting` too (`mark_waits`)."""
+    mark_waits(entries, now)
     for e in entries:
         e.pop("settling", None)
         e.pop("held", None)
