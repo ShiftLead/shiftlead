@@ -1039,7 +1039,7 @@ The other cases:
 **Added:** 2026-10-14 (the designer, building TD-682's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open The split (grinder-ao-2's note to grinder-ao-1, 2026-10-14): grinder-ao-1 builds the `src/sessionorc/` part — `ci_spells` at the home, the `ci_rerun` RPC and its run-status reads on the tick, `agent_notify`/`notify.py`'s told line and snooze key, the person-only list — and grinder-ao-2 takes the Inbox row (`ui/inbox.py`, its template, `app.js`, `help.py`) once that has merged.
+**Status:** Open. Slice 1 is #1770 (the spells on the `host` record as `ci_spells`, `ci_rerun`, the run-status reads, the Telegram line and the `ci_not_run:<owner>` snooze key); slice 2, the Inbox row, is grinder-ao-2's. The split (grinder-ao-2's note to grinder-ao-1, 2026-10-14): grinder-ao-1 builds the `src/sessionorc/` part — `ci_spells` at the home, the `ci_rerun` RPC and its run-status reads on the tick, `agent_notify`/`notify.py`'s told line and snooze key, the person-only list — and grinder-ao-2 takes the Inbox row (`ui/inbox.py`, its template, `app.js`, `help.py`) once that has merged.
 **Blocked by:** TD-686
 **Location:** design §4.5a *Inbox row: CI not starting*, §4.4 *CI that never started is the person's*, §4.10 *Told on Telegram when nobody is looking*; `src/shiftlead/ui/inbox.py` (beside the red PR row), the Inbox page's template and `app.js`, the home's RPCs (`src/sessionorc/agent_serve.py`, a `ci_rerun` call), `src/sessionorc/agent_notify.py` and `notify.py` (the told list, `_notify_snoozed`), the spells at the home
 
