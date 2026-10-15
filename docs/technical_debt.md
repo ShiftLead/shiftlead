@@ -55,7 +55,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
-| TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
@@ -992,27 +991,6 @@ The other cases:
 - A head pushed between the check and the merge is not merged. `sync: {auto: false}` merges nothing. The switch shows the verdict.
 
 **Related:** TD-681 (the design), TD-684 (the order), dev-cadence#TD-113 (`post_sync`), §6 *Promote* and *Pull* (the pass it shares).
-
----
-
-## TD-702: The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (ao-paul, with Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-14 (the designer; no mockup: the feed's rows are drawn as before) — §4.8 *the doing log*: the team's last fifty calls and, beside them, each doer's newest five (the call's record `id`); a doer with no call in 30 days keeps nothing beyond the fifty. The feed is the kept calls in time order, newest first; the Repo page's chips offer every doer kept. One keep rule, in `sessionorc`, used by the host agent's ring and the UI's copy alike. Built by TD-705. Was: Open.
-**Blocked by:** TD-705
-**Location:** design §4.8 *the doing log*, §4.5a *team card: Answer needed / Doing*, *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`, `keep=50`), `src/shiftlead/ui/org.py` (`DOING_KEPT`, `doing_rows`)
-
-**Why:** Paul, 2026-10-14: *I do not see any "doing" entries from our auditors — lets make sure they report what they are doing.* They do report: `~/.shiftlead/doing.jsonl` holds 31 lines from the shiftlead auditors, the last at 2026-10-13T15:28:25Z. But the ring keeps a team's last 50 lines, and ao-grind's last 50 (from 2026-10-14T23:10Z) are the two grinders' and the techlead's alone: three busy members fill it in under a day, so a seat that runs every ten PRs is never seen. The filter chips (`doing_chips`) can only pick from what the ring kept.
-
-**Fix:** decide what the feed keeps so every member is visible — e.g. the ring keeps each doer's newest few beside the team's last 50, or keeps per member — and how the feed and its chips draw a member whose newest line is old.
-
-**Done when** the design says what the doing log keeps per member, and a build entry carries it.
-
-**Related:** TD-700 (why the auditors also stopped writing), TD-176.
 
 ---
 
