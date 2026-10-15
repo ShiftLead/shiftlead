@@ -73,6 +73,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
 | TD-742 | Five behaviours of TD-716 slice 1 (#1843) are held by no test: a repeat claim on a waiting entry, an `until` with no date's refusal words, a capitalised `Waits:` word, `Waits:` dash forms, and a held entry's `waiting` list | Low | Open |
 | TD-743 | Build TD-734: *waiting* only on a person or another session; an idle session with a live subagent reads *working* | Low | Open |
+| TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
 
 ---
 
@@ -1533,5 +1534,27 @@ The other cases:
 **Done when** the tests above pass, and a session running `/cadence` with an Agent-tool reviewer reads *working* (a reviewer run as a separate `claude -p` session fires no hook and is not read), and one waiting only on its own PR reads *idle*, on a scratch home (§4.9b, a screenshot of each card named in the PR).
 
 **Related:** TD-418, TD-428, TD-201, TD-734.
+
+---
+
+## TD-744: TD-731's `_hold_tell` reading a PR only from a declared claim, and `prehold` keeping an id's existing hold, are held by no test (#1861)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1861)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_ids.py` (`_hold_tell`, the `p.status == "claimed" and p.source == "declared" and (p.pr or p.review_pr)` test), `src/sessionorc/settle.py` (`prehold`'s `rec.setdefault("held", …)`); `tests/test_settle.py`, `tests/test_td_next.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1861's lines one at a time and running `tests/test_settle.py tests/test_td_next.py tests/test_repo_facts.py` (94 passed unmutated, main's venv). Ten mutations fail a test (the `review_pr` read, the `(p.pr or p.review_pr)` gate, `not was_held`, the interactive-holder skip, the holder/state skips, `_held_caller`'s interactive pass, `observe`'s first-reading rule, the sig kept on an edit, the reader's PR number). Two pass all 94:
+1. `p.source == "declared"` dropped from `_hold_tell`'s progress loop: the docstring says a PR is read from *a declared lease's claim*, and a non-declared (inferred or scraped) `claimed` line on the same ref carrying a `pr` would add that PR to the readers' set; every test's claim is declared.
+2. `prehold`'s `rec.setdefault("held", {...})` changed to `rec["held"] = {...}`: an id already held (a person's earlier Hold, with its `at` and `by`) is re-stamped with the caller and the new time; no test pre-holds an id that already holds a record.
+
+**Fix:** (1) in `tests/test_settle.py`, a holder with a declared claim on TD-003 and a non-declared claim line carrying `pr=1842`: the seat asking about #1842 is not told; (2) in `tests/test_settle.py`, `prehold` over an id whose record already has `held: {at, by}` leaves both. Each fails under its mutation above.
+
+**Done when** the two tests exist and fail under those mutations.
+
+**Related:** TD-731, #1861.
 
 ---
