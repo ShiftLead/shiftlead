@@ -1159,7 +1159,7 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 ## TD-700: A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due
 
 **Priority:** High
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** grinder
 **Kind:** build
@@ -1179,7 +1179,7 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 ## TD-701: Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed
 
 **Priority:** Medium
-**Type:** bug
+**Type:** debt
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** grinder
 **Kind:** build
@@ -1199,7 +1199,7 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 ## TD-702: The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day
 
 **Priority:** Medium
-**Type:** design gap
+**Type:** feature
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
@@ -1219,7 +1219,7 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 ## TD-703: A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one
 
 **Priority:** Medium
-**Type:** design gap
+**Type:** feature
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
