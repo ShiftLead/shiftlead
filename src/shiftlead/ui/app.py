@@ -167,7 +167,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     with_lines,  # noqa: F401
 )
 from .counts import CountsKeeper
-from .fanout import FAILED, Fanout, Stream
+from .fanout import FAILED, SAID_MAX, Every, Fanout, OpenRate, Stream
 from .inbox import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     _FIND_EDGE,  # noqa: F401
     BOARD_ACTS,  # noqa: F401
@@ -3881,15 +3881,28 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 run.to_all(run.live, {"event": "usage", "account": name, "usage": grouped.get(name)})
 
     fan = Fanout(lambda: LocalClient(), fan_seed, fan_step, fan_regroup)
+    # §4.5 *A reconnect reloads once, never in a loop* (TD-694): a page opening `/events` in a loop is
+    # one warning line, and the handler's own failure is logged, at most once a minute
+    opens, events_failed = OpenRate(), Every(60.0)
 
     @app.websocket("/events")
     async def events(ws: WebSocket):
         await ws.accept()
+        # `page` (the `v=` of the `app.js` the page loaded) and `at` (its path) are the client's word:
+        # cut, keyed on as cut, and logged with `%r`
+        page, at = (ws.query_params.get(k, "")[:SAID_MAX] for k in ("page", "at"))
+        addr = ws.client.host if ws.client else ""
+        if n := opens.opened(addr, at, time.monotonic()):
+            serves = static_url("app.js").partition("?v=")[2]
+            what = "events: %s opened /events %d times in 60s from %r (page %r, this UI serves %s)"
+            log.warning(what, addr, n, at, page, serves)
         # `?light=1` is the Focus and Inbox pages' stream: no card markup and no groups, another
         # record's delta only when it can move something (`SHAPE_KEYS`), and `focus`'s own in full —
         # one Focus tab was otherwise as costly to the UI as an Org page (TD-572). Every stream is fed
         # by the one subscriber (`fan`), which computes each delta once (TD-617).
-        st = Stream(ws, light=ws.query_params.get("light") == "1", focus=ws.query_params.get("focus") or "")
+        st = Stream(
+            ws, light=ws.query_params.get("light") == "1", focus=ws.query_params.get("focus") or "", page=page, at=at
+        )
 
         async def gone() -> None:
             # The page sends one thing on this socket — whether its document is visible, for the
@@ -3922,6 +3935,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass
         except Exception:  # noqa: BLE001
+            if events_failed.due(time.monotonic()):
+                log.exception("the events handler failed")
             with contextlib.suppress(Exception):
                 await ws.send_text(json.dumps({"event": "error", "text": FAILED}))
         finally:

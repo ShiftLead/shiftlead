@@ -35,8 +35,9 @@ FAILED = "events stream failed; reconnecting"
 class Stream:
     """One page's `/events` socket: what the run puts for it, sent in order by `pump`."""
 
-    def __init__(self, ws: Any, light: bool = False, focus: str = "") -> None:
+    def __init__(self, ws: Any, light: bool = False, focus: str = "", page: str = "", at: str = "") -> None:
         self.ws, self.light, self.focus = ws, light, focus
+        self.page, self.at = page, at  # the `app.js` hash the page loaded and its path, as it says them (TD-694)
         self.heads_key: str | None = None  # the groups this page last got, as their JSON
         self._queue: asyncio.Queue[tuple[str, str | None]] = asyncio.Queue()
         self.ended = False
@@ -65,6 +66,52 @@ class Stream:
                         await self.ws.send_text(json.dumps({"event": "error", "text": text}))
                 return
             await self.ws.send_text(text or "")
+
+
+# design §4.5 *A reconnect reloads once, never in a loop* (TD-692, TD-694): one client address opening
+# `/events` from one path more than `OPENS_LIMIT` times in `OPENS_WINDOW` seconds is a page in a loop,
+# warned of at most once per address and path every `OPENS_QUIET` seconds.
+OPENS_WINDOW, OPENS_LIMIT, OPENS_QUIET = 60.0, 20, 600.0
+SAID_MAX = 100  # `page` and `at` come from the client: each is cut to this many characters
+
+
+class OpenRate:
+    """The `/events` accepts per client address and path over the last minute, and when each pair was last
+    warned of. Each accept drops what has aged out of both tables, so they hold only the last minute's
+    pairs and the last ten minutes' warnings."""
+
+    def __init__(self) -> None:
+        self._opens: dict[tuple[str, str], list[float]] = {}
+        self._told: dict[tuple[str, str], float] = {}
+
+    def opened(self, addr: str, at: str, now: float) -> int | None:
+        """Count one accept; the count when it is past the limit and a warning is due, else None."""
+        for k in list(self._opens):
+            if not (kept := [t for t in self._opens[k] if now - t < OPENS_WINDOW]):
+                del self._opens[k]
+            else:
+                self._opens[k] = kept
+        for k in [k for k, t in self._told.items() if now - t >= OPENS_QUIET]:
+            del self._told[k]
+        key = (addr, at)
+        self._opens.setdefault(key, []).append(now)
+        if len(self._opens[key]) > OPENS_LIMIT and key not in self._told:
+            self._told[key] = now
+            return len(self._opens[key])
+        return None
+
+
+class Every:
+    """At most once per `seconds`: `due(now)` is true the first time and then once the time has passed."""
+
+    def __init__(self, seconds: float) -> None:
+        self.seconds, self._last = seconds, None
+
+    def due(self, now: float) -> bool:
+        if self._last is not None and now - self._last < self.seconds:
+            return False
+        self._last = now
+        return True
 
 
 Step = Callable[["Run", dict[str, Any]], Awaitable[None]]

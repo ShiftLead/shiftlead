@@ -1435,7 +1435,63 @@
     });
   }
 
-  // ---- events websocket with backoff; a reconnect reloads the snapshot once ----
+  // ---- events websocket with backoff; a reconnect reloads the snapshot once, never in a loop ----
+  // design §4.5 *A reconnect reloads once, never in a loop* (TD-692, TD-694). The page reloads when its
+  // stream comes back after a close, and records each such reload's time in `sessionStorage` under
+  // `ao.reloads:<path>`; three in the last 60 s hold the fourth back and draw the reload-loop banner.
+  // `ao.reloading:<path>` marks a reload the page made itself, so a load that finds it keeps the
+  // times and any other load (F5, a link, **Reload**) clears them. Storage that throws counts nothing.
+  AO.RELOADS_MAX = 3; AO.RELOADS_WINDOW = 60000;
+  const reloadsKey = () => `ao.reloads:${location.pathname}`, reloadingKey = () => `ao.reloading:${location.pathname}`;
+  try {
+    if (sessionStorage.getItem(reloadingKey()) !== null) sessionStorage.removeItem(reloadingKey());
+    else sessionStorage.removeItem(reloadsKey());
+  } catch (e) { /* storage that throws counts nothing */ }
+  let reloadLoopDrawn = false;
+  function drawReloadLoop() {
+    if (reloadLoopDrawn) return;
+    reloadLoopDrawn = true;
+    const b = $("#reloadloop"); if (b) b.hidden = false;
+  }
+  // §4.5a *every page: reload-loop banner* **Reload**: clears the count, then a load of the person's own
+  const reloadBtn = $("#reloadloopbtn");
+  if (reloadBtn) reloadBtn.addEventListener("click", () => {
+    try { sessionStorage.removeItem(reloadsKey()); sessionStorage.removeItem(reloadingKey()); } catch (e) {}
+    location.reload();
+  });
+  // A stream came back after a close: reload, unless three reloads in the window hold this one back.
+  // Returns whether it reloaded. `location.reload()` does not stop the page at once, so the messages
+  // still arriving before it goes are the same reload, counted once.
+  let reloadMade = false;
+  function reloadOnReturn() {
+    if (reloadMade) return true;
+    let times;
+    try {
+      times = JSON.parse(sessionStorage.getItem(reloadsKey()) || "[]");
+      if (!Array.isArray(times)) times = [];
+    } catch (e) { reloadMade = true; location.reload(); return true; }
+    const now = Date.now();
+    times = times.filter((t) => typeof t === "number" && now - t < AO.RELOADS_WINDOW && t <= now);
+    if (times.length >= AO.RELOADS_MAX) {
+      try { sessionStorage.setItem(reloadsKey(), JSON.stringify(times)); } catch (e) {}
+      drawReloadLoop();
+      return false;
+    }
+    try {
+      times.push(now);
+      sessionStorage.setItem(reloadsKey(), JSON.stringify(times));
+      sessionStorage.setItem(reloadingKey(), "1");
+    } catch (e) {}
+    reloadMade = true;
+    location.reload();
+    return true;
+  }
+  // the `v=` of the `app.js` link this page loaded: the stream says it as `page=`, so the UI's
+  // open-rate warning names the build the page came from beside the one it serves
+  const pageHash = (() => {
+    try { return new URL(document.currentScript.src, location.href).searchParams.get("v") || ""; } catch (e) { return ""; }
+  })();
+  let errorToasted = false;  // an `error` event is toasted once per page load
   // `query` asks for a light stream (TD-572): `light=1` on the Focus and Inbox pages, which draw no
   // cards and no team groups, and hear of another record only when it moves (its state, team or
   // controllers); `focus=<id>` keeps that one record's deltas whole.
@@ -1448,14 +1504,25 @@
     let sock = null, up = false;
     const say = () => { if (sock && sock.readyState === 1) sock.send(JSON.stringify({ visible: document.visibilityState === "visible" })); };
     document.addEventListener("visibilitychange", say);
+    const params = new URLSearchParams(query || "");
+    params.set("page", pageHash); params.set("at", location.pathname);
     function open() {
-      const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events${query ? `?${query}` : ""}`);
+      const ws = sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events?${params}`);
       // The handshake succeeds even when the agent is down (the server accepts, then closes), so
-      // "connected" means the first message, not onopen — otherwise a down agent reload-loops.
-      ws.onopen = () => { delay = 500; say(); };
-      ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; }
+      // "up" is the first message that is not `error`, never onopen — and the backoff is put back
+      // there too, or an accepted-then-closed socket reopens every half second.
+      ws.onopen = () => { say(); };
+      ws.onmessage = (m) => { const ev = JSON.parse(m.data);
+        // `error` is not up: toasted once, and the stream stays as it was — no banner cleared, no
+        // count, no reload, *reconnected* kept — so a stream that fails at each open never reloads
+        if (ev.event === "error") { if (!errorToasted) { errorToasted = true; AO.toast(ev.text); } return; }
+        delay = 500;
+        setDown(false);
+        if (reconnected) {
+          if (reloadOnReturn()) return;
+          reconnected = false;  // held back: this stream is the page's own from here on
+        }
         if (!up) { up = true; streamsUp++; }
-        const ev = JSON.parse(m.data);
         if (ev.event === "usage") onUsage(ev); else if (ev.event === "counts") AO.drawCounts(ev); else onEvent(ev);
       };
       // a close the page caused by leaving is no outage (TD-372); the reconnect stays, so a page
@@ -1465,6 +1532,7 @@
     }
     open();
   }
+  AO.connectEvents = connectEvents;  // node's probes (tests) drive it with a fake socket
   // ---- usage chip: one span per account, its **worst** window, the rest on hover (TD-001, TD-073, TD-122) ----
   // The windows and their labels are the adapter's — this file names no window of any one tool, so a
   // tool with one daily window or three windows prints what it has. The server regroups each pushed
@@ -3083,7 +3151,7 @@
         syncGroups(ev.groups);
         if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
         layout();
-      } else if (ev.event === "error") AO.toast(ev.text);
+      }
     });
   };
 
