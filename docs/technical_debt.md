@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Designed — TD-696, TD-697, TD-698 build it |
-| TD-695 | `test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not` flakes: the promote's own sync task may run a pass inside the test | Low | Open |
 | TD-696 | Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule | Medium | Open |
 | TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
 | TD-698 | Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so | Medium | Open |
@@ -1020,26 +1019,6 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 
 ---
 
-## TD-695: `test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not` flakes: the promote's own sync task may run a pass inside the test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-14 (grinder-ao-1, from grinder-ao-2's note m-ff4ef0883a87)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open. Seen once on py3.12 in PR #1779's run 38671055081, at `tests/test_sync_pass.py:286` (*no login: no cover, the team's*); it passed on rerun. Not yet reproduced.
-**Location:** `tests/test_sync_pass.py` (the cover test, lines ~277–286), `src/sessionorc/agent_promote.py:60` (`_sync_task`), `src/sessionorc/agent_sync.py` (where `_sync_ran` and `_sync_login` are used; declared at `agent.py:723-725`)
-
-**Why:** A flaky test in the sync pass (TD-685 slice 2, #1771) costs every PR a rerun. The likely cause is that the `agent` fixture is a running host agent: its promote watch starts `_sync_pass` as a background task (`agent_promote.py:60`) on a full reading. The first tick is a full reading, because `_promote_read_at` starts at `-inf`. After that, `PROMOTE_EVERY` is 300 s, so the race is between the fixture's first tick and the test body, never a repeating one. `_sync_pass` walks `self._repos`, which the test has just set. That first-tick task could run between the test's `_sync_ran.clear()` (with the login cleared) and its assert, re-reading the login through the `gh` fake and setting `_sync_ran[ROOT]` again. A second cause to rule out is `_red_prs` reading a stamp the background pass moved.
-
-**Fix:** reproduce it first (`pytest --count` or a loop of the one test under `-p no:randomly`). Then either stop the promote's watch from starting a sync task in these tests (a fixture that sets `_sync_task` to a done task, or a monkeypatched `_sync_pass` guard), or make the test assert on a pass it awaits alone. Check the other `agent_sync` integration tests for the same race.
-
-**Done when** the test passes 200 runs in a row, and the fix names the race it closed.
-
-**Related:** TD-685 (the sync pass).
-
----
-
 ## TD-696: Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule
 
 **Priority:** Medium
@@ -1150,4 +1129,3 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-693 (the design), TD-682 / #1777 and TD-688 / #1780 (archive-only PRs).
 
 ---
-
