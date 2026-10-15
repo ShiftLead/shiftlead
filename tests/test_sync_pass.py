@@ -103,6 +103,14 @@ def test_prune_keeps_the_open_prs_and_judges_a_no_gate_refusal_again_once_gated(
     kept = {"1": {"head": HEAD, "verdict": "refused", "why": cadence.NO_GATE}, "2": {"head": HEAD}, "9": {}}
     assert set(sync.prune(kept, [_pr(1), _pr(2)], False)) == {"1", "2"}
     assert set(sync.prune(kept, [_pr(1), _pr(2)], True)) == {"2"}
+    # the newest *merged* entry outlives its PR, for the Repos card (§4.5a); an older one does not
+    kept = {
+        "5": {"head": HEAD, "verdict": "merged", "at": "2026-10-15T01:00:00Z"},
+        "6": {"head": HEAD, "verdict": "merged", "at": "2026-10-15T02:00:00Z"},
+        "7": {"head": HEAD, "verdict": "refused", "at": "2026-10-15T03:00:00Z"},
+    }
+    assert set(sync.prune(kept, [], True)) == {"6"}
+    assert [p["number"] for p in sync.candidates([_pr(1)], sync.prune(kept, [], True), lambda p: False)] == [1]
 
 
 def test_mark_the_homes_prs_are_no_order_and_a_verdicts_why_is_the_context():

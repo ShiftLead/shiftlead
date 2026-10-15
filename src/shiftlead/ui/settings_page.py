@@ -351,14 +351,44 @@ def pull_reading(reading: Mapping[str, Any] | None, now: datetime | None = None)
     return str(outcome) if outcome in ("current", "off") else ""
 
 
+def sync_reading(reading: Mapping[str, Any] | None, on: bool, now: datetime | None = None) -> str:
+    """The repo's last sync verdict beside the Repos card's **sync** switch (§4.5a, §6 *Sync*, TD-685),
+    from its repo facts (`sync` and `prs`): *merged #<n> <age> ago*, *#<n> refused: <why>*, *#<n> gate:
+    <line>*, *#<n> error: <why>*, *no sync PR*, *off* — the newest entry with a verdict by its `at`;
+    *no sync PR* only when the PR reading holds none open. "" with no reading, a PR reading that failed,
+    or an open sync PR with no verdict yet (waiting on CI, a retry still counted)."""
+    if not on:
+        return "off"
+    if not isinstance(reading, Mapping):
+        return ""
+    sync = reading.get("sync") if isinstance(reading.get("sync"), Mapping) else {}
+    done = [(str(e.get("at") or ""), str(n), e) for n, e in sync.items() if isinstance(e, Mapping)]
+    done = [d for d in done if d[2].get("verdict") in ("merged", "refused", "gate", "error")]
+    if not done:
+        prs = reading.get("prs") if isinstance(reading.get("prs"), Mapping) else {}
+        if prs.get("error") or not isinstance(prs.get("open"), list):
+            return ""
+        return "" if any(isinstance(p, Mapping) and p.get("sync") is True for p in prs["open"]) else "no sync PR"
+    _, n, e = max(done, key=lambda d: d[0])
+    if e["verdict"] == "merged":
+        age = _age(e.get("at"), now or datetime.now(UTC))
+        return f"merged #{n} {age + ' ago' if age else 'just now'}"
+    return f"#{n} {e['verdict']}: {e.get('why') or 'no reason given'}"
+
+
 def repo_cards(
-    checkouts: list[str], settings_repos: Mapping[str, Any] | None, pulls: Mapping[str, Any] | None = None
+    checkouts: list[str],
+    settings_repos: Mapping[str, Any] | None,
+    pulls: Mapping[str, Any] | None = None,
+    readings: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """**Repos** (§4.5 screen 8): a card per registered checkout with its `.shiftlead.yml` values
     read-only — the keys the clients read — and, where the file carries `promote:`, the one setting,
     **auto**, as `settings.yml` holds it (`false` when absent). A repo with no block says why it has
     no switch; a file that does not parse says so in place of its values. Every card, block or not,
-    carries **pull** (§6 *Pull*: on when absent) and the home's last reading of it from `pulls`."""
+    carries **pull** (§6 *Pull*: on when absent) and the home's last reading of it from `pulls`, and
+    **sync** (§6 *Sync*: on when absent) with the repo's last verdict from the repo facts' `sync`
+    (`readings`, keyed by the checkout's path; a checkout with no reading says nothing of it)."""
     out = []
     for path in checkouts:
         root = Path(path)
@@ -366,6 +396,10 @@ def repo_cards(
         card: dict[str, Any] = {"name": name, "path": path, "file": str(paths.repo_file(root)), "rows": []}
         card["pull"] = ((settings_repos or {}).get(name) or {}).get("pull") is not False
         card["pull_reading"] = pull_reading((pulls or {}).get(name))
+        sync_on = (((settings_repos or {}).get(name) or {}).get("sync") or {}).get("auto") is not False
+        reading = (readings or {}).get(path)
+        card["sync"] = sync_on
+        card["sync_reading"] = sync_reading(reading, sync_on)
         try:
             cfg = repoconfig.load(root)
         except (ValueError, OSError) as e:
