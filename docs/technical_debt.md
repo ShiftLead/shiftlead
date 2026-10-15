@@ -1176,9 +1176,9 @@ The other cases:
 
 **Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). It is blocked by TD-710 because it marks entries in TD-710's settle pass. Slices, each its own PR:
 1. **The reading and the lanes** (`sessionorc`).
-   - `ledger.entries` reads `**Waits:**` into `waits: {on, date, why}`: `on` is the first word, `until` or `event`, `date` the first `YYYY-MM-DD` after `until` (or none), and `why` the rest. A first word outside the two is not read; `ledger.py --check` already flags it against the `Fields:` vocabulary.
+   - `ledger.entries` reads `**Waits:**` (in the header block, after `Kind:`; one below the block draws ledgerboard's ℹ) into `waits: {on, date, why}`: `on` is the first word, `until` or `event`, `date` the first `YYYY-MM-DD` after `until` (or none), and `why` the rest. A first word outside the two is not read; `ledger.py --check` already flags it against the `Fields:` vocabulary.
    - `flags` gains *TD-NNN: Waits: until names no date* for an `until` with no date. Such an entry waits with no end.
-   - TD-710's marking pass (`settle.mark`, on every reading it carries) adds `waiting: {on, until}` while the wait stands. An `until` stands while the home's local date is before the date; an `event` always stands.
+   - TD-710's marking pass (`settle.mark`, on every reading it carries, and at the declaration-time reading rule 6 uses, its `then` clock) adds `waiting: {on, until}` while the wait stands, whatever `spans` holds (a repo with no `settle:` still marks waits). An `until` stands while the home's local date is before the date; an `event` always stands.
    - `lane_matches` reads `waiting` as no lane's, as it reads `settling` and `held`, so rule 6's `lane_seen` and rule 8's news wait the same.
    - `in_lanes` gains `waiting: {until: [ids], event: [ids]}`: the entries a lane would take but for the mark. They are kept out of the kinds' counts and out of `rest`. Each member gains `waiting` ids beside `ids`. `out_of_work` is unchanged (count above 0), and a new `out_of_work_waiting` lists `[{id, name, waiting}]` for a member carrying `out_of_work` whose `ids` is empty and whose `waiting` is not.
    - `rpc_progress`'s claim on a `waiting` reference is refused, *TD-463 waits until 2026-10-16* or *TD-685 waits: the next cadence-sync PR*, and `force` passes it.
@@ -1197,7 +1197,8 @@ The other cases:
 - **Tests:**
   - An entry with `Waits: until <tomorrow>` matches no lane and is in `in_lanes`' `waiting`. On its date it matches and is told by rule 6 as new.
   - `Waits: event` waits until the line goes.
-  - An `until` with no date is flagged and waits.
+  - An `until` with no date is flagged (*Waits: until names no date*) and waits.
+  - A member's `waiting` ids are not in its `ids`; rule 8's news waits as rule 6's does.
   - A member whose lane only waits is in `out_of_work_waiting` and not in `out_of_work`.
   - A claim on a waiting entry is refused, and `--force` passes.
   - `ao repo`'s two lines. The lanes line's *waiting* count.
