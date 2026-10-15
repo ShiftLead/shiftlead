@@ -55,7 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
-| TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
+| TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Built (#1798); live check |
 | TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
 | TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
@@ -1000,8 +1000,8 @@ The other cases:
 **Type:** debt
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1798
+**Status:** **Built by #1798 (grinder-ao-1, 2026-10-14); its live half waits for #1798 to be live.** `_seat_done` reads a `prs` or `every` due as the next fill's, and the test half of *Done when* passes. To read once #1798 is live (`ao promote status`): an auditor seat (`ao-shiftlead-docs-audit-ao-1` or `ao-shiftlead-test-audit-ao-1`) whose `seat_due` came while it ran is, once idle and pushed past `SEAT_IDLE_GRACE`, closed by the tick (`closer: {by: tick, why: seat}`) and filled on the next one (`ao status --json`: `restarts[-1].why == "fill"` within a tick of its going idle, `seat_count` starting again).
 **Location:** design §6 rule 3, §4.9b *Seats with a trigger*; `src/sessionorc/agent_tick.py` (`_seat_pass` ~L2315, `_seat_done` ~L2353, `_seat_due` ~L2400)
 
 **Why:** ao-grind's two auditors stopped running for two days with nobody told. `ao status --json`, 2026-10-14: `ao-shiftlead-docs-audit-ao-1` created 2026-10-13T15:26:54Z, `seat_due: {at: 2026-10-13T16:15:47Z, by: prs}`, `seat_count.prs: 100`, idle since 2026-10-14T00:00Z; `ao-shiftlead-test-audit-ao-1` created 2026-10-12T21:00:36Z, `seat_due` at 22:27:10Z, idle the same. Each came due 49 and 87 minutes into its run, as ten PRs merged under it. `_seat_pass` fills a seat only when it is `exited` or `closed` with `seat_due` set, and closes an idle one only when `_seat_done` — which is `not s.seat_due` for a `prs` or `every` trigger. A seat due while it runs is therefore never closed, so never filled. Paul's Close of test-audit on 2026-10-14 ~21:50 MDT let the tick fill it at once (`restarts[-1]: {why: fill, at: 2026-10-15T03:52:03Z}`). Its symptom on the page: no auditor line in the Doing feed (TD-702 is the other half).

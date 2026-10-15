@@ -229,7 +229,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      read that failed leaving the last reading rather than zero; for `every: <d>`, when `d` has
      passed since it was created. A supervised seat that is `exited` or `closed` with `seat_due`
      set, not suspended, on a profile that is not gated, is filled: `create` with `keep_mail`
-     (§4.9b), the launch record, and `seat_due` cleared; a seat that is `idle` with no `seat_due`,
+     (§4.9b), the launch record, and `seat_due` cleared; a seat that is `idle` with no `seat_due` —
+     or with a `prs` or `every` one, met while it ran and so the next fill's cause, as the anchor's
+     `work` is (the count starts again at the fill, from the new record's creation) —
      hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a fill is not closed before its prompt
      lands), with nothing dirty or unpushed, is closed (a seat that left work is the board's) —
      **unless it waits on a PR of its own**: an open PR on the branch it has checked out, as the
