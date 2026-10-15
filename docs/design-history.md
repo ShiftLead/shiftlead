@@ -318,6 +318,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-15 (TD-737, grinder-ao-2): *Browser mechanics* — *The theme is set before the first paint*: an inline script in `base.html`'s `<head>` writes `html[data-theme]` before the stylesheet, and `color-scheme` follows it. Was: `applyTheme` in `app.js`, loaded at the end of the body, set it, so a page change could paint light before turning dark (Paul, 2026-10-15).
 - 2026-10-15 (TD-731, the designer): screen 6 — a held entry is a row under *The ledger's entries that wait on you*, kind *ledger · held*, with **Release**. Built by TD-736.
 - 2026-10-15 (TD-722, the designer): screen 1 — the team header says the host alone, the repo being the heading it sits under; a repo two teams share is on both teams' cards. Built by TD-725.
 - 2026-10-14 (TD-697, grinder-ao-2): *Its builds* — built. *in review #n* reads the PR the entry's *TDs in motion* row shows, so the two agree: the claim's `pr` or `review_pr`, else an open PR whose branch names the entry (the techlead's reading of #1793). Was: the claim's `pr` or `review_pr` alone.

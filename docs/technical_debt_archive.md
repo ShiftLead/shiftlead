@@ -12976,3 +12976,21 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** a node member's record names the renamed lead in `controllers` after the rename, and the tests pass.
 
 **Related:** TD-706 (slice 2 built the carry), TD-703 (the design).
+
+## TD-737: Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/templates/base.html` (`app.css` in `<head>`, `app.js` loaded at the end of `<body>`); `src/shiftlead/ui/static/app.js` (`applyTheme`, its first lines: `ao.theme` from `localStorage`, else `prefers-color-scheme`, written to `html[data-theme]`); `src/shiftlead/ui/static/app.css` (`:root` holds the light tokens, `html[data-theme="dark"]` the dark ones, and no `prefers-color-scheme` rule); `docs/design/2-goals.md` (goal 12, *Dark mode*); `docs/design/4.5-ui.md` (*Browser mechanics*)
+
+**Why:** Paul, 2026-10-15: *often when switching pages Repo<->Org<->Inbox there is a flash of the light mode version of the page and then it resolves to the dark mode. If this flash is necessary, it should flash the dark page then resolve to the light mode page so that people using dark mode are not blinded by the light. There is likely work we can do to render these pages more quickly as well.* Each page is a full navigation, server-rendered (§4.5 *Browser mechanics*). The CSS's defaults are the light tokens, and the dark ones apply only once `html` carries `data-theme="dark"`. That attribute is written by `applyTheme`, and `app.js` runs only after the whole body has been parsed. So the browser can paint the parsed page light before the script turns it dark, and the slower the page, the longer the flash. Goal 12 says the terminal panes are dark whatever the theme, *so light chrome is the jarring case at night*: the flash is that case on every page change.
+
+**Resolved:** 2026-10-15 (PR #1855) — an inline script in `base.html`'s `<head>`, before the stylesheet, writes `html[data-theme]` with `applyTheme`'s read (dark when the read fails); `<meta name="color-scheme" content="dark light">` and a `color-scheme` per theme in `app.css`; design §4.5 *Browser mechanics* says so. Checked in headless Chromium with `app.js` held back: main painted `/inbox` light (`rgb(244, 245, 247)`) on a dark browser, the change paints it dark (`docs/mockups/reviews/2026-10-15-td737-first-frame-*.png`). The render-time measurement is in the PR; its slow parts are TD-738 (the Inbox's repeated line text) and TD-739 (the routes' server render).
+
+**Done when** a page change on a dark browser shows no light frame (checked by the builder in a headless browser on a scratch home: a screenshot at first paint is dark), the *Browser mechanics* line is written, and the render-time measurement is in the PR, with any slow part filed.
+
+**Related:** TD-372 (the *host agent unreachable* banner that flashed on every page change).
