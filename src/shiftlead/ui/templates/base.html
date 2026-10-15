@@ -55,6 +55,10 @@
     </div>
   </details>
 </div>{% endif %}
+{# design §4.5a *every page: reload-loop banner* (TD-692, TD-694): under the top bar, at the top of a
+   popped Focus, which has none; `app.js` shows it when three reloads on the stream's return in 60 s
+   hold back the fourth. The stream stays connected and keeps patching the page. #}
+<div class="warn reloadloop" id="reloadloop" hidden>This page reloaded 3 times in a minute when its stream came back, so it stopped; what it shows may be behind. <span class="grow"></span><button class="btn sm ghost" id="reloadloopbtn" type="button" title="reload the page and clear the count">Reload</button></div>
 <div id="toasts"></div>
 {# design §4.5a **Message** and Focus Inbox **Reply** (§4.10): one mail composer for both. Mail
    lands in an inbox and types nothing — the Focus composer's **Send** is the act that types. #}

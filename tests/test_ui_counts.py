@@ -215,7 +215,9 @@ def test_the_top_bar_draws_the_streams_counts_and_polls_only_while_no_stream_is_
     say = js.split("const say = () => { if (sock")[1].split("\n")[0]
     assert "visible: document.visibilityState" in say and "sock.send(" in say
     assert 'document.addEventListener("visibilitychange", say)' in js
-    assert "ws.onopen = () => { delay = 500; say(); }" in js
+    # the backoff is put back at the first message that is not `error`, never at the open (TD-694)
+    assert "ws.onopen = () => { say(); };" in js
+    assert 'if (ev.event === "error") {' in js and "return; }\n        delay = 500;\n        setDown(false);" in js
 
 
 @pytest.mark.unit
