@@ -56,6 +56,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Open |
+| TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Open |
 
 ---
 
@@ -1008,6 +1009,34 @@ The other cases:
 - **Tests:** the bound (a page stops after N reloads in M seconds) and the warning.
 
 **Related:** TD-372 (a close the page caused by leaving is no outage), TD-539 (build chip: *this page* differs from the agent), TD-062 (promote restarts both units).
+
+---
+
+## TD-693: A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (session `ao-paul`, from Paul's question about subtask ids such as TD-682a; he agreed the three parts below the same day)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9c (flows), §4.5 (the ledger and Repo pages), §6 (the home's policies), §4.7 (CLI); `scripts/ledgerboard.py` is read, never changed
+
+**Why:** Three costs of the `td` flow, as it ran on 2026-10-14:
+- **Ids collide.** Nothing assigns them. Every filer (designer, grinder, auditor, a person's session) takes main's highest number plus one, then greps open PRs' diffs. Two filers at once take the same number, and the later one renumbers across a rebase (TD-651 → 653 → 656, 2026-10-13).
+- **A design's builds are not shown as its group.** Each build names its design in `**Blocked by:**`, but no page groups them under it. You learn that TD-686 and TD-687 build TD-682 by reading each entry.
+- **A design entry costs one more PR.** It stays open until its builds are archived, then a PR archives it alone (#1755, #1777, #1780).
+
+Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are not this entry's fix. The id format is ledgerboard's (`HEADING_RE`, `ROW_RE`, `ID_ITEM_RE`, `XREPO_ITEM_RE` and `_num` all read `TD-(\d+)`), so it would mean a spec change and a release through dev-cadence into every consumer, and ShiftLead's own `sessionorc/ledger.py` parses the number as an int. A suffix would only stop collisions among a design's builds, and it would repeat what `Blocked by` already says.
+
+**Fix:** design first, in three parts, none of which changes the ledger format:
+1. **The home reserves ids.** A command (e.g. `ao td next <repo>`) returns the next free id for a repo and records it. Free means above main's highest, every open PR's added headings and every live reservation. Every filer's brief and the cadence's filing rule use it. An unused reservation is a gap in the numbers, which is allowed ("never reused" still holds). The design settles where the reservation lives, when it expires, and what a session with no home does (today's rule, as the fallback).
+2. **The pages group builds under their design**, read from `Blocked by`: the Repo page's ledger list, and wherever a design entry is drawn. Each build shows its state (open, built, archived) beside it.
+3. **A design entry archives itself** when its last build archives. The home's policy writes the archive commit, or the build's own archive PR carries the design's archive as well. The design picks one and says who owns it in a repo with no team.
+
+**Done when** two sessions filing at the same moment get different ids with no rebase, a design entry's page shows its builds and their states, and no PR exists only to archive a design entry.
+
+**Related:** TD-585 (ledgerboard is ShiftLead's parser), TD-228 (pickable from `Blocked by`), TD-682 / #1777 (an archive-only PR).
 
 ---
 
