@@ -259,6 +259,16 @@ async def test_td_hold_is_the_persons_and_marks_the_reading_at_once(agent, tmp_p
     assert modes.offline_refusal("td_hold", None, {}, host="laptop", home="kmaster")
 
 
+async def test_td_hold_on_a_repo_whose_origin_is_not_read_yet_is_refused_and_writes_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    agent._repos[root]["remote"] = ""  # read before its origin was: the clock's key is not known (TD-727)
+    before = paths.ledger_seen_file().read_text()
+    with pytest.raises(RpcError, match="r's origin is not read yet: its clock is keyed by it, so ask again"):
+        await agent.rpc_td_hold(repo=root, id="TD-002")
+    assert paths.ledger_seen_file().read_text() == before
+
+
 async def test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too(agent, tmp_path):
     await park_ticks(agent)
     root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
