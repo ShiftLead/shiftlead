@@ -132,6 +132,12 @@ def repos_file() -> Path:
     return home() / "repos.json"
 
 
+def ids_file() -> Path:
+    """The ledger ids the home gave (design §4.4 *A ledger entry's id is handed out by the home*, TD-696):
+    `{<origin>: {last, given: [{id, by, at}]}}`, the newest 200 given kept per repo."""
+    return home() / "ids.json"
+
+
 def doing_log_file() -> Path:
     """The home's doing log (design §4.8 *the doing log*, TD-176 slice 2): every `ao doing` call of a
     team's sessions, one JSON line each, the last fifty per team kept when it is compacted."""

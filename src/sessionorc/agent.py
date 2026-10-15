@@ -198,6 +198,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
 from sessionorc.agent_doctor import DoctorMixin
 from sessionorc.agent_hook import HookMixin
 from sessionorc.agent_identity import IdentityMixin
+from sessionorc.agent_ids import IdsMixin
 from sessionorc.agent_inbox import InboxMixin
 from sessionorc.agent_link import LinkMixin
 from sessionorc.agent_mail import MailMixin
@@ -385,6 +386,7 @@ class HostAgent(
     PromoteMixin,
     SyncMixin,
     SpendMixin,
+    IdsMixin,
     AttentionMixin,
     NotifyMixin,
     CiMixin,
@@ -723,6 +725,7 @@ class HostAgent(
         self._sync_login: str | None = None  # the home's `gh` login, read once (§6 *Sync*, TD-685)
         self._sync_task: asyncio.Task[None] | None = None  # the sync pass, detached from the promote's
         self._sync_ran: dict[str, datetime] = {}  # root → the last pass that covered it whole
+        self._ids_locks: dict[str, asyncio.Lock] = {}  # origin → the lock `td_next` gives its ids under (TD-696)
         # An attachment's upload in pieces (§4.4 *Attachment drop*, TD-478): its id → the session,
         # the `.part`, the name and the file's `total`. In memory: a restart drops it, and the hour's
         # sweep the `.part` it leaves.
