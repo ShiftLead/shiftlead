@@ -72,6 +72,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Open |
 | TD-732 | `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837) | Medium | Open |
+| TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
 
 ---
 
@@ -1484,5 +1485,28 @@ The other cases:
 **Done when** each case has a test and fails under its mutation.
 
 **Related:** TD-717, TD-720, #1837.
+
+---
+
+## TD-734: A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.2-state-feed.md` (*Waiting*); `docs/design/4.5-ui.md` (*The card's anatomy*, the *waiting* pill, TD-418); `docs/design/4.5a-controls.md` (the **waiting** mark); `src/shiftlead/ui/cards.py` (`review_wait`, and the pill's composition where `d["pill_word"] = "waiting"`); `src/sessionorc/agent_tick.py` (the record's `subagents` count, from `SubagentStart` / `SubagentStop`)
+
+**Why:** Paul, 2026-10-15: *when an agent is running /cadence it shows as WAITING but it should really be shown as WORKING since the session is still moving forward and in full control of the direction of the work. I would expect WAITING to only apply when a session needs input from the user or another session (something outside of its own purview).* The design draws an `idle` session *waiting* when a claim's PR is open in the repo reading (*waiting · review #N*), whoever moves that PR next (§4.2 *Waiting*). During `/cadence` the author ends turns while its own work goes on — a background reviewer subagent, a CI run it will re-check (`docs/procedures/cadence.md`, exit 3: *wait for a running CI and re-run*) — so its record reads `idle`, and with the PR open the pill reads *waiting*. The pill then says *someone else holds this* when nobody does, and the person cannot tell an author mid-cadence from one stuck on a reader or on them. *with the techlead*, and *waiting on you: TD-NNN*, are true waits and stay.
+
+**Fix:** a design round on §4.2 *Waiting*, with Paul's rule as its premise: *waiting* means the session needs a person or another session.
+1. **An `idle` record with live subagents** (`subagents` > 0) is not *waiting*: it reads as working on its own work (the pill *working*, or a composed word the round names). The count is already on the record, and Ready to close reads it (§4.2's *No live subagents*).
+2. **`waiting · review #N` alone** — a PR no reader holds (no seat's `prs_waiting.asks` names it) — the round decides: drawn as `idle` (the author's own next move: cadence, CI, merge), or kept while a required check runs, since CI is outside the session. Paul's words lean to the first.
+3. **A background shell task** (Claude Code's `run_in_background`, `Monitor`) is invisible to the hooks: the round says whether it is read at all, or left as the gap it is.
+
+**Done when** the design says that *waiting* is drawn only for a wait on a person or another session, the card follows it, and a test holds an idle record with a live subagent and an unheld open PR not drawn *waiting*.
+
+**Related:** TD-418, TD-428, TD-201, TD-271.
 
 ---
