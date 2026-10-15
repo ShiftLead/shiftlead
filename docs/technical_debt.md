@@ -64,6 +64,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
 | TD-708 | `td_next`'s three refusal/unread branches are held by no test: a filled `--limit 200`, a non-GitHub origin, a repo with no origin remote | Low | Open |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
+| TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
 
 ---
 
@@ -1201,5 +1202,25 @@ The other cases:
 **Done when** an entry filed `Kind: design-first` in this repo is untaken for ten minutes, a Hold pressed in that time keeps it untaken until Release, a designer's `Kind: build` entries are picked at once, and every listed test passes.
 
 **Related:** TD-707 (the design), TD-693 / TD-696 (`ids.json`, `td_next`), TD-223 (pickable is derived), TD-702 (the case).
+
+---
+
+## TD-711: TD-706's summary row says *Open* while its entry says slice 1 was built by #1802
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (docs-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt.md` (the summary table's TD-706 row, and TD-706's **Status**)
+
+**Why:** #1802 merged 2026-10-15T05:39Z and changed TD-706's **Status** to *Slice 1 built 2026-10-14 (grinder-ao-2) … Slices 2 (the home's half, `src/sessionorc/`) and 3 (Apply and Start) open*, but left the summary row `| TD-706 | Build TD-703: … | Medium | Open |`. A reader of the table alone (the grinder's pick, `ao repo`) sees the whole entry as untouched and may start slice 1 again. The file's own rule is that the table lists the entry's state, one row each; a partly built entry reads as such there (TD-052: *Partly done — steps 1–8 done*).
+
+**Fix:** the row's status reads *Slice 1 built (#1802); slices 2 and 3 open*.
+
+**Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
+
+**Related:** TD-706, TD-703.
 
 ---
