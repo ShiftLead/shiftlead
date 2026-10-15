@@ -246,12 +246,23 @@ class InboxMixin:
         cadence = (
             kind.startswith("cadence:") and kind[8:].isascii() and kind[8:].isdigit() and kind[8:] == str(int(kind[8:]))
         )
-        rows = (*ATTENTION_KINDS, "alarm", "restart", "idle_open", "seat_held", "promote", "work", "red_pr")
+        # `ci_not_run` (§4.5a *Inbox row: CI not starting*, TD-687): keyed `ci_not_run:<owner>`, by time alone
+        rows = (
+            *ATTENTION_KINDS,
+            "alarm",
+            "restart",
+            "idle_open",
+            "seat_held",
+            "promote",
+            "work",
+            "red_pr",
+            "ci_not_run",
+        )
         if not cadence and kind not in rows:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
                 f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, seat_held, cadence:<pr>, promote, work, "
-                "red_pr"
+                "red_pr, ci_not_run"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:

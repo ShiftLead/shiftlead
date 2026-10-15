@@ -559,6 +559,36 @@ def pr_view(directory: Path | str, pr: int, timeout: float = 30.0) -> dict[str, 
     return out if isinstance(out, dict) else "gh pr view printed something that is not an object"
 
 
+def run_status(directory: Path | str, run: int, timeout: float = 30.0) -> str | None:
+    """An Actions run's `status` (`queued`, `in_progress`, `completed`, …) by `gh api
+    repos/{owner}/{repo}/actions/runs/<run>` from the checkout, or None when it could not be read
+    (design §4.4 *A Re-run's runs are read*, TD-687)."""
+    try:
+        cp = subprocess.run(
+            ["gh", "api", f"repos/{{owner}}/{{repo}}/actions/runs/{int(run)}", "--jq", ".status"],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return None
+    status = (cp.stdout or "").strip()
+    return status if cp.returncode == 0 and status and status != "null" else None
+
+
+def run_rerun(directory: Path | str, run: int, timeout: float = 30.0) -> str | None:
+    """`gh run rerun <run> --failed` from the checkout (design §4.5a *Inbox row: CI not starting*'s
+    **Re-run**, TD-687): None when GitHub took it, else why not, in one line."""
+    try:
+        cp = subprocess.run(
+            ["gh", "run", "rerun", str(int(run)), "--failed"],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired, ValueError) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh run rerun failed"])[-1][:200]
+    return None
+
+
 def _gh_prs(
     directory: Path | str, args: list[str], timeout: float, fields: str = PR_FIELDS
 ) -> list[dict[str, Any]] | str:

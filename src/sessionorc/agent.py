@@ -49,6 +49,7 @@ from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
+from sessionorc.agent_ci import CiMixin
 from sessionorc.agent_common import (  # re-exported: callers and tests read these from the agent
     _CSI,  # noqa: F401
     _ESC_OTHER,  # noqa: F401
@@ -362,6 +363,7 @@ class HostAgent(
     SpendMixin,
     AttentionMixin,
     NotifyMixin,
+    CiMixin,
     WakeMixin,
     HookMixin,
     SettingsMixin,
@@ -857,6 +859,7 @@ class HostAgent(
             out["pulls"] = self._pulls_view()
             out["waiting"] = work.waiting_of(self.person_inbox)
             out["notify"] = self._notify_view()
+            out["ci_spells"] = self._ci_spells_view()  # the *CI not starting* rows' spells (§4.4, TD-687)
             out["work"] = {
                 team: dict(rec["work_waiting"])
                 for team, rec in sorted((self._host_rec.get("teams") or {}).items())

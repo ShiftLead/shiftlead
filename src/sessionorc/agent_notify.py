@@ -1,7 +1,8 @@
 """Told on Telegram when nobody is looking (design §4.10, TD-319 slices 1 and 2): the home's pass over
 the rows that newly stop a session or a team — a state row `permission`, `question` or `needs`, an
 identity alarm, an open `ask` in the person inbox, an outcome reported `blocked`, a record the tick
-could not restart, a wound-down team whose lanes gained work under `on_work: ask` — telling each once
+could not restart, a wound-down team whose lanes gained work under `on_work: ask`, an account whose CI
+never starts (TD-687) — telling each once
 it has stood `notify.HOLD`, is still there, is not snoozed and was not on a visible page, bounded by
 `notify.BURST`; the send, a detached child under Doppler; and `notify_test`. A mixin `HostAgent`
 inherits; the state it reads is the agent's.
@@ -33,6 +34,9 @@ class _Row:
     snooze: str  # the attention store's snooze key; for `mail`, the mail id
     mail: bool = False
     until: str | None = None  # a mail row's own `snoozed_until`, read where the entry is kept
+    # a snooze before its first telling is the person's having seen it: never told in this row's life
+    # (the *CI not starting* row's spell, §4.4 *Its spell*, TD-687)
+    snooze_is_seen: bool = False
 
 
 def _restart_at(s: Any) -> str:
@@ -124,6 +128,15 @@ class NotifyMixin:
                 finished = [str(m) for m in mark.get("members") or {}] if live else None  # keyed by name
                 line = notify.work_line(team, len(ids), finished)
                 rows[k] = _Row(str(mark.get("at") or ""), line, k, f"{k}|work")
+        # *CI not starting* for an account (§4.4 *Its spell*, TD-687): one row a spell, begun at its `since`, so
+        # it is told once per spell — a re-run that reads `not_run` again, or a snooze that runs out, is the same row
+        for key, spell in (self._host_rec.get("ci_spells") or {}).items():
+            if not isinstance(spell, dict) or not spell.get("since"):
+                continue
+            k = f"ci_not_run:{key}"
+            n = len((spell.get("row") or {}).get("items") or [])
+            line = notify.ci_line(str(spell.get("owner") or key), n)
+            rows[k] = _Row(str(spell["since"]), line, k, f"{k}|ci_not_run", snooze_is_seen=True)
         return rows
 
     def _notify_snoozed(self, row: _Row, now: datetime) -> bool:
@@ -150,6 +163,11 @@ class NotifyMixin:
             del store.notified[k]
         tg = settings_mod.telegram(settings_mod.load())
         due: list[tuple[str, str]] = []
+        due_seen = False
+        for key, row in rows.items():
+            if row.snooze_is_seen and key not in store.notified and self._notify_snoozed(row, now):
+                store.notified[key] = now_iso()  # seen, as if told, Telegram on or off: never told in this life
+                due_seen = True
         if tg is not None:
             for key, row in sorted(rows.items(), key=lambda kv: kv[1].began):
                 if key in store.notified:
@@ -180,7 +198,7 @@ class NotifyMixin:
                 texts.append(notify.MORE)
                 self._notify_quiet_until = now + notify.BURST_WINDOW
             self._notify_sent.append(now)
-        if gone or due:
+        if gone or due or due_seen:
             store.save(self.trail, self.attention_snoozed)
         if texts and tg is not None:
             task = asyncio.create_task(self._notify_send(tg["secrets"], texts))
