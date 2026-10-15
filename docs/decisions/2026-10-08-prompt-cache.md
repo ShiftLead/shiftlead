@@ -137,8 +137,8 @@ rank the levers.
   The bound cut the mean context by a fifth, and the extra restarts and their re-orientation took the
   saving back: per merged PR the cost is the week before's, within 1%. The fall from this ADR's week
   came before the trial began. The weekly window, the measure the decision named, is account-wide
-  and keeps no history, so it cannot be split per grinder. Whether the line stays is steer
-  `m-1aa735ccc0cc` (default: it goes).
+  and keeps no history, so it cannot be split per grinder. Paul, 2026-10-15: run another week. The
+  line stays, and a second trial week (to 10-23 04:26Z) is read the same way before it stays or goes.
 
 ## Revisit triggers
 
