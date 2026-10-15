@@ -12379,3 +12379,41 @@ The window's `w.name` assignment, by contrast, is caught.
 **Resolved:** 2026-10-14 (the designer) — designed 2026-10-14 (§4.6 *A file button is a file link*, *A path in the pane is a link*, *A path in a transcript is a link too*; #1764), built by TD-689 (#1765), TD-690 (#1774) and TD-691 (#1767), all archived.
 
 **Related:** TD-501 (a path in the pane is a link), TD-524 and TD-526 (the line after the path), TD-532 (two launches), TD-535 and TD-536 (the recent files, `person.file_link`), TD-148 (the Settings page's **Open file**).
+
+## TD-694: Build TD-692: a reconnect reloads once, never in a loop — an `error` is not up, the reload bound and its banner, the stream's `page=`, the UI's two log lines
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-14 (the designer, building TD-692's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.5 *Browser mechanics* (*A reconnect reloads once, never in a loop*), §4.5a *every page: reload-loop banner*; `src/shiftlead/ui/static/app.js` (`connectEvents`, `setDown`), `src/shiftlead/ui/templates/base.html` (the banner: one element under the top bar, shared by every page; a popped Focus draws it at the top), `src/shiftlead/ui/common.py` (`log`, `static_url`), `src/shiftlead/ui/app.py` (`events`)
+
+**Why:** TD-692's design. On 2026-10-14 three of Paul's tabs reloaded every second or two from 16:28 to 18:22, about 90 `/events` opens a minute, and the UI logged nothing. The suspect: `events` sends `{"event": "error"}` and closes when its stream fails, and `connectEvents` takes that message as *up*. A page whose stream fails each time it opens then reloads on its second socket, every time.
+
+**Fix:**
+- **Reproduce first, on a scratch home** (a short `SHIFTLEAD_HOME`, never the live one): open Focus and the repo page in headless Chromium (`~/ao-shots/pwlib`). Make `events` fail at its start (a test double for `h.counts.join` or `fan.join` that raises), then restart the UI and the agent in each order, and promote. Record what closes the socket: before its first real message (`error`), or after a real one (a stream that comes up, then closes). Record also whether a plain reload keeps the loop going where a hard refresh does not. Put the finding in the PR body. If the cause is not the `error` shape, say so on TD-692 before building past it.
+- **`error` is not up.** `connectEvents` handles an `error` event itself, before the page's handler: `AO.toast(ev.text)` once per page load, on every page with a stream: the Org, the repo page, Focus, a popped Focus (today only the Org's handler toasts it; the repo page and Focus drop it). It runs before `setDown(false)` and the reload check. The stream stays not up: no `setDown(false)`, no `streamsUp`, no reload, and `reconnected` is left as it was. The Org's own `error` branch goes. `delay` goes back to 500 ms at the first message that is not `error`, not in `onopen`: today an accepted-then-closed socket resets it each time, so a failing stream reopens every half second.
+- **The bound.** Each reload on a reconnect is recorded in `sessionStorage` under `ao.reloads:<path>`, as a list of times. Before reloading, the page drops the times older than 60 s. If 3 are left, it does not reload. It clears `reconnected`, draws the banner once, and dispatches that message and every later one as a stream that was up all along. Otherwise it appends the time, sets `ao.reloading:<path>`, and reloads. At load, a page that finds `ao.reloading:<path>` removes it and keeps the list. A page that does not find it clears the list. Every read and write is wrapped in try/catch; storage that throws counts nothing, and the page reloads as before.
+- **The banner.** It has §4.5a's words and **Reload**, which clears the list and reloads.
+- **`page=` and `at=`.** The stream's query carries the `v=` value of the `app.js` link the page loaded, read from its script tag, and `location.pathname`. `events` keeps both in the `Stream` it builds.
+- **The open-rate warning.** `events` counts the accepts per client address (`ws.client.host`) and `at` over 60 s. Past 20, it writes one `log.warning` line (`common.log`, `uvicorn.error`) in §4.5's words, at most once per address and path every 10 minutes. The counts and both limiters are in-process state of the UI app, kept beside `fan`. `at` and `page` come from the client: both are cut to 100 characters, keyed on the cut values, and logged with `%r`; a missing `ws.client` counts as `""`. Each accept drops the counter's times older than 60 s and the limiter's marks older than 10 minutes, so the tables stay small. *this UI serves* is the `v=` value of `static_url("app.js")`.
+- **The exception log.** The `except Exception` in `events` logs its exception with the traceback (`log.exception`, the same logger), at most once a minute. Today only that path is silent: the shared subscriber's failures are already logged by `Fanout` (*the events stream failed*), which keeps no limit and stays as it is.
+- **Tests:**
+  - a page whose stream sends only `error` and closes does not reload, and toasts the text once on the Org, the repo page and Focus;
+  - a stream that sends only `error` reconnects with growing delays (500 ms, 1 s, 2 s … capped at 10 s);
+  - `error`, a close, then a real message reloads once;
+  - a stream that sends a real message, then closes, each time: three reloads in 60 s hold back the fourth and draw the banner;
+  - after a held-back reload, later messages patch the page and draw no second banner;
+  - **Reload** clears the count;
+  - a load the page did not make clears it too;
+  - storage that throws reloads as before;
+  - the warning is written past 20 opens from one address and path, once in 10 minutes, naming the path and both hashes; 20 opens spread over two paths write nothing;
+  - a failing stream logs its traceback, at most once a minute.
+
+
+**Resolved:** 2026-10-14 (PR #1786) — reproduced first on a scratch home (a UI whose `fan.join` raises): the Org, the repo page and Focus each reloaded about twice a second, two `/events` opens a load, nothing logged — the `error` shape. Built: `connectEvents` takes `error` as not up (toasted once a load; the backoff put back at the first real message), the reload bound in `sessionStorage` (`ao.reloads:<path>`, `ao.reloading:<path>`, counted once per reload) and the banner in `base.html`; `?page=&at=` on the stream; `fanout.OpenRate` and `Every`, the open-rate warning and the handler's traceback in `events`. `tests/test_ui_reload_loop.py`. The reproduction and the UI check are in the PR body.
+**Done when** the reproduction is in the PR body and every listed test passes.
+
+**Related:** TD-692 (the design), TD-372 (a close the page caused by leaving), TD-539 (the build chip), TD-062 (a promote restarts both units).
