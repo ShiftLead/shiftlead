@@ -466,3 +466,42 @@ async def test_an_entry_still_settling_is_told_only_once_it_settles(agent, tmp_p
         await agent._lane_news(rec, now + timedelta(minutes=6))
         assert len(_notes(agent, sid)) == 1 and "TD-002" in _notes(agent, sid)[0]
         await person.call("kill", id=sid)
+
+
+async def test_an_entry_settling_at_the_declaration_is_told_by_a_first_write_after_it_settled(agent, tmp_path):
+    """TD-718 (TD-710, §4.4 *A new entry settles before it is pickable*, §6 rule 6): the first write reads
+    the ledger at the declaration from git, which carries no mark, and the settle clock marks it as the
+    clock stood then. An entry settling at the declaration whose window ended before a late first tick
+    is not in `lane_seen`, and is told on that tick; unmarked, it would be recorded as seen, never told."""
+    from sessionorc import ledger, settle
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    (repo / "docs").mkdir()
+    one = "## TD-001: one\n\n**Kind:** design-first\n\n"
+    two = one + "## TD-002: two\n\n**Kind:** design-first\n\n"
+    for text, ago in ((one, timedelta(hours=1)), (two, timedelta(minutes=15))):
+        (repo / "docs" / "technical_debt.md").write_text(text)
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-qm", "ledger", when=(now - ago).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    # the clock as the tick keeps it (keyed by the path: the reading has no remote): TD-001 in the repo's
+    # first reading, settled; TD-002 first seen 12 minutes ago, settling for the built-in 5m
+    spans = settle.spans(repo)
+    settle.observe(ledger.entries(one), str(repo), spans, now - timedelta(hours=1))
+    assert settle.observe(ledger.entries(two), str(repo), spans, now - timedelta(minutes=12))[1].get("settling")
+    async with LocalClient() as person:
+        # the checkout's reading at the first tick: TD-002 has settled, so it carries no mark
+        sid = await _finished(agent, person, repo, "d", ["design-first"], ledger.entries(two))
+        agent._repos[str(repo)]["ledger"]["path"] = "docs/technical_debt.md"
+        rec = agent.sessions[sid]
+        rec.out_of_work = {"at": (now - timedelta(minutes=10)).isoformat(), "why": "nothing pickable"}
+        await agent._lane_news(rec, now)
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "gained 1 entry since you declared out of work: TD-002" in notes[0]
+        assert rec.lane_seen["ids"] == ["TD-001", "TD-002"]
+        await person.call("kill", id=sid)
