@@ -29,7 +29,10 @@ never a fake pass):
               merge. The row NAMES the first such comment (the review); a later one
               (before the merge) is listed after it, never read as the review — an author's follow-up
               `FIXED · <own model>` is not who reviewed (TD-076). A standing BLOCK is
-              the one thing a later comment decides. Self-attested: the session that
+              the one thing a later comment decides. A `cadence-review:` line whose
+              verdict is not SHIP, FIXED or BLOCK (`CLEAN`) is never read as a review:
+              alone, the row fails naming its word; beside a review, it is listed as
+              not read (TD-116). Self-attested: the session that
               ran the review also posts the comment, so this row proves the ritual was
               recorded, not that it was honest. Weigh it accordingly.
               A merged PR whose only review comments came AFTER the merge still fails
@@ -44,7 +47,8 @@ never a fake pass):
               squash whose subject ends `(#n)`; open, the only commit past the default
               branch — is the one-item edit the direct audit's board-edit class
               accepts, read from this clone; unreadable, the row asks for a review.
-    ci        every check run on the head commit either succeeded or was SKIPPED by
+    ci        every check run — and, on GitHub, every commit status (TD-117) — on the
+              head commit either succeeded or was SKIPPED by
               the workflow, and at least one actually ran. A skip never fails the row
               — a job gated off on purpose must not block a merge — but it is named
               rather than counted green, because "not red" is not "ran". (na: none
@@ -56,6 +60,9 @@ never a fake pass):
               within CI_REGISTER_GRACE seconds in a repo with an active workflow, is
               unknown — the seconds after a push look exactly like "no CI here", and
               a caller that merges on exit 0 would merge ahead of CI. Re-run.
+              With `precheck` set (docs/cadence.toml, TD-117), an OPEN PR whose head
+              carries no `cadence/precheck` status is unknown, whatever else ran: run
+              scripts/precheck.py --pr N (cadence §4.12).
     base      the PR's base is the default branch (cadence §1, §9 "Default-branch rule").
               A PR on another branch is the wrong-base stack of §1: merged, its work
               is on that branch and not on the default — the `worktree` row sees that
@@ -152,6 +159,10 @@ from typing import Any
 REVIEW_RE = re.compile(
     r"^\s*cadence-review:\s*(?P<verdict>SHIP|FIXED|BLOCK)\b(?P<rest>.*)$", re.IGNORECASE
 )
+# Any `cadence-review:` line, whatever its verdict: one REVIEW_RE refuses is never read as a
+# review, but the row says so rather than reporting no review at all (TD-116, shiftlead#1698's
+# two `CLEAN` comments).
+ODD_REVIEW_RE = re.compile(r"^\s*cadence-review:\s*(?P<word>[^\s·]*)", re.IGNORECASE)
 STACK_RE = re.compile(r"^\s*cadence-stack:(.*)$", re.IGNORECASE | re.MULTILINE)
 TD_RE = re.compile(r"\bTD-0*(\d+)\b")
 LEDGER_FILES = ("docs/technical_debt.md", "docs/technical_debt_archive.md")
@@ -289,6 +300,7 @@ def row_review(pr):
             f"merged but {FORGE.cli} gave no mergedAt — cannot place the review before the merge",
         )
     found = []
+    odd = []  # (created, word) of comments whose only cadence-review: lines REVIEW_RE refuses
     for c in comments:
         # Any line of the body, the last if several: a report that ends with its verdict
         # is a review, not none (TD-087, ShiftLead PRs #138/#139).
@@ -309,6 +321,10 @@ def row_review(pr):
                     m.group("rest").strip(" ·-"),
                 )
             )
+        elif word := odd_verdict(c.get("body") or ""):
+            odd.append((parse_ts(c["created_at"]), word))
+    if not found and odd:
+        return row("review", "fail", odd_sentence(odd))
     if not found:
         return row(
             "review", "fail", "no `cadence-review:` comment on the PR (cadence §4)"
@@ -365,7 +381,33 @@ def row_review(pr):
         tail = f"; then {len(later)} later, not the review: " + "; ".join(
             f"{v} · {r}" for _, _, v, r in later
         )
+    if merged_at:
+        odd = [o for o in odd if o[0] and o[0] <= merged_at]
+    if odd:
+        tail += f"; {len(odd)} not read, its verdict not SHIP, FIXED or BLOCK: " + ", ".join(
+            w for _, w in odd
+        )
     return row("review", "pass", f"{verdict} · {rest} · {when}{tail} (self-attested)")
+
+
+def odd_verdict(body):
+    """The verdict word of the last `cadence-review:` line in `body` when REVIEW_RE reads none
+    of its lines, else None — a review written with a word of the reviewer's own (TD-116)."""
+    lines = body.splitlines()
+    if any(REVIEW_RE.match(line) for line in lines):
+        return None
+    hits = [m for line in lines if (m := ODD_REVIEW_RE.match(line))]
+    return (hits[-1].group("word") or "nothing") if hits else None
+
+
+def odd_sentence(odd):
+    """What the row says when the only review lines carry a verdict REVIEW_RE refuses: never
+    accepted, and the cure named (TD-116)."""
+    words = sorted({w for _, w in odd}, key=[w for _, w in odd].index)
+    lead = "a review comment says" if len(odd) == 1 else f"{len(odd)} review comments say"
+    return (
+        f"{lead} {' / '.join(words)}: the verdict is SHIP, FIXED or BLOCK. Post a new one."
+    )
 
 
 # TD-079: how long after a PR was last updated "no check run listed" is too early to call
@@ -412,6 +454,26 @@ def _ci_coming(pr, sha):
     )
 
 
+PRECHECK = "cadence/precheck"   # parity (cadence.md §7.9): precheck.py's CONTEXT writes it
+
+
+def _precheck() -> tuple[str | None, str | None]:
+    """(the repo's `precheck` command or None, why it could not be read or None) — TD-117.
+    No cadence_config.py beside this script is no precheck, as before it existed."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        import cadence_config as C
+    except ImportError:
+        return None, None
+    try:
+        v, _ = C.resolve("precheck", C.sources(C.repo_root(".")))
+        return v, None
+    except C.ConfigError as e:
+        return None, str(e)
+
+
 def row_ci(pr):
     sha = pr.get("head_sha")
     if not sha:
@@ -424,6 +486,22 @@ def row_ci(pr):
             "unknown",
             f"check runs for {sha[:7]} unreadable ({e}) — a deleted head reads this way",
         )
+    # TD-117: a repo with `precheck` set is judged by it. An open PR whose head carries no
+    # cadence/precheck status has not been checked, whatever else ran — no evidence, not a pass.
+    if pr["state"] == "open":
+        want, unread = _precheck()
+        if unread:
+            return row("ci", "unknown", f"cannot tell whether a precheck is required: {unread}")
+        if want and not any(r.get("name") == PRECHECK for r in runs):
+            # on GitLab a status posted where a pipeline already ran joins it, and check_runs
+            # lists only the pipeline: ask for the status by name (TD-118)
+            try:
+                runs = runs + FORGE.named_status(sha, PRECHECK)
+            except F.ForgeUnreadable as e:
+                return row("ci", "unknown", f"{PRECHECK} on {sha[:7]} unreadable ({e})")
+        if want and not any(r.get("name") == PRECHECK for r in runs):
+            return row("ci", "unknown", f"precheck is set (docs/cadence.toml) and {sha[:7]} carries no "
+                       f"{PRECHECK} status — run scripts/precheck.py --pr {pr.get('number')}")
     if not runs:
         coming = _ci_coming(pr, sha) if pr["state"] == "open" else None
         if coming:
@@ -442,6 +520,17 @@ def row_ci(pr):
     # GitLab (TD-104): a pipeline that ended failed with no jobs and no yaml_errors never
     # ran — a runner or an account setting, not a red build (a broken .gitlab-ci.yml has
     # yaml_errors and is red above) — so it is no evidence either way, never a pass.
+    # GitHub (TD-115): a job Actions refused to start (the account's billing or spending
+    # limit) carries the refusal as its "why" — the person's to fix, so no evidence either.
+    refused = [r for r in runs if r.get("conclusion") == "not_run" and r.get("why")]
+    if refused:
+        return row(
+            "ci",
+            "unknown",
+            f"{', '.join(r.get('name', '?') for r in refused)} on {sha[:7]} never ran — "
+            f"GitHub did not start the job: {refused[0]['why'].split('. ')[0]} (the account's "
+            "billing or spending limit, the person's to fix); that is no evidence, not a red build",
+        )
     never = [r.get("name", "?") for r in runs if r.get("conclusion") == "not_run"]
     if never:
         return row(
@@ -1062,7 +1151,12 @@ def direct_commits(root, when):
             else:
                 cls, detail = classify_direct(root, sha, subject, [f for f in names.split("\0") if f])
                 if cls == "fail" and FORGE is not None and FORGE.name == "none":
-                    detail += "; no cadence-review: line in its body (no forge, §4.9)"
+                    word = odd_verdict(git(["log", "-1", "--format=%b", sha], cwd=root) or "")
+                    detail += (
+                        f"; its cadence-review: line says {word}: the verdict is SHIP, FIXED or BLOCK (no forge, §4.9)"
+                        if word
+                        else "; no cadence-review: line in its body (no forge, §4.9)"
+                    )
         commits.append({"sha": sha[:7], "subject": subject, "class": cls,
                         "status": "fail" if cls == "fail" else "pass", "detail": detail})
     status = "fail" if any(c["status"] == "fail" for c in commits) else "pass"

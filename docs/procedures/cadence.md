@@ -13,22 +13,33 @@ skipped check is found, not prevented.
 
 ## Steps
 
-The commands are GitHub's (`gh`), with GitLab's (`glab`, a PR is a merge request, `!N`) beside them (cadence.md, *Forges*). The script asks through `scripts/forge.py`, which has a GitHub and a GitLab backend (TD-104): on any other forge its PR rows say *PRs not checked* (TD-098), and a GitHub or GitLab under another host name sets `forge = "github"` or `"gitlab"` in `docs/cadence.toml` (cadence.md §9.18). On GitLab the `ci` row reads the pipelines on the head commit, and one that failed with no jobs (it never ran) is *unknown*, not red.
+The commands are GitHub's (`gh`), with GitLab's (`glab`, a PR is a merge request, `!N`) beside them (cadence.md, *Forges*). The script asks through `scripts/forge.py`, which has a GitHub and a GitLab backend (TD-104): on any other forge its PR rows say *PRs not checked* (TD-098), and a GitHub or GitLab under another host name sets `forge = "github"` or `"gitlab"` in `docs/cadence.toml` (cadence.md §9.18). On GitLab the `ci` row reads the pipelines on the head commit, and one that failed with no jobs (it never ran) is *unknown*, not red. On GitHub a job Actions refused to start (*The job was not started because recent account payments have failed or your spending limit…* — the account's billing, the person's to fix) is reported as a failure; the row reads that run's annotation and says *unknown*, naming the reason, not red (TD-115).
 
 **No forge** (`forge = "none"` in `docs/cadence.toml`, cadence.md §4.9, TD-105): there is no PR, so `--pr` exits 2. Run the review the same way, put the `cadence-review:` line (step 3's form) in the squash commit's body, and land it on the default branch; `python3 scripts/check_cadence.py --since 7d` then reads every commit from git, and a commit with neither that line nor a carve-out fails.
 
 1. Find the PR: the current branch's (`gh pr view --json number`; GitLab: `glab mr view -F json`, its `iid`), or the number you were
-   given. The week means `--since 7d` (report only, steps 3–5 do not apply); its
+   given. The week means `--since 7d` (report only; the precheck and steps 3–5 do not apply); its
    **Direct commits** section lists what reached main with no PR — only §4's carve-outs pass.
-2. Run `python3 scripts/check_cadence.py --pr <n>` and read every row. Exit 0 = every row
+2. **The repo's precheck (TD-117, cadence §4.12):** when `python3 scripts/cadence_config.py get precheck`
+   prints a command, run `python3 scripts/precheck.py --pr <n>` first, on every head you mean to merge.
+   It runs that command in a clean worktree at the PR's head and records a `cadence/precheck`
+   commit status there (no CI minutes); exit 1 is a failed check — fix it, push, run it again;
+   3 is a pass the forge would not record, which the `ci` row cannot see — say in the PR that
+   it passed and on what. GitHub and GitLab both record it (GitLab since TD-118).
+   Then run `python3 scripts/check_cadence.py --pr <n>` and read every row. Exit 0 = every row
    pass or n/a; 1 = a fail; 2 = nothing could be checked (no forge CLI such as `gh`, a CLI error, no PR);
    3 = no fail, but a row is `unknown` — evidence the forge could not give (CI still running, every
-   check skipped, a deleted head's check runs, a rate limit). Say so, never call it a pass.
+   check skipped, a deleted head's check runs, a rate limit, a precheck required and not recorded on
+   the head). Say so, never call it a pass.
 3. **`review` fails and no review has been done:** do it now — a cheaper-model agent on the
    repo's review model (`python3 scripts/cadence_config.py get review-model`; default
    `sonnet`, cadence §9.18), started however your tool starts another agent on a chosen
    model (a subagent, or a separate session) and never the session that wrote the diff, reviews the diff for correctness (code) or fact-checks it
-   against the repo (docs). Fix the findings, re-verify, and then post the evidence comment (§4; on GitLab the same body through `glab mr note <n> -m`, which glab 1.123 marks deprecated but runs; a fine-grained token needs the notes permissions):
+   against the repo (docs). **Its prompt names the verdict words:** *end your report with
+   `cadence-review: <SHIP|FIXED|BLOCK> · <your model> · <code|docs> · <n> findings` — SHIP,
+   FIXED or BLOCK and no other word*. A reviewer asked in its own words writes its own
+   (`CLEAN`), which the row never reads as a review: it fails naming the word, and the cure is a
+   new comment (TD-116). Fix the findings, re-verify, and then post the evidence comment (§4; on GitLab the same body through `glab mr note <n> -m`, which glab 1.123 marks deprecated but runs; a fine-grained token needs the notes permissions):
 
    ```
    gh pr comment <n> --body "$(cat <<'MSG'

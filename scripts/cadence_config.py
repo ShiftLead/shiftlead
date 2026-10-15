@@ -9,6 +9,10 @@
     cadence_config.py --check       name each key no tool reads and each value of the wrong type
                                     in the files below; exit 1 when there is one
 
+    cadence_config.py get post-sync --repo DIR
+                                    the repo's post-sync command (TD-113): the repo's file only,
+                                    never env or the machine's — sync.sh runs it in each repo
+
     cadence_config.py opt-outs --repo DIR
                                     the repo's opt-outs (sync.sh's reader, cadence.md Adoption
                                     checklist step 9): one TSV line per declaration,
@@ -26,6 +30,8 @@ Where a value comes from, the first that has it (cadence.md §9.18):
     machine  cadence.toml in the roster's directory — $DEV_CADENCE_REG_DIR, else
              ${XDG_CONFIG_HOME:-~/.config}/dev-cadence (§9.2), so a test's override moves it too
     default  KEYS below
+A repo key (REPO_KEYS below: precheck, post-sync) has the repo row only — no env, no machine file, no
+default: it is a decision about that one repo.
 
 The files are TOML, read with `tomllib` (Python >= 3.11). **People write them; tools only
 read them and never rewrite them** (cadence.md §9.18): a whole-file write drops the comments,
@@ -77,6 +83,16 @@ def _rel_dir(v: str) -> str:
     if parts[0] == ".git" or n == ".claude" or any(c in n for c in "*?[]\\") or any(p[:1] in ("#", "!") for p in parts):
         raise ValueError(f"must be a plain directory path (no .git, no bare .claude, no * ? [ ] \\, no leading # or !), not {v!r}")
     return n
+
+
+# The repo's own keys (TD-113): read from the repo's file only — never env, never the machine's
+# file, no default — because each is a decision about that one repo. A machine-wide or env
+# post-sync would run one repo's command in every repo sync-all reaches; an env precheck would
+# let a session pick the check it is judged by.
+REPO_KEYS = {
+    "precheck": "the repo's own checks (lint, typecheck, tests) as one command; scripts/precheck.py runs it on a PR's head before the merge and records a cadence/precheck status (TD-117)",
+    "post-sync": "a command sync.sh runs from the repo root after it writes the files (sync-all commits its changes with them); a failure fails the sync",
+}
 
 
 # key -> a function returning the value to use, or raising ValueError naming what is wrong.
@@ -157,6 +173,14 @@ def sources(repo: str | None) -> list[tuple[str, dict]]:
 
 
 def resolve(key: str, files: list[tuple[str, dict]]) -> tuple[object, str]:
+    if key in REPO_KEYS:
+        for label, table in files:
+            if label == REPO_FILE and key in table:
+                v = table[key]
+                if not isinstance(v, str) or not v.strip():
+                    raise ConfigError(f"{label}: {key} must be a non-empty string, not {v!r}")
+                return v, label
+        return None, "unset"
     v = (os.environ.get(env_name(key)) or "").strip()
     if v:
         return _valid(key, v, "env " + env_name(key)), "env " + env_name(key)
@@ -191,8 +215,13 @@ def check(files: list[tuple[str, dict]]) -> list[str]:
                 else:
                     problems += [f"{label}: [{k}] {name!r} must name its ADR as a string, not {adr!r}"
                                  for name, adr in v.items() if not isinstance(adr, str)]
+            elif k in REPO_KEYS and label != REPO_FILE:
+                problems.append(f"{label}: {k} is the repo's decision — put it in {REPO_FILE}; not read here")
+            elif k in REPO_KEYS:
+                if not isinstance(v, str) or not v.strip():
+                    problems.append(f"{label}: {k} must be a non-empty string, not {v!r}")
             elif k not in KEYS:
-                problems.append(f"{label}: unknown key '{k}' — nothing reads it (known: {', '.join(KEYS)})")
+                problems.append(f"{label}: unknown key '{k}' — nothing reads it (known: {', '.join([*KEYS, *REPO_KEYS])})")
             elif not isinstance(v, str) or not v:
                 problems.append(f"{label}: {k} must be a non-empty string, not {v!r}")
             elif k in VALIDATE:
@@ -291,8 +320,8 @@ def main(argv: list[str]) -> int:
         for ln in optouts(a.repo):
             print(ln)
         return 0
-    if a.key and a.key not in KEYS:
-        print(f"cadence_config: unknown key '{a.key}' (known: {', '.join(KEYS)})", file=sys.stderr)
+    if a.key and a.key not in KEYS and a.key not in REPO_KEYS:
+        print(f"cadence_config: unknown key '{a.key}' (known: {', '.join([*KEYS, *REPO_KEYS])})", file=sys.stderr)
         return 2
     try:
         root = repo_root(a.repo or ".")
@@ -310,7 +339,7 @@ def main(argv: list[str]) -> int:
                 return 1
             print(value)
             return 0
-        rows = {k: dict(zip(("value", "from"), resolve(k, files))) for k in KEYS}
+        rows = {k: dict(zip(("value", "from"), resolve(k, files))) for k in [*KEYS, *REPO_KEYS]}
     except ConfigError as e:
         print(f"cadence_config: {e}", file=sys.stderr)
         return 2
