@@ -986,7 +986,7 @@
 {%- endmacro %}
 
 {#- every row carries an error line (§4.5a *Inbox row: pending*, TD-340): a refused write, or a press
-    that took its row away and was refused, drawn there once the refresh brings the row back . A board row
+    that took its row away and was refused, drawn there once the refresh brings the row back. A board row
     carries its line's text once, as `data-text`, and its buttons read it from the row (TD-738) -#}
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
