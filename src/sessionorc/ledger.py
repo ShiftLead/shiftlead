@@ -79,6 +79,25 @@ def _header(fields: dict[str, str], body: str) -> dict[str, str]:
     return fields
 
 
+WAITS = ("until", "event")  # a `**Waits:**` line's first words (design §4.4 *An entry says what it waits for*)
+
+
+def waits_of(value: str) -> dict[str, str] | None:
+    """A `**Waits:**` line read (design §4.4 *An entry says what it waits for*, TD-715, built by TD-716):
+    `{on, date, why}`, `on` its first word, `until` or `event`; `date` the first `YYYY-MM-DD` after
+    `until` ('' for an `event`, or an `until` that names none); `why` the rest, its leading dash dropped.
+    None for no line, or a first word outside the two (`ledger.py --check` flags that one)."""
+    words = (value or "").strip()
+    first = words.split()[0].lower() if words.split() else ""
+    if first not in WAITS:
+        return None
+    rest = words[len(first) :]
+    date = ""
+    if first == "until" and (m := DATE.search(rest)):
+        date, rest = m.group(0), rest[m.end() :]
+    return {"on": first, "date": date, "why": rest.strip().lstrip("—–-").strip()}
+
+
 def answers_of(value: str) -> tuple[list[str], int | None]:
     """An `**Answers:**` line read in the board's `Answers:` grammar (cadence §3.5), by ledgerboard's
     split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, and
@@ -219,12 +238,19 @@ def kind_of(entry: dict[str, Any]) -> str:
 
 
 NO_KIND = "fits no page kind — check its Owner, Kind and Blocked by"
+NO_DATE = "Waits: until names no date"  # it waits with no end (§4.4 *What a wait does*, TD-716)
 
 
 def flags(entries: list[dict[str, Any]]) -> list[str]:
-    """This reader's flag on each entry no page kind takes (§4.4 *Repo facts*, TD-418): the Repo
-    page's *other* list and `ao repo` say it, and the bar still draws the entry."""
-    return [f"{e['id']}: {NO_KIND}" for e in entries if e.get("for_page") == "other"]
+    """This reader's flag on each entry no page kind takes (§4.4 *Repo facts*, TD-418), and on each
+    `Waits: until` that names no date (TD-716): the Repo page's *other* list and `ao repo` say it, and
+    the bar still draws the entry."""
+    out = [f"{e['id']}: {NO_KIND}" for e in entries if e.get("for_page") == "other"]
+    return out + [
+        f"{e['id']}: {NO_DATE}"
+        for e in entries
+        if isinstance(e.get("waits"), dict) and e["waits"].get("on") == "until" and not e["waits"].get("date")
+    ]
 
 
 def _buildlike(entry: dict[str, Any]) -> bool:
@@ -251,8 +277,9 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     every pickable entry whose `Owner:` is `anchor`, of any kind — a live check once its build is
     live — any entry blocked by `decision (anchor)`, pickable or not, its owner then reading
     `anchor`, and every work order. **An entry still settling, or held** (`settling`, `held`: the home's
-    marks, §4.4 *A new entry settles before it is pickable*, TD-710) matches no lane."""
-    if entry.get("settling") or entry.get("held"):
+    marks, §4.4 *A new entry settles before it is pickable*, TD-710), **or waiting** (`waiting`, §4.4 *An
+    entry says what it waits for*, TD-716), matches no lane."""
+    if entry.get("settling") or entry.get("held") or entry.get("waiting"):
         return False
     owners = {o for w in lane if (o := owner_word(w))}
     if entry.get("work_order"):
@@ -290,16 +317,22 @@ def in_lanes(
     for every record with a lane — what `lane_matches` takes for its own lane that `held` does not
     hold, rule 6's view whatever the page kind, and `k`, how many live records (not ended) carry the
     identical lane, the same set of words; and `out_of_work`, each record carrying `out_of_work`
-    whose own count is above 0, `[{id, name, ids}]`, read from `members`. None where no record
-    carries a lane: nothing is drawn."""
+    whose own count is above 0, `[{id, name, ids}]`, read from `members`. **A waiting entry** (its
+    `waiting` mark, §4.4 *An entry says what it waits for*, TD-716) is in no kind, no `rest` and no
+    member's `ids`: what a lane would take but for its wait is `waiting`, `{until: [ids], event:
+    [ids]}`, each member's own beside its `ids` as `waiting`, and `out_of_work_waiting` names each
+    record carrying `out_of_work` whose `ids` is empty and whose `waiting` is not, `[{id, name,
+    waiting}]`. None where no record carries a lane: nothing is drawn."""
     lanes = [list(r["lane"]) for r in records if r.get("lane")]
     if not lanes:
         return None
     open_ = [e for e in entries if e.get("for_page") in LANE_KINDS]
     taken = {e["id"] for e in open_ if any(lane_matches(lane, e) for lane in lanes)}
+    waits = {e["id"]: e for e in open_ if e.get("waiting") and any(lane_matches(lane, _unwaited(e)) for lane in lanes)}
     by_owner: dict[str, list[str]] = {}
     for e in open_:
-        if e["for_page"] == "pickable" and e["id"] not in taken and not (e.get("settling") or e.get("held")):
+        withheld = e.get("settling") or e.get("held") or e.get("waiting")
+        if e["for_page"] == "pickable" and e["id"] not in taken and not withheld:
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
     rest.sort(key=lambda r: (-r["n"], r["owner"]))
@@ -310,13 +343,24 @@ def in_lanes(
         if not r.get("lane"):
             continue
         ids = [e["id"] for e in entries if e["id"] not in held and lane_matches(list(r["lane"]), e)]
+        waiting = [
+            e["id"]
+            for e in entries
+            if e.get("waiting") and e["id"] not in held and lane_matches(list(r["lane"]), _unwaited(e))
+        ]
         name = r.get("name") or r.get("id")
-        members.append({"id": r.get("id"), "name": name, "ids": ids, "k": alive.count(frozenset(r["lane"]))})
+        k = alive.count(frozenset(r["lane"]))
+        members.append({"id": r.get("id"), "name": name, "ids": ids, "waiting": waiting, "k": k})
     by_id = {str(r.get("id")): r for r in records}
     idle = [
         {"id": m["id"], "name": m["name"], "ids": m["ids"]}
         for m in members
         if m["ids"] and by_id.get(str(m["id"]), {}).get("out_of_work")
+    ]
+    idle_waiting = [
+        {"id": m["id"], "name": m["name"], "waiting": m["waiting"]}
+        for m in members
+        if not m["ids"] and m["waiting"] and by_id.get(str(m["id"]), {}).get("out_of_work")
     ]
     return {
         **{
@@ -325,7 +369,14 @@ def in_lanes(
         "rest": rest,
         "members": members,
         "out_of_work": idle,
+        "waiting": {on: [i for i, e in waits.items() if (e["waiting"].get("on") or "event") == on] for on in WAITS},
+        "out_of_work_waiting": idle_waiting,
     }
+
+
+def _unwaited(entry: dict[str, Any]) -> dict[str, Any]:
+    """The entry as a lane would read it once its wait ends (TD-716): its `waiting` mark dropped."""
+    return {k: v for k, v in entry.items() if k != "waiting"}
 
 
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
@@ -362,7 +413,9 @@ def entries(
     is read only from the entry's own section. A `Kind: live-check` entry also carries `built`, the
     PRs its line names, and `live`, `yes` when `live` says every one of them is live and `no`
     otherwise — no callable, no PR named (§4.9b, TD-323). `sig` is a hash of the entry's section text,
-    which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710)."""
+    which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710).
+    An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716); whether it
+    still waits is the home's clock's, its `waiting` mark (`settle`)."""
     t = strip_comments(text)
     heads = list(lb.HEADING_RE.finditer(t))
     derived: dict[str, list[str]] = {}
@@ -387,6 +440,8 @@ def entries(
             "pickable": "no" if blocked_by else "yes",
             "sig": hashlib.sha256(t[m.start() : nxt.start() if nxt else len(t)].encode()).hexdigest()[:16],
         }
+        if waits := waits_of(read["fields"].get("waits", "")):  # the header block's line alone (§4.4)
+            e["waits"] = waits
         if e["kind"] == "live-check":
             e["built"] = built(fields.get("kind", ""))
             e["live"] = "yes" if live is not None and e["built"] and all(live(n) for n in e["built"]) else "no"

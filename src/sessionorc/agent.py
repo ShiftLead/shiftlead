@@ -2781,6 +2781,8 @@ class HostAgent(
             raise RpcError(words, balance=self._balance_of(s))
         if new_claim and (words := self._settle_refusal(s, entry.ref)):
             raise RpcError(words)  # before the lease: `force` is about another session's claim, not this
+        if new_claim and not force and (words := settle_mod.wait_refusal(self._ledger_entry(s, entry.ref))):
+            raise RpcError(words)  # a wait's end the session may know: `force` passes it (§4.4, TD-716)
         holder = self._lease_holder(s, entry) if new_claim else None
         if holder is not None and not force:
             raise RpcError(
@@ -2816,11 +2818,15 @@ class HostAgent(
         """Why a declared claim on a ledger entry is refused because it settles or the person holds it
         (design §4.8 *A claim is a lease*, §4.4 *What settling withholds*, TD-710), read from the home's
         reading of the claimer's repo; None for a reference that is no ledger id, or a repo not read."""
+        return settle_mod.claim_refusal(self._ledger_entry(s, ref), datetime.now(UTC))
+
+    def _ledger_entry(self, s: Session, ref: str) -> dict[str, Any] | None:
+        """Entry `ref` of the home's reading of the record's repo, marks and all; None for a reference
+        that is no ledger id, or a repo not read."""
         if not ref.startswith("TD-"):
             return None
         entries = ((self._repos.get(s.repo or "") or {}).get("ledger") or {}).get("entries") or []
-        entry = next((e for e in entries if isinstance(e, dict) and e.get("id") == ref), None)
-        return settle_mod.claim_refusal(entry, datetime.now(UTC))
+        return next((e for e in entries if isinstance(e, dict) and e.get("id") == ref), None)
 
     async def _pr_checks(self, s: Session, pr: int) -> dict[str, Any]:
         """PR `pr` read once for its checks (design §4.8 *A `done` with a PR is told what its checks

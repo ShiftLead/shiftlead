@@ -505,3 +505,27 @@ async def test_an_entry_settling_at_the_declaration_is_told_by_a_first_write_aft
         assert len(notes) == 1 and "gained 1 entry since you declared out of work: TD-002" in notes[0]
         assert rec.lane_seen["ids"] == ["TD-001", "TD-002"]
         await person.call("kill", id=sid)
+
+
+async def test_an_entry_whose_wait_ends_is_told_once_and_not_before(agent, tmp_path):
+    """TD-716 (design §4.4 *An entry says what it waits for*, §6 rule 6): an entry marked `waiting`
+    matches no lane, so a member that declared out of work is told nothing of it; on its date the mark
+    goes and it is news to the lane, told once, as an entry filed since is."""
+    from sessionorc import settle
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    tomorrow = (now.astimezone() + timedelta(days=1)).date().isoformat()
+    waits = {"on": "until", "date": tomorrow, "why": "CI runs then"}
+    async with LocalClient() as person:
+        led = settle.mark_waits([_e("TD-001"), {**_e("TD-002"), "waits": waits}], now)
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick", "owner:grinder"], led)
+        rec = agent.sessions[sid]
+        await agent._keep_running(now)
+        assert rec.lane_seen["ids"] == ["TD-001"] and _notes(agent, sid) == [], "a waiting entry is no lane's"
+        settle.mark_waits(agent._repos[str(tmp_path)]["ledger"]["entries"], now + timedelta(days=1))
+        await agent._lane_news(rec, now)
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "your lane gained 1 entry since you declared out of work: TD-002" in notes[0]
+        await person.call("kill", id=sid)

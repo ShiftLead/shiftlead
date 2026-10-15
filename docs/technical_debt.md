@@ -60,7 +60,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
 | TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
-| TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
+| TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Slice 1 built by #1843 |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check of #1838 |
@@ -1121,7 +1121,7 @@ The other cases:
 **Added:** 2026-10-15 (the designer, building TD-715's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1 (the reading, the `waiting` mark, the lanes, the claim refusal; `sessionorc`) built by #1843; slice 2 (the words, `shiftlead`) next, and with it, from #1843's review: `teamrun.lane_kinds` (~L1241) and `ui/repo.py` (~L352) still withhold only `settling`/`held` from the pickable count, so a waiting entry counts pickable there until slice 2 reads `waiting` too; slice 3 (this ledger's nine) once #1843 is live.
 **Location:** design §4.4 *An entry says what it waits for* and *In a team's lanes*, §4.7 `ao repo`, §4.8 *A claim is a lease*, §6 rule 6, §4.5a *team card: Repo facet* (the lanes line), *card: compact* (the count) and *Repo page: waits mark*; `src/sessionorc/ledger.py` (`entries`, `lane_matches`, `in_lanes`, `flags`), `src/sessionorc/settle.py` (`mark`, TD-710's), `src/sessionorc/agent_tick.py` (`_read_repo`), the claim refusal in `rpc_progress`, `src/shiftlead/cli.py` (`ao repo`), `src/shiftlead/ui/org.py` and `templates/lanes_line.html`, `repo_part.html`, the card's count in `cards.py`; the role briefs `src/shiftlead/briefs/anchor.md`, `grinder.md` and `designer.md`
 
 **Why:** TD-715's design. On 2026-10-15 `ao repo` read *ao-grind-anchor is out of work with 9 in its lane*, and every one of the nine was waiting on a date, an event or the person, so the closed seat looked like the team's block and a restart like its cure.
