@@ -34,6 +34,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import promote as promote_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
+from sessionorc import sync as sync_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import (
@@ -2691,6 +2692,9 @@ class TickMixin:
                 # the red PRs' orders and memory are the tick's (`_red_prs`), never the read's: carried
                 if (po := (self._repos.get(r) or {}).get("pr_orders")) is not None:
                     v.setdefault("pr_orders", po)
+                # and the sync pass's outcomes are the pass's (§6 *Sync*, TD-685)
+                if (so := (self._repos.get(r) or {}).get("sync")) is not None:
+                    v.setdefault("sync", so)
                 # a write-back re-read this board while the pass ran: its reading is the newer (`_reread_board`)
                 if self._boards_pressed.get(r, float("-inf")) >= began and r in self._repos:
                     v.update({k: self._repos[r][k] for k in ("boards", "work_orders") if k in self._repos[r]})
@@ -2719,9 +2723,14 @@ class TickMixin:
         it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684). A change is saved and
         pushed as a `repos` event."""
         records = [r for r in self._graph().values() if r.repo]
+        sync_on, at = self._sync_on(), datetime.now(UTC)
         for root, r in list(self._repos.items()):
             try:
                 prs = (r.get("prs") or {}).get("open") or []
+                # a sync PR the home holds is no order; one it judged takes its `why` (§6 *Sync*, TD-685)
+                prs = sync_mod.mark(
+                    prs, r.get("sync") or {}, self._sync_covers(root, sync_on.get(Path(root).name, True), at)
+                )
                 old = r.get("pr_orders") or {}
                 mine = [x for x in records if x.repo == root]
                 orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)

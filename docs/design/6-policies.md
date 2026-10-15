@@ -1099,7 +1099,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   agent's own, §6 *A rollback*). *The tree is a person's* (§6 *Promote*) stands: the pull is the one
   move the host agent makes in a person's checkout, and only ever a fast-forward.
 - **Sync: a mechanical sync PR is merged at the home** (TD-681; steps 1 and 2 built as `sessionorc.sync.check`
-  by TD-685 slice 1, the pass, the evidence, the gate, the merge and the switch TD-685's still; Paul,
+  by TD-685 slice 1; the pass, the evidence, the gate, the merge and the setting by slice 2, as
+  `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch TD-685's still; Paul,
   2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and
   post_sync would handle it that's even better*). A sync PR (§4.4 *A sync PR is the team's at once*:
   head branch `cadence-sync-*`, the lock in its diff) changes only what dev-cadence owns, and a
@@ -1160,7 +1161,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      **Mechanical** means three things. The tree then equals the PR's head (`git add -A`, then `git
      diff --cached --quiet <head>`). The PR changes no file the lock does not list, other than what
      `post_sync` wrote. And no path the PR changes matches the repo's held globs (the `held:` of the
-     flow that serves the repo, as `ao pr held` reads it, §4.9b). Otherwise the reason is the first
+     flow that serves the repo, as `ao pr held` reads it, §4.9b: the list, or the union of its named
+     sets, §4.9c). Otherwise the reason is the first
      that held: *<path> is not in the lock*, *<path> deleted but not in the base lock* (a file
      dev-cadence retired that the lock never listed is the team's), *post_sync left <path> unlike the
      PR*, *post_sync exited <n>*, *post_sync did not end in 5 min*, *<path> is a held path*. The lock's membership is checked
@@ -1202,7 +1204,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   while a retry is counted. A PR's entry is dropped once it leaves the open list, and a *refused*
   *no gate* entry is dropped once the repo has a gate, so the PR is judged again. So a head with a
   verdict is never checked again, a new head is checked again, and the team's order says `why`
-  (§4.4). **The switch** is `repos.<repo>.sync.auto` in `settings.yml` (§5; the Repos card's
+  (§4.4), *sync is off* for an *off* one. **The home holds a green sync PR with no verdict at its
+  head** out of the team's order only while the switch is on and a pass covered the repo whole within
+  `SYNC_COVER` (three readings, fifteen minutes). A pass that could not read the home's `gh` login
+  judges nothing and covers nothing, and so does one whose read of the repo failed, so a home that
+  stopped judging leaves the PR the team's rather than hiding it. **The switch** is `repos.<repo>.sync.auto` in `settings.yml` (§5; the Repos card's
   **sync**, §4.5a), `true` when absent, as `pull` is. `false` checks nothing and merges nothing,
   every sync PR is the team's at once, and the reading is *off*. **What it is not**: it never pushes
   a commit to a PR (a sync that needs a step is the team's), never merges a PR that is not a sync,
