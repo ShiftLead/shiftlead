@@ -60,6 +60,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
 | TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
 | TD-690 | Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text | Medium | Open |
+| TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Open |
 
 ---
 
@@ -1119,6 +1120,30 @@ The other cases:
 **Done when** a path in the pane naming a readable regular file anywhere on the session's host is a link, and every path under `PATHS_PRIVATE` stays text.
 
 **Related:** TD-688 (the design), TD-501 (the pane's links), TD-691 (the transcript's, which read this bound).
+
+---
+
+## TD-692: An open page can reload itself about once a second for hours, and only a hard refresh ends it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-14 (session `promote_check`, from Paul's report that ShiftLead had looked down for 30 minutes)
+**Owner:** grinder
+**Kind:** design-first
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` `connectEvents` (*a reconnect reloads the snapshot once*); design §4.5 *Browser mechanics*
+
+**Why:** On 2026-10-14 Paul's laptop showed ShiftLead as down for at least 30 minutes, though Tailscale was connected. On kmaster both units were up and answering 200s, and the route port refused nothing from the laptop. In the UI's journal, three open tabs (`/repo/shiftlead`, Focus `ao-shiftlead-ao-connect`, Focus `ao-shiftlead-ao-dc-decouple`) each loaded the page, opened `/events`, and loaded the page again a second or two later. Together that was about 90 `/events` opens a minute, from 16:28:31 until Paul's hard refresh at 18:22:56. The loop lasted through three restarts (16:33, 17:57 and 18:18; the last two were `auto` promotes). Nothing in the journal flags it, and no error was logged. It began with no restart or promote at 16:28. After the hard refresh it fell to 0–14 opens a minute.
+
+**Suspect, not proven:** `ws.onmessage` reloads when `reconnected` is set, and `onclose` sets it. If a socket closes before its first message and the next one gets a message, each fresh page reloads once more. The comment above `onopen` names that shape for a down agent. A plain reload kept the loop going and a hard refresh ended it, so a cached subresource (`app.js`, or the HTML that names it) is part of it.
+
+**Fix:** design first (§4.5 *Browser mechanics*).
+- **Reproduce** the loop on a scratch home: open Focus and the repo page in headless Chromium, restart the UI and the agent in each order, and promote. Record what closes the socket before its first message.
+- **Bound it.** A page that has reloaded on reconnect more than N times in M seconds stops reloading. It shows the down banner with a **Reload** button and says why. A `sessionStorage` count keyed by path does it.
+- **Make it visible.** The UI logs one warning when the same client reloads in a loop. A promote's restart is the usual trigger, so the warning names the build the page came from (`this page: <sha7>`, §4.5a build chip).
+- **Tests:** the bound (a page stops after N reloads in M seconds) and the warning.
+
+**Related:** TD-372 (a close the page caused by leaving is no outage), TD-539 (build chip: *this page* differs from the agent), TD-062 (promote restarts both units).
 
 ---
 
