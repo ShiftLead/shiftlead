@@ -626,9 +626,14 @@ class HostAgent(
         # trust dialog case — takes the classifier's verdict at once (TD-015)
         # Seeded on load: a hook-confirmed record was fed by a live hook stream until the agent
         # stopped, and `since` is a transition time, not a hook time — so count it fresh as of now.
-        # A restart must never let the screen outrank a state a hook just reported.
+        # A restart must never let the screen outrank a state a hook just reported. A new launch is
+        # `confidence: hook` from its create, so only a record a hook reached (`hook_seen_at`), or one
+        # whose brief is no longer due — every record from before the field — is seeded: a launch whose
+        # first hook was lost keeps its scraped send and its mark across the restart (§4.1, TD-720).
         self._last_hook: dict[str, datetime] = {
-            sid: datetime.now(UTC) for sid, s in self.sessions.items() if s.confidence == "hook"
+            sid: datetime.now(UTC)
+            for sid, s in self.sessions.items()
+            if s.confidence == "hook" and (s.hook_seen_at or not self._first_prompt_due(s))
         }
         # sid → the state, pending and confidence a screen rule's verdict replaced (TD-306): what
         # the record goes back to when that screen is gone and no hook has spoken since; dropped

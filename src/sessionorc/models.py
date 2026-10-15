@@ -90,6 +90,7 @@ NODE_OWNED = frozenset(
         "first_prompt_sent_at",
         "first_prompt_tries",
         "first_prompt_error",
+        "hook_seen_at",
         "run_log",
         "previous_run",
         "supersedes",
@@ -1023,6 +1024,11 @@ class Session:
     first_prompt_sent_at: str | None = None
     first_prompt_tries: int = 0
     first_prompt_error: str | None = None
+    # When the first hook event reached this record, live or drained from the queue (design §4.1 *A launch
+    # whose hook never comes is recovered*, TD-717, built by TD-720): *no hook since launch* read across an
+    # agent restart, where the in-memory `_last_hook` is seeded at load. Written once by the pane's host,
+    # kept across saves, and carried by nothing a replay copies. None: no hook has reached it.
+    hook_seen_at: str | None = None
     # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
     # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
     # are what the session says it did.
