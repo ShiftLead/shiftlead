@@ -67,7 +67,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings | Medium | Open — paused for the TD-722 amendment |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
-| TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Open |
 | TD-732 | `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837) | Medium | Open |
@@ -1376,26 +1375,6 @@ The other cases:
 **Done when** the Org page draws every team under its repo and every repo under its project heading, two teams on one repo stand side by side as whole cards, no header says *mixed* for a repo, and every listed test passes.
 
 **Related:** TD-722 (the design), TD-724 (the definition), TD-721 (the Repo page as the repo group expanded), TD-642 (the director's card).
-
----
-
-## TD-727: `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1818–#1830)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_hold`: `if not remote: raise RpcError(... origin is not read yet ...)`); `tests/test_settle.py` (`test_td_hold_is_the_persons_and_marks_the_reading_at_once`)
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1823 and running `tests/test_settle.py tests/test_person_only.py tests/test_repo_facts.py tests/test_settle_pages.py tests/test_cli_teams.py` (164 passed unmutated). Replacing `if not remote:` with `if False:` passes all 164: no test calls `td_hold` on a repo whose reading carries no `remote`. Without the refusal the hold is looked up under `settle_key(root, "")`, the checkout's path, a key the clock records for no origin-read repo, so the person gets *not in the home's clock yet* instead of the words that say to ask again.
-
-**Fix:** One test: a repo view with a `ledger` and no `remote`; `rpc_td_hold` raises RpcError naming the origin, and `ledger_seen.json` is unchanged. It fails with the guard removed.
-
-**Done when** the test exists and fails under that mutation.
-
-**Related:** TD-710, #1823.
 
 ---
 
