@@ -54,7 +54,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-672 | `ao connect tailscale` fails on a home's first run: its one 15-second probe ends before Tailscale has fetched the first HTTPS certificate (about a minute live) | High | Open |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
-| TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Designed — TD-686, TD-687 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Open |
@@ -931,27 +930,6 @@ with the retired brief).
 **Done when** a sync into a repo with no session running merges without a person, a red one in such a repo is a board line, and a team's member picks up its repo's sync PR before its lane.
 
 **Related:** dev-cadence#TD-113 (`post_sync`), dev-cadence#TD-114 (a PR with nothing left to merge), TD-682.
-
----
-
-## TD-682: CI that never started shows as a red PR nobody holds, and the person is not told
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (the session `ao-dc-decouple`, lessons from the ledgerboard split; Paul agreed the lesson the same day)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-14 (the designer; no mockup: one Inbox row, drawn as the red PR row is) — §4.4 *CI that never started is the person's, not a lane's*. The reading reads each failing GitHub Actions job of a PR it would call red, once per head. A job with no steps and no runner never started, and its reason is its *The job was not started because…* annotation (*billing* when it names payments or a spending limit). A PR whose failing runs all never started reads `checks: not_run`. It gets no `red_since`, is no `pr:<n>` order, has no red-PR row, and its idle holder is not told. A sync PR that is `not_run` waits. A `done` is refused naming the reason and the person (§4.8), and the promote's checks read *unknown — CI never ran* (§6). ShiftLead does this in its own fold, so it does not wait on dev-cadence#TD-115, which maps the same run for the cadence check. The person gets one *Inbox row: CI not starting* per account, under *Needs you*, counted and told on Telegram (§4.10), with **Open** (the billing page), **Re-run** (`gh run rerun --failed`, the person's press) and **Snooze ▾**. It leaves when its spell ends: two successful readings group nothing for the account (no `not_run` PR, no default-branch head that never ran) and no run a **Re-run** asked for is pending. That row replaces the entry's `act` board line, since §4.4 *Board write-back* says no policy adds one. Built by TD-686 and TD-687. Was: Open.
-**Blocked by:** TD-686, TD-687
-**Location:** the reading of a repo's red PRs (`ao repo`, TD-652's holders), the home's board writes (§4.4 *Board write-back*), §4.4 *A red PR nobody holds is a work order*, design §6
-
-**Why:** On 2026-10-14 every Actions job in ContractMatch/samscrape stopped starting: *recent account payments have failed or your spending limit needs to be increased*. `ao repo` read samscrape's sync PR (#1097) as *1 red PR nobody holds*. The cause was a fix only the person can make (the org's billing). No team could act on it, and no line told the person. A session found it by reading the run's annotations.
-
-**Fix:** design first. Once dev-cadence#TD-115 reads such a run as *never ran — billing or spending limit*, ShiftLead's PR reading carries that reason. The home then writes one `act` line per account (org), not one per PR, to the board of a repo it affects: *GitHub Actions does not start in <org>: billing or spending limit (PRs …)*. The line is closed when a run in that org starts again. This changes §4.4's work-order rule for these PRs: a PR is red only because its runs never started, so it is not a `pr:<n>` order for a team. No team can fix it, and the `act` line is how the person hears about it.
-
-**Done when** a refused-for-billing run gives the person one `act` line naming the org and the PRs it holds, and the line closes itself when CI runs again.
-
-**Related:** dev-cadence#TD-115, TD-652, TD-681.
 
 ---
 
