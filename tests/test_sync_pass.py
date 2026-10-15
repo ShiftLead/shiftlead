@@ -298,6 +298,22 @@ async def test_off_is_written_once_per_head(agent, gh, monkeypatch):
 
 
 @pytest.mark.integration
+async def test_the_kept_merged_entry_is_saved_once_and_never_judged(agent, gh, monkeypatch):
+    """The newest *merged* entry outlives its PR (§6 *Sync*, for the Repos card): a pass over the repo
+    with that PR closed keeps it, judges nothing and saves nothing."""
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+    agent._repos[ROOT]["prs"] = {"open": []}  # the PR closed with its merge
+    calls = len(gh["calls"])
+    saved = []
+    monkeypatch.setattr(agent.repos_store, "save", lambda r: saved.append(r))
+    await agent._sync_pass()
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged" and saved == [] and len(gh["calls"]) == calls
+
+
+@pytest.mark.integration
 async def test_a_merge_refused_under_a_moved_head_writes_nothing(agent, gh):
     heads = iter([(HEAD, "open"), ("b" * 40, "open")])
     gh["head"] = lambda *a: next(heads)

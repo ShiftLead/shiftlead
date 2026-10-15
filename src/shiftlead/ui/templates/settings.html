@@ -164,7 +164,7 @@
       <label class="setrow"><span class="setlabel">sync</span>
         <input type="checkbox" class="setsync"{% if r.sync %} checked{% endif %}>
         <span class="setpullcol"><span class="note">{{ "on: the home merges a mechanical dev-cadence sync PR" if r.sync else "off: every sync PR is the team's" }}</span>
-        {% if r.sync_reading %}<span class="note mono setsyncread">{{ r.sync_reading }}</span>{% endif %}</span></label>
+        <span class="note mono setsyncread"{% if not r.sync_reading %} hidden{% endif %}>{{ r.sync_reading }}</span></span></label>
       {{ rows(r.rows) }}
       {% endif %}
       {{ filefoot(r.file, reads.repo[0], reads.repo[1]) }}

@@ -209,6 +209,7 @@ def test_the_sync_reading_in_the_designs_words():
         return {"sync": sync, "prs": {"open": list(open_)}}
 
     assert setmod.sync_reading(read({"9": {"verdict": "merged", "at": at}}), True, NOW) == "merged #9 4m ago"
+    assert setmod.sync_reading(read({"9": {"verdict": "merged"}}), True, NOW) == "merged #9"  # no `at`: no age
     sync = {"9": {"verdict": "merged", "at": old}, "12": {"verdict": "refused", "why": "forked", "at": at}}
     assert setmod.sync_reading(read(sync), True, NOW) == "#12 refused: forked"
     assert setmod.sync_reading(read({"4": {"verdict": "gate", "why": "ci: red", "at": at}}), True) == "#4 gate: ci: red"

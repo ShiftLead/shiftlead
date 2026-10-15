@@ -372,7 +372,7 @@ def sync_reading(reading: Mapping[str, Any] | None, on: bool, now: datetime | No
     _, n, e = max(done, key=lambda d: d[0])
     if e["verdict"] == "merged":
         age = _age(e.get("at"), now or datetime.now(UTC))
-        return f"merged #{n} {age + ' ago' if age else 'just now'}"
+        return f"merged #{n} {age} ago" if age else f"merged #{n}"  # an unreadable `at` says no age
     return f"#{n} {e['verdict']}: {e.get('why') or 'no reason given'}"
 
 
