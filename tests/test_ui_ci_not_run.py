@@ -84,6 +84,17 @@ def test_one_row_per_account_its_reason_and_items():
     (row,) = ci_not_run_rows(clearing, now())
     assert row["text"] == "GitHub Actions does not start in X: billing or spending limit" and row["parts"] == []
     assert ci_not_run_rows(None) == [] and ci_not_run_rows({"bad": "x"}) == []
+    assert ci_not_run_rows(["x"]) == [] and ci_not_run_rows("x") == []  # not a mapping: no rows, no 500
+    odd = {
+        "x": {
+            "owner": "X",
+            "since": _iso(now()),
+            "row": {"kind": "billing", "items": [{"repo": "r", "pr": 1, "url": "javascript:alert(1)"}]},
+        }
+    }
+    assert ci_not_run_rows(odd, now())[0]["parts"] == [
+        {"repo": "r", "label": "r #1", "url": ""}
+    ]  # never a non-https link
 
 
 def test_a_rerun_pending_reads_re_run_asked_with_its_age():

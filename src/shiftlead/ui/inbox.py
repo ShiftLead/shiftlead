@@ -811,7 +811,9 @@ def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = Non
     the Telegram line's `?row=`. **Open** is `billing_url`, filled by the page (`url`)."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
-    for key, spell in sorted((spells or {}).items()):
+    if not isinstance(spells, Mapping):  # a host record a hand or another build left odd costs the rows, not the page
+        return out
+    for key, spell in sorted(spells.items()):
         if not isinstance(spell, Mapping):
             continue
         owner = str(spell.get("owner") or key)
@@ -823,7 +825,9 @@ def ci_not_run_rows(spells: Mapping[str, Any] | None, now: datetime | None = Non
                 continue
             repo = str(it.get("repo") or "")
             if isinstance(it.get("pr"), int):
-                items.append({"repo": repo, "label": f"{repo} #{it['pr']}", "url": str(it.get("url") or "")})
+                url = str(it.get("url") or "")  # GitHub's `html_url`; anything but https is drawn as text
+                url = url if url.startswith("https://") else ""
+                items.append({"repo": repo, "label": f"{repo} #{it['pr']}", "url": url})
             else:
                 items.append({"repo": repo, "label": f"{repo} main", "url": ""})
         rerun = spell.get("rerun") if isinstance(spell.get("rerun"), Mapping) else {}
