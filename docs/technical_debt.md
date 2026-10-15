@@ -1196,7 +1196,7 @@ The other cases:
    - An entry that has not settled carries `settling: {until}`, and a held one carries `held: {at}`. An edit that changes `sig` while settling restarts the window, and on a held entry it ends the hold and restarts the window.
    - `lane_matches` / `in_lanes`, rule 6's `lane_seen` and rule 8's news, and every lane count treat either mark as matching no lane. `pickable` stays cadence §2.4's.
 2. **Hold and the claim**. `td_hold {repo, id, release}` beside `td_next`:
-   - Added to `PERSON_ONLY` (refused to every session, the person's shell passing), and refused for an id that has settled and is not held. Release makes the entry pickable at once.
+   - Added to `PERSON_ONLY` (refused to every session, the person's shell passing; `tests/test_person_only.py`'s count of the list moves by one) and to `modes.HOME_EDITS` (a node forwards it and refuses it offline, as `ledger_decide`'s), and refused for an id that has settled and is not held. Release makes the entry pickable at once.
    - `rpc_progress`'s declared claim on a settling or held ledger reference is refused in the design's words, and `force` does not pass it.
    - `ao td hold <id> [--repo] [--release]`. `ao repo` prints *settles in 7m* / *held 2h* after the owner.
 3. **The pages**. The Repo page's row draws the mark and **Hold** / **Release**, and the Settings page gets the **settle** field (`set_settings` gains `settle`). This repo's `.shiftlead.yml` gains `settle: {design-first: 10m}`.
