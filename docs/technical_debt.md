@@ -61,7 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Slice 1 built by #1843 |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
-| TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
 | TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed — TD-724, TD-725 build it |
@@ -1170,26 +1169,6 @@ The other cases:
 **Done when** a seat launched with its first hook lost gets its brief within minutes, or is relaunched or closed with its askers told, and no seat sits with its brief unsent past `FIRST_PROMPT_BOUND`.
 
 **Related:** TD-348 (the scraped send and the mark, built), TD-342 (its design), TD-341, TD-062 (the promote), TD-706 and TD-710 (the PRs that waited).
-
----
-
-## TD-719: `TickMixin._settle`'s two fallbacks — a clock that cannot be written, and a checkout with no origin — are held by no test (#1811)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1811–#1821)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_settle`: `except OSError as e: log.warning(...)`, and `key = origin_key(remote) if remote else str(root)`); `tests/test_settle.py` (`test_the_repo_reading_is_marked_with_the_repos_settle_over_the_installs`)
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1811 and running `tests/test_settle.py tests/test_lane_news.py tests/test_repo_facts.py` (63 passed unmutated). Two mutations pass all 63: (1) `except OSError as e:` changed to `except ZeroDivisionError as e:` — the docstring's *a clock that cannot be written marks nothing, and says so in the log: entries go at once* has no test, and an unwritable home would raise out of `_read_repo` and the tick; (2) `key = origin_key(remote) if remote else str(root)` changed to `... else 'x'` — the only test of a checkout with no origin asserts that `ledger_seen.json` does not exist, and `fresh` is forced false there, so the key `mark` reads under is never looked at. (A third, deleting `if not remote: fresh = False`, is caught.)
-
-**Fix:** one test that makes `paths.ledger_seen_file()` unwritable (a directory in its place, so `_atomic_write` raises OSError) and reads a repo with an origin: the reading returns, no entry carries a mark, and a warning is logged; and one that gives a no-origin checkout a record under its path as key and sees a new entry marked from it. Each fails with its line mutated as above.
-
-**Done when** both tests exist and fail under those mutations.
-
-**Related:** TD-710, TD-718, #1811.
 
 ---
 
