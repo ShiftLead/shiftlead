@@ -398,10 +398,12 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
     flow it cannot follow — the current one first, with the flows it could — and a repo not read
     from here; and `flow_changed`, a live team's members whose records differ from what the flow compiles
     to, each `{name, act, line}`, with `definition_changed` when the mark reads **definition changed —
-    Apply** (§4.5a, TD-399): the team runs no flow, or every difference is a seat it lacks."""
+    Apply** (§4.5a, TD-399): the team runs no flow, or every difference is a seat it lacks. A team with
+    nothing live keeps only its renames and removals (§4.9 *A member renamed or removed*, TD-703)."""
+    every = list((fv or {}).get("differences") or [])
+    diffs = every if live else [d for d in every if d.get("act") in teamrun.MOVED]
     if not fv or not fv.get("flow"):
         # a team that runs no flow is read on its seats alone (§4.9c, TD-399): one it lacks is the mark
-        diffs = list((fv or {}).get("differences") or []) if live else []
         return {
             "flow": "",
             "flow_strip": "",
@@ -422,8 +424,8 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
         "flow": str(fv["flow"]),
         "flow_strip": str(now.get("strip") or ""),
         "flow_lines": lines,
-        "flow_changed": list(fv.get("differences") or []) if live else [],
-        "definition_changed": teamrun.definition_changed(list(fv.get("differences") or []) if live else [], fv["flow"]),
+        "flow_changed": diffs,
+        "definition_changed": teamrun.definition_changed(diffs, fv["flow"]),
     }
 
 

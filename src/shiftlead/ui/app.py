@@ -1021,6 +1021,8 @@ def create_app() -> FastAPI:
             if d.get("id")
         }
         refill(cards_mod.FLOW_ACTS, acts)
+        to = {str(d["id"]): str(d["to"]) for v in got.values() for d in v.get("differences") or [] if d.get("to")}
+        refill(cards_mod.FLOW_RENAMES, to)
         return got
 
     async def group_heads(

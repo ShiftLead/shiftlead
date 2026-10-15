@@ -651,6 +651,7 @@ def _middle(text: str, width: int) -> str:
 # on every card a delta draws, since a delta reads no plan (as `inbox.PULLS` is)
 FLOWS: dict[str, str] = {}
 FLOW_ACTS: dict[str, str] = {}
+FLOW_RENAMES: dict[str, str] = {}  # a `rename`'s newcomer, by the old record's id (TD-703)
 NODE_RESTART = "flow changed — restarts when it next works or at the team's next Start"
 
 
@@ -661,7 +662,9 @@ def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
     yourself* on a person's session it would sit out, which nothing winds down; *flow changed* on a
     node member whose host is not answering, which Apply skips; and on an
     idle node member relaunched, which the tick does not restart, *flow changed — restarts when it
-    next works or at the team's next Start*. None otherwise; a mark, never pressable."""
+    next works or at the team's next Start*. A record the definition renamed reads *<old> → <new>:
+    renamed*, one it dropped *removed from the definition* (§4.9 *A member renamed or removed*, TD-703).
+    None otherwise; a mark, never pressable."""
     flow = FLOWS.get(str(s.get("team") or "")) or "its flow"
     closed_for = s.get("closed_for") if isinstance(s.get("closed_for"), dict) else {}
     act = FLOW_ACTS.get(str(s.get("id") or ""))
@@ -670,6 +673,16 @@ def flow_mark(s: Mapping[str, Any], here: str = "") -> dict[str, str] | None:
         text = f"sits out under {flow}"
         why = "the team's flow has no stage for its role — its card stays until Forget"
         return {"text": text, "full": f"{text}: {why}", "first": True}  # ahead of `doing`: winding down is what it does
+    if act == "rename" and (to := FLOW_RENAMES.get(str(s.get("id") or ""))):
+        text = f"{s.get('name')} → {to}: renamed"
+        why = "the definition names it anew — Apply or Start on the team card"
+        why += "; until then a start by the tick brings back the old name"
+        return {"text": text, "full": f"{text}: {why}"}
+    if act == "removed":
+        text = "removed from the definition"
+        why = "the definition names it nowhere — Apply or Start on the team card marks it sat out"
+        why += "; its card stays until Forget"
+        return {"text": text, "full": f"{text}: {why}"}
     if act == "left":
         text = f"sits out under {flow} — close it yourself"
         return {"text": text, "full": f"{text}: a person's session is never wound down by a switch (design §4.9c)"}
