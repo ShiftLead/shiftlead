@@ -12708,3 +12708,24 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-702 (the design), TD-176 (the doing log), TD-700 (why the auditors also stopped writing).
 
 **Resolved:** 2026-10-15 — the live check holds (grinder-ao-2, read-only: `ao repo --json`, `ao promote status`, headless GETs of `/` and `/repo/shiftlead`, about 06:30Z, with #1803 live). ao-grind's ring holds 99 lines. At the read the team's last fifty reached back only to 04:16:10Z (04:18Z a few minutes later, as new lines came in), and every doer's newest five ride beside them. The auditors' lines older than the fifty are kept: test-audit's from 03:52Z and 2026-10-12, docs-audit's from 2026-10-13. Under the old rule none of these showed. The Repo page's Doing chips read *docs-audit-ao-1 (5)* and *test-audit-ao-1 (5)*, and the team card's Doing feed on `/` draws the auditors' lines at their age (21m, 2h, and the 10-13 ones). The read came within hours of the promote, not a day after. The ring had already passed fifty, so the per-doer rule was already what kept those lines.
+
+## TD-702: The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — built by TD-705 (#1803, live check #1810). Designed 2026-10-14 (the designer; no mockup: the feed's rows are drawn as before) — §4.8 *the doing log*: the team's last fifty calls and, beside them, each doer's newest five (the call's record `id`); a doer with no call in 30 days keeps nothing beyond the fifty. The feed is the kept calls in time order, newest first; the Repo page's chips offer every doer kept. One keep rule, in `sessionorc`, used by the host agent's ring and the UI's copy alike. Built by TD-705. Was: Open.
+**Blocked by:** TD-705
+**Location:** design §4.8 *the doing log*, §4.5a *team card: Answer needed / Doing*, *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`, `keep=50`), `src/shiftlead/ui/org.py` (`DOING_KEPT`, `doing_rows`)
+
+**Why:** Paul, 2026-10-14: *I do not see any "doing" entries from our auditors — lets make sure they report what they are doing.* They do report: `~/.shiftlead/doing.jsonl` holds 31 lines from the shiftlead auditors, the last at 2026-10-13T15:28:25Z. But the ring keeps a team's last 50 lines, and ao-grind's last 50 (from 2026-10-14T23:10Z) are the two grinders' and the techlead's alone: three busy members fill it in under a day, so a seat that runs every ten PRs is never seen. The filter chips (`doing_chips`) can only pick from what the ring kept.
+
+**Fix:** decide what the feed keeps so every member is visible — e.g. the ring keeps each doer's newest few beside the team's last 50, or keeps per member — and how the feed and its chips draw a member whose newest line is old.
+
+**Done when** the design says what the doing log keeps per member, and a build entry carries it.
+
+**Related:** TD-700 (why the auditors also stopped writing), TD-176.
+
+**Resolved:** 2026-10-15 — built, and archived by the designer as the fallback (§4.9c *A design entry archives with its last build*): its one build TD-705 (#1803) archived in #1810 without it. `sessionorc.store.kept` keeps the team's last fifty and each doer's newest five; the live check read the auditors' lines kept beside ao-grind's fifty, and the Repo page's chips name them.
