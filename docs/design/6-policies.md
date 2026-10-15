@@ -92,7 +92,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   read `org.yml`, §4.9). **So a definition's later edit reaches a launch record only by a person's
   Apply** (§4.9c *Switching*): a role's `profile:`, lane, reader or stage brief changed in `org.yml`
   shows on the team's card as *definition changed — Apply*, and Apply rewrites the record by the
-  `relaunch` RPC; until then a replay is the record as the last start or Apply wrote it (TD-619). The launch record is deleted with the record on Forget and kept across a
+  `relaunch` RPC; until then a replay is the record as the last start or Apply wrote it (TD-619). A member's name is
+  the same: one renamed or dropped in the definition is replayed under its old name until a person's
+  Apply or Start (§4.9 *A member renamed or removed*, TD-703). The launch record is deleted with the record on Forget and kept across a
   supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
   live session — is not retried silently: it counts toward the ceiling as any restart does, keeping
   its `why` and carrying the error text as `error` on the entry, so an unrepairable record reaches
