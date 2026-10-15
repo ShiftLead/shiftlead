@@ -428,7 +428,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
-- 2026-10-14 (TD-703, the designer): *team card: flow changed — Apply* draws a member renamed or dropped by the definition, on a stopped team too, beside Start. Built by TD-706.
+- 2026-10-14 (TD-703, the designer): *team card: flow changed — Apply* draws a member renamed or dropped by the definition, on a stopped team too, beside Start (*team groups* says so); the Members dialog's **Remove** winds a live member down by the sit-out form and marks an ended one. Built by TD-706.
 - 2026-10-14 (TD-687 slice 2, grinder-ao-2): *Inbox row: CI not starting* built from the home's `ci_spells`, one row per spell keyed `ci_not_run:<owner>`, its PRs links and a default branch *<repo> main*. **Open** tells an organisation from a user with `gh api users/<owner>` once per account, and an account it cannot read opens the person's own billing page, asked again after ten minutes. **Re-run** is `ci_rerun` through `/api/person`, and the row reads *re-run asked <age>* while its runs are pending. The help list gains the row's three paragraphs.
 - 2026-10-14 (TD-688, the designer): **Open ledger**, the Settings page's **Open file** and its siblings, and the transcript buttons are file links (TD-689); the pane path's bound is TD-690's; the Transcript page links paths in its turns (TD-691).
 - 2026-10-14 (TD-682, the designer): *Inbox row: CI not starting*, with **Open** (the billing page), **Re-run** and **Snooze ▾**. Built by TD-687.
