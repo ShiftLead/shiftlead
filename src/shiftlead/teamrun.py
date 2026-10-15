@@ -671,7 +671,14 @@ def start(
     Raises `TeamError` (or `NamesHeld`) before anything is created, and `PartialStart` if a create
     fails after the checks passed. Returns the plan and the result the callers render. `caller` is
     the session running it (`SHIFTLEAD_SESSION`), None for a person: it decides where a closed
-    member's mail is kept (`keep_mail_for`)."""
+    member's mail is kept (`keep_mail_for`).
+
+    A member the definition renamed or dropped (§4.9 *A member renamed or removed in the definition*,
+    TD-706) is read as Apply reads it (`renames`), after the checks and a concluded team's closes:
+    each removal is marked sat out (`relaunch {sit_out, dropped}`) and each newcomer paired with an
+    orphan — or held by one an Apply marked — is created succeeding it (`succeeds`), so no definition
+    name is left with two records; `moved` lists them. A person's act, as both calls are: a session's
+    start of a team the definition renamed is refused, and so is one whose orphans are still live."""
     plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
@@ -694,10 +701,38 @@ def start(
     # concluded team whose names are all free would be one whose definition renamed every member.
     # who asks a closed member's mail kept, decided before anything is closed or created (TD-274)
     keeps, notes = keep_mail_for(call, verdicts, caller)
-    closed = _close_concluded(call, org, name, held) if held else []
+    succeeds, removals = _start_moves(plan, call("list"))
+    if (succeeds or removals) and caller is not None:
+        gone = ", ".join(str(r.get("name")) for r in [*succeeds.values(), *removals])
+        raise teams.TeamError(
+            f"team {name} was not started — its definition renamed or removed {gone}: a person's Start or Apply "
+            "takes those, never a session's (design §4.9 A member renamed or removed in the definition)"
+        )
+    closed = _close_concluded(call, org, name, held) if held or succeeds or removals else []
+    if succeeds or removals:
+        succeeds, removals = _start_moves(plan, call("list"))  # read again: the closes ended some
+        up = [str(r.get("name")) for r in [*succeeds.values(), *removals] if r.get("state") not in DEAD]
+        if up:
+            raise teams.TeamError(
+                f"team {name} was not started — {', '.join(up)} still running: a live team takes a rename or a "
+                "removal by Apply (design §4.9 A member renamed or removed in the definition)"
+            )
+    moved = [f"{r.get('name')} → {n}" for n, r in succeeds.items()]
+    for r in removals:
+        try:
+            call("relaunch", id=r["id"], sit_out=True, dropped=True)
+        except AgentError as e:
+            raise teams.TeamError(
+                f"team {name} was not started — {r.get('name')} could not be marked removed: {e}"
+                + (f" ({', '.join(moved[len(succeeds) :])} marked already)" if len(moved) > len(succeeds) else "")
+            ) from e
+        moved.append(f"{r.get('name')} removed")
 
     def params(x: teams.Launch, controllers: list[str]) -> dict[str, Any]:
-        # `team_start`: the home keeps the start's usage reading for rule 9's note (§4.9a, TD-468)
+        # `team_start`: the home keeps the start's usage reading for rule 9's note (§4.9a, TD-468); a
+        # newcomer succeeds its orphan, which moves the mail, so it never asks `keep_mail` beside it
+        if x.name in succeeds:
+            return {**x.create_params(controllers), "team_start": True, "succeeds": str(succeeds[x.name]["id"])}
         return {**x.create_params(controllers), "team_start": True, **({"keep_mail": True} if x.name in keeps else {})}
 
     created: list[dict[str, Any]] = []
@@ -762,6 +797,7 @@ def start(
     return plan, {
         "team": name,
         "closed": closed,  # the concluded sessions closed before the creates (§4.9a, TD-099)
+        "moved": moved,  # the definition's renames and removals (§4.9, TD-706): *grind-1 → mill-1*, *hunt removed*
         "manager": lead_id or None,
         "sessions": created,
         "out_of_reach": out_of_reach,
@@ -933,8 +969,9 @@ def _review_key(review: Any) -> Any:
 
 def _pairing(
     plan: teams.Plan, sessions: list[dict[str, Any]]
-) -> tuple[list[tuple[dict[str, Any], teams.Launch]], list[dict[str, Any]], set[str]]:
-    """`renames`, with the newcomers an applied orphan already holds (its `relaunch` mark's `name`)."""
+) -> tuple[list[tuple[dict[str, Any], teams.Launch]], list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    """`renames`, with the newcomers an applied orphan already holds (its `relaunch` mark's `name`), each
+    by name with the orphan that holds it."""
     mine = crew(plan.team, sessions)
     names = {x.name for x in plan.launches} | set(plan.sit_out)
     gone = [n for n in dict.fromkeys(str(r.get("name") or "") for r in mine) if n and n not in names]
@@ -945,12 +982,12 @@ def _pairing(
     ]
     carried = {str(r.get("name")) for r in badged(plan.team, sessions) if not r.get("superseded_by")}
     newcomers = [x for x in plan.launches if x.name not in carried]
-    held: set[str] = set()
+    held: dict[str, dict[str, Any]] = {}
     for r in list(orphans):
         mark = r.get("relaunch")
         to = mark.get("name") if isinstance(mark, dict) else None
         if to and any(x.name == to for x in newcomers):
-            held.add(str(to))
+            held[str(to)] = r
             orphans.remove(r)
     newcomers = [x for x in newcomers if x.name not in held]
     orphans.sort(key=lambda r: str(r.get("created") or ""))
@@ -964,6 +1001,15 @@ def _pairing(
         newcomers.remove(x)
         pairs.append((r, x))
     return pairs, removals, held
+
+
+def _start_moves(
+    plan: teams.Plan, sessions: list[dict[str, Any]]
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    """What Start does with the definition's renames and removals (§4.9, TD-706): each newcomer, by
+    name, with the orphan it succeeds — paired, or held by one an Apply marked — and the removals."""
+    pairs, removals, held = _pairing(plan, sessions)
+    return {**held, **{x.name: r for r, x in pairs}}, removals
 
 
 def renames(
@@ -999,7 +1045,7 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     moved += [Difference(str(r.get("name")), "removed", record=r) for r in removals]
     if not live(crew(plan.team, sessions)):
         return moved
-    taken = held | {x.name for _, x in pairs}  # a paired or held newcomer is no start of its own
+    taken = set(held) | {x.name for _, x in pairs}  # a paired or held newcomer is no start of its own
     on_call_lead = plan.lead if plan.lead is not None and on_call_gate(plan.lead) else None
     seats = {x.name for x in (plan.techlead, plan.anchor, on_call_lead, *plan.seats) if x is not None}
     if plan.flow is None:
@@ -1330,21 +1376,18 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
     a person's own, since the home's `relaunch` is. A member that cannot be reached, or whose call is
     refused, is skipped and said; the others are applied. Returns `{team, flow, applied, skipped}`,
     each entry `{name, act, line}`, and `stays`, the PRs already asked of a reader, which stay its
-    (`stays_with`); nothing applied for a stopped team, whose next start compiles the flow. A rename or
-    a removal (TD-703) is skipped and said, a stopped team's too: the home's half of it is TD-706's
-    next slice, and until then nothing is created beside the record it would succeed."""
+    (`stays_with`); nothing but the definition's renames and removals applied for a stopped team, whose
+    next start compiles the flow. A rename (§4.9 *A member renamed or removed in the definition*,
+    TD-706) is a relaunch whose launch carries the newcomer's `name`, taken at the record's next replay;
+    a removal is the sit-out form with `dropped` — on a stopped team too, since rule 8 replays its ended
+    records."""
     team = teams.find(org, name)
     sessions = call("list")
     stays = stays_with(name, sessions)
-    if not live(crew(name, sessions)):  # a stopped team: its next start compiles the flow
-        flow = teams.current_flow(team)
-        out = {"team": name, "flow": flow, "applied": [], "skipped": [], "stays": stays}
-        if crew(name, sessions):
-            plan = teams.plan(org, name, host, files=files_via(call))
-            out["skipped"] = [_not_yet(d, plan.flow) for d in differences(plan, sessions)]
-        return out
+    if not crew(name, sessions):  # no records: its next start compiles the flow
+        return {"team": name, "flow": teams.current_flow(team), "applied": [], "skipped": [], "stays": stays}
     plan = teams.plan(org, name, host, files=files_via(call))
-    diffs = differences(plan, sessions)
+    diffs = differences(plan, sessions)  # a stopped team's renames and removals alone
     # a manager on call is the controller closed as live (TD-269): the members Apply starts name it
     lead = next(
         (
@@ -1362,9 +1405,6 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         if d.act == "left":
             out["skipped"].append(row)
             continue
-        if d.act in MOVED:
-            out["skipped"].append(_not_yet(d, plan.flow))
-            continue
         if rec.get("state") == "unreachable":
             row["line"] = f"{d.name}: {rec.get('host') or 'its host'} is not answering — applied to the others"
             out["skipped"].append(row)
@@ -1372,6 +1412,10 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
         try:
             if d.act == "sit_out":
                 call("relaunch", id=rec["id"], sit_out=True)
+            elif d.act == "removed":
+                call("relaunch", id=rec["id"], sit_out=True, dropped=True)
+            elif d.act == "rename":
+                call("relaunch", id=rec["id"], launch={**relaunch_params(d.launch), "name": d.launch.name})
             elif d.act == "relaunch":
                 call("relaunch", id=rec["id"], launch=relaunch_params(d.launch))
             else:
@@ -1402,13 +1446,6 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
             continue
         out["applied"].append(row)
     return out
-
-
-def _not_yet(d: Difference, flow: str | None) -> dict[str, Any]:
-    """Apply's line for a rename or a removal the home cannot take yet (TD-706 slice 1)."""
-    row = d.as_dict(flow)
-    row["line"] += " — not applied yet: the home takes a rename or a removal from TD-706's next slice"
-    return row
 
 
 def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1703,8 +1740,10 @@ def add_member(
 
 def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, host: str = "") -> dict[str, Any]:
     """**Remove** (design §4.9): the entry's `count:` decremented — the highest-numbered member goes
-    — or its line deleted; a live member so removed is sent Wrap up's wind-down, never a kill, and
-    its record stays a card until Forget. A member not live: the definition only. Under a team that
+    — or its line deleted; the member so removed takes the sit-out form a removal from the definition
+    takes (`relaunch {sit_out, dropped}`, §4.9 *A member renamed or removed in the definition*, TD-706):
+    a live one wound down by the home — the wrap-up, never a kill — and an ended one marked as it
+    stands, so rule 8 never replays it; its record stays a card until Forget. Under a team that
     lists flows, the last member of a role a listed flow's stage needs is refused, naming the flow
     (§4.9c), the file untouched; `host` is where the team's checkout is read."""
     org = orgmod.with_home_settings(orgmod.load(path))  # under the picked flow (§4.9c)
@@ -1726,8 +1765,20 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, h
         # a name the definition held twice: another entry still names the session, so it runs on (TD-268)
         out["text"] += f" — another entry still names {gone}, so it runs on"
         return out
-    s = next((s for s in live(crew(name, call("list"))) if s.get("name") == gone), None)
-    if s is not None:
-        out["wound_down"] = _stop_one(call, s, "member", now=False)
-        out["text"] += f" — {gone} is sent the wrap-up; its card stays until Forget"
+    s = _current(gone, crew(name, call("list"))) if gone else None
+    if s is None or s.get("sit_out") or sat_out(s):
+        return out
+    ended = s.get("state") in DEAD
+    try:
+        call("relaunch", id=s["id"], sit_out=True, dropped=True)
+    except AgentError as e:  # the file is edited either way: what the record could not take is said
+        out["wound_down"] = {**_entry(s, "member"), "action": f"refused: {e}", "state": s.get("state") or "?"}
+        out["text"] += f" — {gone} could not be marked sat out ({e})"
+        return out
+    out["wound_down"] = {**_entry(s, "member"), "action": "marked" if ended else "wrap-up sent", "state": "?"}
+    out["text"] += (
+        f" — {gone} is marked sat out, so a start by the tick never brings it back"
+        if ended
+        else f" — {gone} is wound down by the home (the wrap-up, never a kill); its card stays until Forget"
+    )
     return out

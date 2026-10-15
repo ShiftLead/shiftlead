@@ -116,6 +116,15 @@ def world(tmp_path, monkeypatch):
             }
             state["sessions"].append(rec)
             return rec
+        if method == "relaunch":  # a person's Apply, Remove, or a Start's removal (§4.9c, §4.9, TD-706)
+            if (why := state.get("refuse", {}).get(params["id"])) is not None:
+                raise cli.AgentError(why)
+            s = next(s for s in state["sessions"] if s["id"] == params["id"])
+            if params.get("sit_out"):
+                s["sit_out"] = {"at": "now", **({"dropped": True} if params.get("dropped") else {})}
+            else:
+                s["relaunch"] = {"at": "now", **({"name": n} if (n := params["launch"].get("name")) else {})}
+            return s
         if method in ("send", "kill", "close"):
             if (why := state.get("refuse", {}).get(params["id"])) is not None:
                 raise cli.AgentError(why)
@@ -1743,9 +1752,31 @@ def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(wo
     state["calls"].clear()
     got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder")
     assert got["did"] == "grind count: 3 → 2" and got["wound_down"]["name"] == "grind-3"
-    sent = [p for m, p in state["calls"] if m == "send"]
-    assert [p["id"] for p in sent] == ["ao-shiftlead-grind-3"] and sent[0]["wrapup"] is True  # never a kill
-    assert not [m for m, _ in state["calls"] if m == "kill"]
+    # the sit-out form a removal from the definition takes (§4.9, TD-706): the home winds it down —
+    # the wrap-up, never a kill — and marks it, so rule 8 never replays it
+    acts = [(m, p) for m, p in state["calls"] if m in ("relaunch", "send", "kill")]
+    assert acts == [("relaunch", {"id": "ao-shiftlead-grind-3", "sit_out": True, "dropped": True})]
+    assert "grind-3 is wound down by the home" in got["text"]
+
+
+def test_remove_marks_an_ended_member_sat_out_and_says_a_refusal(world):
+    """§4.5a *Members dialog: Remove* (TD-706): an ended member is marked sat out as it stands, so a
+    start by the tick never brings it back; a refused mark leaves the file edited and says so."""
+    tmp_path, state = world
+    path = _flow_org(tmp_path)
+    started(state)
+    by = {s["name"]: s for s in state["sessions"]}
+    by["hunt"]["state"] = "closed"
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=1, role="hunter")
+    assert [p for m, p in state["calls"] if m == "relaunch"] == [
+        {"id": "ao-shiftlead-hunt", "sit_out": True, "dropped": True}
+    ]
+    assert by["hunt"]["sit_out"] == {"at": "now", "dropped": True} and "hunt is marked sat out" in got["text"]
+    by["grind-2"]["state"] = "exited"
+    state["refuse"] = {"ao-shiftlead-grind-2": "the link is down"}
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder")
+    assert got["did"] == "grind count: 2 → 1" and got["wound_down"]["action"] == "refused: the link is down"
+    assert "grind-2 could not be marked sat out (the link is down)" in got["text"]
 
 
 def test_members_default_to_a_free_name_and_remove_of_a_duplicate_keeps_the_live_session(world):

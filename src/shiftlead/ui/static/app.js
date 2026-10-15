@@ -2083,8 +2083,10 @@
       const dlg = $("#startdlg");
       $("#starthead").textContent = `Start ${name}?`;
       $("#starttext").textContent = "Nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts.";
-      $("#startcloses").textContent = b.dataset.closes ? `It first closes ${b.dataset.closes}.` : "";
-      $("#startcloses").hidden = !b.dataset.closes;
+      // the definition's renames and removals (§4.9, TD-706), then a concluded team's closes
+      const first = [b.dataset.moved || "", b.dataset.closes ? `It first closes ${b.dataset.closes}.` : ""].filter(Boolean);
+      $("#startcloses").textContent = first.join(" ");
+      $("#startcloses").hidden = !first.length;
       $("#startlanes").textContent = line;
       if (dlg.open) return;
       dlg.returnValue = "";
@@ -2140,6 +2142,7 @@
       // a concluded team's Start closed its sessions first (TD-099): said, since the cards it drew are gone
       const shut = (o.closed || []).length ? ` (closed ${(o.closed || []).map((c) => c.name).join(", ")} first)` : "";
       AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started${shut}`, true);
+      (o.moved || []).forEach((l) => AO.toast(`${name}: ${l}`, true));  // the definition's renames and removals (TD-706)
       if (lanes) AO.toast(`${name}: ${lanes}`, true);  // what the lanes held at the press (TD-265)
       // The same two things `ao team start|stop` says and a request could not: a member the
       // definition starts interactive is out of its manager's reach (design §9 invariant 5), and the

@@ -1489,7 +1489,7 @@ def test_a_team_with_no_flows_is_compared_on_its_profiles_too(world, tmp_path, c
     assert handed == ["repo-grind", "repo-grind"]
 
 
-# ── a member renamed or removed in the definition (§4.9, TD-703, built by TD-706 slice 1) ─────────
+# ── a member renamed or removed in the definition (§4.9, TD-703, built by TD-706) ─────────────────
 
 
 def _renamed(world, tmp_path, monkeypatch):  # noqa: F811
@@ -1505,20 +1505,11 @@ def _renamed(world, tmp_path, monkeypatch):  # noqa: F811
     t = doc["teams"]["ao-grind"]
     t["members"] = [dict(t["members"][0], name="mill")]
     _write(tmp_path, doc)
-    fake = cli.call_sync
-
-    def call(method, **params):
-        if method == "relaunch":
-            state["calls"].append((method, params))
-            return next(s for s in state["sessions"] if s["id"] == params["id"])
-        return fake(method, **params)
-
-    monkeypatch.setattr(cli, "call_sync", call)
     state["calls"].clear()
     return state
 
 
-def test_a_renamed_member_reads_renamed_and_a_dropped_one_removed_and_apply_creates_neither(
+def test_a_renamed_member_reads_renamed_and_a_dropped_one_removed_and_apply_hands_both_to_the_home(
     world,  # noqa: F811
     tmp_path,
     capsys,
@@ -1527,8 +1518,9 @@ def test_a_renamed_member_reads_renamed_and_a_dropped_one_removed_and_apply_crea
     """§4.9 *A member renamed or removed in the definition*: the records the definition no longer names
     are paired with the names no record carries, within a role, in order — each pair *renamed*, an
     orphan left over *removed from the definition* — the team reads **definition changed**, and the
-    newcomer is no `start` of its own, so Apply never creates it beside the old record (until the
-    home's half lands it says so and touches nothing)."""
+    newcomer is no `start` of its own, so Apply never creates it beside the old record: a rename is a
+    relaunch whose launch carries the newcomer's `name`, a removal the sit-out form with `dropped`
+    (TD-706 slice 3)."""
     from shiftlead import cli, teamrun
 
     state = _renamed(world, tmp_path, monkeypatch)
@@ -1547,9 +1539,18 @@ def test_a_renamed_member_reads_renamed_and_a_dropped_one_removed_and_apply_crea
     assert "    grind-1 → mill-1: renamed" in out and "    hunt: removed from the definition" in out
     assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
     applied = json.loads(capsys.readouterr().out)["apply"]
-    assert applied["applied"] == [] and len(applied["skipped"]) == 3
-    assert applied["skipped"][0]["line"].startswith("grind-1 → mill-1: renamed — not applied yet")
-    assert not [m for m, _ in state["calls"] if m in ("create", "relaunch")]
+    assert [d["line"] for d in applied["applied"]] == [d["line"] for d in diffs] and applied["skipped"] == []
+    acts = [(m, p) for m, p in state["calls"] if m in ("create", "relaunch", "send", "kill")]
+    assert [(m, p["id"], p.get("launch", {}).get("name"), p.get("dropped")) for m, p in acts] == [
+        ("relaunch", "ao-shiftlead-grind-1", "mill-1", None),
+        ("relaunch", "ao-shiftlead-grind-2", "mill-2", None),
+        ("relaunch", "ao-shiftlead-hunt", None, True),
+    ]
+    assert acts[0][1]["launch"]["lane"] and "{" not in acts[0][1]["launch"]["prompt"]  # mill-1's composed launch
+    assert acts[2][1] == {"id": "ao-shiftlead-hunt", "sit_out": True, "dropped": True}
+    # applied: the orphans hold their newcomers and the removal sits out, so nothing is read again
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
 
 
 def test_a_stopped_team_reads_its_renames_and_an_applied_orphan_is_no_difference(
@@ -1612,3 +1613,85 @@ def test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_on
     # by `created`, not by the order the records arrive in (TD-714): reversed, the older still takes mill-1
     pairs, _ = teamrun.renames(plan, sessions[::-1])
     assert [(r["name"], x.name) for r, x in pairs] == [("grind-b", "mill-1"), ("grind-a", "mill-2")]
+
+
+def test_apply_on_a_stopped_team_marks_its_renames_and_removals_and_starts_nothing(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """§4.9: Apply on a stopped team relaunches each renamed record under its newcomer's name, taken at its
+    next replay by rule 8, and marks a removal sat out — it creates nothing, and the card offers neither
+    again (TD-706 slice 3)."""
+    from shiftlead import cli
+
+    state = _renamed(world, tmp_path, monkeypatch)
+    for s in state["sessions"]:
+        s["state"] = "closed"
+    assert cli.main(["--json", "team", "flow", "ao-grind", "--apply"]) == 0
+    applied = json.loads(capsys.readouterr().out)["apply"]
+    assert len(applied["applied"]) == 3 and applied["skipped"] == []
+    acts = [(m, p["id"]) for m, p in state["calls"] if m in ("create", "relaunch", "send", "kill", "close")]
+    assert acts == [
+        ("relaunch", "ao-shiftlead-grind-1"),
+        ("relaunch", "ao-shiftlead-grind-2"),
+        ("relaunch", "ao-shiftlead-hunt"),
+    ]
+    assert cli.main(["--json", "team", "flow", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["differences"] == []
+
+
+def test_start_after_a_rename_succeeds_each_orphan_and_marks_each_removal_first(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """§4.9 *Start reads the same pairing*: a person's Start of a stopped team the definition renamed marks
+    each removal sat out before anything is created, creates each newcomer succeeding its orphan — one an
+    earlier Apply marked too — and never under an old name, so each definition name has one current
+    record; the result lists the pairs and the removal (TD-706 slice 3)."""
+    from shiftlead import cli
+
+    state = _renamed(world, tmp_path, monkeypatch)
+    state["host"] = {"host": "local"}  # a Start reads `waiting` from it (TD-274)
+    by = {s["name"]: s for s in state["sessions"]}
+    for s in state["sessions"]:
+        s["state"] = "closed"
+    by["grind-2"]["relaunch"] = {"at": "x", "name": "mill-2"}  # an Apply ran: grind-2 holds mill-2
+    assert cli.main(["--json", "team", "start", "ao-grind", "--anyway"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["moved"] == ["grind-2 → mill-2", "grind-1 → mill-1", "hunt removed"]
+    acts = [(m, p) for m, p in state["calls"] if m in ("create", "relaunch")]
+    assert acts[0] == ("relaunch", {"id": "ao-shiftlead-hunt", "sit_out": True, "dropped": True})
+    made = {p["name"]: p for m, p in acts if m == "create"}
+    assert sorted(made) == ["mill-1", "mill-2", "orc-ao"]
+    assert made["mill-1"]["succeeds"] == "ao-shiftlead-grind-1" and made["mill-2"]["succeeds"] == "ao-shiftlead-grind-2"
+    assert "succeeds" not in made["orc-ao"] and not any(p.get("keep_mail") for p in made.values() if "succeeds" in p)
+    assert by["hunt"]["sit_out"] == {"at": "now", "dropped": True}
+
+
+def test_start_after_a_rename_is_a_persons_and_never_beside_a_live_orphan(
+    world,  # noqa: F811
+    tmp_path,
+    capsys,
+    monkeypatch,  # noqa: F811
+):
+    """Both calls a Start makes of a renamed team are a person's (`relaunch`, `succeeds`): a session's
+    `ao team start` is refused before anything is marked or created, and so is a Start while an orphan is
+    still running and the team is not concluded — a live team takes a rename by Apply (§4.9, TD-706)."""
+    from shiftlead import cli
+
+    state = _renamed(world, tmp_path, monkeypatch)
+    state["host"] = {"host": "local"}  # a Start reads `waiting` from it (TD-274)
+    for s in state["sessions"]:
+        s["state"] = "closed"
+    monkeypatch.setenv("SHIFTLEAD_SESSION", "ao-shiftlead-orc-ao")
+    assert cli.main(["team", "start", "ao-grind", "--anyway"]) == 1
+    assert "a person's Start or Apply takes those, never a session's" in capsys.readouterr().err
+    monkeypatch.delenv("SHIFTLEAD_SESSION")
+    {s["name"]: s for s in state["sessions"]}["grind-1"]["state"] = "working"
+    assert cli.main(["team", "start", "ao-grind", "--anyway"]) == 1
+    assert "grind-1 still running: a live team takes a rename or a removal by Apply" in capsys.readouterr().err
+    assert not [m for m, _ in state["calls"] if m in ("create", "relaunch", "close")]

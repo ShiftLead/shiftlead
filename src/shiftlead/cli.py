@@ -940,6 +940,8 @@ def cmd_team_start(args: argparse.Namespace) -> int:
     def prose() -> None:
         for c in result.get("closed", []):  # a concluded team's sessions, closed before the creates (TD-099)
             print(f"{c['id']}  closed (concluded)")
+        for line in result.get("moved", []):  # the definition's renames and removals (§4.9, TD-706)
+            print(line)
         for rec in result["sessions"]:
             print(_team_line(rec, args.name, p))
         for warning in result.get("unrepeatable", []):
