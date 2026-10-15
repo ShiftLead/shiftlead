@@ -869,7 +869,6 @@ with the retired brief).
 
 ---
 
-
 ## TD-673: ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own
 
 **Priority:** Low
