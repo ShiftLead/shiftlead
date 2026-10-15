@@ -19,6 +19,7 @@ Both are pure reads of files and git; neither writes anything.
 
 from __future__ import annotations
 
+import hashlib
 import re
 import subprocess
 from collections.abc import Callable, Collection
@@ -249,7 +250,10 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     (TD-381, TD-386: the anchor seat's lane, which a person's own anchor session reads the same) is
     every pickable entry whose `Owner:` is `anchor`, of any kind — a live check once its build is
     live — any entry blocked by `decision (anchor)`, pickable or not, its owner then reading
-    `anchor`, and every work order."""
+    `anchor`, and every work order. **An entry still settling, or held** (`settling`, `held`: the home's
+    marks, §4.4 *A new entry settles before it is pickable*, TD-710) matches no lane."""
+    if entry.get("settling") or entry.get("held"):
+        return False
     owners = {o for w in lane if (o := owner_word(w))}
     if entry.get("work_order"):
         # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384); a red
@@ -295,7 +299,7 @@ def in_lanes(
     taken = {e["id"] for e in open_ if any(lane_matches(lane, e) for lane in lanes)}
     by_owner: dict[str, list[str]] = {}
     for e in open_:
-        if e["for_page"] == "pickable" and e["id"] not in taken:
+        if e["for_page"] == "pickable" and e["id"] not in taken and not (e.get("settling") or e.get("held")):
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
     rest.sort(key=lambda r: (-r["n"], r["owner"]))
@@ -357,7 +361,8 @@ def entries(
     slice 4): what blocks an entry is said in `Blocked by:`. `for_page` is the page's kind. A field
     is read only from the entry's own section. A `Kind: live-check` entry also carries `built`, the
     PRs its line names, and `live`, `yes` when `live` says every one of them is live and `no`
-    otherwise — no callable, no PR named (§4.9b, TD-323)."""
+    otherwise — no callable, no PR named (§4.9b, TD-323). `sig` is a hash of the entry's section text,
+    which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710)."""
     t = strip_comments(text)
     heads = list(lb.HEADING_RE.finditer(t))
     derived: dict[str, list[str]] = {}
@@ -380,6 +385,7 @@ def entries(
             "blocked_by": blocked_by,
             "blocked_ids": blocked_ids(read["blocked_raw"]),
             "pickable": "no" if blocked_by else "yes",
+            "sig": hashlib.sha256(t[m.start() : nxt.start() if nxt else len(t)].encode()).hexdigest()[:16],
         }
         if e["kind"] == "live-check":
             e["built"] = built(fields.get("kind", ""))

@@ -58,7 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
-| TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
+| TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Slice 1 built; slices 2 and 3 open |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
@@ -1072,7 +1072,7 @@ The other cases:
 **Added:** 2026-10-14 (the designer, building TD-707's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 built 2026-10-15 (grinder-ao-1): `sessionorc.settle` keeps `ledger_seen.json` (`paths.ledger_seen_file`) — `observe` records a fresh reading (a repo's first at the epoch; an edit while settling or held restarts the window and ends the hold, one after settling records the new `sig`), `mark` re-marks a carried reading, so a window ends on time — and `durations` layers the repo's `.shiftlead.yml` `settle:` over `settings.yml`'s over the built-in `{design-first: 5m}`. `ledger.entries` gives each entry `sig`; the tick's `_read_repo` marks every reading (`_settle`), and rule 6's reading at the declaration too; `lane_matches` reads `settling`/`held` as no lane's and `in_lanes` leaves them out of the rest. Slices 2 (`td_hold`, the claim's refusal, `ao td hold`, `ao repo`'s words) and 3 (the pages, this repo's `settle:`) open. Was: Open.
 **Location:** design §4.4 *A new entry settles before it is pickable*, §4.7 `ao td hold` and `ao repo`, §4.8 *A claim is a lease*, §5 `settle:`, §6 rule 6, §4.5a *Repo page: Hold / Release on a settling entry* and *Settings page: settle*; `src/sessionorc/ledger.py` (`entries`, `reading`, `lane_matches`, `in_lanes`), `src/sessionorc/paths.py` (beside `ids_file`), `src/sessionorc/agent_ids.py` (beside `rpc_td_next`), `src/sessionorc/mail.py` (`PERSON_ONLY`), `src/sessionorc/agent.py` (`rpc_progress`'s claim), `src/sessionorc/agent_tick.py` (rule 6's `lane_seen` ~L1353), `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py` (`cmd_repo` ~L1710, a `cmd_td_hold` beside `cmd_td_next`), `src/shiftlead/ui/templates/repo_part.html`, the Settings page
 
 **Why:** TD-707's design. TD-702 was designed and merged within 18 minutes of being filed, while Paul was still deciding whether he wanted it, and a ledger PR is too slow to stop that.

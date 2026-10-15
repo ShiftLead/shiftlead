@@ -60,6 +60,7 @@ LEDGER = """# Technical debt
 def test_entries_read_the_header_fields_and_the_page_kind():
     got = {e["id"]: e for e in ledger.entries(LEDGER)}
     assert list(got) == ["TD-010", "TD-011", "TD-012", "TD-013", "TD-014"]  # not the template's TD-001
+    assert len(got["TD-010"].pop("sig")) == 16  # the section's hash, which the settle clock compares (TD-710)
     assert got["TD-010"] == {
         "id": "TD-010",
         "title": "a pickable build",
