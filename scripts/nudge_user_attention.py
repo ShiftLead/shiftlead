@@ -932,36 +932,49 @@ def _remote_filter_path() -> Path:
     return machine_dir() / "remote_repos.txt"
 
 
-def _read_remote_filter() -> tuple[list[str], list[str], list[str]]:
-    """(owners, owner/repo entries, entries on a host the tier cannot read) from the
-    optional machine-local filter. A repo line is `host/owner/repo` or the older
-    `owner/repo`, which reads as github.com (TD-103).
+def _read_remote_filter() -> tuple[dict[str, dict], list[str]]:
+    """({host: {"discover": bool, "owners": [...], "repos": [...]}}, lines on a host the tier
+    cannot read) from the optional machine-local filter. A line is `owner`, `owner/repo` or
+    `host/owner/repo` (github.com's when no host is named, TD-103); on a GitLab host
+    `host/group` names a group or user and `host/group/sub/repo` a project; a bare host
+    (`gitlab.com`, `github.com`) is full discovery there — the user and their groups or orgs
+    (TD-110). Repos on github.com are `owner/repo`, on GitLab `group/…/repo`, host apart.
 
     Missing file OR a file with no entries both mean "no filter" (D1 as
-    amended 2026-08-13): full discovery, user + orgs. Same comment/blank
+    amended 2026-08-13): full discovery, user + orgs, on GitHub. Same comment/blank
     conventions as repos.txt.
     """
+    hosts: dict[str, dict] = {}
+    elsewhere: list[str] = []
     f = _remote_filter_path()
     if not f.is_file():
-        return [], [], []
-    owners: list[str] = []
-    repos: list[str] = []
-    elsewhere: list[str] = []
+        return hosts, elsewhere
+
+    def host(h: str) -> dict:
+        return hosts.setdefault(h, {"discover": False, "owners": [], "repos": []})
+
     for raw in f.read_text(encoding="utf-8", errors="replace").splitlines():
         line = raw.split("#", 1)[0].strip()
         if not line:
             continue
+        first, _, rest = line.strip("/").partition("/")
+        if F is not None and "." in first and (first.lower() == "github.com" or F.is_gitlab_host(first.lower())):
+            # a GitHub owner never has a dot in it, so a dotted first part is a host
+            h = host(first.lower())
+            if not rest:
+                h["discover"] = True
+            else:
+                h["owners" if "/" not in rest else "repos"].append(rest)
+            continue
         if "/" not in line:
-            owners.append(line)
+            host("github.com")["owners"].append(line)
             continue
         key = F.repo_key(line) if F is not None else None
-        if key and key[0] == "github.com":
-            repos.append(key[1] if line.count("/") == 2 else line)
-        elif key:
+        if key and key[0] != "github.com":
             elsewhere.append(line)
         else:
-            repos.append(line)   # as before: the forge says what it makes of it
-    return owners, repos, elsewhere
+            host("github.com")["repos"].append(line)   # as before: the forge says what it makes of it
+    return hosts, elsewhere
 
 
 PR_STALE_DAYS = 2  # an open PR older than this is named at SessionStart (TD-052)
@@ -970,7 +983,9 @@ PR_STALE_DAYS = 2  # an open PR older than this is named at SessionStart (TD-052
 def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
     """TD-052: the SessionStart line's other half — this repo's open PRs older than
     PR_STALE_DAYS, a reviewed-but-unmerged one marked as such (the highest-value case:
-    PR #89 sat seven days reviewed FIXED and nothing said so). One gh call, clipped to
+    PR #89 sat seven days reviewed FIXED and nothing said so), and one with nothing left to
+    merge — its files already the same on origin/<base> — marked superseded (TD-114,
+    forge.nothing_left: local git). One gh call, clipped to
     what is left of the fetch budget; offline, no gh, or any failure is silence — but an
     origin that is not GitHub is said, once, never silence (TD-098)."""
     kind, host = origin_forge(root)
@@ -1013,6 +1028,12 @@ def open_pr_lines(root: Path, deadline: float | None) -> list[str]:
             if hits:
                 verdicts.append(hits[-1].upper())
         mark = f", reviewed {verdicts[-1]} — unmerged" if verdicts else ""
+        # TD-114: a PR whose changes all landed by another PR reads like any stale one, and a
+        # session had to diff it to find nothing to merge (shiftlead#1728). Local git, bounded
+        # by what is left of the budget; "cannot tell" says nothing.
+        left = 5.0 if deadline is None else min(5.0, deadline - time.monotonic())
+        if left > 0.5 and F.nothing_left(root, pr.get("base"), pr.get("head_sha"), left):
+            mark = ", nothing left to merge — close it as superseded"
         title = " ".join("".join(ch if ch.isprintable() else " " for ch in str(pr.get("title") or "")).split())
         num = forge.ref(pr["number"]) if isinstance(pr.get("number"), int) else "?"   # #N, or GitLab's !N
         old.append((age, f"  • {num} {title[:100]} ({age}d open{mark})"))
@@ -1104,10 +1125,11 @@ def settings_line(root: Path, spent: dict) -> str | None:
 
 
 def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None) -> list[str]:
-    """Render the remote-only tier (TD-6): discover boards on GitHub that no
-    local row covers. Returns printable lines; every failure mode degrades to
-    a ⚠ note — a per-repo failure must never ride the same silent path as a
-    genuine 404, and discovery failure must never render as "no remote boards".
+    """Render the remote-only tier (TD-6): discover boards on GitHub — and on a GitLab host
+    remote_repos.txt names (TD-110) — that no local row covers. Returns printable lines;
+    every failure mode degrades to a ⚠ note — a per-repo failure must never ride the same
+    silent path as a genuine 404, and discovery failure must never render as "no remote
+    boards". Every forge call shares the one budget.
     """
     lines: list[str] = ["-- Remote tier (GitHub, pushed state only) --"]
     spent = spent if spent is not None else {"t": 0.0, "hit": False}
@@ -1115,70 +1137,95 @@ def remote_tier(local_roots: list[Path], today: date, spent: dict | None = None)
     if F is None:
         lines.append(f"⚠ remote tier unavailable ({forge_unread_line('?')})")
         return lines
-    forge = F.GitHub(spent=spent, per_call=GH_TIMEOUT, total=GH_BUDGET)
-    owners, direct, elsewhere = _read_remote_filter()
+    hosts, elsewhere = _read_remote_filter()
     if elsewhere:
         lines.append(f"⚠ {len(elsewhere)} remote_repos.txt line(s) on a host the remote tier cannot "
-                     f"read yet, not covered (first: {elsewhere[0]}; TD-104)")
-    if not owners and not direct and not elsewhere:   # a filter naming only other hosts is still a filter
-        rc, out, err = forge.whoami()
-        if rc != 0:
-            reason = "gh not installed" if rc == -3 else (err.strip().splitlines() or [f"{forge.cli} could not name the user"])[-1]
-            lines.append(f"⚠ remote tier unavailable ({reason})")
-            return lines
-        owners = [out.strip()]
-        rc, out, err = forge.owners()
-        if rc == 0:
-            owners += [o for o in out.split() if o]
-        else:
-            reason = (err.strip().splitlines() or ["org listing failed"])[-1]
-            lines.append(f"⚠ org discovery failed ({reason}) — org repos not covered")
+                     f"read yet, not covered (first: {elsewhere[0]}; TD-103)")
+    if not hosts and not elsewhere:   # a filter naming only other hosts is still a filter
+        hosts = {"github.com": {"discover": True, "owners": [], "repos": []}}
+    order = sorted(hosts, key=lambda h: (h != "github.com", h))   # GitHub first, as before
+    label = ", ".join("GitHub" if h == "github.com" else h for h in order) or "GitHub"
+    lines[0] = f"-- Remote tier ({label}, pushed state only) --"
 
-    candidates: list[str] = list(direct)
-    for owner in owners:
-        rc, out, err = forge.list_repos(owner, GH_LIST_LIMIT)
-        if rc != 0:
-            reason = "budget exhausted" if rc == -2 else (err.strip().splitlines() or ["repo list failed"])[-1]
-            lines.append(f"⚠ repo list failed for {owner} ({reason}) — that owner not covered")
-            continue
-        try:
-            listed = json.loads(out)
-        except ValueError:
-            lines.append(f"⚠ repo list unparseable for {owner} — that owner not covered")
-            continue
-        if len(listed) >= GH_LIST_LIMIT:
-            lines.append(f"⚠ repo list truncated at {GH_LIST_LIMIT} for {owner} — remote coverage incomplete")
-        candidates += [r["name"] for r in listed if not r.get("archived")]
+    def why(rc: int, err: str, forge, fallback: str) -> str:
+        if rc == -3:
+            return f"{forge.cli} not installed"
+        return "budget exhausted" if rc == -2 else (err.strip().splitlines() or [fallback])[-1]
+
+    forges: dict = {}
+    candidates: list[tuple[str, str]] = []   # (host, repo as that forge names it)
+    unavailable = 0
+    for h in order:
+        spec = hosts[h]
+        kw = {"spent": spent, "per_call": GH_TIMEOUT, "total": GH_BUDGET}
+        forge = forges[h] = F.GitHub(**kw) if h == "github.com" else F.GitLab(slug=h, **kw)
+        on, at = ("", "") if h == "github.com" else (f" on {h}", f"{h}/")
+        owners = list(spec["owners"])
+        if spec["discover"]:
+            rc, out, err = forge.whoami()
+            if rc != 0:
+                lines.append(f"⚠ remote tier unavailable{on} ({why(rc, err, forge, f'{forge.cli} could not name the user')})")
+                unavailable += 1
+            else:
+                owners = [out.strip(), *owners]
+                rc, out, err = forge.owners()
+                if rc == 0:
+                    owners += [o for o in out.split() if o]
+                else:
+                    kind = "org" if h == "github.com" else "group"
+                    lines.append(f"⚠ {kind} discovery failed{on} ({why(rc, err, forge, f'{kind} listing failed')})"
+                                 f" — {kind} repos not covered")
+        candidates += [(h, r) for r in spec["repos"]]
+        for owner in owners:
+            rc, out, err = forge.list_repos(owner, GH_LIST_LIMIT)
+            if rc != 0:
+                lines.append(f"⚠ repo list failed for {at}{owner} ({why(rc, err, forge, 'repo list failed')})"
+                             " — that owner not covered")
+                continue
+            try:
+                listed = json.loads(out)
+                names = [r["name"] for r in listed if not r.get("archived")]
+            except (ValueError, KeyError, TypeError, AttributeError):
+                lines.append(f"⚠ repo list unparseable for {at}{owner} — that owner not covered")
+                continue
+            if len(listed) >= GH_LIST_LIMIT:
+                lines.append(f"⚠ repo list truncated at {GH_LIST_LIMIT} for {at}{owner} — remote coverage incomplete")
+            candidates += [(h, n) for n in names]
 
     local = {u for u in (_local_origin(r) for r in local_roots) if u}
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     probes = [c for c in candidates
-              if not (c in seen or seen.add(c))                      # order-preserving dedup
-              and f"https://github.com/{c}".lower() not in local]    # local rows win (fresher)
+              if not (c in seen or seen.add(c))                       # order-preserving dedup
+              and f"https://{c[0]}/{c[1]}".lower() not in local]      # local rows win (fresher)
+    if not probes and unavailable:
+        return lines
+
+    def shown(h: str, name: str) -> str:
+        return name if h == "github.com" else f"{h}/{name}"
 
     boards: list[tuple[str, str]] = []
     unprobeable: list[tuple[str, str]] = []
     probed = 0
-    for name in sorted(probes):
+    for h, name in sorted(probes, key=lambda c: shown(*c)):
+        forge = forges[h]
         rc, out, err = forge.read_file(name, "docs/user_attention.md")
         if rc == -2:
             break
         probed += 1
         if rc == 0:
-            boards.append((name, out))
+            boards.append((shown(h, name), out))
         elif rc == F.NOT_FOUND:
             continue                                # no board — silent by design
         else:
-            reason = "gh not installed" if rc == -3 else (err.strip().splitlines() or ["probe failed"])[-1]
-            unprobeable.append((name, reason))
+            unprobeable.append((shown(h, name), why(rc, err, forge, "probe failed")))
 
     if spent["hit"]:
         lines.append(f"⚠ remote tier incomplete (budget exhausted after {probed} of {len(probes)} repos)")
     if unprobeable:
-        n, (first, why) = len(unprobeable), unprobeable[0]
-        lines.append(f"⚠ {n} repo(s) unprobeable (first: {first}: {why})")
+        n, (first, reason) = len(unprobeable), unprobeable[0]
+        lines.append(f"⚠ {n} repo(s) unprobeable (first: {first}: {reason})")
 
-    lines[0] = (f"-- Remote tier (GitHub, pushed state only) — {len(boards)} remote-only "
+    lines[0] = (f"-- Remote tier ({label}, pushed state only) — {len(boards)} remote-only "
                 f"board(s) across {probed} repo(s) probed --")
     for name, content in boards:
         lines.append("")

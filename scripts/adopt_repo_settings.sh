@@ -25,6 +25,9 @@
 #             another repo's settings is not something to do on a guess (TD-058).
 #   --yes     apply without asking: the flag unattended callers pass.
 #
+#   Either mode also names the workflows in this checkout's .github/workflows that run on
+#   every PR (TD-117, cadence.md §4.12) — information, never part of the exit code.
+#
 #   --no-auto-delete   leave "Automatically delete head branches" out of both the check
 #             and the apply (a repo that stacks PRs, below).
 #
@@ -43,6 +46,7 @@ set -u
 
 MODE=check
 REPO=""
+FROM_ORIGIN=0
 NO_AUTO_DELETE=0
 YES=0
 for a in "$@"; do
@@ -68,6 +72,7 @@ if [ -z "$REPO" ]; then
         echo "cannot verify: no owner/repo given and this checkout's origin is not a GitHub repo or a GitLab project (${shown:-no origin})" >&2; exit 2
     fi
     echo "(repo from this checkout's origin: $REPO)"
+    FROM_ORIGIN=1
 fi
 if ! why="$(python3 -B "$FORGE" has-cli "$REPO" 2>&1)"; then
     echo "cannot verify: ${why:-forge.py failed}" >&2; exit 2
@@ -104,6 +109,60 @@ if [ -n "$unreadable" ]; then
 fi
 echo "$REPO — merge settings vs cadence.md §4:"
 compare "$current"
+
+# TD-117: the workflows that run on every PR, read from this checkout's .github/workflows —
+# each run costs CI minutes, and what a session can run belongs in the repo's precheck
+# (cadence.md §4.12), leaving CI what a session cannot easily run (several platforms or
+# versions, a clean runner). Information only: it never changes the exit code. Named only
+# for the repo this checkout is (a repo given by name may be another one).
+pr_workflows() {  # -> one line per workflow file whose `on:` names pull_request(_target)
+    local top
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
+    [ -d "$top/.github/workflows" ] || return 0
+    python3 - "$top/.github/workflows" <<'PY'
+import os, re, sys
+d = sys.argv[1]
+TRIG = re.compile(r"\bpull_request(_target)?\b")
+for f in sorted(os.listdir(d)):
+    if not f.endswith((".yml", ".yaml")):
+        continue
+    try:
+        lines = open(os.path.join(d, f), encoding="utf-8", errors="replace").read().splitlines()
+    except OSError:
+        continue
+    hit = False
+    for i, ln in enumerate(lines):
+        m = re.match(r"""^(on|"on"|'on')\s*:(.*)$""", ln)
+        if not m:
+            continue
+        rest = m.group(2).split("#")[0]
+        if rest.strip():            # on: pull_request / on: [push, pull_request]
+            hit = bool(TRIG.search(rest))
+        else:                       # the indented block under on:
+            for b in lines[i + 1:]:
+                if b.strip() and not b[:1].isspace() and not b.lstrip().startswith("#"):
+                    break
+                if re.match(r"^\s+(-\s*)?pull_request(_target)?\s*(:|$)", b.split("#")[0]):
+                    hit = True
+                    break
+        break
+    if hit:
+        print(f)
+PY
+}
+if [ "$FROM_ORIGIN" = 1 ]; then
+    mapfile -t prw < <(pr_workflows)
+    if [ "${#prw[@]}" -gt 0 ]; then
+        echo "workflows that run on every PR (each run costs CI minutes; cadence.md §4.12): ${prw[*]}"
+        if [ -n "$(python3 "$(dirname "$0")/cadence_config.py" get precheck 2>/dev/null)" ]; then
+            echo "  precheck is set: keep in CI only what a session cannot easily run (several platforms or versions, a clean runner)"
+        else
+            echo "  no precheck set: what a session can run (lint, typecheck, tests) can move to precheck in docs/cadence.toml (TD-117)"
+        fi
+    else
+        echo "workflows that run on every PR: none"
+    fi
+fi
 
 if [ "${#DRIFT[@]}" -eq 0 ]; then
     echo "clean: nothing to change"; exit 0

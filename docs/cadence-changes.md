@@ -12,6 +12,38 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-15 — `precheck` records its verdict on GitLab too
+Do: on a GitLab repo with `precheck` set, run `python3 scripts/precheck.py --pr <n>` before the cadence check as on GitHub — it now records `cadence/precheck` on the MR's head, and the `ci` row reads it; a GitLab MR no longer stays *unknown* for want of it.
+See: cadence.md §4.12, `docs/procedures/cadence.md` step 2; TD-118.
+
+## 2026-10-14 — An open PR with nothing left to merge is named superseded; close it if it is yours
+Do: when the SessionStart PR line or the sweep says *nothing left to merge — close it as superseded* (its files already match the base: a PR stacked on it landed them), close it if your session opened it, else leave it to its owner. `python3 scripts/forge.py nothing-left <n>` checks one.
+See: `docs/procedures/stranded-work.md` quick check 3, cadence.md §3.9; TD-114.
+
+## 2026-10-14 — A review line says SHIP, FIXED or BLOCK, and the reviewer's prompt says so
+Do: give the reviewer the three verdict words in its prompt; a `cadence-review:` line with any other word (`CLEAN`) is not a review — the `review` row fails naming it, and the cure is a new comment.
+See: `docs/procedures/cadence.md` step 3; TD-116.
+
+## 2026-10-14 — `precheck`: a repo's own checks run at the merge gate, recorded on the PR's head
+Do: with `precheck` set in `docs/cadence.toml`, run `python3 scripts/precheck.py --pr <n>` before the cadence check — the `ci` row is *unknown* on an open PR until the head carries a `cadence/precheck` status. Setting it is the repo's choice.
+See: cadence.md §4.12, `docs/procedures/cadence.md` step 2.
+
+## 2026-10-14 — A repo's own step after a sync is `post-sync` in its `docs/cadence.toml`
+Do: when a sync PR cannot pass until your repo runs a step of its own (re-vendoring a copy of a synced file), set `post-sync = "<command>"` in `docs/cadence.toml` (repo file only); sync.sh runs it after writing the files, its changes ride the sync commit, and its failure fails the sync.
+See: cadence.md §9.18.
+
+## 2026-10-14 — Another repo's entry is `<repo>#TD-NNN` everywhere, not only in `Blocked by`
+Do: in a Status, a Why, a board line, a PR body or a commit subject, write another repo's entry as `<repo>#TD-NNN` (`shiftlead#TD-585`); a bare `TD-NNN` is always this repo's.
+See: cadence.md §2.2, §2.4.
+
+## 2026-10-14 — `/attention remote` reads GitLab: `gitlab.com/<group>` and bare-host lines
+Do: to see boards in GitLab projects no clone covers, add `gitlab.com/<group-or-user>` (or `gitlab.com/<group>/<project>`) to `remote_repos.txt`; a bare `gitlab.com` is full discovery there (your projects and groups) and a bare `github.com` keeps GitHub's beside it — any line is a filter, so without it GitHub is no longer discovered.
+See: cadence.md §9.5, procedures/attention.md; TD-110.
+
+## 2026-10-14 — Gemini CLI reads `AGENTS.md` through a seeded `.gemini/settings.json`
+Do: keep the seeded `.gemini/settings.json` (`context.fileName` names `AGENTS.md` and `GEMINI.md`); a repo with its own file adds `"AGENTS.md"` to that list — `sync.sh` warns until it does. Without it a Gemini session gets no map and no wake-up.
+See: cadence.md §7.6, Adoption checklist step 3; TD-111.
+
 ## 2026-10-14 — Gemini CLI sessions are seen: `agents = "claude,gemini"`
 Do: in a repo where Gemini CLI sessions run, list `gemini` in `docs/cadence.toml`'s `agents`; the anchor guard, the reaper, `list_sessions.py` (`gemini --resume <uuid>`) and the sweep row then see them, and "cannot see gemini" means no readable `~/.gemini` (or `/proc`) here.
 See: cadence.md §1.13, §9.18; TD-109.

@@ -6,7 +6,8 @@ forge goes through here, in one neutral shape, so a second forge is one more bac
 never a branch in each caller.
 
 Callers: check_cadence.py (the rows), nudge_user_attention.py (the open-PR line, the settings
-line, the remote tier), adopt_repo_settings.sh and sync-all.sh (through the CLI below). No
+line, the remote tier), adopt_repo_settings.sh and sync-all.sh (through the CLI below), the
+stranded-work sweep (`nothing-left`). No
 other script runs the forge's CLI (`gh`, `glab`): a new question is an operation here first.
 
 Which forge (cadence.md §9.18, the `forge` key): `auto` (the default) reads origin's host —
@@ -37,6 +38,11 @@ read*).
     forge.py repo-settings SLUG        the same lines with the repo's values (null: unreadable)
     forge.py patch-settings SLUG name=value…
                                        write those settings
+    forge.py nothing-left N            exit 0 when PR N has nothing left to merge (every file it
+                                       changes is already the same on origin/<base>: its changes
+                                       landed by another PR — TD-114), 1 when it has or is not
+                                       open (merged, closed), 2 when git
+                                       here cannot tell (its head not fetched, no origin/<base>)
 
 SLUG is `owner/repo` (github.com) or `host/owner/repo` (`host/group/sub/repo` on GitLab), and
 picks the forge itself; the other commands read the forge of the repo in the current
@@ -59,6 +65,8 @@ from urllib.parse import quote, urlencode
 
 KNOWN = ("auto", "github", "gitlab", "none")
 NOT_FOUND = -4   # a remote-tier probe's rc for "the forge says there is no such file"
+# How GitHub Actions begins the annotation on a job it refused to start (billing, spending limit) — TD-115
+_NOT_STARTED = "The job was not started because"
 
 
 class ForgeUnreadable(Exception):
@@ -361,7 +369,8 @@ class GitHub(_CLI):
         # oldest first, so the limit can never drop the stalest PR — the one TD-052 is for
         prs = json.loads(self._run(["pr", "list", "--state", "open", "--limit", str(limit),
                                     "--search", "sort:created-asc",
-                                    "--json", "number,title,createdAt,isDraft,comments"],
+                                    "--json", "number,title,createdAt,isDraft,comments,"
+                                    "baseRefName,headRefOid"],
                                    timeout=timeout, env=_QUIET) or "[]")
         out = []
         for p in prs:
@@ -387,11 +396,67 @@ class GitHub(_CLI):
     # -- CI ----------------------------------------------------------------------------------
 
     def check_runs(self, sha: str) -> list[dict]:
-        """[{name, status, conclusion}] for every check run on sha."""
+        """[{name, status, conclusion}] for every check run on sha. A job Actions refused to
+        start (the account's billing or spending limit, ContractMatch 2026-10-14, TD-115) is
+        reported as conclusion "failure" with no steps; only its annotation says why. Such a
+        run's conclusion is "not_run" and its "why" is that annotation, which the ci row names
+        as no evidence, never as a red build — GitLab's no-jobs pipeline, read the same way."""
         # object-shaped endpoint: --paginate walks the pages, --jq flattens each page's runs to one object per line
-        return self._lines(["api", "--paginate",
+        runs = self._lines(["api", "--paginate",
                             f"repos/{{owner}}/{{repo}}/commits/{sha}/check-runs?per_page=100",
                             "--jq", ".check_runs[]"])
+        for r in runs:
+            if r.get("conclusion") == "failure" and (r.get("output") or {}).get("annotations_count"):
+                why = self._not_started(r.get("id"))
+                if why:
+                    r["conclusion"], r["why"] = "not_run", why
+        # A commit status (precheck's cadence/precheck, TD-117, or any integration's) is not a
+        # check run on GitHub: read beside them, so the ci row sees every verdict on the head.
+        return runs + self.statuses(sha)
+
+    def statuses(self, sha: str) -> list[dict]:
+        """[{name, status, conclusion, kind}] — the latest commit status per context on sha
+        (GitHub's combined status), in check-run shape: success is success, failure and
+        error are failure, pending is still running."""
+        out = []
+        for st in self._lines(["api", f"repos/{{owner}}/{{repo}}/commits/{sha}/status?per_page=100",
+                               "--jq", ".statuses[]"]):
+            state = st.get("state")
+            out.append({"name": st.get("context"), "kind": "status",
+                        "status": "completed" if state in ("success", "failure", "error") else "in_progress",
+                        "conclusion": {"success": "success", "failure": "failure", "error": "failure"}.get(state),
+                        "description": st.get("description")})
+        return out
+
+    def named_status(self, sha: str, name: str) -> list[dict]:
+        """The latest status called `name` on sha — on GitHub check_runs already lists every
+        status, so this only re-reads them (TD-118's GitLab needs the call)."""
+        return [st for st in self.statuses(sha) if st.get("name") == name]
+
+    def set_status(self, sha: str, ok: bool, context: str, description: str) -> None:
+        """Record a commit status on sha (TD-117): no Actions minutes, and it stays on the
+        commit after the session ends. GitHub caps the description at 140 characters."""
+        self._run(["api", "-X", "POST", f"repos/{{owner}}/{{repo}}/statuses/{sha}",
+                   "-f", f"state={'success' if ok else 'failure'}", "-f", f"context={context}",
+                   "-f", f"description={description[:140]}"], env=_QUIET)
+
+    @staticmethod
+    def head_ref(n) -> str:
+        """The ref origin serves a PR's head under — a fork's head included."""
+        return f"refs/pull/{int(n)}/head"
+
+    def _not_started(self, run_id) -> str | None:
+        """The annotation saying Actions never started this check run's job, or None. An
+        unreadable answer is None: the run stays red, as it read before."""
+        try:
+            notes = self._json(["api", f"repos/{{owner}}/{{repo}}/check-runs/{int(run_id)}/annotations"])
+        except (ForgeUnreadable, ValueError, TypeError):
+            return None
+        for a in notes if isinstance(notes, list) else []:
+            msg = (a.get("message") or "").strip() if isinstance(a, dict) else ""
+            if msg.startswith(_NOT_STARTED):
+                return msg
+        return None
 
     def ci_runs_registered(self, sha: str) -> list[dict]:
         """[{status, conclusion}] of the workflow runs registered for sha — a run may exist
@@ -458,6 +523,13 @@ GITLAB_SQUASH_TEMPLATE = "%{title} (%{local_reference})\n\n%{all_commits}"
 _PIPELINE = {"success": ("completed", "success"), "failed": ("completed", "failure"),
              "canceled": ("completed", "cancelled"), "skipped": ("completed", "skipped"),
              "manual": ("completed", "action_required")}
+
+
+# A GitLab commit status's state in check-run shape (TD-118); pending, running and created
+# are still running.
+_STATUS = {"success": ("completed", "success"), "failed": ("completed", "failure"),
+           "canceled": ("completed", "cancelled"), "skipped": ("completed", "skipped"),
+           "manual": ("completed", "action_required")}   # as _PIPELINE reads a manual one
 
 
 class GitLab(_CLI):
@@ -642,8 +714,14 @@ class GitLab(_CLI):
         verification read this way, 2026-10-13): its conclusion is "not_run", which the ci
         row names as no evidence, never as a red build. A broken .gitlab-ci.yml also fails
         with no jobs, so the pipeline's own yaml_errors is read first: set, it stays red."""
-        out = []
+        out, external = [], {}
         for p in self._get(f"{self.project}/pipelines?sha={sha}&per_page=100"):
+            if p.get("source") == "external":
+                # opened by a commit status posted from outside CI (precheck's cadence/precheck,
+                # TD-118) and holding only such statuses: read as them, by name, never as an
+                # anonymous pipeline beside them
+                external[p.get("id")] = p
+                continue
             status, conclusion = _PIPELINE.get(p.get("status"), (p.get("status"), None))
             if p.get("status") == "failed" and not self._get(
                     f"{self.project}/pipelines/{p.get('id')}/jobs?include_retried=true&per_page=1"):
@@ -654,7 +732,52 @@ class GitLab(_CLI):
                 conclusion = "failure" if broken else "not_run"
             out.append({"name": f"pipeline {p.get('id')} ({p.get('source')})",
                         "status": status, "conclusion": conclusion})
+        if external:
+            held = [st for st in self.statuses(sha) if st.get("pipeline_id") in external]
+            out += held
+            # one whose statuses did not come back (a race, a page past the first) is kept as a
+            # pipeline: its verdict is never dropped
+            for pid, p in external.items():
+                if not any(st.get("pipeline_id") == pid for st in held):
+                    status, conclusion = _PIPELINE.get(p.get("status"), (p.get("status"), None))
+                    out.append({"name": f"pipeline {pid} (external)", "status": status,
+                                "conclusion": conclusion})
         return out
+
+    @staticmethod
+    def head_ref(n) -> str:
+        return f"refs/merge-requests/{int(n)}/head"
+
+    def statuses(self, sha: str, name: str | None = None) -> list[dict]:
+        """[{name, status, conclusion, kind, pipeline_id}] — the latest commit status per name on
+        sha (GitLab's default; `all=true` would list each post), only `name`'s when given, in
+        check-run shape (TD-118). Read on the probe project, 2026-10-15: a status posted to a
+        commit with no pipeline opens one of `source: external` holding it; posted to a commit
+        whose ref already has a pipeline, it joins that pipeline (whose status then follows it)
+        and is listed by neither pipeline's jobs."""
+        q = f"&name={quote(name, safe='')}" if name else ""
+        out = []
+        for st in self._get(f"{self.project}/repository/commits/{sha}/statuses?per_page=100{q}", paginate=True):
+            status, conclusion = _STATUS.get(st.get("status"), ("in_progress", None))
+            if conclusion == "failure" and st.get("allow_failure"):
+                conclusion = "neutral"
+            out.append({"name": st.get("name"), "kind": "status", "status": status,
+                        "conclusion": conclusion, "description": st.get("description"),
+                        "pipeline_id": st.get("pipeline_id")})
+        return out
+
+    def named_status(self, sha: str, name: str) -> list[dict]:
+        """The latest status called `name` on sha — one check_runs misses when it joined a CI
+        pipeline rather than opening an external one (TD-118)."""
+        return self.statuses(sha, name)
+
+    def set_status(self, sha: str, ok: bool, context: str, description: str) -> None:
+        """Record a commit status on sha (TD-118): `failed` is GitLab's word for failure (any
+        other state is a 400), and the description is capped at 255 characters (a longer
+        one is refused, read 2026-10-15)."""
+        self._run(self._api(f"{self.project}/statuses/{sha}", "-X", "POST",
+                            "-f", f"state={'success' if ok else 'failed'}", "-f", f"name={context}",
+                            "-f", f"description={description[:255]}"), env=_QUIET_GLAB)
 
     @staticmethod
     def ci_runs_registered(sha: str) -> list[dict]:
@@ -700,9 +823,107 @@ class GitLab(_CLI):
             args += ["-F", f"{k}={str(v).lower()}"] if isinstance(v, bool) else ["-f", f"{k}={v}"]
         g._run(args)
 
+    # -- the remote tier (TD-110; read off gitlab.com with glab 1.123.0, 2026-10-14) ------------
+    # Each returns (rc, out, err) as GitHub's do. Repos are `group/sub/repo` on this backend's
+    # host; the tier puts the host in front.
+
+    def _call_json(self, endpoint: str, paginate: bool = False) -> tuple[int, object, str]:
+        rc, out, err = self.call(self._api(endpoint, *(["--paginate"] if paginate else [])))
+        if rc != 0:
+            # glab prints only "glab: HTTP 403" for some refusals; GitLab's own words are on stdout
+            try:
+                body = json.loads(out)
+                why = body.get("error_description") or body.get("message") if isinstance(body, dict) else None
+            except ValueError:
+                why = None
+            err = (err or out).strip()
+            return rc, None, f"{err} ({why})" if why and str(why) not in err else err
+        try:
+            return 0, _pages(out) if paginate else json.loads(out), ""
+        except ValueError as e:
+            return 1, None, f"{self.cli} gave unparseable JSON ({e})"
+
+    def whoami(self) -> tuple[int, str, str]:
+        rc, got, err = self._call_json("user")
+        if rc == 0 and not (isinstance(got, dict) and got.get("username")):
+            return 1, "", f"{self.cli} could not name the user"
+        return rc, got["username"] if rc == 0 else "", err
+
+    def owners(self) -> tuple[int, str, str]:
+        """The groups the user is a member of, one full_path a line, a subgroup left out when
+        its parent is listed (the parent's listing includes it). A fine-grained token without
+        Group: Read answers 403 here, read 2026-10-14: the caller says so."""
+        rc, got, err = self._call_json("groups?min_access_level=10&per_page=100", paginate=True)
+        if rc != 0:
+            return rc, "", err
+        paths = [g["full_path"] for g in got if isinstance(g, dict) and g.get("full_path")]
+        return 0, "\n".join(p for p in paths
+                            if not any(p.startswith(q + "/") for q in paths)), ""
+
+    def list_repos(self, owner: str, limit: int) -> tuple[int, str, str]:
+        """JSON [{name, archived}] on rc 0. A group's projects with its subgroups'; a name that
+        is no group (404) is read as a user's namespace."""
+        q = "per_page=100"
+        rc, got, err = self._call_json(f"groups/{quote(owner, safe='')}/projects?include_subgroups=true&{q}",
+                                       paginate=True)
+        if rc > 0 and "(HTTP 404)" in err:
+            rc, got, err = self._call_json(f"users/{quote(owner, safe='')}/projects?{q}", paginate=True)
+        if rc != 0:
+            return rc, "", err
+        try:
+            return 0, json.dumps([{"name": p["path_with_namespace"], "archived": bool(p.get("archived"))}
+                                  for p in got][:limit]), ""
+        except (KeyError, TypeError):
+            return 0, "not a project list", ""   # the caller reports it unparseable
+
+    def read_file(self, repo: str, path: str) -> tuple[int, str, str]:
+        """The file's text on rc 0; rc NOT_FOUND when the project has no such file, or no
+        commit at all (an empty project: "404 Commit Not Found"). A missing project — or one
+        this token cannot see, which GitLab answers the same — is an error, not NOT_FOUND."""
+        rc, out, err = self.call(self._api(f"projects/{quote(repo, safe='')}/repository/files/"
+                                           f"{quote(path, safe='')}/raw?ref=HEAD"))
+        if rc > 0 and "(HTTP 404)" in err and "Project Not Found" not in err:
+            return NOT_FOUND, out, err
+        return rc, out, err
+
 
 # GitLab's notes call runs from the SessionStart hook too: glab must never prompt there.
 _QUIET_GLAB = {"NO_PROMPT": "true"}
+
+
+def nothing_left(root: "Path | str", base: str | None, head_sha: str | None,
+                 timeout: float = 5.0) -> bool | None:
+    """True when a PR has nothing left to merge: every file its head changed since its
+    merge-base with origin/<base> is already the same on origin/<base> — its changes landed by
+    another PR (one stacked on it and squash-merged first: shiftlead#1728, TD-114). False when
+    one still differs. None when git here cannot tell: the head commit not fetched (a fork's),
+    no origin/<base>, a git error or the timeout. Local git only — no forge call; a stale
+    origin/<base> mostly reads a superseded PR as False, but a file the base changed back since
+    the last fetch can read a live one as True — fetch first (the sweep does)."""
+    if not base or base.startswith("-") or not re.fullmatch(r"[0-9a-fA-F]{7,64}", head_sha or ""):
+        return None
+    end = time.monotonic() + timeout
+
+    def git(*args: str) -> str | None:
+        left = end - time.monotonic()
+        if left <= 0:
+            return None
+        try:
+            r = subprocess.run(["git", "-C", str(root), *args], check=False, capture_output=True,
+                               text=True, timeout=left)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return r.stdout if r.returncode == 0 else None
+
+    ref = f"refs/remotes/origin/{base}"
+    mb = git("merge-base", ref, head_sha)
+    if not mb:
+        return None
+    mine = git("diff", "--no-renames", "--name-only", "-z", mb.strip(), head_sha)
+    differ = git("diff", "--no-renames", "--name-only", "-z", ref, head_sha)
+    if mine is None or differ is None:
+        return None
+    return not ({f for f in mine.split("\0") if f} & {f for f in differ.split("\0") if f})
 
 
 def _ts(s):
@@ -822,6 +1043,8 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("patch-settings")
     p.add_argument("slug")
     p.add_argument("pairs", nargs="+")
+    n = sub.add_parser("nothing-left")
+    n.add_argument("number", type=int)
     a = ap.parse_args(argv)
     if a.cmd == "origin-slug":
         try:
@@ -847,6 +1070,23 @@ def main(argv: list[str] | None = None) -> int:
             print(why, file=sys.stderr)
             return 2
         return 0
+    if a.cmd == "nothing-left":
+        try:
+            pr = f.pr(a.number)
+        except ForgeUnreadable as e:
+            print(e, file=sys.stderr)
+            return 2
+        if pr.get("state") != "open":
+            print(f"{f.ref(a.number)} is {pr.get('state') or 'not open'}, not open — nothing to close")
+            return 1
+        left = nothing_left(".", pr.get("base"), pr.get("head_sha"))
+        if left is None:
+            print(f"cannot tell: {f.ref(a.number)}'s head {pr.get('head_sha') or '?'} or "
+                  f"origin/{pr.get('base') or '?'} is not here (git fetch origin)", file=sys.stderr)
+            return 2
+        print(f"{f.ref(a.number)} nothing left to merge — close it as superseded" if left
+              else f"{f.ref(a.number)} has changes left to merge")
+        return 0 if left else 1
     if a.cmd == "wanted":
         sys.stdout.write("".join(f"{k}={show(v)}\n" for k, v in f.settings_wanted.items()
                                  if not (a.no_auto_delete and k == f.auto_delete)))
