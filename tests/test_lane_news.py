@@ -446,3 +446,23 @@ async def test_a_decided_board_line_is_told_at_once_to_the_free_pick_lane_and_cl
             await person.call("progress", id=des, ref="board:0123abcd", status="claimed", caller=des)
         for sid in (gri, des):
             await person.call("kill", id=sid)
+
+
+async def test_an_entry_still_settling_is_told_only_once_it_settles(agent, tmp_path):
+    """TD-710, §4.4 *A new entry settles before it is pickable*: the home marks an entry `settling` (or
+    `held`) in the reading, and rule 6 reads the mark as no lane's, so the news waits for it to settle."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], [_e("TD-001")])
+        rec = agent.sessions[sid]
+        await agent._keep_running(now)
+        assert rec.lane_seen and rec.lane_seen["ids"] == ["TD-001"]
+        until = {"until": (now + timedelta(minutes=5)).isoformat()}
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [_e("TD-001"), {**_e("TD-002"), "settling": until}]
+        await agent._lane_news(rec, now)
+        assert _notes(agent, sid) == [] and rec.lane_seen["ids"] == ["TD-001"], "not news while it settles"
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [_e("TD-001"), _e("TD-002")]
+        await agent._lane_news(rec, now + timedelta(minutes=6))
+        assert len(_notes(agent, sid)) == 1 and "TD-002" in _notes(agent, sid)[0]
+        await person.call("kill", id=sid)

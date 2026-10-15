@@ -138,6 +138,12 @@ def ids_file() -> Path:
     return home() / "ids.json"
 
 
+def ledger_seen_file() -> Path:
+    """The settle clock (design §4.4 *A new entry settles before it is pickable*, TD-707, built by TD-710):
+    `{<origin>: {<id>: {at, sig, held?}}}`, keyed by origin as `ids.json` is (`sessionorc.settle`)."""
+    return home() / "ledger_seen.json"
+
+
 def doing_log_file() -> Path:
     """The home's doing log (design §4.8 *the doing log*, TD-176 slice 2): every `ao doing` call of a
     team's sessions, one JSON line each, the last fifty per team and each doer's newest five kept when it

@@ -34,6 +34,7 @@ from sessionorc import ledger as ledger_mod
 from sessionorc import promote as promote_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
+from sessionorc import settle as settle_mod
 from sessionorc import sync as sync_mod
 from sessionorc import usage as usage_mod
 from sessionorc import work as work_mod
@@ -78,6 +79,7 @@ from sessionorc.agent_common import (
     backup_store,
     log,
 )
+from sessionorc.agent_ids import origin_key
 from sessionorc.agent_spend import _metered_of
 from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
 from sessionorc.gitinfo import changed_files, git_info, work_left
@@ -1408,7 +1410,14 @@ class TickMixin:
                         return then, why, None
                     # the tip read as the checkout's reading is, with its live checks' `live`, or a
                     # live one would read as the checkout's own and be seen untold
-                    return then, why, ledger_mod.entries_before(root, str(rel), None, resolve=resolve, live=live)[0]
+                    tip = ledger_mod.entries_before(root, str(rel), None, resolve=resolve, live=live)[0]
+                    # both marked by the settle clock as it stands, so an entry still settling is not
+                    # seen now and is told once it settles (§4.4, TD-710)
+                    remote = str((self._repos.get(s.repo or "") or {}).get("remote") or "")
+                    for got in (then, tip):
+                        if got is not None:
+                            TickMixin._settle(str(root), remote, got, datetime.now(UTC), fresh=False)
+                    return then, why, tip
 
                 then, why, tip = await asyncio.to_thread(both)
                 if s.out_of_work != decl or s.lane_seen is not None:
@@ -3012,6 +3021,10 @@ class TickMixin:
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
+        if isinstance(led.get("entries"), list):
+            # the settle clock (§4.4 *A new entry settles before it is pickable*, TD-710): a fresh reading is
+            # recorded and marked, a carried one marked again, so a window ends when its time does
+            TickMixin._settle(root, remote, led["entries"], now, fresh=ledger and "error" not in led)
         bds, wos = TickMixin._read_boards(root, old, due, boards, stamp)
         seams = old.get("seams")
         if due or seams is None:  # §4.4 *The seams*: on the repo reading's own cadence
@@ -3032,6 +3045,20 @@ class TickMixin:
             "completed": ledger_mod.completed(led.get("recent"), (prs or {}).get("recent")),
             "at": stamp if due else str(old.get("at") or stamp),
         }
+
+    @staticmethod
+    def _settle(root: str, remote: str, entries: list[Any], now: datetime, *, fresh: bool) -> None:
+        """Mark a ledger reading's entries `settling` or `held` from the home's clock (`sessionorc.settle`,
+        §4.4, TD-710), keyed by the checkout's origin (its path where it has none); `fresh` records the
+        reading first. The durations are the repo's `settle:` over the install's over the built-in. A
+        clock that cannot be written marks nothing, and says so in the log: entries go at once."""
+        key = origin_key(remote) if remote else str(root)
+        spans = settle_mod.durations(settings_mod.load().get("settle"), settle_mod.repo_settle(root))
+        got = [e for e in entries if isinstance(e, dict)]
+        try:
+            (settle_mod.observe if fresh else settle_mod.mark)(got, key, spans, now)
+        except OSError as e:
+            log.warning("the settle clock of %s could not be kept: %s", root, e)
 
     @staticmethod
     def _read_boards(
