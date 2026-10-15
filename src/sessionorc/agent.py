@@ -1283,6 +1283,8 @@ class HostAgent(
                     self._write_launch(s.id, s, launch_params(locals()))
                 else:
                     self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
+                if succeeding is not None:  # the launch record moves to the new id: dropped once that is written
+                    self._drop_launch(self._address(succeeding))
         return s.view()
 
     async def _schedule(
@@ -1363,6 +1365,8 @@ class HostAgent(
         self._remember_dir(directory)
         if self.mode != "node":
             self._write_launch(s.id, s, launch_params(given))
+            if given.get("succeeding") is not None:
+                self._drop_launch(self._address(given["succeeding"]))
         if starts:
             log.info("%s scheduled to start at %s", sid, starts)
         else:
@@ -1447,8 +1451,9 @@ class HostAgent(
         and its `lane_seen` copied onto `new`, so the lease and rule 6's memory hold across the name;
         every record of this host and every launch record whose `controllers` name the old address name
         the new one, so a renamed lead is still each member's controller (a node's own records carry
-        theirs from their launch record at their next create); and `old`'s launch record dropped — `new`
-        has its own. Saves what it touched but `old` and `new`, which the caller saves."""
+        theirs from their launch record at their next create). `old`'s launch record is the caller's to
+        drop, once `new`'s is written (`_drop_launch`). Saves what it touched but `old` and `new`, which
+        the caller saves."""
         a, b = self._address(old), self._address(new)
         old.superseded_by = b
         held = {e.ref for e in new.progress}
@@ -1477,7 +1482,6 @@ class HostAgent(
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
                     json.dump(record, f, indent=1)
                 tmp.replace(path)
-        self._drop_launch(a)
 
     async def rpc_name_check(
         self, dir: str, name: str, repo: str | None = None, host: str | None = None
@@ -2006,11 +2010,17 @@ class HostAgent(
             raise RpcError(f"{s.name} has no launch record, so there is nothing to relaunch {rule}") from None
         if launch.get("profile") is not None and s.host == self.host:
             await self._relaunch_profile(s, str(launch["profile"]), rule)
-        renamed = launch.get("name") if launch.get("name") not in (None, params.get("name")) else None
+        before = params.get("name")
         for k in RELAUNCH_KEYS:
             if k not in RELAUNCH_KEPT or launch.get(k) is not None:
                 params.pop(k, None)
         params.update({k: v for k, v in launch.items() if v is not None})
+        # a rename is the launch record's name moved off the record's, by this Apply or one before it
+        # whose replay has not run yet — a second Apply keeps the first one's rename, and one that hands
+        # the record's own name back cancels it (the review of TD-706 slice 2)
+        pending = s.relaunch.get("name") if isinstance(s.relaunch, dict) else None
+        final = params.get("name")
+        renamed = final if final and final != s.name and (final != before or pending == final) else None
         made = params.get("prompt_from")
         # a node member's files are that host's, which rule 7 never reads here (as the replay)
         read = await asyncio.to_thread(brief.record, made, False) if made and s.host == self.host else None

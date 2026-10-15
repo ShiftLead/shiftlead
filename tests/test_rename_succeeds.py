@@ -104,9 +104,9 @@ async def test_succeeds_is_refused_touching_nothing(agent, tmp_path):
         live = (await person.call("create", name="a", dir=_own(tmp_path, "a"), **base))["id"]
         ended = (await person.call("create", name="b", dir=_own(tmp_path, "b"), **base))["id"]
         await person.call("kill", id=ended)
-        stranger = (
-            await person.call("create", name="s", dir=_own(tmp_path, "s"), capabilities=["control"], **SHELL)
-        )["id"]
+        stranger = (await person.call("create", name="s", dir=_own(tmp_path, "s"), capabilities=["control"], **SHELL))[
+            "id"
+        ]
         new = {"dir": _own(tmp_path, "n"), **base}
         refusals = [
             ({"name": "n", "succeeds": live}, "is a record that has ended|has ended"),
@@ -138,6 +138,12 @@ async def test_a_relaunchs_name_and_dropped_are_refused_out_of_place(agent, tmp_
         # the same name handed is no rename
         view = await person.call("relaunch", id=sid, launch={"prompt": "x", "name": "a"})
         assert "name" not in view["relaunch"]
+        # a second Apply before the replay keeps the first one's rename, handed again or not
+        assert (await person.call("relaunch", id=sid, launch={"name": "b"}))["relaunch"]["name"] == "b"
+        assert (await person.call("relaunch", id=sid, launch={"name": "b"}))["relaunch"]["name"] == "b"
+        assert (await person.call("relaunch", id=sid, launch={"prompt": "y"}))["relaunch"]["name"] == "b"
+        # and one that hands the record's own name back cancels it
+        assert "name" not in (await person.call("relaunch", id=sid, launch={"name": "a"}))["relaunch"]
         await _kill_all(person, agent)
 
 

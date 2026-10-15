@@ -2275,6 +2275,7 @@ class TickMixin:
         new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
         if new is not None and renamed and s.host != self.host:
             self._carry(s, new)  # a node's create moved what it holds; the rest is the home's (§4.9)
+            self._drop_launch(self._address(s))  # `_route_act` wrote the new id's
             self._save(s)
         if new is not None:
             new.restarts = history
