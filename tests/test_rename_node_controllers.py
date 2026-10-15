@@ -105,3 +105,31 @@ async def test_a_controller_no_launch_record_moves_is_left_alone(agent):
         assert node.acts == [], "no launch record: nothing says the rename reached it"
     finally:
         del agent._link_muxes["laptop"]
+
+
+async def test_a_lead_renamed_twice_is_carried_to_its_last_name(agent):
+    await park_ticks(agent)
+    old, mid = _renamed(agent)
+    agent.sessions["ao-x-boss"].state, agent.sessions["ao-x-boss"].superseded_by = "closed", "ao-x-chief"
+    last = f"ao-x-chief@{agent.host}"
+    _lead(agent, "ao-x-chief", "chief", state="idle")
+    w = _member(agent, launch=[last], controllers=[old])
+    agent._link_muxes["laptop"] = node = Node()
+    try:
+        await agent._carry_controllers()
+        assert node.acts == [("set_controllers", {"id": "ao-x-w", "add": [last], "remove": [old]})]
+        assert w.controllers == [last] and mid not in w.controllers
+    finally:
+        del agent._link_muxes["laptop"]
+
+
+async def test_the_tick_carries_them(agent, monkeypatch):
+    await park_ticks(agent)
+    seen = []
+
+    async def carry():
+        seen.append(True)
+
+    monkeypatch.setattr(agent, "_carry_controllers", carry)
+    await agent.tick()
+    assert seen == [True]

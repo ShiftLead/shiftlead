@@ -262,8 +262,9 @@ class TickMixin:
         node — `set_controllers` routed as a person's edit is (`_route_act`), since `controllers` is the
         node's field and a rewrite of the home's copy would be lost to its next report. **At the home**;
         a node whose link is down is passed over and tried again on the next tick, and a refused or lost
-        act is said in the log and tried again too. The launch record is what makes it the carry's: a
-        resume under another id rewrites none, so it moves no controller."""
+        act is said in the log and ends that node's pass, so a stuck link holds the tick once. The launch
+        record is what makes it the carry's: a resume under another id rewrites none, so it moves no
+        controller."""
         if self.mode != "home":
             return
         graph = self._graph()
@@ -302,6 +303,7 @@ class TickMixin:
                     log.info("%s@%s: controllers carried across the rename: %s", rid, host, ", ".join(add))
                 except Exception as e:  # noqa: BLE001 — tried again on the next tick
                     log.warning("%s@%s: the rename's controllers did not reach %s: %s", rid, host, host, e)
+                    break  # the rest of this node's wait for the next tick: one stuck act, not one each
 
     def _team_stamp(self, team: str, unattended: bool, run_until: str | None) -> str | None:
         """What a create's `run_until` is under its team's stop time (§6 *Team stop time*): the
