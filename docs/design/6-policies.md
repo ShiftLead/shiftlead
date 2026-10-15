@@ -235,8 +235,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      or with a `prs` or `every` one, met while it ran and so the next fill's cause, as the anchor's
      `work` is (the count starts again at the fill, from the new record's creation) —
      hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a fill is not closed before its prompt
-     lands), with nothing dirty or unpushed, is closed (a seat that left work is the board's) —
-     **unless it waits on a PR of its own**: an open PR on the branch it has checked out, as the
+     lands), with nothing dirty or unpushed and **no live subagent** (§4.2 *Working on its own*,
+     TD-734: a seat that ended its turn on an Agent-tool reviewer is working, as its card says; its
+     two minutes count from the later of `since` and `subagent_at`, as rule 4's do), is
+     closed (a seat that left work is the board's) — **unless it waits on a PR of its own**: an open PR on the branch it has checked out, as the
      repo reading has it; a claim on its record carrying a PR not read merged or closed (`pr`, or
      `review_pr`); or a claim derived from that branch whose PR no reading has yet — a close would
      kill a fact-check or CI it left running and leave the PR with nobody. A PR it handed to a
@@ -351,7 +353,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped`, or, for a seat,
      `seat_due` set (a question waiting on an idle techlead) — and no declaration, no pending, not
-     gated, its composer empty (§4.2 `send`'s rules; the doorbell's *one typist per pane* holds), is
+     gated, **no live subagent** (§4.2 *Working on its own*, the card's reading: its own work is
+     running, and its card says *working*; TD-734; the twenty minutes count from the later of
+     `since` and `subagent_at`, and *idle · open work* is not marked, nor a standing one read as
+     rule 3's `open` cause, while one is live), its
+     composer empty (§4.2 `send`'s rules; the doorbell's *one typist per pane* holds), is
      sent **one fixed line** through `send`'s path: *[shiftlead] you have been idle 20 minutes with
      `<ref>` open — end the run with one of `ao progress done <ref> --pr N`, `ao progress drop
      <ref> --why`, `ao progress none --why` or `ao progress restart --why`*, naming the first open
@@ -729,7 +735,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      as §4.9a defines it — `out_of_work` on the record and `idle`, `exited` or `closed` — none of
      them carries `restart_wanted` (that one is rule 2's, and a team with a restart wanted is not
      finished), its seats are `idle` or gone, and its manager, when live, is `idle`, declared or
-     not. A team whose only unattended live sessions are its seats and its manager is finished too:
+     not — where `idle` in this rule is an idle record with no live subagent (§4.2 *Working on its
+     own*, TD-734). A team whose only unattended live sessions are its seats and its manager is finished too:
      nobody is working and nobody has anything to take. An interactive session in the team is a
      person's and counts for nothing, as everywhere (§4.9 *A person in the team*). **The reading is
      made from the records and nothing else**, since the home reads no definition (§4.9): a seat is
