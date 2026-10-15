@@ -28,5 +28,5 @@ Added 2026-10-15 (Paul): **Fable rounds iterate too**, alongside the Sonnet roun
 up front. After the findings are adopted and written in, a fresh Fable agent reviews the written
 design again, told what earlier rounds settled, until Fable has no finding beyond follow-ons of the
 last adoption. Sonnet's rounds run until READY, and the design is done when both agree. The
-designer's brief carries the same loop (docs/briefs/designer-ao-1.md). Merge nothing the round is
+designer's brief gets the same loop in #1842 (docs/briefs/designer-ao-1.md, a held path). Merge nothing the round is
 still changing: [[hold-a-design-until-its-round-ends]].
