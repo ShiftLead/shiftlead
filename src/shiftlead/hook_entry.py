@@ -30,7 +30,7 @@ def _event() -> str:
         return "statusline"
     try:
         payload = json.loads(sys.stdin.read() or "{}")
-    except (OSError, ValueError):
+    except Exception:  # noqa: BLE001 — no stdin, or not JSON: the entry is still written
         return "?"
     return str(payload.get("hook_event_name") or "?") if isinstance(payload, dict) else "?"
 

@@ -1283,6 +1283,12 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
         seats={"ao-w": "runs after 10 PRs"},
     )["slot"]
     assert full["text"] == "fills exhausted · 6 in 1 h" and full["kind"] == "bad"
+    # a seat's lost-brief replays at `RESTART_CEILING` leave a ceiling with no `why`: no fill (TD-720)
+    replays = view(
+        _card(state="exited", pane=False, seat=prs, restart_ceiling={"at": "x", "count": 3}),
+        seats={"ao-w": "runs after 10 PRs"},
+    )["slot"]
+    assert replays["text"] == "restarts exhausted · 3 in 2 h" and "fills" not in replays["full"]
 
 
 def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):

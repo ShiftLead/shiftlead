@@ -150,6 +150,27 @@ async def test_six_fills_an_hour_over_seats_sharing_a_controller(agent, tmp_path
             await person.call("kill", id=sid)
 
 
+async def test_a_fellows_lost_brief_ceiling_does_not_trip_the_fill_ceiling(agent, tmp_path):
+    """Only a `why: fill` ceiling says a fellow's fill tripped it (§6 rule 3, TD-720): a seat whose brief
+    was lost twice beside it leaves the seat whose fill reaches `FILL_CEILING` to carry the mark."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        a = await _seat(person, tmp_path, name="a", controllers=["ao-x-mgr"])
+        b = await _seat(person, tmp_path, name="b", controllers=["ao-x-mgr"])
+        for sid in (a, b):
+            _end(agent, sid)
+        agent.sessions[a].seat_due = {"at": _iso(now), "by": "every"}
+        agent.sessions[a].restarts = [{"at": _iso(now - ago), "why": "fill"} for ago in _mins(FILL_CEILING)]
+        agent.sessions[b].restart_ceiling = {"at": _iso(now), "count": 1, "why": "lost-brief"}
+        ra = agent.sessions[a]
+        await agent._keep_running(now)
+        assert agent.sessions[a] is ra, "not filled past the ceiling"
+        assert ra.restart_ceiling and ra.restart_ceiling["why"] == "fill", "the mark is its own"
+        for sid in (a, b):
+            await person.call("kill", id=sid)
+
+
 def _mins(n: int) -> list[timedelta]:
     return [timedelta(minutes=5 * (i + 1)) for i in range(n)]
 
