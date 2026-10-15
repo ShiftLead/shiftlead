@@ -56,8 +56,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Designed — TD-694 builds it |
-| TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Open |
+| TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Designed — TD-696, TD-697, TD-698 build it |
 | TD-695 | `test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not` flakes: the promote's own sync task may run a pass inside the test | Low | Open |
+| TD-696 | Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule | Medium | Open |
+| TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
+| TD-698 | Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so | Medium | Open |
 
 ---
 
@@ -1021,17 +1024,18 @@ The other cases:
 **Added:** 2026-10-14 (session `ao-paul`, from Paul's question about subtask ids such as TD-682a; he agreed the three parts below the same day)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-14 (the designer; mockup `RepoPage.dc.html`, the *Blocked* list's builds line; shot `docs/mockups/reviews/2026-10-14-td693-builds-line.png`) — §4.4 *A ledger entry's id is handed out by the home*: `ao td next [--repo] [--count]` (§4.7) asks the home's `td_next`, which gives the next id above the ledger and archive on `origin/<default>`, every open PR's added `## TD-NNN:` headings, and the last id it gave, recorded in `ids.json` under one lock. An id is never given twice and never expires; an unused one is a gap, which cadence §2.2 does not forbid. A session with no home keeps the old rule. Subtask ids are not taken (ledgerboard's format). §4.5 screen 11 *Its builds*: a design entry's row carries *builds:* with each build's state (*archived* · *in review #n* · *held by <name>* · *open*, *blocked by TD-n*), and a build's row says *builds TD-n* (§4.5a). §4.9c *A design entry archives with its last build*: the last build's PR archives the design entry in the same commit; a design entry left behind is pickable and its designer's, as before, and the person's in a repo with no team. Built by TD-696, TD-697 and TD-698. Was: Open.
+**Blocked by:** TD-696, TD-697, TD-698
 **Location:** design §4.9c (flows), §4.5 (the ledger and Repo pages), §6 (the home's policies), §4.7 (CLI); `scripts/ledgerboard.py` is read, never changed
 
 **Why:** Three costs of the `td` flow, as it ran on 2026-10-14:
 - **Ids collide.** Nothing assigns them. Every filer (designer, grinder, auditor, a person's session) takes main's highest number plus one, then greps open PRs' diffs. Two filers at once take the same number, and the later one renumbers across a rebase (TD-651 → 653 → 656, 2026-10-13).
-- **A design's builds are not shown as its group.** Each build names its design in `**Blocked by:**`, but no page groups them under it. You learn that TD-686 and TD-687 build TD-682 by reading each entry.
+- **A design's builds are not shown as its group.** A design entry's `**Blocked by:**` names its builds, but no page groups them under it, and a build names nothing back. You learn that TD-686 and TD-687 build TD-682 by reading each entry.
 - **A design entry costs one more PR.** It stays open until its builds are archived, then a PR archives it alone (#1755, #1777, #1780).
 
 Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are not this entry's fix. The id format is ledgerboard's (`HEADING_RE`, `ROW_RE`, `ID_ITEM_RE` and `XREPO_ITEM_RE` match `TD-` plus digits, and `_num` takes the part after the dash as an int), so it would mean a spec change and a release through dev-cadence into every consumer, and ShiftLead's own `sessionorc/ledger.py` parses the number as an int. A suffix would only stop collisions among a design's builds, and it would repeat what `Blocked by` already says.
 
-**Fix:** design first, in three parts, none of which changes the ledger format:
+**Fix:** design first, in three parts, none of which changes the ledger format. (The ask as filed; the *Status* line says what the design settled: an id never expires, and the last build's PR archives the design entry.)
 1. **The home reserves ids.** A command (e.g. `ao td next <repo>`) returns the next free id for a repo and records it (`ao td` is already the person's verb for handing an entry to the techlead, §4.7, and allocates nothing). Free means above main's highest, every open PR's added headings and every live reservation. Every filer's brief and the cadence's filing rule use it. An unused reservation is a gap in the numbers, which is allowed ("never reused" still holds). The design settles where the reservation lives, when it expires, and what a session with no home does (today's rule, as the fallback).
 2. **The pages group builds under their design**, read from `Blocked by`: the Repo page's ledger list, and wherever a design entry is drawn. Each build shows its state (open, built, archived) beside it.
 3. **A design entry archives itself** when its last build archives. The home's policy writes the archive commit, or the build's own archive PR carries the design's archive as well. The design picks one and says who owns it in a repo with no team.
@@ -1059,6 +1063,117 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** the test passes 200 runs in a row, and the fix names the race it closed.
 
 **Related:** TD-685 (the sync pass).
+
+---
+
+## TD-696: Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-693's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*; `src/sessionorc/` (a new `agent_ids.py` mixin beside `agent_spend.py`, `paths.py` for `ids.json`, `ledger.py`'s `ids_in`, `modes.py`'s `offline_refusal`, a new method set and its reason; `agent_serve`'s node branch already forwards on any reason, a person's call included, and is not changed), `src/shiftlead/cli.py` (`ao td next`, the `td` group's help), `src/shiftlead/briefs/entry.md` (*The number*), `src/shiftlead/briefs/designer.md`, `src/shiftlead/briefs/grinder.md`
+
+**Why:** TD-693's design. Every filer took main's highest id plus one, so two filers at once collided and one renumbered across a rebase (TD-651 → 653 → 656 on 2026-10-13; TD-693 → 694 on 2026-10-14).
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **`td_next(repo, count)`**, a host-agent RPC, under one `asyncio.Lock` per repo, with no `person_only` check. `by` is the dispatcher's authenticated caller (§4.8a), never a parameter. A node forwards it to the home and refuses it offline (§4.4a's table): `td_next` gets its own set in `offline_refusal`, checked beside `HOME_EDITS` and before the `caller is None` return (else a person's call is served on the node and `ids.json` splits per host), refused in *ids.json is the home's* words. `offline_refusal` returns the reason, and `agent_serve`'s node branch already forwards on it, and is in neither `HOME_EDITS` (whose `PERSON_NODE_BOUND` would refuse a person's call from a node) nor `identity.READS`, so the verified caller reaches it. The whole call has a 45-second budget from its arrival, the wait for the lock included: a lock not taken by 30 s refuses (*busy, ask again*); the PRs are read a few at a time until 30 s, and those not read are `unread: budget`; the fetch has until 45 s and refuses past it. Every `gh` and `git` call runs through `asyncio.to_thread` or an async subprocess, killed at its deadline (`ledger._git` is a blocking `subprocess.run`). It takes the repo by its registered name, never a path, which on a node is the node's; a name registered roots of different origins share is refused naming them (not `rpc_entry_add`'s first match), and an origin `owner/repo` is accepted; roots of one origin are one repo, so the first of them serves (unlike `Registry._find`, which refuses any second hit). The CLI factors out `cmd_td_add`'s repo resolution and its `_main_checkout` default only, never its session refusal, and sends the registry's own spelling of the name (`Path(raw).expanduser().name`, the `raw` key `cmd_td_add` keeps, mapped back from the resolved root when `--repo` is not given, so a symlinked checkout keeps its registered name), or the origin's `owner/repo` when that name is shared:
+  1. list the open PRs (`gh pr list --state open --limit 200`; a failed list, or one that fills 200, is one `unread` line), then read each one's `+## TD-NNN:` lines from `gh api repos/<o>/<r>/pulls/<n>/files --paginate` (the ledger's and the archive's patches), collecting as `unread` each PR whose listing fails or is cut at 3000 files, or whose ledger file has no `patch`;
+  2. then fetch `origin/<default>` in the checkout, refusing with the reason when the fetch fails or leaves no `origin/<default>` ref, so a PR merged between the two reads is in main;
+  3. read the highest id in the ledger and its archive at that ref (`ledger.ids_in`). The ledger is `.shiftlead.yml`'s `ledger:` and the archive `ledger.archive_path` of it, never `Registry.LEDGER`'s default; step 1 matches the PRs' files on the same two paths;
+  4. take the highest of those and `ids.json`'s `last`, and give the next `count` ids (1 to 10);
+  5. write `last` and append to `given`, `{id, by, at}`, keeping the newest 200; `ids.json` and the lock are keyed by the origin, `owner/repo` for GitHub (ssh and https alike) and the lowercased URL otherwise, and `by` is the dispatcher's `caller`, or `person` when there is none.
+  `ids.json` is written whole, through a temp file and a rename, as `spend.json` is.
+- **`ao td next [--repo] [--count] [--json]`**: prints the ids one a line; `unread` goes to standard error, and into `--json` as `{repo, ids, unread}`. The repo defaults as `ao td add`'s does. It is open to every session and the person. The `td` group's help stops saying *a person's own* for the group; the wording is the `td` parser's `help=` in `cli.py` (`help.py` holds no `td` text).
+- **The filers' rule.** In `entry.md`, *The number* becomes `ao td next`, with the old rule (main, the archive, every open PR's diff, re-read before the merge) as the fallback when `ao` is not there or refuses. `designer.md` and `grinder.md` point new entries at it. A build's own entries (the designer's) take `--count`.
+- **Tests:**
+  - two concurrent `td_next` calls give different ids;
+  - a PR that merges between the PR read and the fetch is counted;
+  - `by` is the caller, whatever the call carries;
+  - a node forwards the call, a person's included, and refuses it offline;
+  - PRs not read by 30 s are `unread: budget`, and the ids still come;
+  - a lock not taken by 30 s refuses *busy, ask again*;
+  - a name two checkouts of different origins share is refused, and `owner/repo` picks one; two checkouts of one origin are served by `owner/repo`;
+  - a symlinked checkout is sent by its registered name;
+  - two checkouts with one origin, one cloned by ssh and one by https, share one counter;
+  - three calls on one repo at once all answer inside the client's timeout;
+  - a person's call on a node, its checkout at another path, reaches the home and is served by name;
+  - a repo with a custom `ledger:` reads that file and its archive;
+  - an open PR's added heading raises the floor;
+  - a PR whose files cannot be read is named in `unread`, and the ids still come;
+  - a failed fetch refuses;
+  - `last` beats a lower main, so a given id that is never used is never given again;
+  - `given` keeps 200;
+  - `--count 3` gives three ids in a row.
+
+**Done when** two sessions asking at the same moment get different ids with no rebase, and every listed test passes.
+
+**Related:** TD-693 (the design), TD-585 (ledgerboard is ShiftLead's parser), TD-219 (`ao td add`).
+
+---
+
+## TD-697: Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-693's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 screen 11 *Technical debt* (*Its builds*), §4.5a *Repo page: its builds line*; mockup `RepoPage.dc.html` (the *Blocked* list); `src/sessionorc/ledger.py` (`entries`: `blocked_ids`; the reading: `archived`), `src/shiftlead/ui/app.py` (the Repo page's Technical debt lists), `src/shiftlead/ui/templates/` (the repo page), `src/shiftlead/ui/static/app.css`
+
+**Why:** TD-693's design. A design's builds name nothing back, and the page groups nothing under the design. To learn that TD-686 and TD-687 build TD-682 you read each entry.
+
+**Fix:**
+- **The reading grows** (`src/sessionorc/**`, so the techlead reads it, §4.9b). `entries` carries each entry's whole `Blocked by:` ids as `blocked_ids`, archived ones kept; `blocked_by` stays what still blocks. The repo's ledger reading carries as `archived` only the archived ids some entry's `blocked_ids` names (never the whole archive, which would ride every `repos` push), read from the archive text `ledger.reading` already holds, not from `Registry`'s resolver, which reads other repos at `origin/<default>`.
+- **A design's builds.** For each `design-first` entry whose `blocked_ids` is not empty, take those ids in order (`blocked_ids` is `ledgerboard.parse_blocked` of the entry's `blocked_raw` with the `#` items dropped, each through `ledger._norm` so `TD-42` and the archive's `TD-042` match; an archived id counts as a build), each with its state:
+  - *archived* when its id is in the archive's ids;
+  - else *in review #n* from its holder's claim `pr` or `review_pr`;
+  - else *held by <name>*;
+  - else *open*;
+  - and *blocked by TD-n* when another of the design's builds is in its `blocked_by` (what still blocks, never `blocked_ids`; only its items matching `TD-\d+`, each through `_norm`, since `blocked_by` also holds decisions, `<repo>#` items and unreadable ones).
+  When all are archived, the line reads *every build archived — archive this entry*. A build's row gains *builds TD-n* after its owner, from the same pass.
+- **The line.** One `.sub`-sized line under the design's row, ids as the page's row links (§4.5a *Repo page: links*). An archived id is plain text. It is drawn in whichever list holds the design row (*blocked*, mostly).
+- **Verify on a scratch home** before the PR (the grinder brief's rule for `src/shiftlead/ui/`), with a shot in the PR body.
+- **Tests:**
+  - the line's order and every state;
+  - a design whose builds are all archived still lists them, as *archived*;
+  - `archived` holds only ids some `blocked_ids` names;
+  - a `Blocked by:` written `TD-42` matches the archive's `TD-042`, in `blocked_ids` and in a build's `blocked_by` alike, and a `<repo>#TD-n` item is not in `blocked_ids`;
+  - *every build archived* when none is left;
+  - a build's *builds TD-n* link;
+  - no line on an entry whose `Blocked by:` names no build.
+
+**Done when** a design entry's row on the Repo page shows its builds and their states, and every listed test passes.
+
+**Related:** TD-693 (the design), TD-652 (*held by*), TD-228 (pickable from `Blocked by`).
+
+---
+
+## TD-698: Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so, and the designer's says when it is the fallback
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-693's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.9c *A design entry archives with its last build*; `src/shiftlead/flows/td/build.md`, `src/shiftlead/flows/td/design.md`, `src/shiftlead/briefs/grinder.md`, `src/shiftlead/briefs/designer.md`; `docs/briefs/designer-ao-1.md` (a held path, `docs/briefs/**`)
+
+**Why:** TD-693's design. A design entry needed a PR of its own to archive it once its builds were archived (#1755, #1777, #1780). Also, `design.md` says a design *ends when its entry is archived with the build entries*, which is no longer how a design is left: it stays *Designed*, blocked by its builds.
+
+**Fix:**
+- **`build.md`** (and `grinder.md` where it says how an entry is archived): when the entry your PR archives is the last build still in the ledger on `origin/<default>` of a design entry's `Blocked by:`, and that `Blocked by:` names builds alone (no `decision (…)`, no other repo's item), move that design entry to the archive in the same PR. Give it a `**Resolved:**` line naming each build and the PR that merged it (`gh pr list --state merged --search "TD-n in:title"`). Read it again at the rebase before the merge.
+- **`build.md`'s opening** (*those are yours once it is archived*) becomes: once the design entry names them in its `Blocked by:`.
+- **`design.md`**: a design ends when its entry reads *Designed* and its `Blocked by:` names its builds. This replaces *a design ends when its entry is archived with the build entries*. It archives with its last build. A design entry in your lane whose builds are all archived is the fallback, and you archive it as an item of its own.
+- **`docs/briefs/designer-ao-1.md`**: the same sentence, in the round's last step. That file is a held path, so the techlead reads it.
+- **Tests:** the briefs' doc-bound tests, where any read these lines, and `tests/test_briefs_layout.py`.
+
+**Done when** the briefs say it and the next design whose last build merges is archived in that build's PR.
+
+**Related:** TD-693 (the design), TD-682 / #1777 and TD-688 / #1780 (archive-only PRs).
 
 ---
 
