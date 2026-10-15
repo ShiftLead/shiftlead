@@ -15,6 +15,7 @@ import asyncio
 import base64
 import binascii
 import contextlib
+import fnmatch
 import json
 import logging
 import os
@@ -98,6 +99,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     ORPHAN_AFTER,  # noqa: F401
     OWED_NAMED,  # noqa: F401
     PASTE_SHOW_SECONDS,  # noqa: F401
+    PATHS_PRIVATE,
     PATHS_RUN_CHARS,
     PATHS_RUNS_MAX,
     PRUNE_EVERY,  # noqa: F401
@@ -255,16 +257,36 @@ def _place_attachment(where: Path, name: str, place: Any) -> Path:
     raise RpcError(f"attach: {base} is taken a thousand times over in {where}")
 
 
-def _resolve_paths(runs: list[str], cwd: Path, roots: list[str]) -> dict[str, str | None]:
-    """`rpc_paths`' disk half: each run to its real path when that is a regular file inside one of
-    `roots`' real paths, else `None`. Any `OSError` on the way is `None` too."""
-    real_roots = [Path(os.path.realpath(r)) for r in roots]
+def _path_private(real: str) -> bool:
+    """Whether a real path is one `PATHS_PRIVATE` keeps as text (§4.6, TD-688): under one of its
+    trees, through one of its directories, or one of its file names. A name with a `/` in it is
+    matched as the path's last components."""
+    trees, dirs, names = PATHS_PRIVATE
+    if any(real == t or real.startswith(t + "/") for t in trees):
+        return True
+    parts = real.split("/")
+    for d in dirs:
+        want = d.split("/")
+        if any(parts[k : k + len(want)] == want for k in range(len(parts) - len(want) + 1)):
+            return True
+    for n in names:
+        want = n.split("/")
+        if len(parts) >= len(want) and all(
+            fnmatch.fnmatchcase(a, b) for a, b in zip(parts[-len(want) :], want, strict=True)
+        ):
+            return True
+    return False
+
+
+def _resolve_paths(runs: list[str], cwd: Path) -> dict[str, str | None]:
+    """`rpc_paths`' disk half: each run to its real path when that is a regular file this process
+    can read and `PATHS_PRIVATE` does not hold, else `None`. Any `OSError` on the way is `None` too."""
     out: dict[str, str | None] = {}
     for run in runs:
         try:
-            p = Path(os.path.realpath(cwd / Path(run).expanduser()))
-            inside = any(p.is_relative_to(root) for root in real_roots)
-            out[run] = str(p) if inside and p.is_file() else None
+            real = os.path.realpath(cwd / Path(run).expanduser())
+            ok = os.path.isfile(real) and os.access(real, os.R_OK) and not _path_private(real)
+            out[run] = real if ok else None
         except (OSError, ValueError, RuntimeError):
             out[run] = None
     return out
@@ -2391,10 +2413,11 @@ class HostAgent(
 
     async def rpc_paths(self, id: str, runs: list[str] | None = None) -> dict[str, Any]:
         """The Focus pane's file check (design §4.6 *A path in the pane is a link*, TD-501): for each
-        run a row of the pane named, the real absolute path when it is a regular file under the real
-        path of the record's `dir` or of its `repo`, else `None` — a directory, a file outside both, a
-        symlink out, a missing or unreadable one alike, since the page needs no reason. A relative run
-        is resolved against `dir`, `~` is this user's home. It stats and reads nothing else. Served
+        run a row of the pane named, the real absolute path when it is a regular file anywhere on this
+        host that this user can read (TD-688), its real path judged, so a symlink answers its target —
+        else `None`: a directory, a missing or unreadable file, and a path `PATHS_PRIVATE` holds (a
+        credential file stays text) alike, since the page needs no reason. A relative run is resolved
+        against `dir`, `~` is this user's home. It stats and reads nothing else. Served
         here, on the record's host — a node's record reaches its node through `read` (`NODE_READS`).
         A read: never gated (§9 invariant 11)."""
         s = self._get(id)
@@ -2404,8 +2427,7 @@ class HostAgent(
             raise RpcError(f"paths: {len(runs)} runs, past the {PATHS_RUNS_MAX} one row may ask about (design §4.6)")
         if long := [r for r in runs if len(r) > PATHS_RUN_CHARS]:
             raise RpcError(f"paths: a run of {len(long[0])} characters, past the {PATHS_RUN_CHARS} one may be")
-        roots = [s.dir] + ([s.repo] if s.repo else [])
-        return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(s.dir), roots)}
+        return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(s.dir))}
 
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads

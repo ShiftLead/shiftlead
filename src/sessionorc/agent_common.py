@@ -190,6 +190,19 @@ NODE_READS = frozenset({"tail", "explain", "log_tail", "transcript", "paths"})
 TRANSCRIPT_TURNS_MAX = 500  # prompts one transcript read may ask for: a page is twenty
 PATHS_RUNS_MAX = 8  # runs one `paths` read may ask about: one row of a pane (§4.6 *A path in the pane is a link*)
 PATHS_RUN_CHARS = 512  # and the length of each
+# What a `paths` read answers as nothing whatever the stat says (§4.6 *A path in the pane is a link*,
+# TD-688): matched on the real path, so a symlink into one is text too. A floor, not a guarantee —
+# extend it here. Three tuples: whole trees by prefix; a credential directory anywhere, by component
+# or component pair (a pair is two components in a row); a credential file by name (`fnmatch`).
+# ShiftLead itself keeps no token file under `~/.shiftlead`: the Telegram secret is Doppler's, and
+# settings hold only its project/config's name (§4.10).
+PATHS_PRIVATE = (
+    ("/proc", "/sys", "/dev"),
+    (".ssh", ".gnupg", ".aws", ".doppler", ".kube", ".password-store")
+    + (".config/doppler", ".config/gcloud", ".config/gh"),
+    (".netrc", ".git-credentials", ".npmrc", ".pypirc", ".claude.json", ".credentials.json", ".docker/config.json")
+    + (".bash_history", ".zsh_history", "*.pem", "*.key", ".env", ".env.*"),
+)
 
 
 def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[MailEntry]:
