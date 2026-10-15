@@ -59,7 +59,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
-| TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Open |
+| TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Built (#1803); live check |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
 | TD-708 | `td_next`'s three refusal/unread branches are held by no test: a filled `--limit 200`, a non-GitHub origin, a repo with no origin remote | Low | Open |
@@ -1085,8 +1085,8 @@ The other cases:
 **Type:** feature
 **Added:** 2026-10-14 (the designer, building TD-702's design)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1803
+**Status:** **Built by #1803 (grinder-ao-1, 2026-10-14); its live half waits for #1803 to be live.** `sessionorc.store.kept` is the store's and the page's one keep rule, and every listed test passes. To read once #1803 is live (`ao promote status`), a day after: the `doing_log` RPC's ao-grind ring (or the Repo page's Doing section, a headless GET) holds the auditors' newest lines (`ao-shiftlead-docs-audit-ao-1`, `ao-shiftlead-test-audit-ao-1`) beside the grinders' fifty, and the team card's chips name them.
 **Location:** design §4.8 *the doing log*, §4.5 screen 11 *Doing*, §4.5a *team card: Answer needed / Doing* and *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`: its load, `append` and compaction), `src/sessionorc/agent.py` (the comment ~L736, `rpc_doing_log`'s docstring ~L854), `src/sessionorc/paths.py` (`doing_log_file`'s docstring), `src/shiftlead/ui/org.py` (`DOING_KEPT`), `src/shiftlead/ui/app.py` (the `DOING_KEPT` import ~L298, the `doing` event's ring ~L3833), `src/shiftlead/ui/templates/repo_part.html` (the Doing section's *i* text ~L100, which says *the last fifty*)
 
 **Why:** TD-702's design. The ring kept a team's last fifty calls, and ao-grind's three busy members filled it in under a day, so the auditors' lines (31 in `doing.jsonl`) never showed.

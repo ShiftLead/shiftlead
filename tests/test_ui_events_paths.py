@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -28,14 +29,14 @@ def reading(root: str) -> dict:
 pytestmark = pytest.mark.unit
 
 
-def client(monkeypatch, tmp_path, pushed, *, wait=1.6):
+def client(monkeypatch, tmp_path, pushed, *, wait=1.6, doing_log=None):
     """g1 holds TD-301, g2 works; `subscribe` yields `pushed(g1, g2)` and stays open `wait` seconds:
     one `HEADS_EVERY` and some, the flush's turn."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     root = str(tmp_path / "samscrape")
     claim = [{"ref": "TD-301", "status": "claimed", "at": NOW, "pr": 811}]
     g1, g2 = member("g1", root, progress=claim, tail=["a"]), member("g2", root, state="working")
-    replies = {"repos": {root: reading(root)}, "doing_log": {}, "list": [g1, g2], "usage": {}, "host": {}}
+    replies = {"repos": {root: reading(root)}, "doing_log": doing_log or {}, "list": [g1, g2], "usage": {}, "host": {}}
 
     class Fake:
         def __init__(self, *a, **k):
@@ -88,6 +89,29 @@ def test_a_doing_line_is_passed_through_and_marks_the_groups_for_the_flush(tmp_p
     evs = received(client(monkeypatch, tmp_path, pushed), "/events")
     assert [e["event"] for e in evs] == ["session", "doing", "groups"]
     assert evs[1]["entry"] == entry and evs[2]["groups"] != evs[0]["groups"]
+
+
+def test_the_pages_doing_ring_keeps_what_the_host_agents_keeps(tmp_path, monkeypatch):
+    """TD-705 (§4.8 *the doing log*): the stream's copy of a team's ring takes a `doing` event by the
+    host agent's own rule, `kept` — the last fifty and each doer's newest five — so a seldom doer's
+    lines, past the fifty, are still on the team card after a busy member's next call."""
+    from sessionorc.store import kept
+
+    now = datetime.now(UTC)
+
+    def at(minutes: int) -> str:
+        return (now - timedelta(minutes=minutes)).isoformat().replace("+00:00", "Z")
+
+    seldom = [{"team": "grind", "id": "g1", "text": f"audit {i}", "at": at(300 - i)} for i in range(6)]
+    busy = [{"team": "grind", "id": "g2", "text": f"busy {i}", "at": at(200 - i)} for i in range(50)]
+    entry = {"team": "grind", "id": "g2", "text": "busy 50", "at": at(0)}
+    pushed = first_then({"event": "doing", "team": "grind", "entry": entry})
+    evs = received(client(monkeypatch, tmp_path, pushed, doing_log={"grind": seldom + busy}), "/events")
+    want = kept(seldom + busy + [entry], now)
+    assert [e["text"] for e in want if e["id"] == "g1"] == [f"audit {i}" for i in range(1, 6)], "the newest five"
+    (grind,) = [g for g in evs[-1]["groups"] if g["team"] == "grind"]
+    drawn = list(dict.fromkeys(re.findall(r"(?:busy|audit) \d+", grind["summary"])))  # a row's words and title
+    assert drawn == [e["text"] for e in reversed(want)], "newest first, the page's ring the store's"
 
 
 def test_a_repos_reading_is_passed_through_and_marks_the_groups_for_the_flush(tmp_path, monkeypatch):

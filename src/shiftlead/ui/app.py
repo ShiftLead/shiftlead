@@ -36,6 +36,7 @@ from sessionorc.models import (
     start_note,
     stop_note,
 )
+from sessionorc.store import kept as doing_kept
 from shiftlead import org as orgmod
 from shiftlead import profiles as profiles_mod
 from shiftlead import repoconfig, teamrun, teams
@@ -296,7 +297,6 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
 from .org import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_HOVER,  # noqa: F401
     DOER_WIDTH,  # noqa: F401
-    DOING_KEPT,  # noqa: F401
     FACETS,  # noqa: F401
     HEADS_EVERY,  # noqa: F401
     HOLDERS_WIDTH,  # noqa: F401
@@ -3837,9 +3837,9 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 run.to_all(run.light(), {"event": "repos", "root": root, "pr_marks": marks})
             else:
                 if isinstance(ev.get("entry"), dict):
-                    ring = doing.setdefault(str(ev.get("team")), [])
-                    ring.append(ev["entry"])
-                    del ring[:-DOING_KEPT]
+                    # the host agent's keep rule (§4.8 *the doing log*, TD-702), by this process's clock
+                    team = str(ev.get("team"))
+                    doing[team] = doing_kept([*doing.get(team, []), ev["entry"]], datetime.now(UTC))
                 run.to_all(run.live, ev)
             if run.full:
                 run.dirty.set()
