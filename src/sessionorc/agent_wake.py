@@ -241,15 +241,26 @@ class WakeMixin:
 
     def _first_prompt_road(self, s: Session, now: datetime) -> str | None:
         """How the brief may be sent now: `hook` at a hook-reported `idle` — the composer the launch
-        landed at — or, once, `scraped` (§4.1 *A brief whose first hook is lost*, TD-348): no hook
-        since the launch, `FIRST_PROMPT_HOOK_WAIT` passed since `created`, a scraped `idle`, and no try
-        made yet. None otherwise."""
-        if s.state != "idle" or s.superseded_by:
+        landed at — or, once, `scraped` (§4.1 *A brief whose first hook is lost*, TD-348, and *A launch
+        whose hook never comes is recovered*, TD-720): no hook ever on the record (`hook_seen_at`, and
+        none this run), `FIRST_PROMPT_HOOK_WAIT` passed since `created`, no try made yet, and a state
+        that is not `needs-you`, `exited` or `closed` — a Claude Code pane at its empty composer reads
+        `working` or `stalled?`, never `idle`, when no hook reaches it; `_first_prompt_typing` then
+        sends only on a composer that reads empty. An adapter with no composer reader still needs a
+        scraped `idle`. None otherwise."""
+        if s.superseded_by:
             return None
-        if s.confidence == "hook" and s.id in self._last_hook:
-            return "hook"
-        if s.id in self._last_hook or s.first_prompt_tries:
+        if s.id in self._last_hook:
+            return "hook" if s.state == "idle" and s.confidence == "hook" else None
+        if s.hook_seen_at or s.first_prompt_tries or s.state in ("needs-you", "exited", "closed"):
             return None
+        if s.state != "idle":
+            try:
+                reader = getattr(adapters.get(s.adapter), "composer", None)
+            except KeyError:
+                reader = None
+            if reader is None:
+                return None
         age = (now - _parse(s.created)).total_seconds()
         return "scraped" if age >= agent_common.FIRST_PROMPT_HOOK_WAIT else None
 
@@ -258,13 +269,14 @@ class WakeMixin:
         whose first prompt is due and that may be sent now (`_first_prompt_road`). One task per
         session, as a ring is: a submit takes seconds and the tick never waits. A record no hook has
         reached by `FIRST_PROMPT_BOUND` after its launch, the brief unsent, is marked *no hook since
-        launch* (§4.1, TD-348) — a hook arriving later clears nothing by itself."""
+        launch* (§4.1, TD-348) — a hook arriving later clears nothing by itself. *No hook* is read from
+        `hook_seen_at`, which a restart keeps, never from `_last_hook`, which a restart seeds (TD-720)."""
         now = datetime.now(UTC)
         for s in list(self.sessions.values()):
             if s.id in self._prompting or not self._first_prompt_due(s):
                 continue
             if (
-                s.id not in self._last_hook
+                not s.hook_seen_at
                 and not s.superseded_by
                 and (now - _parse(s.created)).total_seconds() >= agent_common.FIRST_PROMPT_BOUND
             ):

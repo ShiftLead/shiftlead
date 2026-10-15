@@ -232,3 +232,86 @@ async def test_a_hook_before_the_bound_keeps_the_ordinary_road(agent, briefstubs
         await agent.rpc_hook(w, state="idle")
         assert await wait_for(lambda: _sent(rec), timeout=6)
         assert rec.sends[-1].scraped is False
+
+
+# -- a launch whose hook never comes is recovered (design §4.1, TD-717, built by TD-720) --------------------
+
+
+async def test_a_launch_no_hook_reaches_gets_its_brief_while_it_reads_working(agent, briefstubs, tmp_path, monkeypatch):
+    """A Claude Code pane at its empty composer matches no screen rule, so a launch no hook reaches reads
+    `working` (`confidence: hook` from its create), never a scraped `idle`: the one scraped send reads
+    the composer, not the state."""
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.5)
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        rec = agent.sessions[w]
+        rec.set_state("working", confidence="hook")
+        assert w not in agent._last_hook and rec.hook_seen_at is None
+        assert await wait_for(lambda: _first(agent, w, "SUBMITTED " + TYPED), timeout=8), "never sent on the composer"
+        assert await wait_for(lambda: _sent(rec), timeout=6)
+        assert rec.sends[-1].scraped is True and rec.first_prompt_error is None
+
+
+async def test_a_dialog_on_a_launch_no_hook_reaches_is_waited_past(agent, briefstubs, tmp_path, monkeypatch):
+    """A dialog on screen (the composer reader's None) sends nothing and counts no try, whatever the state."""
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.2)
+    monkeypatch.setattr(adapters._REGISTRY["brief0"], "composer", lambda tail: None)
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        rec = agent.sessions[w]
+        rec.set_state("working", confidence="hook")
+        await asyncio.sleep(8 * FAST_TICK)
+        assert await _submitted(agent, w) == [] and rec.first_prompt == BRIEF and rec.first_prompt_tries == 0
+
+
+async def test_needs_you_exited_and_a_composerless_adapter_take_no_scraped_send(agent, briefstubs, tmp_path):
+    """The road (§4.1): no scraped send on `needs-you`, `exited` or `closed`, and an adapter with no
+    composer reader still needs a scraped `idle`."""
+    from datetime import UTC, datetime, timedelta
+
+    async with LocalClient() as c:
+        w = await _start(agent, c, tmp_path, "w", "brief0", prompt=BRIEF)
+        rec = agent.sessions[w]
+        later = datetime.now(UTC) + timedelta(seconds=agent_common.FIRST_PROMPT_HOOK_WAIT + 1)
+        for state, road in (("working", "scraped"), ("stalled?", "scraped"), ("needs-you", None), ("exited", None)):
+            rec.state = state
+            assert agent._first_prompt_road(rec, later) == road, state
+        rec.state = "working"
+        rec.adapter = "hookstub-none"
+        assert agent._first_prompt_road(rec, later) is None, "an unknown adapter has no composer reader"
+        rec.state, rec.adapter = "idle", "brief0"
+        rec.hook_seen_at = "2026-10-15T08:00:00Z"
+        assert agent._first_prompt_road(rec, later) is None, "a hook reached it once: never the scraped road"
+
+
+async def test_no_hook_since_launch_survives_an_agent_restart(agent, briefstubs, tmp_path, monkeypatch):
+    """At load only a record a hook reached (`hook_seen_at`), or whose brief is no longer due, is seeded as
+    hook-fed: a live hook-fed record from before the field keeps its seeding; a launch whose first hook
+    was lost is not seeded, so it gets its brief by the scraped send, or is marked at `FIRST_PROMPT_BOUND`
+    when its composer never reads empty."""
+    from sessionorc.agent import HostAgent
+
+    # no send and no mark until the restart below is staged
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 3600)
+    monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 3600)
+    async with LocalClient() as c:
+        old, fed, empty, words = [await _start(agent, c, tmp_path, n, "brief0", prompt=BRIEF) for n in "aefw"]
+        agent.tmux.send_literal(words, "half a thought")
+        for sid in (old, fed, empty, words):
+            agent.sessions[sid].set_state("working", confidence="hook")
+        agent.sessions[old].first_prompt, agent.sessions[old].first_prompt_sent_at = None, "2026-10-15T08:00:00Z"
+        await agent.rpc_hook(fed, state="working")
+        assert agent.sessions[fed].hook_seen_at, "the first hook writes it"
+        for sid in (old, fed, empty, words):
+            agent._save(agent.sessions[sid])
+        seeded = HostAgent(tmux=agent.tmux)._last_hook  # what an agent started now seeds
+        assert old in seeded and fed in seeded and empty not in seeded and words not in seeded
+        agent._last_hook.clear()
+        agent._last_hook.update(seeded)
+        monkeypatch.setattr(agent_common, "FIRST_PROMPT_HOOK_WAIT", 0.2)
+        monkeypatch.setattr(agent_common, "FIRST_PROMPT_BOUND", 3.0)
+        assert await wait_for(lambda: _first(agent, empty, "SUBMITTED " + TYPED), timeout=8), "never sent"
+        rec = agent.sessions[words]
+        assert await wait_for(lambda: _marked(rec), timeout=10), "never marked at the bound"
+        assert rec.first_prompt_error == agent_common.FIRST_PROMPT_NO_HOOK and await _submitted(agent, words) == []
+        assert agent.sessions[fed].first_prompt_error is None, "a record a hook reached is never marked"

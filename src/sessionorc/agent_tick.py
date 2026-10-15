@@ -3941,6 +3941,7 @@ class TickMixin:
         if not queued:
             self._live_hook_at[sid] = time.time()
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
+        s.hook_seen_at = s.hook_seen_at or now_iso()  # the first hook, kept across restarts (§4.1, TD-720)
         if aid:
             s.adapter_id = aid
         if (path := event.get("transcript")) and isinstance(path, str):
