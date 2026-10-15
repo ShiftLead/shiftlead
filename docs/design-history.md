@@ -56,6 +56,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.1 Session substrate: tmux, one session per conversation
 
+- 2026-10-15 (TD-717, the designer; a techlead seat filled five seconds before an auto promote lost its first hook and sat eight hours at an empty composer): *A launch whose hook never comes is recovered*. The scraped send keys on the composer reading empty, not on a scraped `idle`, which Claude Code's empty composer never gives. The record keeps `hook_seen_at`, and only that seeds the agent's fresh-hook table at load, since every new Claude Code record is `confidence: hook` from its create and a restart counted its missing hook as fresh (the 47-minute mark). A supervised record marked *no hook since launch* is replayed once, with its askers told. No screen rule for the empty composer, and no coupling between a promote and a fill. Built by TD-720.
 - 2026-10-10 (TD-060 step 2, the anchor): `install --system` stops and removes the old-named system units first, refused while their server holds a session.
 - 2026-10-09 (TD-495 slice 2, grinder-ao-1): `ao service install` gains the tmux system unit's text (`service.tmux_unit_text`). It stages the text at `~/.agentorc/systemd/agentorc-tmux.service` and prints *run once as root: sudo <ao> service install --system* only when `/etc/systemd/system`'s copy is absent or differs. The `ao` path is absolute, since root's PATH has no venv. `--system` refuses a non-root caller, naming that line. As root it makes the text again for `SUDO_USER`. It never copies the stage: any session can write that file, and root would run what it says (review). It is refused while a server other than the unit's answers on the person's socket. Then it runs `daemon-reload` and `enable --now`. The unit carries `LANG=C.UTF-8`, and its tmux is the first one the agent unit's PATH finds. `ao service status` adds where the server runs, in §4.7's words.
 - 2026-10-09 (TD-489, the designer): the root press installs the watch timer beside the tmux unit. Built by TD-497.
@@ -432,6 +433,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-15 (TD-717, the designer): *brief not sent* on a team's record is replayed once; the restart Inbox row gains *brief lost twice*. Built by TD-720.
 - 2026-10-15 (TD-715, the designer): the Repo page's **waits** mark, the lanes line's *· n waiting*, and the card's *n waiting* in grey for a member whose lane only waits. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): **Hold** / **Release** on a settling entry's Repo page row, and the Settings page's **settle**. Built by TD-710.
 - 2026-10-14 (TD-703, the designer): *team card: flow changed — Apply* draws a member renamed or dropped by the definition, on a stopped team too, beside Start (*team groups* says so); the Members dialog's **Remove** winds a live member down by the sit-out form and marks an ended one. Built by TD-706.
@@ -1314,6 +1316,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-15 (TD-717, the designer): rule 1 — a lost brief, a seat included, is replayed once with `why: lost-brief`. Built by TD-720.
 - 2026-10-15 (TD-715, the designer): rule 6 — a waiting entry matches no lane and is told when its date comes or its line goes. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): rule 6 — a settling or held entry matches no lane until it settles or is released, so its news and rule 8's wait with it. Built by TD-710.
 - 2026-10-14 (TD-700, grinder-ao-1): rule 3 closes an idle seat whose `prs` or `every` due was met while it ran, and fills it on the next tick. Until this date `_seat_done` read any `seat_due` as work left for that run, so a seat that came due mid-run was never closed and never filled: ao-grind's docs-audit and test-audit seats sat idle for two days (2026-10-13/14) until Paul closed one by hand.

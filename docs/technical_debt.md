@@ -63,9 +63,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Open |
-| TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Open |
+| TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-718 | `agent_tick`'s rule-6 declaration reading is marked by the settle clock, and no test would notice if it were not (#1811) | Medium | Open |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
+| TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Open |
 
 ---
 
@@ -1220,7 +1221,8 @@ The other cases:
 **Added:** 2026-10-15 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-15 (the designer; no mockup: one mark's words and one Inbox reason) — §4.1 *A launch whose hook never comes is recovered*. The scraped send keys on the composer reading empty, whatever the record's state. A record keeps `hook_seen_at`, and only that seeds the agent's fresh-hook table at load: the cause of the 47-minute mark was that a new Claude Code record is `confidence: hook` from its create, so a restart counted its missing hook as fresh. A supervised record marked *no hook since launch*, a seat included, is replayed once (`why: lost-brief`), and the senders of its open asks are told; a second loss is the person's. Neither a promote nor a fill waits for the other. `shiftlead-hook` keeps its traceback in `hook-errors.log`. Built by TD-720. Was: Open.
+**Blocked by:** TD-720
 **Location:** design §4.1 *A brief whose first hook is lost*, §4.5a *brief not sent* mark, §6 (seat fill and promote); `src/sessionorc/agent_wake.py` (`_first_prompt_road`, `_send_first_prompts`), `src/sessionorc/agent_tick.py` (`_observe`), `src/shiftlead/adapters/claude_code/screen_rules.toml`
 
 **Why:** on 2026-10-15 at 00:42:07 MDT the home filled `ao-shiftlead-techlead-ao-1` for the held-PR ask on #1807; the ask on #1811 (opened 00:42:30) reached the same seat moments later. At 00:42:12 an auto promote restarted the host agent. The new pane's `SessionStart` hook failed with a traceback (run log `ao-shiftlead-techlead-ao-1-20261015T064207Z.log`), and no hook reached the agent. The seat sat at an empty composer, read `stalled?`, until Paul killed it at 08:37. Both asks passed their bound (`ao pr held` reads *bound 2h*) and lapsed to the person. Both PRs, each with a SHIP review, waited unread until Paul killed the seat at 08:37 and grinder-ao-1 asked again at 11:33, and grinder-ao-2's stacked #1818 waited with them. TD-348's fallback did not help, for three reasons:
@@ -1277,5 +1279,54 @@ The other cases:
 **Done when** both tests exist and fail under those mutations.
 
 **Related:** TD-710, TD-718, #1811.
+
+---
+
+## TD-720: Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-717's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1 (*A lost brief*), §4.5a *brief not sent* mark and *Inbox row: restart*; `src/sessionorc/agent_wake.py` (`_first_prompt_road`, `_send_first_prompts`, `_first_prompt_typing`), `src/sessionorc/agent.py` (`_last_hook`'s seeding at load ~L629), `src/sessionorc/agent_hook.py` and `agent_tick.py` ~L3943 (where a hook is applied), `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent_tick.py` (`_keep_running`, `_replay`), `src/shiftlead/adapters/claude_code/hook.py` (`main`), a new `src/shiftlead/hook_entry.py` and `pyproject.toml`'s `shiftlead-hook`, `src/sessionorc/paths.py` (`hook_errors_file`), `src/shiftlead/ui/inbox.py` (`restart_mark`), `src/shiftlead/ui/cards.py` (~L913, ~L951: a seat's `restart_ceiling` words)
+
+**Why:** TD-717's design. On 2026-10-15 a techlead seat filled five seconds before an auto promote lost its first hook and sat at an empty composer for eight hours, while two held-PR asks lapsed to the person.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). Slices, each its own PR:
+1. **Recovery of the send** (`sessionorc`).
+   - **`hook_seen_at`.** `Session` gains `hook_seen_at`, written by the pane's host at the first hook event applied to the record, live or drained from the queue. It is kept across saves and carried by nothing a replay copies.
+   - **Seeding at load.** `_last_hook` is seeded for a `confidence == "hook"` record only when it carries `hook_seen_at` or its brief is not `_first_prompt_due`. Today every `confidence == "hook"` record is seeded. The second test keeps every record from before the field seeded as today.
+   - **The scraped road.** `_first_prompt_road`'s `scraped` road no longer needs `state == "idle"`. It needs:
+     - no `hook_seen_at`;
+     - no entry in `_last_hook`;
+     - no try made;
+     - age at least `FIRST_PROMPT_HOOK_WAIT`;
+     - a state that is not `needs-you`, `exited` or `closed`, and not `superseded_by`.
+
+     `_first_prompt_typing` already insists on the composer reading empty for this road. An adapter with no `composer` reader keeps needing a scraped `idle`.
+   - **The mark.** `_send_first_prompts`' *no hook since launch* mark reads `hook_seen_at`, not `_last_hook`, so it is written at `FIRST_PROMPT_BOUND` across restarts.
+2. **The replay** (`sessionorc`).
+   - **Who is replayed.** The tick replays a supervised record (a team member or a seat) whose `first_prompt_error` is *no hook since launch*, on the next tick. It first closes the live record, through `rpc_close` with closer `{by: tick, why: lost-brief}` and `_mark_closed`, as rules 2 and 7 do before `_replay` (agent_tick.py ~L785–L925); the run never started, so no `restart_blocked` applies. It then replays it as rule 1's replay does: `create` with `keep_mail`, `restarts` gaining `{at, why: "lost-brief"}`, counted in `RESTART_CEILING`.
+   - **A second loss.** A record whose newest `restarts` entry is `lost-brief` and that is marked again is not replayed. It is written `restart_ceiling: {at, count, why: "lost-brief"}`, with `count` the record's `lost-brief` replays (so 1), and `ui/inbox.py`'s `restart_mark` and `cards.py`'s seat words (~L913, ~L951, which today read any seat ceiling as *fills exhausted*) read that `why` as *brief lost twice*, with no count. The fill ceiling's `tripped` test (~L2610) counts only a `why: "fill"` ceiling. The *brief not sent* mark stays.
+   - **A seat's replay** passes the fill's `closing` (`filled_for(seat_due)`) again and sets `seat_filled`, as rule 3's fill does (agent_tick.py ~L2605–L2630). `lost-brief` is not counted by the fill ceiling (`why == "fill"`). A failed close is the replay entry's `error`.
+   - **The senders.** After the replay, each sender of an `ask` or `steer` still open in the moved inbox gets a system note in the design's words. Bounds are unchanged.
+   - **Who is left alone.** A person's own session, unsupervised, is never replayed.
+3. **The hook's traceback** (`shiftlead`). `pyproject.toml`'s `shiftlead-hook` points at a new `shiftlead.hook_entry:main`, a module of the standard library alone (`src/shiftlead/__init__.py` is empty; `shiftlead.adapters.claude_code`'s `__init__` imports `sessionorc`, so the hook module cannot be the entry). It imports `shiftlead.adapters.claude_code.hook` inside a `try` and calls its `main`. An exception in the import is appended to `<home>/hook-errors.log`, the home read from `SHIFTLEAD_HOME` else `~/.shiftlead` without `sessionorc.paths` (cut to its last 256 KB when it passes it; `paths.hook_errors_file()` names the same file for readers), with the time, `SHIFTLEAD_SESSION` and the event name. The hook still exits 0.
+- **Tests:**
+  - A Claude Code record created with no hook, reading `working` with an empty composer, gets its brief by the scraped send after `FIRST_PROMPT_HOOK_WAIT`.
+  - The same record with a dialog on screen does not.
+  - A live hook-fed record from before the field (no `hook_seen_at`, brief sent) is seeded at load.
+  - An agent restarted after the launch does not seed it, sends it, and marks it at `FIRST_PROMPT_BOUND` when the composer never reads empty.
+  - A record with `hook_seen_at` is seeded as before.
+  - A marked seat is replayed once with `lost-brief`, its open ask moved and its sender told.
+  - A second loss is not replayed and reads *brief lost twice*.
+  - An unsupervised marked record is left alone.
+  - The hook's import failure writes `hook-errors.log` and exits 0.
+
+**Done when** a seat launched with its first hook lost gets its brief within `FIRST_PROMPT_HOOK_WAIT` of its composer reading empty, or is replayed once with its askers told, no record waits past `FIRST_PROMPT_BOUND` unmarked across an agent restart, and every listed test passes.
+
+**Related:** TD-717 (the design), TD-348 (the scraped send and the mark), TD-342, TD-062 (the promote).
 
 ---

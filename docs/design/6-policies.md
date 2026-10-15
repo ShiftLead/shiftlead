@@ -106,7 +106,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   home and execute on the member's node as any act does. A policy needs no grant and passes no
   gate; it acts on the record's own fields and never on text a session wrote. The rules:
   1. **Crash restart.** A supervised member **other than a seat** (a seat's ending is its own,
-     and rule 3 is the only rule that fills one) that is `exited` by a **natural exit** — `pane` true,
+     and rule 3 is the only rule that fills one, save the replay of a seat whose run never started,
+     *A lost brief* below) that is `exited` by a **natural exit** — `pane` true,
      the tool left on its own — with **no declaration** (`out_of_work` and `restart_wanted` both
      absent), **no wrap-up asked** (`wrapup_at` and `wrapup_sent_at` empty), **no stop time
      passed**, **not gated** (§6 *Usage gate*: a paused profile is not restarted into a pause)
@@ -128,7 +129,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      rule 11 — lands on a thread the new record holds; `why` is `crash`, `wanted` or `fill` (and
      `start`, `schedule`, rule 7's `brief` and rule 8's `work`, each named where it is written),
      and a replay that failed keeps its `why` and adds `error` (the text), so a failed entry still
-     says what it was trying. At the ceiling the policy stops, writes `restart_ceiling: {at, count}`
+     says what it was trying. **A lost brief** (§4.1 *A launch whose hook never comes is recovered*, TD-717): a supervised record marked *no hook since launch*, a seat included, is closed by the tick and replayed once on the next tick with `why: lost-brief`, counted in `RESTART_CEILING` and not in the fill ceiling, a seat's replay repeating its fill's context; a record that came from such a replay and loses its brief again is not replayed and is the person's (*Inbox row: restart*, *brief lost twice*). At the ceiling the policy stops, writes `restart_ceiling: {at, count}`
      on the record, and the session is a person's: the card's slot says *restarts exhausted · 3 in
      2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it under *Needs you* (§4.5a **Inbox
      row: restart**). The host agent writes no board line (§4.4's write-back acts at a person's
@@ -227,7 +228,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      reports' five-minute cadence, one read per repo, at the home in the seat's checkout (a
      node's is at the same absolute path, §4.4a; a path the home cannot see gives no reading), a
      read that failed leaving the last reading rather than zero; for `every: <d>`, when `d` has
-     passed since it was created. A supervised seat that is `exited` or `closed` with `seat_due`
+     passed since it was created. A seat whose run never started, its brief lost at launch, is replayed by rule 1's *A lost
+     brief* (TD-717), not filled here. A supervised seat that is `exited` or `closed` with `seat_due`
      set, not suspended, on a profile that is not gated, is filled: `create` with `keep_mail`
      (§4.9b), the launch record, and `seat_due` cleared; a seat that is `idle` with no `seat_due` —
      or with a `prs` or `every` one, met while it ran and so the next fill's cause, as the anchor's
