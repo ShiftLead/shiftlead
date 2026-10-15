@@ -1609,3 +1609,6 @@ def test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_on
     assert [r["name"] for r in removals] == ["hunt"]
     lines = [d.line(None) for d in teamrun.differences(plan, sessions)]
     assert lines == ["grind-b → mill-1: renamed", "grind-a → mill-2: renamed", "hunt: removed from the definition"]
+    # by `created`, not by the order the records arrive in (TD-714): reversed, the older still takes mill-1
+    pairs, _ = teamrun.renames(plan, sessions[::-1])
+    assert [(r["name"], x.name) for r, x in pairs] == [("grind-b", "mill-1"), ("grind-a", "mill-2")]

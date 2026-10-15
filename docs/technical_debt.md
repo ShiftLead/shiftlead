@@ -61,7 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
-| TD-714 | `teamrun._pairing`'s sort of orphans by `created` is held by no test, though a test is named for it (#1802) | Low | Open |
 
 ---
 
@@ -1132,23 +1131,5 @@ The other cases:
 **Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
 
 **Related:** TD-706, TD-703.
-
----
-
-## TD-714: `teamrun._pairing`'s sort of orphans by `created` is held by no test, though a test is named for it (#1802)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1800–#1810)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/teamrun.py` (`_pairing`, `orphans.sort(key=lambda r: str(r.get("created") or ""))`); `tests/test_flows.py` (`test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_one`, `_renamed`), `tests/test_ui_teams.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1802's code and running `tests/test_flows.py tests/test_ui_teams.py` (121 passed unmutated). Replacing `orphans.sort(key=lambda r: str(r.get("created") or ""))` with `pass` still passes all 121. Every fixture lists its records already in `created` order — `grind-b` (`…:01`) before `grind-a` (`…:02`) in the test named *pairs by created*, and `_renamed` writes `created` by the records' list index — so the sort is a no-op there, and the design's rule (§4.9 *A member renamed or removed*: orphans paired with newcomers *by `created`*) is held by nothing: a run that pairs in the order `sessions` happens to arrive in, which `list` does not promise, passes. Four other edits tried (the `sit_out` filter, the `relaunch`-mark hold, the role match, `MOVED` in `definition`) each fail a test.
-
-**Done when** a test hands `teamrun.renames` records of one role whose list order is the reverse of their `created`, and pairs the older with the first newcomer; it fails with the sort removed.
-
-**Related:** TD-703, TD-706.
 
 ---
