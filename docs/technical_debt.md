@@ -56,7 +56,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Designed — TD-696, TD-697, TD-698 build it |
-| TD-696 | Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule | Medium | Open |
 | TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
 | TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
@@ -1021,54 +1020,6 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** two sessions filing at the same moment get different ids with no rebase, a design entry's page shows its builds and their states, and no PR exists only to archive a design entry.
 
 **Related:** TD-585 (ledgerboard is ShiftLead's parser), TD-228 (pickable from `Blocked by`), TD-682 / #1777 (an archive-only PR).
-
----
-
-## TD-696: Build TD-693 (1): the home hands out ledger ids — `td_next`, `ids.json`, `ao td next`, and every filer's rule
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (the designer, building TD-693's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*; `src/sessionorc/` (a new `agent_ids.py` mixin beside `agent_spend.py`, `paths.py` for `ids.json`, `ledger.py`'s `ids_in`, `modes.py`'s `offline_refusal`, a new method set and its reason; `agent_serve`'s node branch already forwards on any reason, a person's call included, and is not changed), `src/shiftlead/cli.py` (`ao td next`, the `td` group's help), `src/shiftlead/briefs/entry.md` (*The number*), `src/shiftlead/briefs/designer.md`, `src/shiftlead/briefs/grinder.md`
-
-**Why:** TD-693's design. Every filer took main's highest id plus one, so two filers at once collided and one renumbered across a rebase (TD-651 → 653 → 656 on 2026-10-13; TD-693 → 694 on 2026-10-14).
-
-**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
-- **`td_next(repo, count)`**, a host-agent RPC, under one `asyncio.Lock` per repo, with no `person_only` check. `by` is the dispatcher's authenticated caller (§4.8a), never a parameter. A node forwards it to the home and refuses it offline (§4.4a's table): `td_next` gets its own set in `offline_refusal`, checked beside `HOME_EDITS` and before the `caller is None` return (else a person's call is served on the node and `ids.json` splits per host), refused in *ids.json is the home's* words. `offline_refusal` returns the reason, and `agent_serve`'s node branch already forwards on it, and is in neither `HOME_EDITS` (whose `PERSON_NODE_BOUND` would refuse a person's call from a node) nor `identity.READS`, so the verified caller reaches it. The whole call has a 45-second budget from its arrival, the wait for the lock included: a lock not taken by 30 s refuses (*busy, ask again*); the PRs are read a few at a time until 30 s, and those not read are `unread: budget`; the fetch has until 45 s and refuses past it. Every `gh` and `git` call runs through `asyncio.to_thread` or an async subprocess, killed at its deadline (`ledger._git` is a blocking `subprocess.run`). It takes the repo by its registered name, never a path, which on a node is the node's; a name registered roots of different origins share is refused naming them (not `rpc_entry_add`'s first match), and an origin `owner/repo` is accepted; roots of one origin are one repo, so the first of them serves (unlike `Registry._find`, which refuses any second hit). The CLI factors out `cmd_td_add`'s repo resolution and its `_main_checkout` default only, never its session refusal, and sends the registry's own spelling of the name (`Path(raw).expanduser().name`, the `raw` key `cmd_td_add` keeps, mapped back from the resolved root when `--repo` is not given, so a symlinked checkout keeps its registered name), or the origin's `owner/repo` when that name is shared:
-  1. list the open PRs (`gh pr list --state open --limit 200`; a failed list, or one that fills 200, is one `unread` line), then read each one's `+## TD-NNN:` lines from `gh api repos/<o>/<r>/pulls/<n>/files --paginate` (the ledger's and the archive's patches), collecting as `unread` each PR whose listing fails or is cut at 3000 files, or whose ledger file has no `patch`;
-  2. then fetch `origin/<default>` in the checkout, refusing with the reason when the fetch fails or leaves no `origin/<default>` ref, so a PR merged between the two reads is in main;
-  3. read the highest id in the ledger and its archive at that ref (`ledger.ids_in`). The ledger is `.shiftlead.yml`'s `ledger:` and the archive `ledger.archive_path` of it, never `Registry.LEDGER`'s default; step 1 matches the PRs' files on the same two paths;
-  4. take the highest of those and `ids.json`'s `last`, and give the next `count` ids (1 to 10);
-  5. write `last` and append to `given`, `{id, by, at}`, keeping the newest 200; `ids.json` and the lock are keyed by the origin, `owner/repo` for GitHub (ssh and https alike) and the lowercased URL otherwise, and `by` is the dispatcher's `caller`, or `person` when there is none.
-  `ids.json` is written whole, through a temp file and a rename, as `spend.json` is.
-- **`ao td next [--repo] [--count] [--json]`**: prints the ids one a line; `unread` goes to standard error, and into `--json` as `{repo, ids, unread}`. The repo defaults as `ao td add`'s does. It is open to every session and the person. The `td` group's help stops saying *a person's own* for the group; the wording is the `td` parser's `help=` in `cli.py` (`help.py` holds no `td` text).
-- **The filers' rule.** In `entry.md`, *The number* becomes `ao td next`, with the old rule (main, the archive, every open PR's diff, re-read before the merge) as the fallback when `ao` is not there or refuses. `designer.md` and `grinder.md` point new entries at it. A build's own entries (the designer's) take `--count`.
-- **Tests:**
-  - two concurrent `td_next` calls give different ids;
-  - a PR that merges between the PR read and the fetch is counted;
-  - `by` is the caller, whatever the call carries;
-  - a node forwards the call, a person's included, and refuses it offline;
-  - PRs not read by 30 s are `unread: budget`, and the ids still come;
-  - a lock not taken by 30 s refuses *busy, ask again*;
-  - a name two checkouts of different origins share is refused, and `owner/repo` picks one; two checkouts of one origin are served by `owner/repo`;
-  - a symlinked checkout is sent by its registered name;
-  - two checkouts with one origin, one cloned by ssh and one by https, share one counter;
-  - three calls on one repo at once all answer inside the client's timeout;
-  - a person's call on a node, its checkout at another path, reaches the home and is served by name;
-  - a repo with a custom `ledger:` reads that file and its archive;
-  - an open PR's added heading raises the floor;
-  - a PR whose files cannot be read is named in `unread`, and the ids still come;
-  - a failed fetch refuses;
-  - `last` beats a lower main, so a given id that is never used is never given again;
-  - `given` keeps 200;
-  - `--count 3` gives three ids in a row.
-
-**Done when** two sessions asking at the same moment get different ids with no rebase, and every listed test passes.
-
-**Related:** TD-693 (the design), TD-585 (ledgerboard is ShiftLead's parser), TD-219 (`ao td add`).
 
 ---
 
