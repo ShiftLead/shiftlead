@@ -1018,6 +1018,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-14 (TD-686 slice 2, grinder-ao-1): *How the reader hears of a PR* — an `ask` carrying a PR whose required checks never started is sent, with *PR #<n>: checks never started on <head>: <reason>* in the reply (the techlead's finding on #1768).
 - 2026-10-14 (TD-641, grinder-ao-1): *The director seat answers permission prompts* — a node answers by rule again, but only while its link is up and only once the home has filed the *Answered for you* FYI over it (`answered_by_rule`, a request, not a notification); a link that is down or a filing refused leaves the prompt for the person, so no answer goes untold. This lifts the 2026-10-13 *a node matches no rule*.
 - 2026-10-13 (TD-641, grinder-ao-1; the techlead's read of #1697): *The director seat answers permission prompts* — a node matches no rule: its hook is the node's, but the *Answered for you* FYI is mail, whose one writer is the home (§9 invariant 15), and one filed to a node's own person inbox went untold. Carrying it over the link is left on TD-641.
 - 2026-10-13 (TD-641, grinder-ao-1; its review): *What always reaches the person* — a stream such as `/dev/null` is no path outside the worktree, so a rule may allow `… 2>/dev/null`; another member's worktree, the repo's `.git`, a `.claude/settings*` file and a path that cannot be placed count as outside; the check reads the strings the adapter names (`prompt_strings`), never a file's content.
