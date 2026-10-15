@@ -70,6 +70,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings | Medium | Open — paused for the TD-722 amendment |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
+| TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
+| TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Open |
 
 ---
 
@@ -1433,5 +1435,54 @@ The other cases:
 **Done when** the test exists and fails under that mutation.
 
 **Related:** TD-710, #1823.
+
+---
+
+## TD-730: A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Blocked by:** decision (paul) — the amendment to TD-722's design (a per-repo anchor, names unique per repo), from the 2026-10-15 interactive round, lands first; this entry's teams are the teams of one repo it defines
+**Location:** `docs/design/4.4-host-agent.md` (*Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
+
+**Why:** Paul, 2026-10-15: *when a TD is added to the ledger in shiftlead we can require that a team is selected (by the techlead if not beforehand by the user) … If TDs are added outside shiftlead, the host agent can identify them and send them to a techlead to have them resolved … We should also have a check for stale entries, e.g. team1 is assigned entries but is no longer defined.* Under TD-722 a repo has any number of teams (a db team and a compliance team), each with its own lanes, but an entry names only an `Owner:` role word. So two teams' grinders both take every pickable `Owner: grinder` entry. A claim keeps them off the same entry at once, but nothing keeps compliance work with the compliance team.
+
+**Fix:** a design round. What Paul and the session proposed (2026-10-15), for the designer to check against the design:
+1. **A `Team:` header field, not `Owner: <team>:<role>`.** `Owner:` is read by dev-cadence's synced `scripts/ledger.py` against a fixed word list in every cadence repo, ShiftLead or not. A field declared on the ledger's `Fields:` line is how `Waits` joined (TD-715), and dev-cadence reads past it. Its values are the repo's team names.
+2. **Required only where the repo has two or more teams**; one team is implied, so no existing entry is edited. `Owner: paul` and `Owner: anchor` entries carry none, since the anchor is the repo's (TD-722's amendment).
+3. **Set at Add entry**: the form's team pick, optional. Left blank, the techlead that drafts the entry writes it.
+4. **An entry with no `Team:` on a repo of several teams, or one naming a team no definition holds any more (stale)**, is withheld from every lane, as a waiting entry is (TD-715). The home hands it to a techlead of the repo's teams to tag. The Repo page lists it as *needs a team*, and `ao org check` names the stale ones.
+5. The lanes reader (`lane_matches` over `repo_lanes`) takes an entry only into its `Team:`'s lanes.
+
+**Done when** the design says how an entry names its team, how an untagged or stale one is found and resolved, and how the lanes read it, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-722, TD-721, TD-715, TD-707, TD-731.
+
+---
+
+## TD-731: The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.4-host-agent.md` (*A new entry settles before it is pickable*, its **Hold** bullet: *refused for an id that has settled and is not held … a settled entry is taken out of a lane by its `Blocked by:`*); `docs/design/4.5a-controls.md` (*Repo page: Hold / Release on a settling entry*); `docs/design/4.7-cli.md` (`ao td hold`); `src/sessionorc/settle.py` (the hold and its refusal)
+
+**Why:** 2026-10-15. TD-722 (`design-first`) merged at 12:44 MDT while Paul and an interactive session were still reviewing its proposal with Fable. It settled at 12:54, and Paul's `ao td hold TD-722` at about 12:56 was refused: *TD-722 has settled, and a hold is a settling entry's … take a settled entry out of a lane with its Blocked by: line*. designer-ao-1 designed it as #1832 by 13:30. Its build TD-724 (`Kind: build`, which settles 0 minutes) was claimed at once and under review as #1840 before the round's findings were adopted, and had to be stopped by hand. A `Blocked by:` line is a PR: minutes at best, and only after the person has a session write it. So the window is the person's only press, and a build has none.
+
+**Fix:** a design round, Paul's direction (2026-10-15):
+1. **The person may hold any unclaimed entry, settled or not**: the same `held: {at, by}` record, the same Hold and Release on the Repo page row (now on every pickable row, not only a settling one) and `ao td hold`. A held entry is withheld until Release or until its `sig` changes, as now.
+2. **A claimed entry** is refused with its holder's name, since a hold does not take a lease. The person's way there is the claimer's manager or the claimer. Or, the round decides, the hold also asks the claimer to drop it.
+3. **An entry filed during a conversation with the person** (Add entry from a session working with the person, `ao td add` with a flag) may land held, so the conversation ends before any lane looks.
+
+**Done when** the design says when the person may hold an entry, what a hold on a claimed entry does, and how an entry can land held; its build entries are filed; and this entry's `Blocked by:` names them.
+
+**Related:** TD-707, TD-710, TD-722, TD-724, TD-730.
 
 ---
