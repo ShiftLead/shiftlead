@@ -352,9 +352,12 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     LEDGER_FLAG,  # noqa: F401
     LEDGER_FOLD,  # noqa: F401
     LEDGER_LISTS,  # noqa: F401
+    LOCAL_ID,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401
+    _tid,  # noqa: F401
     compact_in,  # noqa: F401
     completed_rows,
+    design_builds,  # noqa: F401
     doing_chips,  # noqa: F401
     entry_branch_exists,
     entry_hand,
