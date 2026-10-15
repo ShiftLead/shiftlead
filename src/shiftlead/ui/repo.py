@@ -6,6 +6,7 @@ each name from the app as before.
 
 from __future__ import annotations
 
+import re
 import subprocess
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
@@ -118,6 +119,64 @@ LEDGER_LISTS = (
 LEDGER_FLAG = ledger.NO_KIND  # an *other* row's flag (§4.4 *Repo facts*), the words `ledger.flags` uses
 LEDGER_FOLD = 4  # a list folds past this many rows, with *+n more*
 PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
+LOCAL_ID = re.compile(r"TD-(\d+)")  # a `blocked_by` item that is a local id, not a decision or `<repo>#` item
+
+
+def _tid(item: str) -> str:
+    """A local id written `TD-NNN`, as the archive's are (`TD-42` and `TD-042` are one entry), or ''."""
+    m = LOCAL_ID.fullmatch(item.strip())
+    return f"TD-{int(m.group(1)):03d}" if m else ""
+
+
+def design_builds(
+    entries: Collection[Mapping[str, Any]],
+    archived: Collection[str],
+    held: Mapping[str, str],
+    prs: Mapping[str, Mapping[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, list[str]]]:
+    """**Its builds** (§4.5 screen 11, §4.5a *Repo page: its builds line*, TD-693): for each `design-first`
+    entry whose `blocked_ids` is not empty, by its id, `{builds, done}` — `builds` its ids in that order,
+    each `{id, state, pr, url, held, blocked_by, row}`: `state` *archived* (in `archived`), else *review*
+    with its holder's claim `pr` and its `url` (`prs`, the motion rows'), else *held* by `held`'s names, else *open*;
+    `blocked_by` the design's other builds its own `blocked_by` still names; `row` the id as the ledger
+    writes it when it has a row to link to, else ''. `done` is every build archived. And by each
+    build's ledger id, the designs it builds (the back-link), from the same pass."""
+    by_tid = {_tid(str(e.get("id") or "")): e for e in entries}
+    held_t = {_tid(k): v for k, v in held.items() if _tid(k)}
+    prs_t = {_tid(k): v for k, v in prs.items() if _tid(k) and isinstance(v.get("pr"), int)}
+    gone = {_tid(a) for a in archived}
+    lines: dict[str, dict[str, Any]] = {}
+    back: dict[str, list[str]] = {}
+    for e in entries:
+        ids = [b for b in e.get("blocked_ids") or [] if _tid(b)]
+        if e.get("kind") != "design-first" or not ids:
+            continue
+        mine = {_tid(b) for b in ids}
+        builds = []
+        for b in ids:
+            tid, row = _tid(b), by_tid.get(_tid(b))
+            if tid in gone:
+                builds.append(
+                    {"id": tid, "state": "archived", "pr": None, "url": "", "held": "", "blocked_by": [], "row": ""}
+                )
+                continue
+            if row is not None:
+                back.setdefault(str(row["id"]), []).append(str(e["id"]))
+            state = "review" if tid in prs_t else "held" if held_t.get(tid) else "open"
+            blocked = [x for x in (_tid(str(y)) for y in (row or {}).get("blocked_by") or []) if x in mine and x != tid]
+            builds.append(
+                {
+                    "id": str(row["id"]) if row else tid,
+                    "state": state,
+                    "pr": (prs_t.get(tid) or {}).get("pr"),
+                    "url": (prs_t.get(tid) or {}).get("url") or "",
+                    "held": held_t.get(tid, ""),
+                    "blocked_by": blocked,
+                    "row": str(row["id"]) if row else "",
+                }
+            )
+        lines[str(e["id"])] = {"builds": builds, "done": all(x["state"] == "archived" for x in builds)}
+    return lines, back
 
 
 def missing_seams(r: Mapping[str, Any]) -> dict[str, Any]:
@@ -228,12 +287,20 @@ def ledger_lists(
     from the entry's `blocked_by` (§4.4 *Repo facts*), and a live check *live check* or *waits for
     its build to be live* with its build's PRs (§4.9b, TD-323; the template's), sorted by priority
     then id; `fold` the rows past the fold; an *other* row carries `flag`, this reader's flag on it.
+    A design's row carries `builds`, its builds line, and a build's `builds_of`, the designs it builds
+    (`design_builds`, TD-693).
     The board's open decided lines, the lanes' work orders
     (§4.5a *Repo page: decided lines*, TD-384), come first in *pickable*, each with its `decided`
     and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it, None
     where the ledger was not read and the lanes could not be (`lanes` None or the entries unread)."""
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+    builds, builds_of = design_builds(
+        entries,
+        (r.get("ledger") or {}).get("archived") or [],
+        held,
+        {x["ref"]: {"pr": x.get("pr"), "url": x.get("pr_url")} for x in motion},
+    )
     known = lanes is not None and teamrun.lane_entries(r) is not None
     orders = [
         {
@@ -249,7 +316,13 @@ def ledger_lists(
     for key, label in LEDGER_LISTS:
         rows = sorted(
             (
-                {**e, "held": held.get(e["id"], ""), **({"flag": LEDGER_FLAG} if key == "other" else {})}
+                {
+                    **e,
+                    "held": held.get(e["id"], ""),
+                    **({"flag": LEDGER_FLAG} if key == "other" else {}),
+                    "builds": builds.get(e["id"]),
+                    "builds_of": builds_of.get(e["id"], []),
+                }
                 for e in entries
                 if e.get("for_page") == key
             ),
