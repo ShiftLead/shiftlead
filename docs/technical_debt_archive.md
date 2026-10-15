@@ -12487,3 +12487,23 @@ The window's `w.name` assignment, by contrast, is caught.
 **Done when** the briefs say it and the next design whose last build merges is archived in that build's PR.
 
 **Related:** TD-693 (the design), TD-682 / #1777 and TD-688 / #1780 (archive-only PRs).
+
+## TD-702: The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved — checked, no change
+**Location:** design §4.8 *the doing log*, §4.5a *team card: Answer needed / Doing*, *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`, `keep=50`), `src/shiftlead/ui/org.py` (`DOING_KEPT`, `doing_rows`)
+
+**Why:** Paul, 2026-10-14: *I do not see any "doing" entries from our auditors — lets make sure they report what they are doing.* They do report: `~/.shiftlead/doing.jsonl` holds 31 lines from the shiftlead auditors, the last at 2026-10-13T15:28:25Z. But the ring keeps a team's last 50 lines, and ao-grind's last 50 (from 2026-10-14T23:10Z) are the two grinders' and the techlead's alone: three busy members fill it in under a day, so a seat that runs every ten PRs is never seen. The filter chips (`doing_chips`) can only pick from what the ring kept.
+
+**Fix:** decide what the feed keeps so every member is visible — e.g. the ring keeps each doer's newest few beside the team's last 50, or keeps per member — and how the feed and its chips draw a member whose newest line is old.
+
+**Resolved:** 2026-10-14 (PR #PRNUM) — no change. Paul, 2026-10-14: *I'm not sure having the auditor items disappear is necessarily bad - the doing feed is just honest. I suppose it does not hurt to check that its not getting flooded with unhelpful info tho.* The check: ao-grind's last 50 lines, 2026-10-15T00:33Z to 04:30Z, are 4 hours of grinder-ao-1, grinder-ao-2, techlead-ao-1 and both auditors' refilled runs. Every line names its item and its step (*TD-696: #1794 open — independent review and CI, then the techlead*); none is a log line or a message. The densest pattern is a PR's lifecycle — open, CI, rebased, asked of the techlead — about four lines an item, each a real change of state. Not flooded. An auditor's lines leaving within a day is the feed saying it has not run, which is what exposed TD-700.
+
+**Done when** the design says what the doing log keeps per member, and a build entry carries it.
+
+**Related:** TD-700 (why the auditors also stopped writing), TD-176.

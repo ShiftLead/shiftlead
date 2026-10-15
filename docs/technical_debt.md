@@ -61,7 +61,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
 | TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
-| TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Open |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Open |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 
@@ -1140,7 +1139,7 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Status:** Open
 **Location:** design §6 rule 3, §4.9b *Seats with a trigger*; `src/sessionorc/agent_tick.py` (`_seat_pass` ~L2315, `_seat_done` ~L2353, `_seat_due` ~L2400)
 
-**Why:** ao-grind's two auditors stopped running for two days with nobody told. `ao status --json`, 2026-10-14: `ao-shiftlead-docs-audit-ao-1` created 2026-10-13T15:26:54Z, `seat_due: {at: 2026-10-13T16:15:47Z, by: prs}`, `seat_count.prs: 100`, idle since 2026-10-14T00:00Z; `ao-shiftlead-test-audit-ao-1` created 2026-10-12T21:00:36Z, `seat_due` at 22:27:10Z, idle the same. Each came due 49 and 87 minutes into its run, as ten PRs merged under it. `_seat_pass` fills a seat only when it is `exited` or `closed` with `seat_due` set, and closes an idle one only when `_seat_done` — which is `not s.seat_due` for a `prs` or `every` trigger. A seat due while it runs is therefore never closed, so never filled. Paul's Close of test-audit on 2026-10-14 ~21:50 MDT let the tick fill it at once (`restarts[-1]: {why: fill, at: 2026-10-15T03:52:03Z}`). Its symptom on the page: no auditor line in the Doing feed (TD-702 is the other half).
+**Why:** ao-grind's two auditors stopped running for two days with nobody told. `ao status --json`, 2026-10-14: `ao-shiftlead-docs-audit-ao-1` created 2026-10-13T15:26:54Z, `seat_due: {at: 2026-10-13T16:15:47Z, by: prs}`, `seat_count.prs: 100`, idle since 2026-10-14T00:00Z; `ao-shiftlead-test-audit-ao-1` created 2026-10-12T21:00:36Z, `seat_due` at 22:27:10Z, idle the same. Each came due 49 and 87 minutes into its run, as ten PRs merged under it. `_seat_pass` fills a seat only when it is `exited` or `closed` with `seat_due` set, and closes an idle one only when `_seat_done` — which is `not s.seat_due` for a `prs` or `every` trigger. A seat due while it runs is therefore never closed, so never filled. Paul's Close of test-audit on 2026-10-14 ~21:50 MDT let the tick fill it at once (`restarts[-1]: {why: fill, at: 2026-10-15T03:52:03Z}`). Its symptom on the page: no auditor line in the Doing feed (TD-702, archived: the feed's limit stays).
 
 **Fix:** a `prs` or `every` seat that is idle, has run, and is pushed closes as a done seat does, and the standing `seat_due` fills it on the next tick — the due that came during the run is the next run's cause, as the anchor's `work` trigger already reads it (`_seat_done`'s `work` branch). The count the run covered is not counted twice: `seat_count` is read from the fill on.
 
@@ -1167,26 +1166,6 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** a test holds a branch with upstream `origin/main`, one commit squash-merged into it under another sha, and its remote branch gone, reading 0 unpushed; and a commit that never reached the remote still reads 1.
 
 **Related:** TD-700, TD-080 (one measure, computed by the host agent).
-
----
-
-## TD-702: The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (ao-paul, with Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Open
-**Location:** design §4.8 *the doing log*, §4.5a *team card: Answer needed / Doing*, *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`, `keep=50`), `src/shiftlead/ui/org.py` (`DOING_KEPT`, `doing_rows`)
-
-**Why:** Paul, 2026-10-14: *I do not see any "doing" entries from our auditors — lets make sure they report what they are doing.* They do report: `~/.shiftlead/doing.jsonl` holds 31 lines from the shiftlead auditors, the last at 2026-10-13T15:28:25Z. But the ring keeps a team's last 50 lines, and ao-grind's last 50 (from 2026-10-14T23:10Z) are the two grinders' and the techlead's alone: three busy members fill it in under a day, so a seat that runs every ten PRs is never seen. The filter chips (`doing_chips`) can only pick from what the ring kept.
-
-**Fix:** decide what the feed keeps so every member is visible — e.g. the ring keeps each doer's newest few beside the team's last 50, or keeps per member — and how the feed and its chips draw a member whose newest line is old.
-
-**Done when** the design says what the doing log keeps per member, and a build entry carries it.
-
-**Related:** TD-700 (why the auditors also stopped writing), TD-176.
 
 ---
 
