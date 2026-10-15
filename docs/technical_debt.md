@@ -62,6 +62,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
+| TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Open |
 
 ---
 
@@ -1147,5 +1148,30 @@ The other cases:
 **Done when** dev-cadence's rename (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`) reads as three renames on dc-grind's stopped card, Apply or Start brings the team back under the new names with no old record replayed beside them, and every listed test passes.
 
 **Related:** TD-703 (the design), TD-619 (a profile change reaches the team by Apply), TD-163 (Members…), TD-654.
+
+---
+
+## TD-707: A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.4 *Pickable is derived, never written* (L56), §4.8 *Choosing in a free-pick lane*, §5 (`org.yml`, `.shiftlead.yml`), §4.5a (Repo page ledger rows), §4.7 (`ao repo`, `ao progress claim`, a new `ao td hold`), §6 rule 8
+
+**Why:** Paul, 2026-10-14: *Lets talk about adding a wait for new TDs, Im thinking 5min default and we can use 10min. That way as new items are added, thoughts/changes that come to mind quickly are not too late to make changes.* And: *we would only want to require a settle on new items we generate. The idea is to give the user time to change their mind / add thoughts. Items from a designer should go immediately. Maybe … make a settle value available for all items (defaults to zero on all but design-first items, which default to 5min)?* The case that prompted it: TD-702 merged in #1792 at 2026-10-15T04:22Z, the designer opened its design (#1795) at 04:32Z and merged it at 04:40Z, while Paul was still deciding whether TD-702 was wanted at all (he had just said the feed *is just honest*). A ledger PR takes 10–15 minutes through the cadence, so a change made by PR cannot land inside a short window: the window has to be one in which the person can **hold** the entry, not one in which they must finish the edit.
+
+**Fix** (agreed with Paul in the conversation; the designer writes it into the design):
+- **`settle:`**, a map from `Kind` to a duration, in `org.yml` with a repo override in `.shiftlead.yml`, like a role's settings. Built-in default `{design-first: 5m}`; any Kind not listed settles 0. This repo sets `{design-first: 10m}`. Keyed on the entry's own `**Kind:**` line, so every reader decides from the entry alone, and the designer's builds (`Kind: build`) go at once.
+- **The clock** starts when the home first sees the id on `origin/<default>` in its repo reading (recorded per repo by the home; `**Added:**` holds a date only). Until it runs out the entry is not pickable: `ao repo` and the Repo page show *settles in 7m*, and `ao progress claim` is refused with *settling until <time>* (`--force` does not pass it).
+- **Hold**: while an entry settles, its Repo page row has a **Hold** button, and `ao td hold <id>` / `ao td hold <id> --release` does the same. The hold is the home's record, not a ledger edit, so it takes effect at once with no PR; it keeps the entry unpickable until released, or until the entry's text changes on `origin/<default>`, which ends the hold and starts the window again.
+- **Not settled**: a decided board line, a red PR's work order, and every Kind the map leaves at 0. A `design-first` finding from an auditor or hunter settles too (accepted: it is a question the person may want a say on).
+- To decide in the design: whether the person gets a quiet Inbox row when an entry starts settling, or the Repo page alone shows it.
+
+**Done when** the design says the settle map, its clock, the Hold and its release, and what never settles, and build entries carry it.
+
+**Related:** TD-702 (the case that prompted it), TD-693 / TD-696 (the home hands out ids, `ao td next`), TD-223 (pickable is derived).
 
 ---
