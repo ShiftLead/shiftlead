@@ -72,7 +72,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
 | TD-735 | Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held | Medium | Open |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
-| TD-737 | Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body | Medium | Open |
 | TD-738 | The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button | Medium | Open |
 | TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
 | TD-742 | Five behaviours of TD-716 slice 1 (#1843) are held by no test: a repeat claim on a waiting entry, an `until` with no date's refusal words, a capitalised `Waits:` word, `Waits:` dash forms, and a held entry's `waiting` list | Low | Open |
@@ -1505,29 +1504,6 @@ The other cases:
 **Done when** the two §4.5a rows draw as written and the tests above pass.
 
 **Related:** TD-707, TD-731, TD-735.
-
----
-
-## TD-737: Every page change paints the light theme first, then turns dark: the theme is set by `app.js` at the end of the body
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/base.html` (`app.css` in `<head>`, `app.js` loaded at the end of `<body>`); `src/shiftlead/ui/static/app.js` (`applyTheme`, its first lines: `ao.theme` from `localStorage`, else `prefers-color-scheme`, written to `html[data-theme]`); `src/shiftlead/ui/static/app.css` (`:root` holds the light tokens, `html[data-theme="dark"]` the dark ones, and no `prefers-color-scheme` rule); `docs/design/2-goals.md` (goal 12, *Dark mode*); `docs/design/4.5-ui.md` (*Browser mechanics*)
-
-**Why:** Paul, 2026-10-15: *often when switching pages Repo<->Org<->Inbox there is a flash of the light mode version of the page and then it resolves to the dark mode. If this flash is necessary, it should flash the dark page then resolve to the light mode page so that people using dark mode are not blinded by the light. There is likely work we can do to render these pages more quickly as well.* Each page is a full navigation, server-rendered (§4.5 *Browser mechanics*). The CSS's defaults are the light tokens, and the dark ones apply only once `html` carries `data-theme="dark"`. That attribute is written by `applyTheme`, and `app.js` runs only after the whole body has been parsed. So the browser can paint the parsed page light before the script turns it dark, and the slower the page, the longer the flash. Goal 12 says the terminal panes are dark whatever the theme, *so light chrome is the jarring case at night*: the flash is that case on every page change.
-
-**Fix:**
-1. **The theme before the first paint.** A small inline script in `base.html`'s `<head>`, before the stylesheet, does `applyTheme`'s read (`ao.theme`, else `prefers-color-scheme`) and sets `html[data-theme]`. `applyTheme` in `app.js` stays for the toggle. Add `<meta name="color-scheme" content="dark light">` so the browser's own canvas, before any CSS, is dark, and set `color-scheme` per `html[data-theme]` in `app.css`, so scrollbars and native controls follow the chosen theme rather than the system's. A theme stored as light then paints light from the first frame; Paul's *flash dark, then light* is needed only if the read itself can fail, and then the default is dark.
-2. **A line in §4.5 *Browser mechanics*** in the same PR: the theme is set in `<head>`, before the first paint, so a page change never shows the other theme.
-3. **The render time, measured first.** Time each page's server render (Org, Repo, Inbox, on the live home's data) and its first paint, and say in the PR where the time goes. File each slow part found as its own entry, not in this one.
-
-**Done when** a page change on a dark browser shows no light frame (checked by the builder in a headless browser on a scratch home: a screenshot at first paint is dark), the *Browser mechanics* line is written, and the render-time measurement is in the PR, with any slow part filed.
-
-**Related:** TD-372 (the *host agent unreachable* banner that flashed on every page change).
 
 ---
 
