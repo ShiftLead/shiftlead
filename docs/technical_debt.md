@@ -61,9 +61,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
 | TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
 | TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
-| TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Open |
+| TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Designed — TD-705 builds it |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Open |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
+| TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Open |
 
 ---
 
@@ -1177,7 +1178,8 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-14 (the designer; no mockup: the feed's rows are drawn as before) — §4.8 *the doing log*: the team's last fifty calls and, beside them, each doer's newest five (the call's record `id`); a doer with no call in 30 days keeps nothing beyond the fifty. The feed is the kept calls in time order, newest first; the Repo page's chips offer every doer kept. One keep rule, in `sessionorc`, used by the host agent's ring and the UI's copy alike. Built by TD-705. Was: Open.
+**Blocked by:** TD-705
 **Location:** design §4.8 *the doing log*, §4.5a *team card: Answer needed / Doing*, *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`, `keep=50`), `src/shiftlead/ui/org.py` (`DOING_KEPT`, `doing_rows`)
 
 **Why:** Paul, 2026-10-14: *I do not see any "doing" entries from our auditors — lets make sure they report what they are doing.* They do report: `~/.shiftlead/doing.jsonl` holds 31 lines from the shiftlead auditors, the last at 2026-10-13T15:28:25Z. But the ring keeps a team's last 50 lines, and ao-grind's last 50 (from 2026-10-14T23:10Z) are the two grinders' and the techlead's alone: three busy members fill it in under a day, so a seat that runs every ten PRs is never seen. The filter chips (`doing_chips`) can only pick from what the ring kept.
@@ -1228,5 +1230,35 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** the design names the definition and its matching rule, and a build entry carries it.
 
 **Related:** §4.9c flows, TD-418.
+
+---
+
+## TD-705: Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-702's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.8 *the doing log*, §4.5 screen 11 *Doing*, §4.5a *team card: Answer needed / Doing* and *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`: its load, `append` and compaction), `src/sessionorc/agent.py` (the comment ~L736, `rpc_doing_log`'s docstring ~L854), `src/sessionorc/paths.py` (`doing_log_file`'s docstring), `src/shiftlead/ui/org.py` (`DOING_KEPT`), `src/shiftlead/ui/app.py` (the `DOING_KEPT` import ~L298, the `doing` event's ring ~L3833), `src/shiftlead/ui/templates/repo_part.html` (the Doing section's *i* text ~L100, which says *the last fifty*)
+
+**Why:** TD-702's design. The ring kept a team's last fifty calls, and ao-grind's three busy members filled it in under a day, so the auditors' lines (31 in `doing.jsonl`) never showed.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **One keep rule**, `kept(ring, now, keep=50, per_doer=5, quiet_days=30) -> ring`, in `sessionorc` (beside `DoingLogStore`, whose constructor gains `per_doer` beside `keep`): the union of the ring's last `keep` and, for each `id` whose newest call is younger than `quiet_days`, its newest `per_doer`, in time order. The ring's append order is kept: *newest* is the latest position, and `at` is read only to judge quiet. An entry with no `id` is one doer of its own (`""`); one whose `at` cannot be read counts as quiet. `now` is the home's clock at load and at each `append` (the UI passes its own; a few seconds' difference is harmless). `DoingLogStore` applies it at load, on `append` and when it compacts `doing.jsonl`. The UI's copy of the ring (the `doing` event in `ui/app.py`, `del ring[:-DOING_KEPT]`) applies the same function, and `DOING_KEPT` and its import go. Every comment and docstring that says *the last fifty*, and `repo_part.html`'s *i* text, say *the last fifty and each doer's newest five*.
+- **Nothing else changes**: `doing_log`, the `doing` event, `doing_rows` and `doing_chips` read the ring as they do. The feed is newest first, so a seldom doer's lines sit at their age.
+- **Tests:**
+  - three busy doers' 60 calls keep a fourth doer's 5 older ones;
+  - a doer's 6th-newest call beyond the 50 goes;
+  - a doer quiet for 30 days keeps nothing beyond the 50;
+  - load, append and compaction agree, and a `doing.jsonl` written under the old rule loads with the quiet doers' lines back (the 31 auditor lines are in the file today);
+  - an entry with no `id`, and one with a garbage `at`, are kept without a crash;
+  - `tests/test_repo_facts.py`'s `test_the_doing_log_keeps_the_last_calls_per_team_and_compacts_its_file` (`keep=3, compact_at=8`) passes unchanged, since its `at` values (`str(i)`) are unreadable and so quiet; the `per_doer` tests write real instants (`now_iso()`'s form);
+  - in `tests/test_ui_events_paths.py`, beside its `doing` event test, the UI's ring (`st.doing` in the stream, read back through its `groups` output) after a `doing` event equals the store's.
+
+**Done when** an auditor that calls `ao doing` once a day stays in its team's feed and chips while busier members call hourly, and every listed test passes.
+
+**Related:** TD-702 (the design), TD-176 (the doing log), TD-700 (why the auditors also stopped writing).
 
 ---
