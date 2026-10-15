@@ -67,6 +67,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-718 | `agent_tick`'s rule-6 declaration reading is marked by the settle clock, and no test would notice if it were not (#1811) | Medium | Open |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Open |
+| TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
+| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Open |
+| TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 
 ---
 
@@ -1328,5 +1331,79 @@ The other cases:
 **Done when** a seat launched with its first hook lost gets its brief within `FIRST_PROMPT_HOOK_WAIT` of its composer reading empty, or is replayed once with its askers told, no record waits past `FIRST_PROMPT_BOUND` unmarked across an agent restart, and every listed test passes.
 
 **Related:** TD-717 (the design), TD-348 (the scraped send and the mark), TD-342, TD-062 (the promote).
+
+---
+
+## TD-721: The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Blocked by:** TD-722
+**Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
+
+**Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
+
+1. **The header** (`group_head.html`, §4.5a *team groups*): the flow chip and *flow changed* / *definition changed* with **Apply**, ✉ *n* unread, *anchor held*, the *answered for you* mark, *n PRs waiting*, *n ready to close*, the *needs you* pill, the run's state (*concluded*, *wound down … by …*, *stopped*, *work waiting*), and the notes under it (*over its line*, *stops*, *started … for*).
+2. **The controls**: Start, Wind down, Stop now, Forget all, and the ***i*** panel (Definition, Members…, Open file, Flow on Settings →, who for what, *not concluded:*).
+3. **The member cards** (`card.html` compact, with their state pills and the lane's count) and the **+** card.
+4. **A repo two teams service** names both in its *serviced by* line but draws only the first team's facets (`serving[0]`); the second team's card on the Org has nothing on the page that is meant to expand it.
+
+**Fix:** a design round on screen 11: the page opens with the servicing team's whole Org card — header, controls, facets, member cards — drawn by the same templates, so the page cannot drift from the card, and the lists below expand it. Two teams on one repo are two cards, listed together and never combined (Paul, 2026-10-15, TD-722). It decides whether the member cards fold as on the Org; and how the page keeps the header and cards current, since the Org takes them from `/events` deltas and the Repo page re-reads `?part=1` on a 30 s poll. Then one or more build entries.
+
+**Done when** screen 11 says the page carries everything the team's Org card shows, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-722, TD-176 (slice 5 built the page), TD-418, TD-604, TD-693.
+
+---
+
+## TD-722: One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** `docs/design/4.9-org-team-project.md` (*Projects*, *Teams*: `projects: [...]`, `manager.home`, a member's `home`, the guardians example with a nested team; *Home and reach*); `docs/design/4.10-messages.md` (*across teams, by project*: the `project` badge, *the first of its team's projects that lists its home repo*); `docs/design/4.5-ui.md` (screen 1 *The Org, team-first*, screen 6 `repo_teams`, screen 11); `docs/design/4.5a-controls.md` (*team groups*: the header's place, *mixed*); `docs/design/4.9b-techlead.md` (*The director seat*); `docs/design/5-configuration.md` (`org.yml`, a repo's `.shiftlead.yml`); [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md) (*a team may span projects*)
+
+**Why:** Paul, 2026-10-15, in the conversation TD-721 waited on: *one repo per team, declared. We still want to be able to have multiple teams per repo (e.g. db team, compliance team) and those can be listed together (per repo) but not auto-combined* — and of a grouping such as Guardians, *a project heading*, placed **on the repo** (*project on the repo*). The design today lets a team span projects and a project hold several repos, and infers a team's repo from where its live members sit (`team_repo`); every project in the org file holds one repo, and no team spans two. The inference is what leaves the header's *mixed* place, `repo_teams`' first-team-in-definition-order rule, and a Repo page that can expand only one team's card (TD-721). The cases for a team over several repos each split by repo: a function across repos (docs, audits, dependency bumps) is a role or flow stage in each repo's team; a product over several repos is one team per repo, sequenced by cross-repo `Blocked by: <repo>#TD-NNN`; the cost a team per repo adds is its seats, which an on-call seat and a team managed by the person already keep small.
+
+**Fix:** a design round:
+1. **A team declares one repo** — `repo:` in its definition, replacing `projects: [...]`, `manager.home` and a member's `home`; a repo's `.shiftlead.yml` team's repo is that repo. A repo has any number of teams.
+2. **A project is a heading on repos** — `projects:` in the org file keeps listing repos, and a repo sits in at most one project; a team's project is its repo's. A repo in no project is its own heading. Nothing acts on a project but the mail gate and the brief's Project block.
+3. **Mail and reach stay as they are**, read off the repo: *across teams, by project* (TD-582) keys on the repo's project, so two teams on one repo always share one; the Project block names the project's other repos.
+4. **The director** (TD-636, TD-642, TD-657) is the org's, above every heading: what it reads of the org's repos (an org-wide Project block: every registered repo's checkout) and where it is drawn (with the person, at the top of the Org page).
+5. **The Org page groups project → repo → team cards**: a repo's teams listed together, each its own whole card, never combined; the *mixed* place and `repo_teams`' first-team rule go. The Repo page is one repo group expanded (TD-721).
+6. **What goes**: §4.9's guardians example (one team over several repos, a nested team) becomes several teams under a Guardians heading; the ADR's *a team may span projects* is superseded, with a dated line in the history.
+7. **Migration**: a definition carrying `projects:` or `home:` on a team — refused by name, or read for a release with a warning — and the backfill (TD-723). Then build entries.
+
+**Done when** the design says the above, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-721, TD-723, TD-582, TD-636, TD-642, TD-657, TD-040.
+
+---
+
+## TD-723: Backfill TD-722: samscrape and contractmatch under one ContractMatch project
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** anchor
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-722
+**Location:** `~/.shiftlead/org.yml` (`projects:` — today `samscrape` and `contractmatch`, one repo each); `~/samscrape/.shiftlead.yml`, `~/contractmatch/.shiftlead.yml` (their teams, defined there since 2026-10-03)
+
+**Why:** Paul, 2026-10-15: *file a backfill to have samscrape and contractmatch both be on the ContractMatch project.* The two repos are one product; once a project is a heading on repos (TD-722), they share one, which draws them together on the Org page, lets their teams settle things by mail (§4.10 *across teams, by project*) and gives each session the other repo in its Project block.
+
+**Fix:** once TD-722's build is live, one project, `contractmatch` (drawn *ContractMatch* if the design gives a heading a display name), listing both repos with their checkouts per host, in place of the two one-repo projects; the teams in each repo's `.shiftlead.yml` changed only as TD-722's migration says. Paul decided the change on 2026-10-15; the anchor makes it once TD-722's build is live, with a backup of the org file first (`org.yml.bak-<date>-<what>`), as earlier org-file edits had.
+
+**Done when** the Org page draws samscrape and contractmatch under one ContractMatch heading, and a samscrape session's brief names contractmatch's checkout in its Project block.
+
+**Related:** TD-722.
 
 ---
