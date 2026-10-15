@@ -12271,3 +12271,21 @@ The window's `w.name` assignment, by contrast, is caught.
 **Related:** TD-682 (the design), TD-687 (the row), dev-cadence#TD-115 (the same mapping in `forge.py`, for the cadence check), TD-613 and TD-637.
 
 **Resolved:** 2026-10-14 (PR #1766, slice 1; PR #1768, slice 2) — slice 1: the reading tells an Actions job that never started (`checks: not_run`, `not_run: {reason, kind, runs}`, verdicts kept as `jobs` by job id per head), every reader of `checks` and the pages. Slice 2: `reports.at_done`/`done_verdicts` and `_checks_at_done`'s `not_run` refusal in §4.8's words, an `ask`'s *checks never started* line, `promote.read_checks`' third value `checks_not_run` (cached per sha; a rollback's read keeps main's), and `workorders.ci_not_run(repos, promotes)` for TD-687. Left for the next design PR on §4.5a (the techlead's note on #1766): the *team card: Repo facet* row describes *· n red* but not *· n CI never ran*.
+
+## TD-690: Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-688's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.6 *A path in the pane is a link*, §4.5a *Focus pane: a path is a link*; `src/sessionorc/agent.py` (`_resolve_paths`, `rpc_paths`, `PATHS_RUNS_MAX`), its tests
+
+**Why:** TD-688's design. Paul, 2026-10-14: *add links in our transcripts to any file that is actually available on the corresponding machine (e.g. ~/.bashrc would not have a link currently)*.
+
+**Resolved:** 2026-10-14 (PR #1774) — `_resolve_paths` answers any readable regular file on the record's host, its real path judged, and `PATHS_PRIVATE` (`agent_common`, three tuples: trees, credential directories, credential names, with a container node's `nodes/*/env`) stays text; design §4.6 *A path in the pane is a link* names the list; `tests/test_paths_rpc.py`.
+
+**Done when** a path in the pane naming a readable regular file anywhere on the session's host is a link, and every path under `PATHS_PRIVATE` stays text.
+
+**Related:** TD-688 (the design), TD-501 (the pane's links), TD-691 (the transcript's, which read this bound).
