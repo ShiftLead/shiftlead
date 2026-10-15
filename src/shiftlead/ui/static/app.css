@@ -622,6 +622,8 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .lanecount { margin-left: 5px; padding: 0 4px; border-radius: 3px; font-weight: 600; text-transform: none; letter-spacing: 0;
   color: var(--lc); background: color-mix(in srgb, var(--lc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--lc) 45%, transparent); }
 .lanecount.k-pickable { --lc: var(--k-pickable); } .lanecount.k-design { --lc: var(--k-design); }
+/* a lane that takes only entries that wait (TD-716): grey, never solid — nothing there to act on */
+.lanecount.k-waiting { --lc: var(--muted); font-weight: 400; }
 .lanecount.solid { color: #fff; background: var(--lc); }
 .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
 /* TDs in motion in columns (§4.5a **Columns**, TD-252): one grid per row with the same tracks, so

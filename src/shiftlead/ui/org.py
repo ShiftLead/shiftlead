@@ -113,14 +113,21 @@ def _blocks(win: Mapping[str, Any] | None) -> dict[str, Any]:
     return {"opened": o, "closed": c, "opct": round(100 * o / (o + c), 1) if o + c else 50.0}
 
 
-def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str, Any]) -> dict[str, Any] | None:
+def lanes_line(
+    team: str,
+    lanes: Mapping[str, Any] | None,
+    by_kind: Mapping[str, Any],
+    entries: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     """The **lanes line** (§4.5a *team card: Repo facet*, §4.4 *In a team's lanes*, TD-361), from
     `ledger.in_lanes`' reading: what the team's lanes take, the rest of the pickable by owner, each
     member out of work with unheld work in its lane, and the hovers of the three segments a lane
     takes; `text`, the line as words, which the team card carries as the *i* beside *Technical debt*
     (TD-418) where the Repo page draws it whole; `members`, each record's own count by id
-    (`lane_count`). None for a team none of
-    whose records carries a lane: the bars stand alone."""
+    (`lane_count`). What a lane would take but for its wait (TD-716) is counted after the kinds as
+    *· 4 waiting*, its hover each id and what it waits for (`entries`, the reading's entries by id), and
+    a member out of work whose lane only waits reads *out of work, its lane waiting*. None for a team
+    none of whose records carries a lane: the bars stand alone."""
     if not lanes or not team:
         return None
     rest = list(lanes.get("rest") or [])
@@ -142,6 +149,13 @@ def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str,
     text += "".join(
         f" · {m['name']} out of work with {len(m['ids'])} in its lane" for m in lanes.get("out_of_work") or []
     )
+    # what waits (§4.4 *Counted apart*, TD-716): apart from the kinds, and never *out of work with n*
+    by_id = entries or {}
+    waits = [i for ids in (lanes.get("waiting") or {}).values() for i in ids]
+    idle_waiting = list(lanes.get("out_of_work_waiting") or [])
+    if waits:
+        text += f" · {len(waits)} waiting"
+    text += "".join(f" · {m['name']} out of work, its lane waiting" for m in idle_waiting)
     return {
         "team": team,
         "pickable": n_pick,
@@ -153,10 +167,25 @@ def lanes_line(team: str, lanes: Mapping[str, Any] | None, by_kind: Mapping[str,
             {**m, "title": f"{', '.join(m['ids'])} — in its lane, held by nobody"}
             for m in lanes.get("out_of_work") or []
         ],
+        "waiting": len(waits),
+        "waiting_title": "; ".join(f"{i} {teamrun.wait_words(by_id.get(i) or {}) or 'waits'}" for i in waits),
+        "out_of_work_waiting": [
+            {**m, "title": f"{', '.join(m['waiting'])} — its lane waits: {teamrun.waits_tally(m['waiting'], by_id)}"}
+            for m in idle_waiting
+        ],
         "titles": {"pickable": pick, "design": design, "live-check": live},
         "text": text,
-        # each record's own count (§4.5a *card: compact*, TD-428), by id: what its card draws in its pill
-        "members": {str(m["id"]): {"n": len(m["ids"]), "k": int(m.get("k") or 0)} for m in lanes.get("members") or []},
+        # each record's own count (§4.5a *card: compact*, TD-428), by id: what its card draws in its pill,
+        # and what its lane would take but for a wait (TD-716), drawn grey where it takes nothing else
+        "members": {
+            str(m["id"]): {
+                "n": len(m["ids"]),
+                "k": int(m.get("k") or 0),
+                "w": len(m.get("waiting") or []),
+                "waits": teamrun.waits_tally(m.get("waiting") or [], by_id),
+            }
+            for m in lanes.get("members") or []
+        },
         # a count links to its list only when the Repo page draws that list (it draws no empty one)
         "listed": {k: int(by_kind.get(k) or 0) > 0 for k in ("pickable", "design", "live-check")},
     }
@@ -167,11 +196,22 @@ def lane_count(v: Mapping[str, Any], lanes: Mapping[str, Any] | None) -> dict[st
     TD-418, built by TD-428): from `lanes_line`'s `members`, how many entries the member's own lane
     takes that no live record holds, `n` or `n/k` where `k` > 1 live records of the team carry the same
     lane; purple (`design`) for a `design-first` lane, the pickable blue otherwise; soft, and **solid**
-    while the record carries `out_of_work` and its pill reads *idle*. None at 0, on a record with no
-    lane, and on one that has ended."""
+    while the record carries `out_of_work` and its pill reads *idle*. A lane that takes nothing but
+    entries that wait (TD-716) draws *4 waiting* in grey in the count's place, never solid. None at 0,
+    on a record with no lane, and on one that has ended."""
     got = ((lanes or {}).get("members") or {}).get(str(v.get("id") or ""))
-    if not got or not got.get("n") or not v.get("lane") or v.get("state") in DEAD:
+    if not got or not v.get("lane") or v.get("state") in DEAD:
         return None
+    if not got.get("n"):
+        if not (w := int(got.get("w") or 0)):
+            return None
+        said = "entry in its lane waits" if w == 1 else "entries in its lane wait"
+        return {
+            "text": f"{w} waiting",
+            "title": f"{w} {said}: {got.get('waits')}",
+            "kind": "waiting",
+            "solid": False,
+        }
     n, k = int(got["n"]), int(got.get("k") or 0)
     shared = k > 1
     return {
@@ -430,7 +470,12 @@ def team_lanes(team: str, fleet: list[dict[str, Any]], r: Mapping[str, Any] | No
     `teamrun.repo_lanes` runs over the fleet — the team's records for its lanes, every live record of
     the repo for what is held; None with no reading or no lane."""
     got = teamrun.repo_lanes(teamrun.lane_entries(r), str((r or {}).get("root") or ""), fleet).get(team)
-    return lanes_line(team, got, teamrun.lane_kinds(r))
+    return lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r))
+
+
+def entries_by_id(r: Mapping[str, Any] | None) -> dict[str, Mapping[str, Any]]:
+    """The reading's ledger entries by id: what the lanes line's *waiting* hover reads (TD-716)."""
+    return {str(e["id"]): e for e in ((r or {}).get("ledger") or {}).get("entries") or () if isinstance(e, dict)}
 
 
 # a summary's three facets, in their order: Repo, TDs in motion, Answer needed / Doing

@@ -325,6 +325,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     completed_title,  # noqa: F401
     doing_rows,  # noqa: F401
     drawn_facets,  # noqa: F401
+    entries_by_id,
     lane_count,  # noqa: F401
     lanes_line,
     motion_rows,  # noqa: F401
@@ -1378,7 +1379,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
             "completed": completed_rows(r, sessions, now),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
-            "lanes": [ln for team, got in lanes.items() if (ln := lanes_line(team, got, teamrun.lane_kinds(r)))],
+            "lanes": [
+                ln
+                for team, got in lanes.items()
+                if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
+            ],
             "boards": boards,
             "horizon": hz,
             "doing": summary["doing"],

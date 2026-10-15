@@ -1521,8 +1521,13 @@ def _repo_line(r: dict[str, Any]) -> str:
         decided += f", {len(syncs)} sync PR{'' if len(syncs) == 1 else 's'} to land" if syncs else ""
         decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         orders = [*orders, *reds]
-        # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710)
-        withheld = sum(1 for e in led["entries"] if e.get("for_page") == "pickable" and _settle_mark(e))
+        # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710),
+        # and so is one whose wait stands (§4.4 *An entry says what it waits for*, TD-716)
+        withheld = sum(
+            1
+            for e in led["entries"]
+            if e.get("for_page") == "pickable" and (_settle_mark(e) or teamrun.wait_words(e))
+        )
         # the page's seven kinds as the kind bar names them (§4.4 *Repo facts*, §4.7, TD-418)
         led_part = (
             f"{len(led['entries'])} open entries{decided}: "
@@ -1820,14 +1825,22 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # withheld by the home's settle clock (§4.4, TD-710): said after the owner
                     if settling := _settle_mark(e):
                         owner += f" {settling}"
+                    # what it waits for (§4.4 *An entry says what it waits for*, TD-716): said after the owner
+                    if waits := teamrun.wait_words(e):
+                        owner += f" {waits}"
                     print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")
             # a member out of work with unheld work in its own lane (§4.4 *In a team's lanes*, TD-361)
+            # and one whose lane only waits (§4.4 *Counted apart*, TD-716): it waits, it is not work left
+            by_id = {e["id"]: e for e in (r.get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
             for x in (r.get("lanes") or {}).values():
                 for m in x["out_of_work"]:
                     print(f"  {m['name']} is out of work with {len(m['ids'])} in its lane: {', '.join(m['ids'])}")
+                for m in x.get("out_of_work_waiting") or []:
+                    tally = teamrun.waits_tally(m["waiting"], by_id)
+                    print(f"  {m['name']} is out of work; its lane waits: {tally}: {', '.join(m['waiting'])}")
             board = r.get("board") or {}
             if board.get("error"):
                 print(f"  board: could not look — {board['error']}")
