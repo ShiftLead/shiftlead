@@ -187,6 +187,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     claim_draft,  # noqa: F401
     closer_of,
     draft_folder,  # noqa: F401
+    idle_from,  # noqa: F401
     launch_params,  # noqa: F401
     log,  # noqa: F401
     model_env,  # noqa: F401
@@ -194,6 +195,7 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     read_checkout,  # noqa: F401
     read_draft_claim,  # noqa: F401
     stat_dir,  # noqa: F401
+    subagents_live,  # noqa: F401
     tick_ready,  # noqa: F401
     write_model_file,  # noqa: F401
 )
@@ -721,6 +723,9 @@ class HostAgent(
         # rule 9 (§6, TD-241): team → when the home's reading of *finished* first held; in memory, and
         # dropped the tick it stops holding, so a restart of the home starts the settle again
         self._finished_first: dict[str, datetime] = {}
+        # record address → its `subagents_live` at the last tick (§4.2 *Working on its own*, TD-734):
+        # a flip with no event behind it is pushed by the tick
+        self._subagents_were: dict[str, bool] = {}
         # team → that reading's first tick, where no manager is live to carry `finished_sent_at` and a
         # member was left open with work: the note to the person is owed until the last one is gone
         self._finished_owed: dict[str, datetime] = {}

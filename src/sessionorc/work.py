@@ -194,6 +194,8 @@ def finished(
 
     - a **seat** or the **manager**, when live, must be `idle` — declared or not; a seat never
       declares and the manager's word is a judgement about these same records;
+    - an `idle` record carrying `subagents_live` (the view's reading, §4.2 *Working on its own*,
+      TD-734) is working on its own, not idle: *grinder-dc-1 idle, subagent live*;
     - a live **member** must be `idle` with `out_of_work` or `restart_wanted` on its record: one
       that declared and then took a turn is `working` with the word still there;
     - a dead member with `out_of_work` is counted; one `exited` with its pane and no declaration
@@ -218,9 +220,13 @@ def finished(
             continue  # the flow sat it out (§4.9c): passed over whatever it declared
         name, state = str(_f(r, "name") or _f(r, "id")), str(_f(r, "state"))
         live = state not in DEAD
+        # an idle record whose own subagent runs is working on its own, not idle (§4.2, TD-734)
+        alive = live and state == "idle" and bool(_f(r, "subagents_live"))
         if r is manager or _f(r, "seat") is not None or _f(r, "name") in seats:
             if live and state != "idle":
                 why.append(f"{name} {state}")
+            elif alive:
+                why.append(f"{name} idle, subagent live")
             continue
         wants, out = _said(r, "restart_wanted"), _said(r, "out_of_work")
         asked = (waiting or {}).get(str(_f(r, "id"))) if live else None
@@ -230,6 +236,8 @@ def finished(
         if live:
             if state != "idle":
                 why.append(f"{name} {state}")
+            elif alive:
+                why.append(f"{name} idle, subagent live")
             elif wants is None and out is None:
                 why.append(f"{name} idle, not declared")
             else:

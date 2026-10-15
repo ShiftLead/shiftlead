@@ -213,6 +213,7 @@ class TickMixin:
         await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
+        await self._subagent_flips(snapshot_at)
         await self._keep_running(snapshot_at)
         await self._finished_pass(snapshot_at)
         await self._work_marks(snapshot_at)
@@ -599,6 +600,21 @@ class TickMixin:
         reading = self._usage.get(profile) or {}
         tool, account = reading.get("tool"), reading.get("account")
         return f"{tool} · {account}" if tool and account else str(account or profile)
+
+    async def _subagent_flips(self, now: datetime) -> None:
+        """A live subagent goes stale at `STALL_AFTER` with no event to say so (design §4.2 *Working
+        on its own*, TD-734): each record's last `subagents_live` is kept, and a record whose reading
+        flipped since the last tick is pushed, so the card leaves *working* without waiting for a change."""
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        flipped = False
+        seen: dict[str, bool] = {}
+        for r in records:
+            key = self._address(r)
+            seen[key] = live = agent_common.subagents_live(r, now)
+            flipped = flipped or self._subagents_were.get(key, live) != live
+        self._subagents_were = seen
+        if flipped:
+            await self._push_changes()
 
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
@@ -1128,8 +1144,11 @@ class TickMixin:
             return
         if s.state != "idle" or s.confidence != "hook" or s.pending or s.out_of_work or s.restart_wanted:
             return
-        if not s.since or now - _parse(s.since) < IDLE_NUDGE:
-            return
+        if agent_common.subagents_live(s, now):
+            return  # its own work is running, and its card says *working* (§4.2 *Working on its own*, TD-734)
+        idle = agent_common.idle_from(s)
+        if idle is None or now - idle < IDLE_NUDGE:
+            return  # counted from the later of `since` and `subagent_at`, so a subagent just ended is not idling
         if s.nudged_at and _parse(s.nudged_at) >= _parse(s.since):
             return  # this stretch was nudged already: never a second before the first is answered
         if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
@@ -1179,6 +1198,8 @@ class TickMixin:
             return
         if s.confidence != "hook" or s.pending or now - _parse(str(s.nudged_at)) < IDLE_NUDGE:
             return
+        if agent_common.subagents_live(s, now):
+            return  # not marked while its own work runs (§6 rule 4, TD-734)
         s.idle_open = {"at": now_iso(), "ref": ref}
         log.info("%s: still idle %s after the nudge with %s open — idle · open work", s.id, IDLE_NUDGE, ref or "a debt")
         self._save(s)
@@ -1991,9 +2012,10 @@ class TickMixin:
         for team in [t for t in self._finished_owed if t not in by_team]:
             del self._finished_owed[team]  # its records are forgotten: nothing left to announce
 
-    def _finished_view(self, r: Session) -> dict[str, Any]:
+    def _finished_view(self, r: Session, now: datetime) -> dict[str, Any]:
         """What `work.finished` reads of a record, as this host addresses it: a node's member names
-        its controllers in its own host's form (§4.4a), and the manager is found by address."""
+        its controllers in its own host's form (§4.4a), and the manager is found by address; a live
+        subagent is read at the tick's `now`, as the view reads it at its own (§4.2, TD-734)."""
         return {
             "id": self._address(r),
             "name": r.name,
@@ -2006,13 +2028,14 @@ class TickMixin:
             "controllers": self._ctl(r),
             "out_of_work": r.out_of_work,
             "restart_wanted": r.restart_wanted,
+            "subagents_live": agent_common.subagents_live(r, now),
         }
 
     async def _finished_team(self, team: str, records: list[Session], now: datetime) -> datetime | None:
         """One team's pass of rule 9: when its reading first held, to keep for the next tick, or None
         when it does not hold or the wind-down is over."""
         by_address = {self._address(r): r for r in records}
-        views = [self._finished_view(r) for r in records]
+        views = [self._finished_view(r, now) for r in records]
         mine = [v for v in views if v["unattended"] is not False and not v["superseded_by"]]
         top = work_mod.manager_of(mine)
         manager = by_address[top["id"]] if top is not None else None
@@ -2536,6 +2559,7 @@ class TickMixin:
         — hook-confirmed `needs-you` on a permission (a question or a menu is a person's);
         `stalled` — `stalled?`; `open` — carrying `idle_open`."""
         causes: list[dict[str, Any]] = [{"by": "asks", "ask": i} for i in s.asks_ids(home=self.host)]
+        now = datetime.now(UTC)
         me = self._address(s)
         members = [
             r
@@ -2553,7 +2577,8 @@ class TickMixin:
                 elif by == "stalled":
                     met = r.state == "stalled?"
                 else:
-                    met = r.state == "idle" and bool(r.idle_open)
+                    # a standing mark is no cause while a subagent of the member's runs (§6 rule 4, TD-734)
+                    met = r.state == "idle" and bool(r.idle_open) and not agent_common.subagents_live(r, now)
                 if met:
                     causes.append({"by": by, "member": self._address(r)})
         return causes
@@ -2811,14 +2836,18 @@ class TickMixin:
         return sorted({w for w in found if w not in handed})
 
     def _seat_has_run(self, s: Session, now: datetime) -> bool:
-        """A seat to close (§6 rule 3): hook-confirmed idle for `SEAT_IDLE_GRACE`, with its git known
-        and nothing uncommitted or unpushed — a seat that left work is the board's, as today."""
+        """A seat to close (§6 rule 3): hook-confirmed idle for `SEAT_IDLE_GRACE` — counted from the later
+        of `since` and `subagent_at`, with no live subagent (TD-734: a seat that ended its turn on a
+        reviewer subagent is working) — with its git known and nothing uncommitted or unpushed — a seat
+        that left work is the board's, as today."""
         git = s.git or {}
+        idle = agent_common.idle_from(s)  # from the later of `since` and `subagent_at` (TD-734)
         return bool(
             s.state == "idle"
             and s.confidence == "hook"
-            and s.since
-            and now - _parse(s.since) >= SEAT_IDLE_GRACE
+            and idle is not None
+            and now - idle >= SEAT_IDLE_GRACE
+            and not agent_common.subagents_live(s, now)
             and git
             and not git.get("dirty")
             and not git.get("unpushed")
@@ -4092,8 +4121,7 @@ class TickMixin:
         if (model := event.get("model")) and str(model) != s.model:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
             agent_common.write_model_file(s)  # the commit hook's trailer follows it (§4.2, TD-638)
-        if delta := event.get("subagent_delta"):
-            s.subagents = max(0, s.subagents + int(delta))
+        self._apply_subagents(s, event, at)
         if event.get("prompt") and not stale and (s.first_prompt or s.first_prompt_error):
             # a prompt went in (the tool's UserPromptSubmit, §4.1 *No prose in the argv*): the brief
             # typed by the tick, or a person's or a manager's send that cures *brief not sent*
@@ -4127,6 +4155,24 @@ class TickMixin:
                 s.set_state(state, confidence="hook", pending=pending)
                 self._hook_state.pop(sid, None)  # a hook's word: no screen's verdict to go back from
         self.store.save(s)
+
+    @staticmethod
+    def _apply_subagents(s: Session, event: dict[str, Any], at: Any) -> None:
+        """The subagent count and its time (design §4.2 *Working on its own*, TD-734). An event the
+        adapter marked `subagent_seen` sets `subagent_at` to the later of the record's and its own
+        time — a queued event's `at`, else now — so a drained event never moves it back; a
+        `subagents_reset` older than the record's `subagent_at` is a stale start, and is not applied."""
+        when = datetime.fromtimestamp(at, UTC) if isinstance(at, int | float) else datetime.now(UTC)
+        try:
+            last = _parse(s.subagent_at) if s.subagent_at else None
+        except ValueError:
+            last = None
+        if event.get("subagents_reset") and (last is None or when >= last):
+            s.subagents, s.subagent_at, last = 0, None, None
+        if delta := event.get("subagent_delta"):
+            s.subagents = max(0, s.subagents + int(delta))
+        if event.get("subagent_seen") and (last is None or when > last):
+            s.subagent_at = when.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
     def _permission_waiting(self, sid: str) -> bool:
         return any(k[0] == sid and not f.done() for k, f in self._waiters.items())

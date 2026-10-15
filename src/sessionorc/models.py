@@ -80,6 +80,7 @@ NODE_OWNED = frozenset(
         "model",
         "context",
         "subagents",
+        "subagent_at",
         "files",
         "links",
         "wrapup_sent_at",
@@ -706,7 +707,7 @@ def normalize_ref(ref: str) -> str:
 
 # What counts as something worth waking a manager for (design §4.8 "Waking a manager", TD-049). The
 # vocabulary is deliberately short, and the exclusions are the point: `last_output`, `tail`,
-# `since`, `seen_at`, `git`, `subagents`, `model` and `context` move on almost every tick of a healthy
+# `since`, `seen_at`, `git`, `subagents`, `subagent_at`, `model` and `context` move on almost every tick of a healthy
 # session, so a digest over the whole record would wake a lead continuously and be worth less
 # than the poll it replaces. What is left is what a lead acts on: the state it may have to answer
 # or restart, the pending thing it would answer, what the session has claimed or finished, what it
@@ -951,6 +952,10 @@ class Session:
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
+    # When a subagent last said anything (design §4.2 *Working on its own*, TD-734): the time of the last
+    # event the adapter marked `subagent_seen`, never moved back, so a replay never revives a stale
+    # pill. `subagents_live` reads it with `subagents`; both are reset on a fresh conversation and on exit.
+    subagent_at: str | None = None
     # The files the session's work changed (design §4.2 *The record's `files`*, TD-538): `{path, at, sha}`
     # read from git with the status — the porcelain's paths and the branch's commits since its base —
     # newest first, a path once, at most `RECENT_FILES`, `sha` absent on a dirty path. The Focus Session
@@ -1436,6 +1441,8 @@ class Session:
         self.pending = pending
         if state not in ("exited", "closed"):
             self.ended = None  # a run that came back has not ended
+        else:
+            self.subagents, self.subagent_at = 0, None  # no subagent outlives its process (§4.2, TD-734)
 
     def report_progress(self, entry: ProgressEntry) -> bool:
         """Upsert a `progress` entry by reference, in place so the lane order the session declared
