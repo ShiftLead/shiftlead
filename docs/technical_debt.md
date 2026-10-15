@@ -62,7 +62,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-705 | Build TD-702: the doing log keeps each doer's newest five beside the team's last fifty | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Open |
-| TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Open |
+| TD-707 | A new `design-first` entry is pickable the moment it lands, so the person has no time to change it or add to it: a settle window per Kind, and a Hold | Medium | Designed — TD-710 builds it |
+| TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
 
 ---
 
@@ -1158,7 +1159,8 @@ The other cases:
 **Added:** 2026-10-14 (ao-paul, with Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-14 (the designer; no mockup: a row's mark and one button) — §4.4 *A new entry settles before it is pickable*: `settle:` per Kind in `settings.yml` and the repo's `.shiftlead.yml` (not `org.yml`: the home applies it and reads no `org.yml`), built-in `{design-first: 5m}`; the home's clock in `ledger_seen.json` from the first reading that holds the id, restarted by an edit while settling; a settling or held entry matches no lane and a claim on it is refused, `--force` too; **Hold** / **Release** on the Repo page and `ao td hold`, the person's and an interactive session's, refused to an unattended one; no Inbox row. Built by TD-710. Was: Open.
+**Blocked by:** TD-710
 **Location:** design §4.4 *Pickable is derived, never written* (L56), §4.8 *Choosing in a free-pick lane*, §5 (`org.yml`, `.shiftlead.yml`), §4.5a (Repo page ledger rows), §4.7 (`ao repo`, `ao progress claim`, a new `ao td hold`), §6 rule 8
 
 **Why:** Paul, 2026-10-14: *Lets talk about adding a wait for new TDs, Im thinking 5min default and we can use 10min. That way as new items are added, thoughts/changes that come to mind quickly are not too late to make changes.* And: *we would only want to require a settle on new items we generate. The idea is to give the user time to change their mind / add thoughts. Items from a designer should go immediately. Maybe … make a settle value available for all items (defaults to zero on all but design-first items, which default to 5min)?* The case that prompted it: TD-702 merged in #1792 at 2026-10-15T04:22Z, the designer opened its design (#1795) at 04:32Z and merged it at 04:40Z, while Paul was still deciding whether TD-702 was wanted at all (he had just said the feed *is just honest*). A ledger PR takes 10–15 minutes through the cadence, so a change made by PR cannot land inside a short window: the window has to be one in which the person can **hold** the entry, not one in which they must finish the edit.
@@ -1173,5 +1175,35 @@ The other cases:
 **Done when** the design says the settle map, its clock, the Hold and its release, and what never settles, and build entries carry it.
 
 **Related:** TD-702 (the case that prompted it), TD-693 / TD-696 (the home hands out ids, `ao td next`), TD-223 (pickable is derived).
+
+---
+
+## TD-710: Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (the designer, building TD-707's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *A new entry settles before it is pickable*, §4.7 `ao td hold` and `ao repo`, §4.8 *A claim is a lease*, §5 `settle:`, §6 rule 6, §4.5a *Repo page: Hold / Release on a settling entry* and *Settings page: settle*; `src/sessionorc/ledger.py` (`entries`, `reading`, `lane_matches`, `in_lanes`), `src/sessionorc/paths.py` (beside `ids_file`), `src/sessionorc/agent_ids.py` (beside `rpc_td_next`), `src/sessionorc/agent.py` (`rpc_progress`'s claim), `src/sessionorc/agent_tick.py` (rule 6's `lane_seen` ~L1353), `src/shiftlead/repoconfig.py`, `src/shiftlead/cli.py` (`cmd_repo` ~L1710, a `cmd_td_hold` beside `cmd_td_next`), `src/shiftlead/ui/templates/repo_part.html`, the Settings page
+
+**Why:** TD-707's design. TD-702 was designed and merged within 18 minutes of being filed, while Paul was still deciding whether he wanted it, and a ledger PR is too slow to stop that.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). Slices, each its own PR:
+1. **The clock and the reading** (`sessionorc`). `settle:` is read from `settings.yml` and the repo's `.shiftlead.yml` (the repo's wins key by key; built-in `{design-first: 5m}`; durations as `5m`, `1h`, `0`).
+   - `ledger_seen.json` beside `ids.json` (`paths`), keyed by origin as `ids.json` is: `{<origin>: {<id>: {at, sig, held?}}}`, where `sig` is a hash of the entry's section text. It is written by the ledger reading, and a repo's first reading records every id it holds at the epoch.
+   - An entry that has not settled carries `settling: {until}`, and a held one carries `held: {at}`. An edit that changes `sig` while settling restarts the window, and on a held entry it ends the hold and restarts the window.
+   - `lane_matches` / `in_lanes`, rule 6's `lane_seen` and rule 8's news, and every lane count treat either mark as matching no lane. `pickable` stays cadence §2.4's.
+2. **Hold and the claim**. `td_hold {repo, id, release}` beside `td_next`:
+   - Refused to an unattended session's caller, and for an id that has settled and is not held. Release makes the entry pickable at once.
+   - `rpc_progress`'s declared claim on a settling or held ledger reference is refused in the design's words, and `force` does not pass it.
+   - `ao td hold <id> [--repo] [--release]`. `ao repo` prints *settles in 7m* / *held 2h* after the owner.
+3. **The pages**. The Repo page's row draws the mark and **Hold** / **Release**, and the Settings page gets the **settle** field (`set_settings` gains `settle`). This repo's `.shiftlead.yml` gains `settle: {design-first: 10m}`.
+- **Tests:** a new design-first entry is withheld for its window and pickable after it; a `build` entry goes at once; a repo's first reading settles every existing id; an edit inside the window restarts it, and an edit after settling does not; a hold withholds past the window until Release or an edit; a claim on a settling or held entry is refused with `--force` too; an unattended session's `td_hold` is refused, and an interactive one's passes; rule 6 tells a member of the entry only once it settles; the repo's `settle:` overrides the install's key by key; the §4.5a doc-bound tests pass.
+
+**Done when** an entry filed `Kind: design-first` in this repo is untaken for ten minutes, a Hold pressed in that time keeps it untaken until Release, a designer's `Kind: build` entries are picked at once, and every listed test passes.
+
+**Related:** TD-707 (the design), TD-693 / TD-696 (`ids.json`, `td_next`), TD-223 (pickable is derived), TD-702 (the case).
 
 ---

@@ -448,7 +448,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      work. For a supervised member, not a seat, carrying `out_of_work`, the tick keeps
      **`lane_seen: {at, ids}`** (home-owned) — written on the first tick after the declaration as
      the ids of the entries in its repo's ledger reading (§4.4 *Repo facts*) that **match its
-     lane**, and cleared with `out_of_work`. **The first write is the ledger as it stood at the
+     lane**, and cleared with `out_of_work`. An entry that settles or is held (§4.4 *A new entry settles
+     before it is pickable*, TD-707) matches no lane until it has settled or been released, so it is
+     told when a member may take it, and rule 8's news, reading the same lanes, waits the same. **The first write is the ledger as it stood at the
      declaration**: the ledger file as the last commit of `origin/<default>` before
      `out_of_work.at` held it, read from the checkout's history, so an entry merged between the
      declaration and the first tick that looks is new and is told; an entry the checkout's reading

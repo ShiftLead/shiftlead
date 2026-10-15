@@ -35,6 +35,7 @@
 usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
   grind: {"5h": 30, week: {per_day: 10}}      # line 70% on the session window; 100 − 10 × days left on the weekly
   grind-api: {day: "$5", week: "$20"}        # a metered profile's reserve is an amount (§4.2a): the window's 100; "2M tok" without prices
+settle: {design-first: 5m}                    # §4.4 *A new entry settles before it is pickable* (TD-707): per Kind, how long a new ledger entry waits, holdable, before a lane may take it; a Kind not listed 0; a repo's .shiftlead.yml settle: wins key by key; set_settings and the Settings page's field
 usage: {max_age: 1h}                          # §6 *A reading the gate can no longer trust* (read by the gate, set by set_settings, ao gate --max-age and the Settings page's field): past it the gate projects; `off` never. A key of its own: every key under usage_gate is a profile's name
 teams:                                        # per team, by the name org.yml or a repo's teams: defines
   ao-grind:
@@ -159,6 +160,7 @@ board: docs/user_attention.md         # the person's board, optional (*The seams
 gate: python3 scripts/check_cadence.py --pr {pr} --json   # the merge gate, a command judged by its exit code (*The seams*)
 worktree_setup: scripts/hydrate_worktree.sh   # run in every new worktree (*The seams*)
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
+settle: {design-first: 10m}           # §4.4 *A new entry settles*: wins over settings.yml's settle:, key by key
                                       # this repo's own flows and roles are directories in .shiftlead/, not keys (§4.9c)
 teams:                                # §4.9: the repo's own teams, aggregated into the org; org.yml wins a name
   grind: {flows: [build], manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
@@ -254,7 +256,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   template's. `commands:` is also read in its older list form, `[{name, run}]`.
   Convention notices (§6 rule 12) and the SessionStart line (§4.3) run only in a dev-cadence repo:
   features of one, never requirements. **Who reads them**: the host agent, at the home, reads
-  `ledger:`, `board:`, `gate:` and `worktree_setup:` as it reads `promote:` — for the repo facts
+  `ledger:`, `board:`, `gate:`, `worktree_setup:` and `settle:` as it reads `promote:` — for the repo facts
   (§4.4: the seam state the Repo page and `ao doctor` draw), the gate run (§6 rule 10 runs at the
   home), the write-back (§4.4: the board's path) and a worktree's creation — and the clients
   (`repoconfig.py`) read every key for the briefs, `ao board edit` and `ao repo init`; `commands:`
