@@ -910,6 +910,17 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # §4.5a **brief not sent** (§4.1 *No prose in the argv*, TD-339): live and idle with nothing to
         # do, amber as the design words it — the needs family's colour, never its ring
         kind, text, full = "needs", d["brief_unsent"]["text"], d["brief_unsent"]["full"]
+    elif (
+        isinstance(d.get("restart_ceiling"), dict)
+        and d["restart_ceiling"].get("why") == "lost-brief"
+        and (d.get("seat") or state == "exited")
+    ):
+        # a second lost brief (§4.1 *A launch whose hook never comes is recovered*, TD-720): no count
+        kind, text = "bad", "brief lost twice"
+        full = (
+            f"{text}: no hook reached it at its launch, nor after the host agent relaunched it once "
+            "(design §4.1) — it is yours now: send it its brief, Resume it, or Forget it"
+        )
     elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict):
         # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled six times
         # in the hour, and this one's fill tripped it — an ending, as the crash ceiling's is

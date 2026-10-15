@@ -109,7 +109,7 @@ STATE_SUBJECTS = {
     "alarm": "identity alarm",
 }
 # …and the restart row's, by which of its marks raised it: what `restart_mark`'s words open with
-RESTART_SUBJECTS = ("fills exhausted", "restarts exhausted", "restart held", "restart wanted")
+RESTART_SUBJECTS = ("brief lost twice", "fills exhausted", "restarts exhausted", "restart held", "restart wanted")
 
 
 def state_kind(v: dict[str, Any]) -> str:
@@ -154,6 +154,11 @@ def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
     if isinstance(ceiling, dict):
         n = ceiling.get("count")
         n = n if isinstance(n, int) else "?"
+        if ceiling.get("why") == "lost-brief":
+            # a second lost brief (§4.1 *A launch whose hook never comes is recovered*, TD-720): no count
+            return str(ceiling.get("at") or ""), (
+                "brief lost twice — no hook reached it at its launch, nor after the host agent relaunched it once"
+            )
         if ceiling.get("why") == "fill":
             return str(ceiling.get("at") or ""), (
                 f"fills exhausted · {n} in 1 h — the seats beside it were filled as often as the host agent will"
