@@ -13009,7 +13009,7 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 
 **Fix:** Tests in `tests/test_lost_brief.py`, each failing with its line mutated: a marked record with each of `wrapup_at`, `suspended`, `sit_out`, a past `run_until`, `gated`, and state `exited` is not replayed and not given a ceiling; `RESTART_CEILING` counted replays in the window put the ceiling `{count}` with no `why`; a seat on `trigger: work` keeps `lane_seen`; two open asks from one sender and one from the person tell the sender once and the person never; `rpc_close` raising leaves a `restarts` entry with `error`, and the next tick replays without a second close; two records marked in one tick are each replayed once.
 
-**Resolved:** 2026-10-15 by #1859 — eleven tests in `tests/test_lost_brief.py` (the guards parametrised over seven cases, the ceiling, the failed entry, a work seat's `lane_seen`, the senders told, the two failed closes, two records in one tick, and the pass the replay ends — an `every` seat still due, filled on top of its replay without the `continue`); each of the entry's fifteen mutations, run one at a time, fails at least one.
+**Resolved:** 2026-10-15 by #1859 — nine tests (fifteen cases) in `tests/test_lost_brief.py` (the guards parametrised over seven cases, the ceiling, the failed entry, a work seat's `lane_seen`, the senders told, the two failed closes, two records in one tick, and the pass the replay ends — an `every` seat still due, filled on top of its replay without the `continue`); each of the entry's fifteen mutations, run one at a time, fails at least one.
 
 **Done when** each case has a test and fails under its mutation.
 
