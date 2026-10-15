@@ -60,6 +60,11 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-697 | Build TD-693 (2): the Repo page draws a design's builds under it, with each build's state | Medium | Open |
 | TD-698 | Build TD-693 (3): a design entry archives with its last build — the td flow's briefs say so | Medium | Open |
 | TD-699 | #1786's held-back reload clearing `reconnected` is held by no test (test audit) | Low | Open |
+| TD-700 | A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due | High | Open |
+| TD-701 | Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed | Medium | Open |
+| TD-702 | The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day | Medium | Open |
+| TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Open |
+| TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 
 ---
 
@@ -1151,3 +1156,103 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 
 ---
 
+## TD-700: A `prs` or `every` seat that comes due while it is still running sits idle forever: the tick fills only an ended seat and closes only one with nothing due
+
+**Priority:** High
+**Type:** bug
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §6 rule 3, §4.9b *Seats with a trigger*; `src/sessionorc/agent_tick.py` (`_seat_pass` ~L2315, `_seat_done` ~L2353, `_seat_due` ~L2400)
+
+**Why:** ao-grind's two auditors stopped running for two days with nobody told. `ao status --json`, 2026-10-14: `ao-shiftlead-docs-audit-ao-1` created 2026-10-13T15:26:54Z, `seat_due: {at: 2026-10-13T16:15:47Z, by: prs}`, `seat_count.prs: 100`, idle since 2026-10-14T00:00Z; `ao-shiftlead-test-audit-ao-1` created 2026-10-12T21:00:36Z, `seat_due` at 22:27:10Z, idle the same. Each came due 49 and 87 minutes into its run, as ten PRs merged under it. `_seat_pass` fills a seat only when it is `exited` or `closed` with `seat_due` set, and closes an idle one only when `_seat_done` — which is `not s.seat_due` for a `prs` or `every` trigger. A seat due while it runs is therefore never closed, so never filled. Paul's Close of test-audit on 2026-10-14 ~21:50 MDT let the tick fill it at once (`restarts[-1]: {why: fill, at: 2026-10-15T03:52:03Z}`). Its symptom on the page: no auditor line in the Doing feed (TD-702 is the other half).
+
+**Fix:** a `prs` or `every` seat that is idle, has run, and is pushed closes as a done seat does, and the standing `seat_due` fills it on the next tick — the due that came during the run is the next run's cause, as the anchor's `work` trigger already reads it (`_seat_done`'s `work` branch). The count the run covered is not counted twice: `seat_count` is read from the fill on.
+
+**Done when** a test holds a `prs` seat whose `seat_due` is set mid-run: idle and pushed, it is closed and then filled, and `_seat_done` says so; and on the live copy an auditor that came due mid-run is filled again within a tick of its going idle.
+
+**Related:** TD-701 (the close it needs can be blocked), TD-702, TD-386 (the anchor's `work` trigger), TD-660.
+
+---
+
+## TD-701: Ready to close reads a squash-merged branch as unpushed when its upstream is `origin/main`, so a finished seat cannot be closed
+
+**Priority:** Medium
+**Type:** bug
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 (*branch pushed*); `src/sessionorc/gitinfo.py` (`_unpushed`), `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1047)
+
+**Why:** `docs-audit-ao-1`'s Focus, 2026-10-14 21:53 MDT (Paul's screenshot, `~/.shiftlead/attachments/ao-shiftlead-ao-paul/paste-20261014-215450.png`): *✗ branch pushed (vs origin/main)*, Git *td632-git-card-deletion-code · 1 unpushed vs origin/main · 1 ahead · 147 behind · clean*, so the seat would not close. Its one commit, `5f7161ab`, is #1643's head, merged 2026-10-13T15:46Z by squash, and its branch deleted from origin. The branch was cut with `git switch -c … origin/main`, so its upstream is `origin/main`; a squash leaves the commit on no remote-tracking ref, and `_unpushed` counts it. Every worker and seat that cuts its branch this way and merges by squash reads *not pushed* once the remote branch is deleted.
+
+**Fix:** a commit whose content is in its upstream, or that is the head of a merged PR the reading already holds, is not unpushed: count only commits whose patch is absent from the upstream (`git cherry` / `--cherry-pick` over the range), and failing that, a branch whose PR is merged at the same head is pushed.
+
+**Done when** a test holds a branch with upstream `origin/main`, one commit squash-merged into it under another sha, and its remote branch gone, reading 0 unpushed; and a commit that never reached the remote still reads 1.
+
+**Related:** TD-700, TD-080 (one measure, computed by the host agent).
+
+---
+
+## TD-702: The Doing feed keeps the team's last 50 lines, so a member that reports less often (an auditor) drops out of it within a day
+
+**Priority:** Medium
+**Type:** design gap
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.8 *the doing log*, §4.5a *team card: Answer needed / Doing*, *Repo page: doing filters*; `src/sessionorc/store.py` (`DoingLogStore`, `keep=50`), `src/shiftlead/ui/org.py` (`DOING_KEPT`, `doing_rows`)
+
+**Why:** Paul, 2026-10-14: *I do not see any "doing" entries from our auditors — lets make sure they report what they are doing.* They do report: `~/.shiftlead/doing.jsonl` holds 31 lines from the shiftlead auditors, the last at 2026-10-13T15:28:25Z. But the ring keeps a team's last 50 lines, and ao-grind's last 50 (from 2026-10-14T23:10Z) are the two grinders' and the techlead's alone: three busy members fill it in under a day, so a seat that runs every ten PRs is never seen. The filter chips (`doing_chips`) can only pick from what the ring kept.
+
+**Fix:** decide what the feed keeps so every member is visible — e.g. the ring keeps each doer's newest few beside the team's last 50, or keeps per member — and how the feed and its chips draw a member whose newest line is old.
+
+**Done when** the design says what the doing log keeps per member, and a build entry carries it.
+
+**Related:** TD-700 (why the auditors also stopped writing), TD-176.
+
+---
+
+## TD-703: A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one
+
+**Priority:** Medium
+**Type:** design gap
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9 *Where definitions live*, §4.9c *Apply*, §6 rule 8; `src/sessionorc/agent_tick.py` (`_work_start` ~L1670, `_work_replays` ~L1730), `src/sessionorc/work.py` (`crew`), `src/shiftlead/teamrun.py` (`start`, `apply`)
+
+**Why:** Paul renamed dev-cadence's members on 2026-10-14 (dev-cadence `1145d97`: `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`, `grinder-dc-1` → `dc-grinder`) and saw nothing change. The definition is read — `ao team list` shows *manager: dc-manager (on call) techlead: dc-techlead* — but dc-grind is stopped, and its cards are the closed records of the last run under the old names. Rule 8's start replays a team's ended crew records (`_work_replays`) with their own names and launch records and never reads the definition (§6 *Keeping a team running*), so the team would come back as `grinder-dc-1`. Only a person's Start creates records under the new names, and `crew` is every unattended record of the team: the old ones stay closed, not superseded, and a later rule 8 start could replay them beside the new ones (read in the code, not seen live). Paul: *we should also make sure members are not duplicated on changes as well (e.g. dc-grinder alongside grinder-dc-1)*. The design says nothing of a rename.
+
+**Fix:** decide what a renamed member is: the client finds the difference as it finds a lane's or a profile's (§4.9c, TD-619), shown as **definition changed — Apply**, and Apply (or the next Start) retires the old record — superseded by the new name's, its mail and claims carried — so neither rule 8 nor the card ever holds both. A member removed from the definition is the same case without a successor.
+
+**Done when** the design says how a rename and a removal reach a running and a stopped team, and no path leaves two records for one member; a build entry carries it.
+
+**Related:** TD-619 (a profile change reaches the team), TD-654 (rule 8 replays seats), TD-457.
+
+---
+
+## TD-704: The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-14 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Blocked by:** decision (paul) — designed in an interactive session with Paul
+**Location:** design §4.5a *team card: TDs in motion*, *Org: rollup*, §4.9 *Where definitions live*, §4.9c *Flows*; `src/shiftlead/ui/org.py` (`PHASES` L27, `motion_rows` ~L310)
+
+**Why:** Paul, 2026-10-14: *where are the chip names defined (e.g. GRIND, DESIGN, REVIEW)? it seems like those should be defined beside the roles (in org.yml with repo-level overrides available in .shiftlead.yml)*, and: *having the chip names and entries it matches configurable is the right move for being able to create new flows on the fly. It may need to be designed in an interactive session to make sure we come up with a simple, effective design.* Today `PHASES = ("add", "design", "grind", "review")` is a constant, and `motion_rows` derives a claim's phase in one line: a `design-first` entry is *design*, a claim with a PR *review*, anything else *grind*. A flow with another stage (a fact-check, a live check, a hunt) has no chip of its own.
+
+**Fix:** to be designed with Paul: where a phase is defined (the role, the flow's stage, or a list of its own), what it matches (an entry's `Kind`, a PR, the claimant's role), its order and colour, and how a repo overrides the org's.
+
+**Done when** the design names the definition and its matching rule, and a build entry carries it.
+
+**Related:** §4.9c flows, TD-418.
+
+---
