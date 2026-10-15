@@ -58,6 +58,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Designed — TD-694 builds it |
 | TD-693 | A new TD id is the highest on main plus one, so concurrent filers collide; a design's builds show nowhere as its group; a design entry needs its own archive PR after its builds | Medium | Open |
 | TD-694 | Build TD-692: a reconnect reloads once, never in a loop — an `error` is not up, the reload bound and its banner, the stream's `page=`, the UI's two log lines | Medium | Open |
+| TD-695 | `test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not` flakes: the promote's own sync task may run a pass inside the test | Low | Open |
 
 ---
 
@@ -1077,6 +1078,26 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** the reproduction is in the PR body and every listed test passes.
 
 **Related:** TD-692 (the design), TD-372 (a close the page caused by leaving), TD-539 (the build chip), TD-062 (a promote restarts both units).
+
+---
+
+## TD-695: `test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not` flakes: the promote's own sync task may run a pass inside the test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-14 (grinder-ao-1, from grinder-ao-2's note m-ff4ef0883a87)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open. Seen once on py3.12 in PR #1779's run 38671055081, at `tests/test_sync_pass.py:286` (*no login: no cover, the team's*); it passed on rerun. Not yet reproduced.
+**Location:** `tests/test_sync_pass.py` (the cover test, lines ~277–286), `src/sessionorc/agent_promote.py:60` (`_sync_task`), `src/sessionorc/agent_sync.py` (where `_sync_ran` and `_sync_login` are used; declared at `agent.py:723-725`)
+
+**Why:** A flaky test in the sync pass (TD-685 slice 2, #1771) costs every PR a rerun. The likely cause is that the `agent` fixture is a running host agent: its promote watch starts `_sync_pass` as a background task (`agent_promote.py:60`) on a full reading. The first tick is a full reading, because `_promote_read_at` starts at `-inf`. After that, `PROMOTE_EVERY` is 300 s, so the race is between the fixture's first tick and the test body, never a repeating one. `_sync_pass` walks `self._repos`, which the test has just set. That first-tick task could run between the test's `_sync_ran.clear()` (with the login cleared) and its assert, re-reading the login through the `gh` fake and setting `_sync_ran[ROOT]` again. A second cause to rule out is `_red_prs` reading a stamp the background pass moved.
+
+**Fix:** reproduce it first (`pytest --count` or a loop of the one test under `-p no:randomly`). Then either stop the promote's watch from starting a sync task in these tests (a fixture that sets `_sync_task` to a done task, or a monkeypatched `_sync_pass` guard), or make the test assert on a pass it awaits alone. Check the other `agent_sync` integration tests for the same race.
+
+**Done when** the test passes 200 runs in a row, and the fix names the race it closed.
+
+**Related:** TD-685 (the sync pass).
 
 ---
 
