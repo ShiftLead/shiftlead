@@ -121,8 +121,10 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         # A subagent's tool (the tool sets `agent_id` only inside one) says nothing about the main
         # composer: a background agent runs on after its caller's Stop, and read as `working` it held
         # an idle session unrung; mid-turn the session is `working` anyway, and a `PostToolUse` of
-        # its own no longer clears the main thread's `needs-you` (TD-201).
-        return out or None
+        # its own no longer clears the main thread's `needs-you` (TD-201). It does say a subagent is
+        # alive, which `subagent_seen` carries: the core reads no tool's field (§4.2 *Working on its
+        # own*, §4.3, TD-734).
+        return {**out, "subagent_seen": True}
     if ev == "Notification":
         kind = NOTIFICATION_KINDS.get(payload.get("notification_type", ""))
         if kind is None:
@@ -140,14 +142,19 @@ def translate(payload: dict[str, Any], *, at_composer: bool = False) -> dict[str
         return {**out, "state": "exited", "pending": None, **({"reason": reason} if reason else {})}
     if ev == "SessionStart" and payload.get("source") in SESSION_START_NOT_A_START:
         return out or None  # the session id and model still count; the state is what it was
+    if ev == "SessionStart":
+        # `startup`, `resume` or `clear`: a new conversation, or this process's first, so no subagent of
+        # the old one is alive (§4.2 *Working on its own*, TD-734) — set before the branches part, so
+        # a start at the composer and a start with a brief both carry it; `compact` returned above
+        out["subagents_reset"] = True
     if ev == "SessionStart" and (
         payload.get("source") in SESSION_START_AT_THE_COMPOSER or (at_composer and payload.get("source") == "startup")
     ):
         return {**out, "state": "idle", "pending": None}
     if ev == "SubagentStart":
-        return {**out, "subagent_delta": 1}
+        return {**out, "subagent_delta": 1, "subagent_seen": True}
     if ev == "SubagentStop":
-        return {**out, "subagent_delta": -1}
+        return {**out, "subagent_delta": -1, "subagent_seen": True}
     if ev in TOOL_EVENTS:
         tool = payload.get("tool_name")
         # the call it names (`tool_use_id`) ends only that call's permission waiter, if one is live:

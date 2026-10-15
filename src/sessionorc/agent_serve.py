@@ -65,6 +65,9 @@ class ServeMixin:
         # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, as a person reads
         # it — computed here so the dialog opens with it and asks nothing; a `reply` reads as a note
         now = datetime.now(UTC)
+        # §4.2 *Working on its own* (TD-734): a live subagent, the one reading every page and RPC
+        # reader takes and the tick's rules call at their own `now`; derived, never stored
+        v["subagents_live"] = agent_common.subagents_live(s, now)
         down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
         rings = getattr(adapters.get(s.adapter), "composer", None) is not None
         cache = s.host == self.host and agent_common.cache_restarts(s, now)  # a lapsed cache (TD-467)
