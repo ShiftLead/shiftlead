@@ -244,3 +244,20 @@ async def test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too(age
         await agent.rpc_td_hold(repo=root, id="TD-002", release=True)
         await person.call("progress", id=g, ref="TD-002", status="claimed")
         assert {e.ref for e in agent.sessions[g].progress} >= {"TD-002", "TD-003"}
+
+
+async def test_the_claimer_of_an_entry_the_person_then_holds_still_reports_on_it(agent, tmp_path):
+    """The settle refusal is a claim's (design §4.8 *A claim is a lease*, TD-726): a session that took
+    TD-002 before the home read its repo, whose entry the person then holds, reports `done` on it as on
+    any claim — refused, it could not say what became of its work."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        g = (await person.call("create", name="g", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        agent.sessions[g].repo = str(tmp_path / "r")
+        await person.call("progress", id=g, ref="TD-002", status="claimed")  # the repo not read yet: no refusal
+        root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+        await agent.rpc_td_hold(repo=root, id="TD-002")
+        with pytest.raises(AgentError, match="TD-002 is held by the person since"):
+            await person.call("progress", id=g, ref="TD-002", status="claimed")  # a claim is still refused
+        await person.call("progress", id=g, ref="TD-002", status="done", why="built")
+        assert next(e for e in agent.sessions[g].progress if e.ref == "TD-002").status == "done"

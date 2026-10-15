@@ -12879,3 +12879,21 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-707 (the design), TD-693 / TD-696 (`ids.json`, `td_next`), TD-223 (pickable is derived), TD-702 (the case).
 
 **Resolved:** 2026-10-15 — grinder-ao-2, the live check of #1829 (live at a235a54, read-only). A `design-first` entry settled ten minutes: TD-722 (Kind design-first, filed by #1828) landed 18:44:52Z, and the home first told the designer's lane of it at 18:55:10Z (*your lane gained 1 entry … TD-722*, in the designer's transcript); the designer claimed it at 18:55:26Z (read from its record before its `done` on #1832 rewrote the line). A designer's `build` entries were picked at once: TD-724 (Kind build, filed by #1832, merged 19:30:02Z) read *pickable* in `ao repo` at 19:33Z with no *settles in*, as did TD-726 and TD-727 (#1833). A Hold and Release were pressed on a scratch home in #1829's UI check; the listed tests pass in CI.
+
+## TD-726: `rpc_progress`'s settle refusal runs on every status, not only a claim, and no test notices (#1823)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1818–#1830)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_progress`: `if new_claim and (words := self._settle_refusal(s, entry.ref)):`); `tests/test_settle.py` (`test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1823 and running `tests/test_settle.py tests/test_person_only.py tests/test_repo_facts.py tests/test_settle_pages.py tests/test_cli_teams.py` (164 passed unmutated). Changing `if new_claim and (words := self._settle_refusal(` to `if (words := self._settle_refusal(` passes all 164. The refusal is a *claim's* (design §4.8 *A claim is a lease*), and the tests only ever send `status="claimed"`. With the guard gone, a worker whose entry the person then holds is refused its own `progress done`, `blocked` or `working` for a reason that is about claiming: it cannot report.
+
+**Resolved:** 2026-10-15 (PR #1839) — `tests/test_settle.py::test_the_claimer_of_an_entry_the_person_then_holds_still_reports_on_it`: a claim taken before the home read the repo, the person's hold, a fresh claim still refused and the claimer's `done` recorded. It fails with `new_claim and` removed.
+
+**Done when** the test exists and fails under that mutation.
+
+**Related:** TD-710, #1823.
