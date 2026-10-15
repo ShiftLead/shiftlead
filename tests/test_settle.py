@@ -400,3 +400,26 @@ async def test_a_note_that_cannot_be_sent_leaves_the_hold_written_and_names_the_
     assert got["held"]["at"] and got["told"] == [] and got["untold"] == ["could not tell ao-gw: ao-gw's inbox is full"]
     assert "held" in json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]
     assert "held" in _by_id(entries)["TD-003"]
+
+
+async def test_a_reviewers_pr_and_a_live_seat_are_read_once_and_a_holder_is_not_told_twice(agent, tmp_path):
+    """Review of #1861: a claim's `review_pr` names its PR as `pr` does; an exited seat is not told; a seat
+    with two asks on the PR gets one note; a holder that is also a reader gets only the holder's."""
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True)
+    worker.progress.append(ProgressEntry(ref="TD-003", review_pr=1841))
+    worker.inbox.append(MailEntry(id="m-a0", from_="ao-x", to=["ao-gw"], at="t", kind="ask", text="read", pr=1841))
+    reader = _put(agent, "ao-tl", unattended=True)
+    for n in (1, 2):
+        reader.inbox.append(
+            MailEntry(id=f"m-a{n}", from_="ao-gw", to=["ao-tl"], at="t", kind="ask", text="read", pr=1841)
+        )
+    gone = _put(agent, "ao-tl3", unattended=True)
+    gone.state = "exited"
+    gone.inbox.append(MailEntry(id="m-a3", from_="ao-gw", to=["ao-tl3"], at="t", kind="ask", text="read", pr=1841))
+    got = await agent.rpc_td_hold(repo=root, id="TD-003")
+    assert got["told"] == ["ao-gw", "ao-tl"] and got["readers"] == ["ao-tl"] and got["untold"] == []
+    assert len(_notes(worker, "TD-003")) == 1 and "drop the entry" in _notes(worker, "TD-003")[0]
+    assert _notes(reader, "TD-003") == ["TD-003 is held by the person: leave PR #1841 unmerged until they release it."]
+    assert _notes(gone, "TD-003") == []

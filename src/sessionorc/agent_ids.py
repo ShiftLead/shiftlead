@@ -172,8 +172,8 @@ class IdsMixin:
                     prs.add(int(p.pr or p.review_pr))
         seats: dict[str, int] = {}
         for addr, r in graph.items():
-            if r.state in ("exited", "closed", "scheduled") or addr in seats:
-                continue
+            if r.state in ("exited", "closed", "scheduled") or addr in holders:
+                continue  # a holder is told to drop the entry already, which leaves its PR unmerged
             for a in (r.prs_waiting(home=self.host) or {}).get("asks") or ():
                 if a.get("pr") in prs:
                     seats[addr] = int(a["pr"])
