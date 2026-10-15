@@ -987,7 +987,7 @@ with the retired brief).
 **Added:** 2026-10-14 (the designer, building TD-681's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1 built (#1769, held: the techlead reads it): `sessionorc.sync.check(root, number, head, branch, clones=, held=, bound=)` → `{verdict: mechanical|refused|error|moved, why, head, commit, files, post_sync}`, steps 1 and 2. Slice 2 (the pass in the promote's tick: the decline rules, the SHIP comment once per head, the gate in the registry checkout, the pinned merge and note, `sync: {<n>: …}` on the repo reading, the order narrowed, `set_settings` `repos.<repo>.sync.auto`) and slice 3 (the Repos card's switch, `src/shiftlead/ui/`) left. Slice 2 passes `clones` (the registry's checkouts) and `held` (the serving flow's globs) and treats *moved* as dropped, *error* as a counted try.
 **Blocked by:** TD-684
 **Location:** design §6 *Sync: a mechanical sync PR is merged at the home*, §4.4 *A sync PR is the team's at once*, §5 `repos.<repo>.sync`, §4.5a *Settings page: Repos*; a new `src/sessionorc/sync.py`, the promote's pass in `src/sessionorc/agent_tick.py`, `set_settings`, `src/sessionorc/workorders.py` (the order narrowed to what the home does not merge), the Settings page's Repos card (`src/shiftlead/ui/`)
 
