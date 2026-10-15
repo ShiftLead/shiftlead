@@ -55,7 +55,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-673 | ShiftLead's Telegram notes go through samscrape's bot (`secrets: samscrape/prd`): give ShiftLead a bot and a Doppler config of its own | Low | Open |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Designed — TD-686, TD-687 build it |
-| TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
+| TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Built — live check of #1775 |
 | TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Open |
 
@@ -964,9 +964,8 @@ with the retired brief).
 **Type:** feature
 **Added:** 2026-10-14 (the designer, building TD-681's design)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 2 built (#1771: the pass in `agent_sync`, its steps 3–5 in `sessionorc.sync`, the order through `sync.mark`, `repos.<repo>.sync.auto`); slice 3, the Repos card's switch, is left, then a live check of *Done when* on a scratch home. Slice 1 merged (#1769): `sessionorc.sync.check`, steps 1 and 2. Slice 3 (`src/shiftlead/ui/`): the Repos card's **sync** switch writing `repos.<repo>.sync.auto` (on when absent), with the last verdict beside it, read from the repo view's `sync` entries.
-**Blocked by:** TD-684
+**Kind:** live-check #1775
+**Status:** Built — slices 1 (#1769), 2 (#1771) and 3 (#1775, the Repos card's **sync** switch with the last verdict beside it; `sync.prune` keeps the newest *merged* entry for it). The live check, once #1775 is live (`ao promote status`), is read only: the next dev-cadence sync PR on a registered repo (`cadence-sync-*`, pushed by the home's `gh` login). Read the repo reading's `sync` entry for it (`ao repo --json`, or the Settings page's Repos card). Mechanical and gated: verdict *merged*, the PR carrying the `cadence-review: SHIP · sync-check` comment and merged by the home, a `system` note in the person inbox, and the card saying *merged #<n> <age> ago*. Not mechanical: *refused* with its reason, and the team's order carrying it as Context. The scenarios themselves are covered by `tests/test_sync_check.py` and `tests/test_sync_pass.py` against a fake `gh`.
 **Location:** design §6 *Sync: a mechanical sync PR is merged at the home*, §4.4 *A sync PR is the team's at once*, §5 `repos.<repo>.sync`, §4.5a *Settings page: Repos*; a new `src/sessionorc/sync.py`, the promote's pass in `src/sessionorc/agent_tick.py`, `set_settings`, `src/sessionorc/workorders.py` (the order narrowed to what the home does not merge), the Settings page's Repos card (`src/shiftlead/ui/`)
 
 **Why:** TD-681's design. Paul (2026-10-14): *if it's mechanical and post_sync would handle it that's even better*. A sync PR changes only dev-cadence's files, so a mechanical one needs no session.

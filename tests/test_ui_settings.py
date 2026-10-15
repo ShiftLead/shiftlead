@@ -179,6 +179,12 @@ def test_a_repo_card_draws_the_switch_only_where_the_file_carries_promote(tmp_pa
     a, b = setmod.repo_cards([str(with_block), str(without)], {"b": {"pull": False}}, pulls)
     assert a["pull"] and a["pull_reading"] == "waiting: main is mid-turn"
     assert not b["pull"] and b["pull_reading"] == "off"
+    # **sync** on every card: on when absent, the repo's last verdict from the repo facts (§6 *Sync*)
+    assert a["sync"] and a["sync_reading"] == ""  # no reading of the repo: nothing said
+    readings = {str(with_block): {"prs": {"open": []}}, str(without): {"sync": {"3": {"verdict": "merged"}}}}
+    a, b = setmod.repo_cards([str(with_block), str(without)], {"b": {"sync": {"auto": False}}}, None, readings)
+    assert a["sync"] and a["sync_reading"] == "no sync PR"
+    assert not b["sync"] and b["sync_reading"] == "off"
 
 
 @pytest.mark.unit
@@ -190,6 +196,34 @@ def test_the_pull_reading_in_the_designs_words():
     assert setmod.pull_reading({"outcome": "refused", "why": "on topic"}) == "refused: on topic"
     assert setmod.pull_reading({"outcome": "waiting", "occupant": None}).startswith("waiting: a session here")
     assert setmod.pull_reading(None) == ""
+
+
+@pytest.mark.unit
+def test_the_sync_reading_in_the_designs_words():
+    """§4.5a *Settings page: Repos*: the newest verdict by its `at`; *no sync PR* only when the PR
+    reading holds none open; an open one with no verdict yet, and a reading that failed, say nothing."""
+    at = (NOW - timedelta(minutes=4)).isoformat()
+    old = (NOW - timedelta(hours=2)).isoformat()
+
+    def read(sync, *open_):
+        return {"sync": sync, "prs": {"open": list(open_)}}
+
+    assert setmod.sync_reading(read({"9": {"verdict": "merged", "at": at}}), True, NOW) == "merged #9 4m ago"
+    assert setmod.sync_reading(read({"9": {"verdict": "merged"}}), True, NOW) == "merged #9"  # no `at`: no age
+    sync = {"9": {"verdict": "merged", "at": old}, "12": {"verdict": "refused", "why": "forked", "at": at}}
+    assert setmod.sync_reading(read(sync), True, NOW) == "#12 refused: forked"
+    assert setmod.sync_reading(read({"4": {"verdict": "gate", "why": "ci: red", "at": at}}), True) == "#4 gate: ci: red"
+    assert (
+        setmod.sync_reading(read({"4": {"verdict": "error", "why": "gh down", "at": at}}), True) == "#4 error: gh down"
+    )
+    pr = {"number": 4, "sync": True}
+    assert setmod.sync_reading(read({"4": {"verdict": "", "tries": 1, "at": at}}, pr), True) == ""  # a retry
+    assert setmod.sync_reading(read({"4": {"verdict": "off", "at": at}}, pr), True) == ""  # *off* is no verdict
+    assert setmod.sync_reading(read({}, pr), True) == ""  # open, waiting on its checks
+    assert setmod.sync_reading(read({}, {"number": 5, "sync": False}), True) == "no sync PR"
+    assert setmod.sync_reading({"prs": {"error": "gh down"}}, True) == ""  # an outage is never zero PRs
+    assert setmod.sync_reading(None, True) == ""
+    assert setmod.sync_reading(read(sync), False) == "off"
 
 
 @pytest.mark.unit
@@ -260,6 +294,11 @@ def test_a_save_writes_settings_yml_through_set_settings(client, subprocess_agen
         assert call_sync("settings")["repos"]["shiftlead"] == {"promote": {"auto": True}, "pull": False}
         assert client.post("/api/settings/repos", json={"repo": "shiftlead", "pull": "no"}).status_code == 400
         both = {"repo": "shiftlead", "auto": True, "pull": True}  # one switch per press: never half-applied
+        assert client.post("/api/settings/repos", json=both).status_code == 400
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "sync": False}).json()["ok"]
+        assert call_sync("settings")["repos"]["shiftlead"]["sync"] == {"auto": False}
+        assert client.post("/api/settings/repos", json={"repo": "shiftlead", "sync": "off"}).status_code == 400
+        both = {"repo": "shiftlead", "pull": True, "sync": True}
         assert client.post("/api/settings/repos", json=both).status_code == 400
 
         got = client.post("/api/settings/you", json={"open_in": "none", "terminal": {"size": 15, "face": "Fira Code"}})

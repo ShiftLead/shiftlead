@@ -103,6 +103,14 @@ def test_prune_keeps_the_open_prs_and_judges_a_no_gate_refusal_again_once_gated(
     kept = {"1": {"head": HEAD, "verdict": "refused", "why": cadence.NO_GATE}, "2": {"head": HEAD}, "9": {}}
     assert set(sync.prune(kept, [_pr(1), _pr(2)], False)) == {"1", "2"}
     assert set(sync.prune(kept, [_pr(1), _pr(2)], True)) == {"2"}
+    # the newest *merged* entry outlives its PR, for the Repos card (§4.5a); an older one does not
+    kept = {
+        "5": {"head": HEAD, "verdict": "merged", "at": "2026-10-15T01:00:00Z"},
+        "6": {"head": HEAD, "verdict": "merged", "at": "2026-10-15T02:00:00Z"},
+        "7": {"head": HEAD, "verdict": "refused", "at": "2026-10-15T03:00:00Z"},
+    }
+    assert set(sync.prune(kept, [], True)) == {"6"}
+    assert [p["number"] for p in sync.candidates([_pr(1)], sync.prune(kept, [], True), lambda p: False)] == [1]
 
 
 def test_mark_the_homes_prs_are_no_order_and_a_verdicts_why_is_the_context():
@@ -287,6 +295,22 @@ async def test_off_is_written_once_per_head(agent, gh, monkeypatch):
     monkeypatch.setattr(agent.repos_store, "save", lambda r: saved.append(r))
     await agent._sync_pass()
     assert saved == [], "nothing changed: nothing saved or pushed"
+
+
+@pytest.mark.integration
+async def test_the_kept_merged_entry_is_saved_once_and_never_judged(agent, gh, monkeypatch):
+    """The newest *merged* entry outlives its PR (§6 *Sync*, for the Repos card): a pass over the repo
+    with that PR closed keeps it, judges nothing and saves nothing."""
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged"
+    agent._repos[ROOT]["prs"] = {"open": []}  # the PR closed with its merge
+    calls = len(gh["calls"])
+    saved = []
+    monkeypatch.setattr(agent.repos_store, "save", lambda r: saved.append(r))
+    await agent._sync_pass()
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["verdict"] == "merged" and saved == [] and len(gh["calls"]) == calls
 
 
 @pytest.mark.integration

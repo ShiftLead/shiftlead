@@ -341,13 +341,18 @@ def candidates(prs: list[dict[str, Any]], sync: dict[str, Any], held_by: Any) ->
 
 
 def prune(sync: dict[str, Any], prs: list[dict[str, Any]], gated: bool) -> dict[str, Any]:
-    """The kept outcomes, pruned to the open PRs; a *no gate* refusal dropped once the repo has a gate,
-    so the PR is judged again (§6 *Sync*)."""
+    """The kept outcomes, pruned to the open PRs and the newest *merged* one, which the Repos card names
+    (§4.5a) and which neither the pass nor the order reads, since both walk the open PRs; a *no gate*
+    refusal dropped once the repo has a gate, so the PR is judged again (§6 *Sync*)."""
     open_ = {str(p.get("number")) for p in prs if isinstance(p, dict)}
+    merged = [
+        (str(e.get("at") or ""), n) for n, e in sync.items() if isinstance(e, dict) and e.get("verdict") == "merged"
+    ]
+    last = max(merged)[1] if merged else None
     return {
         n: e
         for n, e in sync.items()
-        if n in open_
+        if (n in open_ or n == last)
         and isinstance(e, dict)
         and not (gated and e.get("verdict") == "refused" and e.get("why") == cadence.NO_GATE)
     }

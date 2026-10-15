@@ -2958,7 +2958,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     flows=await asyncio.to_thread(team_flows, org),
                     host=info,
                 ),
-                "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls")),
+                "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls"), readings),
                 "you": term,
                 # **Telegram** (§4.5a **You**, §4.10; TD-319 slice 3): the last send is the home's alone
                 "telegram": setmod.telegram(
@@ -3112,13 +3112,19 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def settings_repos(request: Request):
         """§4.5a *Settings page: Repos* → the promote's **auto** switch, `{repo, auto: bool}`, written
         to `repos.<repo>.promote.auto`, or the **pull** switch, `{repo, pull: bool}`, written to
-        `repos.<repo>.pull` (§6 *Pull*, TD-263) — each through `set_settings`."""
+        `repos.<repo>.pull` (§6 *Pull*, TD-263), or the **sync** switch, `{repo, sync: bool}`, written to
+        `repos.<repo>.sync.auto` (§6 *Sync*, TD-685) — each through `set_settings`, one key a press."""
         body = await body_of(request)
-        repo, auto, pull = str(body.get("repo") or ""), body.get("auto"), body.get("pull")
-        if repo and isinstance(pull, bool) and "auto" not in body:
+        repo, auto, pull, sync = str(body.get("repo") or ""), body.get("auto"), body.get("pull"), body.get("sync")
+        keys = [k for k in ("auto", "pull", "sync") if k in body]
+        if not repo or len(keys) != 1 or not isinstance(body[keys[0]], bool):
+            raise HTTPException(
+                400, "repos: send {repo, auto: true|false}, {repo, pull: true|false} or {repo, sync: true|false}"
+            )
+        if keys == ["pull"]:
             return answer(await call("set_settings", repos={repo: {"pull": pull}}))
-        if not repo or not isinstance(auto, bool) or "pull" in body:
-            raise HTTPException(400, "repos: send {repo, auto: true|false} or {repo, pull: true|false}")
+        if keys == ["sync"]:
+            return answer(await call("set_settings", repos={repo: {"sync": {"auto": sync}}}))
         return answer(await call("set_settings", repos={repo: {"promote": {"auto": auto}}}))
 
     @app.post("/api/settings/you")

@@ -1100,7 +1100,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   move the host agent makes in a person's checkout, and only ever a fast-forward.
 - **Sync: a mechanical sync PR is merged at the home** (TD-681; steps 1 and 2 built as `sessionorc.sync.check`
   by TD-685 slice 1; the pass, the evidence, the gate, the merge and the setting by slice 2, as
-  `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch TD-685's still; Paul,
+  `sessionorc.sync`'s pass functions and `agent_sync`; the Repos card's switch by slice 3; Paul,
   2026-10-14: *each team should pick up those PRs and run them to ground, but if it's mechanical and
   post_sync would handle it that's even better*). A sync PR (§4.4 *A sync PR is the team's at once*:
   head branch `cadence-sync-*`, the lock in its diff) changes only what dev-cadence owns, and a
@@ -1201,7 +1201,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   The outcome is kept on the repo reading as **`sync: {<n>: {head, verdict, why, tries, posted,
   at}}`** (home-owned). The verdict is *merged*, *refused* (a declined PR, or the reason from step 1
   or 2), *gate* (the gate's line), *error* (no reading after `SYNC_TRIES`) or *off*, and it is empty
-  while a retry is counted. A PR's entry is dropped once it leaves the open list, and a *refused*
+  while a retry is counted. A PR's entry is dropped once it leaves the open list, except the newest
+  *merged* one, which the Repos card names (§4.5a) and which neither the pass nor the order reads, and a *refused*
   *no gate* entry is dropped once the repo has a gate, so the PR is judged again. So a head with a
   verdict is never checked again, a new head is checked again, and the team's order says `why`
   (§4.4), *sync is off* for an *off* one. **The home holds a green sync PR with no verdict at its
@@ -1210,7 +1211,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   judges nothing and covers nothing, and so does one whose read of the repo failed, so a home that
   stopped judging leaves the PR the team's rather than hiding it. **The switch** is `repos.<repo>.sync.auto` in `settings.yml` (§5; the Repos card's
   **sync**, §4.5a), `true` when absent, as `pull` is. `false` checks nothing and merges nothing,
-  every sync PR is the team's at once, and the reading is *off*. **What it is not**: it never pushes
+  every sync PR is the team's at once, and the reading is *off*. Beside the switch the card names
+  the newest entry with a verdict, by its `at` (the kept *merged* one among them), and *no sync PR*
+  only when no entry has a verdict and the PR reading holds no open sync PR. An open one still
+  waiting for its checks or its retries, or a PR reading that failed, says nothing. **What it is not**: it never pushes
   a commit to a PR (a sync that needs a step is the team's), never merges a PR that is not a sync,
   runs nothing from the PR's head except bytes step 1 proved are dev-cadence's, and never moves a
   checkout. The pull (above) follows the
