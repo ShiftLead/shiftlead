@@ -150,3 +150,181 @@ async def test_what_the_lost_brief_replay_leaves_alone(agent, tmp_path):
             assert agent.sessions[sid] is rec and rec.restarts == [] and rec.state != "closed", sid
         for sid in recs:
             await person.call("kill", id=sid)
+
+
+# -- TD-732: the guards, the ceiling, the senders told and the failed close, each held by a test ----------
+
+
+@pytest.mark.parametrize(
+    "why",
+    ["wrapup_at", "wrapup_sent_at", "suspended", "sit_out", "run_until", "gated", "exited"],
+)
+async def test_a_marked_record_the_replay_must_not_touch_is_left_as_it_is(agent, tmp_path, why):
+    """Wound down, suspended, sat out, past its stop time, gated or already ended: no relaunch and no
+    ceiling — each is another rule's, or the person's."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
+        _lose(agent, sid)
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        if why == "run_until":
+            rec.run_until = _iso(now - timedelta(minutes=1))
+        elif why == "exited":
+            rec.state = "exited"
+        elif why in ("wrapup_at", "wrapup_sent_at"):
+            setattr(rec, why, _iso(now))
+        else:
+            setattr(rec, why, {"at": _iso(now), "by": "person", "why": "test"})
+        assert await agent._lost_brief(rec, now) is False
+        assert agent.sessions[sid] is rec and rec.restarts == [] and rec.restart_ceiling is None
+        assert rec.state != "closed" and rec.closer is None
+        await person.call("kill", id=sid)
+
+
+async def test_restart_ceiling_replays_in_the_window_stop_the_replay_with_no_why(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
+        _lose(agent, sid)
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        rec.restarts = [{"at": _iso(now - timedelta(minutes=i + 1)), "why": "crash"} for i in range(3)]
+        assert await agent._lost_brief(rec, now) is False
+        assert agent.sessions[sid] is rec and rec.state != "closed"
+        assert rec.restart_ceiling["count"] == 3 and "why" not in rec.restart_ceiling, "the ceiling's, not a loss's"
+        await person.call("kill", id=sid)
+
+
+async def test_a_failed_lost_brief_entry_is_no_second_loss(agent, tmp_path):
+    """A `lost-brief` entry carrying `error` (its close failed, the record not closed) is retried, not read
+    as *brief lost twice*."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
+        _lose(agent, sid)
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        rec.restarts = [{"at": _iso(now), "why": "lost-brief", "error": "close: boom"}]
+        assert await agent._lost_brief(rec, now) is True
+        new = agent.sessions[sid]
+        assert new is not rec and new.restart_ceiling is None
+        assert [r["why"] for r in new.restarts] == ["lost-brief", "lost-brief"]
+        await person.call("kill", id=sid)
+
+
+async def test_a_work_seats_replay_keeps_its_lane_seen(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(person, tmp_path, "anchor", supervised=True, prompt="the brief", seat={"trigger": "work"})
+        rec = agent.sessions[sid]
+        rec.lane_seen = {"repo": {"TD-1": "sig"}}
+        _lose(agent, sid)
+        assert await agent._lost_brief(rec, datetime.now(UTC)) is True
+        new = agent.sessions[sid]
+        assert new is not rec and new.lane_seen == {"repo": {"TD-1": "sig"}}
+        await person.call("kill", id=sid)
+
+
+async def test_each_open_asker_is_told_once_and_the_person_and_the_system_never(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        a = await _create(person, tmp_path, "a")
+        b = await _create(person, tmp_path, "b")
+        sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        at = _iso(now)
+        rec.inbox += [
+            MailEntry(id="m-1", from_=a, to=[sid], at=at, kind="ask", text="one"),
+            MailEntry(id="m-2", from_=a, to=[sid], at=at, kind="steer", text="two", default="go"),
+            MailEntry(id="m-3", from_="person", to=[sid], at=at, kind="ask", text="the person's"),
+            MailEntry(id="m-4", from_=SYSTEM, to=[sid], at=at, kind="ask", text="the system's"),
+            MailEntry(id="m-5", from_=b, to=[sid], at=at, kind="ask", text="answered", closed_reason="replied"),
+            MailEntry(id="m-6", from_=b, to=[sid], at=at, kind="note", text="a note asks nothing"),
+        ]
+        _lose(agent, sid)
+        told: list[str] = []
+        monkeypatch.setattr(agent, "_system_note", lambda to, text, **kw: told.append(to))
+        assert await agent._lost_brief(rec, now) is True
+        assert told == [a], "one note for two open asks; none to the person, the system or a closed ask's sender"
+        await person.call("kill", id=sid)
+
+
+async def test_a_close_that_fails_is_a_failed_replay_and_the_next_tick_replays(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
+        _lose(agent, sid)
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        real, closes = agent.rpc_close, []
+
+        async def refused(id, **kw):
+            closes.append(id)
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(agent, "rpc_close", refused)
+        assert await agent._lost_brief(rec, now) is False, "nothing closed: the pass goes on"
+        assert rec.state != "closed" and rec.closed_for is None
+        assert [(r["why"], r["error"]) for r in rec.restarts] == [("lost-brief", "close: boom")]
+        monkeypatch.setattr(agent, "rpc_close", real)
+        assert await agent._lost_brief(rec, now + timedelta(seconds=1)) is True
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["lost-brief", "lost-brief"]
+        assert new.restart_ceiling is None
+        await person.call("kill", id=sid)
+
+
+async def test_a_close_that_closed_then_failed_is_replayed_next_tick_without_a_second_close(
+    agent, tmp_path, monkeypatch
+):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(person, tmp_path, "w", supervised=True, prompt="the brief")
+        _lose(agent, sid)
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        real, closes = agent.rpc_close, []
+
+        async def closed_then_failed(id, **kw):
+            closes.append(id)
+            await real(id, **kw)
+            raise RuntimeError("after the close")
+
+        monkeypatch.setattr(agent, "rpc_close", closed_then_failed)
+        assert await agent._lost_brief(rec, now) is True, "closed: the rest of the pass leaves it"
+        assert rec.state == "closed" and rec.closed_for["why"] == "lost-brief"
+        assert [r.get("error") for r in rec.restarts] == ["close: after the close"]
+        assert await agent._lost_brief(rec, now + timedelta(seconds=1)) is True
+        new = agent.sessions[sid]
+        assert closes == [sid], "the retry replays the closed run without closing it again"
+        assert new is not rec and [r["why"] for r in new.restarts] == ["lost-brief", "lost-brief"]
+        await person.call("kill", id=sid)
+
+
+async def test_two_records_marked_in_one_tick_are_each_replayed_once(agent, tmp_path):
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        ids = [await _create(person, tmp_path, n, supervised=True, prompt="the brief") for n in ("w1", "w2")]
+        olds = {sid: agent.sessions[sid] for sid in ids}
+        for sid in ids:
+            _lose(agent, sid)
+        await agent._keep_running(datetime.now(UTC))
+        for sid in ids:
+            new = agent.sessions[sid]
+            assert new is not olds[sid] and [r["why"] for r in new.restarts] == ["lost-brief"], sid
+        for sid in ids:
+            await person.call("kill", id=sid)
+
+
+async def test_the_closed_run_is_left_by_the_rest_of_the_pass(agent, tmp_path):
+    """A seat still due when its brief was lost (an `every` seat keeps its `seat_due`) is replayed, and
+    the rest of the tick's pass leaves its closed run alone: no fill on top of the replay."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _create(
+            person, tmp_path, "lead", supervised=True, prompt="the brief", seat={"trigger": "every", "after": "1h"}
+        )
+        rec, now = agent.sessions[sid], datetime.now(UTC)
+        rec.seat_due = {"at": _iso(now), "by": "every"}
+        _lose(agent, sid)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["lost-brief"]
+        assert rec.restarts == [], "the closed run is not filled on top of its replay"
+        await person.call("kill", id=sid)
