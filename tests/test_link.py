@@ -187,6 +187,22 @@ async def home(tmp_path):
         kill_private_server(Tmux(socket_name=h.sock_name))
 
 
+def shut_the_lid(node, monkeypatch) -> asyncio.Event:
+    """Close the node's link to the home and keep it closed until the returned event is set (TD-713).
+    The dialer read `BACKOFF_FIRST` and `BACKOFF_MAX` once, when the node started, so setting them
+    afterwards held nothing, and a timed hold races the steps it is meant to cover on a slow runner;
+    each attempt is a fresh `link._dial_once`, so that is what waits for the lid."""
+    lid, dial_once = asyncio.Event(), link._dial_once
+
+    async def after_the_lid(*args, **kwargs):
+        await lid.wait()
+        return await dial_once(*args, **kwargs)
+
+    monkeypatch.setattr(link, "_dial_once", after_the_lid)
+    node._home_mux.close("the lid closed")
+    return lid
+
+
 @contextlib.asynccontextmanager
 async def node_agent(tmp_path, monkeypatch, command=None, name="laptop", socket=None):
     d = tmp_path / name
@@ -426,11 +442,10 @@ async def test_laptop_closed_its_cards_go_unreachable_and_come_back(home, hookst
 
         v = await until(lambda v: v is not None and v["state"] != "unreachable")
         assert v["host"] == "laptop" and v["host_link"]["up"] is True and v["name"] == "w"
-        monkeypatch.setattr(link, "BACKOFF_FIRST", 2.0)  # the lid stays shut long enough to be seen
-        monkeypatch.setattr(link, "BACKOFF_MAX", 2.0)
-        node._home_mux.close("the lid closed")
+        lid = shut_the_lid(node, monkeypatch)
         v = await until(lambda v: v is not None and v["state"] == "unreachable")
         assert v["last_state"] in ("working", "idle") and v["host_link"]["why"]
+        lid.set()
         v = await until(lambda v: v is not None and v["state"] != "unreachable")  # nobody did anything
         assert v["host_link"]["up"] is True
         async with LocalClient() as c:
@@ -656,15 +671,14 @@ async def test_an_act_on_an_unreachable_host_is_refused_and_never_runs_when_the_
             w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
         address = f"{w['id']}@laptop"
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
-        monkeypatch.setattr(link, "BACKOFF_FIRST", 2.0)
-        monkeypatch.setattr(link, "BACKOFF_MAX", 2.0)
-        node._home_mux.close("the lid closed")
+        lid = shut_the_lid(node, monkeypatch)
         await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             with pytest.raises(AgentError, match="runs on laptop: unreachable since .*; refused, not queued"):
                 await person.call("kill", id=address)
             with pytest.raises(AgentError, match="runs on laptop: unreachable"):
                 await person.call("host_dir", host="laptop", dir=str(tmp_path))
+        lid.set()
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
         await asyncio.sleep(0.5)  # nothing was queued: the session is still there after the link came back
         assert node.sessions[w["id"]].state != "exited"
@@ -1022,15 +1036,14 @@ async def test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on
                     got = await at_node.call("msg", to=[lead_there], text="from the node's terminal")
                     assert got["entry"]["from"] == "person"
                 # the lid closes: mail to the node lands at the home and says so; read on return
-                monkeypatch.setattr(link, "BACKOFF_FIRST", 2.0)
-                monkeypatch.setattr(link, "BACKOFF_MAX", 2.0)
-                node._home_mux.close("the lid closed")
+                lid = shut_the_lid(node, monkeypatch)
                 await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
                 got = await as_lead.call("msg", to=[address], text="while you were away")
                 assert got["unreachable"] == [address] and got["delivered"] == [address]
                 assert (await person.call("get", id=address))["unread"] == 1
                 with pytest.raises(AgentError, match="unreachable"):
                     await as_w.call("inbox")  # refused at the node, not queued
+                lid.set()
                 await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
                 assert await wait_for(node.home_reachable, timeout=15.0, step=0.05)
                 mine = await as_w.call("inbox", unread=True)
@@ -1362,9 +1375,7 @@ async def test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_crea
             w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
         address = f"{w['id']}@laptop"
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
-        monkeypatch.setattr(link, "BACKOFF_FIRST", 5.0)
-        monkeypatch.setattr(link, "BACKOFF_MAX", 5.0)
-        node._home_mux.close("the lid closed")
+        lid = shut_the_lid(node, monkeypatch)
         await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             with pytest.raises(AgentError, match="is marked suspended"):
@@ -1373,6 +1384,7 @@ async def test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_crea
             await at_node.call("kill", id=w["id"])
             again = await at_node.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
         assert again["id"] == w["id"] and again["supersedes"][0]["id"] == w["id"] and not again["suspended"]
+        lid.set()
         await until(home, address, lambda v: v and v["state"] != "unreachable" and v["created"] == again["created"])
         assert (await at_home(home, address))["suspended"]["why"] == "claimed another session's id"
         assert await wait_for(lambda: bool(node.sessions[w["id"]].suspended), timeout=10.0, step=0.1)  # pushed
@@ -1401,15 +1413,14 @@ async def test_a_suspension_reaches_a_name_retaken_on_a_node_after_the_link_retu
             w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
         address = f"{w['id']}@laptop"
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
-        monkeypatch.setattr(link, "BACKOFF_FIRST", 1.0)
-        monkeypatch.setattr(link, "BACKOFF_MAX", 1.0)
-        node._home_mux.close("the lid closed")
+        lid = shut_the_lid(node, monkeypatch)
         await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             with pytest.raises(AgentError, match="is marked suspended"):
                 await person.call("suspend", id=address, why="claimed another session's id")
         async with LocalClient() as at_node:
             await at_node.call("kill", id=w["id"])
+            lid.set()
             # the link is back and the old record has the home's mark before the name is retaken
             await until(home, address, lambda v: v and v["state"] in ("exited", "closed"))
             assert await wait_for(lambda: bool(node.sessions[w["id"]].suspended), timeout=10.0, step=0.1)
