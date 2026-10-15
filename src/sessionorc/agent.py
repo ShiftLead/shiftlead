@@ -47,6 +47,7 @@ from sessionorc import (
 )
 from sessionorc import balance as balance_mod
 from sessionorc import settings as settings_mod
+from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_attention import AttentionMixin
@@ -2640,6 +2641,8 @@ class HostAgent(
         new_claim = status == "claimed" and entry.source == "declared"
         if new_claim and (words := self._balance_refusal(s, entry.ref, caller)):
             raise RpcError(words, balance=self._balance_of(s))
+        if new_claim and (words := self._settle_refusal(s, entry.ref)):
+            raise RpcError(words)  # before the lease: `force` is about another session's claim, not this
         holder = self._lease_holder(s, entry) if new_claim else None
         if holder is not None and not force:
             raise RpcError(
@@ -2670,6 +2673,16 @@ class HostAgent(
         if said and said["line"]:
             out["checks_said"] = said["line"]
         return out
+
+    def _settle_refusal(self, s: Session, ref: str) -> str | None:
+        """Why a declared claim on a ledger entry is refused because it settles or the person holds it
+        (design §4.8 *A claim is a lease*, §4.4 *What settling withholds*, TD-710), read from the home's
+        reading of the claimer's repo; None for a reference that is no ledger id, or a repo not read."""
+        if not ref.startswith("TD-"):
+            return None
+        entries = ((self._repos.get(s.repo or "") or {}).get("ledger") or {}).get("entries") or []
+        entry = next((e for e in entries if isinstance(e, dict) and e.get("id") == ref), None)
+        return settle_mod.claim_refusal(entry, datetime.now(UTC))
 
     async def _pr_checks(self, s: Session, pr: int) -> dict[str, Any]:
         """PR `pr` read once for its checks (design §4.8 *A `done` with a PR is told what its checks

@@ -13,11 +13,13 @@ import json
 import re
 import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import hosts, mail, paths
+from sessionorc import agent_common, hosts, mail, paths
 from sessionorc import ledger as ledger_mod
+from sessionorc import settle as settle_mod
 from sessionorc.agent_common import RpcError, log
 from sessionorc.models import PERSON, now_iso
 from sessionorc.store import _atomic_write
@@ -89,7 +91,51 @@ def _why(err: str, fallback: str) -> str:
     return ((err or "").strip().splitlines() or [fallback])[-1][:200]
 
 
+def settle_key(root: str, remote: str) -> str:
+    """The settle clock's key for a checkout: its origin as `ids.json` keys it, its path where it has none."""
+    return origin_key(remote) if remote else str(root)
+
+
 class IdsMixin:
+    async def rpc_td_hold(
+        self, repo: str = "", id: str = "", release: bool = False, caller: Any = None
+    ) -> dict[str, Any]:
+        """`ao td hold` and the Repo page's **Hold** / **Release** (design §4.4 *Hold*, §4.7 *Entries*,
+        TD-707, built by TD-710 slice 2): the person holds an entry while it settles, or releases a held
+        one, on the home's settle clock — no ledger edit. `repo` is a checkout the home reads, by its path
+        or its registered name. A person's own act (`mail.PERSON_ONLY`). The reading is marked again at
+        once, so a lane and the page read the hold now. Returns `{repo, id, held, settling}`."""
+        agent_common.person_only(caller, "hold a ledger entry", "§4.4 *Hold*", self._graph())
+        want = str(repo or "").strip()
+        roots = [
+            r
+            for r, v in self._repos.items()
+            if want and (r == want or str(Path(r).resolve()) == str(Path(want).expanduser().resolve())
+                         or str((v or {}).get("name") or Path(r).name) == want)
+        ]  # fmt: skip
+        if not roots:
+            raise RpcError(f"{want or 'no repo'} is not a repo this home reads (its repos registry)")
+        root = roots[0]
+        view = self._repos.get(root) or {}
+        name = str(view.get("name") or Path(root).name)
+        tid = str(id or "").strip().upper()
+        entries = [e for e in ((view.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+        entry = next((e for e in entries if e.get("id") == tid), None)
+        if entry is None:
+            raise RpcError(f"{tid or 'no id'} is not an open entry of {name}'s ledger as the home last read it")
+        remote = str(view.get("remote") or "")
+        if not remote:
+            raise RpcError(f"{name}'s origin is not read yet: its clock is keyed by it, so ask again in a minute")
+        key, spans = settle_key(root, remote), settle_mod.spans(root)
+        now = datetime.now(UTC)
+        by = PERSON if caller is None or mail.is_person(caller) else str(caller)
+        try:
+            await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, release=bool(release))
+        except settle_mod.Refused as e:
+            raise RpcError(str(e)) from None
+        await asyncio.to_thread(settle_mod.mark, entries, key, spans, now)
+        return {"repo": name, "id": tid, "held": entry.get("held"), "settling": entry.get("settling")}
+
     async def rpc_td_next(self, repo: str = "", count: int = 1, caller: Any = None) -> dict[str, Any]:
         """`ao td next` (design §4.4 *A ledger entry's id is handed out by the home*, §4.7 *Entries*): the next
         `count` free ids of the repo named `repo` — its registered name, or its origin's `owner/repo` — and the

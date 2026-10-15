@@ -9,9 +9,12 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 
-from sessionorc import ledger, paths, settle
+from sessionorc import ledger, modes, paths, settle
+from sessionorc.agent_common import RpcError
 from sessionorc.agent_tick import TickMixin
+from sessionorc.client import AgentError, LocalClient
 
 T0 = datetime(2026, 10, 15, 6, 0, tzinfo=UTC)
 SPANS = settle.durations(None, None)  # the built-in: design-first 5m, the rest 0
@@ -144,3 +147,100 @@ def test_a_partial_reading_keeps_the_records_it_does_not_hold():
     settle.observe(_ledger(_entry(3, "build")), "o/r", SPANS, T0 + timedelta(minutes=1))  # TD-002 missing
     got = _by_id(settle.observe(_ledger(_entry(2)), "o/r", SPANS, T0 + timedelta(days=1)))
     assert got["TD-002"]["held"] == {"at": T0.isoformat()}, "the hold survived the reading that lacked it"
+
+
+# -- slice 2: Hold and the claim (§4.4 *Hold*, §4.8 *A claim is a lease*) ------------------------------------
+
+
+def _settling_two(t: datetime = T0) -> dict[str, dict]:
+    """A first reading, then TD-002 (design-first, settling) and TD-003 (build, settled at once)."""
+    settle.observe(_ledger(), "o/r", SPANS, t)
+    return _by_id(settle.observe(_ledger(_entry(2), _entry(3, "build")), "o/r", SPANS, t))
+
+
+def test_a_hold_withholds_past_the_window_and_a_release_makes_it_pickable_at_once():
+    got = _settling_two()
+    rec = settle.hold("o/r", got["TD-002"], SPANS, T0 + timedelta(minutes=1), by="person")
+    assert rec["held"] == {"at": (T0 + timedelta(minutes=1)).isoformat(), "by": "person"}
+    assert settle.hold("o/r", got["TD-002"], SPANS, T0 + timedelta(minutes=2), by="person") == rec, "held already"
+    later = _by_id(settle.mark(list(got.values()), "o/r", SPANS, T0 + timedelta(days=1)))
+    assert "held" in later["TD-002"] and not ledger.lane_matches(DESIGNER, later["TD-002"])
+    settle.hold("o/r", got["TD-002"], SPANS, T0 + timedelta(days=1), by="person", release=True)
+    now = _by_id(settle.mark(list(got.values()), "o/r", SPANS, T0 + timedelta(days=1)))
+    assert "held" not in now["TD-002"] and "settling" not in now["TD-002"]
+    # a release inside what was the window frees it at once too, and an edit after it changes nothing
+    got = _by_id(settle.observe(_ledger(_entry(4)), "o/r", SPANS, T0))
+    settle.hold("o/r", got["TD-004"], SPANS, T0, by="person")
+    settle.hold("o/r", got["TD-004"], SPANS, T0, by="person", release=True)
+    edited = _by_id(settle.observe(_ledger(_entry(4, body="an edit")), "o/r", SPANS, T0 + timedelta(seconds=30)))
+    assert "settling" not in edited["TD-004"] and ledger.lane_matches(DESIGNER, edited["TD-004"])
+
+
+def test_a_settled_entry_cannot_be_held_and_an_unheld_one_cannot_be_released():
+    got = _settling_two()
+    with pytest.raises(settle.Refused, match="TD-003 has settled, and a hold is a settling entry's"):
+        settle.hold("o/r", got["TD-003"], SPANS, T0, by="person")  # a build: settled at once
+    with pytest.raises(settle.Refused, match="TD-002 has settled"):
+        settle.hold("o/r", got["TD-002"], SPANS, T0 + timedelta(minutes=6), by="person")
+    with pytest.raises(settle.Refused, match="TD-002 is not held"):
+        settle.hold("o/r", got["TD-002"], SPANS, T0, by="person", release=True)
+    with pytest.raises(settle.Refused, match="TD-009 is not in the home's clock"):
+        settle.hold("o/r", {"id": "TD-009"}, SPANS, T0, by="person")
+    assert "held" not in json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
+
+
+def test_the_claim_refusal_names_the_window_or_the_hold():
+    got = _settling_two()
+    words = settle.claim_refusal(got["TD-002"], T0)
+    until = (T0 + timedelta(minutes=5)).astimezone()
+    assert words.startswith(f"TD-002 settles until {until:%H:%M}: ") and "--force does not pass it" in words
+    assert settle.claim_refusal(got["TD-002"], T0 + timedelta(minutes=5)) is None, "a stale mark past its until"
+    assert settle.claim_refusal(got["TD-003"], T0) is None and settle.claim_refusal(None, T0) is None
+    words = settle.claim_refusal({"id": "TD-002", "held": {"at": T0.isoformat()}}, T0)
+    assert words.startswith(f"TD-002 is held by the person since {T0.astimezone():%H:%M}: no lane takes it")
+
+
+async def _home_with(agent, tmp_path, *, now: datetime) -> tuple[str, list[dict]]:
+    """The agent reading a repo whose TD-002 settles, as the tick would leave it."""
+    root = str(tmp_path / "r")
+    got = _settling_two(now)
+    agent._repos[root] = {"name": "r", "root": root, "remote": "https://github.com/o/r.git",
+                          "ledger": {"entries": list(got.values())}}  # fmt: skip
+    return root, agent._repos[root]["ledger"]["entries"]
+
+
+async def test_td_hold_is_the_persons_and_marks_the_reading_at_once(agent, tmp_path):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    with pytest.raises(RpcError, match="ao-w cannot hold a ledger entry: a person's own act"):
+        await agent.rpc_td_hold(repo=root, id="TD-002", caller="ao-w")
+    got = await agent.rpc_td_hold(repo="r", id="td-002")
+    assert got["repo"] == "r" and got["id"] == "TD-002" and got["held"]["at"] and got["settling"] is None
+    assert "held" in _by_id(entries)["TD-002"], "the reading is marked now, not at the next pass"
+    got = await agent.rpc_td_hold(repo=root, id="TD-002", release=True)
+    assert got["held"] is None and got["settling"] is None and "held" not in _by_id(entries)["TD-002"]
+    with pytest.raises(RpcError, match="TD-003 has settled"):
+        await agent.rpc_td_hold(repo=root, id="TD-003")
+    with pytest.raises(RpcError, match="TD-404 is not an open entry of r's ledger"):
+        await agent.rpc_td_hold(repo=root, id="TD-404")
+    with pytest.raises(RpcError, match="elsewhere is not a repo this home reads"):
+        await agent.rpc_td_hold(repo="elsewhere", id="TD-002")
+    assert modes.offline_refusal("td_hold", None, {}, host="laptop", home="kmaster")
+
+
+async def test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too(agent, tmp_path):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    async with LocalClient() as person:
+        g = (await person.call("create", name="g", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        agent.sessions[g].repo = root
+        for force in (False, True):
+            with pytest.raises(AgentError, match="TD-002 settles until .*--force does not pass it"):
+                await person.call("progress", id=g, ref="TD-002", status="claimed", force=force)
+        await agent.rpc_td_hold(repo=root, id="TD-002")
+        with pytest.raises(AgentError, match="TD-002 is held by the person since"):
+            await person.call("progress", id=g, ref="TD-002", status="claimed", force=True)
+        await person.call("progress", id=g, ref="TD-003", status="claimed")  # a build: settled at once
+        await agent.rpc_td_hold(repo=root, id="TD-002", release=True)
+        await person.call("progress", id=g, ref="TD-002", status="claimed")
+        assert {e.ref for e in agent.sessions[g].progress} >= {"TD-002", "TD-003"}
