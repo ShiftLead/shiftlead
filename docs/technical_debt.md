@@ -59,7 +59,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
 | TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
 | TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
-| TD-690 | Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text | Medium | Open |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Open |
 
 ---
@@ -1082,44 +1081,6 @@ The other cases:
 **Done when** every file button on the pages opens the file in the person's editor by the same two launches as a pane path, on the local, ssh-remote and container forms, held by a test over the templates. A path in the pane or the transcript that names a readable file on the session's host outside its checkout (`~/.bashrc`) is a link under the bound the design writes.
 
 **Related:** TD-501 (a path in the pane is a link), TD-524 and TD-526 (the line after the path), TD-532 (two launches), TD-535 and TD-536 (the recent files, `person.file_link`), TD-148 (the Settings page's **Open file**).
-
----
-
-## TD-690: Build TD-688 (2): a pane path links any readable file on the record's host, the real path judged, `PATHS_PRIVATE` text
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (the designer, building TD-688's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.6 *A path in the pane is a link*, §4.5a *Focus pane: a path is a link*; `src/sessionorc/agent.py` (`_resolve_paths`, `rpc_paths`, `PATHS_RUNS_MAX`), its tests
-
-**Why:** TD-688's design. Paul, 2026-10-14: *add links in our transcripts to any file that is actually available on the corresponding machine (e.g. ~/.bashrc would not have a link currently)*.
-
-**Fix:** this is `src/sessionorc/**`, so the techlead reads it (§4.9b).
-- **The bound.** `_resolve_paths` drops its `roots` argument, and `rpc_paths` drops the `roots` it computes. A run answers its real path when, after `os.path.realpath`, it is a regular file the process can read (`os.access(p, os.R_OK)`) and `PATHS_PRIVATE` does not match it.
-- **`PATHS_PRIVATE`** sits beside `PATHS_RUNS_MAX` as three tuples matched on the real path, so a symlink into one is text too:
-  - prefixes: `/proc`, `/sys`, `/dev`;
-  - path components or component pairs anywhere: `.ssh`, `.gnupg`, `.aws`, `.doppler`, `.kube`, `.password-store`, `.config/doppler`, `.config/gcloud`, `.config/gh`;
-  - file names and patterns: `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc`, `.claude.json`, `.credentials.json`, `.docker/config.json`, `.bash_history`, `.zsh_history`, `*.pem`, `*.key`, `.env`, `.env.*`.
-
-  The build lists any token or secret file under `~/.shiftlead` (the Telegram secret's name, an attachment of credentials) and adds it, saying so in the PR.
-- **The docstring** of `rpc_paths` says the new bound, and drops *`dir` or `repo`*.
-- **Tests:**
-  - `~/.bashrc` answers;
-  - a symlink in the checkout to a readable file outside answers its target;
-  - an unreadable file is nothing;
-  - `~/.ssh/config` is nothing, and so is a `.ssh/` in another user's home or a repo;
-  - a symlink to `~/.ssh/id_x` is nothing;
-  - `/proc/self/environ` is nothing;
-  - a `.env` and a `.env.local` are nothing;
-  - a directory is nothing;
-  - the run limits stand.
-
-**Done when** a path in the pane naming a readable regular file anywhere on the session's host is a link, and every path under `PATHS_PRIVATE` stays text.
-
-**Related:** TD-688 (the design), TD-501 (the pane's links), TD-691 (the transcript's, which read this bound).
 
 ---
 

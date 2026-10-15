@@ -1,5 +1,6 @@
-"""The `paths` read (design §4.6 *A path in the pane is a link*, TD-501): which runs a pane named are
-regular files inside the record's checkout, answered by the record's host."""
+"""The `paths` read (design §4.6 *A path in the pane is a link*, TD-501, TD-688): which runs a pane
+named are regular files the record's host can read, its real path judged and `PATHS_PRIVATE` kept as
+text, answered by the record's host."""
 
 from __future__ import annotations
 
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from sessionorc.agent import _path_private
 from sessionorc.agent_common import NODE_READS, PATHS_RUN_CHARS, PATHS_RUNS_MAX
 from sessionorc.client import AgentError, LocalClient
 
@@ -30,7 +32,7 @@ def checkout(tmp_path: Path) -> Path:
 
 
 @pytest.mark.integration
-async def test_a_run_answers_only_as_a_regular_file_inside_the_checkout(agent, tmp_path, monkeypatch):
+async def test_a_run_answers_as_any_readable_regular_file_on_the_host(agent, tmp_path, monkeypatch):
     assert "paths" in NODE_READS  # a node's record answers through `read`, as a transcript does
     wt = checkout(tmp_path)
     repo = wt.parent.parent.parent
@@ -47,10 +49,10 @@ async def test_a_run_answers_only_as_a_regular_file_inside_the_checkout(agent, t
             "src/a.py:12",  # the page strips `:line` before it asks: a run with one is not a file
             "src/sub",  # a directory is the header button's
             "src/missing.py",
-            "out.txt",  # a symlink out of the checkout
+            "out.txt",  # a symlink out of the checkout answers its target (TD-688)
             "in.txt",  # a symlink inside it answers as its target
-            "../../../src/x.py",  # up out of the worktree, into the repo: still ours
-            "../../../../outside.txt",  # and up out of both
+            "../../../src/x.py",  # up out of the worktree, into the repo
+            "../../../../outside.txt",  # and up out of both: any readable file on the host
             f"{repo}/top.md",  # absolute, inside the repo
         ]
         got = {}
@@ -62,19 +64,19 @@ async def test_a_run_answers_only_as_a_regular_file_inside_the_checkout(agent, t
             "src/a.py:12": None,
             "src/sub": None,
             "src/missing.py": None,
-            "out.txt": None,
+            "out.txt": os.path.realpath("/etc/passwd"),
             "in.txt": str(wt / "src" / "a.py"),
             "../../../src/x.py": str(repo / "src" / "x.py"),
-            "../../../../outside.txt": None,
+            "../../../../outside.txt": str(tmp_path / "outside.txt"),
             f"{repo}/top.md": str(repo / "top.md"),
         }
-        odd = [f"{repo}-evil/f.txt", "src/a\x00.py", "~nosuchuser-td501/x"]
-        assert (await person.call("paths", id=sid, runs=odd))["paths"] == dict.fromkeys(odd)  # a prefix is not a root
+        odd = ["src/a\x00.py", "~nosuchuser-td501/x"]
+        assert (await person.call("paths", id=sid, runs=odd))["paths"] == dict.fromkeys(odd)
         with pytest.raises(AgentError, match="runs, a list of strings"):
             await person.call("paths", id=sid, runs=["src/a.py", 3])
-        assert (await person.call("paths", id=sid, runs=["~/h.txt", "/etc/passwd"]))["paths"] == {
-            "~/h.txt": None,  # home expanded, and outside the checkout
-            "/etc/passwd": None,
+        assert (await person.call("paths", id=sid, runs=["~/h.txt", f"{repo}-evil/f.txt"]))["paths"] == {
+            "~/h.txt": str(home / "h.txt"),  # home expanded: a `~/.bashrc` is a link (TD-688)
+            f"{repo}-evil/f.txt": str(tmp_path / "repo-evil" / "f.txt"),
         }
         # the bounds, refused naming them
         with pytest.raises(AgentError, match=f"past the {PATHS_RUNS_MAX} one row may ask about"):
@@ -108,24 +110,28 @@ async def test_an_unreadable_file_and_a_record_with_no_repo(agent, tmp_path):
     locked = d / "locked"
     locked.mkdir()
     (locked / "g.txt").write_text("g\n")
+    (d / "shut.txt").write_text("s\n")
     async with LocalClient() as person:
         sid = (await person.call("create", name="sh", dir=str(d), adapter="shell", argv=["bash", "--norc"]))["id"]
         assert agent.sessions[sid].repo is None
         os.chmod(locked, 0)
+        os.chmod(d / "shut.txt", 0)
         try:
-            got = (await person.call("paths", id=sid, runs=["f.txt", "locked/g.txt"]))["paths"]
+            got = (await person.call("paths", id=sid, runs=["f.txt", "locked/g.txt", "shut.txt"]))["paths"]
         finally:
             os.chmod(locked, 0o755)
+            os.chmod(d / "shut.txt", 0o644)
         assert got["f.txt"] == str(d / "f.txt")
         assert got["locked/g.txt"] is None or os.geteuid() == 0  # root stats through a mode of 0
+        assert got["shut.txt"] is None or os.geteuid() == 0  # a regular file this user cannot read
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
 
 
 @pytest.mark.integration
 async def test_a_checkout_reached_through_a_symlink_answers_its_files(agent, tmp_path):
-    """The roots are compared as real paths (TD-517): a `dir` and a `repo` reached through a link —
-    a home or a worktree path that is one — still own the files under them."""
+    """A `dir` reached through a link (TD-517) — a home or a worktree path that is one — resolves a
+    relative run against it and answers the real path."""
     wt = checkout(tmp_path)
     repo = wt.parent.parent.parent
     (tmp_path / "linked").symlink_to(repo)
@@ -135,7 +141,11 @@ async def test_a_checkout_reached_through_a_symlink_answers_its_files(agent, tmp
         s.dir = str(tmp_path / "linked" / ".claude" / "worktrees" / "w")  # as the record may hold it
         s.repo = str(tmp_path / "linked")
         got = (await person.call("paths", id=sid, runs=["src/a.py", "../../../top.md", "out.txt"]))["paths"]
-        assert got == {"src/a.py": str(wt / "src" / "a.py"), "../../../top.md": str(repo / "top.md"), "out.txt": None}
+        assert got == {
+            "src/a.py": str(wt / "src" / "a.py"),
+            "../../../top.md": str(repo / "top.md"),
+            "out.txt": os.path.realpath("/etc/passwd"),
+        }
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
 
@@ -163,3 +173,84 @@ async def test_paths_is_served_under_enforce_from_a_channel_nobody_can_place(age
     async with LocalClient() as person:
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+@pytest.mark.integration
+async def test_a_credential_file_stays_text_whatever_the_stat_says(agent, tmp_path, monkeypatch):
+    """`PATHS_PRIVATE` (§4.6, TD-688): a credential file is nothing though it is readable, matched on
+    the real path, so a symlink to one is nothing too; the run limits stand beside it."""
+    home = tmp_path / "userhome"
+    for f in (".bashrc", ".ssh/config", ".ssh/id_x", ".config/gh/hosts.yml", ".config/other.yml", ".netrc"):
+        (home / f).parent.mkdir(parents=True, exist_ok=True)
+        (home / f).write_text("x\n")
+    other = tmp_path / "otheruser" / ".ssh"  # a `.ssh/` in another user's home
+    other.mkdir(parents=True)
+    (other / "known_hosts").write_text("x\n")
+    d = tmp_path / "repo"
+    (d / "deploy" / ".ssh").mkdir(parents=True)  # and in a repo
+    (d / "deploy" / ".ssh" / "k").write_text("x\n")
+    for f in (".env", ".env.local", "env.txt", "server.pem", "tls.key", "notes.keys", ".docker/config.json"):
+        (d / f).parent.mkdir(parents=True, exist_ok=True)
+        (d / f).write_text("x\n")
+    (d / "docker").mkdir()
+    (d / "docker" / "config.json").write_text("x\n")  # not `.docker/`: a file like any other
+    (d / "id_link").symlink_to(home / ".ssh" / "id_x")
+    monkeypatch.setenv("HOME", str(home))
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="sh", dir=str(d), adapter="shell", argv=["bash", "--norc"]))["id"]
+        runs = [
+            "~/.bashrc",
+            "~/.ssh/config",
+            f"{other}/known_hosts",
+            "deploy/.ssh/k",
+            "id_link",  # a symlink to `~/.ssh/id_x`
+            "~/.config/gh/hosts.yml",
+            "~/.config/other.yml",
+            "~/.netrc",
+        ]
+        got = (await person.call("paths", id=sid, runs=runs))["paths"]
+        assert got == {
+            "~/.bashrc": str(home / ".bashrc"),
+            "~/.ssh/config": None,
+            f"{other}/known_hosts": None,
+            "deploy/.ssh/k": None,
+            "id_link": None,
+            "~/.config/gh/hosts.yml": None,
+            "~/.config/other.yml": str(home / ".config" / "other.yml"),
+            "~/.netrc": None,
+        }
+        runs = [".env", ".env.local", "./env.txt", "./server.pem", "./tls.key", "./notes.keys"]
+        runs += ["./.docker/config.json", "docker/config.json", "/proc/self/environ", "./deploy"]
+        got = (await person.call("paths", id=sid, runs=runs[:PATHS_RUNS_MAX]))["paths"]
+        got |= (await person.call("paths", id=sid, runs=runs[PATHS_RUNS_MAX:]))["paths"]
+        assert got == {
+            ".env": None,
+            ".env.local": None,
+            "./env.txt": str(d / "env.txt"),
+            "./server.pem": None,
+            "./tls.key": None,
+            "./notes.keys": str(d / "notes.keys"),
+            "./.docker/config.json": None,
+            "docker/config.json": str(d / "docker" / "config.json"),
+            "/proc/self/environ": None,  # a process's environment holds the secrets Doppler injected
+            "./deploy": None,  # a directory is the header button's
+        }
+        with pytest.raises(AgentError, match=f"past the {PATHS_RUNS_MAX} one row may ask about"):
+            await person.call("paths", id=sid, runs=runs)
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+
+
+def test_private_matches_whole_components_only():
+    assert _path_private("/proc") and _path_private("/dev/null") and _path_private("/sys/kernel/x")
+    assert not _path_private("/process/x") and not _path_private("/devices.txt")
+    assert _path_private("/home/u/.aws/credentials") and _path_private("/r/.password-store/a.gpg")
+    assert not _path_private("/home/u/my.ssh/x") and not _path_private("/home/u/.ssh.md")
+    assert _path_private("/home/u/.config/doppler/cli.yaml") and not _path_private("/home/u/doppler/x")
+    assert not _path_private("/home/u/.config/ghost/x") and not _path_private("/home/u/.docker/other.json")
+    assert _path_private("/home/u/.claude.json") and _path_private("/home/u/.claude/.credentials.json")
+    assert not _path_private("/home/u/.claude/settings.json") and not _path_private("/r/.envrc")
+    # a container node's token file (§4.4a), and nothing else of its directory
+    assert _path_private("/home/u/.shiftlead/nodes/cm/env")
+    assert not _path_private("/home/u/.shiftlead/nodes/cm/.devcontainer/devcontainer.json")
+    assert not _path_private("/home/u/.shiftlead/nodes/env") and not _path_private("/home/u/.shiftlead/env")
