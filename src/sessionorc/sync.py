@@ -418,15 +418,21 @@ def merge(root: Path | str, number: int, head: str) -> str | None:
     return _gh(root, ["pr", "merge", str(number), "--squash", "--match-head-commit", head], GATE_TIMEOUT)[0]
 
 
-def held_globs(root: Path | str) -> list[str]:
+def held_globs(root: Path | str) -> list[str] | None:
     """The repo's `held:` from its `.shiftlead.yml` (§4.9c *What is the repo's*): what every review stage
-    holds, so a sync PR touching one is the team's. An unreadable file holds nothing."""
-    try:
-        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError):
+    holds, so a sync PR touching one is the team's. No file holds nothing; a file that cannot be read, or a
+    `held:` that is not a list, is None — no reading, never *nothing held*."""
+    f = paths.repo_file(root)
+    if not f.exists():
         return []
-    got = doc.get("held") if isinstance(doc, dict) else None
-    return [str(g) for g in got if isinstance(g, str) and g.strip()] if isinstance(got, list) else []
+    try:
+        doc = yaml.safe_load(f.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+    got = doc.get("held", []) if isinstance(doc, dict) else [] if doc is None else None
+    if not isinstance(got, list):
+        return None
+    return [str(g) for g in got if isinstance(g, str) and g.strip()]
 
 
 def _no_reading(entry: dict[str, Any], why: str, at: str) -> dict[str, Any]:
@@ -445,7 +451,10 @@ def judge(
     number, head = int(pr["number"]), str(pr["head"])
     e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0, "posted": False}
     e.pop("ready", None)
-    got = check(root, number, head, str(pr.get("branch") or ""), clones=clones, held=held_globs(root))
+    held = held_globs(root)
+    if held is None:
+        return _no_reading(e, "the repo's .shiftlead.yml held: could not be read", at)
+    got = check(root, number, head, str(pr.get("branch") or ""), clones=clones, held=held)
     if got["verdict"] == "moved":
         return None
     if got["verdict"] == "error":

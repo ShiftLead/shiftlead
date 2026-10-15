@@ -181,7 +181,7 @@ async def _orders(agent) -> list[dict]:
 @pytest.mark.integration
 async def test_a_mechanical_sync_pr_is_merged_with_the_note_and_is_no_order(agent, gh):
     _reading(agent, _pr())
-    assert await _orders(agent) == [], "green and unjudged while the switch is on: the home's"
+    assert len(await _orders(agent)) == 1, "no pass has covered the repo yet: the team's"
     await agent._sync_pass()
     entry = agent._repos[ROOT]["sync"]["1097"]
     assert (entry["verdict"], entry["head"], entry["posted"]) == ("merged", HEAD, True)
@@ -258,3 +258,53 @@ def test_the_switch_is_a_repo_setting():
     assert settings_mod.parse_repo({"sync": {"auto": False}}) == {"sync": {"auto": False}}
     with pytest.raises(ValueError, match="sync.auto is true or false"):
         settings_mod.parse_repo({"sync": {"auto": "no"}})
+
+
+@pytest.mark.integration
+async def test_a_pass_that_covers_the_repo_holds_a_green_pr_back_and_one_that_cannot_does_not(agent, gh):
+    gh["gate"] = None  # a retry: no verdict yet
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    assert agent._repos[ROOT]["sync"]["1097"]["tries"] == 1
+    assert await _orders(agent) == [], "green and unjudged under a pass that covers it: the home's"
+    agent._sync_ran.clear()
+    gh["login"], agent._sync_login = None, None
+    await agent._sync_pass()
+    assert ROOT not in agent._sync_ran and len(await _orders(agent)) == 1, "no login: no cover, the team's"
+
+
+@pytest.mark.integration
+async def test_off_is_written_once_per_head(agent, gh, monkeypatch):
+    settings_mod.save({"repos": {"samscrape": {"sync": {"auto": False}}}})
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    saved = []
+    monkeypatch.setattr(agent.repos_store, "save", lambda r: saved.append(r))
+    await agent._sync_pass()
+    assert saved == [], "nothing changed: nothing saved or pushed"
+
+
+@pytest.mark.integration
+async def test_a_merge_refused_under_a_moved_head_writes_nothing(agent, gh):
+    heads = iter([(HEAD, "open"), ("b" * 40, "open")])
+    gh["head"] = lambda *a: next(heads)
+    gh["merge"] = "Head branch was modified"
+    _reading(agent, _pr())
+    await agent._sync_pass()
+    assert "1097" not in agent._repos[ROOT].get("sync", {})
+
+
+def test_an_unreadable_held_list_is_no_reading(gh, monkeypatch):
+    monkeypatch.setattr(sync, "held_globs", lambda root: None)
+    e = sync.judge(ROOT, _pr(), None, [], "T0")
+    assert (e["tries"], e["verdict"]) == (1, "") and "held" in e["why"] and _names(gh) == []
+
+
+def test_held_globs_reads_the_repo_file(tmp_path):
+    assert sync.held_globs(tmp_path) == []
+    (tmp_path / ".shiftlead.yml").write_text('held: ["src/x/**"]\n')
+    assert sync.held_globs(tmp_path) == ["src/x/**"]
+    (tmp_path / ".shiftlead.yml").write_text("held: src/x\n")
+    assert sync.held_globs(tmp_path) is None
+    (tmp_path / ".shiftlead.yml").write_text("held: [\n")
+    assert sync.held_globs(tmp_path) is None

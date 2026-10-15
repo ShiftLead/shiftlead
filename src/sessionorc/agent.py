@@ -699,6 +699,8 @@ class HostAgent(
         # Until the first pass lands, a live check's `live` is unknown, not *not live* (TD-516).
         self._promotes_read = False
         self._sync_login: str | None = None  # the home's `gh` login, read once (§6 *Sync*, TD-685)
+        self._sync_task: asyncio.Task[None] | None = None  # the sync pass, detached from the promote's
+        self._sync_ran: dict[str, datetime] = {}  # root → the last pass that covered it whole
         # An attachment's upload in pieces (§4.4 *Attachment drop*, TD-478): its id → the session,
         # the `.part`, the name and the file's `total`. In memory: a restart drops it, and the hour's
         # sweep the `.part` it leaves.

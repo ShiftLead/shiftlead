@@ -8,6 +8,7 @@ the head read again and the merge pinned to the head. Its outcome is the repo re
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,10 @@ from sessionorc.agent_common import log
 from sessionorc.mail import PERSON
 from sessionorc.models import now_iso
 
+# How long a pass's cover holds a green sync PR back from the order (§6 *Sync*): three full readings. A home
+# whose pass stopped covering a repo (no `gh` login, a read failing, a surprise) leaves it the team's.
+SYNC_COVER = timedelta(seconds=3 * 300)
+
 
 class SyncMixin:
     @staticmethod
@@ -25,6 +30,12 @@ class SyncMixin:
         """`repos.<repo>.sync.auto` from `settings.yml`; a repo absent is on (§6 *Sync*, as `pull` is)."""
         repos = settings_mod.repos(settings_mod.load())
         return {name: bool((v.get("sync") or {}).get("auto", True)) for name, v in repos.items()}
+
+    def _sync_covers(self, root: str, on: bool, now: datetime) -> bool:
+        """Whether the home holds this repo's green unjudged sync PRs back from the order: the switch on and a
+        pass that covered the repo whole inside `SYNC_COVER`."""
+        ran = self._sync_ran.get(root)
+        return on and ran is not None and now - ran <= SYNC_COVER
 
     def _sync_held_by(self, root: str, pr: dict[str, Any]) -> bool:
         """Whether a live record of the repo holds the PR (§4.4's test), read now."""
@@ -54,16 +65,21 @@ class SyncMixin:
         if not auto:
             for pr in prs:
                 n, head = str(pr.get("number")), str(pr.get("head") or "")
+                e = sync.get(n) or {}
+                if e.get("verdict") == "off" and e.get("head") == head:
+                    continue  # already *off* at this head: nothing rewritten, nothing pushed
                 if pr.get("sync") is True and head and not sync_mod.settled(sync.get(n), head):
                     sync[n] = {"head": head, "verdict": "off", "why": "sync is off", "tries": 0, "posted": False,
                                "at": now_iso()}  # fmt: skip
         else:
+            covered = True
             for pr in sync_mod.candidates(prs, sync, lambda p: self._sync_held_by(root, p)):
                 n, head = str(pr["number"]), str(pr["head"])
                 if gated and not self._sync_login:
                     self._sync_login = await asyncio.to_thread(sync_mod.gh_login)
                     if not self._sync_login:
                         log.warning("sync: the home's gh login could not be read; nothing judged this pass")
+                        covered = False
                         break  # no reading: no verdict on anyone
                 if why := sync_mod.decline(pr, self._sync_login, gated):
                     sync[n] = {"head": head, "verdict": "refused", "why": why, "tries": 0, "posted": False,
@@ -76,6 +92,8 @@ class SyncMixin:
                     e = await self._sync_merge(root, pr, e)
                 if e is not None:
                     sync[n] = e
+            if covered:
+                self._sync_ran[root] = datetime.now(UTC)
         if sync != old and (cur := self._repos.get(root)) is not None:
             self._repos[root] = {**cur, "sync": sync}  # never the snapshot: a re-read may have landed
             self.repos_store.save(self._repos)
@@ -85,6 +103,8 @@ class SyncMixin:
         """Step 5: the holders and the head read again just before the merge. A new holder drops the merge
         with no verdict; a moved head drops it unwritten; the merge pinned with `--match-head-commit`."""
         n, head = int(pr["number"]), str(pr["head"])
+        if not (await asyncio.to_thread(self._sync_on)).get(Path(root).name, True):
+            return e  # turned off while the pass ran: nothing merged
         if self._sync_held_by(root, pr):
             return e  # no verdict: back on the list once the claim ends
         now = await asyncio.to_thread(cadence.head, root, n)
@@ -93,6 +113,8 @@ class SyncMixin:
         if now != (head, "open"):
             return None
         if why := await asyncio.to_thread(sync_mod.merge, root, n, head):
+            if await asyncio.to_thread(cadence.head, root, n) not in (None, (head, "open")):
+                return None  # the head moved under the merge: the forge's match refused it, and nothing is written
             return sync_mod._no_reading(e, f"the merge was refused: {why}", now_iso())
         repo = Path(root).name
         text = f"merged {repo} #{n} — sync of dev-cadence {e.get('commit') or '?'}, {e.get('files', 0)} files"

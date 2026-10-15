@@ -2723,12 +2723,14 @@ class TickMixin:
         it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684). A change is saved and
         pushed as a `repos` event."""
         records = [r for r in self._graph().values() if r.repo]
-        sync_on = self._sync_on()
+        sync_on, at = self._sync_on(), datetime.now(UTC)
         for root, r in list(self._repos.items()):
             try:
                 prs = (r.get("prs") or {}).get("open") or []
                 # a sync PR the home holds is no order; one it judged takes its `why` (§6 *Sync*, TD-685)
-                prs = sync_mod.mark(prs, r.get("sync") or {}, sync_on.get(Path(root).name, True))
+                prs = sync_mod.mark(
+                    prs, r.get("sync") or {}, self._sync_covers(root, sync_on.get(Path(root).name, True), at)
+                )
                 old = r.get("pr_orders") or {}
                 mine = [x for x in records if x.repo == root]
                 orders, told, notes = workorders.red_prs(prs, mine, now, old.get("told") or {}, ORPHAN_AFTER)

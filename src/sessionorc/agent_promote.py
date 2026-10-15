@@ -55,8 +55,10 @@ class PromoteMixin:
             for text in notes:
                 log.info("promote: %s", text)
                 self._system_note(PERSON, text)
-            if full:  # the sync pass rides the full readings' cadence (§6 *Sync*, TD-685)
-                await self._sync_pass()
+            # the sync pass rides the full readings' cadence, as a task of its own: a check, a gate and a merge
+            # take minutes, and the promote's watch never waits on them (§6 *Sync*, TD-685)
+            if full and (self._sync_task is None or self._sync_task.done()):
+                self._sync_task = asyncio.create_task(self._sync_pass())
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("the promote pass failed")
 
