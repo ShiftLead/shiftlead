@@ -69,6 +69,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
 | TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Open |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
+| TD-726 | `rpc_progress`'s settle refusal runs on every status, not only a claim, and no test notices (#1823) | Medium | Open |
+| TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
 
 ---
 
@@ -1384,5 +1386,45 @@ The other cases:
 **Done when** the Org page draws samscrape and contractmatch under one ContractMatch heading, and a samscrape session's brief names contractmatch's checkout in its Project block.
 
 **Related:** TD-722.
+
+---
+
+## TD-726: `rpc_progress`'s settle refusal runs on every status, not only a claim, and no test notices (#1823)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1818–#1830)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_progress`: `if new_claim and (words := self._settle_refusal(s, entry.ref)):`); `tests/test_settle.py` (`test_a_claim_on_a_settling_or_held_entry_is_refused_with_force_too`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1823 and running `tests/test_settle.py tests/test_person_only.py tests/test_repo_facts.py tests/test_settle_pages.py tests/test_cli_teams.py` (164 passed unmutated). Changing `if new_claim and (words := self._settle_refusal(` to `if (words := self._settle_refusal(` passes all 164. The refusal is a *claim's* (design §4.8 *A claim is a lease*), and the tests only ever send `status="claimed"`. With the guard gone, a worker whose entry the person then holds is refused its own `progress done`, `blocked` or `working` for a reason that is about claiming: it cannot report.
+
+**Fix:** One test: claim a settled entry, have the person hold it (`rpc_td_hold`), then `progress` the same ref with `status="done"` as the claimer — accepted and recorded. It fails with the `new_claim and` guard removed.
+
+**Done when** the test exists and fails under that mutation.
+
+**Related:** TD-710, #1823.
+
+---
+
+## TD-727: `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1818–#1830)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_ids.py` (`rpc_td_hold`: `if not remote: raise RpcError(... origin is not read yet ...)`); `tests/test_settle.py` (`test_td_hold_is_the_persons_and_marks_the_reading_at_once`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1823 and running `tests/test_settle.py tests/test_person_only.py tests/test_repo_facts.py tests/test_settle_pages.py tests/test_cli_teams.py` (164 passed unmutated). Replacing `if not remote:` with `if False:` passes all 164: no test calls `td_hold` on a repo whose reading carries no `remote`. Without the refusal the hold is looked up under `settle_key(root, "")`, the checkout's path, a key the clock records for no origin-read repo, so the person gets *not in the home's clock yet* instead of the words that say to ask again.
+
+**Fix:** One test: a repo view with a `ledger` and no `remote`; `rpc_td_hold` raises RpcError naming the origin, and `ledger_seen.json` is unchanged. It fails with the guard removed.
+
+**Done when** the test exists and fails under that mutation.
+
+**Related:** TD-710, #1823.
 
 ---
