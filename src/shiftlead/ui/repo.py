@@ -299,7 +299,9 @@ def ledger_lists(
     where the ledger was not read and the lanes could not be (`lanes` None or the entries unread).
     An entry the home's settle clock withholds carries `settle`, *settles in 7m* or *held 2h*, and
     `settle_mark`, `settling` or `held`, which the row draws with **Hold** or **Release** (§4.5a *Repo
-    page: Hold / Release on a settling entry*, TD-710); `held` is the claim's, as ever."""
+    page: Hold / Release on a settling entry*, TD-710); one whose wait stands carries `wait`, *waits
+    until 10-16* or *waits: <words>*, and `wait_line`, its `Waits:` line whole (TD-716); `held` is the
+    claim's, as ever."""
     now = now or datetime.now(UTC)
     held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
     entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
@@ -329,6 +331,9 @@ def ledger_lists(
                     "held": held.get(e["id"], ""),
                     "settle": settle_mod.words(e, now),
                     "settle_mark": settle_mark(e, now),
+                    # what it waits for (§4.5a *Repo page: waits mark*, TD-716): the line whole on hover
+                    "wait": teamrun.wait_words(e, short=True),
+                    "wait_line": teamrun.wait_line(e),
                     **({"flag": LEDGER_FLAG} if key == "other" else {}),
                     "builds": builds.get(e["id"]),
                     "builds_of": builds_of.get(e["id"], []),
