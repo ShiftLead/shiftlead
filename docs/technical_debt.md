@@ -63,6 +63,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-708 | `td_next`'s three refusal/unread branches are held by no test: a filled `--limit 200`, a non-GitHub origin, a repo with no origin remote | Low | Open |
 | TD-710 | Build TD-707: a new entry settles by its Kind before a lane may take it, and the person can hold it | Medium | Open |
 | TD-711 | TD-706's summary row says *Open* while its entry says slice 1 was built by #1802 | Low | Open |
+| TD-713 | `test_link.py`'s mail-across-the-link test races its own 2-second reconnect: the *unreachable* refusal is not raised on a slow runner | Low | Open |
 
 ---
 
@@ -1170,5 +1171,25 @@ The other cases:
 **Done when** the table row and the entry's **Status** agree, and each later slice's PR moves the row with the entry.
 
 **Related:** TD-706, TD-703.
+
+---
+
+## TD-713: `test_link.py`'s mail-across-the-link test races its own 2-second reconnect: the *unreachable* refusal is not raised on a slow runner
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, a CI failure on #1810, a ledger-only PR)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_link.py` (`test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on_it`, ~L1024–1033)
+
+**Why:** CI run 38693877522, test (3.12), on #1810: `tests/test_link.py:1032: Failed: DID NOT RAISE AgentError`. 1 failed and 2906 passed; 3.13 passed on the same commit. The test closes the node's link (`node._home_mux.close("the lid closed")`) with `link.BACKOFF_FIRST` and `BACKOFF_MAX` set to 2.0, then waits for the home to read it unreachable and makes two calls, a `msg` and a `get`. Only then does it expect `as_w.call("inbox")` to be refused as *unreachable*. On a slow runner those steps take longer than the 2-second backoff, the link is back first, and the `inbox` succeeds. The fix is in the test, not the link.
+
+**Fix:** keep the link down until the refusal has been read. Either hold the reconnect (a backoff far longer than the steps, or a patched dial that waits on an event the test sets after the `pytest.raises`), or take the refusal before the home-side asserts. The test still checks the return afterwards (`until(... != "unreachable")`, `home_reachable`).
+
+**Done when** the test cannot pass its *unreachable* step only by timing: with a sleep of 3 seconds put before the `inbox` call, it still raises.
+
+**Related:** TD-463 (the CI flakes since 2026-10-03).
 
 ---
