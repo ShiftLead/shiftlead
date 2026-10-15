@@ -71,7 +71,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
 | TD-738 | The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button | Medium | Open |
 | TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
-| TD-742 | Five behaviours of TD-716 slice 1 (#1843) are held by no test: a repeat claim on a waiting entry, an `until` with no date's refusal words, a capitalised `Waits:` word, `Waits:` dash forms, and a held entry's `waiting` list | Low | Open |
 | TD-743 | Build TD-734: *waiting* only on a person or another session; an idle session with a live subagent reads *working* | Low | Open |
 
 ---
@@ -1457,31 +1456,6 @@ The other cases:
 **Done when** the PR names each route's split, and the largest share is fixed or filed.
 
 **Related:** TD-737, TD-738.
-
----
-
-## TD-742: TD-716 slice 1's `Waits:` behaviours — a repeat claim, a date-less `until`'s refusal, a capitalised first word, the dash forms, and a held entry — are held by no test (#1843)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1843)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`rpc_progress`: `if new_claim and not force and (words := settle_mod.wait_refusal(...))`), `src/sessionorc/settle.py` (`wait_refusal`), `src/sessionorc/ledger.py` (`waits_of`, `in_lanes`); `tests/test_waits.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1843's lines one at a time and running `tests/test_waits.py tests/test_lane_news.py tests/test_settle.py tests/test_repo_facts.py` (80 passed unmutated). Five mutations pass all 80 (six others — dropping `not force`, `mark_waits` out of `_marks`, `date <= today` to `<`, the `rest` withhold, the `out_of_work_waiting` guard, the `live-check` branch — are caught):
-1. `if new_claim and not force and …` changed to `if not force and …`: the docstring says *a declared claim on a waiting entry is refused*, and `new_claim` keeps a session's own repeated `progress` on an entry it already claimed from being refused; no test sends a second write on a claimed waiting entry.
-2. `wait_refusal`'s `and entry["waiting"].get("until"):` changed to `and True:`: an `until` that names no date then reads *TD-003 waits until *; the test only reaches the date and the `event` words.
-3. `waits_of`'s `words.split()[0].lower()` changed to `words.split()[0]`: `Until 2026-10-20` or `Event — …` reads as no wait; every test line is lower case.
-4. `.lstrip("—–-")` changed to `.lstrip("—")`: a hyphen or en dash before the reason stays in `why`, and so in the refusal's words; only the em dash is tested.
-5. `in_lanes`' member `waiting` list without `e["id"] not in held`: a held waiting entry is listed as a member's waiting; the test's `held={"TD-001"}` names an entry that does not wait.
-
-**Fix:** extend `tests/test_waits.py`: (1) after a forced claim of TD-002, a second `progress` on it raises nothing; (2) a `Waits: until` with no date refused with *waits: …* words, not *until *; (3) `Until <date>` and `EVENT — x` read as waits; (4) `until D - why` and `until D – why` give `why == "why"`; (5) `held` naming a waiting entry drops it from the member's `waiting`. Each fails under its mutation above.
-
-**Done when** the five tests exist and fail under those mutations.
-
-**Related:** TD-715, TD-716, #1843.
 
 ---
 

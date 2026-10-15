@@ -100,3 +100,50 @@ async def test_a_claim_on_a_waiting_entry_is_refused_and_force_passes_it(agent, 
             await person.call("progress", id=g, ref="TD-002", status="claimed")
         await person.call("progress", id=g, ref="TD-002", status="claimed", force=True)
         assert [e.ref for e in agent.sessions[g].progress] == ["TD-002"]
+
+
+# -- TD-742: the behaviours the test audit of #1843 found unheld ------------------------------------------
+
+
+@pytest.mark.integration
+async def test_a_second_write_on_a_claimed_waiting_entry_is_not_refused(agent, tmp_path):
+    """Only a claim is refused (`new_claim`): the claimer's next `progress` on the waiting entry it took
+    with `force` — its `done` — passes without `force`, or it could not say what became of its work."""
+    await park_ticks(agent)
+    root = str(tmp_path / "r")
+    got = _read(_entry(2, "event — the next cadence-sync PR"))
+    agent._repos[root] = {"name": "r", "root": root, "ledger": {"entries": list(got.values())}}
+    async with LocalClient() as person:
+        g = (await person.call("create", name="g", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        agent.sessions[g].repo = root
+        await person.call("progress", id=g, ref="TD-002", status="claimed", force=True)
+        await person.call("progress", id=g, ref="TD-002", status="done", why="built")  # no refusal, no force
+        assert [(e.ref, e.status) for e in agent.sessions[g].progress] == [("TD-002", "done")]
+
+
+def test_an_until_with_no_date_is_refused_in_its_words_not_an_empty_date():
+    got = _read(_entry(3, "until a date nobody wrote"))
+    words = settle.wait_refusal(got["TD-003"])
+    assert words.startswith("TD-003 waits: a date nobody wrote (design §4.4"), words
+    assert "waits until " not in words
+
+
+def test_the_first_word_is_read_in_any_case():
+    got = _read(_entry(1, f"Until {TOMORROW} — CI"), _entry(2, "EVENT — x"))
+    assert got["TD-001"]["waits"] == {"on": "until", "date": TOMORROW, "why": "CI"}
+    assert got["TD-002"]["waits"] == {"on": "event", "date": "", "why": "x"}
+    assert got["TD-001"]["waiting"] and got["TD-002"]["waiting"]
+
+
+@pytest.mark.parametrize("dash", ["-", "–", "—"])
+def test_a_hyphen_or_an_en_dash_before_the_reason_is_dropped_as_the_em_dash_is(dash):
+    assert ledger.waits_of(f"until {TOMORROW} {dash} why") == {"on": "until", "date": TOMORROW, "why": "why"}
+    assert ledger.waits_of(f"event {dash} why") == {"on": "event", "date": "", "why": "why"}
+
+
+def test_a_held_waiting_entry_is_in_no_members_waiting():
+    got = _read(_entry(1, f"until {TOMORROW} — CI"), _entry(2, "event — a sync"))
+    records = [{"id": "w1", "name": "w1", "lane": GRINDER, "state": "idle", "out_of_work": {"at": "x"}}]
+    lanes = ledger.in_lanes(list(got.values()), records, held={"TD-001"})
+    assert lanes["members"][0]["waiting"] == ["TD-002"]
+    assert lanes["out_of_work_waiting"] == [{"id": "w1", "name": "w1", "waiting": ["TD-002"]}]
