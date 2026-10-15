@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Built (#1802, #1807, #1818); live check |
-| TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
@@ -1054,31 +1053,6 @@ The other cases:
 **Done when** dev-cadence's rename (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`) reads as three renames on dc-grind's stopped card, Apply or Start brings the team back under the new names with no old record replayed beside them, and every listed test passes.
 
 **Related:** TD-703 (the design), TD-619 (a profile change reaches the team by Apply), TD-163 (Members…), TD-654.
-
----
-
-## TD-715: A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (ao-paul, with Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-15 (the designer; no mockup: one mark and one count in rows the pages draw already) — §4.4 *An entry says what it waits for*: a repo-declared `**Waits:**` line, `until <date>` or `event`, which the agent's settle pass marks `waiting`, so no lane takes the entry and `in_lanes` counts it apart. A member out of work whose lane only waits reads *its lane waits: …*, never *out of work with n*. What waits on the person is `decision (paul)` or `Owner: paul`, already *for you*. The session that reads such an entry writes the line before it declares. Built by TD-716. Was: Open.
-**Blocked by:** TD-716
-**Location:** design §4.4 *Repo facts* and *In a team's lanes* (the *out of work with n* line, the card's solid count), §4.7 `ao repo`, §6 rule 6 (the `anchor` lane), `sessionorc/ledger.py` (`in_lanes`, `for_page`)
-
-**Why:** on 2026-10-15 Paul asked what blocks the ao-grind team. `ao repo` read *ao-grind-anchor is out of work with 9 in its lane: TD-005, TD-112, TD-292, TD-413, TD-460, TD-463, TD-641, TD-672, TD-685*, and listed seven of them as pickable live checks, so the closed anchor seat looked like the team's biggest block and a restart its cure. It was neither. The seat had run at 2026-10-14 20:58 MDT and declared `ao progress none`, naming a reason for seven of the nine (and TD-297, a live check not among them): TD-460, TD-463 and TD-413 wait for a date (a trial ending about 10-15, CI runs on or after 10-16, a week of journal to 10-20); TD-685 and TD-292 wait for an event nobody can cause (the next sync PR, a look being handed); TD-672 and TD-641 wait on the person (a first certificate on a fresh tailnet name; a `permissions:` rule and a profile's `permission_prompts: ask`); and the two it did not name, TD-112 and TD-005, are evaluations that need an attended session with Paul — TD-112 by his decision of 2026-10-10 (the Gemini spike), TD-005 by its own Fix (the trust-dialog test) — which no seat can do. What the seat knew lives only in its `out_of_work.why` and in each entry's prose. The reader counts a live check *pickable* the moment its build is live, and an evaluation pickable whenever it is unblocked, so the line, the card's solid count and the pick list all say "work waiting" where there is none. A person — or a session answering one — then restarts a seat to read the same nine again, or misses what is really theirs to do (three of the nine).
-
-**Fix** (for the designer to decide):
-- A way for an entry to say what it waits for, read by the reader: a `**Waits:**` line (or `Blocked by:` items) of three shapes — a date (*not before 2026-10-16*, pickable from then), an event (*the next cadence-sync PR*, never pickable until the line is edited), and the person (counted *for you*, with what they must do).
-- An entry the person must run with a session (TD-112, TD-005) leaves the seat's lane: `Owner: paul` with what it needs, or a word the `anchor` lane does not take.
-- `ao repo`, the team card and the Repo page count a waiting entry apart (*9 in its lane, all waiting: 3 on a date, 2 on an event, 4 on you*), and the *out of work with n* line names only what the seat could take; the person-shaped ones join *for you*.
-- Whether the seat's `ao progress none --why` writes those lines back (a PR of its own each run would be churn), or the brief tells it to write each as it reads it.
-
-**Done when** a seat that declares out of work with nothing it can take reads as *waiting* on `ao repo`, the card and the Repo page, each waiting entry says on what, and what waits on the person is counted *for you*.
-
-**Related:** TD-707 (a settle window, the other "not pickable yet" reason), TD-112, TD-005, TD-641, TD-672.
 
 ---
 
