@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
-| TD-732 | `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837) | Medium | Open |
 | TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
 | TD-735 | Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held | Medium | Open |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
@@ -1407,26 +1406,6 @@ The other cases:
 **Done when** the design says when the person may hold an entry, what a hold on a claimed entry does, and how an entry can land held; its build entries are filed; and this entry's `Blocked by:` names them.
 
 **Related:** TD-707, TD-710, TD-722, TD-724, TD-730.
-
----
-
-## TD-732: `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1831–#1841)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_lost_brief`, the `continue` at its call in `_keep_running`); `tests/test_lost_brief.py` (four tests)
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1837 (TD-720 slice 2) one line at a time and running `tests/test_lost_brief.py test_first_prompt.py test_hook_entry.py test_seat_policy.py test_ui_org.py test_ui_inbox.py test_card_volatile.py` (206 passed unmutated). Each of these edits left all 206 passing: the guard `or s.wrapup_at or s.wrapup_sent_at` dropped; `or s.suspended or s.sit_out` dropped; `(s.run_until and now >= _parse(s.run_until))` dropped; `if s.gated or self._profile_gated(...)` made `if False`; `or s.state in ("exited", "closed")` dropped; `or len(recent) >= RESTART_CEILING` dropped (the ceiling branch is reached only through `again`); `and not last.get("error")` dropped; `new.lane_seen = dict(s.lane_seen)` made `pass`; the `or e.from_ in told` dedupe, the `e.from_ in (PERSON, SYSTEM)` exclusion and the `e.open` filter each dropped; the failed-close entry `restarts = [..., {"error": ...}]` made `pass`, the `if s.state == "closed": self._mark_closed(...)` made `pass`, and `retry = self._closed_by_tick(...)` made `retry = False`; and `if await self._lost_brief(s, now): continue` made `pass` (the rest of the pass then acts on the closed run). Each is a behaviour the docstring and design §4.1 state; a regression would relaunch a seat in wrap-up, a gated profile, a suspended or sat-out record, or twice in one tick, or tell the person and the system about a lost brief. The four tests cover the one-replay path, the second-loss ceiling, the seat's `seat_filled` and launch-prompt context, and what the replay leaves alone.
-
-**Fix:** Tests in `tests/test_lost_brief.py`, each failing with its line mutated: a marked record with each of `wrapup_at`, `suspended`, `sit_out`, a past `run_until`, `gated`, and state `exited` is not replayed and not given a ceiling; `RESTART_CEILING` counted replays in the window put the ceiling `{count}` with no `why`; a seat on `trigger: work` keeps `lane_seen`; two open asks from one sender and one from the person tell the sender once and the person never; `rpc_close` raising leaves a `restarts` entry with `error`, and the next tick replays without a second close; two records marked in one tick are each replayed once.
-
-**Done when** each case has a test and fails under its mutation.
-
-**Related:** TD-717, TD-720, #1837.
 
 ---
 
