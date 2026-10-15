@@ -205,6 +205,7 @@ from sessionorc.agent_remote import RemoteMixin
 from sessionorc.agent_serve import ServeMixin
 from sessionorc.agent_settings import SettingsMixin
 from sessionorc.agent_spend import SpendMixin
+from sessionorc.agent_sync import SyncMixin
 from sessionorc.agent_tick import TickMixin
 from sessionorc.agent_wake import WakeMixin
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, work_left
@@ -360,6 +361,7 @@ class HostAgent(
     ServeMixin,
     TickMixin,
     PromoteMixin,
+    SyncMixin,
     SpendMixin,
     AttentionMixin,
     NotifyMixin,
@@ -696,6 +698,7 @@ class HostAgent(
         self._promotes: dict[str, dict[str, Any]] = {}
         # Until the first pass lands, a live check's `live` is unknown, not *not live* (TD-516).
         self._promotes_read = False
+        self._sync_login: str | None = None  # the home's `gh` login, read once (§6 *Sync*, TD-685)
         # An attachment's upload in pieces (§4.4 *Attachment drop*, TD-478): its id → the session,
         # the `.part`, the name and the file's `total`. In memory: a restart drops it, and the hour's
         # sweep the `.part` it leaves.

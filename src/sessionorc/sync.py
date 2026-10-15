@@ -18,13 +18,16 @@ import re
 import shutil
 import signal
 import subprocess
+import tempfile
 import tomllib
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from sessionorc import cadence, paths
 from sessionorc import held as held_mod
-from sessionorc import paths
 from sessionorc.workorders import _git as _git_bytes
 from sessionorc.workorders import default_branch
 
@@ -304,3 +307,182 @@ def _check(
             return f"{path} is a held path"
     out.update(commit=head_lock["commit"], files=[p for s, p in changes if p in listed], post_sync=bool(command))
     return None
+
+
+# -- the pass (§6 *Sync*, steps 3 to 5; TD-685 slice 2) ---------------------------------------------------
+
+SYNC_TRIES = 3  # passes at one head with no reading before its verdict is *error* (§6 step 4)
+GH_TIMEOUT = 30.0
+GATE_TIMEOUT = 300.0
+SETTLED = ("merged", "refused", "gate", "error")  # a verdict at a head is final for that head; *off* is not
+REVIEWER = "sync-check"  # named for what it is, never a model (§6 step 3)
+
+
+def settled(entry: dict[str, Any] | None, head: str) -> bool:
+    """Whether the pass has a verdict for this head, so it is never checked again."""
+    return bool(entry) and entry.get("head") == head and entry.get("verdict") in SETTLED
+
+
+def candidates(prs: list[dict[str, Any]], sync: dict[str, Any], held_by: Any) -> list[dict[str, Any]]:
+    """The open sync PRs the pass takes up (§6 *Sync*): flagged `sync` (§4.4's test), not a draft, not
+    conflicting, *green*, held by no live record (`held_by(pr)`), and with no verdict at their head."""
+    return [
+        pr
+        for pr in prs
+        if isinstance(pr, dict)
+        and pr.get("sync") is True
+        and not pr.get("draft")
+        and not pr.get("conflicting")
+        and pr.get("checks") == "green"
+        and pr.get("head")
+        and not settled(sync.get(str(pr.get("number"))), str(pr["head"]))
+        and not held_by(pr)
+    ]
+
+
+def prune(sync: dict[str, Any], prs: list[dict[str, Any]], gated: bool) -> dict[str, Any]:
+    """The kept outcomes, pruned to the open PRs; a *no gate* refusal dropped once the repo has a gate,
+    so the PR is judged again (§6 *Sync*)."""
+    open_ = {str(p.get("number")) for p in prs if isinstance(p, dict)}
+    return {
+        n: e
+        for n, e in sync.items()
+        if n in open_
+        and isinstance(e, dict)
+        and not (gated and e.get("verdict") == "refused" and e.get("why") == cadence.NO_GATE)
+    }
+
+
+def decline(pr: dict[str, Any], login: str | None, gated: bool) -> str | None:
+    """Why a green sync PR is not the home's to check, or None (§6 *Sync*'s three kinds, the gate first)."""
+    if not gated:
+        return cadence.NO_GATE
+    if pr.get("fork"):
+        return "forked"
+    author = str(pr.get("author") or "")
+    if not login or author.lower() != login.lower():
+        return f"author {author or '(unknown)'} is not the home's"
+    return None
+
+
+def review_body(got: dict[str, Any]) -> str:
+    """The SHIP comment for a mechanical PR (§6 step 3): the first line the cadence check reads, then
+    the lock's `commit:`, the files checked, the replay and the head."""
+    files = got.get("files") or []
+    return "\n".join(
+        [
+            f"cadence-review: SHIP · {REVIEWER} · code · 0 findings",
+            "",
+            f"A sync of dev-cadence {got.get('commit') or '(no commit:)'}, checked by the home (design §6 *Sync*).",
+            "",
+            f"- {len(files)} file(s) checked against dev-cadence's `files/` at the lock's `files_commit`"
+            + (": " + ", ".join(f"`{p}`" for p in files) if files else ""),
+            "- post_sync replayed" if got.get("post_sync") else "- no post_sync",
+            f"- head {got.get('head')}",
+        ]
+    )
+
+
+def block_body(line: str) -> str:
+    """The BLOCK comment for a gate that failed (§6 step 4), with the gate's line."""
+    return f"cadence-review: BLOCK · {REVIEWER} · code · 1 findings\n\nThe gate failed: {line}"
+
+
+def _gh(root: Path | str, args: list[str], timeout: float = GH_TIMEOUT) -> tuple[str | None, str]:
+    """`gh <args>` in the checkout: `(None, stdout)`, or `(why, "")` in one line."""
+    try:
+        cp = subprocess.run(["gh", *args], capture_output=True, text=True, timeout=timeout, cwd=str(root))
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}", ""
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or [f"gh {args[0]} failed"])[-1][:200], ""
+    return None, cp.stdout or ""
+
+
+def gh_login() -> str | None:
+    """The home's own `gh` login (`gh api user`), the account `sync-all.sh` pushes as; None unread."""
+    why, out = _gh(Path.home(), ["api", "user", "--jq", ".login"])
+    return out.strip() or None if why is None else None
+
+
+def comment(root: Path | str, number: int, body: str) -> str | None:
+    """One PR comment through `--body-file`; None when posted, else why not."""
+    with tempfile.NamedTemporaryFile("w", suffix=".md", encoding="utf-8") as f:
+        f.write(body)
+        f.flush()
+        return _gh(root, ["pr", "comment", str(number), "--body-file", f.name])[0]
+
+
+def merge(root: Path | str, number: int, head: str) -> str | None:
+    """`gh pr merge <n> --squash --match-head-commit <head>`, no body (§6 step 5); None when merged."""
+    return _gh(root, ["pr", "merge", str(number), "--squash", "--match-head-commit", head], GATE_TIMEOUT)[0]
+
+
+def held_globs(root: Path | str) -> list[str]:
+    """The repo's `held:` from its `.shiftlead.yml` (§4.9c *What is the repo's*): what every review stage
+    holds, so a sync PR touching one is the team's. An unreadable file holds nothing."""
+    try:
+        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return []
+    got = doc.get("held") if isinstance(doc, dict) else None
+    return [str(g) for g in got if isinstance(g, str) and g.strip()] if isinstance(got, list) else []
+
+
+def _no_reading(entry: dict[str, Any], why: str, at: str) -> dict[str, Any]:
+    tries = int(entry.get("tries") or 0) + 1
+    return {**entry, "tries": tries, "verdict": "error" if tries >= SYNC_TRIES else "", "why": why, "at": at}
+
+
+def judge(
+    root: Path | str, pr: dict[str, Any], entry: dict[str, Any] | None, clones: Iterable[Path | str], at: str,
+    *, gate: Any = None,
+) -> dict[str, Any] | None:  # fmt: skip
+    """Steps 1 to 4 on one candidate, blocking (called off the loop): the entry to keep, `ready` set on
+    one the gate passed — the merge is the caller's, after it reads the holders again — or None for a
+    head that moved (nothing written). A retry keeps `posted`, so the SHIP comment is posted once per
+    head; no reading counts `tries`, and at `SYNC_TRIES` the verdict is *error*."""
+    number, head = int(pr["number"]), str(pr["head"])
+    e = dict(entry) if entry and entry.get("head") == head else {"head": head, "tries": 0, "posted": False}
+    e.pop("ready", None)
+    got = check(root, number, head, str(pr.get("branch") or ""), clones=clones, held=held_globs(root))
+    if got["verdict"] == "moved":
+        return None
+    if got["verdict"] == "error":
+        return _no_reading(e, got["why"], at)
+    if got["verdict"] == "refused":
+        return {**e, "verdict": "refused", "why": got["why"], "at": at}
+    if not e.get("posted"):
+        if why := comment(root, number, review_body(got)):
+            return _no_reading(e, f"the review comment was not posted: {why}", at)
+        e["posted"] = True
+    g = (gate or cadence.check)(root, number, GATE_TIMEOUT)
+    if g is None or g.get("verdict") not in ("pass", "fail"):
+        return _no_reading(e, "the gate gave no reading", at)
+    if g["verdict"] == "fail":
+        line = "; ".join(g.get("failed") or []) or "the gate failed"
+        if why := comment(root, number, block_body(line)):
+            return _no_reading(e, f"the BLOCK comment was not posted: {why}", at)
+        return {**e, "verdict": "gate", "why": line, "at": at}
+    return {**e, "verdict": "", "why": "", "at": at, "ready": True,
+            "commit": got.get("commit") or "", "files": len(got.get("files") or [])}  # fmt: skip
+
+
+def mark(prs: list[dict[str, Any]], sync: dict[str, Any], auto: bool) -> list[dict[str, Any]]:
+    """The open PRs as TD-684's order reads them once the home merges (§6 *Sync*): a sync PR the home
+    holds — merged at its head, or green with no verdict at its head while the switch is on — carries
+    `sync_home`, and is no order; one with a verdict at its head carries `sync_why`, its order's
+    `Context`. Copies; the reading is never changed."""
+    out = []
+    for pr in prs:
+        if not isinstance(pr, dict) or pr.get("sync") is not True:
+            out.append(pr)
+            continue
+        e = sync.get(str(pr.get("number")))
+        head = str(pr.get("head") or "")
+        if settled(e, head):
+            pr = {**pr, "sync_home": True} if e["verdict"] == "merged" else {**pr, "sync_why": str(e.get("why") or "")}
+        elif auto and pr.get("checks") == "green" and not pr.get("draft") and not pr.get("conflicting"):
+            pr = {**pr, "sync_home": True}
+        out.append(pr)
+    return out

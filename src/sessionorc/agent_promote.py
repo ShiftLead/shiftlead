@@ -55,6 +55,8 @@ class PromoteMixin:
             for text in notes:
                 log.info("promote: %s", text)
                 self._system_note(PERSON, text)
+            if full:  # the sync pass rides the full readings' cadence (§6 *Sync*, TD-685)
+                await self._sync_pass()
         except Exception:  # noqa: BLE001 — a detached task: log it, and the next tick tries again
             log.exception("the promote pass failed")
 
