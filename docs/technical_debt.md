@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-681 | A green sync PR has no owner: in a repo with no session running, it waits for nobody | Medium | Designed — TD-684, TD-685 build it |
 | TD-682 | CI that never started (the org's billing) shows as a red PR nobody holds, and the person is not told | Medium | Designed — TD-686, TD-687 build it |
 | TD-685 | Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch | Medium | Open |
-| TD-687 | Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram | Medium | Open |
 | TD-688 | The "open in editor" buttons on a file (Open ledger, every Open file, the transcript's raw file) send a folder link and fail on a remote editor; and a path in the pane links only inside the checkout | Medium | Designed — TD-689, TD-690, TD-691 build it |
 | TD-692 | An open page can reload itself about once a second for hours (three tabs from 16:28 to 18:22 on 2026-10-14); only a hard refresh ended it, and nothing tells the person or the log | Medium | Open |
 
@@ -1029,34 +1028,6 @@ The other cases:
 - A head pushed between the check and the merge is not merged. `sync: {auto: false}` merges nothing. The switch shows the verdict.
 
 **Related:** TD-681 (the design), TD-684 (the order), dev-cadence#TD-113 (`post_sync`), §6 *Promote* and *Pull* (the pass it shares).
-
----
-
-## TD-687: Build TD-682 (2): the Inbox row *CI not starting*, one per account — Open, Re-run, Snooze, told on Telegram
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-14 (the designer, building TD-682's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open. Slice 1 is #1770 (the spells on the `host` record as `ci_spells`, `ci_rerun`, the run-status reads, the Telegram line and the `ci_not_run:<owner>` snooze key); slice 2, the Inbox row, is grinder-ao-2's. The split (grinder-ao-2's note to grinder-ao-1, 2026-10-14): grinder-ao-1 builds the `src/sessionorc/` part — `ci_spells` at the home, the `ci_rerun` RPC and its run-status reads on the tick, `agent_notify`/`notify.py`'s told line and snooze key, the person-only list — and grinder-ao-2 takes the Inbox row (`ui/inbox.py`, its template, `app.js`, `help.py`) once that has merged.
-**Blocked by:** TD-686
-**Location:** design §4.5a *Inbox row: CI not starting*, §4.4 *CI that never started is the person's*, §4.10 *Told on Telegram when nobody is looking*; `src/shiftlead/ui/inbox.py` (beside the red PR row), the Inbox page's template and `app.js`, the home's RPCs (`src/sessionorc/agent_serve.py`, a `ci_rerun` call), `src/sessionorc/agent_notify.py` and `notify.py` (the told list, `_notify_snoozed`), the spells at the home
-
-**Why:** TD-682's design. The cure for CI that does not start is the account's billing, which only the person can fix. Today nothing tells them, and once the bill is paid nothing re-runs the PRs.
-
-**Fix:**
-- **The row.** One row per owner in `workorders.ci_not_run` (TD-686), under *Needs you*, counted, worded as §4.5a words it, each PR and each *main* a link. Its **spell** is kept at the home (`ci_spells: {<owner>: {since, clear, rerun: {at, runs}}}`). It runs from the first grouping until `CI_SPELL_CLEAR` (2) successful readings in a row group nothing for the owner and no run a Re-run asked for is still queued or running. A failed reading counts for nothing.
-- **Open.** The owner's billing page: `https://github.com/organizations/<owner>/settings/billing` for an org, `https://github.com/settings/billing` for a user, told apart once with `gh api users/<owner>` `type`.
-- **Re-run.** The person's press, joining §4.8's person-only list and served by the home alone (a node forwards it, §4.4a), refused to a session as `inbox_delete` is: `ci_rerun {owner}` runs `gh run rerun <run> --failed` from each repo's root for every run the row's PRs name, bounded as the other `gh` calls are. It answers how many runs were asked and how many `gh` refused, records them on the spell, and the row reads *re-run asked <age>* while any of them is queued or running. Their status is read with `gh api repos/<o>/<r>/actions/runs/<run>` on the same tick as the reading, bounded. A failed status read counts as pending, and a pending run resets the spell's clear count.
-- **Snooze ▾.** By time alone, kept under `ci_not_run:<owner>` in the attention store.
-- **Telegram.** `agent_notify.py` reads `ci_not_run` and the spells at the home, and tells a row once per spell under `NOTIFY_HOLD`, with a fixed line naming the owner and the count. A snoozed row is not told (`_notify_snoozed` knows the `ci_not_run:<owner>` key). It joins the told list and its test.
-- **Help.** The help text for the row is written with `help.py` in this build, not in the design (§4.5a's help list is bound to it by `tests/test_help.py`).
-- **Tests**: the row from a reading with two PRs in one org and one in another; a *main* entry; the billing link for an org and for a user; **Re-run** refused to a session and run for the person with a stubbed `gh`; the row standing while the re-run's runs are pending and not told again when they read `not_run`; a new push that reads pending for one reading and then `not_run` again, told once; a failed reading not ending the spell; a snooze running out inside the spell, not told again; the snooze; the told line.
-
-**Done when** an account whose PRs (or a default branch's head) read `not_run` shows one *CI not starting* row with them and the billing link, told on Telegram once per spell. **Re-run** asks GitHub to re-run their failed jobs. The row leaves when its spell ends: two successful readings group nothing, and no re-run is pending. `ci_rerun` is in §4.8's person-only list.
-
-**Related:** TD-682 (the design), TD-686 (the reading), TD-613 (the red PR row it sits beside), TD-092 (Telegram).
 
 ---
 

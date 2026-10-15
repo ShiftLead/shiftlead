@@ -366,6 +366,38 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "ci-open",
+        "Open",
+        "Inbox row: CI not starting",
+        (
+            "Opens this account's billing page on GitHub: the organisation's, or your own for a user account. "
+            "Press it to see why Actions does not start, and to pay the bill or raise the spending limit. It "
+            "changes nothing at the home: paying does not re-run a pull request, and Re-run is what starts the "
+            "waiting checks."
+        ),
+    ),
+    Help(
+        "ci-rerun",
+        "Re-run",
+        "Inbox row: CI not starting",
+        (
+            "Asks GitHub to re-run the failed jobs of every run this row names, and says how many it asked for "
+            "and how many GitHub refused. Press it once the bill is paid or the limit raised. The row stays, "
+            "reading re-run asked, while those runs are queued or running, and a run that again does not start "
+            "keeps it without telling you again."
+        ),
+    ),
+    Help(
+        "ci-snooze",
+        "Snooze ▾",
+        "Inbox row: CI not starting",
+        (
+            "Sets this row aside until the time you pick: +1 day, +1 week or a date. Press it when the bill will "
+            "be paid later and you want to be left alone until then. It changes nothing at the home or on GitHub: "
+            "the pull requests keep waiting, and the row is not told on Telegram while it is snoozed."
+        ),
+    ),
+    Help(
         "on-work",
         "when work appears",
         "Settings page: Teams",
@@ -511,6 +543,9 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "work-start",
             "work-snooze",
             "work-dismiss",
+            "ci-open",
+            "ci-rerun",
+            "ci-snooze",
             "board-answers",
             "board-go-with-it",
             "restart",

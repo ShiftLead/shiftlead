@@ -861,6 +861,39 @@
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: CI not starting** (§4.4 *CI that never started is the person's*, TD-687) ──
+   One row per account whose CI never starts, for the home's spell's life: its PRs and default
+   branches, each PR a link. **Open** is the account's billing page; **Re-run** the person's own,
+   `ci_rerun` at the home, which keeps the row *re-run asked <age>* while those runs are pending;
+   **Snooze ▾** by time alone, keyed `ci_not_run:<owner>`. #}
+{% macro ci_not_run_row(e, section) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="the GitHub account whose Actions do not start">{{ e.owner }}</span>
+  <span class="badge kindmark k-promote">CI not starting</span>
+  <span class="grow"></span>
+  {%- if e.rerun_pending %} <span class="st" title="re-run asked: its runs are queued or running">re-run asked <span class="age" data-since="{{ e.rerun_at }}">{{ e.rerun_age or '' }}</span></span>
+  {%- elif e.at %} <span class="st age" data-since="{{ e.at }}" title="not starting since">{{ e.age or '' }}</span>{% endif %}
+</div>
+{{ subj(e) }}
+<div class="body">{{ e.head }}{% if e.parts %} · {% for i in e.parts %}{% if i.url %}<a href="{{ i.url }}" target="_blank" rel="noopener">{{ i.label }}</a>{% else %}{{ i.label }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</div>
+<div class="row gap wrap mfoot">
+  {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
+  <span class="grow"></span>
+  <details class="more"><summary class="btn sm ghost" title="{{ help_title('ci-snooze') }}">Snooze ▾</summary>
+    <div class="menu">
+      {%- if e.snoozed_until %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="ci_not_run" data-when="now" title="clear the snooze: back in its section">now</button>
+      {%- endif %}
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="ci_not_run" data-when="1d">+1 day</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="ci_not_run" data-when="1w">+1 week</button>
+      <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="ci_not_run" data-when="pick">pick a date…</button>
+    </div>
+  </details>
+  <button class="btn sm" data-act="ci_rerun" data-id="person" data-owner="{{ e.owner }}" title="{{ help_title('ci-rerun') }}">Re-run</button>
+  {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="{{ help_title('ci-open') }}">Open</a>{% endif %}
+</div>
+{%- endmacro %}
+
 {# ── design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3) ─────────────────────────
    One row per wound-down team whose lanes gained work, every part a structured reading of the
    home's (`work_waiting`, `work` on `host`): the team, when it wound down, the ids — each a link
@@ -975,6 +1008,7 @@
 {%- if e.row == 'promote' %}{{ promote_row(e, section) }}
 {%- elif e.row == 'work' %}{{ work_row(e, section) }}
 {%- elif e.row == 'red_pr' %}{{ red_pr_row(e, section) }}
+{%- elif e.row == 'ci_not_run' %}{{ ci_not_run_row(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
