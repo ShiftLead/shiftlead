@@ -951,6 +951,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-15 (TD-706 slice 2, grinder-ao-1; the techlead's read of #1807): *A member renamed or removed in the definition* — a node member's own record keeps a renamed lead's old address in `controllers` until its next create: `controllers` is the node's field, which a home-side rewrite would lose to the node's next report, so the carry rewrites the node member's launch record alone. Routing the rewrite to the node is TD-712.
 - 2026-10-14 (TD-703, the designer; Paul, 2026-10-14, after renaming dev-cadence's members: *we should also make sure members are not duplicated on changes as well (e.g. dc-grinder alongside grinder-dc-1)*): *A member renamed or removed in the definition* — the client pairs the records the definition no longer names with the names no record carries, within a role, in order; a rename is a relaunch under the new name whose create succeeds the old record, a removal the sit-out form; read on a stopped team too; Members…'s Remove marks the record sat out instead of Wrap up's wind-down, which left a declared record rule 8 replayed. Rejected: an explicit `was:` key on the member line (the edit as Paul made it would not take). Built by TD-706.
 - 2026-10-14 (TD-675, the designer): *Add an entry to the ledger* — *Open a session*'s worktree is named by the form's **Name** box. Built by TD-677.
 - 2026-10-13 (TD-657, the designer): the home's work tree also tracks the person's `preferences.md`. Built by TD-663.
