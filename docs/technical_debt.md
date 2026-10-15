@@ -57,7 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Built (#1802, #1807, #1818); live check |
-| TD-712 | A renamed lead is not in a node member's `controllers` until that member's next create | Low | Open |
 | TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
 | TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Slice 1 built by #1843 |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
@@ -1050,27 +1049,6 @@ The other cases:
 **Done when** dev-cadence's rename (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`) reads as three renames on dc-grind's stopped card, Apply or Start brings the team back under the new names with no old record replayed beside them, and every listed test passes.
 
 **Related:** TD-703 (the design), TD-619 (a profile change reaches the team by Apply), TD-163 (Members…), TD-654.
-
----
-
-## TD-712: A renamed lead is not in a node member's `controllers` until that member's next create
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-1, building TD-706 slice 2; the techlead's read of #1807)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.9 *A member renamed or removed in the definition* (the succeeds carry); `src/sessionorc/agent.py` (`_carry`, `rpc_set_controllers`), `src/sessionorc/agent_remote.py` (`_route_act`), `src/sessionorc/agent_tick.py` (`_replay`)
-
-**Why:** §4.9 says a rename's create rewrites every record's `controllers` that named the old address. `_carry` rewrites this host's records and every launch record, but a node's record keeps the old address: `controllers` is the node's field (not in `HOME_OWNED`), so a rewrite of the home's copy is lost to the node's next report. Until the member's next create reads its rewritten launch record, the renamed manager or techlead cannot act on it.
-
-**Fix:** in the rename's carry, for each node record whose `controllers` (read through `_ctl`) holds the old address, route `set_controllers {id, add: [new], remove: [old]}` to its node as `rpc_set_controllers` routes a person's edit (`_route_act`, a `HOME_EDITS` act), awaited after the create; a link that is down leaves the record for the next tick to retry, said in the log. Then drop the exception from §4.9 and its history line's *until TD-712*.
-- **Tests:** a node member under a renamed manager names the new manager in its record's `controllers` after the rename's replay (a fake node link, as `tests/test_link*.py` build one); a node that is down is retried.
-
-**Done when** a node member's record names the renamed lead in `controllers` after the rename, and the tests pass.
-
-**Related:** TD-706 (slice 2 built the carry), TD-703 (the design).
 
 ---
 
