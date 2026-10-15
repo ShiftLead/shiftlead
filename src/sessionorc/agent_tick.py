@@ -2316,7 +2316,8 @@ class TickMixin:
         """Rule 3 (design §6 *Keeping a team running*, §4.9b): a supervised seat's `seat_due` from its
         trigger, the fill of an ended seat that is due — `create` with `keep_mail`, so a question that
         was waiting is still there — under `FILL_CEILING`, and the close of a seat that has run and
-        sits idle with nothing due and nothing left unpushed."""
+        sits idle with nothing due — or a due that is the next fill's (`_seat_done`) — and nothing
+        left unpushed."""
         if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
             return
         filled, seen = s.seat_filled, s.lane_seen
@@ -2351,10 +2352,11 @@ class TickMixin:
 
     @staticmethod
     def _seat_done(s: Session) -> bool:
-        """Whether an idle seat has nothing left that this run of it will take: nothing due — or,
-        for a manager on call, a reading of a member that came due after its fill, which the next
-        fill is for, since a fill starts cold on the one reading its `seat_due` names (§6 rule 3,
-        TD-259). A question waiting is the idle seat's own to read, as the techlead's is."""
+        """Whether an idle seat has nothing left that this run of it will take: nothing due — or a
+        due that is the next fill's: the anchor's `work`, a `prs` or `every` one met while it ran
+        (TD-700), and for a manager on call a reading of a member that came due after its fill,
+        since a fill starts cold on the one reading its `seat_due` names (§6 rule 3, TD-259). A question
+        waiting is the idle seat's own to read, as the techlead's is."""
         if not s.seat_due:
             return True
         # the anchor's (TD-386): ids its lane gained while it sat idle are the next fill's, from cold;
