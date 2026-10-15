@@ -23,7 +23,7 @@ ui = [
 shiftlead = "shiftlead.cli:main"
 ao = "shiftlead.cli:main"
 shiftlead-agent = "sessionorc.agent:main"
-shiftlead-hook = "shiftlead.adapters.claude_code.hook:main"
+shiftlead-hook = "shiftlead.hook_entry:main"
 shiftlead-ui = "shiftlead.ui.app:main"
 shiftlead-watch = "shiftlead.watch:main"
 

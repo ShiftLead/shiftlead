@@ -103,6 +103,12 @@ def identity_alarms_file() -> Path:
     return home() / "identity_alarms.json"
 
 
+def hook_errors_file() -> Path:
+    """What `shiftlead-hook` could not import (design §4.1 *The hook keeps its traceback*, TD-720 slice 3):
+    appended by `shiftlead.hook_entry`, which finds the same file without this module, its last 256 KB kept."""
+    return home() / "hook-errors.log"
+
+
 def attention_file() -> Path:
     """The home's **attention trail** and the state rows' snoozes (design §4.10 *The Inbox is a
     queue*, TD-079): a state row is a view of a record and leaves no entry behind, so what became

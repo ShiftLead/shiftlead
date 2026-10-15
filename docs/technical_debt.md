@@ -1241,7 +1241,7 @@ The other cases:
    - **A seat's replay** passes the fill's `closing` (`filled_for(seat_due)`) again and sets `seat_filled`, as rule 3's fill does (agent_tick.py ~L2605–L2630). `lost-brief` is not counted by the fill ceiling (`why == "fill"`). A failed close is the replay entry's `error`.
    - **The senders.** After the replay, each sender of an `ask` or `steer` still open in the moved inbox gets a system note in the design's words. Bounds are unchanged.
    - **Who is left alone.** A person's own session, unsupervised, is never replayed.
-3. **The hook's traceback** (`shiftlead`). `pyproject.toml`'s `shiftlead-hook` points at a new `shiftlead.hook_entry:main`, a module of the standard library alone (`src/shiftlead/__init__.py` is empty; `shiftlead.adapters.claude_code`'s `__init__` imports `sessionorc`, so the hook module cannot be the entry). It imports `shiftlead.adapters.claude_code.hook` inside a `try` and calls its `main`. An exception in the import is appended to `<home>/hook-errors.log`, the home read from `SHIFTLEAD_HOME` else `~/.shiftlead` without `sessionorc.paths` (cut to its last 256 KB when it passes it; `paths.hook_errors_file()` names the same file for readers), with the time, `SHIFTLEAD_SESSION` and the event name. The hook still exits 0.
+3. **The hook's traceback** (`shiftlead`). `pyproject.toml`'s `shiftlead-hook` points at a new `shiftlead.hook_entry:main`, a module of the standard library alone (`src/shiftlead/__init__.py` is empty; `shiftlead.adapters.claude_code`'s `__init__` imports `sessionorc`, so the hook module cannot be the entry). It imports `shiftlead.adapters.claude_code.hook` inside a `try` and calls its `main`. An exception in the import is appended to `<home>/hook-errors.log`, the home read from `SHIFTLEAD_HOME` else `~/.shiftlead` without `sessionorc.paths` (cut to its last 256 KB when it passes it; `paths.hook_errors_file()` names the same file for readers), with the time, `SHIFTLEAD_SESSION` and the event name. The hook then exits 1, Claude Code's non-blocking error, so it still shows its one-line *hook error* as §4.1 says (the build found this line saying 0, which would hide it).
 - **Tests:**
   - A Claude Code record created with no hook, reading `working` with an empty composer, gets its brief by the scraped send after `FIRST_PROMPT_HOOK_WAIT`.
   - The same record with a dialog on screen does not.
@@ -1251,7 +1251,7 @@ The other cases:
   - A marked seat is replayed once with `lost-brief`, its open ask moved and its sender told.
   - A second loss is not replayed and reads *brief lost twice*.
   - An unsupervised marked record is left alone.
-  - The hook's import failure writes `hook-errors.log` and exits 0.
+  - The hook's import failure writes `hook-errors.log` and exits 1.
 
 **Done when** a seat launched with its first hook lost gets its brief within `FIRST_PROMPT_HOOK_WAIT` of its composer reading empty, or is replayed once with its askers told, no record waits past `FIRST_PROMPT_BOUND` unmarked across an agent restart, and every listed test passes.
 
