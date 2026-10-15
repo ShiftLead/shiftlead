@@ -672,6 +672,8 @@
   // opened with the row's board and text. Resolves to the agent's answer once the line is on the
   // board, or null on Cancel. A refusal is drawn in the form and leaves it open, so the person can
   // pick another board or fix the date rather than start again from the row.
+  // a board row's line text, written once on the row rather than on each of its buttons (TD-738)
+  const lineText = (b) => (b.closest(".mailrow") || b).dataset.text || "";
   AO.boardAdd = function (b, onSend) {
     const dlg = $("#boardadd");
     if (!dlg) { AO.toast("Put on the board: this page has no form for it"); return Promise.resolve(null); }
@@ -935,7 +937,7 @@
       // reader gave it — board, line, text — so the agent can refuse a line that has moved on.
       if (action === "board") {
         // …and its id (§4.4 *A board line's id*, TD-603), by which the agent finds the line first
-        body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, key: b.dataset.key || "" };
+        body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "" };
         if (body.action === "snooze") {
           const due = boardDue(b.dataset.when, b.dataset.due);
           if (!due) return;
@@ -972,13 +974,13 @@
       // is not Done — and the refresh brings it back with the reply on it. `refs` are the reader's,
       // handed as they came: the home mails each live lease holder on one of them (TD-142).
       if (action === "board_reply") {
-        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.text });
+        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: lineText(b) });
         if (!m) return;
         let refs = [];
         try { refs = JSON.parse(b.dataset.refs || "[]"); } catch (_) { refs = []; }
         pressed();
         const res = await act("person", "board", {
-          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, key: b.dataset.key || "", reply: m.text, refs,
+          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "", reply: m.text, refs,
         });
         const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
         say(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
@@ -991,14 +993,14 @@
       // does (`entry_add`), its first line the item's head and the person's words — after the
       // decide has committed, and a refusal there is toasted: the decision stands.
       if (action === "board_notright") {
-        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.text, text: "Not right: " });
+        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: lineText(b), text: "Not right: " });
         if (!m) return;
         const said = m.text.split(/\s+/).filter(Boolean).join(" ");
         // the prefix is the form's, whatever case it was retyped in
         const answer = `Not right: ${said.replace(/^not right\s*:?\s*/i, "")}`.trim();
         pressed();
         await act("person", "board", {
-          action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, key: b.dataset.key || "",
+          action: "decide", board: b.dataset.board, line: Number(b.dataset.line), text: lineText(b), key: b.dataset.key || "",
           answer, answers: JSON.parse(b.dataset.answers || "[]"),
         });
         let handed = "", refused = false;

@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Designed — built by TD-743 |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
-| TD-738 | The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button | Medium | Open |
 | TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
 | TD-743 | Build TD-734: *waiting* only on a person or another session; an idle session with a live subagent reads *working* | Low | Open |
 | TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
@@ -1390,27 +1389,6 @@ The other cases:
 **Done when** the two §4.5a rows draw as written and the tests above pass.
 
 **Related:** TD-707, TD-731, TD-735.
-
----
-
-## TD-738: The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/inbox_row.html` (a board row's buttons, ~L751–L778: Done, Reply, Decide, Not right, the three Snoozes, each with `data-text="{{ e.text }}"`; ~L373 `board_add`; the rows' `data-find`); `src/shiftlead/ui/static/app.js` (the handlers that read `b.dataset.text`, ~L681, ~L933–L996)
-
-**Why:** TD-737's measurement, 2026-10-15, a read-only GET of the live `/inbox`: 1,454,246 bytes of HTML for ~320 mail rows. `data-text` attributes come to 252,721 bytes and `data-find` to 220,720, together about a third of the page. On a board row the line's whole text is written into `data-text` on every button that acts on the line (seven or so per row), and once more as the row's `data-find`. The browser parses all of it on every page change: first paint came at 0.93–1.11 s and the DOM was ready at 1.05–1.23 s, against 0.46–0.48 s for `/settings` (83 KB).
-
-**Fix:** write the line's text once per row, on the row (as `data-text` beside `data-find`, or derive the find text from it), and have the buttons' handlers read it from `closest(".mailrow")` instead of their own `dataset.text`. Then measure the page again, as above, and put both sizes in the PR.
-- **Tests:** a board row's buttons carry no `data-text`, and each press still sends the line's text (the existing board-press tests, reading it from the row).
-
-**Done when** a board row holds its line's text once, the presses send the same bodies as before, and the PR gives the page's size before and after.
-
-**Related:** TD-737 (the measurement), TD-739.
 
 ---
 
