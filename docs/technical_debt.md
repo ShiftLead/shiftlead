@@ -67,8 +67,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-719 | `TickMixin._settle`'s two fallbacks — an unwritable clock and a checkout with no origin — are held by no test (#1811) | Low | Open |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Open |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Open |
-| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Open |
+| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed — TD-724, TD-725 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
+| TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings | Medium | Open |
+| TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-726 | `rpc_progress`'s settle refusal runs on every status, not only a claim, and no test notices (#1823) | Medium | Open |
 | TD-727 | `rpc_td_hold`'s *origin is not read yet* refusal is held by no test (#1823) | Low | Open |
 
@@ -716,6 +718,7 @@ with the retired brief).
 4. A pass: `ao msg person` naming the prompt and why, the prompt left as `needs-you`.
 5. Every answer: an FYI in *Answered for you* with the reason.
 6. The manager's brief: with a director defined, it leaves permissions to it.
+6a. The seat is the org's, above every project heading (TD-722): no `project` badge, the org-wide Project block (every registered repo's checkout on its host, by heading; `teams.project_block` given every repo), and its card drawn at the top of the Org page beside the person's row (TD-725's grouping draws it there).
 7. Tests: the seat fills on an unmatched prompt and not on a matched one; `permit` allows and denies an unattended record's prompt, is refused on an interactive one, on itself and on a `~/.shiftlead` prompt; no `director:` leaves the prompt to the person; the FYI is written.
 
 **Done when** an unattended member's prompt no rule covers is answered by the director seat with a reason told to the person, or passed up in words, never touching an interactive session or the always-the-person prompts, and the tests above pass.
@@ -1348,7 +1351,8 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-15 (the designer; no mockup: the Org page keeps every card as it is and adds a heading per project and a line per repo above them) — §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The Org page*. A team declares one `repo:` (required in the org file, unsaid in a repo's own), and every `home:` and `projects:` on a team goes. A project is a heading on repos with an optional `title`, a repo in at most one, and a repo in none is its own heading. The `project` badge is the repo's project, so two teams on one repo always share one, and mail is unchanged. The director is the org's, with the org-wide block (a step added to TD-642). The Org page groups project → repo → team, cards whole and never combined. The old keys are read for one release where they name one repo, and refused where a team spans. §4.9's guardians example is two teams under one heading, and the ADR is amended. Built by TD-724 and TD-725. Was: Open.
+**Blocked by:** TD-724, TD-725
 **Location:** `docs/design/4.9-org-team-project.md` (*Projects*, *Teams*: `projects: [...]`, `manager.home`, a member's `home`, the guardians example with a nested team; *Home and reach*); `docs/design/4.10-messages.md` (*across teams, by project*: the `project` badge, *the first of its team's projects that lists its home repo*); `docs/design/4.5-ui.md` (screen 1 *The Org, team-first*, screen 6 `repo_teams`, screen 11); `docs/design/4.5a-controls.md` (*team groups*: the header's place, *mixed*); `docs/design/4.9b-techlead.md` (*The director seat*); `docs/design/5-configuration.md` (`org.yml`, a repo's `.shiftlead.yml`); [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md) (*a team may span projects*)
 
 **Why:** Paul, 2026-10-15, in the conversation TD-721 waited on: *one repo per team, declared. We still want to be able to have multiple teams per repo (e.g. db team, compliance team) and those can be listed together (per repo) but not auto-combined* — and of a grouping such as Guardians, *a project heading*, placed **on the repo** (*project on the repo*). The design today lets a team span projects and a project hold several repos, and infers a team's repo from where its live members sit (`team_repo`); every project in the org file holds one repo, and no team spans two. The inference is what leaves the header's *mixed* place, `repo_teams`' first-team-in-definition-order rule, and a Repo page that can expand only one team's card (TD-721). The cases for a team over several repos each split by repo: a function across repos (docs, audits, dependency bumps) is a role or flow stage in each repo's team; a product over several repos is one team per repo, sequenced by cross-repo `Blocked by: <repo>#TD-NNN`; the cost a team per repo adds is its seats, which an on-call seat and a team managed by the person already keep small.
@@ -1376,7 +1380,7 @@ The other cases:
 **Owner:** anchor
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-722
+**Blocked by:** TD-722, TD-724
 **Location:** `~/.shiftlead/org.yml` (`projects:` — today `samscrape` and `contractmatch`, one repo each); `~/samscrape/.shiftlead.yml`, `~/contractmatch/.shiftlead.yml` (their teams, defined there since 2026-10-03)
 
 **Why:** Paul, 2026-10-15: *file a backfill to have samscrape and contractmatch both be on the ContractMatch project.* The two repos are one product; once a project is a heading on repos (TD-722), they share one, which draws them together on the Org page, lets their teams settle things by mail (§4.10 *across teams, by project*) and gives each session the other repo in its Project block.
@@ -1386,6 +1390,88 @@ The other cases:
 **Done when** the Org page draws samscrape and contractmatch under one ContractMatch heading, and a samscrape session's brief names contractmatch's checkout in its Project block.
 
 **Related:** TD-722.
+
+---
+
+## TD-724: Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the old keys' release of warnings
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-722's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The org is an aggregate*, §4.10 *across teams, by project*, §4.5a *Add entry form: Hand to the techlead*, §5 `org.yml`; `src/shiftlead/org.py` (`TeamDef.projects` ~L184, `ManagerDef`/`TechleadDef`/`AnchorDef`/`SeatDef`/`MemberDef.home`, `MANAGER_KEYS` ~L628, `MEMBER_KEYS`, `TEAM_KEYS` ~L631, `TECHLEAD_KEYS`, `ANCHOR_KEYS`, `SEAT_KEYS`, `_project` ~L580, `_team` ~L675, `_validate` ~L858, `_home` ~L903, `team_repos` ~L273, `anchor_first` ~L282, `merge_repo_teams` ~L338, `_land` ~L415), `src/shiftlead/teams.py` (`project_of` ~L214, `project_block` ~L222, `reach_block` ~L244, `entry_teams` ~L481, `_launch` ~L784, `plan` ~L971), `src/shiftlead/teams.py` (the other readers of `team.projects` and `.home`, ~L330, ~L344, ~L352, ~L492, ~L541, ~L868, and the anchor message at ~L1041 that names `anchor.home`), `src/shiftlead/ui/common.py` (~L757, ~L775, which read `t.projects`), `src/shiftlead/ui/templates/group_head.html` (~L20, `g.projects`), `src/shiftlead/ui/app.py` (`repo_teams` ~L383), `src/shiftlead/teamrun.py` (`rows` ~L457), `src/shiftlead/orgcheck.py` (`view` ~L100), `src/shiftlead/cli.py` (`cmd_team_list` ~L1072), `src/shiftlead/ui/settings_page.py` (`org_cards` ~L481)
+
+**Why:** TD-722's design. A team that may span projects leaves its repo to be read from where its members sit, and that inference is what leaves the Org header's *mixed* place, `repo_teams`' first-team rule and a Repo page that can expand only one team (TD-721).
+
+**Fix:** this touches no `src/sessionorc/**` (the badge stays a plain string there, and `mail.message_edge` is unchanged). Slices, each its own PR:
+1. **The definition** (`org.py`).
+   - `TeamDef.repo` (one name) replaces `TeamDef.projects`. `home` leaves every `*_KEYS` set and dataclass, `TEAM_KEYS` gains `repo`, and `_home` goes. In the org file `repo:` is required and resolves through a project's repos or the registry's directory names. In a repo's `.shiftlead.yml` it is that repo: `merge_repo_teams` writes it in place of `raw["projects"] = [rname]`, and a written `repo:` naming another repo is refused.
+   - `Project` gains an optional `title`. A repo listed by two projects is an error naming both, at load.
+   - **No synthetic project.** `merge_repo_teams` stops creating `Project(rname, …)` for a repo-defined team (~L382), since under the new check a repo-defined team's repo listed by a heading (TD-723's samscrape under `contractmatch`) would be in two projects. A repo in no project is its own heading with no `Project` object.
+   - **One store of checkouts.** `Org.checkouts: {repo: {host: path}}` is filled from every project's `repos:` and from each repo-defined team's registered checkout, and is carried by every `Org(...)` copy (`merge_repo_teams` ~L354, `with_repos` ~L508) as `projects` is. A project's `repos:` stays its list of names for the heading and the block. `Org.checkout(repo, host)` (today `checkout(project, repo, host)`, ~L267) reads it, and so do `teams.py`'s launch and start checks (~L330, ~L541, and the *declared on* words of its no-checkout error ~L544), `entry_teams` (~L492), `reach_block` (~L255), `project_block` (~L229) and `_land` (~L430–L461). `_land` keeps its rule: a path the org file already gives for the landing host is used as it stands. It writes the landed path into `Org.checkouts`. Its *not landed* words become *add `{host}: <path>` under `projects.<project>.repos.<repo>`* where a heading lists the repo, and *register the checkout on `{host}`* (§5 *Repos*) where none does.
+   - `Org.project_of(repo)` returns the listing project's name, else the repo's own name. `team_repos` becomes `[team.repo]`, kept for §4.9c's `held:` union. `anchor_first` compares team repos. `_land` reads `team.repo`.
+2. **The old keys** (`org.py`, `orgcheck.py`). A team carrying `projects:` or any `home:` is read for one release with a warning in the design's words, wherever they name exactly one repo, and refused by name where they name more. `ao org check` lists each one. Name the release after which they become unknown keys in a comment beside the warning.
+3. **What reads a team's repo** (`teams.py`, `ui/app.py`, `teamrun.py`, `cli.py`, `settings_page.py`).
+   - `project_of` is the repo's project. `project_block` lists the project's repos and marks the team's.
+   - `repo_teams` and `entry_teams` map a checkout to the teams whose `repo:` is it, in definition order. The hand-to target is the first of them with a techlead seat.
+   - `ao team list --json` carries `repo` and `project` (dropping `projects` and `anchor.home`), and `ao org` likewise. The Settings org card's row reads *repo*.
+   - `team_repo` (`ui/org.py`, the inference) stays only for a badge no definition holds; TD-725 removes its other callers.
+- **Tests:** in `tests/test_org.py`, `test_cli_teams.py`, `test_cli_org.py`, `test_anchor_seat.py`, `test_ui_board.py` and `test_ui_teams.py`, rewrite the tests that pin `projects`, `home` and the first-team rule (`test_projects_and_checkout_expand_home`, `test_home_is_required_above_one_repo`, `test_merge_repo_teams`, `test_the_project_block_names_every_repo_on_this_host_and_which_is_home`, `test_a_repo_maps_to_the_first_team_whose_projects_hold_it`, `test_home_is_the_managers_and_required_only_where_written`, and the `MEMBER_KEYS` assertion). New tests:
+  - `repo:` is required in the org file and implied in a repo's.
+  - A repo in two projects is an error.
+  - A repo in no project badges its sessions with the repo's name.
+  - Two teams on one repo share the badge, and mail passes between them (`tests/test_mail.py`'s edge test, unchanged).
+  - The old keys warn when they name one repo and are refused when they span.
+  - `title` is read.
+  - The director's org-wide block lists every registered repo (with TD-642).
+
+**Done when** every team in this install reads its repo from its definition, `ao team list` and `ao org` say each team's repo and project, two teams on one repo badge alike, the old keys warn or refuse as designed, and every listed test passes.
+
+**Related:** TD-722 (the design), TD-725 (the page), TD-723 (the org file's backfill, after this is live), TD-721, TD-582, TD-642.
+
+---
+
+## TD-725: Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-722's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-724
+**Location:** design §4.9 *The Org page*, §4.5 screen 1 (the team's header), §4.5a *Org: team groups*; `src/shiftlead/ui/repo.py` (`team_groups` ~L450, its `projects` from badges ~L522 and ~L567, `group_place` use ~L576), `src/shiftlead/ui/cards.py` (`group_place` ~L1150), `src/shiftlead/ui/org.py` (`team_repo` ~L60, `team_summary` ~L452), `src/shiftlead/ui/repo.py` (`compact_in` ~L366), `src/shiftlead/ui/templates/group_head.html` (~L15), the Org page's template and its ordering
+
+**Why:** TD-722's design. With a team's repo declared, the Org page can say what it groups: project headings over repos over teams, two teams on one repo two whole cards, and no *mixed* place.
+
+**Fix:**
+- **Grouping.** `team_groups` is grouped project → repo → team:
+  - a project heading (its `title`, else its name) with its repos in its list's order;
+  - a repo in no project as a heading of its own;
+  - under each repo, its teams' groups in definition order, each drawn as today.
+  - A team's repo is its `repo:` (TD-724). A `team` badge no definition holds is drawn under the repo its records sit in, which is `team_repo`'s one remaining use. `team_summary` and `compact_in` read the definition's repo.
+- **The repo line** is the repo's name, linked to `/repo/<name>`.
+- **The team header's place** is the host alone. `group_place` returns the host, *mixed* where members' hosts differ, and the repo goes from it.
+- **Order:**
+  - the person's row and the director's card on top (the director with TD-642);
+  - then headings with something live;
+  - then *No team*;
+  - then headings with nothing live;
+  - within a heading, the definition's order.
+- **Unchanged:** the fold, the counts, every mark and control, and the cards.
+- **Tests:**
+  - Two teams on one repo are two groups under one repo line.
+  - Two repos of one project are under one heading, with its `title`.
+  - A repo in no project is its own heading.
+  - Heading order follows liveness.
+  - The header's place has no repo (`tests/test_ui_org.py`'s `test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count`, rewritten).
+  - An undefined badge's group is under its records' repo.
+
+**Done when** the Org page draws every team under its repo and every repo under its project heading, two teams on one repo stand side by side as whole cards, no header says *mixed* for a repo, and every listed test passes.
+
+**Related:** TD-722 (the design), TD-724 (the definition), TD-721 (the Repo page as the repo group expanded), TD-642 (the director's card).
 
 ---
 

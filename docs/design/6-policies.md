@@ -1462,8 +1462,8 @@ teams:
   team that wound down loses its mark with nobody to tell, and neither the manager nor the person
   is sent a clearing. The manager is the controller the team's unattended, non-seat members share,
   read from those that control no teammate, each address in the home's form (a node's member's is
-  `id@host`); a team a person leads has none, and only the person is told. Nested teams are not
-  built (§4.9), so this reading is one layer deep: a team in which a member leads members of its
+  `id@host`); a team a person leads has none, and only the person is told. No team holds
+  another (§4.9, TD-722), so this reading is one layer deep: a team in which a member leads members of its
   own tells the controller those bottom members share, which is that member and not the manager
   above it, and where two leads' members share none, only the person. When the mark goes, each
   member whose claim was refused is rung with *the line is clear again: pick as your lane says*,
