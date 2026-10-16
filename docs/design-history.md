@@ -910,6 +910,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-16 (TD-769, grinder-ao-1): *Choosing in a free-pick lane*'s rank order is built — the grinder, designer and repo briefs say *work orders first, then the highest-ranked pickable entry in your lane that nobody holds*, and the *Until TD-769* sentence is gone.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): *Choosing in a free-pick lane* — work orders, then the highest-ranked pickable entry in the lane nobody holds; a passed-over line is drawn on the card passed over. Built by TD-769 (the briefs and the flag's reading) and TD-771 (the flag drawn).
 - 2026-10-15 (TD-730, the designer): a claim on another team's entry, or on one that needs a team, is refused; `--force` passes both.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the roles table's `anchor` row is removed. Built by TD-757.

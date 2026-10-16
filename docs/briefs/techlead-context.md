@@ -55,7 +55,7 @@ person is `docs/user_attention.md`.
 - **Profiles** (§4.2a): tool · account · model. One account has one usage window; a capped
   account caps every session on it.
 - **The UI** (§4.5, `src/shiftlead/ui/`): Org, Focus, the Inbox (a queue — *Needs you*,
-  *Steering*, *Waiting on them*, FYI; §4.10 *The Inbox is a queue*; its filters are the rail and
+  *Steering*, *Waiting on them*, FYI; §4.10 *Nothing leaves the Inbox without an answer*; its filters are the rail and
   one entry opens as a page, §4.5 screen 6 *The rail* and *The message page*, TD-129; a message to
   the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message
   to a person is written*, TD-127, and a `--subject`, a headline apart from that paragraph, §4.10
