@@ -95,6 +95,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     waits_of,
 )
 from .common import (  # re-exported: routes, templates and tests read these from the app (TD-196)
+    _DICT_NAMES,  # noqa: F401
     GRANT_NOTES,  # noqa: F401
     HERE,  # noqa: F401
     ICON_TTL,  # noqa: F401
@@ -116,9 +117,11 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _amount_says,  # noqa: F401
     _as_session_id,  # noqa: F401
     _countdown,  # noqa: F401
+    _getattr,  # noqa: F401
     _icon_cache,  # noqa: F401
     _instant,  # noqa: F401
     _iso,  # noqa: F401
+    _jinja_getattr,  # noqa: F401
     _left,  # noqa: F401
     _look_for,  # noqa: F401
     _metered_chip,  # noqa: F401
@@ -229,6 +232,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _shot_on_host,  # noqa: F401
     _shot_on_origin,  # noqa: F401
     _shot_seen,  # noqa: F401
+    _subject_of,  # noqa: F401
     _trail_rows,  # noqa: F401
     _with_subject,  # noqa: F401
     billing_url,  # noqa: F401

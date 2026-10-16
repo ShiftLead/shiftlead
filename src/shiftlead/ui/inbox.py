@@ -93,7 +93,12 @@ def row_subject(e: Mapping[str, Any]) -> str:
         return mail_mod.clip_subject(str(e.get("title") or ""))
     if e.get("row"):
         return ""
-    return mail_mod.subject_of(str(e.get("text") or ""))
+    return _subject_of(str(e.get("text") or ""))
+
+
+# a mail entry's text never changes, and the page asks for its subject twice a row on every request
+# (the row's subject line and its find text), so each text's is derived once (TD-747)
+_subject_of = functools.lru_cache(maxsize=4096)(mail_mod.subject_of)
 
 
 # design §4.5a **Inbox row: state**: the row kinds that are a *needs you* session, and so exactly

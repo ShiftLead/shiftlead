@@ -155,15 +155,16 @@ PERSON_ONLY = frozenset(
 )
 
 
-# every control character read as a space, in one C pass rather than a generator per character (TD-739)
-_CONTROLS = {c: " " for c in range(32)}
+# every control character read as a space, in one C pass rather than a generator per character (TD-739);
+# a pattern, since `str.translate` with a mapping looks each character up in Python's dict (TD-747)
+_CONTROLS = re.compile(r"[\x00-\x1f]")
 
 
 def clip_subject(line: str) -> str:
     """A subject as one line of at most `SUBJECT_CHARS` (§4.10 *A subject on every entry*): whitespace
     and control characters folded to single spaces, and a longer one clipped at a word with an
     ellipsis."""
-    flat = " ".join(str(line).translate(_CONTROLS).split())
+    flat = " ".join(_CONTROLS.sub(" ", str(line)).split())
     if len(flat) <= SUBJECT_CHARS:
         return flat
     cut = flat[: SUBJECT_CHARS - 1]
@@ -175,8 +176,15 @@ def clip_subject(line: str) -> str:
 def subject_of(text: str) -> str:
     """The subject a text with none stands under (§4.10 *A subject on every entry*, TD-561): its first
     sentence — to the first full stop, question or exclamation mark followed by a space or the end —
-    else the text itself, either one clipped as `clip_subject` clips."""
-    flat = " ".join(str(text).translate(_CONTROLS).split())
+    else the text itself, either one clipped as `clip_subject` clips. Only a prefix is folded: a clipped
+    subject reads no further than `SUBJECT_CHARS + 1` folded characters, and a prefix's fold is a prefix
+    of the whole text's, so the first prefix whose fold is longer than that draws the same (TD-747)."""
+    text, n = str(text), 4 * SUBJECT_CHARS
+    while True:
+        flat = " ".join(_CONTROLS.sub(" ", text[:n]).split())
+        if n >= len(text) or len(flat) > SUBJECT_CHARS + 1:
+            break
+        n *= 4
     m = _SENTENCE.match(flat)
     return clip_subject(m.group(1) if m else flat)
 
