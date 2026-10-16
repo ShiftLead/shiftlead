@@ -1571,7 +1571,9 @@ class TickMixin:
 
         def matching(got: list[Any]) -> list[str]:
             return [
-                str(e["id"]) for e in got if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(s.lane, e)
+                str(e["id"])
+                for e in got
+                if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(s.lane, e, s.team)
             ]
 
         ledger_ids = matching(led["entries"])

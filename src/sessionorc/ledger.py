@@ -258,7 +258,7 @@ def _buildlike(entry: dict[str, Any]) -> bool:
     return entry.get("kind") in ("", "build") or (entry.get("kind") == "live-check" and entry.get("live") == "yes")
 
 
-def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
+def lane_matches(lane: list[str], entry: dict[str, Any], team: str | None = None) -> bool:
     """Whether an entry belongs to a lane (design §6 rule 6, TD-195), by its header and never its
     prose. A word: `design-first` is a pickable entry with `Kind: design-first`, or any entry
     blocked by `decision (designer)`; `free-pick` a
@@ -274,10 +274,19 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     the grinders' pick list, since the anchor seat is retired (§4.9b *No anchor seat*, TD-757). **An
     entry still settling, or held** (`settling`, `held`: the home's
     marks, §4.4 *A new entry settles before it is pickable*, TD-710), **or waiting** (`waiting`, §4.4 *An
-    entry says what it waits for*, TD-716), matches no lane."""
+    entry says what it waits for*, TD-716), matches no lane. **`team`** is the lane's record's (§4.4 *An
+    entry names its team*, TD-730): an entry marked `needs_team` matches nothing; one with a `team`
+    matches only a lane of that team, case-folded; a lane with no team ('' or None) narrows nothing;
+    a work order carries no team and matches as its own rule says."""
     if entry.get("settling") or entry.get("held") or entry.get("waiting"):
         return False
     owners = {o for w in lane if (o := owner_word(w))}
+    if not entry.get("work_order"):
+        if entry.get("needs_team"):
+            return False
+        mine_team = str(entry.get("team") or "").casefold()
+        if team and mine_team and mine_team != team.casefold():
+            return False
     if entry.get("work_order"):
         # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384); nor a
         # red PR's (TD-613): both are on the grinders' pick list (§4.9b *No anchor seat*)
@@ -311,16 +320,24 @@ def in_lanes(
     member's `ids`: what a lane would take but for its wait is `waiting`, `{until: [ids], event:
     [ids]}`, each member's own beside its `ids` as `waiting`, and `out_of_work_waiting` names each
     record carrying `out_of_work` whose `ids` is empty and whose `waiting` is not, `[{id, name,
-    waiting}]`. None where no record carries a lane: nothing is drawn."""
-    lanes = [list(r["lane"]) for r in records if r.get("lane")]
+    waiting}]`. Each lane is read with its record's `team` (§4.4 *An entry names its team*, TD-730), and
+    an entry marked `needs_team` is in no kind, no `rest` and no member's `ids`; another team's entry is in
+    no `rest` of a team's records. None where no record
+    carries a lane: nothing is drawn."""
+    lanes = [(list(r["lane"]), str(r.get("team") or "")) for r in records if r.get("lane")]
     if not lanes:
         return None
     open_ = [e for e in entries if e.get("for_page") in LANE_KINDS]
-    taken = {e["id"] for e in open_ if any(lane_matches(lane, e) for lane in lanes)}
-    waits = {e["id"]: e for e in open_ if e.get("waiting") and any(lane_matches(lane, _unwaited(e)) for lane in lanes)}
+    taken = {e["id"] for e in open_ if any(lane_matches(lane, e, t) for lane, t in lanes)}
+    waits = {
+        e["id"]: e for e in open_ if e.get("waiting") and any(lane_matches(lane, _unwaited(e), t) for lane, t in lanes)
+    }
     by_owner: dict[str, list[str]] = {}
+    ours = {t.casefold() for _, t in lanes if t}  # another team's entry is in its own team's rest, not this one's
     for e in open_:
-        withheld = e.get("settling") or e.get("held") or e.get("waiting")
+        withheld = e.get("settling") or e.get("held") or e.get("waiting") or e.get("needs_team")
+        if ours and str(e.get("team") or "") and str(e["team"]).casefold() not in ours:
+            continue
         if e["for_page"] == "pickable" and e["id"] not in taken and not withheld:
             by_owner.setdefault(str(e.get("owner") or "").lower() or UNOWNED, []).append(e["id"])
     rest = [{"owner": o, "n": len(ids), "ids": ids} for o, ids in by_owner.items()]
@@ -331,11 +348,12 @@ def in_lanes(
     for r in records:
         if not r.get("lane"):
             continue
-        ids = [e["id"] for e in entries if e["id"] not in held and lane_matches(list(r["lane"]), e)]
+        team = str(r.get("team") or "")
+        ids = [e["id"] for e in entries if e["id"] not in held and lane_matches(list(r["lane"]), e, team)]
         waiting = [
             e["id"]
             for e in entries
-            if e.get("waiting") and e["id"] not in held and lane_matches(list(r["lane"]), _unwaited(e))
+            if e.get("waiting") and e["id"] not in held and lane_matches(list(r["lane"]), _unwaited(e), team)
         ]
         name = r.get("name") or r.get("id")
         k = alive.count(frozenset(r["lane"]))
@@ -380,6 +398,25 @@ def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     return False
 
 
+def declared_teams(text: str) -> tuple[str, ...]:
+    """The repo's teams, in order: the `Team` vocabulary of the ledger's `Fields:` line, as ledgerboard's
+    `declared` reads it, each lower-cased (§4.4 *An entry names its team*, TD-730); () for none."""
+    return lb.declared(text)[0].get("team", ())
+
+
+def team_need(entry: dict[str, Any], teams: Collection[str]) -> str:
+    """Why an entry needs a team (§4.4 *An entry names its team*, *What the reader marks*, TD-730): `unknown
+    <name>` wherever a vocabulary is declared and its `team` is not in it; `untagged` where the vocabulary
+    names two or more and the entry, of a kind a lane takes, names none; else ''. Names compare case-folded."""
+    names = {n.casefold() for n in teams}
+    team = str(entry.get("team") or "").casefold()
+    if names and team and team not in names:
+        return f"unknown {team}"
+    if len(names) >= 2 and not team and entry.get("for_page") in LANE_KINDS:
+        return "untagged"
+    return ""
+
+
 def entries(
     text: str, archive: str | None = None, resolve: Resolve | None = None, live: Live | None = None
 ) -> list[dict[str, Any]]:
@@ -399,8 +436,11 @@ def entries(
     otherwise — no callable, no PR named (§4.9b, TD-323). `sig` is a hash of the entry's section text,
     which the home's settle clock compares (§4.4 *A new entry settles before it is pickable*, TD-710).
     An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716); whether it
-    still waits is the home's clock's, its `waiting` mark (`settle`)."""
+    still waits is the home's clock's, its `waiting` mark (`settle`). `team` is its `**Team:**` line's first
+    word ('' for none), and `needs_team: {why}` marks an entry `team_need` finds lacking (§4.4 *An entry
+    names its team*, TD-730)."""
     t = strip_comments(text)
+    teams = declared_teams(text)
     heads = list(lb.HEADING_RE.finditer(t))
     derived: dict[str, list[str]] = {}
     for r in lb.pickable(t, archive or "", resolve)["entries"]:
@@ -430,6 +470,9 @@ def entries(
             e["built"] = built(fields.get("kind", ""))
             e["live"] = "yes" if live is not None and e["built"] and all(live(n) for n in e["built"]) else "no"
         e["for_page"] = kind_of(e)
+        e["team"] = _word(fields.get("team", ""))
+        if why := team_need(e, teams):
+            e["needs_team"] = {"why": why}
         # an Inbox row's reading (TD-565) on every open entry: a hold is marked after the parse, and a
         # held row opens with its Why and Fix (§4.5 screen 6 *A held entry waits on the person too*, TD-736)
         added = DATE.search(fields.get("added", ""))
@@ -686,7 +729,8 @@ def reading(
     from the history and `recent` the entries opened or closed in the longest window, newest first —
     both absent when the history was not read, and marked `history_error` when git could not be
     asked. `archived` is the archived ids some entry's `blocked_ids` names, never the whole archive
-    (§4.5 screen 11 *Its builds*, TD-693)."""
+    (§4.5 screen 11 *Its builds*, TD-693). `declared_teams` is the `Fields:` line's `Team` vocabulary in
+    its order, and `needs_team` the ids marked so (§4.4 *An entry names its team*, TD-730)."""
     rel = rel or ledger_path(root)
     try:
         text = (Path(root) / rel).read_text(encoding="utf-8")
@@ -703,6 +747,8 @@ def reading(
         "by_priority": {p: sum(1 for e in got if e["priority"] == p) for p in PRIORITIES},
         "by_kind": {k: sum(1 for e in got if e["for_page"] == k) for k in KINDS},
         "archived": sorted(ids_in(archive) & {b for e in got for b in e["blocked_ids"]}),
+        "declared_teams": list(declared_teams(text)),
+        "needs_team": [e["id"] for e in got if e.get("needs_team")],
         "at": now.isoformat(),
     }
     if not with_history:

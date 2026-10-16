@@ -118,6 +118,23 @@ def wait_refusal(entry: dict[str, Any] | None) -> str | None:
     return f"{said} (design §4.4 *An entry says what it waits for*); claim it anyway with --force if the wait is over"
 
 
+def team_refusal(entry: dict[str, Any] | None, team: str, who: str = "") -> str | None:
+    """Why a declared claim is refused by the entry's team (design §4.4 *An entry names its team*, TD-730),
+    or None: on an entry marked `needs_team`, for every claimer, *TD-801 needs a team (untagged)*; on
+    another team's entry, *TD-801 is db's: compliance-grinder-1 is compliance's*, never for a claimer with
+    no team (`team` ''). `who` is the claimer's name. `--force` passes both, as for a waiting entry."""
+    if not isinstance(entry, dict):
+        return None
+    i = str(entry.get("id") or "")
+    tail = " (design §4.4 *An entry names its team*); claim it anyway with --force"
+    if isinstance(entry.get("needs_team"), dict):
+        return f"{i} needs a team ({entry['needs_team'].get('why') or 'untagged'}){tail}"
+    theirs = str(entry.get("team") or "")
+    if team and theirs and theirs.casefold() != team.casefold():
+        return f"{i} is {theirs}'s: {who or 'this session'} is {team}'s{tail}"
+    return None
+
+
 def _marks(entries: list[dict[str, Any]], seen: dict[str, Any], spans: dict[str, int], now: datetime) -> None:
     """Each entry's `settling` or `held` from its record, dropping a stale one: a held entry is held
     whatever the clock says; an unsettled one settles at `at` plus its Kind's duration. Each entry's
