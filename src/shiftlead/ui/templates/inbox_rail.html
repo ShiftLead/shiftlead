@@ -61,7 +61,11 @@
   <div class="railgroup" role="group" aria-labelledby="railh-kind">
     <div class="railh" id="railh-kind">Kinds</div>
     {%- for k in rail_kinds %}
+    {#- *ledger entries* left the rail for the Queue's cards (TD-771): drawn only while a ledger row is still
+        the Inbox's — a home that serves no Queue, or picked by the URL #}
+    {%- if k != 'ledger' or rail.kinds[k].all or 'ledger' in picks.kind %}
     {{ line('kind', k, rail_kind_names[k], rail.kinds[k], picks, rail.filtered) }}
+    {%- endif %}
     {%- endfor %}
   </div>
 </aside>

@@ -948,6 +948,7 @@
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-ledger">{{ e.kind }}</span>
   {%- if e.held %} <span class="st">{{ 'claimed by' if e.claimed else 'held by' }} {{ e.held }}</span>{% endif %}
+  {%- if e.home == 'queue' %} <span class="st qneed">{% if e.claimed %}held (person){% elif e.why == 'yours' %}yours to do{% else %}held until your decision{% endif %}</span>{% endif %}
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
@@ -974,7 +975,17 @@
   {%- if e.default %}
   <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-go="1" data-answer="{{ e.default }}" title="the answer marked default, written on {{ e.name }}'s board as your decision on {{ e.id }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Go with it</button>
   {%- endif %}
-  {%- if e.held %}
+  {#- on its Queue card (§4.5 screen 12 *What needs the person*, §4.5a *Queue card: what needs the person*,
+      TD-771): **Done** on *yours to do* and **Lift the hold** on a decision, each the Reply road with its
+      fixed words — one decided board line, `Context: TD-n`, its session's work order; a decision there has
+      no Start session -#}
+  {%- if e.home == 'queue' and e.why == 'yours' %}
+  <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="done" data-answer="done" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: done — its session archives the entry, or asks you what was done" data-confirm="Done? &ldquo;done&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Done</button>
+  {%- elif e.home == 'queue' %}
+  <button class="btn sm ghost" data-act="ledger" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-words="go ahead" data-answer="go ahead" title="written on {{ e.name }}'s board as your decision on {{ e.id }}: go ahead — its session drops decision (paul) from Blocked by" data-confirm="Lift the hold? &ldquo;go ahead&rdquo; is written on {{ e.name }}'s board as your decision on {{ e.id }}.">Lift the hold</button>
+  {%- endif %}
+  {%- if e.home == 'queue' and e.why != 'yours' %}
+  {%- elif e.held %}
   <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="{{ e.held }} holds {{ e.id }}: go to its Focus — nothing is started">Open session</button>
   {%- else %}
   <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="your own interactive session on {{ e.id }}, {{ e.id|lower }}, in a new worktree on {{ e.team or 'the repo' }}'s team, told to read the entry and wait for you — or the New session form, filled in, where it cannot be one press">Start session</button>
