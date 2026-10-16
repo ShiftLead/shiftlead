@@ -1696,9 +1696,16 @@ def test_a_decided_lines_waiting_words_name_its_work_orders_holder_or_the_teams_
     g1 = {"id": "ao-g1", "name": "g1", "state": "working", "team": "grind", "repo": str(root), "lane": ["free-pick"]}
     assert board_waiting_on(row, [{**g1, "progress": [lease]}], now) == f"waiting on g1 — holds {ref}"
     assert board_waiting_on(row, [g1], now) == "pickable by grind"
-    down = {**g1, "state": "exited"}
+    down = {**g1, "state": "exited", "out_of_work": {"at": "2026-10-04T10:00:00Z", "why": "nothing pickable"}}
     assert board_waiting_on(row, [down], now) == "pickable by grind · grind wound down — starts on `on_work`"
     assert board_waiting_on(row, [down], now, {"grind"}) == "pickable by grind · the start row is in Needs you"
+    # a team that stopped rather than wound down (nobody declared) is never started by rule 8 (TD-781)
+    stopped = {**g1, "state": "exited"}
+    assert board_waiting_on(row, [stopped], now) == "pickable by grind · grind stopped — Start it"
+    # a seat that never declares does not keep its team from *wound down*; a person's session is not its crew
+    seat = {**stopped, "id": "ao-t1", "name": "t1", "seat": "techlead"}
+    mine = {**stopped, "id": "ao-p1", "name": "p1", "unattended": False}
+    assert board_waiting_on(row, [down, seat, mine], now).endswith("grind wound down — starts on `on_work`")
     # a lane that takes no free-pick work, a fyi line, and no team: the next reader
     nobody = "waiting on the next session to read repo's board"
     assert board_waiting_on(row, [{**g1, "lane": ["design-first"]}], now) == nobody

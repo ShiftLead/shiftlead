@@ -820,7 +820,7 @@ def test_status_json_carries_what_the_homes_reading_reads_and_the_reading(world,
     assert got["sessions"][0]["running"] is False and got["sessions"][0]["out_of_work"] is None
 
 
-def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, capsys):
+def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, capsys, monkeypatch):
     tmp_path, state = world
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"teams": {"repo-team": {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}}})
@@ -856,6 +856,32 @@ def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, ca
     assert cli.main(["--json", "team", "list"]) == 0
     listed = {r["name"]: r["work_waiting"] for r in json.loads(capsys.readouterr().out)["teams"]}
     assert listed == {"ao-grind": 2, "repo-team": 0}
+    # a team that stopped rather than wound down says it beside *stopped* (§6 rule 8 *A team that
+    # stopped*, TD-781); a defined team with no record, what its lanes hold from `teamrun.lanes`, each
+    # id once, and nothing where a lane cannot be read
+    decl = {s["name"]: s.pop("out_of_work") for s in state["sessions"] if s.get("team") == "ao-grind"}
+    hold = {"line": "hunter: 2", "empty": False, "roles": {"hunter": {"n": 2, "by_kind": {}}}, "ids": ["TD-7", "TD-9"]}
+    asked: list[str] = []
+
+    def lanes(call, org, name, host):
+        asked.append(name)
+        return hold
+
+    monkeypatch.setattr(teamrun, "lanes", lanes)
+    assert cli.main(["team", "list"]) == 0
+    out = capsys.readouterr().out
+    assert re.search(r"ao-grind\s+stopped, work waiting: 2 entries", out), out
+    assert re.search(r"repo-team\s+stopped, lanes hold 2 entries", out), out
+    assert asked == ["repo-team"], "only a team with no record reads its lanes"
+    assert cli.main(["--json", "team", "list"]) == 0
+    listed = {r["name"]: (r["work_waiting"], r["lanes_hold"]) for r in json.loads(capsys.readouterr().out)["teams"]}
+    assert listed == {"ao-grind": (2, None), "repo-team": (0, 2)}
+    hold["roles"]["hunter"]["n"] = None  # a ledger that cannot be read is unknown, never a count
+    assert cli.main(["--json", "team", "list"]) == 0
+    assert {r["name"]: r["lanes_hold"] for r in json.loads(capsys.readouterr().out)["teams"]}["repo-team"] is None
+    for s in state["sessions"]:
+        if s.get("team") == "ao-grind":
+            s["out_of_work"] = decl[s["name"]]
     # live, and every live session idle and declared: *concluded*, said beside the live count (TD-099)
     for s in state["sessions"]:
         if s.get("team") == "ao-grind":
@@ -2373,9 +2399,12 @@ def test_a_start_counts_every_lane_it_creates_by_kind_the_managers_too(world, ca
     assert got["line"] == "manager: 0 · grinder: 1 pickable, 6 live check · hunter: 0" and got["empty"] is False
     assert got["roles"]["grinder"]["n"] == 7 and got["roles"]["grinder"]["by_kind"]["live-check"] == 6
     assert "anchor" not in got["roles"] and "held" not in got["roles"]["grinder"]
+    # the distinct ids every lane matched, each once (§6 rule 8 *A team with no record*, TD-781)
+    assert got["ids"] == ["TD-60", *(f"TD-7{i}" for i in range(6))]
     state["repos"] = {checkout: {"ledger": {"entries": []}}}
     picks = teamrun.lanes(call, cli._org_here(), "ao-grind", HOST)
     assert picks["line"] == "manager: 0 · grinder: 0 · hunter: 0" and picks["empty"] is True
+    assert picks["ids"] == []
 
 
 def test_the_lanes_line_counts_only_the_teams_own_entries(world, capsys):
