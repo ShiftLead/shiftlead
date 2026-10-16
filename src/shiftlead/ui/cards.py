@@ -1095,10 +1095,11 @@ def next_act(d: dict[str, Any]) -> str:
 
 
 def shells_of(s: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The record's background shells (§4.2 *A background shell task*, TD-761), oldest `since` first;
-    a malformed entry is left out rather than costing the card."""
+    """The record's background shells (§4.2 *A background shell task*, TD-761), oldest `since` first and
+    one with no readable `since` last, so the oldest named is one whose age can be said; a malformed
+    entry is left out rather than costing the card."""
     got = [sh for sh in (s.get("shells") or []) if isinstance(sh, dict)] if isinstance(s.get("shells"), list) else []
-    return sorted(got, key=lambda sh: str(sh.get("since") or ""))
+    return sorted(got, key=lambda sh: (_instant(sh.get("since")) is None, str(sh.get("since") or "")))
 
 
 SHELL_CMD_CUT = 32  # characters of a shell's `cmd` a row, a slot or a confirm draws before *…*

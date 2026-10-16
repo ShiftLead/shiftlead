@@ -1751,6 +1751,15 @@ def test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_
     assert view({**rec, "git": {**clean, "dirty": 2}})["shell_close"] == ""
     # a live shell: never offered
     assert view({**rec, "shells_live": True})["shell_close"] == ""
+    # a shell with no `since` sorts after the dated one, which is the one named (review of #1916)
+    mixed = view({**rec, "shells": [{"pid": 3, "cmd": "sleep 1"}, srv]})
+    assert mixed["shell_close"] == "Close kills: python -m http.server 8000 · running 3h 2m"
+    assert mixed["not_ready"] == ["2 background shells running 3h 2m — stop it in the session, or Close kills it"]
+    # a host agent older than `shells_live`: the row still fails naming the shell, no pill, no Close past it
+    old = {k: v for k, v in rec.items() if k != "shells_live"}
+    v_old = view(old)
+    assert v_old["pill_word"] == "idle" and v_old["shell_close"] == ""
+    assert v_old["not_ready"] == ["1 background shell running — python -m http.server 8000"]
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "cm.disabled = !(ready || v.shell_close)" in js
 
