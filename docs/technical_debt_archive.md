@@ -14345,3 +14345,28 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** TD-748 (the design), TD-770, TD-771, TD-772, dev-cadence#TD-119, TD-734 (the holder state).
 
 **Resolved:** 2026-10-16 (grinder-ao-2, live check) — with #1939 and #1940 live (`ao promote status`: live c4239d9), the home's first rank flush was #1950, `queue: rank TD-748, TD-769, TD-770, TD-771, TD-772 (shiftlead)`: one PR for the repo, one commit, opened 19:15:04Z and squash-merged 19:15:08Z, changing `docs/technical_debt_rank.yml` alone — a new file of the grammar's two comment lines and one line per open member of TD-748's card, each `0i`. `ao rank --list` (read 19:28Z; which cards are In progress moves with every claim) puts TD-748's card first (In progress) and the repo's Up next cards in key order (TD-717, TD-156, TD-410, TD-460, TD-637, TD-781, …); `ledger.py --pickable` on main gives the same order card by card (TD-769 on the lined `0i`, TD-784 on its card's best implicit key `1|0|000052` from TD-052 High, then TD-720 on `1|0|000717`, …), each In progress card at its key's place as §4.4 says, and `ao repo` lists its pickable entries in that order. Read, never pressed; no join or prune PR has been needed since.
+
+## TD-770: Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-748's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-769
+**Location:** design §4.5 screen 11 item 2, screen 12 (*A card*), §4.5a *Repo page: Technical debt cards*, *Queue page: card*, *Queue page, Up next: grip / ⤒ ↑ ↓*; `src/shiftlead/ui/app.py` (`/repo/{name}` ~L1364); `src/shiftlead/ui/templates/repo.html`, `repo_part.html`; new partials `queue_card.html` and `queue_row.html`, which screen 12 reuses; `src/shiftlead/ui/static/app.js`, `app.css`
+
+**Why:** TD-748, slice 2: the cards drawn first where one repo's are, so the card's look and its moves are tried before the cross-repo page.
+
+**Fix:**
+- **The partials**: a card (header the top entry: id, Priority badge right of the id, the whole title wrapped, the holder's pill, state word, count, status; the header tinted when open and folding the card, no chevron, the open set remembered in the browser) and a row (id, badge, title, state word, holder's pill, two letters of indent a level, *also after TD-n*), from the `queue` reading, the look of screen 12 (amber only on what needs the person, a green stripe in progress, *stalled* grey dashed, no red, IBM Plex Sans with the mono face for ids).
+- **Screen 11 item 2**: the repo's cards in rank order; the kind lists become the heading's count line and each row's tag; *Its builds* and the back-link stay as rows' words, and each row keeps its owner after the title, *needs a team*, and **Hold** / **Release** at its end (§4.5a *Repo page: Hold / Release on an entry*); a card spanning repos is drawn whole on each of its repos' pages; `/repo/<name>#TD-n` opens the card that holds the entry and scrolls to its row.
+- **Moves**: the grip (HTML drag and drop, with a keyboard fallback being the buttons) and **⤒ ↑ ↓** on every Up next card (no open member — the top entry or a row — claimed by a session, no PR naming one open; a card the person holds moves), calling `rank_move`; the card moves at once and goes back, with the reason under the heading, when the home refuses.
+- **Tests** (`tests/test_ui_repo_page.py`, a new `tests/test_ui_queue_cards.py`): a two-entry card renders its header and indented row; an In-progress card has no grip and a *held (person)* card has one; a move posts `rank_move` with the two neighbours; a refused move restores the order; the deep link opens the right card; a row carries its owner, *needs a team* and Hold or Release; a cross-repo card is drawn on both repos' pages.
+
+**Done when** the Repo page draws the repo's cards in rank order, a drag or a move button there lands a rank PR, and every listed test passes, with screenshots in the PR (design §4.9b).
+
+**Related:** TD-748, TD-769, TD-771.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1955) — the Repo page's Technical debt is the repo's Queue cards in rank order, drawn by `queue_card.html` and `queue_row.html` (which screen 12 reuses) from the `queue` reading through `ui.repo.debt_cards`: a cross-repo card is drawn whole on each repo's page, each of this repo's rows keeps its kind, owner, *needs a team*, Hold / Release and builds line, decided lines are listed above the cards, an entry no card holds yet is a card of its own (*not on the Queue yet*), and the kind lists stand where the home serves no reading. The grip and ⤒ ↑ ↓ on Up next cards post `/api/rank/move` → `rank_move` with the whole Up next order's neighbours (`AO.rankMove`), the card moving at once and going back with the home's reason when refused; `#TD-n` opens its card; the page re-reads on the `queue` event. Checked on a scratch home: a ↓ and a drag each moved a card and the home's order agreed; screenshots in `docs/mockups/reviews/2026-10-16-td770-repo-cards-*.png`.

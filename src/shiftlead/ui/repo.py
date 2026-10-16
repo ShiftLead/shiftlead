@@ -356,6 +356,64 @@ def ledger_lists(
     return out
 
 
+def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """**Technical debt cards** (§4.5 screen 11 item 2, §4.5a *Repo page: Technical debt cards*, TD-770):
+    the Queue's cards one of whose open members is this repo's, whole and in the reading's order (In
+    progress first, then Up next by key), for the Queue's partials — or None where the home serves no
+    cards (a node, a home before its first tick, an older home), and the page draws the kind lists.
+
+    Each row (the card's `top` and its `rows`) gains `show`, its id as this page writes it, `also`, its
+    `also_after` so written, `anchor`, the id a `#TD-n` link finds (this repo's rows alone), and `ext`,
+    what the ledger row carried beyond the Queue's (`ledger_lists`' row for the entry, its kind's `label`
+    as `kind_label`): the owner, *needs a team*, the settle mark with **Hold** / **Release**, the builds line,
+    the live check's words. An open entry of the repo no card holds yet (filed since the home's last
+    reading) is drawn as a card of its own after them, with no moves. `upnext` is the whole Up next
+    order, every repo's — a move's neighbours are the adjacent cards in it (§4.4 *A move lands*) —
+    each card's id; `ids` on a card are its open members, which `rank_move` takes."""
+    cards = [c for c in (queue or {}).get("cards") or [] if isinstance(c, Mapping) and c.get("top")]
+    if not cards:
+        return None
+    ext: dict[str, dict[str, Any]] = {}
+    for lst in lists:
+        for e in lst["rows"]:
+            if not e.get("work_order"):
+                ext[str(e["id"])] = {**e, "kind_label": lst["label"]}
+
+    def _shown(q: str, name: str) -> str:  # `TD-n` for this repo's own, `<repo>#TD-n` for another's
+        repo, _, tid = q.rpartition("#")
+        return tid if repo == name else q
+
+    def row(r: Mapping[str, Any]) -> dict[str, Any]:
+        own = r.get("repo") == name
+        return {
+            **r,
+            "priority": str(r.get("priority") or "").lower(),
+            "show": _shown(str(r.get("qid") or ""), name),
+            "also": [_shown(str(a), name) for a in r.get("also_after") or []],
+            "anchor": str(r.get("id") or "") if own and not r.get("archived") else "",
+            "ext": ext.get(str(r.get("id"))) if own and not r.get("archived") else None,
+        }
+
+    out: list[dict[str, Any]] = []
+    drawn: set[str] = set()
+    for c in cards:
+        if name not in (c.get("repos") or ()):
+            continue
+        top, rows = row(c["top"]), [row(r) for r in c.get("rows") or []]
+        drawn.update(r["anchor"] for r in (top, *rows) if r["anchor"])
+        out.append({**c, "top": top, "rows": rows, "ids": list(c.get("order") or [c["id"]])})
+    # filed since the reading: a card of its own, unranked, so no entry of the ledger goes undrawn
+    for i, e in ext.items():
+        if i in drawn:
+            continue
+        q = f"{name}#{i}"
+        top = row({"qid": q, "repo": name, "id": i, "title": e.get("title") or "", "priority": e.get("priority"),
+                   "state": "", "holder": None, "archived": False, "also_after": []})  # fmt: skip
+        out.append({"id": q, "top": top, "rows": [], "ids": [q], "group": "", "place": None, "status": "", "new": True})
+    upnext = [str(c["id"]) for c in cards if c.get("group") == "up_next"]
+    return {"cards": out, "upnext": upnext}
+
+
 def team_notes(r: Mapping[str, Any], defs: Collection[str], fleet: list[dict[str, Any]]) -> dict[str, Any]:
     """The lines under the Technical debt heading's lanes lines (§4.5 screen 11, §4.4 *An entry names its
     team*, TD-764): `needs`, the repo's *needs a team* line as `ao repo` prints it — `{ids, to}`, `to`

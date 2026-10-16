@@ -1,4 +1,10 @@
 {% import "inbox_row.html" as ir with context %}
+{% import "queue_card.html" as qc %}
+{# a decided board line, a work order of the lanes (§4.5a *Repo page: decided lines*, TD-384) #}
+{% macro order_row(e, key, folded) %}
+    <div class="rrow{% if folded %} folded{% endif %}" id="{{ e.id }}" data-list="{{ key }}" data-order><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
+      <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?repo={{ e.repo_name }}&kind=board" title="the line on the board, in the Inbox">board →</a></div>
+{% endmacro %}
 {% if part %}{% include "repo_head.html" %}{% endif %}
 {# (1) Open PRs — every open PR on the remote, newest last; a PR is GitHub's: no control #}
 <section class="rsec" id="prs">
@@ -16,7 +22,7 @@
   </div>
 </section>
 
-{# (2) Technical debt — the ledger's open entries in seven lists, one per kind; an entry is edited in its file.
+{# (2) Technical debt — the repo's Queue cards in rank order (TD-770), else (no Queue reading) the open entries in seven lists, one per kind; an entry is edited in its file.
    A ledger that is not there, or does not parse, is one warning line in its place (§4.5a *missing seams*) #}
 {% if seams and seams.ledger %}
 <section class="rsec" id="debt"><div class="warn" id="noledger">{{ seams.ledger.text }}{% if seams.ledger.cure %} <code>{{ seams.ledger.cure }}</code>{% endif %}</div></section>
@@ -32,15 +38,20 @@
   {# what needs a team, and a team the ledger and the definitions disagree on (§4.4 *An entry names its team*, TD-764) #}
   {% if team_notes and team_notes.needs %}<div class="meta teamnote">needs a team: {% for i in team_notes.needs.ids %}<a href="#{{ i }}">{{ i }}</a>{{ ', ' if not loop.last }}{% endfor %}{% if team_notes.needs.to %} — {{ team_notes.needs.to }}{% endif %}</div>{% endif %}
   {% for s in (team_notes.stale if team_notes else []) %}<div class="meta teamnote stale">{{ s.text }}{% if s.ids %}: {% for i in s.ids %}<a href="#{{ i }}">{{ i }}</a>{{ ', ' if not loop.last }}{% endfor %}{% endif %}</div>{% endfor %}
-  <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes, and first among the pickable the board's decided lines, <i>board:</i>; <i>held by</i> is a member's claim; <i>settles in 7m</i> is a new entry no lane takes yet, which <b>Hold</b> keeps from them until you <b>Release</b> it</div>
+  <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes, and first among the pickable the board's decided lines, <i>board:</i>; drawn as the Queue's cards — an entry and everything its <i>Blocked by:</i> joins — in the order you rank them: drag a card by its grip, or ⤒ ↑ ↓, on a card nobody is working yet; <i>held by</i> is a member's claim; <i>settles in 7m</i> is a new entry no lane takes yet, which <b>Hold</b> keeps from them until you <b>Release</b> it</div>
+  <div class="qwhy meta" id="qwhy" hidden></div>
+  {% if cards %}{# the repo's Queue cards, in rank order (§4.5 screen 11 item 2, TD-770) #}
+  {% if orders %}<div class="rlist">{% for e in orders %}{{ order_row(dict(e, repo_name=name), 'orders', false) }}{% endfor %}</div>{% endif %}
+  <div class="qcards" id="qcards" data-upnext='{{ cards.upnext | tojson }}'>
+  {% for c in cards.cards %}{{ qc.card(c, name) }}{% endfor %}
+  </div>
+  {% else %}
   <div class="rlist">
   {% if r.ledger and r.ledger.entries is none %}<div class="rrow meta">could not look — {{ r.ledger.error or 'not read yet' }}</div>{% endif %}
   {% for l in lists %}{% if l.rows %}
     <div class="rlh" id="debt-{{ l.key }}">{{ l.label }} · {{ l.rows | length }}</div>
     {% for e in l.rows %}
-    {% if e.work_order %}{# a decided board line, a work order of the lanes (§4.5a *Repo page: decided lines*, TD-384) #}
-    <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}" data-order><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
-      <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?repo={{ name }}&kind=board" title="the line on the board, in the Inbox">board →</a></div>
+    {% if e.work_order %}{{ order_row(dict(e, repo_name=name), l.key, loop.index > 4) }}
     {% else %}
     <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
       {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.needs_team %}<span class="meta needsteam">· needs a team</span>{% endif %}{% if e.settle %}<span class="meta settle">· {{ e.settle }}</span>{% endif %}{% if e.wait %}<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>{% endif %}{% if e.settle_mark %}{# the home's settle clock (§4.5a *Repo page: Hold / Release on an entry*, TD-710, TD-736) #}<button class="btn sm ghost" type="button" data-tdhold="{{ e.id }}" data-repo="{{ name }}"{% if e.settle_mark == 'held' %} data-release="1" title="make it pickable now: a lane may take it at once (design §4.4)">Release{% else %} title="keep every lane off it until you release it (design §4.4)">Hold{% endif %}</button>{% endif %}{% for d in e.builds_of %}<span class="meta">· builds <a href="#{{ d }}">{{ d }}</a></span>{% endfor %}{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}</div>
@@ -52,6 +63,7 @@
     {% if l.fold %}<button class="rrow meta mono more" type="button" data-unfold="{{ l.key }}">+{{ l.fold }} more</button>{% endif %}
   {% endif %}{% endfor %}
   </div>
+  {% endif %}
 </section>
 {% endif %}
 

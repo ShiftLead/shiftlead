@@ -1,0 +1,31 @@
+{# A Queue card's row (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*; TD-770): its id, Priority
+   badge, title, one state word and the holder's pill, two letters in a level; *also after TD-n* where it
+   has two parents. `r.ext` is what the Repo page's row carries beyond the Queue's (§4.5 screen 11 item 2):
+   its kind, its owner, *needs a team*, the settle mark with Hold / Release, a design's builds — absent on
+   the Queue page. No red anywhere: a state is a word with a small mark. #}
+{% macro pbadge(p) %}{% set p = (p or '') | lower %}<span class="qpri qp-{{ p or 'none' }}" title="{{ p | capitalize or 'no priority' }}">{{ (p[:1] or '?') | upper }}</span>{% endmacro %}
+
+{% macro needs_word(r) %}{% if r.needs == 'owner' %}yours to do{% elif r.needs == 'decision' %}your decision{% endif %}{% endmacro %}
+
+{% macro state(r) %}{% if r.needs %}<span class="qstate needs">{{ needs_word(r) }}</span>{% elif r.state %}<span class="qstate s-{{ r.state.split(' ')[0] | replace('#', 'pr') }}{% if r.archived %} done{% endif %}">{{ r.state }}</span>{% endif %}{% endmacro %}
+
+{% macro holder(h) %}{% if h %}<a class="qpill mono" href="/focus/{{ h.id }}" title="holds it: {{ h.name }}">{{ h.name }}</a>{% endif %}{% endmacro %}
+
+{# what the Repo page's row adds (§4.5 screen 11 item 2): drawn after the title, the Hold / Release at its end #}
+{% macro extras(e, repo) %}{% if e %}
+  <span class="meta qkind">{{ e.kind_label }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.needs_team %}<span class="meta needsteam">· needs a team</span>{% endif %}{% if e.settle %}<span class="meta settle">· {{ e.settle }}</span>{% endif %}{% for d in e.builds_of %}<span class="meta">· builds <a href="#{{ d }}">{{ d }}</a></span>{% endfor %}{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}{% if e.settle_mark %}<button class="btn sm ghost" type="button" data-tdhold="{{ e.id }}" data-repo="{{ repo }}"{% if e.settle_mark == 'held' %} data-release="1" title="make it pickable now: a lane may take it at once (design §4.4)">Release{% else %} title="keep every lane off it until you release it (design §4.4)">Hold{% endif %}</button>{% endif %}
+{% endif %}{% endmacro %}
+
+{# a design's builds line, under its row (§4.5a *Repo page: its builds line*, TD-693) #}
+{% macro builds(e) %}{% if e and e.builds %}
+  <div class="qbuilds">{% if e.builds.done %}every build archived — archive this entry{% else %}builds:{% for b in e.builds.builds %}{% if not loop.first %} ·{% endif %} {% if b.row %}<a href="#{{ b.row }}">{{ b.id }}</a>{% else %}{{ b.id }}{% endif %} <span class="bstate">{% if b.state == 'archived' %}archived{% elif b.state == 'review' %}in review {% if b.url %}<a href="{{ b.url }}" target="_blank" rel="noopener">#{{ b.pr }}</a>{% else %}#{{ b.pr }}{% endif %}{% elif b.state == 'held' %}held by {{ b.held }}{% else %}open{% endif %}{% if b.blocked_by %}, blocked by {{ b.blocked_by | join(', ') }}{% endif %}</span>{% endfor %}{% endif %}</div>
+{% endif %}{% endmacro %}
+
+{# a row: its state word, and the holder's pill unless the word already names it (*held by X*) #}
+{% macro row(r, repo='') %}
+  <div class="qrow{% if r.archived %} archived{% endif %}{% if r.needs %} needsyou{% endif %}{% if r.state == 'stalled' %} stalled{% endif %}" style="--qd: {{ r.depth or 1 }}"{% if r.anchor %} id="{{ r.anchor }}"{% endif %} data-qid="{{ r.qid }}">
+    <span class="qid mono">{{ r.show }}</span>{{ pbadge(r.priority) }}<span class="qtitle">{{ r.title }}</span>
+    <span class="qright">{{ extras(r.ext, repo) }}{% if r.also %}<span class="meta">also after {{ r.also | join(', ') }}</span>{% endif %}{{ state(r) }}{% if not (r.state or '').startswith('held by') %}{{ holder(r.holder) }}{% endif %}</span>
+    {{ builds(r.ext) }}
+  </div>
+{% endmacro %}
