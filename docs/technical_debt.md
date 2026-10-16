@@ -66,7 +66,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
-| TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Open |
 | TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
@@ -1341,28 +1340,6 @@ The other cases:
 **Done when** the design says when the person may hold an entry, what a hold on a claimed entry does, and how an entry can land held; its build entries are filed; and this entry's `Blocked by:` names them.
 
 **Related:** TD-707, TD-710, TD-722, TD-724, TD-730.
-
----
-
-## TD-744: TD-731's `_hold_tell` reading a PR only from a declared claim, and `prehold` keeping an id's existing hold, are held by no test (#1861)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1861)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_ids.py` (`_hold_tell`, the `p.status == "claimed" and p.source == "declared" and (p.pr or p.review_pr)` test), `src/sessionorc/settle.py` (`prehold`'s `rec.setdefault("held", …)`); `tests/test_settle.py`, `tests/test_td_next.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1861's lines one at a time and running `tests/test_settle.py tests/test_td_next.py tests/test_repo_facts.py` (94 passed unmutated, main's venv). Ten mutations fail a test (the `review_pr` read, the `(p.pr or p.review_pr)` gate, `not was_held`, the interactive-holder skip, the holder/state skips, `_held_caller`'s interactive pass, `observe`'s first-reading rule, the sig kept on an edit, the reader's PR number). Two pass all 94:
-1. `p.source == "declared"` dropped from `_hold_tell`'s progress loop: the docstring says a PR is read from *a declared lease's claim*, and a non-declared (inferred or scraped) `claimed` line on the same ref carrying a `pr` would add that PR to the readers' set; every test's claim is declared.
-2. `prehold`'s `rec.setdefault("held", {...})` changed to `rec["held"] = {...}`: an id already held (a person's earlier Hold, with its `at` and `by`) is re-stamped with the caller and the new time; no test pre-holds an id that already holds a record.
-
-**Fix:** (1) in `tests/test_settle.py`, a holder with a declared claim on TD-003 and a non-declared claim line carrying `pr=1842`: the seat asking about #1842 is not told; (2) in `tests/test_settle.py`, `prehold` over an id whose record already has `held: {at, by}` leaves both. Each fails under its mutation above.
-
-**Done when** the two tests exist and fail under those mutations.
-
-**Related:** TD-731, #1861.
 
 ---
 
