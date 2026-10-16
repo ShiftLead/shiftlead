@@ -14235,3 +14235,57 @@ Each reproduction passed with its fix.
 **Done when** the mutation above fails a test.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1942) — `tests/test_rank_order.py`'s `test_a_rank_file_with_a_byte_that_is_not_utf8_still_reads_the_ledger` writes a rank file holding a `\xff` line beside a good one; `reading` returns every entry and the good line still ranks its entry. Dropping `errors="replace"` fails it.
+
+---
+
+## TD-730: A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed (2026-10-15, the designer): §4.4 *An entry names its team* — a `**Team:**` line whose vocabulary is the ledger's own `Fields:` line (`Team = db | compliance`), required only where it names two or more teams; the reader marks `needs_team` (untagged or unknown) and withholds it; `lane_matches` takes the lane's record's team; a claim on another team's entry is refused (`--force` passes); the techlead seat carries `seat.tags`, and the tagging seat (first in the vocabulary's order) is due `by: tag` to tag them in one PR; a stale or missing declaration is `ao org check`'s. The home reads the declaration, never the definitions. Built by TD-762 (reader, lanes, claim, `ao repo`), TD-763 (the tagging seat, `entry.md`, `ao org check`) and TD-764 (the pages, `entry.team`).
+**Blocked by:** TD-762, TD-763, TD-764
+**Location:** `docs/design/4.4-host-agent.md` (*An entry names its team*, *Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
+
+**Why:** Paul, 2026-10-15: *when a TD is added to the ledger in shiftlead we can require that a team is selected (by the techlead if not beforehand by the user) … If TDs are added outside shiftlead, the host agent can identify them and send them to a techlead to have them resolved … We should also have a check for stale entries, e.g. team1 is assigned entries but is no longer defined.* Under TD-722 a repo has any number of teams (a db team and a compliance team), each with its own lanes, but an entry names only an `Owner:` role word. So two teams' grinders both take every pickable `Owner: grinder` entry. A claim keeps them off the same entry at once, but nothing keeps compliance work with the compliance team.
+
+**Fix:** a design round. What Paul and the session proposed (2026-10-15), for the designer to check against the design:
+1. **A `Team:` header field, not `Owner: <team>:<role>`.** `Owner:` is read by dev-cadence's synced `scripts/ledger.py` against a fixed word list in every cadence repo, ShiftLead or not. A field declared on the ledger's `Fields:` line is how `Waits` joined (TD-715), and dev-cadence reads past it. Its values are the repo's team names.
+2. **Required only where the repo has two or more teams**; one team is implied, so no existing entry is edited. `Owner: paul` entries carry none.
+3. **Set at Add entry**: the form's team pick, optional. Left blank, the techlead that drafts the entry writes it.
+4. **An entry with no `Team:` on a repo of several teams, or one naming a team no definition holds any more (stale)**, is withheld from every lane, as a waiting entry is (TD-715). The home hands it to a techlead of the repo's teams to tag. The Repo page lists it as *needs a team*, and `ao org check` names the stale ones.
+5. The lanes reader (`lane_matches` over `repo_lanes`) takes an entry only into its `Team:`'s lanes.
+
+**Done when** the design says how an entry names its team, how an untagged or stale one is found and resolved, and how the lanes read it, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-722, TD-721, TD-715, TD-707, TD-731.
+
+**Resolved:** 2026-10-16 (grinder-ao-2) — designed in #1893; its builds all merged: TD-762 in #1902, TD-763 in #1908 and TD-764, the last, in #1943, so it archives with it (§4.9c *A design entry archives with its last build*).
+
+---
+
+## TD-764: Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-730's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #1943
+**Blocked by:** TD-762, TD-740
+**Location:** design §4.5 screen 11 (*Technical debt*), §4.5a *Add entry form: Hand to the techlead*, §4.10 *An entry handed to a seat*, §4.7 `ao td add`; `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/plan`), the Repo page's templates; `src/sessionorc/agent_inbox.py` (`rpc_entry_add` ~L371); `src/shiftlead/cli.py` (`cmd_td_add` ~L2889, its `teams` list ~L2929 from `teams.entry_teams`)
+
+**Why:** TD-730. The person sees which entries need a team and which declared team is stale, and the form's Team pick reaches the ledger.
+
+**Fix:**
+- **Repo page**: a Technical debt row of a `needs_team` entry says *needs a team* after its owner; under the heading's lanes lines, the repo's *needs a team* line as `ao repo` prints it, and each stale-team note, read by the page from the definitions it already reads (*the ledger declares db, which no definition holds: TD-801*; *the ledger leaves out ops, which this repo defines*).
+- **The hand**: `entry_add` takes `team` and carries `entry: {repo, type, team}`; `/api/entry/hand` sends the form's Team pick (TD-740's field), empty when blank; blank hands to the first team with a techlead seat in `declared_teams`' order where the ledger declares one, else definition order (`repo_teams`), `declared_teams` read from the home's repo reading, as the page and `ao td add` already read the repo; `ao td add --team` naming no team of the repo is refused with the repo's team names; `ao td add --team <team>` hands to that team's seat and carries it.
+- **Tests** (in `tests/test_ui_repo*.py`, `tests/test_handed_entry.py` and `tests/test_ui_entry.py`): the row mark and the heading line; a stale note for a declared name no definition holds; the hand carries `entry.team` from the form and from `--team`, and blank carries it empty; a blank pick hands in the vocabulary's order; `--team` with an unknown name is refused.
+
+**Done when** the Repo page shows what needs a team and what is stale, Add entry's and `ao td add`'s team reaches the seat as `entry.team`, and every listed test passes.
+
+**Related:** TD-730, TD-762, TD-763, TD-740.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1943) — the Repo page's row says *needs a team* after its owner, and under the Technical debt heading's lanes lines are the repo's *needs a team* line (`team_notes`, as `ao repo` prints it) and each stale-team note (`teams.stale_teams`, shared with `ao org check`'s lacks); `entry_add` takes `team` and carries `entry: {repo, type, team}`, blank handing to the first team with a seat in the ledger's `Team` order (`teams.entry_teams`' `declared`), which `/api/entry/plan` and `ao td add` read from the home's repo reading; `ao td add --team` names the team or is refused with the repo's teams.
