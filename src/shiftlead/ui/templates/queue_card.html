@@ -1,0 +1,34 @@
+{# A Queue card (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*, *Queue page, Up next: grip /
+   ⤒ ↑ ↓*; TD-770), drawn by the Queue page and the Repo page alike. Its header is the top entry — id,
+   Priority badge, the whole title wrapped, then the holder's pill, its state, the count and the card's
+   status — and a press on it folds or opens the card (no chevron; the page remembers which). An Up next
+   card carries its place, a grip and ⤒ ↑ ↓; an In progress one a green stripe and *d/m done* where the
+   status would be. Amber is spent on what needs the person alone. #}
+{% from "queue_row.html" import row, pbadge, state, holder, extras, builds %}
+{% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
+<div class="qcard g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if c.rows %} hasrows{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %}>
+  <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if c.rows %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
+    <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
+    <span class="qplace">{{ c.place if c.place else '' }}</span>
+    <div class="qmain">
+    <span class="qid mono strong">{{ t.show }}</span>{{ pbadge(t.priority) }}
+    <span class="qtitle">{{ t.title }}</span>
+    <span class="qright">
+      {% if up %}<span class="qmoves"><button type="button" class="qmove" data-move="top" title="to the top of Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="up one card" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="down one card" aria-label="down one">↓</button></span>{% endif %}
+      {# the top entry's state where the card's own words do not already say it: *ready* is the status's,
+         a need the amber badge's, *held by X* the holder's pill #}
+      {{ extras(t.ext, repo) }}{{ holder(t.holder) }}{% if t.state and t.state != 'ready' and not t.needs and not t.state.startswith('held by') %}{{ state(t) }}{% endif %}
+      {% if c.group == 'in_progress' %}<span class="qcount qdone">{{ c.done }}/{{ c.of }} done</span>
+      {% else %}{% if c.of and c.of > 1 %}<span class="qcount meta">{{ c.of }} entries</span>{% endif %}
+        {% if c.status == 'needs you' %}<span class="qstatus needsyou">Needs you</span>{% elif c.status %}<span class="qstatus s-{{ c.status | replace(' ', '-') }}">{{ c.status }}</span>{% endif %}{% endif %}
+      {% if c.new %}<span class="meta">not on the Queue yet</span>{% endif %}
+    </span>
+    {{ builds(t.ext) }}
+    {% if c.pending and not c.not_landed %}<div class="qnote">moved — lands within a minute</div>{% endif %}
+    {% if c.not_landed %}<div class="qnote">not landed — retrying</div>{% endif %}
+    {% for f in c.passed_over or [] %}<div class="qnote">passed over by {{ f.name }}{% if f.why %}: {{ f.why }}{% endif %}</div>{% endfor %}
+    </div>
+  </div>
+  {% if c.rows %}<div class="qrows">{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}</div>{% endif %}
+</div>
+{% endmacro %}

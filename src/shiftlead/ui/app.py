@@ -367,6 +367,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     _tid,  # noqa: F401
     compact_in,  # noqa: F401
     completed_rows,
+    debt_cards,  # noqa: F401
     design_builds,  # noqa: F401
     doing_chips,
     entry_branch_exists,
@@ -1471,6 +1472,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         boards = hz["due"]
         # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
         lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
+        lists = ledger_lists(r, motion, lanes, now)
+        queue: dict[str, Any] | None = None
+        with contextlib.suppress(Exception):  # an older home or a node's link down: the kind lists stand
+            queue = await call("queue", omit=["completed"])
         ctx = {
             "r": r,
             "name": name,
@@ -1478,7 +1483,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "facet": facet,
             "teams": teams,
             "prs": pr_rows(r, members, standing, now, sessions),
-            "lists": ledger_lists(r, motion, lanes, now),
+            "lists": lists,
+            # the repo's Queue cards in rank order (§4.5 screen 11 item 2, TD-770); None: the kind lists
+            "cards": debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None,
+            # the board's decided lines, the lanes' work orders, above the cards (§4.5a *Repo page: decided lines*)
+            "orders": [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
             # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
             "completed": completed_rows(r, sessions, now),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
@@ -2454,6 +2463,20 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             raise HTTPException(400, "send {repo, id, release?}")
         # the home resolves the repo by the name its reading carries, the page's own (a refusal is the 400)
         got = await call("td_hold", repo=repo, id=ref, release=bool(body.get("release")))
+        return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
+
+    @app.post("/api/rank/move")
+    async def api_rank_move(request: Request):
+        """§4.5a *Queue page, Up next: grip / ⤒ ↑ ↓* and *Repo page: Technical debt cards* (TD-770):
+        `{ids, prev, next}` — the moved card's open members and the Up next cards now just before and
+        just after it in the whole order, each a member's `<repo>#TD-n` (none: the top, the end) — to the
+        home's `rank_move`, the person's (§4.4 *A move lands*). A refusal is a 400 in the home's words,
+        which the page draws under the heading as it puts the card back."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        ids = [str(i) for i in (body.get("ids") or []) if i] if isinstance(body, dict) else []
+        if not ids:
+            raise HTTPException(400, "send {ids, prev, next}")
+        got = await call("rank_move", ids=ids, prev=body.get("prev") or None, next=body.get("next") or None)
         return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
 
     @app.post("/api/ledger/start")
@@ -4009,6 +4032,10 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 run.to_all(run.live, ev)
             if run.full:
                 run.dirty.set()
+        elif ev.get("event") == "queue":
+            # the Queue's reading moved (§4.4 *Each reading has one owner*, TD-769): a page drawing cards
+            # re-reads them (the Repo page, TD-770); the reading itself stays at the home, a page asks
+            run.to_all(run.live, {"event": "queue"})
         elif ev.get("event") == "gone":
             # only a `gone` names a session; a `usage` event carries a profile, and popping on it
             # would one day evict a live session by coincidence

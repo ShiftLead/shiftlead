@@ -780,3 +780,68 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .transcript .tcompact, .transcript .tearlier { text-align: center; padding: 8px; }
 /* the find's matched words (TD-280): a highlight that reads in both themes, the text's own colour */
 mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px; padding: 0 1px; }
+/* The Queue's cards (design §4.5 screen 12 *A card*, TD-770), drawn on the Repo page and the Queue page:
+   the header the top entry, the rows two letters in a level. Amber is spent on what needs the person
+   alone; In progress carries a green stripe; every other state is a word with a small mark, *stalled*
+   a grey dashed one; nothing is red. The rank number is large at a quarter strength in its own column. */
+.qcards { border: 1px solid var(--line); border-radius: 6px; background: var(--card); overflow: hidden; }
+.qcard { border-top: 1px solid var(--line); border-left: 3px solid transparent; }
+.qcard:first-child { border-top: 0; }
+.qcard.g-in_progress { border-left-color: var(--working); }
+.qcard.st-needs-you { border-left-color: var(--needs); }
+.qcard.st-needs-you > .qhead { background: var(--warn-bg); }
+.qcard.hasrows:not(.folded) > .qhead { background: var(--hover); }
+.qcard.st-needs-you.hasrows:not(.folded) > .qhead { background: var(--warn-bg); }
+.qcard.dragging { opacity: .45; }
+.qcard.dropbefore { box-shadow: inset 0 3px 0 var(--link); }
+.qcard.dropafter { box-shadow: inset 0 -3px 0 var(--link); }
+.qhead { display: grid; grid-template-columns: 1.4em 2.6em 1fr; column-gap: 8px; align-items: baseline; padding: 9px 14px 9px 4px; }
+.qhead[role="button"] { cursor: pointer; }
+.qgrip { color: var(--ended); cursor: grab; letter-spacing: -.2em; font-size: var(--t-small); user-select: none; }
+.qplace { font-size: calc(var(--t-body) * 2); font-weight: 600; line-height: 1; color: var(--fg); opacity: .25; text-align: right; }
+/* the id, badge and title on one line, the words at the right on it when they fit, else under it */
+.qmain, .qrow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.qid { flex: none; white-space: nowrap; font-size: var(--t-mono-s); }
+.qtitle { flex: 1 1 18em; min-width: 0; overflow-wrap: anywhere; }
+.qhead .qtitle { font-weight: 600; }
+.qright { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; justify-content: flex-end; margin-left: auto; font-size: var(--t-small); }
+.qright > .meta { white-space: nowrap; font-family: inherit; font-size: var(--t-small); }
+.qbuilds, .qnote { flex: 1 0 100%; padding-left: calc(6ch + 2.4em); font-size: var(--t-small); color: var(--muted); }
+.qpri { display: inline-block; min-width: 1.3em; padding: 0 3px; border-radius: 3px; text-align: center; font: 600 var(--t-cap)/1.5 "JetBrains Mono", monospace; color: var(--seg-fg); background: var(--p-medium); }
+.qpri.qp-high { background: var(--p-high); } .qpri.qp-low { background: var(--p-low); color: var(--p-high); } .qpri.qp-none { background: var(--ended); }
+.qmoves { display: inline-flex; gap: 2px; }
+.qmove { border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit; padding: 0 4px; border-radius: 3px; }
+.qmove:hover, .qmove:focus-visible { background: var(--hover); color: var(--fg); }
+.qpill { white-space: nowrap; color: var(--working-fg); }
+.qpill::before { content: "● "; color: var(--working); }
+.qstate { white-space: nowrap; color: var(--muted); }
+.qstate.needs { color: var(--needs-fg); font-weight: 600; }
+.qstate.s-stalled { border-bottom: 1px dashed var(--ended); }
+.qstate.done { color: var(--done-fg); }
+.qcount { white-space: nowrap; }
+.qcount.qdone { color: var(--working-fg); font-weight: 600; }
+.qcount.qdone::before { content: "● "; color: var(--working); }
+.qstatus { white-space: nowrap; color: var(--strong); }
+.qstatus::before { content: "● "; color: var(--ended); }
+.qstatus.s-ready::before { color: var(--idle); } .qstatus.s-waiting::before { color: var(--waiting); }
+.qstatus.s-blocked::before { content: "○ "; color: var(--muted); }
+.qstatus.s-stalled { border-bottom: 1px dashed var(--ended); } .qstatus.s-stalled::before { content: ""; }
+.qstatus.needsyou { padding: 1px 9px; border-radius: 10px; background: var(--needs); color: #3b2300; font-weight: 600; }  /* dark on amber in both themes */
+.qstatus.needsyou::before { content: ""; }
+.qrows { padding: 2px 0 8px; }
+.qcard.folded .qrows { display: none; }
+.qrow { padding: 4px 14px 4px calc(4em + 20px + var(--qd, 1) * 2ch); }
+.qrow.archived .qtitle, .qrow.archived .qid { color: var(--muted); }
+.qrow.stalled { border-left: 2px dashed var(--ended); }
+.qrow:target, .qhead:target { background: var(--alarm-bg); }
+.qbuilds .bstate { color: var(--muted); }
+.qwhy { margin: 4px 0 8px; color: var(--needs-fg); }
+#debt .rlist + .qcards { margin-top: 8px; }
+@media (max-width: 720px) {
+  .qhead { grid-template-columns: 1em 1.6em 1fr; column-gap: 6px; }
+  .qplace { font-size: calc(var(--t-body) * 1.4); }
+  .qtitle { flex: 1 1 0; min-width: 8em; }
+  .qright { margin-left: 0; justify-content: flex-start; flex-basis: 100%; }
+  .qbuilds, .qnote { padding-left: 0; }
+  .qrow { padding-left: calc(2.6em + var(--qd, 1) * 1ch); }
+}

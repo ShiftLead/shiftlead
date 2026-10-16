@@ -338,6 +338,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-16 (TD-770, grinder-ao-2): screen 11's Technical debt built as the repo's Queue cards (`queue_card.html`, `queue_row.html`, which screen 12 reuses); the kind lists stand only where the home serves no Queue reading, and an entry no card holds yet is drawn as a card of its own, *not on the Queue yet*.
 - 2026-10-16 (TD-787, the designer; the fix agreed with Paul over Fable rounds 1–4 and Sonnet rounds 1–3 when it was filed): screen 11's Open PRs reads *unasked · 17h* (amber) for a green held PR nobody has asked, naming the reader to ask; the blank no longer stands for both. Built by TD-790.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): screen 12, the **Queue**, added; screen 6's ledger rows and held rows move to their cards, and *Where a row is drawn* tags each row `home: inbox|queue` while the numbers stay the Inbox's; *It is a queue* reads *Nothing leaves it without an answer*; screen 11's Technical debt becomes the repo's cards in Queue order. Built by TD-769–TD-771.
 - 2026-10-15 (TD-761, the designer): an idle session with a background shell reads *working · 1 shell*.
@@ -466,6 +467,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-16 (TD-770, grinder-ao-2): *Repo page: Technical debt cards* and *Queue page, Up next: grip / ⤒ ↑ ↓* built on the Repo page (`/api/rank/move` to `rank_move`); *Repo page: decided lines* are listed above the cards.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): rows *Org top bar: Queue tab*, *Queue page: card*, *Queue page, Up next: grip / ⤒ ↑ ↓*, *Queue page, Recently completed: 4 h · day · week · month*, *Queue page: filters, find*, *Queue card: Lift the hold*, *Queue card: passed over*, *Queue page, In progress: other work*, *Repo page: Technical debt cards*; the ledger, held and *Later* rows point at the Queue; *Settings* tab now after Queue.
 - 2026-10-15 (TD-761, the designer): *Close session* waits for a background shell, which fails Ready to close.
 - 2026-10-15 (TD-730, the designer): *Add entry form: Hand to the techlead* carries `entry.team`, the Team pick, and the filed entry's `Team:` line names it.
