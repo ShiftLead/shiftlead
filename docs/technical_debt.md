@@ -1641,7 +1641,7 @@ The other cases:
 **Kind:** build
 **Status:** Open
 **Blocked by:** TD-762, TD-740
-**Location:** design §4.5 screen 11 (*Technical debt*), §4.5a *Add entry form: Hand to the techlead*, §4.10 *An entry handed to a seat*, §4.7 `ao td add`; `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/plan`), the Repo page's templates; `src/sessionorc/agent_inbox.py` (`rpc_entry_add` ~L371); `src/shiftlead/cli.py` (`ao td add`, its `teams` list ~L2892)
+**Location:** design §4.5 screen 11 (*Technical debt*), §4.5a *Add entry form: Hand to the techlead*, §4.10 *An entry handed to a seat*, §4.7 `ao td add`; `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/plan`), the Repo page's templates; `src/sessionorc/agent_inbox.py` (`rpc_entry_add` ~L371); `src/shiftlead/cli.py` (`cmd_td_add` ~L2889, its `teams` list ~L2929 from `teams.entry_teams`)
 
 **Why:** TD-730. The person sees which entries need a team and which declared team is stale, and the form's Team pick reaches the ledger.
 
