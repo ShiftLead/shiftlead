@@ -204,6 +204,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     SHOT_WAIT,  # noqa: F401
     SHOTS_MAX,  # noqa: F401
     STATE_SUBJECTS,  # noqa: F401
+    STOPPED_BY,  # noqa: F401
     USER_BILLING,  # noqa: F401
     WORK_IDS,  # noqa: F401
     WORKS,  # noqa: F401
@@ -235,6 +236,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _shot_on_origin,  # noqa: F401
     _shot_seen,  # noqa: F401
     _subject_of,  # noqa: F401
+    _team_wound,  # noqa: F401
     _trail_rows,  # noqa: F401
     _with_subject,  # noqa: F401
     billing_url,  # noqa: F401
@@ -365,6 +367,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     LEDGER_LISTS,  # noqa: F401
     LOCAL_ID,  # noqa: F401
     PRIORITY_RANK,  # noqa: F401
+    _stopped,  # noqa: F401
     _tid,  # noqa: F401
     compact_in,  # noqa: F401
     completed_rows,
