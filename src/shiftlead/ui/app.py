@@ -1504,7 +1504,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "groups": items,  # the Org's items, drawn by its partials (TD-740)
             "facet": facet,
             "teams": teams,
-            "prs": pr_rows(r, members, standing, now, sessions),
+            "prs": pr_rows(r, members, standing, now, sessions, [g["members"] for g in serving]),
             "lists": lists,
             # the repo's Queue cards in rank order (§4.5 screen 11 item 2, TD-770); None: the kind lists
             "cards": debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None,

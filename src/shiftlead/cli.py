@@ -1605,6 +1605,18 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
     return {str(pr): st["word"] for pr, st in reviewmod.standing(seats, _age).items()}
 
 
+def _org_order(names: set[str], members: list[dict[str, Any]]) -> list[str]:
+    """A repo's teams in the Org page's order (`ui.repo.org_layout`, TD-790): the teams with a live
+    crew first, then the rest, each in the org file's definition order, and a badge no definition
+    holds last, by name. An org that cannot be read orders them by name alone."""
+    try:
+        defs = list(_org_notes()[0].teams)
+    except Exception:  # noqa: BLE001 — the order is a nicety: the lists stand without it
+        defs = []
+    up = {s["team"] for s in members if not teamrun.persons(s) and s.get("state") not in teamrun.DEAD}
+    return sorted(names, key=lambda t: (t not in up, defs.index(t) if t in defs else len(defs), t))
+
+
 PICK_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
@@ -1746,6 +1758,8 @@ def cmd_repo(args: argparse.Namespace) -> int:
     ages and the reader's standing, the window counts, the pickable and design entries, what
     the servicing team's members hold and say, and the board items due. A read, never a write;
     `ao repo init` is the one word that writes (`cmd_repo_init`)."""
+    from shiftlead import review as reviewmod
+
     if args.name == "init":
         return cmd_repo_init(args)
     if args.repo:
@@ -1771,7 +1785,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
             members = [
                 s for s in fleet if s.get("team") and s.get("repo") and pathlib.Path(s["repo"]).resolve() == root
             ]
-            teams = sorted({s["team"] for s in members})
+            teams = _org_order({s["team"] for s in members}, members)
             calls = [e for t in teams for e in log.get(t, [])]
             r["teams"] = teams
             r["doing"] = sorted(calls, key=lambda e: str(e.get("at") or ""), reverse=True)
@@ -1783,6 +1797,17 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 if isinstance(p, dict) and p.get("status") == "claimed"
             ]
             r["standing"] = _pr_standing(members)
+            # a held PR nobody asked, the reading's tag (§4.4 *A held PR nobody asked is marked, never ordered*, TD-790)
+            by_team = [[s for s in members if s["team"] == t] for t in teams]
+            asked = (r.get("pr_orders") or {}).get("asked") or {}
+            for p in (r.get("prs") or {}).get("open") or []:
+                if not isinstance(p, dict) or not isinstance(p.get("number"), int):
+                    continue
+                p["asked"] = asked.get(str(p["number"]))
+                p["unasked"] = p["number"] in ((r.get("pr_orders") or {}).get("unasked") or [])
+                p.setdefault("held", None)
+                if str(p["number"]) not in r["standing"] and (tag := reviewmod.unasked(r, p["number"], by_team)):
+                    p["unasked_line"] = f"unasked {_age(tag['created'])} — {reviewmod.unasked_hint(p['number'], tag)}"
             r["board"] = _board_due(r)
             # the board's decided lines are in the lanes beside the entries (§4.4 *Board write-back*, TD-384)
             r["lanes"] = teamrun.repo_lanes(teamrun.lane_entries(r), root, fleet)
@@ -1822,7 +1847,7 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     draft = f" (draft · red since {w['red_since']}: {teamrun.DRAFT_WHOSE})"
                 age = _age(p.get("created") or "")
                 print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
-                if st := (r.get("standing") or {}).get(str(p["number"])):
+                if st := (r.get("standing") or {}).get(str(p["number"])) or p.get("unasked_line"):
                     print(f"         {st}")
             # a sync PR's order before everything (§4.4 *A sync PR is the team's at once*, TD-684): the
             # cadence's own files wait behind it
@@ -2281,6 +2306,46 @@ def _own_session(args: argparse.Namespace) -> str | None:
     return sid
 
 
+def _repo_hold(rec: dict[str, Any], n: int) -> str:
+    """What the home's reading of the record's repo says of PR `n` beside a *not held* answer (design
+    §4.7 `ao pr held`, §4.4 *A held PR nobody asked is marked, never ordered*, TD-790): the repo-level
+    mark, read from the `repos` RPC — never a key derived or a file read here. "" for nothing to say:
+    no reading of the repo (a node's checkout), a PR the reading does not list, or one it holds nothing of."""
+    if not rec.get("repo"):
+        return ""
+    try:
+        got = call_sync("repos") or {}
+    except AgentError:
+        return ""
+    if not isinstance(got, dict):
+        return ""
+    root = str(pathlib.Path(str(rec["repo"])).resolve())
+    r = next(
+        (
+            x
+            for k, x in got.items()
+            if isinstance(x, dict) and str(pathlib.Path(str(x.get("root") or k)).resolve()) == root
+        ),
+        None,
+    )
+    if r is None:
+        return ""
+    p = next((x for x in (r.get("prs") or {}).get("open") or [] if isinstance(x, dict) and x.get("number") == n), None)
+    if p is None:
+        return ""
+    if not isinstance(p.get("held"), list):
+        return "the repo's hold is not yet read"
+    orders = r.get("pr_orders") or {}
+    path = ", ".join(f"`{x}`" for x in p["held"][:3]) + (
+        f" and {len(p['held']) - 3} more" if len(p["held"]) > 3 else ""
+    )
+    if n in (orders.get("unasked") or []):
+        return f"the repo holds {path}: the Repo page tags it unasked until a reader is asked"
+    if isinstance(a := (orders.get("asked") or {}).get(str(n)), dict) and p["held"]:
+        return f"the repo holds {path}: asked of {a.get('to')} {_age(str(a.get('at') or ''))} ago"
+    return ""
+
+
 def cmd_pr(args: argparse.Namespace) -> int:
     """`ao pr held <n>` (design §4.9b *The reader*, TD-093): whether PR `n` waits for this
     session's reader — its record's `review`, checked against the PR's changed files. Read by the
@@ -2319,6 +2384,8 @@ def cmd_pr(args: argparse.Namespace) -> int:
             asks, unread = None, str(e)
         walked = reviewmod.walk(links, asks)
         out.update(walked, unread=unread)
+    if not paths:
+        out["repo_hold"] = _repo_hold(rec, args.n)
 
     def prose() -> None:
         if not setting:
@@ -2342,6 +2409,8 @@ def cmd_pr(args: argparse.Namespace) -> int:
                 f"PR #{args.n} is held for the {setting['reader']} (bound {setting['bound']}): {shown}\n"
                 f'ask it: ao msg --kind ask --pr {args.n} <reader> "<your summary>"'
             )
+        if out.get("repo_hold"):  # the repo-level mark beside a *not held* answer (TD-790)
+            print(out["repo_hold"])
 
     return emit(args, out, prose)
 

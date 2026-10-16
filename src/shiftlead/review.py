@@ -18,8 +18,8 @@ from typing import Any
 # the glob match, the files read and `addressed` are `sessionorc`'s since §6 rule 11 reads them at
 # the home (TD-258 slice 2; TD-349 for a chain): the package rule runs one way, so `ao pr held`
 # reads them from there
-from sessionorc.held import GH_TIMEOUT, addressed, held_paths, matches, pr_files  # noqa: F401
-from sessionorc.models import review_links
+from sessionorc.held import GH_TIMEOUT, addressed, held_paths, match, matches, pr_files  # noqa: F401
+from sessionorc.models import PERSON, review_links
 
 
 def setting(review: Any) -> dict[str, Any] | None:
@@ -125,6 +125,56 @@ def standing(seats: list[tuple[str, list[Any], list[Any]]], age: Callable[[str],
         cls = "wait" if any(x["wait"] for x in parts) else "done"
         out[pr] = {"word": " · ".join(x["word"] for x in parts), "cls": cls}
     return out
+
+
+def unasked_reader(teams: list[list[dict[str, Any]]], held: list[str]) -> str | None:
+    """The reader an *unasked* PR's tag names (design §4.4 *A held PR nobody asked is marked, never
+    ordered*, TD-790), for the Repo page and `ao repo` alike: `teams` the servicing teams' members, in
+    the Org's order, and `held` the PR's held paths. The first team whose members' `review` holds a
+    touched path gives it: the first link whose `held` matches one of the paths (as `ao pr held` walks
+    a chain, so under named sets a `ui` stage is not named for a PR outside its set), that link's
+    seat by name — the team's member named so, else carrying it as its role — else `person` (a team
+    without a seat). None where no servicing team has a reader."""
+    for members in teams:
+        links = [x for m in members for x in review_links(m.get("review"))]
+        if not links:
+            continue
+        link = next((x for x in links if match(held, x.get("held") or ["**"])), None)
+        if link is None:
+            continue
+        reader = str(link.get("reader") or "")
+        if reader == PERSON:
+            return PERSON
+        named = [str(m.get("name") or "") for m in members]
+        if reader in named:
+            return reader
+        seat = next(
+            (m for m in members if m.get("role") == reader and (m.get("seat") or m.get("role") == "techlead")), None
+        )
+        return str(seat.get("name") or seat["id"]) if seat else PERSON
+    return None
+
+
+def unasked(r: dict[str, Any], number: int, teams: list[list[dict[str, Any]]]) -> dict[str, Any] | None:
+    """The *unasked* tag of open PR `number` in the reading `r` (§4.4, §4.5 screen 11, TD-790): the PR
+    is in the reading's `pr_orders.unasked` — never re-derived here — and a servicing team has a
+    reader. `paths` the PR's held paths, `reader` as `unasked_reader` names it, `created` the PR's.
+    None otherwise: the tag is drawn nowhere."""
+    if number not in ((r.get("pr_orders") or {}).get("unasked") or []):
+        return None
+    p = next(
+        (x for x in (r.get("prs") or {}).get("open") or [] if isinstance(x, dict) and x.get("number") == number), None
+    )
+    paths = [str(x) for x in (p or {}).get("held") or []]
+    reader = unasked_reader(teams, paths)
+    if reader is None:
+        return None
+    return {"paths": paths, "reader": reader, "created": str((p or {}).get("created") or "")}
+
+
+def unasked_hint(number: int, tag: dict[str, Any]) -> str:
+    """What the tag's title, and `ao repo`'s line after the age, tell the author (§4.5 screen 11)."""
+    return f"post its review, then ao msg --kind ask --pr {number} {tag['reader']}"
 
 
 _REMOTE = re.compile(
