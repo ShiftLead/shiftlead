@@ -218,7 +218,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `every`, `work`, **`tag`** — the repo's tagging seat while the reading's `needs_team` holds
      ids not yet filled for, `seat_due: {at, by: tag, ids}` and `seat_filled` keeping `{by: tag,
      ids}`, so a fill is once per set of ids (§4.4 *An entry names its team*, TD-730) — and `prompt`, the org's director seat's alone: due while a prompt no rule of the
-     person's answered is pending on an unattended record of the org, cleared when none is, §4.9b
+     person's answered is pending on an unattended record of the org whose adapter has a permission
+     channel (§4.3 `permission_channel`: one without it is the terminal's, never the seat's), cleared when none is, §4.9b
      *The director seat*, TD-636; the director's seat is also due by `asks` while a question passed
      up to it is open in its inbox, and by **`groom`** once `director.groom` has passed since its last
      groom pass concluded (with none concluded, at once) or at a press of **Groom now**, never while
@@ -262,7 +263,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      records and never of a screen: **`asks`**, as the techlead's — an open `ask` or `steer`
      addressed to it (`asks_waiting` leaves zero); **`pending`** — a member of its team (a
      supervised record listing it in `controllers`) hook-confirmed `needs-you` with a `permission`
-     pending (a question or a menu fills nothing: it is a person's, and the Inbox's state row has
+     pending, its adapter having a permission channel (§4.3 `permission_channel`: one without it is
+     the terminal's, never the seat's; a question or a menu fills nothing: it is a person's, and the Inbox's state row has
      it); **`stalled`** — a member `stalled?`; **`open`** — a member *idle · open work*:
      `nudged_at` set and the member still hook-confirmed idle `IDLE_NUDGE` after it with the same
      work open, which the tick writes as **`idle_open: {at, ref}`** on the member's record
