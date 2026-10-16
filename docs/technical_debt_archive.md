@@ -13306,3 +13306,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-731, #1861.
 
 **Resolved:** 2026-10-15 — two tests in `tests/test_settle.py`: `test_a_pr_is_read_only_from_a_declared_claim` (a derived `claimed` line carrying #1842 names no reader) and `test_pre_holding_an_id_already_held_keeps_its_hold`; each fails under its mutation and passes on main.
+
+## TD-753: `test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_once` is flaky on CI: the first tick's promote pass outlives `park_ticks` and overwrites the test's `_promotes`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-1, on #1875's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_repo_facts.py` (`test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_once`); `src/sessionorc/agent_tick.py` (`_refresh_repos`, the tick's detached `_promote_task`), `src/sessionorc/agent_promote.py` (`_refresh_promotes`)
+
+**Why:** #1875's CI, run 38832457100 attempt 1 (test (3.12), 2026-10-16T01:06Z UTC), failed `assert handed == [None, {"r": "abc"}]` with `[{}, {}]`; it passed on the re-run and five times locally. `park_ticks` cancels the tick loop, but not the passes a tick already started as tasks. The fixture's first tick starts `_refresh_promotes`. Where that pass is slow, it ends after the test has set `_promotes = {"r": {"live": "abc"}}` and `_promotes_read = False`. It then writes its own reading (`{}`, no repo registered) and `_promotes_read = True`. That happens during `_refresh_repos`'s first await (`_ledger_mtimes`), before `live` is read, so both calls hand `{}`. This is reproduced deterministically by making `promote.survey` wait until `_ledger_mtimes` is called. It is the same family as TD-695 (`test_sync_pass.py`'s first-tick tasks).
+
+**Fix:** the test awaits the first tick's `_promote_task` and `_repos_task` after `park_ticks`, before it sets the state they write, as `test_sync_pass.py`'s fixture does.
+
+**Done when** the test passes under the deterministic reproduction above.
+
+**Related:** TD-695, TD-463, TD-752.
+
+**Resolved:** 2026-10-15 — the test awaits both first-tick tasks. It passed under the reproduction, which fails without the fix. The reproduction was a scratch test, not committed.

@@ -1087,6 +1087,9 @@ async def test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_on
     """TD-516: `_refresh_repos` hands `_read_repos` no live commits (`None`, unknown) until the promote
     pass has assigned its readings since the start, and the promote's live commits after."""
     await park_ticks(agent)
+    for task in (agent._promote_task, agent._repos_task):  # TD-753: the first tick's passes, finished before
+        if task is not None:  # the test sets `_promotes`, which an in-flight promote pass overwrote on CI
+            await task
     _register(repo)
     monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
     handed = []
