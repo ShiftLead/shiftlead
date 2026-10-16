@@ -77,7 +77,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
-| TD-773 | The pre-start lane count reads an entry's team through no test: `teamrun.lanes` passes the team name to `lane_matches` and nothing fails without it (#1902) | Low | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
 | TD-776 | The tagging seat's tag cause and its seat choice (#1908) are held by no test in four lines: the unchanged-ids due kept, a repo with no reading keeping its due, and the seat's supervised, unattended, superseded and suspended filters | Low | Open |
 | TD-777 | `teamrun.tagging_seat` (`ao repo`'s *handed to* line) and `orgcheck.team_lacks` (#1908) are held by no test in four lines: the declared-team order, the live-seat filters, the case-folded declared name, and the unparsed ledger's silence | Low | Open |
@@ -1628,26 +1627,6 @@ The other cases:
 **Done when** the three readings are written in this entry's Status and Paul's decision is recorded.
 
 **Related:** TD-748, TD-771, TD-460 (the same shape of trial read).
-
----
-
-## TD-773: The pre-start lane count reads an entry's team through no test: `teamrun.lanes` passes the team name to `lane_matches` and nothing fails without it (#1902)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1902)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/teamrun.py` (`lanes`, `ledger_mod.lane_matches(x.lane, e, name)`); `tests/test_cli_teams.py`, `tests/test_entry_team.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1902's (TD-762) lines one at a time. Deleting the `name` argument in `lanes` (`lane_matches(x.lane, e, name)` → `lane_matches(x.lane, e)`) leaves every test green: 409 pass with `-k "team or lanes or lane"` over `tests/`, and 92 pass over `tests/test_cli_teams.py`, the only file that calls `teamrun.lanes`. The docstring of `lane_matches` says an entry with a `team` matches only a lane of that team, so the Start's *what the lanes hold, before the start* line would count another team's entries and a `needs_team`-withheld one's team-less sibling as the team's own. Every other call site #1902 changed fails a test when reverted (`rpc_progress`'s `team_refusal`, `in_lanes`' `withheld` and `ours`, `cli`'s `needs_team` withheld count); this one has none, and `tests/test_entry_team.py` never reaches `teamrun.lanes`.
-
-**Fix:** in `tests/test_cli_teams.py`, beside the existing `lanes` tests: a repo reading holding one entry tagged for the team and one tagged for another, and the team's plan; the line and `roles[...]["n"]` count only the team's. Fails under the mutation above.
-
-**Done when** the test exists and fails with the `name` argument removed.
-
-**Related:** TD-762, TD-730, #1902.
 
 ---
 

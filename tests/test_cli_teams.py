@@ -2348,6 +2348,32 @@ def test_a_start_counts_every_lane_it_creates_by_kind_the_managers_too(world, ca
     assert picks["line"] == "manager: 0 · grinder: 0 · hunter: 0" and picks["empty"] is True
 
 
+def test_the_lanes_line_counts_only_the_teams_own_entries(world, capsys):
+    """§4.4 *An entry names its team* (TD-730, TD-762; TD-773): the pre-start count reads each entry's
+    `team` against the team starting — an entry tagged for another team is not its lane's, one tagged for
+    it (case-folded) or untagged is — so the line and `roles[...]["n"]` hold only the team's own."""
+    tmp_path, state = world
+    checkout = str(tmp_path / "shiftlead")
+    build = {"pickable": "yes", "kind": "build", "owner": "grinder", "for_page": "pickable"}
+    state["repos"] = {
+        checkout: {
+            "ledger": {
+                "entries": [
+                    {**build, "id": "TD-1", "team": "AO-Grind"},
+                    {**build, "id": "TD-2"},
+                    {**build, "id": "TD-3", "team": "ops"},
+                    {**build, "id": "TD-4", "team": "ops"},
+                ]
+            }
+        }
+    }
+    picks = teamrun.lanes(cli.call_sync, cli._org_here(), "ao-grind", HOST)
+    assert picks["roles"]["grinder"]["n"] == 2, "TD-3 and TD-4 are ops' entries, not ao-grind's"
+    assert "grinder: 2 pickable" in picks["line"]
+    assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
+    assert json.loads(capsys.readouterr().out)["lanes"]["roles"]["grinder"]["n"] == 2
+
+
 # ── a team its repo's ledger does not declare (§4.4 *The move from one team to two*, TD-763) ─────
 
 
