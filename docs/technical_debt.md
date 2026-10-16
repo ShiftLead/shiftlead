@@ -72,6 +72,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
 | TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
+| TD-753 | `tests/test_claude_adapter.py::test_model_in_use_reads_the_last_top_level_assistant_turn` fails when its module is run alone: `short_model("claude-code", …)` reads an empty adapter registry, so it passes only after another module has loaded the adapters | Low | Open |
 
 ---
 
@@ -1465,5 +1466,25 @@ The other cases:
 **Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
 
 **Related:** TD-108, TD-748.
+
+---
+
+## TD-753: `test_model_in_use_reads_the_last_top_level_assistant_turn` fails when `tests/test_claude_adapter.py` is run alone: `short_model("claude-code", …)` reads an empty adapter registry
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing the tests of #1864–#1872)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_claude_adapter.py` (the last two `short_model` asserts of `test_model_in_use_reads_the_last_top_level_assistant_turn`), `src/sessionorc/adapters.py` (`get`: `load_all()` only `if not _REGISTRY`)
+
+**Why:** `test-audit-ao-1`, 2026-10-15, on `origin/main` (`08944413`): `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_claude_adapter.py` → `1 failed, 35 passed`, three runs out of three, the failure at `assert short_model("claude-code", "claude-fable-5-1") == "fable-5-1"` (got `'claude-fable-5-1'`). Cause, shown with `python -c "from sessionorc import adapters as a; import shiftlead.adapters.claude_code; a.get('claude-code')"` → `KeyError: unknown adapter 'claude-code'; known: ['command', 'shell']`: the two built-ins register at import, so `_REGISTRY` is never empty and `get` never calls `load_all()`; `short_model` swallows the `KeyError` and returns the name as observed. The assert passes in the full suite only because some earlier module has already loaded the adapters, so it is a test that depends on run order (the module has held the assert since TD-031, #72). Run alone, as a worker does to check its own change, it reads as a failure in a module nobody touched.
+
+**Fix:** have the test name its dependency: call `adapters.load_all()` (or register `ClaudeCodeAdapter`) before the `short_model` asserts, or in a module fixture. Not a change to `get` — whether the registry should load built-ins lazily is a design question for the adapter owner, and is not this entry's.
+
+**Done when** `pdm run pytest -q tests/test_claude_adapter.py` passes alone, and the full `pdm run test` still does.
+
+**Related:** TD-031, #72.
 
 ---
