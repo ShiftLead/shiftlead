@@ -446,12 +446,13 @@ def entries(
             e["built"] = built(fields.get("kind", ""))
             e["live"] = "yes" if live is not None and e["built"] and all(live(n) for n in e["built"]) else "no"
         e["for_page"] = kind_of(e)
+        # an Inbox row's reading (TD-565) on every open entry: a hold is marked after the parse, and a
+        # held row opens with its Why and Fix (§4.5 screen 6 *A held entry waits on the person too*, TD-736)
+        added = DATE.search(fields.get("added", ""))
+        e["added"] = added.group(0) if added else ""
+        e["detail"] = detail_of(t[m.end() : nxt.start() if nxt else len(t)])
         if e["for_page"] == "for-you":
-            # the Inbox row's reading (TD-565), on these entries alone so the repo facts barely grow
-            added = DATE.search(fields.get("added", ""))
-            e["added"] = added.group(0) if added else ""
             e["answers"], e["default"] = answers_of(fields.get("answers", ""))
-            e["detail"] = detail_of(t[m.end() : nxt.start() if nxt else len(t)])
         out.append(e)
     return out
 

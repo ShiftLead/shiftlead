@@ -307,10 +307,11 @@ def test_a_pass_that_rereads_one_repo_still_resolves_among_the_whole_registry(tm
 
 
 def test_a_for_you_entry_carries_added_answers_and_detail():
-    """§4.4 *Repo facts* (TD-565): a *for you* entry's reading carries `added` (its `Added:` date),
-    `answers` and `default` (its `**Answers:**` line in cadence §3.5's form, `\\|` a literal bar, the
-    one ` (default)` marked — none when two are, as the board's reader gives it) and `detail` (its
-    **Why** and **Fix** paragraphs, clipped at `MAX_DETAIL_LINES`); no other entry carries any of them."""
+    """§4.4 *Repo facts* (TD-565, TD-736): every open entry's reading carries `added` (its `Added:` date)
+    and `detail` (its **Why** and **Fix** paragraphs, clipped at `MAX_DETAIL_LINES`), since a hold is
+    marked after the parse and a held row opens with them; a *for you* entry's carries `answers` and
+    `default` too (its `**Answers:**` line in cadence §3.5's form, `\\|` a literal bar, the one
+    ` (default)` marked — none when two are, as the board's reader gives it), and no other entry's."""
     fix = "\n".join(f"{n}. step" for n in range(1, 30))
     text = (
         "## TD-050: mine\n\n**Priority:** Low\n**Added:** 2026-10-07 (the designer)\n**Owner:** paul\n\n"
@@ -332,5 +333,6 @@ def test_a_for_you_entry_carries_added_answers_and_detail():
     assert ledger.answers_of("A | (default)") == (["A"], None)
     assert mine["detail"][:3] == ["**Why:** the reason,", "over two lines.", "**Fix:**"]
     assert len(mine["detail"]) == ledger.MAX_DETAIL_LINES
-    assert not {"added", "answers", "default", "detail"} & set(build)
+    assert not {"answers", "default"} & set(build)
+    assert (build["added"], build["detail"]) == ("2026-10-07", ["**Why:** x"])
     assert (bare["added"], bare["answers"], bare["default"], bare["detail"]) == ("", [], None, [])

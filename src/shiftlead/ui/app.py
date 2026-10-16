@@ -2348,9 +2348,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/ledger/hold")
     async def api_ledger_hold(request: Request):
-        """§4.5a *Repo page: Hold / Release on a settling entry* (TD-707, built by TD-710 slice 3):
-        `{repo, id, release?}` — the repo by its name, as the page names it — to the home's `td_hold`,
-        the person's own act on its settle clock, no ledger edit. A refusal (*TD-707 has settled*) is
+        """§4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry* (TD-707, built by
+        TD-710 slice 3 and TD-736): `{repo, id, release?}` — the repo by its name, as the page names it —
+        to the home's `td_hold`, the person's own act on its settle clock, no ledger edit; the reply's
+        `told`, `readers` and `untold` are the Hold toast's. A refusal (*TD-707 has settled*) is
         the toast's, a 400 in its words; the row's mark moves on the next repo reading's push."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         repo, ref = (str(body.get("repo") or ""), str(body.get("id") or "")) if isinstance(body, dict) else ("", "")

@@ -947,13 +947,16 @@
    sends its **index**, **Go with it** the default, **Reply** the composer's words, each `ledger_decide`,
    which writes one decided line on the repo's board: the row leaves once the reading lists it.
    **Start session** (TD-678) is the person's own session on the entry, or the filled New session form;
-   **Open session** while a member holds it, that session's Focus. **Open** is the Repo page on the id. #}
+   **Open session** while a member holds it, that session's Focus. **Open** is the Repo page on the id.
+   A held entry (§4.5a **Inbox row: held entry**, TD-736) carries `release`: **Release** beside **Open**,
+   the Repo page's `td_hold` with `release`. One not *for you* is of the kind *ledger · held*, its age the
+   hold's, *claimed by* while a member's claim stands, and nothing else: it waits for a Release. #}
 {% macro ledger(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.name }}'s ledger">{{ e.name }}</span>
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-ledger">{{ e.kind }}</span>
-  {%- if e.held %} <span class="st">held by {{ e.held }}</span>{% endif %}
+  {%- if e.held %} <span class="st">{{ 'claimed by' if e.claimed else 'held by' }} {{ e.held }}</span>{% endif %}
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>
@@ -970,6 +973,10 @@
 </div>
 {%- endif %}
 <div class="row gap wrap mfoot">
+  {%- if e.claimed %}
+  <span class="st">held in {{ e.name }}'s ledger — no lane takes it until you release it</span>
+  <span class="grow"></span>
+  {%- else %}
   <span class="st">in {{ e.name }}'s ledger — waits on you, with no date; an answer is written on {{ e.name }}'s board as a decided line, its session's work order</span>
   <span class="grow"></span>
   <button class="btn sm ghost" data-act="ledger_reply" data-id="person" data-repo="{{ e.root }}" data-ref="{{ e.id }}" data-quote="{{ e.id }} {{ e.title }}" data-name="{{ e.name }}'s board" title="your words written on {{ e.name }}'s board as your decision on {{ e.id }}, one line landed on origin by shiftlead's own pull request">Reply</button>
@@ -980,6 +987,10 @@
   <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="{{ e.held }} holds {{ e.id }}: go to its Focus — nothing is started">Open session</button>
   {%- else %}
   <button class="btn sm ghost" data-act="ledger_start" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="your own interactive session on {{ e.id }}, {{ e.id|lower }}, in a new worktree on {{ e.team or 'the repo' }}'s team, told to read the entry and wait for you — or the New session form, filled in, where it cannot be one press">Start session</button>
+  {%- endif %}
+  {%- endif %}
+  {%- if e.release %}
+  <button class="btn sm ghost" data-act="ledger_release" data-id="person" data-repo="{{ e.name }}" data-ref="{{ e.id }}" title="make {{ e.id }} pickable now: a lane may take it at once (design §4.4)">Release</button>
   {%- endif %}
   <a class="btn sm ghost" href="{{ e.url }}" title="{{ e.id }} on the {{ e.name }} Repo page">Open</a>
 </div>

@@ -4171,7 +4171,10 @@ def build_parser() -> argparse.ArgumentParser:
         "hold", help="hold any open entry, settling or settled, or release a held one (§4.4); the person's own"
     )
     q.add_argument(
-        "--json", action="store_true", default=argparse.SUPPRESS, help="{repo, id, held, settling, told, untold}"
+        "--json",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="{repo, id, held, settling, told, readers, untold}",
     )
     q.add_argument("entry", metavar="id", help="the entry's id, TD-NNN")  # `id` is resolved as a session's
     q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")

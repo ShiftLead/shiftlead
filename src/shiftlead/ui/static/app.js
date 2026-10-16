@@ -725,7 +725,7 @@
   // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
   const PRESS_VERBS = {
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
-    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
+    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", ledger_release: "releasing…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
@@ -1033,6 +1033,19 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // design §4.5a *Inbox row: held entry* → **Release** (TD-736): the Repo page's `td_hold` with
+      // `release`, the person's own act on the home's record; the row leaves on the refresh
+      if (action === "ledger_release") {
+        pressed();
+        const got = await fetch("/api/ledger/hold", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref, release: true }),
+        });
+        if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
+        say(`${b.dataset.ref} released: pickable now`, true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       // design §4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-678): one press —
       // the session that holds the entry or its name (`focus`), the one it started (`id`), or the New
       // session form filled in with the reason (`form`), as **Resume**'s press lands
@@ -1140,7 +1153,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", ledger_release: "Release", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
@@ -3252,7 +3265,7 @@
           body: JSON.stringify({ repo: b.dataset.repo, id, release }),
         });
         if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
-        w.settle(release ? `${id} released: pickable now` : `${id} held: no lane takes it until you release it`, true);
+        w.settle(release ? `${id} released: pickable now` : AO.heldWords(id, await r.json().catch(() => ({}))), true);
         reread();
       } catch (err) {
         b.disabled = false;
@@ -3278,7 +3291,7 @@
       if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
       const more = e.target.closest("[data-unfold]");
       if (more) return unfold(more.dataset.unfold);
-      // **Hold** / **Release** on a settling entry (§4.5a, TD-710): the home's clock, no ledger edit
+      // **Hold** / **Release** on an entry (§4.5a, TD-710, TD-736): the home's clock, no ledger edit
       const hold = e.target.closest("[data-tdhold]");
       if (hold && !hold.disabled) return holdEntry(hold);
       // a board row's team badge: here it opens the Org filtered to that team (in the Inbox it picks the rail)
@@ -3297,6 +3310,15 @@
       if (!["repos", "doing", "session", "gone"].includes(ev.event)) return;
       clearTimeout(soon); soon = setTimeout(reread, 1500);
     }, "light=1");
+  };
+
+  // The toast of a **Hold** (§4.5a *Repo page: Hold / Release on an entry*, TD-736): what the hold did,
+  // from the reply's `told` (a reader among them, `readers`, is told to leave its PR unmerged) and
+  // `untold`, each line *could not tell <name>: <why>*
+  AO.heldWords = function (id, got) {
+    const readers = new Set(got.readers || []);
+    const told = (got.told || []).map((n) => `${n} told to ${readers.has(n) ? "leave its PR unmerged" : "drop it"}`);
+    return [`${id} held`, ...told, ...(got.untold || [])].join(" · ");
   };
 
   // ---- New session: the anchor rule, shown before you press Start ----
