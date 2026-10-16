@@ -386,6 +386,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     settle_mark,  # noqa: F401
     strip_group,  # noqa: F401
     team_groups,
+    team_notes,
     who_for_what,  # noqa: F401
 )
 from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
@@ -1443,7 +1444,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         items = repo_items(org_layout(groups, repos, (await h.defs()).projects.values(), vs, now), name)
         serving = [g for g in items if g["kind"] == "team"]
         org, _ = await asyncio.to_thread(org_here)
-        named = repo_teams(org, host_name()).get(str(Path(str(r.get("root") or "")).resolve()), "")
+        here_root = str(Path(str(r.get("root") or "")).resolve())
+        named = repo_teams(org, host_name()).get(here_root, "")
         teams = list(dict.fromkeys([*(g["team"] for g in serving), *([named] if named else [])]))
         members = [m for g in serving for m in g["members"]]
         motion = [x for g in serving for x in (g.get("summary") or {}).get("motion") or []]
@@ -1485,6 +1487,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 for team, got in lanes.items()
                 if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
             ],
+            # under them, *needs a team* and each stale-team note (§4.4 *An entry names its team*, TD-764)
+            "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
             "boards": boards,
             "horizon": hz,
             "doing": (drows := repo_doing(serving))[0],
@@ -2260,7 +2264,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         **Name** box, else the default — and `name_why`, why that name is not free (TD-677), the
         team's live manager, and the line under the button. `pick` is the form's **Team** pick
         (TD-740): a servicing team's name puts it first among the teams **Hand to the techlead**
-        hands to; blank, or no team of the repo, leaves the first with a techlead seat."""
+        hands to; blank, or no team of the repo, leaves the first with a techlead seat, in the order
+        of the ledger's `Team` vocabulary as the home's repo reading carries it, else definition order
+        (§4.10 *An entry handed to a seat*, TD-764)."""
         if type_ not in orgmod.ENTRY_TYPES:
             raise HTTPException(400, f"type is {' or '.join(orgmod.ENTRY_TYPES)}, not {type_!r}")
         root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
@@ -2293,7 +2299,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             manager = mid if mid in {s["id"] for s in teamrun.live(list(records.values()))} else ""
             if (t.host or here) != here:  # **Attach** in the composer's words for a node's session (§4.5a, TD-630)
                 attach = f"{team} runs on {t.host}: this call does not cross the link"
-        servicing = entry_teams(org, root, host_name())
+        led = next(
+            (
+                v.get("ledger") or {}
+                for v in (await h.repo_facts())[0].values()
+                if isinstance(v, dict) and v.get("root") and str(Path(str(v["root"])).expanduser().resolve()) == root
+            ),
+            {},
+        )
+        servicing = entry_teams(org, root, host_name(), led.get("declared_teams") or ())
         picked = next((t for t in servicing if t["team"] == pick), None)
         servicing = [picked, *(t for t in servicing if t is not picked)] if picked else servicing
         return {
@@ -2340,7 +2354,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def api_entry_hand(request: Request):
         """§4.5a Add entry form → **Hand to the techlead** (TD-219 slice 4): `{repo, type, words, team}`
         goes to `entry_add` (TD-218) as the person's `ask` to the techlead seat of the team the **Team**
-        pick names (TD-740), else the repo's first servicing team with a seat, marked `handed`, with no
+        pick names (TD-740), carried as `entry.team` (TD-764), else the repo's first servicing team with a
+        seat in the ledger's `Team` order, marked `handed`, with no
         bound; the host agent refuses in words what the page disables (no team, no seat, no words).
         Answers `{id, to, name, text, href}`: the toast's words, *handed to techlead-ao-1 · m-…*, and the
         message's page in the Inbox."""
@@ -2356,6 +2371,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             type=plan["type"],
             text=str(body.get("words") or ""),
             teams=[{"team": t["team"], "seat": t["seat"]} for t in plan["teams"]],
+            team=plan["picked"],  # `entry.team`: the pick, empty when blank (§4.10, TD-764)
             **_draft_of(body),
         )
         name = plan["hand"]["name"] if got.get("to") == plan["hand"]["to"] else got.get("to")

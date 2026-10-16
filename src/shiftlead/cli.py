@@ -3012,12 +3012,14 @@ def _settle_mark(e: dict[str, Any], now: datetime | None = None) -> str:
 
 
 def cmd_td_add(args: argparse.Namespace) -> int:
-    """`ao td add [--repo <name>] [--type debt|feature] ["<words>"]` (design §4.7 *Entries*, §4.9 *Add
-    an entry to the ledger*; TD-218 slice 4): the terminal's form of **Hand to the techlead**. The
+    """`ao td add [--repo <name>] [--type debt|feature] [--team <team>] ["<words>"]` (design §4.7 *Entries*,
+    §4.9 *Add an entry to the ledger*; TD-218 slice 4): the terminal's form of **Hand to the techlead**. The
     words — the argument, or standard input when there is none — go to `entry_add` as the person's
-    `ask` to the techlead seat of the repo's first servicing team, carrying `entry` and marked
-    `handed`. The repo defaults to the one the command is run in, and it is the **main checkout**
-    that is handed, by path: a worktree's path is not in the registry. A person's only: a session is
+    `ask` to the techlead seat of `--team`, else of the repo's first servicing team with a seat in the
+    ledger's `Team` order, carrying `entry` (its `team` the `--team`, empty without it; TD-764) and marked
+    `handed`; a `--team` that does not service the repo is refused with the repo's team names. The repo
+    defaults to the one the command is run in, and it is the **main checkout** that is handed, by path: a
+    worktree's path is not in the registry. A person's only: a session is
     refused here before its standard input is read, and by the host agent whatever this says — but
     the person's own shell (§4.8 *The person's own shell is the person*, TD-580), as the agent lets it by."""
     if (sid := os.environ.get("SHIFTLEAD_SESSION")) and not mailmod.person_shell(
@@ -3032,7 +3034,26 @@ def cmd_td_add(args: argparse.Namespace) -> int:
         org = _org_here()
     except ValueError as e:
         raise AgentError(str(e)) from None
-    servicing = teams.entry_teams(org, root, hosts.local_host().name)
+    declared: list[str] = []
+    with contextlib.suppress(AgentError):  # no reading: definition order, as the form falls back to
+        led = next(
+            (
+                r.get("ledger") or {}
+                for r in call_sync("repos").values()
+                if isinstance(r, dict) and r.get("root") and str(pathlib.Path(str(r["root"])).resolve()) == root
+            ),
+            {},
+        )
+        declared = list(led.get("declared_teams") or [])
+    servicing = teams.entry_teams(org, root, hosts.local_host().name, declared)
+    pick = (args.team or "").strip()
+    if pick:
+        picked = next((t for t in servicing if t["team"].casefold() == pick.casefold()), None)
+        if picked is None:
+            names = ", ".join(t["team"] for t in servicing) or "none"
+            raise AgentError(f"{pick} does not service {pathlib.Path(root).name}: its teams are {names}")
+        pick = picked["team"]
+        servicing = [picked, *(t for t in servicing if t is not picked)]
     # where the form's button is disabled with a reason the host agent cannot know (§4.5a): a seat
     # the team defines whose home has no checkout on its host reads to `entry_add` as no seat at all
     if servicing and not servicing[0]["seat"] and servicing[0]["techlead"]:
@@ -3052,6 +3073,7 @@ def cmd_td_add(args: argparse.Namespace) -> int:
         type=args.type,
         text=words,
         teams=[{"team": t["team"], "seat": t["seat"]} for t in servicing],
+        team=pick,
     )
 
     def prose() -> None:
@@ -4289,6 +4311,9 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
     q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
     q.add_argument("--type", choices=orgmod.ENTRY_TYPES, default="debt", help="the ledger's Type (default: debt)")
+    q.add_argument(
+        "--team", help="the team whose techlead seat drafts it, carried as the entry's Team (default: the first)"
+    )
     q.add_argument("words", nargs="*", metavar='"words"', help="what the entry is; standard input when there is none")
     q.set_defaults(fn=cmd_td_add)
     q = dsub.add_parser(

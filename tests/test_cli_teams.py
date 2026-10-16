@@ -1987,8 +1987,9 @@ def test_new_with_a_team_keeps_a_roles_deliberately_empty_controllers(world):
 # ── ao td add: the terminal's Hand to the techlead (design §4.7 *Entries*, TD-218 slice 4) ─────
 
 
-def _td_world(world, monkeypatch, *, seat=True):
-    """The world with a techlead seat on ao-grind and an `entry_add` that answers as the agent does."""
+def _td_world(world, monkeypatch, *, seat=True, declared=None):
+    """The world with a techlead seat on ao-grind and an `entry_add` that answers as the agent does;
+    `declared`, the ledger's `Team` vocabulary in the home's repo reading (none: no reading)."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
     if seat:
@@ -1999,6 +2000,11 @@ def _td_world(world, monkeypatch, *, seat=True):
     def fake(method, **params):
         if method == "get":  # the caller's own record, inside a pane: an agent session's
             return {"id": params["id"], "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/"}
+        if method == "repos":
+            if declared is None:
+                raise cli.AgentError("unknown method: repos")
+            root = str(tmp_path / "shiftlead")
+            return {root: {"name": "shiftlead", "root": root, "ledger": {"declared_teams": declared}}}
         assert method == "entry_add", method
         handed.append(params)
         if not params["teams"]:
@@ -2028,6 +2034,7 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
             "type": "feature",
             "text": "a picker for the lane",
             "teams": [{"team": "ao-grind", "seat": "ao-shiftlead-techlead-ao"}],
+            "team": "",
         }
     ]
     out = capsys.readouterr().out.splitlines()
@@ -2045,6 +2052,31 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
         assert handed[-1]["repo"] == str(tmp_path / "shiftlead")
     assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1  # the registry calls it `link`
     assert "no registered repo is named 'shiftlead'" in capsys.readouterr().err
+
+
+def test_td_add_team_hands_to_that_teams_seat_and_a_blank_one_takes_the_ledgers_order(world, capsys, monkeypatch):
+    """`ao td add --team` (§4.7 *Entries*, §4.10 *An entry handed to a seat*, TD-764): the named team's
+    seat takes it and `team` carries it; without it the first team with a seat in the ledger's `Team`
+    order; a name no team of the repo has is refused, naming the repo's teams, and nothing is sent."""
+    tmp_path, handed = _td_world(world, monkeypatch, declared=["ao-db", "ao-grind"])
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
+    doc["teams"]["ao-db"] = {
+        "repo": "shiftlead",
+        "manager": {"role": "manager", "name": "orc-db"},
+        "techlead": {"name": "techlead-db"},
+        "members": [{"role": "grinder", "name": "db-grind"}],
+    }
+    write_org(tmp_path, doc)
+    assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 0
+    assert [t["team"] for t in handed[-1]["teams"]] == ["ao-db", "ao-grind"] and handed[-1]["team"] == ""
+    assert capsys.readouterr().out.startswith("m-1 handed to techlead-db ")
+    assert cli.main(["td", "add", "--repo", "shiftlead", "--team", "AO-grind", "words"]) == 0
+    assert [t["team"] for t in handed[-1]["teams"]] == ["ao-grind", "ao-db"] and handed[-1]["team"] == "ao-grind"
+    assert capsys.readouterr().out.startswith("m-1 handed to techlead-ao ")
+    assert cli.main(["td", "add", "--repo", "shiftlead", "--team", "ops", "words"]) == 1
+    assert "ops does not service shiftlead: its teams are ao-db, ao-grind" in capsys.readouterr().err
+    assert len(handed) == 2
 
 
 def test_td_add_runs_from_the_persons_own_shell_and_is_refused_to_a_session(world, capsys, monkeypatch):

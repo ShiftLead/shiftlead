@@ -21,7 +21,7 @@ container node sharing the path), and otherwise from the checkout on that host, 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -474,13 +474,15 @@ def brief_ids(
     return ids
 
 
-def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
+def entry_teams(org: orgmod.Org, root: str, host: str, declared: Collection[str] = ()) -> list[dict[str, str]]:
     """The teams whose `repo:` is the checkout `root` on `host`, in definition order, each `{team,
     seat, name}` — `seat` the id its techlead takes (`teams.seat_id`), empty where it defines none,
     and `name` that seat's name — which is what `entry_add` is handed by the
     Add entry form and `ao td add` (TD-218: the host agent does
     not read `org.yml`). Those that define a techlead seat come first, so the first is the one
-    **Hand to the techlead** hands to (design §4.9 *Teams*: a repo has any number of teams)."""
+    **Hand to the techlead** hands to with the **Team** pick blank (design §4.9 *Teams*: a repo has any
+    number of teams) — in `declared`'s order, the ledger's `Team` vocabulary, where it names them, a
+    team it leaves out after, in definition order (§4.10 *An entry handed to a seat*, TD-764)."""
     out = []
     for tname, t in org.teams.items():
         path = org.checkout(t.repo, host)
@@ -497,7 +499,37 @@ def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
                 }
             )
     # a repo has any number of teams (§4.9 *Teams*): the hand-to is the first that defines a techlead seat
-    return sorted(out, key=lambda x: not x["techlead"])
+    order = [str(d).casefold() for d in declared]
+
+    def key(x: dict[str, str]) -> tuple[bool, int]:
+        name = x["team"].casefold()
+        return (not x["techlead"], order.index(name) if name in order else len(order))
+
+    return sorted(out, key=key)
+
+
+def stale_teams(declared: Collection[str], defs: Collection[str], entries: Collection[Any]) -> list[dict[str, Any]]:
+    """Where a repo's definitions on this host (`defs`, `entry_teams`' names) and its ledger's `Team`
+    vocabulary (`declared`) disagree (design §4.4 *A stale team*, TD-730): `{kind: "declared", team,
+    ids}` for a declared name no definition holds, `ids` the open entries that carry it; and, where the
+    definitions hold two or more teams, `{kind: "left-out", team, ids: []}` for each the vocabulary
+    leaves out, whatever its size. `ao org check`'s lacks and the Repo page's notes are both this, worded
+    each its own way (TD-764)."""
+    held = {str(d).casefold() for d in defs}
+    said = {str(d).casefold() for d in declared}
+    out: list[dict[str, Any]] = []
+    for d in declared:
+        if str(d).casefold() in held:
+            continue
+        ids = [
+            str(e.get("id"))
+            for e in entries
+            if isinstance(e, dict) and str(e.get("team") or "").casefold() == str(d).casefold()
+        ]
+        out.append({"kind": "declared", "team": str(d), "ids": ids})
+    if len(defs) >= 2:
+        out += [{"kind": "left-out", "team": str(t), "ids": []} for t in defs if str(t).casefold() not in said]
+    return out
 
 
 def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: str, files: Files | None) -> str:

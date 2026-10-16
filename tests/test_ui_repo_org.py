@@ -214,3 +214,81 @@ def test_the_re_read_carries_the_title_line_and_the_seams_and_never_the_cards(tm
     assert part.count('id="repohead"') == 1 and "serviced by" in part and 'id="groups"' not in part
     page = client(monkeypatch, tmp_path, fake({root: reading(root)}, two_teams(root))).get("/repo/samscrape").text
     assert page.count('id="repohead"') == 1 and page.index('id="repohead"') < page.index('id="groups"')
+
+
+# -- TD-764: *needs a team*, the stale-team notes, and the hand's `entry.team` ------------------------
+
+
+def test_the_debt_heading_says_what_needs_a_team_and_what_is_stale_and_the_row_is_marked(tmp_path, monkeypatch):
+    """§4.5 screen 11 *Technical debt*, §4.4 *An entry names its team* (TD-764): under the lanes lines,
+    the repo's *needs a team* line as `ao repo` prints it, and a note for a declared name no definition
+    holds (with the entries that carry it) and for a defined team the ledger leaves out; the row of an
+    entry that needs a team says so after its owner."""
+    two_team_world(tmp_path)
+    root = str(tmp_path / "samscrape")
+    r = reading(root)
+    r["ledger"]["declared_teams"] = ["sam-grind", "db-old"]
+    r["ledger"]["entries"] += [
+        {"id": "TD-320", "title": "untagged", "for_page": "pickable", "priority": "medium", "owner": "grinder", "needs_team": {"why": "untagged"}},
+        {"id": "TD-321", "title": "the old team's", "for_page": "pickable", "priority": "low", "owner": "grinder", "team": "db-old", "needs_team": {"why": "unknown"}},
+    ]  # fmt: skip
+    seat = rec(
+        "techlead-sam", root, team="sam-grind", state="idle", role="techlead", seat={"trigger": "asks", "tags": True}
+    )
+    html = client(monkeypatch, tmp_path, fake({root: r}, [seat])).get("/repo/samscrape").text
+    debt = html[html.index('<section class="rsec" id="debt">') : html.index('id="completed"')]
+    head = debt[: debt.index('class="rlist"')]
+    assert 'needs a team: <a href="#TD-320">TD-320</a>, <a href="#TD-321">TD-321</a> — handed to techlead-sam' in head
+    assert 'the ledger declares db-old, which no definition holds: <a href="#TD-321">TD-321</a>' in head
+    assert "the ledger leaves out sam-db, which this repo defines" in head
+    assert "the ledger leaves out sam-grind" not in head
+
+    def row(tid: str) -> str:
+        return re.search(rf'id="{tid}".*?(?=class="rrow|</section>)', debt, re.S).group(0)
+
+    assert row("TD-320").index("· grinder</span>") < row("TD-320").index("· needs a team</span>")
+    assert "needs a team</span>" not in row("TD-301")
+    # nobody to hand them to: why, in `ao repo`'s words; a ledger that declares no teams has nothing stale
+    r["ledger"]["declared_teams"] = []
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    head = html[html.index('<section class="rsec" id="debt">') :]
+    head = head[: head.index('class="rlist"')]
+    assert "— no techlead seat to tag them</div>" in head
+    assert "the ledger leaves out sam-db" in head and "the ledger leaves out sam-grind" in head
+    # a reading with no `Team` vocabulary read (an older home) draws neither
+    del r["ledger"]["declared_teams"]
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    assert 'class="meta teamnote' not in html and "· needs a team</span>" in html
+
+
+def test_the_hand_carries_the_pick_as_entry_team_and_a_blank_one_takes_the_ledgers_order(tmp_path, monkeypatch):
+    """§4.10 *An entry handed to a seat* (TD-764): the hand sends the form's Team pick as `team`, empty
+    when blank; blank, the first team with a seat in the ledger's `Team` order takes it — here sam-db,
+    though sam-grind is defined first."""
+    repo = two_team_world(tmp_path)
+    handed: list[dict] = []
+    Base = entry_fake([], handed=handed)
+
+    class Fake(Base):
+        async def call(self, method, **kw):
+            if method == "repos":
+                return {
+                    str(repo): {
+                        "name": "samscrape",
+                        "root": str(repo),
+                        "ledger": {"declared_teams": ["sam-db", "sam-grind"]},
+                    }
+                }
+            return await super().call(method, **kw)
+
+    c = entry_client(monkeypatch, tmp_path, Fake)
+    plan = c.get("/api/entry/plan", params={"repo": "samscrape", "type": "debt"}).json()
+    assert [t["team"] for t in plan["teams"]] == ["sam-db", "sam-grind"] and plan["hand"]["name"] == "techlead-db"
+    body = {"repo": "samscrape", "type": "debt", "words": "a slow query"}
+    assert c.post("/api/entry/hand", json=body).json()["text"].startswith("handed to techlead-db")
+    assert (
+        c.post("/api/entry/hand", json={**body, "team": "sam-grind"})
+        .json()["text"]
+        .startswith("handed to techlead-sam")
+    )
+    assert [(kw["teams"][0]["team"], kw["team"]) for kw in handed] == [("sam-db", ""), ("sam-grind", "sam-grind")]
