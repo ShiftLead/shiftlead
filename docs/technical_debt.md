@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Designed — built by TD-743 |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
-| TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
 | TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
 | TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
@@ -1390,26 +1389,6 @@ The other cases:
 **Done when** the two §4.5a rows draw as written and the tests above pass.
 
 **Related:** TD-707, TD-731, TD-735.
-
----
-
-## TD-739: The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (the `/`, `/inbox` and `/repo/{name}` routes and what each reads from the host agent before rendering); `src/shiftlead/ui/org.py`, `inbox.py`, `repo.py`
-
-**Why:** TD-737's measurement, 2026-10-15, read-only GETs of the live UI, three passes each: time to first byte was 0.45–0.57 s for `/` (280 KB), 0.39–0.86 s for `/inbox` (1.46 MB), 0.31–0.79 s for `/repo/shiftlead` (636 KB), and 0.14–0.40 s for `/settings` (83 KB). In headless Chromium, parsing then added 0.1–0.35 s before the DOM was ready. The server's half is the larger, and it is paid on every page change, since each page is a full server-rendered navigation (§4.5 *Browser mechanics*).
-
-**Fix:** profile each route's render on a scratch home loaded to the live home's size (`scripts/look_home.py`, with the fixture's sessions, mail and board raised to the counts the live Inbox shows: ~320 mail rows, ~60 board items). Split the time into the host agent's RPCs, the view's computation and the template, say in the PR where it goes, and fix the largest share, or file each part as its own entry where its fix is in `src/sessionorc/`.
-
-**Done when** the PR names each route's split, and the largest share is fixed or filed.
-
-**Related:** TD-737, TD-738.
 
 ---
 

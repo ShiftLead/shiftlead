@@ -13016,6 +13016,26 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 
 **Related:** TD-737 (the measurement), TD-739.
 
+## TD-739: The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (the `/`, `/inbox` and `/repo/{name}` routes and what each reads from the host agent before rendering); `src/shiftlead/ui/org.py`, `inbox.py`, `repo.py`
+
+**Why:** TD-737's measurement, 2026-10-15, read-only GETs of the live UI, three passes each: time to first byte was 0.45–0.57 s for `/` (280 KB), 0.39–0.86 s for `/inbox` (1.46 MB), 0.31–0.79 s for `/repo/shiftlead` (636 KB), and 0.14–0.40 s for `/settings` (83 KB). In headless Chromium, parsing then added 0.1–0.35 s before the DOM was ready. The server's half is the larger, and it is paid on every page change, since each page is a full server-rendered navigation (§4.5 *Browser mechanics*).
+
+**Fix:** profile each route's render on a scratch home loaded to the live home's size (`scripts/look_home.py`, with the fixture's sessions, mail and board raised to the counts the live Inbox shows: ~320 mail rows, ~60 board items). Split the time into the host agent's RPCs, the view's computation and the template, say in the PR where it goes, and fix the largest share, or file each part as its own entry where its fix is in `src/sessionorc/`.
+
+**Resolved:** 2026-10-15 by #1871 — the split, on a scratch home at the live size (320 mail, 60 board lines, this ledger, 12 sessions), per request: `/` 74 ms (RPCs 27, `board_reading` 29, template 3), `/inbox` 304 ms (RPCs 35, `board_reading` 27, template 186), `/repo` 86 ms (RPCs 16, `board_reading` 28, template 27); live, the `repos` RPC is 1.3 MB in 34–55 ms and was read 2–3 times a page. Fixed: `subject_of`/`clip_subject` fold control characters in one `str.translate` (the Inbox's template 186 → ~140 ms, `/inbox` 304 → ~230 ms), and every page reads `repos` once per request (`Readings.repos`, a per-request memo). Filed: TD-746 (the `repos` payload, `src/sessionorc/`), TD-747 (the rest of the Inbox's template time).
+
+**Done when** the PR names each route's split, and the largest share is fixed or filed.
+
+**Related:** TD-737, TD-738.
+
 ## TD-732: `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837)
 
 **Priority:** Medium
