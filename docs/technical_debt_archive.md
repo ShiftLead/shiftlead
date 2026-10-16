@@ -14486,3 +14486,85 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** TD-787, TD-789.
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1965) — `review.unasked_reader` names the reader for the page and `ao repo` alike: the first servicing team, in the Org's order, whose members' `review` holds a touched path, its first matching link's seat by name, else `person`, and nothing where no team has a reader; `review.unasked` reads the reading's `pr_orders.unasked`, never the rule. The Repo page draws *unasked · <age>* (`wait`) in the standing's place with its title, and the *i* panel says what it means; `ao repo` orders its teams as the Org does (`_org_order`), prints *unasked 17h — post its review, then ao msg --kind ask --pr <n> <reader>* on the standing line, and `--json` carries per open PR `held`, `asked` and `unasked`; `ao pr held` adds the repo's line on both *not held* branches (`_repo_hold`). Tests: `tests/test_unasked_shown.py`. The page was looked at in headless Chromium on the app served from a fixture reading (`look_home.py`'s fixture repo has no PRs and no reader): `docs/mockups/reviews/2026-10-16-td790-unasked.png`.
+
+## TD-781: A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — designed (2026-10-16, the designer; no mockup: one row's words and section, one card note; *never a start* confirmed by Paul 2026-10-16 on steer m-b7bce89ccde0) — §6 rule 8 *A team that stopped*: rule 8 reads a stopped team's lanes as a wound-down team's (the same `lane_seen`, `WORK_SETTLE`, `gained`), giving a member with no `lane_seen` one at the first stopped reading so only entries after the stop are news; the mark carries `stopped: {by: person|until|other, at}`; under `ask` and `start` alike the Inbox row *team start*, never a start — *Needs you* for `until` and `other`, *Later* and uncounted for the person's own stop; the baseline `lane_seen` (entries and work orders) for any read record without one, wound down or stopped; `by` read over current records, `until` from the tick's `stop time` word; told on Telegram except for `person`; *A team with no record*: the card, `ao team list` and an uncounted *Later* row say *its lanes hold n entries* (distinct ids) from `teamrun.lanes`, no start — so the dc-grind incident draws a row whether its records stood or not. §4.5a *Inbox row: team start*, *team card: work waiting note*; §4.7 `ao team list`; §4.9a. A rename keeps old-named records (TD-703), so it is a stopped or wound-down team, not the no-record case. Built by TD-782.
+**Blocked by:** TD-782
+**Location:** design §6 rule 8 *Work for a team that wound down* (6-policies.md:576), §4.9a *Out of work does not mean out of reach*, §4.5a **when work appears**; `src/sessionorc/work.py` (`wound_down`: *a team with no session carrying its badge has never run, or has been forgotten, and is neither*), `src/sessionorc/agent_tick.py` and `agent_inbox.py` (the rule's `work_waiting` mark), `src/sessionorc/agent_notify.py` (its row), `src/shiftlead/cli.py` (`ao team list`'s *work waiting* only on a wound-down team)
+
+**Why:** dev-cadence's TD-119 (filed 2026-10-16 06:52Z by ShiftLead's designer, #277) was the only pickable build of its ledger and the first step of the Queue (shiftlead TD-769 waits on it). `dc-grind` has `on_work: start` in `settings.yml`, and rule 8 had started it three times on 2026-10-14. This time it started nothing and wrote nothing — no `work_waiting` in `host.json`, no Inbox row — and the Queue's builds stood still for seven hours until Paul asked how the team was doing and started it by hand (13:58Z). The cause, read from the records: on 2026-10-14 20:05 MDT the definition's members were renamed (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`, dev-cadence 1145d97), so no record carries the new names; `wound_down` returns None for a team with no records, so the team reads *stopped*, and rule 8 reads only a wound-down team (or a finished member of a team that runs on). A stopped team waits for Start or its schedule by design — but nothing tells the person its lanes hold work. Paul, 2026-10-16: *should it have started automatically when new work arrived?* (The old records are gone and the Start rewrote the new ones, so the rename is the reading of what is left, not a proof.)
+
+**Fix:** the design decides what a team with no live session gets when its lanes gain an entry while it is *stopped* rather than *wound down* — at the least a row (*dc-grind is stopped, 1 entry waiting: TD-119 — Start*), drawn under every `on_work` but `off`; and whether `on_work: start` starts a team that has no record under its definition's names (a rename, a Forget, a definition never started), which has nothing to replay but its definition, under rule 8's five bounds. A team a person stopped (`ao team stop`, a closer naming the person) is the case to keep apart: its stop is the person's word. Then a build entry.
+
+**Done when** the design says what a stopped team with waiting work shows and does under each `on_work`, and its build entry is filed and named in this entry's `Blocked by:`.
+
+**Related:** TD-214, TD-227, TD-457, TD-748, TD-769.
+
+**Resolved:** 2026-10-16 (grinder-ao-1) — designed in #1928; its build TD-782 merged in three slices (#1952, #1960 and the last, #PRNUM), so it archives with it (§4.9c *A design entry archives with its last build*).
+
+## TD-782: Build TD-781: rule 8 reads a stopped team — the baseline `lane_seen`, `work_waiting.stopped`, the row under Needs you or Later, never a start; the card's *lanes hold n* for a team with no record
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-781's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — slice 1 (the home) by #1952, slice 2 (a stopped mark's row under Needs you, the card note beside *stopped*, the board hint, `ao team list`) by #1960, slice 3 (the *Later* half) by #PRNUM.
+**Location:** design §6 rule 8 *A team that stopped*, *A team with no record*; §4.5a *Inbox row: team start*, *team card: work waiting note*; §4.7 `ao team list`; `src/sessionorc/work.py` (a `team_stopped` reading beside `team_wound_down`), `src/sessionorc/agent_tick.py` (`_work_marks`, `_work_mark`, `_work_start` ~L1731–1960), `src/sessionorc/agent_inbox.py` (`rpc_clear_work`; `rpc_attention_snooze`'s row kinds ~L246–265), `src/sessionorc/agent_notify.py` (the Telegram tell ~L115–127), `src/shiftlead/ui/inbox.py` (the team-start row ~L898, `work_note` ~L978), `src/shiftlead/ui/repo.py` (~L604: the note's `wound_down` gate, which must take the stopped case too; and the no-record note from `teamrun.lanes`), `src/shiftlead/ui/templates/group_head.html` (~L51, the card's note), `src/shiftlead/cli.py` (`ao team list` ~L1092–1135), `src/shiftlead/ui/help.py` (`Help("on-work", …)` ~L400)
+
+**Why:** TD-781: dc-grind stood stopped for seven hours with TD-119, the Queue's first build, in its lane, and nothing was drawn, since rule 8 reads only a wound-down team.
+
+**Fix:**
+- **The reading** (`sessionorc.work`): a team is *stopped* when none of its crew is live and `team_wound_down` is None, with at least one crew record. `stopped_by(records)` gives `{by, at}` over the **current** crew records (not superseded, not sat out):
+  - A record's end is `ended.at` where `ended` stands, else `closer.at`, else `closed_at`; `at` is the newest end across the records, and `by` reads only the records whose end is within `FINISHED_SETTLE` of `at`.
+  - `by` is `person` where such a record's `ended.by` (or, with no `ended`, `closer.by`) is the person, or it ended naming nobody after a wrap-up whose `wrapup_by` is the person; else `until` where its `ended.why` or `closer.why` is `stop time` (the tick's word, `agent_tick.py` ~L389–418), or it ended naming nobody with `wrapup_sent_at` standing (the stop time's wrap-up, ~L407–411); else `other`.
+  - **`wrapup_by`** (new record field: `models.py` beside `wrapup_at` ~L1233, and in `NODE_OWNED` beside `"wrapup_at"` ~L90, so a node's member carries it home): `rpc_send` with `wrapup` (`agent.py` ~L2212) stamps it from the caller as `closer_of` reads one, and clears it with `wrapup_at`. `_sit_out` (`agent.py` ~L2086–2088) passes `rpc_relaunch`'s `caller` to `rpc_send` and to the routed act, so a lead's sit-out stamps the lead, not `person`. Where a record carries both `wrapup_by` and `wrapup_sent_at`, the later of `wrapup_at` and `wrapup_sent_at` decides between `person` and `until`.
+  - Reword `finished_alone`'s docstring (~L86: *stopped, which rule 8 leaves alone*) to *never starts*.
+- **The tick** (`_work_marks`/`_work_mark`):
+  - A stopped team's records are read as a wound-down team's.
+  - **The baseline**: every record the pass reads whose `lane_seen` is None, wound down or stopped alike, gets `{at, ids, base: true}` on the first tick that reads it. The ids are `ledger.entries_before(root, rel, <the record's end>)` matching its lane, plus the `_orders` matching now, plus the ids the checkout's reading holds that `entries_before(root, rel, None)` does not (rule 6's own guard in `_lane_news`); `entries_before` returns `(entries | None, label)`. It is written pruned as `reread` prunes it and saved with the record, and that record has no news on that tick. A failed read writes nothing. A `base` memory whose `at` is older than the record's `created` (carried by a supersede, `agent.py` ~L1456–1470) is rewritten the same way.
+  - The mark is `work_waiting` with `stopped: {by, at}`, removed as now (a crew session live, no id new, `off`, Start, Dismiss). A team read *wound down* later has `stopped` dropped and its ids kept.
+  - `_work_start` never starts a mark carrying `stopped`.
+  - The log line *wound down with work waiting* (~L1775) says *stopped* for a stopped team.
+  - Reword `_question_end`'s docstring to say a stopped team's lanes are read.
+- **Telegram** (`src/sessionorc/agent_notify.py` ~L115–127, `src/sessionorc/notify.py` `work_line` ~L67; design §4.10 *What is told*): a mark carrying `stopped` is told when `by` is `until` or `other`, under `ask` and `start` alike (the `ask`-only gate and the `held` skip lifted for it), and never when it is `person`; `work_line` gains *· <team> stopped and has work: n entries*.
+- **The row** (`ui/inbox.py` ~L898):
+  - It reads *`<team>` · stopped <t> · its lanes gained n entries: …*, with *by you* (`person`) or *at its stop time* (`until`) after *stopped*. Under `on_work: start` it ends *· not started: a stopped team is started by Start*.
+  - `person` goes under *Later*, uncounted; `until` and `other` under *Needs you*, counted. Start, Snooze and Dismiss as the row's.
+  - A mark carrying `stopped` is never read as a team that runs on: `finished` is `[]` and `running` False (today `work_finished` is taken for any team not in `wound`, ~L896–975, which would draw *<member> finished* and send Start to `work_start` for a team with nobody live); the row's words and its `wound_down` field come from `stopped`.
+  - **A defined team with no record** has a client-drawn row under *Later*, uncounted, under `ask` and `start`: *`<team>` · stopped · its lanes hold n entries: …*, with Start and Snooze and no Dismiss. Its Snooze is a new attention row kind, `lanes`, with the team as its id: `rpc_attention_snooze` (`agent_inbox.py` ~L246–265) adds `lanes` to its kinds and to the refusal's words, and the row's `sid` is `lanes:<team>`, as the `work` row's is `work:<team>`. It leaves when an unattended record carries the badge; the card note's no-record test reads the crew, not every record.
+  - The *Later* section (`inbox_sections`) takes both rows.
+  - The board hint (~L1319, *· <team> wound down — starts on `on_work`*) reads *· <team> stopped — Start it* for a stopped team.
+- **`teamrun.lanes`** returns the distinct matching ids beside its per-role counts. The page reads it at most once in `DEFS_TTL` per team, and `ao team list` once per run.
+- **The card and the CLI**:
+  - The *work waiting* note sits beside *stopped* as it does beside *wound down*, through `inbox.work_note` (~L978) and the `wound_down` gate at `ui/repo.py` ~L604, which takes the stopped case too.
+  - A defined team with no record reads *· its lanes hold n entries* (tooltip Start's line; nothing when empty or unread).
+  - `ao team list` shows *work waiting: n entries* beside *stopped* too, and *lanes hold n entries* for a team with no record. `--json` carries `work_waiting` and `lanes_hold`.
+- **Help text**: the **when work appears** paragraph (§4.5a help list, `src/shiftlead/ui/help.py` `Help("on-work", …)` ~L400) gains a sentence: *A team that stopped is never started for its work; the Inbox says its lanes gained it — under Later if you stopped it yourself.* Change §4.5a's help list and `ui/help.py` together in this PR.
+- **Tests**:
+  - A team the person stopped (a member killed by the person) gains an entry: the mark has `stopped.by == "person"`, there is no start under `start`, and the row is under Later and untold.
+  - A crash-stopped team gives `other`: counted under Needs you and told, with `work_line`'s stopped wording.
+  - A stopped mark's row is not a running team's: no *finished* clause, and its Start is the card's, never `work_start`.
+  - A tick kill at the stop time gives `until`; so does a member that exited on its own after the stop time's wrap-up.
+  - A superseded record closed by the person does not make `person`; nor does a member the person closed a day before a stop-time stop.
+  - A team the person wound down from the Org page whose members left on their own reads `person` (`wrapup_by`); a manager's wind-down does not.
+  - A plain send clears `wrapup_by`; a wrap-up a session sends stamps that session's id, one the person sends stamps `person`.
+  - A killed record Closed later keeps its kill's end: the baseline and `at` read `ended.at`, and the Close's `person` does not override the kill's `stop time`.
+  - The baseline is the ledger at the record's end: an entry filed while the home was down after the stop is news; one only on a branch checked out at the home is not. A baseline carried by a supersede onto a run that ended undeclared is rewritten.
+  - A member with no `lane_seen` gets the baseline: an entry, or a red PR, present at the stop is not news, while an entry filed after it is.
+  - Dismiss adds the ids; a crew session going live removes the mark; `work_start` does not start a stopped mark.
+  - The no-record row and card note come from `teamrun.lanes`, with distinct ids.
+  - `ao team list` covers each case.
+  - `attention_snooze` accepts kind `lanes` and still refuses an unknown kind.
+
+**Done when** a stopped team whose lane gains an entry draws the *team start* row in the section its stop decides and is never started by rule 8, a defined team with no record shows what its lanes hold on its card and in `ao team list`, and every listed test passes, with a screenshot of the row and the card in the PR (design §4.9b).
+
+**Related:** TD-781, TD-703, TD-227, TD-457.
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #PRNUM) — slice 3: a state row carrying `later` is drawn in the Inbox's *Later* section (`INBOX_SECTIONS` gains `later`, `#rows-later`, uncounted, snoozed as any state row): the *team start* row of a team the person stopped, and `inbox.lanes_rows`, a defined team no unattended record carries, under `ask` and `start` — *`<team>` · stopped · its lanes hold n entries: …*, Start the card's, Snooze kept under `lanes:<team>`, no Dismiss. `Readings.team_lanes` reads `teamrun.lanes` per such team at most once in `DEFS_TTL`, off the loop, over the request's one `repos` reading; `with_lanes` puts `lanes_hold` and `lanes_line` on the definitions' rows, so the team card of a team with no crew record reads *· its lanes hold n entries* beside *stopped*, its tooltip Start's line. The **when work appears** help paragraph gained its sentence (§4.5a and `ui/help.py`). Tests: `tests/test_ui_work_row.py`. Looked at on a scratch home (`look_home.py` with a team defined and never started): `docs/mockups/reviews/2026-10-16-td782-later.png`, `docs/mockups/reviews/2026-10-16-td782-card.png`.

@@ -51,7 +51,7 @@ PERSON_ASK_KINDS = ("ask",)  # what reads as a question to the person; `steer` h
 # section, under *Steering* and in neither number — it waits on a session, not on the person.
 # §4.9b (TD-075 step 2): **Answered for you** follows it, uncounted too — what a teammate answered
 # for the person from the record, each with **Overrule**.
-INBOX_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi", "snoozed")
+INBOX_SECTIONS = ("needs", "steering", "waiting", "answered", "later", "fyi", "snoozed")
 
 
 def _entry_open(e: dict[str, Any]) -> bool:
@@ -984,6 +984,63 @@ def work_rows(
     return out
 
 
+def lanes_hold(got: Mapping[str, Any] | None) -> list[str] | None:
+    """The distinct ids a `teamrun.lanes` reading matched (§6 rule 8 *A team with no record*, TD-781), or
+    None where it says nothing: no reading, or a lane whose ledger could not be read — *unknown*, never empty."""
+    if not got or any(r.get("n") is None for r in (got.get("roles") or {}).values()):
+        return None
+    return [str(i) for i in got.get("ids") or []]
+
+
+def lanes_rows(
+    teams: Iterable[Mapping[str, Any]],
+    readings: Mapping[str, Any],
+    records: Iterable[Mapping[str, Any]] = (),
+    on_work: Callable[[str], str] | None = None,
+) -> list[dict[str, Any]]:
+    """design §4.5a **Inbox row: team start**, a defined team with **no record** (§6 rule 8 *A team with
+    no record*, TD-781): the client's own row, under *Later*, uncounted and never told — *`<team>` ·
+    stopped · its lanes hold n entries: TD-119*, five ids at most and *and n more*, from `readings`, the
+    `teamrun.lanes` reading by team. `teams` is the definitions' rows (`teamrun.rows`). A team is drawn
+    when no **unattended** record in `records` carries its badge (a person's own session in the team does
+    not take the row away), its `on_work` is `ask` or `start`, and its lanes were read and hold an entry.
+    **Start** is the card's and **Snooze ▾** is kept under `lanes:<team>`; nothing is stored, so no Dismiss."""
+    on_work = on_work or uiconf.team_on_work
+    manned = {str(r.get("team") or "") for r in records if r.get("unattended") and r.get("team")}
+    out: list[dict[str, Any]] = []
+    for row in teams:
+        team = str(row.get("name") or "")
+        if not team or team in manned or on_work(team) not in ("ask", "start"):
+            continue
+        ids = lanes_hold(readings.get(team))
+        if not ids:
+            continue
+        n = len(ids)
+        said = f"its lanes hold {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}"
+        if n > WORK_IDS:
+            said += f" and {n - WORK_IDS} more"
+        out.append(
+            {
+                "row": "lanes",
+                "sid": f"lanes:{team}",
+                "id": f"lanes:{team}",
+                "name": team,
+                "team": team,
+                "subject": kind_subject(f"lanes hold {n} entr{'y' if n == 1 else 'ies'}", team),
+                "at": "",
+                "repo": Path(str(row.get("repo") or "")).name,
+                "ids": ids[:WORK_IDS],
+                "more": max(0, n - WORK_IDS),
+                "n": n,
+                "questions": [],
+                "later": True,  # under Later, uncounted and never told (§6 rule 8, TD-781)
+                "text": f"{team} · stopped · {said}",
+                "find": " ".join((team, "team start", "stopped", said)),
+            }
+        )
+    return out
+
+
 def work_finished(team: str, mark: Mapping[str, Any], records: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
     """The members a running team's mark names (§6 rule 8 *A member that finished while its team runs
     on*, TD-466), each `{name, at}` in the mark's order: the mark keys them by name, and the instant is
@@ -1892,6 +1949,10 @@ def inbox_sections(
       instead of in FYI, uncounted, newest first, so what was decided in the person's name is
       never mixed in with the notes.
 
+    - **Later** (§6 rule 8 *A team that stopped*, *A team with no record*; TD-781, built by TD-782) — a
+      state row carrying `later`: the *team start* row of a team the person stopped, and a defined
+      team with no record's (`lanes_rows`). Uncounted, snoozed as any state row is.
+
     **Where a row is drawn** (§4.5 screen 6, TD-748, built by TD-771): with `cards`, the open Queue
     cards' entries (`ui.queue.card_index`), every row is tagged `home: inbox|queue` with the `on_card` and
     `on_row` it is drawn on and its `mentions` (`ui.queue.item_home`); a view rule, so the sections and the
@@ -1900,9 +1961,6 @@ def inbox_sections(
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
-    # a stopped team's row the person stopped is *Later*'s, never counted (§6 rule 8 *A team that
-    # stopped*, TD-781); the Later section draws it from TD-782's next slice, so until then no section does
-    states = [r for r in states if not r.get("later")]
     for r in states:
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
         if r.get("fyi") and not (r.get("auto_row") and _iso(raw) and _iso(raw) > at):
@@ -1919,6 +1977,10 @@ def inbox_sections(
         until = _iso(raw)
         if until and until > at:
             out["snoozed"].append({**r, "snoozed_until": str(raw), "until_words": _left(str(raw), at)})
+        elif r.get("later"):
+            # a stopped team's row the person stopped, and a team with no record's (§6 rule 8, TD-781):
+            # *Later*'s, never counted
+            out["later"].append(r)
         else:
             out["needs"].append(r)
     # The outcome `note` that settles a question is an ordinary entry in its own right, and is
@@ -1985,7 +2047,8 @@ def inbox_sections(
 # *Urgency*: the page's own sections in the page's order. The snoozed list is not one of them: it
 # is in no section and no count (§4.10 *Snooze*).
 # *Later* (TD-565) is the board's rows coming up, the fold's once opened, and the ledger's *for you*
-# rows: its own boxes the poll puts back, so it is a rail section and not one of `INBOX_SECTIONS`.
+# rows, its own boxes the poll puts back, and the team start rows a stopped team's own Stop or a team
+# with no record draws (§6 rule 8, TD-781), which are `INBOX_SECTIONS`' `later`.
 RAIL_SECTIONS = ("needs", "steering", "waiting", "answered", "later", "fyi")
 RAIL_SECTION_NAMES = {
     "needs": "Needs you",

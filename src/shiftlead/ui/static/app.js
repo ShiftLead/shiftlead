@@ -2308,7 +2308,7 @@
   // poll swaps a whole section's markup: nothing here composes markup out of what a session wrote.
   // What lives in the browser is what belongs to this browser — the filter, the FYI fold — exactly
   // as the Org's filter and team folds do.
-  const IN_SECS = ["needs", "steering", "waiting", "answered", "fyi", "snoozed"];
+  const IN_SECS = ["needs", "steering", "waiting", "answered", "later", "fyi", "snoozed"];
   let landed = "";  // the row a `?row=` link landed on: marked until the page is left, across the poll's swaps
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
@@ -2737,7 +2737,8 @@
         }
       }
     }
-    // *Later* (TD-565): drawn while it holds a row coming up, a *not shown* fold or a ledger row
+    // *Later* (TD-565): drawn while it holds a row coming up, a *not shown* fold, a ledger row or a team
+    // start row of its own (TD-781)
     const lt = $("#sec-later");
     if (lt) lt.classList.toggle("hidden", !AO.laterHas(lt) && !rail.sec.includes("later"));
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
@@ -2912,7 +2913,7 @@
   // design §4.5 screen 6 *The ledger's entries that wait on you* (TD-368, TD-565): full rows in
   // *Later*. The rules are `AO.` so that `tests/test_ui_inbox_ledger.py` runs them under node (TD-374).
   // *Later* holds something: a row coming up, a *not shown* fold, or a ledger row
-  AO.laterHas = (sec) => !!sec.querySelector("#rows-coming .mailrow, details.boardfold, #ledgerforyou .mailrow");
+  AO.laterHas = (sec) => !!sec.querySelector("#rows-coming .mailrow, details.boardfold, #ledgerforyou .mailrow, #rows-later .mailrow");
   // the poll's swap: put back whole when the server's markup changed — compared with what it sent
   // last, not with the DOM, whose `open` and `hidden` differ. True when it swapped.
   AO.ledgerSwap = function (lf, html) {

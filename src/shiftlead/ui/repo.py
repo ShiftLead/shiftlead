@@ -759,6 +759,10 @@ def team_groups(
                 # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only, beside *wound
                 # down* or a stopped team's *stopped* (TD-781)
                 "work_note": work_note(mark) if not live and (row.get("wound_down") or _stopped(mark)) else None,
+                # …and a defined team with no crew record, what its lanes hold (*A team with no record*, TD-781):
+                # `teamrun.lanes`' distinct ids, the tooltip Start's line; nothing when empty or unread
+                "lanes_hold": (row.get("lanes_hold") or 0) if not live and not row.get("records") else 0,
+                "lanes_line": row.get("lanes_line") or "",
                 "work_started": work_started(crew) if live and team != NO_TEAM else None,
                 # §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark, display only
                 "balance_note": teamrun.balance_note(marks[team]) if live and team in marks else "",
