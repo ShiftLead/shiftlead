@@ -14077,3 +14077,29 @@ Each reproduction passed with its fix.
 **Related:** TD-722 (the design), TD-724 (the definition), TD-721 (the Repo page as the repo group expanded), TD-642 (the director's card).
 
 **Resolved:** 2026-10-16 (grinder-ao-2) — `ui/repo.py`'s new `org_layout` draws the Org page from `team_groups`' groups: project headings in the org file's order (`title`, else the name; a project of one repo draws no heading of its own, its repo's line being the heading), then the repos no project lists in the registry's order; under each repo its line (`repo_line.html`: the name, *open →*, and the Repo facet, now `repo_facet.html`, drawn once, its lanes *i* one line per team), its teams (live and concluded first, then nothing live, each in definition order — `team_groups` gives each group its `repo` and `order`), and a no-team strip *n sessions, no team*; then a team whose repo is told nowhere, and *No repo* last. No team card draws the Repo facet (`summary.drawn` leaves it out; the Repo page and the rollup still read `summary.repo`). `team_summary` and `compact_in` read the definition's repo (`repo_named`), `team_repo` only for a badge no definition holds; `group_place` says the host alone; the header no longer names its project. The client (`syncGroups`) keys every element by `key` and places headings and lines in the server's order; the filter hides a repo line, and a heading, when everything under it is hidden; the ring runs repo line → team cards → strip (`RINGS.org`). Tests: `tests/test_ui_org_layout.py` (nine, a node probe among them), the header test rewritten. The director's card is TD-642's (its item 6a): no `director:` exists until it lands. UI check on a scratch home in #1929 (`docs/mockups/reviews/2026-10-16-td725-project-repo-team.png`).
+
+## TD-741: Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, an interactive round with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5 screen 6 (board items, *The board's horizon* `next:<n>`, *the rail*), §4.5a *Inbox page: the rail*; `src/shiftlead/ui/inbox.py` (the horizon ~L1571, `next:` ~L1605, its `repo_teams` badge ~L1582), `src/shiftlead/ui/app.py` (`repo_teams` ~L383 and its callers ~L758, ~L2171, ~L2397, ~L3241), the Inbox templates and rail
+
+**Why:** the board is the repo's, but the Inbox badges a board row with the first team whose repo it is (`repo_teams`) and counts the horizon per team. With two teams on one repo (TD-722) the badge is arbitrary and the second team's rail pick shows none of the repo's board. Paul, 2026-10-15, asked whether a board row should carry the project or *project.repo*: the row carries its repo, and the project heading is read from it, since a repo is in one project.
+
+**Fix:**
+- A board row carries its **repo** and no team badge, drawn *ContractMatch · samscrape* where the repo's project has several repos (`Org.project_of`, TD-724), else the repo's name.
+- The rail gains a **Repos** group after *Teams*, each repo a row on the page carries, with its count; the pick is the URL's `repo`. A **team** pick narrows board items to the team's repo.
+- `next:<n>` is per repo: each board's n soonest open items, the board counted once whichever teams work its repo. The setting keeps its word.
+- `repo_teams` keeps its other callers (Add entry's hand-to default, the start-on-work row), and stops badging board rows.
+- A team's rail count includes the board rows of the team's repo, so the count and the narrowed page agree.
+- **Tests** (in `tests/test_ui_board.py` and the Inbox tests, `tests/test_ui_inbox*.py`): a team's rail count includes its repo's board rows; a board row of a repo two teams service carries the repo and no team; `?repo=` narrows to it; a team pick shows its repo's board rows; `next:3` draws three per repo; a repo in a multi-repo project reads *Project · repo*.
+
+**Done when** board rows carry their repo, the rail filters by repo, the horizon counts per repo, and every listed test passes.
+
+**Related:** TD-722, TD-724, TD-740, TD-207, TD-220.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1931) — board rows carry their repo (`repo_boards`: the repo's name, *Project · repo* where its project has several repos, and every team whose repo it is) and no team badge; the rail's **Repos** group and `?repo=`; a team pick and a team's count take in its repo's board rows; `next:<n>` per repo and the line saying so; `repo_teams` keeps Add entry's default and the start-on-work row. Every listed test is in `tests/test_ui_board.py` and `tests/test_ui_inbox.py`; checked on a scratch home with two teams on one repo of a two-repo project (the PR's UI check).
