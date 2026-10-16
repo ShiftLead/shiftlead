@@ -211,7 +211,8 @@ def lined_ids(text: str) -> list[str]:
 class RankStore:
     """`ranks.json`: the intents not yet landed, when the last move was made, the cards whose rank PR
     failed after its retry (`not_landed`, card id → why), when a join or a prune was first found, and what
-    the last flush found (`flushed`), so a checkout that has not caught up is not flushed again. Written
+    the last flush found (`flushed`), so a checkout that has not caught up is not flushed again, and the keys
+    landed moves gave (`landed`, card id → {key, at}) until the reading shows them. Written
     whole; a missing or unreadable file is no intents (an intent not landed is lost on a machine change,
     accepted — §4.4)."""
 
@@ -231,6 +232,7 @@ class RankStore:
             "found_at": raw.get("found_at"),
             "not_landed": {str(k): str(v) for k, v in (raw.get("not_landed") or {}).items()},
             "flushed": [list(x) for x in raw.get("flushed") or () if isinstance(x, list)],
+            "landed": {str(k): v for k, v in (raw.get("landed") or {}).items() if isinstance(v, dict)},
         }
 
     def save(self, state: Mapping[str, Any]) -> None:

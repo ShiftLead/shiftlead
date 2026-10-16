@@ -6,6 +6,7 @@ move the person's and an interactive session's alone."""
 from __future__ import annotations
 
 import subprocess
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -228,15 +229,48 @@ async def test_the_flush_lands_per_repo_and_a_failed_pr_keeps_its_intent(agent, 
     monkeypatch.setattr(board, "land_rank", land)
     cards = list(agent._queue["cards"])
     agent._rank_flush(cards, agent._rank_repos())
+    assert landed == [] and len(agent.rank_store.load()["intents"]) == 1  # within RANK_FLUSH of the move: kept
+    _age(agent)
+    agent._rank_flush(cards, agent._rank_repos())
     assert [(n, m) for n, _, m in landed] == [("a", "queue: rank TD-004 (shiftlead)")]
     state = agent.rank_store.load()
     assert len(state["intents"]) == 1 and "the forge refused it" in state["not_landed"]["a#TD-004"]
+    assert time.time() - state["moved_at"] < 5  # retried RANK_FLUSH on, not on the next tick
     assert (await agent.rpc_queue())["cards"][0]["not_landed"]
-    # the next flush lands it, and the intent goes
+    # the next flush lands it, and the intent goes; its key stands in until the reading shows it
     monkeypatch.setattr(board, "land_rank", lambda root, rel, lines, msg: {"pr": 8})
+    _age(agent)
     agent._rank_flush(cards, agent._rank_repos())
     state = agent.rank_store.load()
     assert state["intents"] == [] and state["not_landed"] == {} and state["moved_at"] is None
+    assert list(state["landed"]) == ["a#TD-004"]
+    q = await agent.rpc_queue()
+    assert q["cards"][0]["id"] == "a#TD-004" and "pending" not in q["cards"][0]
+    # the checkout pulls the landed lines: the reading shows the key, and the stand-in goes
+    key = state["landed"]["a#TD-004"]["key"]
+    for v in agent._queue["cards"]:
+        if v["id"] == "a#TD-004":
+            v["key"] = key
+    await agent._rank_pass(NOW)
+    assert agent.rank_store.load()["landed"] == {}
+
+
+def _age(agent) -> None:
+    state = agent.rank_store.load()
+    state["moved_at"] = float(state["moved_at"] or time.time()) - rank.RANK_FLUSH - 1
+    agent.rank_store.save(state)
+
+
+async def test_a_repo_whose_reading_is_empty_or_unknown_ids_are_never_pruned(agent, tmp_path):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, r = _repo(tmp_path, "r", FIVE, archive=[_entry(9, "done", Resolved="2026-10-16")],
+                    lines="TD-009: 0|1\nTD-077: 0|2\n")  # fmt: skip
+    agent._repos = {root: r}
+    assert agent._rank_lined(agent._rank_repos()) == {"r": ["TD-009"]}  # TD-077: in neither file
+    agent._repos = {root: {**r, "ledger": {**r["ledger"], "entries": []}}}
+    assert agent._rank_lined(agent._rank_repos()) == {}
 
 
 async def test_a_flush_is_due_rank_flush_after_the_last_move(agent, tmp_path, monkeypatch):

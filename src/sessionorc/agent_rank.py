@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import board as board_mod
+from sessionorc import ledger as ledger_mod
 from sessionorc import ledgerboard as lb
 from sessionorc import mail
 from sessionorc import rank as rank_mod
@@ -22,6 +23,8 @@ from sessionorc.agent_common import RpcError, log
 from sessionorc.models import now_iso
 
 KINDS = ("rank", "join", "prune")  # a flush's PRs, each kind its own (§4.4 *The rank file*)
+# A landed move's key stands in for its card's until the home's reading shows it (the checkout pulled), or this long
+LANDED_KEEP = 3600.0
 
 
 class RankMixin:
@@ -48,10 +51,11 @@ class RankMixin:
             )
         return str(caller)
 
-    def _pending_keys(self, cards: list[dict[str, Any]], intents: list[dict[str, Any]]) -> dict[str, str]:
-        """Card id → the key its intents give it, re-derived now, in the order they were made."""
-        keys: dict[str, str] = {}
-        for it in intents:
+    def _pending_keys(self, cards: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, str]:
+        """Card id → the key a landed move gave it that the reading does not show yet, then the key its
+        intents give it, re-derived now, in the order they were made."""
+        keys = _landed(cards, state)
+        for it in state["intents"]:
             try:
                 rank_mod.derive(it, cards, keys)
             except rank_mod.Refused:
@@ -83,7 +87,7 @@ class RankMixin:
                 state["intents"].append(it)
                 state["moved_at"] = time.time()
                 self.rank_store.save(state)
-        keys = self._pending_keys(cards, state["intents"])
+        keys = self._pending_keys(cards, state)
         if it is not None and self._queue:  # applied on the page at once (§4.4 *A move lands*)
             await self._broadcast({"event": "queue", "queue": self._queue_ranked(self._queue)})
         log.info("rank_move by %s: %s between %s and %s%s", by, want, prev, next, "" if it else " (where it is)")
@@ -105,14 +109,17 @@ class RankMixin:
         if not cards:
             return got
         state = self.rank_store.load()
-        if not state["intents"] and not state["not_landed"]:
+        if not state["intents"] and not state["not_landed"] and not state["landed"]:
             return got
-        keys = self._pending_keys(cards, state["intents"])
+        keys = self._pending_keys(cards, state)
+        landed = _landed(cards, state)
         out = []
         for c in cards:
             c = dict(c)
             if c["id"] in keys:
-                c["key"], c["pending"] = keys[c["id"]], True
+                c["key"] = keys[c["id"]]
+                if landed.get(c["id"]) != c["key"]:  # an intent's, not yet landed; a landed key only stands in
+                    c["pending"] = True
             if c["id"] in state["not_landed"]:
                 c["not_landed"] = state["not_landed"][c["id"]]
             out.append(c)
@@ -158,6 +165,15 @@ class RankMixin:
             t = time.time()
             with self.rank_store.lock:
                 state = self.rank_store.load()
+                shown = {c["id"]: c.get("key") for c in cards}
+                kept = {
+                    cid: v
+                    for cid, v in state["landed"].items()
+                    if cid in shown and shown[cid] != v.get("key") and t - float(v.get("at") or 0) < LANDED_KEEP
+                }
+                if kept != state["landed"]:  # the reading shows it now, or the card is gone, or it is too old
+                    state["landed"] = kept
+                    self.rank_store.save(state)
                 if found and state["found_at"] is None:
                     state["found_at"] = t
                     self.rank_store.save(state)
@@ -171,7 +187,16 @@ class RankMixin:
             log.exception("looking for a rank flush failed")
             return
         if due:
-            self._rank_task = asyncio.create_task(asyncio.to_thread(self._rank_flush, cards, repos))
+            self._rank_task = asyncio.create_task(self._rank_run(cards, repos))
+
+    async def _rank_run(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str]]) -> None:
+        """The flush off the event loop, then the page told what it changed (`pending` gone, `not_landed`)."""
+        try:
+            await asyncio.to_thread(self._rank_flush, cards, repos)
+        except Exception:  # noqa: BLE001 — the intents stay for the next flush
+            log.exception("the rank flush failed")
+        if self._queue:
+            await self._broadcast({"event": "queue", "queue": self._queue_ranked(self._queue)})
 
     def _rank_flush(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str]]) -> None:
         """One flush (§4.4 *A move lands*): every intent re-derived against `cards` in the order made, its
@@ -179,8 +204,12 @@ class RankMixin:
         repo. A repo whose rank PR fails after its retry keeps every intent that touches it, retried at the
         next flush, and its cards read *not landed*; an intent that no longer derives is dropped."""
         with self.rank_store.lock:
-            taken = list(self.rank_store.load()["intents"])
-        keys: dict[str, str] = {}
+            state = self.rank_store.load()
+        # the moves only once `RANK_FLUSH` has passed since the last one, so a run of drags lands as one PR
+        # even when a join or a prune comes due in the middle of it
+        due = state["intents"] and time.time() - float(state["moved_at"] or 0) >= rank_mod.RANK_FLUSH
+        taken = list(state["intents"]) if due else []
+        keys = _landed(cards, state)  # a move derives against the keys landed moves gave, not the stale reading
         lines: dict[str, str | None] = {}
         made: list[tuple[dict[str, Any], dict[str, Any]]] = []
         for it in taken:
@@ -208,7 +237,7 @@ class RankMixin:
                 root, rel = repos[repo]
                 try:
                     got = board_mod.land_rank(root, rel, ls, lb.queue_subject(rank_mod.TOOL, kind, list(ls)))
-                except (board_mod.Refused, lb.Refused) as e:
+                except Exception as e:  # noqa: BLE001 — a refusal, or gh or git failing under it: kept, retried
                     log.warning("the %s flush of %s did not land: %s", kind, repo, e)
                     if kind == "rank":
                         failed[repo] = str(e)
@@ -217,6 +246,7 @@ class RankMixin:
                 if got:
                     log.info("rank flush %s %s: PR #%s", kind, repo, got.get("pr"))
         keep = [it for it, card in made if set(card.get("repos") or ()) & failed.keys()]
+        t = time.time()
         with self.rank_store.lock:
             state = self.rank_store.load()
             later = [i for i in state["intents"] if i not in taken]  # moves made while this flush ran
@@ -226,23 +256,47 @@ class RankMixin:
                 for it, card in made
                 if it in keep
             }
+            for it, card in made:
+                if it not in keep:  # landed: its key stands in until the reading shows it
+                    state["landed"][str(card["id"])] = {"key": keys[card["id"]], "at": t}
             state["found_at"] = None
             state["flushed"] = [] if missed else _signature(self._rank_found(cards, repos))
-            if not state["intents"]:
+            if keep and not later:
+                state["moved_at"] = t  # retried at the next flush, `RANK_FLUSH` on, never every tick
+            elif not state["intents"]:
                 state["moved_at"] = None
             self.rank_store.save(state)
 
     def _rank_lined(self, repos: Mapping[str, tuple[str, str]]) -> dict[str, list[str]]:
-        """Repo name → the ids its checkout's rank file gives a line (none read: no rank file)."""
+        """Repo name → the ids its checkout's rank file gives a line that are open or archived — what a prune
+        may weigh. A repo whose ledger reading failed or holds no entry, or whose archive cannot be read, is
+        left out: a reading that is missing must never read as every line's card archived."""
         out: dict[str, list[str]] = {}
+        views = {str(v.get("name") or Path(r).name): v for r, v in self._repos.items() if isinstance(v, Mapping)}
         for name, (root, rel) in repos.items():
+            led = (views.get(name) or {}).get("ledger") or {}
+            if led.get("error") or not led.get("entries"):
+                continue
             try:
-                out[name] = rank_mod.lined_ids((Path(root) / rel).read_text(encoding="utf-8", errors="replace"))
+                lined = rank_mod.lined_ids((Path(root) / rel).read_text(encoding="utf-8", errors="replace"))
+                archive = (Path(root) / ledger_mod.archive_path(str(led["path"]))).read_text(encoding="utf-8")
             except OSError:
                 continue
+            known = ledger_mod.ids_in(archive) | {str(e.get("id")) for e in led["entries"]}
+            out[name] = [t for t in lined if t in known]
         return out
 
 
 def _signature(found: Mapping[str, str | None]) -> list[list[Any]]:
     """The joins and prunes found, as `ranks.json` keeps them."""
     return [[q, k] for q, k in sorted(found.items())]
+
+
+def _landed(cards: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, str]:
+    """Card id → the key a landed move gave it, for a card the reading still shows at another key."""
+    shown = {c["id"]: c.get("key") for c in cards}
+    return {
+        cid: str(v["key"])
+        for cid, v in (state.get("landed") or {}).items()
+        if cid in shown and isinstance(v, dict) and v.get("key") and shown[cid] != v["key"]
+    }
