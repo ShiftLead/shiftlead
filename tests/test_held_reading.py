@@ -125,18 +125,18 @@ def test_held_is_read_once_per_head_and_key_carried_through_old_and_a_failed_rea
 
 
 @pytest.mark.unit
-def test_held_reads_are_capped_a_pass_unread_rows_first_oldest_first(tmp_path, monkeypatch):
+def test_held_reads_are_capped_a_pass_oldest_first(tmp_path, monkeypatch):
     prs = [_pr(n, T0 + timedelta(minutes=n), f"h{n}") for n in range(1, 8)]
     files = {n: ["src/core/a.py"] for n in range(1, 8)}
     reads: list[int] = []
     _gh(monkeypatch, prs, files, reads)
     first = reports.pr_reading(tmp_path, T0, held=["src/core/**"])
     assert reads == [1, 2, 3, 4, 5] and held.HELD_READS == 5
-    # the next pass reads the two never read before a stale one, whatever its age
+    # the next pass reads the two never read and the one read at another head, oldest first; the rest stand
     reads.clear()
-    prs[0]["headRefOid"] = "h1b"
-    reports.pr_reading(tmp_path, T0 + timedelta(minutes=5), old=first, held=["src/core/**"])
-    assert reads == [6, 7, 1]
+    prs[3]["headRefOid"] = "h4b"
+    second = reports.pr_reading(tmp_path, T0 + timedelta(minutes=5), old=first, held=["src/core/**"])
+    assert reads == [4, 6, 7] and all(p["held"] == ["src/core/a.py"] for p in second["open"])
 
 
 # ── asked and unasked ────────────────────────────────────────────────────────────────────────────
@@ -177,6 +177,11 @@ def test_asked_reads_the_seats_and_the_persons_mail_by_the_senders_repo():
     got = held.asks(graph, [stamped, unstamped], repos)
     assert got["/a"]["30"] == {"at": T0.isoformat(), "to": PERSON} and "30" not in got.get("/b", {})
     assert got["/a"]["31"]["to"] == PERSON and got["/b"]["31"]["to"] == PERSON
+    # a team that works two repos: the person's ask counts for each
+    graph["ao-gb"] = _rec("ao-gb", repo="/b", team="t")
+    got = held.asks(graph, [stamped], repos)
+    assert got["/a"]["30"] == got["/b"]["30"] == {"at": T0.isoformat(), "to": PERSON}
+    del graph["ao-gb"]
     # two checkouts of one remote both count it
     two = _repos("/a", "/a2", remote="git@github.com:o/a.git")
     lead.inbox = [_ask(40, "ao-ga")]
@@ -252,3 +257,80 @@ async def test_the_tick_passes_each_remotes_union_of_keys_to_the_read(agent, tmp
     assert agent._held_keys([a, b]) == {a: ["src/a/**", "src/b/**"], b: ["src/a/**", "src/b/**"]}
     agent._repos = {a: {"remote": "r1"}, b: {"remote": "r2"}}
     assert agent._held_keys([a, b]) == {a: ["src/a/**"], b: ["src/b/**"]}
+
+
+async def test_asked_and_unasked_are_kept_across_a_re_read_of_the_rows(agent, tmp_path, monkeypatch):
+    """The rows are rebuilt at each read; `pr_orders` is `_red_prs`' own and carried through it."""
+    from conftest import park_ticks
+
+    from sessionorc import hosts
+
+    await park_ticks(agent)
+    root = tmp_path / "repo"
+    root.mkdir()
+    reg = hosts.default_repos_registry()
+    reg.parent.mkdir(parents=True, exist_ok=True)
+    reg.write_text(f"{root}\n")
+    agent.sessions["ao-g"] = _rec("ao-g", repo=str(root), review=CORE, host=agent.host)
+    lead = _rec("ao-tl", role="techlead", host=agent.host)
+    lead.inbox = [_ask(12, "ao-g")]
+    agent.sessions[lead.id] = lead
+    row = {"held": ["src/core/a.py"], "held_head": "h", "held_key": ["src/core/**"], "checks": "green"}
+    keys = []
+
+    def read(d, now, old=None, held=None, **kw):
+        keys.append(held)
+        return {"open": [{"number": 12, **row}, {"number": 13, **row}], "at": now.isoformat()}
+
+    monkeypatch.setattr(reports, "pr_reading", read)
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()
+    assert keys == [["src/core/**"]]
+    await agent._red_prs(T0)
+    want = {"asked": {"12": {"at": T0.isoformat(), "to": "ao-tl"}}, "unasked": [13]}
+    po = agent._repos[str(root)]["pr_orders"]
+    assert {k: po[k] for k in want} == want
+    lead.inbox = []
+    agent._repos_read_at = float("-inf")
+    await agent._refresh_repos()  # the rows read again, the mail pruned meanwhile
+    po = agent._repos[str(root)]["pr_orders"]
+    assert {k: po[k] for k in want} == want
+
+
+def test_two_checkouts_of_one_remote_read_at_the_first_key_then_the_union(tmp_path, monkeypatch):
+    """§4.4 *The key's scope*: on a first pass no `remote` is read yet, so the second checkout takes
+    the first's reading at the first's key; the next pass reads every root of the remote at the union."""
+    from sessionorc.agent_tick import TickMixin
+
+    roots = []
+    for name in ("a", "b"):
+        r = tmp_path / name
+        r.mkdir()
+        for argv in (["init", "-q", "-b", "main"], ["remote", "add", "origin", "git@github.com:o/r.git"]):
+            subprocess.run(["git", "-C", str(r), *argv], check=True, capture_output=True)
+        roots.append(str(r))
+    a, b = roots
+    keys = []
+
+    def read(d, now, old=None, held=None, **kw):
+        keys.append((d, held))
+        return {"open": [], "at": now.isoformat()}
+
+    monkeypatch.setattr(reports, "pr_reading", read)
+    first = TickMixin._read_repos(roots, {}, set(roots), keys={a: ["src/a/**"], b: ["src/b/**"]})
+    assert keys == [(a, ["src/a/**"])] and first[b]["prs"] == first[a]["prs"]
+    assert first[a]["remote"] == first[b]["remote"] == "git@github.com:o/r.git"
+
+    class Home:
+        _repos = first
+        _graph = staticmethod(
+            lambda: {
+                "ao-a": _rec("ao-a", repo=a, review={"reader": "t", "held": ["src/a/**"]}),
+                "ao-b": _rec("ao-b", repo=b, review={"reader": "t", "held": ["src/b/**"]}),
+            }
+        )
+
+    union = TickMixin._held_keys(Home(), roots)
+    keys.clear()
+    TickMixin._read_repos(roots, first, set(roots), keys=union)
+    assert keys == [(a, ["src/a/**", "src/b/**"])]

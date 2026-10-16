@@ -706,8 +706,8 @@ def _held_flags(
     """Sets `held` on the open PRs (design §4.4 *A held PR nobody asked is marked, never ordered*,
     TD-789): the changed files `key`'s globs name (`held.match`), with `held_head` and `held_key`, the
     head and the key they were read at — carried from `olds` as `sync_head` is, and read again for a
-    changed head or key. A sync PR is never read; a draft is. At most `held.HELD_READS` reads, the
-    rows never read or read at another head or key first, oldest first. A read that failed keeps the
+    changed head or key. A sync PR is never read; a draft is. At most `held.HELD_READS` reads, of
+    the rows never read or read at another head or key, oldest first. A read that failed keeps the
     last word, and a PR never read carries no `held`. No key (None, or empty): nothing is read, and
     the last word is kept, so a repo whose readers are gone keeps its key and its `held`."""
     todo = []
@@ -719,7 +719,7 @@ def _held_flags(
             p["held"], p["held_head"], p["held_key"] = was["held"], was.get("held_head"), was.get("held_key")
         if key and p["head"] and (p.get("held_head"), p.get("held_key")) != (p["head"], key):
             todo.append(p)
-    todo.sort(key=lambda p: ("held" in p, p["created"] or ""))
+    todo.sort(key=lambda p: p["created"] or "")
     for p in todo[: held.HELD_READS]:
         files = pr_files(directory, p["number"], timeout)
         if not isinstance(files, str):
