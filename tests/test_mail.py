@@ -1269,6 +1269,33 @@ async def test_asker_gone_closes_the_persons_questions_on_close_and_forget_but_n
         assert await reason(asks[a]) == "asker_gone"
 
 
+async def test_about_is_filled_from_the_senders_one_claim(agent, tmp_path):
+    """Design §4.10 (TD-748, built by TD-771): a message sent with no `about` takes the sender's one
+    live claim, as `normalize_ref` wrote it, so the Queue draws it on that entry's card; a given
+    `about` is kept, and a sender holding none or several leaves it empty."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        a = await mk("a", unattended=True, team="ao-grind")
+        async with LocalClient(caller=a) as s:
+
+            async def about(**kw):
+                return (await s.call("msg", to="person", text="which?", kind="ask", **kw))["entry"]["about"]
+
+            assert await about() is None  # no claim
+            await s.call("progress", id=a, ref="td-771", status="claimed")
+            assert await about() == "TD-771"
+            assert await about(about="#702") == "#702"  # given, kept
+            ask = (await s.call("msg", to="person", text="which?", kind="ask"))["entry"]["id"]
+            left = (await s.call("msg", to="person", text="and?", kind="ask"))["entry"]["id"]
+            await s.call("progress", id=a, ref="TD-772", status="claimed")
+            assert await about() is None  # two claims: which one is not the home's guess
+        reply = (await person.call("msg", text="this one", kind="reply", reply_to=ask))["entry"]
+        assert reply["about"] == "TD-771"  # a reply keeps its thread's
+        await person.call("close", id=a)  # an ask about a reference outlives its asker (§4.10)
+        (held,) = [e for e in (await person.call("inbox"))["entries"] if e["id"] == left]
+        assert held["closed_reason"] is None and held["orphaned"]["ref"] == "TD-771"
+
+
 async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
     """Design §4.10 *A question about a reference outlives its asker* (TD-213, TD-215): a wind-down
     closes two members, each with an open question to the person whose `about` names a reference —

@@ -1249,6 +1249,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-16 (TD-771, grinder-ao-2): a reply keeps its thread's `about` before the sender's claim, so one thread is never about two entries.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): a message sent with no `about` takes the sender's one live declared claim. Built by TD-771.
 - 2026-10-15 (TD-730, the designer): *An entry handed to a seat* carries `entry: {repo, type, team}`.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the *seat held* row's example and the anchor's *No team* exception go. Built by TD-757.
