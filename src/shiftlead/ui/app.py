@@ -227,6 +227,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     _owing,  # noqa: F401
     _parts_text,  # noqa: F401
     _pr_parts,  # noqa: F401
+    _rail_teams,  # noqa: F401
     _resolved,  # noqa: F401
     _same_ref,  # noqa: F401
     _shot_host_down,  # noqa: F401
@@ -391,13 +392,36 @@ from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, t
 
 
 def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
-    """Each checkout on `host` → the first team whose `repo:` is it, in definition order (§4.5 screen
-    6: *a board item carries its repo*, design §4.9 *Teams*): a repo has any number of teams, and a
-    row carries one team badge, as a message does."""
+    """Each checkout on `host` → the first team whose `repo:` is it, in definition order (design §4.9
+    *Teams*): a repo has any number of teams, and where one must be named — Add entry's hand-to
+    default, the start-on-work row — it is the first. A board row names its repo instead
+    (`repo_boards`, TD-741)."""
     out: dict[str, str] = {}
     for tname, t in org.teams.items():
         if path := org.checkout(t.repo, host):
             out.setdefault(str(Path(path).expanduser().resolve()), tname)
+    return out
+
+
+def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
+    """Each checkout on `host` → what a board row of it carries (§4.5 screen 6 *a board item carries its
+    repo*, TD-722, built by TD-741): the board is the repo's, so a row names the repo and no team —
+    `name`, the rail's `repo` pick; `label`, *ContractMatch · samscrape* where the repo's project has
+    several repos, else the name; and `teams`, every team whose `repo:` it is in definition order, which
+    a team pick narrows board rows by and whose rail counts take them in."""
+    out: dict[str, dict[str, Any]] = {}
+
+    def entry(repo: str, path: Path) -> dict[str, Any]:
+        p = org.heading(repo)
+        label = f"{p.title or p.name} · {repo}" if p is not None and len(p.repos) > 1 else repo
+        return out.setdefault(str(Path(path).expanduser().resolve()), {"name": repo, "label": label, "teams": []})
+
+    for repo, per_host in org.checkouts.items():
+        if path := per_host.get(host):
+            entry(repo, path)
+    for tname, t in org.teams.items():
+        if path := org.checkout(t.repo, host):
+            entry(t.repo, path)["teams"].append(tname)
     return out
 
 
@@ -812,10 +836,10 @@ class Readings:
             repos = await self.repos()
         except Exception as e:  # noqa: BLE001 — said in words, never an empty board
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
-        teams_of = repo_teams(await self.defs(), host_name())
+        boards_of = repo_boards(await self.defs(), host_name())
         # off the loop (TD-670): every repo's board rows and their standings run to ~40 ms on the live
         # home, on every recount of the Inbox's counts as on the page's read
-        return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, teams_of)
+        return await asyncio.to_thread(board_reading, repos if isinstance(repos, dict) else {}, boards_of)
 
     async def board_items(self) -> tuple[list[dict[str, Any]], str]:
         """The Inbox's **due** board rows and the note beside them: what is counted is what is due,
@@ -3541,9 +3565,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # rows, so the poll brings the group's markup as it brings the rows'; the script presses
             # the lines the URL picks and recounts every line from the rows on the page
             rail = rail_counts(rail_rows(sections, hz["ahead"], ledger_rows(lf)), rail_picks({}))
-            got["html"]["rail_teams"] = str(
-                templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
-            )
+            rail_mod = templates.get_template("inbox_rail.html").module
+            got["html"]["rail_teams"] = str(rail_mod.teams_group(rail, rail_picks({})))  # type: ignore[attr-defined]
+            # …and its *Repos* lines (TD-741), which come and go with the board's rows
+            got["html"]["rail_repos"] = str(rail_mod.repos_group(rail, rail_picks({})))  # type: ignore[attr-defined]
             return sections["needs"], json_body(got, gz)
 
         needs, body = await asyncio.to_thread(read)

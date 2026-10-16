@@ -1,6 +1,6 @@
 {# design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**, **Inbox page: find**
    (TD-129, built by TD-135). Left of the column, sticky: **Clear filters**, the find box, then three
-   groups of toggles — *Urgency* (the page's sections), *Teams*, *Kinds*. Every line is a real
+   groups of toggles — *Urgency* (the page's sections), *Teams*, *Repos*, *Kinds*. Every line is a real
    `<button>` with `aria-pressed`, so a pick is a press and a keyboard reaches it; within a group
    the picks are OR'd, across groups AND'd, and a group with nothing picked means all of it.
 
@@ -8,7 +8,9 @@
    picked or typed, a plain number otherwise; a line at 0 stays, dimmed, so a pick can be undone.
    The page's script recounts on every press and every poll (`AO.railCounts`, the same rule); what
    is drawn here is the first paint, from the picks in the URL. A team's name is the envelope's,
-   drawn as text. #}
+   drawn as text. *Repos* (TD-722, built by TD-741) is each repo a board row on the page carries, in
+   its row's words (*ContractMatch · samscrape* where its project has several repos): the board is
+   the repo's, so its rows carry no team, and a team pick takes in the rows of the team's repo. #}
 
 {% macro num(c, filtered) -%}
 {%- if filtered %}{{ c.shown }} of {{ c.all }}{% else %}{{ c.all }}{% endif -%}
@@ -21,6 +23,12 @@
 {% macro teams_group(rail, picks) -%}
 {%- for t in rail.team_order %}
 {{ line('team', t, 'no team' if t == 'none' else t, rail.teams[t], picks, rail.filtered, 'its rows that need you, on the page now — press: show only this team; a second team adds its rows') }}
+{%- endfor %}
+{%- endmacro %}
+
+{% macro repos_group(rail, picks) -%}
+{%- for x in rail.repo_order %}
+{{ line('repo', x, rail.repo_labels[x], rail.repos[x], picks, rail.filtered, rail.repo_labels[x] ~ ': its board rows that need you, on the page now — press: show only this repo’s board; a second repo adds its rows') }}
 {%- endfor %}
 {%- endmacro %}
 
@@ -40,6 +48,10 @@
   <div class="railgroup" role="group" aria-labelledby="railh-team">
     <div class="railh" id="railh-team">Teams</div>
     <div id="railteams">{{ teams_group(rail, picks) }}</div>
+  </div>
+  <div class="railgroup" role="group" aria-labelledby="railh-repo">
+    <div class="railh" id="railh-repo">Repos</div>
+    <div id="railrepos">{{ repos_group(rail, picks) }}</div>
   </div>
   <div class="railgroup" role="group" aria-labelledby="railh-kind">
     <div class="railh" id="railh-kind">Kinds</div>

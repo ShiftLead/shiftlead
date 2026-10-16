@@ -3056,8 +3056,9 @@ def test_the_picks_come_from_the_url_and_unknown_lines_are_dropped():
     from shiftlead.ui.app import rail_picks
 
     got = rail_picks({"team": "grind,none", "sec": "needs,bogus", "kind": "questions", "find": "  jeff  "})
-    assert got == {"team": ["grind", "none"], "sec": ["needs"], "kind": ["questions"], "find": "jeff"}
-    assert rail_picks({}) == {"team": [], "sec": [], "kind": [], "find": ""}
+    assert got == {"team": ["grind", "none"], "repo": [], "sec": ["needs"], "kind": ["questions"], "find": "jeff"}
+    assert rail_picks({}) == {"team": [], "repo": [], "sec": [], "kind": [], "find": ""}
+    assert rail_picks({"repo": "samscrape,ao"})["repo"] == ["samscrape", "ao"]
 
 
 @pytest.mark.unit
@@ -3257,9 +3258,18 @@ def test_the_script_counts_the_rail_as_the_server_does():
     from shiftlead.ui.app import find_words, rail_counts, rail_picks, rail_rows
 
     # …with a board row coming up (TD-220): in *board items*, in no section's number, kept by a *Needs you* pick
-    rows = rail_rows(_rail_fixture(), [{"row": "board", "id": "b9", "team": "grind", "find": "later on"}])
+    # …and board rows that carry their repo and its teams, never a team of their own (TD-741): one of a
+    # repo two teams work, due, and one of a repo no team works, in a multi-repo project's words
+    sections = _rail_fixture()
+    b1 = {"row": "board", "id": "b1", "teams": ["grind", "audit"], "repo": "ao", "repo_name": "ao", "find": "ao due"}
+    b2 = {"row": "board", "id": "b2", "teams": [], "repo": "ContractMatch · cm-web", "repo_name": "cm-web",
+          "find": "cm-web due"}  # fmt: skip
+    sections["needs"] = [*sections["needs"], b1, b2]
+    ahead = [{"row": "board", "id": "b9", "teams": ["grind"], "repo": "ao", "repo_name": "ao", "find": "later on"}]
+    rows = rail_rows(sections, ahead)
     queries = ["", "?team=grind", "?team=grind,cm&sec=needs", "?sec=fyi&kind=notes", "?team=none&find=home",
-               "?kind=questions&find=517%2C", "?team=gone", "?sec=needs&kind=board"]  # fmt: skip
+               "?kind=questions&find=517%2C", "?team=gone", "?sec=needs&kind=board", "?repo=ao", "?repo=cm-web,gone",
+               "?team=audit", "?team=cm&repo=ao", "?repo=ao&sec=later"]  # fmt: skip
     tmp = pathlib.Path(tempfile.mkdtemp())
     (tmp / "probe.js").write_text(RAIL_PROBE)
     (tmp / "cases.json").write_text(json.dumps({"rows": rows, "picks": queries}))
