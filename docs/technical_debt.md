@@ -72,6 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
+| TD-781 | A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start` | Medium | Open |
 
 ---
 
@@ -1475,3 +1476,23 @@ The other cases:
 **Done when** an org file with a `{team: …}` member fails to load naming the key and its fix, no reader of `MemberDef.team` is left, and `pdm run test` passes.
 
 **Related:** TD-722, TD-724.
+
+---
+
+## TD-781: A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start`
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 rule 8 *Work for a team that wound down* (6-policies.md:576), §4.9a *Out of work does not mean out of reach*, §4.5a **when work appears**; `src/sessionorc/work.py` (`wound_down`: *a team with no session carrying its badge has never run, or has been forgotten, and is neither*), `src/sessionorc/agent_tick.py` and `agent_inbox.py` (the rule's `work_waiting` mark), `src/sessionorc/agent_notify.py` (its row), `src/shiftlead/cli.py` (`ao team list`'s *work waiting* only on a wound-down team)
+
+**Why:** dev-cadence's TD-119 (filed 2026-10-16 06:52Z by ShiftLead's designer, #277) was the only pickable build of its ledger and the first step of the Queue (shiftlead TD-769 waits on it). `dc-grind` has `on_work: start` in `settings.yml`, and rule 8 had started it three times on 2026-10-14. This time it started nothing and wrote nothing — no `work_waiting` in `host.json`, no Inbox row — and the Queue's builds stood still for seven hours until Paul asked how the team was doing and started it by hand (13:58Z). The cause, read from the records: on 2026-10-14 20:05 MDT the definition's members were renamed (`grinder-dc-1` → `dc-grinder`, `manager-dc-1` → `dc-manager`, `techlead-dc-1` → `dc-techlead`, dev-cadence 1145d97), so no record carries the new names; `wound_down` returns None for a team with no records, so the team reads *stopped*, and rule 8 reads only a wound-down team (or a finished member of a team that runs on). A stopped team waits for Start or its schedule by design — but nothing tells the person its lanes hold work. Paul, 2026-10-16: *should it have started automatically when new work arrived?* (The old records are gone and the Start rewrote the new ones, so the rename is the reading of what is left, not a proof.)
+
+**Fix:** the design decides what a team with no live session gets when its lanes gain an entry while it is *stopped* rather than *wound down* — at the least a row (*dc-grind is stopped, 1 entry waiting: TD-119 — Start*), drawn under every `on_work` but `off`; and whether `on_work: start` starts a team that has no record under its definition's names (a rename, a Forget, a definition never started), which has nothing to replay but its definition, under rule 8's five bounds. A team a person stopped (`ao team stop`, a closer naming the person) is the case to keep apart: its stop is the person's word. Then a build entry.
+
+**Done when** the design says what a stopped team with waiting work shows and does under each `on_work`, and its build entry is filed and named in this entry's `Blocked by:`.
+
+**Related:** TD-214, TD-227, TD-457, TD-748, TD-769.
