@@ -352,7 +352,7 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     # a plain worker's checklist is what it always was
     assert [n for n, _ in view(worker, fleet)["ready"]] == [
         "agent working — wait or Wrap up", "tree clean", "branch pushed", "no subagents running",
-        "outcomes reported", "mail read",
+        "no background shells running", "outcomes reported", "mail read",
     ]  # fmt: skip
     # design §4.2, §4.10 *Outcomes* (TD-079): the person answered and has not been told what came
     # of it — the same fact `ao progress none` is refused on, for a session that never declares
@@ -1660,6 +1660,108 @@ def test_an_idle_session_with_a_live_subagent_reads_working(tmp_path, monkeypatc
     assert [(a["word"], a["n"]) for a in agents] == [("working", 1), ("idle", 1)]
     # Ready to close still refuses on the count
     assert ("no subagents running", False) in v["ready"]
+
+
+def test_an_idle_session_on_a_background_shell_reads_working_and_is_not_ready_to_close(tmp_path, monkeypatch):
+    """§4.2 *A background shell task*, *No background shells running* (TD-761, TD-767): an idle record
+    whose view carries `shells_live` draws *working · 1 shell* (*working · 2 subagents · 1 shell*, never
+    *0 subagents*), its slot naming the oldest shell and its age; Ready to close fails on the row naming
+    the shell, so *ready to close ✓* and Close session wait for it; without a shell the row passes."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from datetime import UTC, datetime, timedelta
+
+    from shiftlead.ui.app import templates, view
+
+    since = (datetime.now(UTC) - timedelta(minutes=4, seconds=5)).isoformat().replace("+00:00", "Z")
+    old = (datetime.now(UTC) - timedelta(minutes=9)).isoformat().replace("+00:00", "Z")
+    gh = {"pid": 7, "start": 1, "cmd": "timeout 1500 gh pr checks 1893 --watch", "since": since}
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0}
+    v = view(_card(git=clean, shells=[gh], shells_live=True))
+    assert (v["state"], v["pill_word"], v["state_class"]) == ("idle", "working", "working")
+    assert v["own_work"] == "working · 1 shell"
+    assert v["slot"]["text"] == "working · 1 shell: timeout 1500 gh pr checks 1893 … · 4m"
+    assert v["pill_title"] == "working · 1 shell — idle in every payload, its own background shells running"
+    assert ("1 background shell running — timeout 1500 gh pr checks 1893 …", False) in v["ready"]
+    assert v["ready_ok"] is False and v["slot"]["caption"] != "ready to close ✓" and v["next_act"] != "close"
+    assert v["shell_close"] == "", "a live shell offers no Close: the wait is the point"
+    # 0 subagents is never said; 2 subagents and the shell join, the oldest shell named
+    both = view(
+        _card(
+            git=clean,
+            subagents=2,
+            subagents_live=True,
+            shells=[gh, {**gh, "pid": 8, "cmd": "sleep 9", "since": old}],
+            shells_live=True,
+        )
+    )  # noqa: E501
+    assert both["own_work"] == "working · 2 subagents · 2 shells"
+    assert both["slot"]["text"] == "working · 2 subagents · 2 shells: sleep 9 · 9m"
+    assert view(_card(git=clean, subagents=0, subagents_live=True, shells=[gh], shells_live=True))["own_work"] == (
+        "working · 1 shell"
+    )
+    # the person's own idle session: no inline Close session, the card's more ▾ Close disabled naming the row
+    mine = view(_card(git=clean, unattended=False, shells=[gh], shells_live=True))
+    card = templates.get_template("card.html").render(s=mine)
+    assert 'class="btn sm next" data-act="close"' not in card
+    close = re.search(r'<button data-act="close"[^>]*>', card).group(0)
+    assert "disabled" in close and "1 background shell running" in close, close
+    # no shell: the row passes, and the clean idle session is ready to close
+    calm = view(_card(git=clean))
+    assert ("no background shells running", True) in calm["ready"] and calm["ready_ok"] is True
+    assert calm["slot"]["caption"] == "ready to close ✓"
+
+
+def test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_the_own_session(tmp_path, monkeypatch):
+    """§4.2 *A shell that never ends*, §4.5a *Close session* (TD-761, TD-767): a shell past `SHELL_WAIT`
+    (`shells` held, the view's `shells_live` false) is no longer *working*, but its row still fails, saying
+    its age and what to do; on the person's own session, that row alone failing, *more ▾* (the card's and
+    Focus's) offers Close with a confirm naming the shell — never on a team member, never beside another
+    failing row."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from datetime import UTC, datetime, timedelta
+
+    from shiftlead.ui.app import templates, view
+    from shiftlead.ui.cards import ready_to_close
+
+    since = (datetime.now(UTC) - timedelta(hours=3, minutes=2)).isoformat().replace("+00:00", "Z")
+    srv = {"pid": 9, "start": 1, "cmd": "python -m http.server 8000", "since": since}
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0}
+    rec = _card(git=clean, unattended=False, seen_at="2027-01-01T00:00:00Z", shells=[srv], shells_live=False,
+                created="2026-10-14T20:00:00Z", host="h")  # fmt: skip
+    v = view(rec)
+    assert v["pill_word"] == "idle" and not v["own_work"]
+    row = "1 background shell running 3h 2m — stop it in the session, or Close kills it"
+    assert v["not_ready"] == [row]
+    assert v["shell_close"] == "Close kills: python -m http.server 8000 · running 3h 2m"
+    # ready_to_close says the age only with a `now`; without one it names the shell
+    assert (row, False) in ready_to_close(rec, [], now=datetime.now(UTC))
+    assert ("1 background shell running — python -m http.server 8000", False) in ready_to_close(rec, [])
+    card = templates.get_template("card.html").render(s=v)
+    close = re.search(r'<button data-act="close"[^>]*>', card).group(0)
+    assert "disabled" not in close and 'data-confirm="Close kills: python -m http.server 8000 · running 3h 2m"' in close
+    focus = templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+    menu = re.search(r'<button id="fclosemenu"[^>]*>', focus, re.S).group(0)
+    assert "disabled" not in menu and "Close kills: python -m http.server" in menu
+    # a team member: no Close offered over the shell
+    member = view({**rec, "unattended": True, "team": "t"})
+    assert member["shell_close"] == ""
+    close = re.search(r'<button data-act="close"[^>]*>', templates.get_template("card.html").render(s=member)).group(0)
+    assert "disabled" in close
+    # another failing row beside it: no Close either
+    assert view({**rec, "git": {**clean, "dirty": 2}})["shell_close"] == ""
+    # a live shell: never offered
+    assert view({**rec, "shells_live": True})["shell_close"] == ""
+    # a shell with no `since` sorts after the dated one, which is the one named (review of #1916)
+    mixed = view({**rec, "shells": [{"pid": 3, "cmd": "sleep 1"}, srv]})
+    assert mixed["shell_close"] == "Close kills: python -m http.server 8000 · running 3h 2m"
+    assert mixed["not_ready"] == ["2 background shells running 3h 2m — stop it in the session, or Close kills it"]
+    # a host agent older than `shells_live`: the row still fails naming the shell, no pill, no Close past it
+    old = {k: v for k, v in rec.items() if k != "shells_live"}
+    v_old = view(old)
+    assert v_old["pill_word"] == "idle" and v_old["shell_close"] == ""
+    assert v_old["not_ready"] == ["1 background shell running — python -m http.server 8000"]
+    js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
+    assert "cm.disabled = !(ready || v.shell_close)" in js
 
 
 def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypatch):

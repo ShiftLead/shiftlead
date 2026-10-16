@@ -4544,7 +4544,13 @@
       const ready = !!(checks.length && checks.every(([, ok]) => ok));
       $("#closebtn").disabled = !ready;
       $("#closebtn").classList.toggle("hidden", !v.own);  // a member's checklist has no button: its Close is more ▾'s
-      const cm = $("#fclosemenu"); if (cm) cm.disabled = !ready;
+      // more ▾'s Close also on the person's own session whose only failing row is a shell past SHELL_WAIT,
+      // its confirm naming the shell (§4.5a *Close session*, TD-761: `shell_close`, the card's reading)
+      const cm = $("#fclosemenu");
+      if (cm) {
+        cm.disabled = !(ready || v.shell_close);
+        cm.dataset.confirm = v.shell_close || v.close_confirm || cm.dataset.confirm;
+      }
       // …and the next act only on the person's own session (`own`): a team member runs itself
       $("#fready").classList.toggle("hidden", !(ready && v.own));
       $("#fclose").classList.toggle("hidden", !(ready && v.own));

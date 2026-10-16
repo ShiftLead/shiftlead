@@ -149,8 +149,9 @@
         {% if s.restartable %}<button data-act="restart" data-id="{{ s.id }}"{% if not s.restart_marked %} data-confirm="Restart {{ s.name }}? It is closed if still there and started again from its launch record, in its team."{% endif %} title="{{ help_title('restart') }}">Restart</button>{% endif %}
         {% if s.agent %}<button data-act="wrapup" data-id="{{ s.id }}" title="{{ help_title('wrap-up') }}">Wrap up</button>{% endif %}
         <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">Kill</button>
-        {# enabled only when Ready to close passes (§4.5): dimmed here means disabled, and says why #}
-        <button data-act="close" data-id="{{ s.id }}" data-confirm="{{ 'Close ' ~ s.name ~ '?' if s.agent else s.close_confirm }}"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% else %} title="{{ help_title('close') }}"{% endif %}>Close</button>
+        {# enabled only when Ready to close passes (§4.5): dimmed here means disabled, and says why — or, on
+           the person's own session, when its only failing row is a shell past SHELL_WAIT, confirming it (TD-761) #}
+        <button data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.shell_close if s.shell_close else 'Close ' ~ s.name ~ '?' if s.agent else s.close_confirm }}"{% if not (s.ready_ok or s.shell_close) %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% else %} title="{{ help_title('close') }}"{% endif %}>Close</button>
         <button data-act="shell-here" data-id="{{ s.id }}" data-dir="{{ s.dir }}" title="a shell session in this session's directory, in a new tab (Shift: a window)">Open shell here</button>
         {# design §4.5a **Pop out** (TD-046): client-side, nothing is written to the record #}
         <button data-act="popout" data-id="{{ s.id }}" title="open its Focus in its own browser window, for alt-tab — a second press raises it">Pop out</button>

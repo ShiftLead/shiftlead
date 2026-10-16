@@ -1511,9 +1511,8 @@ The other cases:
 **Type:** feature
 **Added:** 2026-10-15 (TD-761's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-766
+**Kind:** live-check #1916
+**Status:** Built by #1916 (grinder-ao-2, 2026-10-16): the Ready to close row (*no background shells running*, failing with the oldest shell's `cmd`, or past `SHELL_WAIT` its age and *stop it in the session, or Close kills it*), *working · 1 shell* on the pill (joined with live subagents, never *0 subagents*), the slot naming the oldest shell and its age, and on the person's own session *more ▾ → Close* with *Close kills: …* when that stale shell is the only failing row (card and Focus). **Live check** once #1916 is live (`ao promote status`), read-only: a Claude Code session idle on a `run_in_background` task — the next one a member or the person leaves, read with a headless GET of `/` and of its Focus — reads *working · 1 shell* with the slot naming the shell, and its Ready to close shows *✗ 1 background shell running — <cmd>* with no *ready to close ✓*; the same session once the shell ends reads the row ✓.
 **Location:** design §4.2 (*Working on its own*, the Ready to close list), §4.5 (*working* on its own), §4.5a *Close session*; `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1097, the pill ~L378, the slot's ending ~L565, ~L1022), the card's and Focus's *more ▾*
 
 **Why:** TD-761. The read is useless until the card and Ready to close say it.
