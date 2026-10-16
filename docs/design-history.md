@@ -1062,6 +1062,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-15 (TD-749, grinder-ao-2; Paul's decision of that day): *A live check* no longer says the two grinders' package lanes do not divide it — the grinders' briefs dropped the split by package (TD-108 step 2, TD-196), and a live check is claimed by whichever grinder claims it first.
 - 2026-10-15 (TD-722, the designer): the director seat is the org's, above every heading: an org-wide Project block, and a card at the top of the Org page. Built with TD-642.
 - 2026-10-14 (TD-686 slice 2, grinder-ao-1): *How the reader hears of a PR* — an `ask` carrying a PR whose required checks never started is sent, with *PR #<n>: checks never started on <head>: <reason>* in the reply (the techlead's finding on #1768).
 - 2026-10-14 (TD-641, grinder-ao-1): *The director seat answers permission prompts* — a node answers by rule again, but only while its link is up and only once the home has filed the *Answered for you* FYI over it (`answered_by_rule`, a request, not a notification); a link that is down or a filing refused leaves the prompt for the person, so no answer goes untold. This lifts the 2026-10-13 *a node matches no rule*.
