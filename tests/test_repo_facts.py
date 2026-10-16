@@ -72,6 +72,11 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "blocked_by": [],
         "blocked_ids": [],
         "pickable": "yes",
+        # its place in the rank (§4.4 *The Queue*, TD-769): no rank file, so its implicit key
+        "key": "1|0|000010",
+        "card_key": "1|0|000010",
+        "order": 0,
+        "lined": False,
         "for_page": "pickable",
         "team": "",  # no `**Team:**` line (§4.4 *An entry names its team*, TD-762)
         "added": "",
