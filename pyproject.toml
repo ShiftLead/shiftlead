@@ -59,6 +59,8 @@ test = "pytest -q"
 test-fast = "pytest -q -m unit"
 lint = "ruff check src tests"
 fmt = "ruff format src tests"
+# the adapter conformance suite's live walk, by hand (design §4.3, TD-784): `pdm run conformance <adapter> --profile <p>`
+conformance = "python scripts/conformance.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

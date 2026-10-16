@@ -158,6 +158,11 @@ class Adapter(Protocol):
 # TD-112): what the suite tests where declared and finds absent where not.
 OPTIONAL_METHODS = ("background", "composer", "context", "links", "mail", "spend", "title", "usage_report")
 
+# The live walk's `--capture` (design §4.3 *The conformance suite*, TD-784): set in a launch's environment,
+# it names a directory where the adapter's hook appends each payload its tool hands it, as received, one
+# JSON line per payload to `<dir>/<kind>.jsonl` — the fixtures the offline suite reads.
+CAPTURE_ENV = "SHIFTLEAD_CAPTURE"
+
 
 def implements(adapter: object) -> frozenset[str]:
     """The optional methods `adapter` declares (design §4.3 *The conformance suite*): its `implements`,

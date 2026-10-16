@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import paths
+from sessionorc.adapters import CAPTURE_ENV
 from sessionorc.store import EventQueue
 from shiftlead.adapters.claude_code import (
     AT_COMPOSER_ENV,
@@ -328,10 +329,22 @@ def chained_output(raw: str, payload: dict[str, Any]) -> str:
     return done.stdout
 
 
+def capture(kind: str, raw: str) -> None:
+    """Under the live walk's `--capture` (`CAPTURE_ENV`, design §4.3 *The conformance suite*, TD-784):
+    append the payload as Claude Code handed it, one line of `<dir>/<kind>.jsonl`. Never fails the hook."""
+    if not (where := os.environ.get(CAPTURE_ENV)):
+        return
+    with contextlib.suppress(OSError, ValueError):
+        line = json.dumps(json.loads(raw or "{}"))
+        with (Path(where) / f"{kind}.jsonl").open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+
 def statusline() -> int:
     """`shiftlead-hook --statusline`: report, then print the person's own status line. It never
     fails the status line — any error in the report is swallowed and the chained command still runs."""
     raw = sys.stdin.read()
+    capture("statusline", raw)
     try:
         payload = json.loads(raw or "{}")
     except ValueError:
@@ -358,9 +371,11 @@ def main() -> int:
     if not session:
         return 0  # not an shiftlead session; the hook layer is only ever passed to ours, but be safe
     try:
-        payload = json.loads(sys.stdin.read() or "{}")
-    except ValueError:
+        raw = sys.stdin.read()
+        payload = json.loads(raw or "{}")
+    except ValueError:  # not JSON, or not UTF-8
         return 0
+    capture("hooks", raw)
     if isinstance(payload, dict) and (reason := refused_command(payload)):
         # the hook's own decision, before the host agent is asked anything: one it cannot reach still
         # refuses, and the event below still reports `working` (design §4.3 *A kill the guard refuses*)
