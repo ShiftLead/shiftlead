@@ -13859,3 +13859,48 @@ Each reproduction passed with its fix.
 **Related:** TD-734, TD-743 (subagents read, background shells left to `ao doing`), TD-079 (the checklist's outcome row).
 
 **Resolved:** 2026-10-16 — archived with its last build, TD-767 (TD-766 by #1905, its live check #1911; TD-767 by #1916, its live check #1920; see their **Resolved:**).
+
+## TD-731: The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — Designed (2026-10-15, the designer): §4.4 *Hold*, *A claimed entry is held all the same*, *An entry can land held*; §4.5 screen 6; §4.5a *Repo page: Hold / Release on an entry*, *Inbox row: held entry*; §4.7 `ao td hold`, `ao td next --held`. A hold ends only at Release (an edit no longer ends it); a hold on a claimed entry mails each unattended lease holder to stop and drop it. Built by TD-735 (the home and the CLI) and TD-736 (the pages).
+**Blocked by:** TD-735, TD-736
+**Location:** `docs/design/4.4-host-agent.md` (*A new entry settles before it is pickable*: *Hold*, *A claimed entry is held all the same*, *An entry can land held*); `docs/design/4.5a-controls.md` (*Repo page: Hold / Release on an entry*, *Inbox row: held entry*); `docs/design/4.7-cli.md` (`ao td hold`, `ao td next --held`); `src/sessionorc/settle.py` (the hold and its refusal)
+
+**Why:** 2026-10-15. TD-722 (`design-first`) merged at 12:44 MDT while Paul and an interactive session were still reviewing its proposal with Fable. It settled at 12:54, and Paul's `ao td hold TD-722` at about 12:56 was refused: *TD-722 has settled, and a hold is a settling entry's … take a settled entry out of a lane with its Blocked by: line*. designer-ao-1 designed it as #1832 by 13:30. Its build TD-724 (`Kind: build`, which settles 0 minutes) was claimed at once and under review as #1840 before the round's findings were adopted, and had to be stopped by hand. A `Blocked by:` line is a PR: minutes at best, and only after the person has a session write it. So the window is the person's only press, and a build has none.
+
+**Fix:** a design round, Paul's direction (2026-10-15):
+1. **The person may hold any unclaimed entry, settled or not**: the same `held: {at, by}` record, the same Hold and Release on the Repo page row (now on every pickable row, not only a settling one) and `ao td hold`. A held entry is withheld until Release or until its `sig` changes, as now.
+2. **A claimed entry** is refused with its holder's name, since a hold does not take a lease. The person's way there is the claimer's manager or the claimer. Or, the round decides, the hold also asks the claimer to drop it.
+3. **An entry filed during a conversation with the person** (Add entry from a session working with the person, `ao td add` with a flag) may land held, so the conversation ends before any lane looks.
+
+**Done when** the design says when the person may hold an entry, what a hold on a claimed entry does, and how an entry can land held; its build entries are filed; and this entry's `Blocked by:` names them.
+
+**Related:** TD-707, TD-710, TD-722, TD-724, TD-730.
+
+**Resolved:** 2026-10-16 — archived with its last build, TD-736 (TD-735 by #1861; TD-736 by #1873; see their **Resolved:**).
+
+## TD-745: A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the anchor, found reading its lane)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — Designed (2026-10-15, the designer): §4.4 *A red PR nobody holds is a work order* — a draft is no work order (no order, no note, no Inbox row), ready again it is under the rule at once; `ao repo`, the Repo page's tag and the facet's hover say *no order while a draft*; a draft `is_sync_order` orders is still an order. Built by TD-750.
+**Blocked by:** TD-750
+**Location:** design §4.4 *A red PR nobody holds is a work order*; `teamrun.red_prs`
+
+**Why:** on 2026-10-15 `ao repo` listed #1840 (TD-724's build) and #1850 (TD-722's amendment) as `pr:1840` and `pr:1850`, both High, both *red since …: conflicting*, first in the anchor's lane. Both are drafts that Paul paused in an interactive session. #1840 waits for the amendment, and #1850 is held until its Fable and Sonnet rounds converge (memory `hold-a-design-until-its-round-ends`). The rule's cure, a rebase on the PR's own branch, would reach into a design under the person's review, so the anchor passed over both and named why in its `ao doing` line. Every anchor run until they land will read them first and pass over them again. The rule reads `isDraft` (§4.4, the PR list's fields) but never uses it for an order; §4.4 says a draft only for a sync PR.
+
+**Fix:** a design decision first. A draft is no work order (or one only past a longer bound), or a paused PR names its holder (a `Paused:` line in its body, a label) and the reading counts that as held. Either way, `ao repo` says why it does not list the PR.
+
+**Done when** a draft PR the person paused is not a pickable `pr:<n>` in any lane, and the design says what makes it so.
+
+**Related:** TD-613 (the rule), TD-722, TD-724.
+
+**Resolved:** 2026-10-16 — archived with its build, TD-750 (#1883; see its **Resolved:**).
