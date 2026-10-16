@@ -2777,6 +2777,12 @@ class HostAgent(
             raise RpcError(words)  # before the lease: `force` is about another session's claim, not this
         if new_claim and not force and (words := settle_mod.wait_refusal(self._ledger_entry(s, entry.ref))):
             raise RpcError(words)  # a wait's end the session may know: `force` passes it (§4.4, TD-716)
+        if (
+            new_claim
+            and not force
+            and (words := settle_mod.team_refusal(self._ledger_entry(s, entry.ref), s.team, s.name or s.id))
+        ):
+            raise RpcError(words)  # another team's entry, or one that needs a team: `force` passes it (§4.4, TD-730)
         holder = self._lease_holder(s, entry) if new_claim else None
         if holder is not None and not force:
             raise RpcError(

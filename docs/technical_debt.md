@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-757 | Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired | Medium | Built — live check #1900 |
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
-| TD-762 | Build TD-730 (1): an entry's `Team:` read, `needs_team` marked and withheld, `lane_matches` by the record's team, the claim refusals, `ao repo`'s lines | Medium | Open |
 | TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
@@ -1530,32 +1529,6 @@ The other cases:
 **Done when** the design says how a background shell task is read and what Ready to close and the card do with it, its build entries are filed, and this entry's `Blocked by:` names them; a session idle on a background shell no longer reads *ready to close ✓*.
 
 **Related:** TD-734, TD-743 (subagents read, background shells left to `ao doing`), TD-079 (the checklist's outcome row).
-
----
-
-## TD-762: Build TD-730 (1): an entry's `Team:` read, `needs_team` marked and withheld, `lane_matches` by the record's team, the claim refusals, `ao repo`'s lines
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (TD-730's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *An entry names its team* (*The `Team:` line*, *When it is required*, *What the reader marks*, *What the lanes read*, *Shown where it is read*), §4.8 (the claim refusals), §4.7 `ao repo`; `src/sessionorc/ledger.py` (`entries` ~L399, after `for_page`; `lane_matches` ~L261, `in_lanes` ~L305); `src/sessionorc/ledgerboard.py` (`declared` ~L96); `src/sessionorc/work.py` ~L283; `src/sessionorc/agent_tick.py` (rule 6's news ~L1532, the anchor seat's `_seat_lane` ~L2638 until TD-757 removes it); `src/shiftlead/teamrun.py` (~L617, `repo_lanes` ~L1296); `src/shiftlead/ui/inbox.py` ~L1390; `src/sessionorc/settle.py` (a new `team_refusal` beside `wait_refusal` ~L107); `src/sessionorc/agent.py` (the claim, ~L2794); `src/shiftlead/cli.py` (`ao repo`)
-
-**Why:** TD-730. A repo may have several teams, and an entry names only a role word, so every team's lanes take every entry of their owner words.
-
-**Fix:**
-- **The reader** (`ledger.entries`, after each entry's page kind is known) reads `**Team:**` as the entry's `team`, and the `Fields:` line's `Team` vocabulary, in its order, as `declared_teams` on the repo's reading (through ledgerboard's `declared()`, never a second parser).
-- It marks `needs_team: {why}`: `untagged` where the vocabulary names two or more, on an open entry whose page kind a lane takes (*pickable*, *design*, *live check*) and that has no `Team:`; `unknown <name>` wherever a vocabulary is declared, on an entry whose `Team:` it does not hold. Names compare case-folded. The repo's reading carries the ids as `needs_team`.
-- **`lane_matches(lane, entry, team=None)`**: a `needs_team` entry matches nothing; an entry's `team` matches only a lane whose `team` is it; `team=None` narrows nothing; a work order (`work_order`, `pr_order`) carries no team, is never marked, and matches as it does now. Every caller listed in *Location* passes the lane's record's `team` (the anchor seat's `_seat_lane` its own record's); `in_lanes` pairs each lane with its record's `team` rather than keeping the lanes alone. Names compare case-folded on both sides. `in_lanes` counts a `needs_team` entry in no kind of the team's lanes and no rest.
-- **The claim**: `settle.team_refusal(entry, team)` beside `wait_refusal`, called in the claim under `not force` with the claimer's `s.team` (`""` is no team): refused on another team's entry (*TD-801 is db's: compliance-grinder-1 is compliance's*), never for a claimer with no team; refused on a `needs_team` one for every claimer (*TD-801 needs a team (untagged)*).
-- **`ao repo`**: *needs a team* after the owner; a line under the first, *needs a team: TD-801, TD-802* (TD-763 adds the seat it is handed to); `--json` carries `needs_team`, `declared_teams` and each entry's `team`.
-- **Tests** (in `tests/test_ledger.py`, `tests/test_lane_news.py`, `tests/test_live_check_lane.py`, and the claim's own): a ledger declaring `Team = db | ops` marks an untagged pickable entry `untagged`, one naming `qa` `unknown qa`, and no blocked, evaluation or person's entry; a vocabulary of one name marks no untagged entry and does mark `Team: qa`; `Team: DB` reads as `db`; a work order is in both teams' lanes; db's lane takes `Team: db` and not `Team: ops`; a teamless lane takes both; `in_lanes` leaves a marked entry out of every count; a vocabulary of one name with a lane of another team takes nothing tagged otherwise; `Team: DB` against a lane of team `db`; a settling, held or waiting entry that also needs a team reads as settling, held or waiting first; the two claim refusals, a teamless claimer on another team's entry and on a marked one, and `--force`; `ao repo --json` carries the three fields.
-
-**Done when** an entry's `Team:` keeps it in its team's lanes, an untagged or unknown one on a multi-team ledger is in no lane and listed, the claim refuses across teams, and every listed test passes.
-
-**Related:** TD-730 (the design), TD-763, TD-764, TD-724.
 
 ---
 

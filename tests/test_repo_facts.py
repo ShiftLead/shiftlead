@@ -73,6 +73,7 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "blocked_ids": [],
         "pickable": "yes",
         "for_page": "pickable",
+        "team": "",  # no `**Team:**` line (§4.4 *An entry names its team*, TD-762)
         "added": "",
         "detail": [],
     }

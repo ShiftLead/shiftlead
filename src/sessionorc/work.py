@@ -280,7 +280,7 @@ def reread(
             continue
         i = str(e["id"])
         held.add(i)
-        if i not in matching and ledger_mod.lane_matches(lane, e):
+        if i not in matching and ledger_mod.lane_matches(lane, e, member.team):
             matching.append(i)
     ids = list(seen.get("ids") or [])
     left = {i for i in ids if i in held and i not in matching}

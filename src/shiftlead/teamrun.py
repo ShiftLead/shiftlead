@@ -596,7 +596,7 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
         led = (readings.get(str(x.dir)) or {}).get("ledger") or {}
         entries = led.get("entries") if "error" not in led else None
         if isinstance(entries, list):
-            mine = [e for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e)]
+            mine = [e for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e, name)]
             by_kind = {k: sum(1 for e in mine if (e.get("for_page") or "other") == k) for k, _ in LANE_WORDS}
             roles[x.role] = {"n": len(mine), "by_kind": by_kind}
         else:

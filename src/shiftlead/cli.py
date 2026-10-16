@@ -1521,11 +1521,12 @@ def _repo_line(r: dict[str, Any]) -> str:
         decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         orders = [*orders, *reds]
         # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710),
-        # and so is one whose wait stands (§4.4 *An entry says what it waits for*, TD-716)
+        # and so is one whose wait stands (§4.4 *An entry says what it waits for*, TD-716), and one that needs
+        # a team (§4.4 *An entry names its team*, TD-730)
         withheld = sum(
             1
             for e in led["entries"]
-            if e.get("for_page") == "pickable" and (_settle_mark(e) or teamrun.wait_words(e))
+            if e.get("for_page") == "pickable" and (_settle_mark(e) or teamrun.wait_words(e) or e.get("needs_team"))
         )
         # the page's seven kinds as the kind bar names them (§4.4 *Repo facts*, §4.7, TD-418)
         led_part = (
@@ -1767,6 +1768,10 @@ def cmd_repo(args: argparse.Namespace) -> int:
             r["board"] = _board_due(r)
             # the board's decided lines are in the lanes beside the entries (§4.4 *Board write-back*, TD-384)
             r["lanes"] = teamrun.repo_lanes(teamrun.lane_entries(r), root, fleet)
+            # the repo's teams as its ledger declares them, and what needs one (§4.4 *An entry names its team*, TD-730)
+            led = r.get("ledger") or {}
+            r["declared_teams"] = list(led.get("declared_teams") or [])
+            r["needs_team"] = [e["id"] for e in led.get("entries") or [] if isinstance(e, dict) and e.get("needs_team")]
 
     def prose() -> None:
         if not picked:
@@ -1781,6 +1786,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
             # an entry no page kind takes, flagged under the first line (§4.7, §4.4 *Repo facts*, TD-418)
             for flag in ledger_mod.flags((r.get("ledger") or {}).get("entries") or []):
                 print(f"  {flag}")
+            # an entry no team's lane takes until it names one (§4.7, §4.4 *An entry names its team*, TD-730)
+            if r.get("needs_team"):
+                print(f"  needs a team: {', '.join(r['needs_team'])}")
             # a draft is no order, and its line says so where it would be one (§4.4 *A draft is no work order*, TD-745)
             waits = {
                 x["number"]: x for x in teamrun.red_prs(r, [], datetime.now(UTC)) if x["whose"] == teamrun.DRAFT_WHOSE
@@ -1833,6 +1841,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # what it waits for (§4.4 *An entry says what it waits for*, TD-716): said after the owner
                     if waits := teamrun.wait_words(e):
                         owner += f" {waits}"
+                    # in no team's lanes until it names one (§4.4 *An entry names its team*, TD-730)
+                    if e.get("needs_team"):
+                        owner += " needs a team"
                     print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
