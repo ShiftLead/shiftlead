@@ -71,11 +71,13 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15), amended from the mockup (#1887); Paul lifted the hold — the design next |
 | TD-757 | Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired | Medium | Built — live check #1900 |
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
-| TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Open |
+| TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
 | TD-762 | Build TD-730 (1): an entry's `Team:` read, `needs_team` marked and withheld, `lane_matches` by the record's team, the claim refusals, `ao repo`'s lines | Medium | Open |
 | TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
+| TD-766 | Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9 | Medium | Open |
+| TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
 | TD-768 | Two CI flakes with no entry: `test_attachment_life`'s tick test (three times) and `test_promote`'s press under auto (once, on main) | Medium | Open |
 
 ---
@@ -1517,7 +1519,8 @@ The other cases:
 **Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-15, the designer): §4.2 *Working on its own* — a background shell is read from the process tree by the adapter's `background` (Claude Code: the `claude` process's `shell-snapshots` command-wrapper children, `cmd` the wrapper's first child), into the record's `shells` and `shells_at` on the tick, with no reset or bound needed since a reading is of what is there now; the pill reads *working · 1 shell*, Ready to close gains *no background shells running* (so *ready to close ✓* and **Close session** wait), and `shells_live` (within `SHELL_WAIT`, two hours) holds §6 rules 3, 4 and 9 as a live subagent does. Built by TD-766 (the read and the rules) and TD-767 (the pages).
+**Blocked by:** TD-766, TD-767
 **Location:** design §2 goal 11 (`docs/design/2-goals.md`); §4.2 *Working on its own* (`docs/design/4.2-state-feed.md`, *A background shell task … fires no hook and is not read*); `src/shiftlead/ui/cards.py` (`ready_to_close`); the Claude Code adapter under `src/shiftlead/adapters/claude_code/`
 
 **Why:** 2026-10-15, 22:56 MDT. Paul's own session `ao-paul` ended its turn on a background Bash call (`sleep 20; timeout 1200 gh pr checks …`, *Running in the background*), waiting on CI before the cadence check and the merge. Claude Code's own footer read *1 shell still running* and *1 shell*. ShiftLead's pill read *IDLE*, the header read ***ready to close ✓***, and the Ready to close card passed all six rows (*agent not working (turn ended)*, tree clean, branch pushed, no subagents running, outcomes reported, mail read), with **Close session** offered. One press would have killed the CI wait and the merge after it. Goal 11 says the checklist includes *no subagents or background tasks running*, but §4.2 says a background shell task *fires no hook and is not read*. TD-734/TD-743 left it to an `ao doing` line, which the role briefs ask of unattended members. A person's own interactive session has no brief, and an `ao doing` line does not stop a Close anyway. The check is missing exactly on the sessions where Close is the next act offered (§4.5a *Close session*: the person's own session).
@@ -1604,6 +1607,7 @@ The other cases:
 
 **Related:** TD-730, TD-762, TD-763, TD-740.
 
+---
 
 ## TD-765: A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886)
 
@@ -1622,6 +1626,60 @@ The other cases:
 **Done when** the two tests exist and fail under those mutations.
 
 **Related:** TD-754, #1886.
+
+---
+
+## TD-766: Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-761's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.2 *Working on its own* (*A background shell task*), §4.3 `background`, §6 rules 3, 4 and 9; `src/sessionorc/identity.py` (`ProcReader` ~L76, `LinuxProc` ~L84, and §4.8a's bounded walk); `src/shiftlead/adapters/claude_code/__init__.py` (`ClaudeCodeAdapter` ~L502, beside `context` ~L652); `src/sessionorc/agent_tick.py` (a new `_refresh_shells` beside `_refresh_context` ~L173/~L3563; `_subagent_flips` ~L604; the rule sites reading `subagents_live` ~L1147, ~L1201, ~L2581, ~L2850; the *finished* dict ~L2031); `src/sessionorc/tmux.py` (`#{pane_pid}` in the pane list ~L21); `src/sessionorc/agent_common.py` (`subagents_live` ~L1048, `idle_from` ~L1059, `SEAT_PR_WAIT` ~L138); `src/sessionorc/agent_serve.py` (`_view` ~L71); `src/sessionorc/work.py` (~L197, ~L224); `src/sessionorc/models.py` (`NODE_OWNED` ~L66, the wake exclusions ~L708, the record's fields ~L957, the exit reset ~L1445)
+
+**Why:** TD-761. A session idle on a background shell reads *ready to close ✓*; one Close kills the shell.
+
+**Fix:**
+- **`ProcReader`** gains `children(pid)` (from `/proc/<pid>/task/<pid>/children`, else by scanning `/proc/*/stat` for the `ppid`) and `cmdline(pid)`; `None` for a process gone or unreadable, never an error.
+- **The adapter's `background(pid, proc)`**: Claude Code walks from `pid` to the first process, `pid` included, whose `comm` is the adapter's binary (`basename(self.binary)[:15]`, `comm`'s length; `claude` by default) (depth-bounded as §4.8a's walk; none is `None`), and returns its direct children whose argv is `bash -c` with `/shell-snapshots/` in the script, each `{pid, start, cmd}`, `cmd` the wrapper's first child's argv joined and cut to 120 characters. An MCP server child is never one. `shell` has no such method, and the tick finds it as it finds `context` (`getattr`). The build checks `Monitor`'s tasks against the wrapper and records the answer in this entry's Status and in §4.2.
+- **`_refresh_shells(snapshot_at, panes)`**, called after `_refresh_context` in `tick()` (~L173) with the `panes` the tick already listed (`main_panes`), every tick: for each record of this host whose state is `idle`, attended or not, with no live subagent, and whose adapter has the method, read off the loop (`asyncio.to_thread`) with the pid `panes.get(s.id).pane_pid` (`panes` is keyed by the record id, its tmux session's name, as `_reconcile` reads it; a record with no pane there is not read); write `shells: [{pid, start, cmd, since}]` (`since` kept for a `pid`+`start` seen before) and `shells_at` (the last tick that read a shell within `SHELL_WAIT`, never moved back), saved on the loop as `_refresh_context` saves. Otherwise the last reading is kept. A record that turned `idle` by a hook between ticks is read on the next tick.
+- **The record**: `shells` and `shells_at` on `Session`, in `NODE_OWNED`; named in the comment above `WAKE_FIELDS` (~L715) as excluded, which the allow-list already makes them; cleared where `subagents` is on exit (`set_state`, models ~L1445), which the tool's `SessionEnd` and every other exit path go through.
+- **`SHELL_WAIT`** (two hours) beside `SEAT_PR_WAIT`; **`shells_live(record, now)`** beside `subagents_live`: a shell whose `since` is within it. `_subagent_flips` (agent_tick.py ~L604, its `seen[key] = live = …` line) keeps one dict (`_subagents_were`, declared in agent.py ~L731), now valued `subagents_live(r, now) or shells_live(r, now)`, and pushes when that combined *working on its own* reading flips; `agent.py`'s re-exports (~L123, ~L198) gain `SHELL_WAIT` and `shells_live`. The view (`_view`) and the *finished* dict carry `shells_live`, and `work.finished` reads it ("idle, shell live"). Rules 3 (seat close), 4 (idle nudge, and the `open` cause ~L2581) and 9 (*finished*) read it beside `subagents_live`, and `idle_from` takes the later of `since`, `subagent_at` and `shells_at`.
+- **Tests** (in `tests/test_subagents_live.py`, `tests/test_identity.py` for the reader, `tests/test_claude_adapter.py`): a fake `ProcReader` with a wrapper child, an MCP child and a wrapper with a first child gives one task with that `cmd`; the walk finds `claude` under a hand-started shell and returns `None` with none; `children` falls back to `ppid`; the tick writes `shells` on an idle record, `[]` once the child is gone, keeps the last reading mid-turn and while a subagent is live, and clears it on exit; `shells_at` stops moving for a shell past `SHELL_WAIT`; `shells_live` flips push the record; a seat idle with a live shell is not closed, a member not nudged, a team not *finished*, and one past `SHELL_WAIT` is.
+
+**Done when** an idle session's background shells are on its record and in its view, the rules read them as they read a live subagent, and every listed test passes.
+
+**Related:** TD-761 (the design), TD-767, TD-734.
+
+---
+
+## TD-767: Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-761's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-766
+**Location:** design §4.2 (*Working on its own*, the Ready to close list), §4.5 (*working* on its own), §4.5a *Close session*; `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1097, the pill ~L378, the slot's ending ~L565, ~L1022), the card's and Focus's *more ▾*
+
+**Why:** TD-761. The read is useless until the card and Ready to close say it.
+
+**Fix:**
+- **Ready to close** gains *no background shells running* after *no subagents running*, failing while `shells` holds one: *1 background shell running — <cmd>* (the oldest's `cmd`, cut). *ready to close ✓* and **Close session** follow it, as every row does.
+- **The pill** (cards.py ~L378): an idle record with the view's `subagents_live or shells_live` and nothing waiting is *working*, its ending joining the parts that are live, *working · 1 shell*, *working · 2 subagents*, *working · 2 subagents · 1 shell* (never *0 subagents*), the shell count `len(shells)`. The `own_work` text reused at ~L566 and ~L1025 (*its own subagents running*) says shells too.
+- **The slot's ending** names the oldest shell: *working · 1 shell: <cmd> · 4m*.
+- **A shell past `SHELL_WAIT`** is the view's `shells` non-empty with `shells_live` false; its age is from the oldest `since`, with `now` passed to `ready_to_close` as a new `now=None` parameter by `card()` (~L524), from the clock the card builder already reads. The row (label prefix *background shell*, which the card tests to know it is the only failing row) reads *1 background shell running 3h — stop it in the session, or Close kills it*; on the person's own session, when that is the only failing row, *more ▾* offers **Close** with a confirm naming the shell (§4.5a *Close session*). The gate is the page's alone: `ready_to_close` has no server-side caller to relax (it is read at cards.py ~L524).
+- **Tests** (in `tests/test_ui_org.py` beside `ready_to_close`'s own, and `tests/test_subagents_live.py` for the pill): the row fails with a shell and passes without; *ready to close ✓* and Close are withheld while one runs; the pill and slot words, with 0 subagents and 1 shell; a shell past `SHELL_WAIT` still fails the row with its words, and the own session's *more ▾* Close and its confirm appear only then.
+
+**Done when** a session idle on a background shell reads *working · 1 shell*, Ready to close names the shell and fails, and every listed test passes.
+
+**Related:** TD-761, TD-766, TD-734.
+
+---
 
 ## TD-768: Two CI flakes with no entry: `test_attachment_life`'s tick test (three times) and `test_promote`'s press under auto (once, on main)
 
