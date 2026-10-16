@@ -78,7 +78,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
-| TD-776 | The tagging seat's tag cause and its seat choice (#1908) are held by no test in four lines: the unchanged-ids due kept, a repo with no reading keeping its due, and the seat's supervised, unattended, superseded and suspended filters | Low | Open |
 
 ---
 
@@ -1650,16 +1649,3 @@ The other cases:
 
 ---
 
-## TD-776: The tagging seat's tag cause and its seat choice (#1908) are held by no test in four lines: the unchanged-ids due kept, a repo with no reading keeping its due, and the seat's supervised, unattended, superseded and suspended filters
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1908)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_tag_cause`, `_tagging_seat`); `tests/test_entry_team.py`, `tests/test_seat_policy.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1908's (TD-763) lines one at a time and running `tests/test_entry_team.py tests/test_seat_policy.py tests/test_cli_org.py tests/test_cli_teams.py tests/test_repoconfig.py` (main's venv, `PYTHONPATH=$PWD/src`). Of 26 mutations 19 fail a test; these leave every test green: (1) `_tag_cause`'s `return s.seat_due if (s.seat_due or {}).get("by") == "tag" else None` for a repo with no `needs_team` reading, changed to `return None` — the docstring says *a repo with no reading yet changes nothing*, so a standing `tag` due must survive a tick before the reading; (2) the `if (s.seat_due or {}).get("by") == "tag" and s.seat_due.get("ids") == ids: return s.seat_due` branch deleted — the due then takes a new `at` every tick for the same ids, which is what the branch exists to stop; (3) `_tagging_seat`'s `r.supervised`, `r.unattended` and `not r.superseded_by` conditions, each deleted alone (three runs) and (4) `not r.suspended`: all four survive. The docstring says an unattended session carrying its badge is live and a stopped team's seat is never filled for this.
-
-**Fix:** in `tests/test_entry_team.py` (or `tests/test_seat_policy.py`, beside the existing `_tag_cause` tests): (1) a standing `tag` due and a repo reading with no `needs_team` key: the due is kept; (2) two ticks over the same uncovered ids: the second returns the first's `at`; (3) one tagging-seat candidate each that is unsupervised, attended, superseded and suspended, beside a good one: the good one is chosen and the others get no `tag` due. Each fails under its mutation above.
