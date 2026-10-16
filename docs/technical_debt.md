@@ -60,7 +60,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
-| TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-781 | A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start` | Medium | Designed — built by TD-782 |
@@ -1150,31 +1149,6 @@ The other cases:
 **Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
 
 **Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
-
----
-
-## TD-770: Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (TD-748's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-769
-**Location:** design §4.5 screen 11 item 2, screen 12 (*A card*), §4.5a *Repo page: Technical debt cards*, *Queue page: card*, *Queue page, Up next: grip / ⤒ ↑ ↓*; `src/shiftlead/ui/app.py` (`/repo/{name}` ~L1364); `src/shiftlead/ui/templates/repo.html`, `repo_part.html`; new partials `queue_card.html` and `queue_row.html`, which screen 12 reuses; `src/shiftlead/ui/static/app.js`, `app.css`
-
-**Why:** TD-748, slice 2: the cards drawn first where one repo's are, so the card's look and its moves are tried before the cross-repo page.
-
-**Fix:**
-- **The partials**: a card (header the top entry: id, Priority badge right of the id, the whole title wrapped, the holder's pill, state word, count, status; the header tinted when open and folding the card, no chevron, the open set remembered in the browser) and a row (id, badge, title, state word, holder's pill, two letters of indent a level, *also after TD-n*), from the `queue` reading, the look of screen 12 (amber only on what needs the person, a green stripe in progress, *stalled* grey dashed, no red, IBM Plex Sans with the mono face for ids).
-- **Screen 11 item 2**: the repo's cards in rank order; the kind lists become the heading's count line and each row's tag; *Its builds* and the back-link stay as rows' words, and each row keeps its owner after the title, *needs a team*, and **Hold** / **Release** at its end (§4.5a *Repo page: Hold / Release on an entry*); a card spanning repos is drawn whole on each of its repos' pages; `/repo/<name>#TD-n` opens the card that holds the entry and scrolls to its row.
-- **Moves**: the grip (HTML drag and drop, with a keyboard fallback being the buttons) and **⤒ ↑ ↓** on every Up next card (no open member — the top entry or a row — claimed by a session, no PR naming one open; a card the person holds moves), calling `rank_move`; the card moves at once and goes back, with the reason under the heading, when the home refuses.
-- **Tests** (`tests/test_ui_repo_page.py`, a new `tests/test_ui_queue_cards.py`): a two-entry card renders its header and indented row; an In-progress card has no grip and a *held (person)* card has one; a move posts `rank_move` with the two neighbours; a refused move restores the order; the deep link opens the right card; a row carries its owner, *needs a team* and Hold or Release; a cross-repo card is drawn on both repos' pages.
-
-**Done when** the Repo page draws the repo's cards in rank order, a drag or a move button there lands a rank PR, and every listed test passes, with screenshots in the PR (design §4.9b).
-
-**Related:** TD-748, TD-769, TD-771.
 
 ---
 

@@ -356,12 +356,6 @@ def ledger_lists(
     return out
 
 
-def _shown(q: str, name: str) -> str:
-    """A card member's id as this repo's page writes it: `TD-n` for its own, `<repo>#TD-n` for another's."""
-    repo, _, tid = q.rpartition("#")
-    return tid if repo == name else q
-
-
 def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str, Any]]) -> dict[str, Any] | None:
     """**Technical debt cards** (§4.5 screen 11 item 2, §4.5a *Repo page: Technical debt cards*, TD-770):
     the Queue's cards one of whose open members is this repo's, whole and in the reading's order (In
@@ -384,6 +378,10 @@ def debt_cards(queue: Mapping[str, Any] | None, name: str, lists: list[dict[str,
         for e in lst["rows"]:
             if not e.get("work_order"):
                 ext[str(e["id"])] = {**e, "kind_label": lst["label"]}
+
+    def _shown(q: str, name: str) -> str:  # `TD-n` for this repo's own, `<repo>#TD-n` for another's
+        repo, _, tid = q.rpartition("#")
+        return tid if repo == name else q
 
     def row(r: Mapping[str, Any]) -> dict[str, Any]:
         own = r.get("repo") == name
