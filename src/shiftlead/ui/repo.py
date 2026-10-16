@@ -753,7 +753,8 @@ def org_layout(
         listed.update(p.repos)
     rest = [n for n in readings if n not in listed]
     rest += [n for n in by_repo if n and n not in listed and n not in readings]
-    heads += [(n, n, [n]) for n in rest]
+    # a repo in no project is its own heading, under no project's key: a project named like it is another's
+    heads += [("", n, [n]) for n in rest]
     out: list[dict[str, Any]] = []
     for key, label, names in heads:
         names = [n for n in names if n in readings or n in by_repo or n in strays]

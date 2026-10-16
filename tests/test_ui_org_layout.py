@@ -156,6 +156,7 @@ def test_headings_follow_the_org_files_order_and_a_live_team_precedes_a_stopped_
         "repo:alpha",
         "repo:loose*",  # in no project: its own heading, after the projects, in the registry's order
     ]
+    assert items[-1]["project"] == ""  # no project's key, so a project named `loose` could not claim its line
 
 
 def test_a_registered_repo_with_no_team_draws_its_line_and_facet(tmp_path, monkeypatch):
