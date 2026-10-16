@@ -72,6 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-789 | Build TD-787 (1): the reading marks a held PR — `held.repo_key`, `pr_reading`'s per-head `held` read under `HELD_READS`, `pr_orders.asked` from the review seats' and the person's mail | Medium | Open |
 | TD-790 | Build TD-787 (2): *unasked* shown — the Repo page's tag and *i* panel, `ao repo`'s line and `--json`, `ao pr held`'s *the repo holds* line | Medium | Open |
 | TD-791 | Nothing asserts the remedy line of `ao org check`'s two-team lack: the left-out names can be dropped from `orgcheck.team_lacks`' `Team = …` suggestion and every test passes | Low | Open |
+| TD-792 | No test holds Claude Code's `permission_channel = True`: the conformance suite checks only that the value is a bool, so flipping it to False passes | Low | Open |
 
 ---
 
@@ -1488,5 +1489,23 @@ The other cases:
 **Why:** `test-audit-ao-1`, 2026-10-16. Changing `names = [*declared, *(s["team"] for s in stale if s["kind"] == "left-out")]` to `names = [*declared]` in `orgcheck.team_lacks` (the lines #1943 rewrote onto `teams.stale_teams`) leaves `pdm run pytest -q tests/test_cli_org.py tests/test_cli_teams.py` green. The lack's remedy, `add `Team = ao-grind | ops``, then names only the declared teams, so a person who follows it declares nothing new and the lack stays. `test_cli_org.py` asserts only the message's prefix (`startswith("alpha: has 2 teams and its ledger's Fields: line does not declare alpha-grind")`); the `add `Team = …`` assertion in `tests/test_cli_teams.py` reads `teamrun`'s own start-refusal message, a different function.
 
 **Fix:** extend the two-team lack test to assert the whole remedy: with `declared = []` the lack says `Team = alpha-grind | span`; with `["span"]`, `Team = span | alpha-grind`.
+
+**Done when** the mutation above fails a test.
+
+---
+
+## TD-792: No test holds Claude Code's `permission_channel = True`: the conformance suite checks only that the value is a bool, so flipping it to False passes
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1949)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/adapters/claude_code/__init__.py` (`permission_channel`); `tests/conformance/_harness.py` line 62, `tests/conformance/test_conformance.py` `test_shell_declares_no_permission_channel`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `permission_channel = True` to `False` on `ClaudeCodeAdapter` leaves `tests/conformance` at 17 passed, 3 skipped (run with the main checkout's venv and `PYTHONPATH=$PWD/src`: a scratch worktree's venv has no `shiftlead.adapters` entry point, so there the suite's first test fails at baseline). `_harness.py` asserts `permission_channel` is a `bool` (`getattr(ad, "permission_channel", True)`) and nothing else; the only assertion on a value is the shell's and the command's `False`. The contract's comment says a pending permission is answered through the hook channel (Allow / Deny) where it is True: that is Claude Code's claim, and no test holds it.
+
+**Fix:** a conformance test that Claude Code declares `permission_channel` True, beside the shell's `False`; and, once TD-784's hook-payload fixtures land, one that a declared channel's pending permission reads as answerable.
 
 **Done when** the mutation above fails a test.
