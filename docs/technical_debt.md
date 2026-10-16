@@ -72,12 +72,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
-| TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
 | TD-769 | Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs | Medium | Open |
 | TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
+| TD-778 | A shell's `cmd` cut exactly at a word's end loses that word: *python3 scripts/check_cadence.py --pr 1917* is drawn *python3 …* (#1916) | Low | Open |
 
 ---
 
@@ -1502,31 +1502,6 @@ The other cases:
 
 ---
 
-## TD-767: Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (TD-761's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #1916
-**Status:** Built by #1916 (grinder-ao-2, 2026-10-16): the Ready to close row (*no background shells running*, failing with the oldest shell's `cmd`, or past `SHELL_WAIT` its age and *stop it in the session, or Close kills it*), *working · 1 shell* on the pill (joined with live subagents, never *0 subagents*), the slot naming the oldest shell and its age, and on the person's own session *more ▾ → Close* with *Close kills: …* when that stale shell is the only failing row (card and Focus). **Live check** once #1916 is live (`ao promote status`), read-only: a Claude Code session idle on a `run_in_background` task — the next one a member or the person leaves, read with a headless GET of `/` and of its Focus — reads *working · 1 shell* with the slot naming the shell, and its Ready to close shows *✗ 1 background shell running — <cmd>* with no *ready to close ✓*; the same session once the shell ends reads the row ✓.
-**Location:** design §4.2 (*Working on its own*, the Ready to close list), §4.5 (*working* on its own), §4.5a *Close session*; `src/shiftlead/ui/cards.py` (`ready_to_close` ~L1097, the pill ~L378, the slot's ending ~L565, ~L1022), the card's and Focus's *more ▾*
-
-**Why:** TD-761. The read is useless until the card and Ready to close say it.
-
-**Fix:**
-- **Ready to close** gains *no background shells running* after *no subagents running*, failing while `shells` holds one: *1 background shell running — <cmd>* (the oldest's `cmd`, cut). *ready to close ✓* and **Close session** follow it, as every row does.
-- **The pill** (cards.py ~L378): an idle record with the view's `subagents_live or shells_live` and nothing waiting is *working*, its ending joining the parts that are live, *working · 1 shell*, *working · 2 subagents*, *working · 2 subagents · 1 shell* (never *0 subagents*), the shell count `len(shells)`. The `own_work` text reused at ~L566 and ~L1025 (*its own subagents running*) says shells too.
-- **The slot's ending** names the oldest shell: *working · 1 shell: <cmd> · 4m*.
-- **A shell past `SHELL_WAIT`** is the view's `shells` non-empty with `shells_live` false; its age is from the oldest `since`, with `now` passed to `ready_to_close` as a new `now=None` parameter by `card()` (~L524), from the clock the card builder already reads. The row (label prefix *background shell*, which the card tests to know it is the only failing row) reads *1 background shell running 3h — stop it in the session, or Close kills it*; on the person's own session, when that is the only failing row, *more ▾* offers **Close** with a confirm naming the shell (§4.5a *Close session*). The gate is the page's alone: `ready_to_close` has no server-side caller to relax (it is read at cards.py ~L524).
-- **Tests** (in `tests/test_ui_org.py` beside `ready_to_close`'s own, and `tests/test_subagents_live.py` for the pill): the row fails with a shell and passes without; *ready to close ✓* and Close are withheld while one runs; the pill and slot words, with 0 subagents and 1 shell; a shell past `SHELL_WAIT` still fails the row with its words, and the own session's *more ▾* Close and its confirm appear only then.
-
-**Done when** a session idle on a background shell reads *working · 1 shell*, Ready to close names the shell and fails, and every listed test passes.
-
-**Related:** TD-761, TD-766, TD-734.
-
----
-
 ## TD-769: Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs
 
 **Priority:** Medium
@@ -1649,3 +1624,20 @@ The other cases:
 
 ---
 
+## TD-778: A shell's `cmd` cut exactly at a word's end loses that word: *python3 scripts/check_cadence.py --pr 1917* is drawn *python3 …* (#1916)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-767's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/cards.py` (`shell_cmd`, `SHELL_CMD_CUT`); `tests/test_ui_org.py`
+
+**Why:** TD-767's live read, 2026-10-16 10:42:53Z: grinder-ao-1's background `python3 scripts/check_cadence.py --pr 1917` read *1 background shell running — python3 …* on Ready to close and the slot. `shell_cmd` takes the first `SHELL_CMD_CUT` (32) characters and drops the last partial word with `rsplit(" ", 1)`; `python3 scripts/check_cadence.py` is exactly 32 characters, so the whole word that ends at the cut is dropped as if it were partial, and the row names nothing a person can recognise.
+
+**Fix:** in `shell_cmd`, keep `head` whole when the character after it is a space (the cut lands at a word's end); drop the partial word only otherwise. A test in `tests/test_ui_org.py` beside the shell tests: `python3 scripts/check_cadence.py --pr 1917` → *python3 scripts/check_cadence.py …*; a cut inside a word still drops it (*timeout 1500 gh pr checks 1893 …*).
+
+**Done when** a word ending at the cut is kept and the test passes.
+
+**Related:** TD-767, TD-761.
