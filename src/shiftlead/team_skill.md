@@ -128,11 +128,10 @@ teams:
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
   sessions are `<name>-1`, `<name>-2`, … Each also takes, as the manager does, `profile`,
   `lane`, `brief`, `grants` and `unattended` — so a member's `profile:` goes on its line, not in a
-  `roles:` overlay — and `team` (below); any other key is refused.
-  **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
-  built** (design §4.9: the flat case ships first). Write the teams flat and start each on its own
-  until it is. The trap is that `ao team list` accepts it and only `ao team start` refuses it,
-  which is the one place in this recipe where a file that reads fine is not one.
+  `roles:` overlay; any other key is refused.
+  **`{team: other-team}` is refused when the file is read**, naming the key: no team holds another
+  (design §4.9 *Teams*) — teams that work together are teams on one repo, or on repos under one
+  heading, and settle things by mail. Write each team on its own and start each on its own.
 - Both take `lane:` and `unattended:` (default true). **`lane:` is one word or a list.**
   `free-pick` means *choose from the ledger by priority*; anything else is a named lane, the
   references that member works — `lane: [TD-041, TD-054]`, or `lane: TD-041,TD-054` — which its

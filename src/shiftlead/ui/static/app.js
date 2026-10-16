@@ -2987,7 +2987,6 @@
       if (v.manager) rows.push(`<div class="row gap"><span class="meta">manager</span> ${who(v.manager)}</div>`);
       if (v.techlead) rows.push(`<div class="row gap"><span class="meta">techlead seat</span> ${who(v.techlead)}</div>`);
       v.members.forEach((e) => {
-        if (e.nested) { rows.push(`<div class="row gap"><span class="meta">team</span> ${esc(e.nested)} <span class="meta">— nested, edited by hand</span></div>`); return; }
         const held = (e.sessions || []).map(who).join(", ");
         const rm = v.editable ? ` <span class="grow"></span><button class="btn sm ghost" type="button" data-mremove="${e.index}">Remove</button>` : "";
         rows.push(`<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} · ${e.count}</span><span class="meta">${held}</span>${rm}</div>`);

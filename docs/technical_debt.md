@@ -69,7 +69,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
-| TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
 | TD-781 | A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start` | Medium | Open |
 
 ---
@@ -1385,26 +1384,6 @@ The other cases:
 **Done when** the three readings are written in this entry's Status and Paul's decision is recorded.
 
 **Related:** TD-748, TD-771, TD-460 (the same shape of trial read).
-
----
-
-## TD-775: A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (grinder-ao-2, building TD-724)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.9 *Teams* (*A member that is `{team: <name>}` is refused by name*); `src/shiftlead/org.py` (`_member`, `MemberDef.team`, `_validate`'s nested-team check, `_no_cycles`, `TeamDef.session_names`), `src/shiftlead/teams.py` (`plan`'s *is a nested team, which is not built yet*, and every `m.team` reader), `src/shiftlead/team_skill.md` (*`{team: other-team}` … refused at `start`*), the tests that write one (`grep -n '{"team":' tests/test_org.py tests/test_cli_teams.py`)
-
-**Why:** TD-722's design says no team holds another: a member `{team: <name>}` is refused by name when the definition is read. TD-724 (#1840) refuses it in a repo's `.shiftlead.yml`, as before, but leaves the org file's loader taking it and the planner refusing it at `start` — the old shape — because removing `MemberDef.team` touches about forty readers and tests, past TD-724's own Fix.
-
-**Fix:** `_member` refuses `team:` by name in the design's words (*no team holds another — teams that work together are teams on one repo, or on repos under one heading, and settle things by mail*); `MemberDef.team`, `_no_cycles`, `_validate`'s nested check and every `m.team is None` filter go; `teams.plan`'s nested branch goes; `team_skill.md` says the refusal; the tests that build a nested team are rewritten to expect the refusal.
-
-**Done when** an org file with a `{team: …}` member fails to load naming the key and its fix, no reader of `MemberDef.team` is left, and `pdm run test` passes.
-
-**Related:** TD-722, TD-724.
 
 ---
 

@@ -35,7 +35,6 @@ ORG = {
             "manager": {"profile": "orc"},
             "members": [
                 {"role": "grinder", "brief": "docs/briefs/api-grinder.md"},
-                {"team": "guardians-ui"},
             ],
         },
         "guardians-ui": {
@@ -93,7 +92,7 @@ def test_every_default_of_section_4_9(tmp_path):
     g = o.teams["guardians"]
     assert g.manager.role == "manager" and g.manager.name == "guardians-lead" and g.manager.profile == "orc"
     assert g.members[0].brief == "docs/briefs/api-grinder.md"
-    assert g.members[1] == org.MemberDef(team="guardians-ui")
+    assert len(g.members) == 1  # no team holds another (§4.9 *Teams*)
     ui = o.teams["guardians-ui"]
     assert ui.manager.role == "person" and ui.repo == "guardians"
     assert ui.members[0].unattended is False and ui.members[0].grants == ["control"]
@@ -163,21 +162,14 @@ def test_member_name_defaults_to_the_role_and_lane_forms(tmp_path):
                 "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
                 "teams": {"t": {"repo": "r", "members": [{"team": "x", "role": "g"}]}},
             },
-            "teams.t.members[0]: a nested team member is `{team: <name>}` alone",
-        ),
-        (
-            {
-                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
-                "teams": {"t": {"repo": "r", "members": [{"team": "x"}]}},
-            },
-            "teams.t.members[0].team: 'x' is not a defined team",
+            "teams.t.members[0].team: no team holds another",
         ),
         (
             {
                 "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
                 "teams": {"t": {"repo": "r", "members": [{"team": "t"}]}},
             },
-            "teams.t nests itself",
+            "teams.t.members[0].team: no team holds another",
         ),
         ({"roles": {"g": [1]}}, "roles.g must be a mapping"),
     ],
@@ -217,16 +209,22 @@ def test_the_old_keys_are_refused_by_name_with_their_fix(tmp_path):
         org.merge_repo_teams(org.Org(), tmp_path / "solo", {"solo-grind": {"members": [{"role": "g", "home": "x"}]}})
 
 
-def test_an_indirect_cycle_is_refused(tmp_path):
+def test_a_team_member_is_refused_by_name_with_its_fix(tmp_path):
+    """§4.9 *Teams* (TD-722, TD-775): no team holds another, so `{team: <name>}` fails to load, naming
+    the key and saying the fix — a team of its own, started on its own — whether or not the name is
+    a defined team."""
     doc = {
         "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
-        "teams": {
-            "a": {"repo": "r", "members": [{"team": "b"}]},
-            "b": {"repo": "r", "members": [{"team": "a"}]},
-        },
+        "teams": {"a": {"repo": "r", "members": [{"role": "g"}]}, "b": {"repo": "r", "members": [{"team": "a"}]}},
     }
-    with pytest.raises(ValueError, match="nests itself"):
+    with pytest.raises(ValueError) as e:
         org.load(write(tmp_path, doc))
+    assert str(e.value).endswith(
+        "teams.b.members[0].team: no team holds another — teams that work together are teams on one repo, or on "
+        "repos under one heading, and settle things by mail: delete the entry and start that team on its own "
+        "(design §4.9 *Teams*)"
+    )
+    assert "team" not in {f.name for f in __import__("dataclasses").fields(org.MemberDef)}
 
 
 def test_merge_repo_teams(tmp_path, monkeypatch):
@@ -256,8 +254,8 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     assert org.merge_repo_teams(base, repo, None).checkouts == base.checkouts
     # the repo's team the org file wins over is recorded, for `ao team list`'s *shadowed* (TD-229)
     assert merged.shadowed == {"ao-grind": [repo / ".shiftlead.yml"]} and base.shadowed == {}
-    # nesting is the org file's (§4.9 *The org is an aggregate*), and the error names the repo's file
-    with pytest.raises(ValueError, match=r"\.shiftlead\.yml: teams\.bad\.members\[0\]\.team: a nested team"):
+    # no team holds another (§4.9 *Teams*), in a repo's file as in the org's, and the error names the file
+    with pytest.raises(ValueError, match=r"\.shiftlead\.yml: teams\.bad\.members\[0\]\.team: no team holds another"):
         org.merge_repo_teams(base, repo, {"bad": {"members": [{"team": "ao-grind"}]}})
     # its `repo:` is unsaid, and written it is refused by name, as `projects:` is (§4.9 *The org is an aggregate*)
     for key, value in (("repo", "myrepo"), ("repo", "shiftlead"), ("projects", ["p"])):
