@@ -70,6 +70,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-787 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Designed — built by TD-789, TD-790 |
 | TD-790 | Build TD-787 (2): *unasked* shown — the Repo page's tag and *i* panel, `ao repo`'s line and `--json`, `ao pr held`'s *the repo holds* line | Medium | Open |
 | TD-793 | No test holds that `asked` is the *first* ask: the sort by `at` in `held.asks` and the earlier-wins merge in `_red_prs` can be reversed and every test passes | Low | Open |
+| TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 
 ---
 
@@ -1437,3 +1438,27 @@ The other cases:
 **Fix:** a test with two asks of one PR (different `at`, listed latest first in the inbox, to different seats) whose `asked[n]` is the earlier's `{at, to}`; and one where a second ask arrives on a later pass, `asked[n]` still the first's.
 
 **Done when** both mutations above fail a test.
+
+---
+
+## TD-794: The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept, and no refresh can mend them
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** evaluation
+**Status:** Open
+**Location:** design §4.6 *Attach behaviour with another client present* (`window-size latest`, and `window-size manual` plus a fixed `default-size` named as the fallback if the reflow upsets Claude Code's TUI), *Scrollback is tmux's, reached through tmux* (TD-022); §4.5 *The panel put away* (the terminal refits as a window resize does); `src/shiftlead/ui/static/app.js` (`new ResizeObserver(() => fit.fit())` and `term.onResize` → `{resize: [cols, rows]}`, ~L4536–L4537: one resize per observed frame, no debounce; `AO.setTermLook`, ~L70, refits on a face or size change); `src/shiftlead/ui/pty_bridge.py` (`resize`, ~L95, `setwinsize` on the attach's pty); `src/sessionorc/tmux.py` (the session options, `history-limit` ~L113)
+
+**Why:** Paul, 2026-10-16, on `ao-queue-vs-inbox`'s Focus scrolled back in tmux's copy mode: the line *That was the last part of TD-769's live check. A builder will now find the check in its lane, read #1950 and cl* stops at *cl*, and the next line starts a different paragraph (*- The rank file: …*); a page refresh mended a different line but not this one. He asked whether resizing does it. The record says yes, and that the damage is in the pane itself, not the browser: `ao tail ao-shiftlead-ao-queue-vs-inbox -n 3000` (tmux's own capture, at the pane's current width) holds the same reply mangled differently — *a new* ends a line mid-sentence and the next line starts *- The rank file:*, and the bullets and the *The system recorded the move…* paragraph appear **twice**. Claude Code redraws its last frame when the pane's width changes. tmux had already put part of that frame into its history and reflowed it to the new width, so the redraw writes over lines that have moved and leaves the old copy's fragments behind. A browser refresh re-attaches and tmux repaints the visible screen, but history already written stays as it is: hence *helps, but not fully*. Any Focus resize can do it: a window drag, **» put away** and back, a terminal face or size from Settings, a second client under `window-size latest`. Today a drag sends one resize per observed frame. The harm: a reply the person reads back can silently lose words or repeat a block, and nothing on the page says the text is damaged.
+
+**Fix:** an evaluation, then a build.
+1. **Reproduce it on a scratch home** (`scripts/look_home.py`) with a Claude Code session printing a long reply. Resize the Focus by a drag, by **» put away**, and by a Settings size, then compare `tmux capture-pane -p -S -` before and after. Count the resizes the bridge receives per gesture.
+2. **Measure the cheap cure first:** debounce the fit, so one gesture sends one `{resize}` with the final grid (~150 ms, after the last observed change), and send nothing when `cols`×`rows` is unchanged. Count the damaged lines with and without it.
+3. If damage remains at one resize per gesture, weigh §4.6's named fallback, `window-size manual` with a fixed `default-size`. It ends reflow, but a narrower Focus then crops instead of wrapping. That changes behaviour the design describes, so it is a design PR first, with the person's look.
+4. Whatever is left, which is Claude Code's own repaint, goes in the adapter's notes with the version it was seen on, so the next sighting is recognised and not re-filed.
+
+**Done when** the evaluation's measurements are written here, the debounce has landed or been shown not to help, and any design change has a filed entry of its own.
+
+**Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
