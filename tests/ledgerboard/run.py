@@ -13,12 +13,15 @@ line (exit 1 when it is not a release header, or the hash does not match). Stdli
 
 Fixtures, each an invented input and its expected JSON:
 - ``ledger/<case>.md`` (+ ``<case>.archive.md``, optional ``<case>.resolve.json`` mapping a
-  ``<repo>#TD-NNN`` item to ``[state, why]``) → ``<case>.json``: ``pickable()`` and ``check()``.
+  ``<repo>#TD-NNN`` item to ``[state, why]``, optional ``<case>.rank.yml``, its rank file) →
+  ``<case>.json``: ``pickable()`` and ``check()``.
 - ``board/<case>.md`` → ``<case>.json``: every open item's ``item_record()`` at ``TODAY``, plus
   ``item_key()`` of every item line and ``closed_items()``.
 - ``edit/cases.json`` → ``edit/expected.json``: ``edit_line()``, ``subject()``, ``subject_kind()``,
   ``item_line()``/``decided_line()``, the line predicates, the version reader (v1.0), and
-  ``bold_head()``, ``is_not_right_form()`` and ``fill_not_right()`` (v1.1).
+  ``bold_head()``, ``is_not_right_form()`` and ``fill_not_right()`` (v1.1), and the rank —
+  ``queue_subject()``, ``implicit_key()``, ``key_order()``, ``midpoint()``, ``rank()``, ``set_rank()``,
+  ``rank_path()`` and ``components()`` of a ledger fixture's entries (v1.2).
 """
 
 from __future__ import annotations
@@ -75,13 +78,16 @@ def ledger_case(L, md: Path) -> dict:
     res = md.with_name(md.stem + ".resolve.json")
     table = json.loads(res.read_text(encoding="utf-8")) if res.exists() else {}
 
+    rk = md.with_name(md.stem + ".rank.yml")
+    rank_text = rk.read_text(encoding="utf-8") if rk.exists() else None
+
     def resolve(item):
         return tuple(table[item]) if item in table else ("unresolved", f"{item} is not in the fixture's resolver")
-    p = L.pickable(text, archive, resolve)
+    p = L.pickable(text, archive, resolve, rank_text=rank_text)
     return {"entries": p["entries"], "pickable": [e["id"] for e in p["pickable"]],
             "blocked": [e["id"] for e in p["blocked"]], "flags": p["flag_recs"],
             "declared": p["declared"], "rows": L.rows(text),
-            "check": L.check(text, archive, resolve=resolve),
+            "check": L.check(text, archive, resolve=resolve, rank_text=rank_text),
             "check_since_empty": L.check(text, archive, old="", resolve=resolve)}
 
 
@@ -93,7 +99,7 @@ def board_case(L, md: Path) -> dict:
             "closed": L.closed_items(text)}
 
 
-def edit_cases(L, spec: dict) -> dict:
+def edit_cases(L, spec: dict, root: Path = HERE) -> dict:
     today = date.fromisoformat(spec["today"])
     out: dict = {"edits": {}, "subjects": [], "subject_kinds": {}, "compose": [], "predicates": {}, "versions": []}
     for c in spec["edits"]:
@@ -123,6 +129,16 @@ def edit_cases(L, spec: dict) -> dict:
     out["not_right_forms"] = {a: L.is_not_right_form(a) for a in spec["not_right_forms"]}
     out["not_right_fills"] = {c["name"]: _refused(lambda c=c: L.fill_not_right(c["said"], c["offered"]))
                               for c in spec["not_right_fills"]}
+    out["queue_subjects"] = [_refused(lambda c=c: L.queue_subject(c["tool"], c["action"], c["ids"]))
+                             for c in spec["queue_subjects"]]
+    out["implicit_keys"] = [L.implicit_key(c["priority"], c["type"], c["id"], c["repo"]) for c in spec["implicit_keys"]]
+    out["key_orders"] = [sorted(ks, key=L.key_order) for ks in spec["key_orders"]]
+    out["midpoints"] = [_refused(lambda a=a, b=b: L.midpoint(a, b)) for a, b in spec["midpoints"]]
+    out["rank_reads"] = [list(L.rank(t)) for t in spec["rank_reads"]]
+    out["rank_writes"] = [_refused(lambda c=c: L.set_rank(c["text"], c["lines"])) for c in spec["rank_writes"]]
+    out["rank_paths"] = {p: L.rank_path(p) for p in spec["rank_paths"]}
+    out["components"] = {f: L.components(L.entries((root / f).read_text(encoding="utf-8")))
+                         for f in spec["components"]}
     return out
 
 
@@ -133,7 +149,7 @@ def cases(L, root: Path):
     for md in sorted((root / "board").glob("*.md")):
         yield md.with_suffix(".json"), board_case(L, md)
     spec = json.loads((root / "edit" / "cases.json").read_text(encoding="utf-8"))
-    yield root / "edit" / "expected.json", edit_cases(L, spec)
+    yield root / "edit" / "expected.json", edit_cases(L, spec, root)
 
 
 def main(argv: list[str] | None = None) -> int:

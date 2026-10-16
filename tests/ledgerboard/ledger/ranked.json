@@ -1,0 +1,273 @@
+{
+ "blocked": [
+  "TD-012",
+  "TD-016",
+  "TD-017",
+  "TD-013",
+  "TD-019"
+ ],
+ "check": [
+  {
+   "field": "blocked by",
+   "id": "TD-015",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-015: every blocker is archived (TD-020) — pickable; the Blocked by field can go"
+  }
+ ],
+ "check_since_empty": [
+  {
+   "field": "blocked by",
+   "id": "TD-015",
+   "kind": "blockers-archived",
+   "level": "info",
+   "standing": false,
+   "text": "ℹ TD-015: every blocker is archived (TD-020) — pickable; the Blocked by field can go"
+  }
+ ],
+ "declared": {},
+ "entries": [
+  {
+   "blocked_by": [],
+   "card_key": "0h",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-011",
+   "key": "0h",
+   "pickable": true,
+   "priority": "Low",
+   "title": "Low, ranked to the top",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-011"
+   ],
+   "card_key": "0h",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-011",
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-012",
+   "key": "1|0|000012",
+   "pickable": false,
+   "priority": "High",
+   "title": "Joins the ranked card later",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "1|0|000010",
+   "cross_repo": [],
+   "fields": {
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-010",
+   "key": "1|0|000010",
+   "pickable": true,
+   "priority": "High",
+   "title": "High and unranked",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000015",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-020",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-015",
+   "key": "2|0|000015",
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Its blocker is archived",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-017"
+   ],
+   "card_key": "2|0|000016",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-017",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-016",
+   "key": "2|0|000016",
+   "pickable": false,
+   "priority": "Medium",
+   "title": "One half of a cycle",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-016"
+   ],
+   "card_key": "2|0|000016",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-016",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-017",
+   "key": "2|0|000017",
+   "pickable": false,
+   "priority": "Medium",
+   "title": "The other half",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|1|000013",
+   "cross_repo": [],
+   "fields": {
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-014",
+   "key": "3|0|000014",
+   "pickable": true,
+   "priority": "Low",
+   "title": "The low prerequisite",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [
+    "TD-014"
+   ],
+   "card_key": "2|1|000013",
+   "cross_repo": [],
+   "fields": {
+    "blocked by": "TD-014",
+    "priority": "Medium",
+    "status": "Open",
+    "type": "feature"
+   },
+   "id": "TD-013",
+   "key": "2|1|000013",
+   "pickable": false,
+   "priority": "Medium",
+   "title": "A feature that waits on a low one",
+   "type": "feature"
+  },
+  {
+   "blocked_by": [
+    "far#TD-002"
+   ],
+   "card_key": "3|0|000019",
+   "cross_repo": [
+    {
+     "item": "far#TD-002",
+     "state": "open",
+     "why": ""
+    }
+   ],
+   "fields": {
+    "blocked by": "far#TD-002",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-019",
+   "key": "3|0|000019",
+   "pickable": false,
+   "priority": "Low",
+   "title": "Waits on another repo",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3i",
+   "cross_repo": [],
+   "fields": {
+    "priority": "High",
+    "status": "Open"
+   },
+   "id": "TD-018",
+   "key": "3i",
+   "pickable": true,
+   "priority": "High",
+   "title": "High, ranked below the low band",
+   "type": "debt"
+  }
+ ],
+ "flags": [
+  {
+   "field": "blocked by",
+   "id": "TD-015",
+   "kind": "blockers-archived",
+   "level": "info",
+   "text": "ℹ TD-015: every blocker is archived (TD-020) — pickable; the Blocked by field can go"
+  }
+ ],
+ "pickable": [
+  "TD-011",
+  "TD-010",
+  "TD-015",
+  "TD-014",
+  "TD-018"
+ ],
+ "rows": [
+  {
+   "id": "TD-010",
+   "priority": "High",
+   "title": "High and unranked"
+  },
+  {
+   "id": "TD-011",
+   "priority": "Low",
+   "title": "Low, ranked to the top"
+  },
+  {
+   "id": "TD-012",
+   "priority": "High",
+   "title": "Joins the ranked card later"
+  },
+  {
+   "id": "TD-013",
+   "priority": "Medium",
+   "title": "A feature that waits on a low one"
+  },
+  {
+   "id": "TD-014",
+   "priority": "Low",
+   "title": "The low prerequisite"
+  },
+  {
+   "id": "TD-015",
+   "priority": "Medium",
+   "title": "Its blocker is archived"
+  },
+  {
+   "id": "TD-016",
+   "priority": "Medium",
+   "title": "One half of a cycle"
+  },
+  {
+   "id": "TD-017",
+   "priority": "Medium",
+   "title": "The other half"
+  },
+  {
+   "id": "TD-018",
+   "priority": "High",
+   "title": "High, ranked below the low band"
+  },
+  {
+   "id": "TD-019",
+   "priority": "Low",
+   "title": "Waits on another repo"
+  }
+ ]
+}

@@ -1,4 +1,4 @@
-# ledgerboard v1.1 sha256:cb51bf752484cec8fff844715e6b9be3615e24523c6550faac3692dc7a9fad68
+# ledgerboard v1.2 sha256:a3935e7a90244b1363a33dfef186598d95df95535d67ef25e64f0e3689177417
 # SYNCED FILE — canonical copy: ShiftLead/ledgerboard ledgerboard.py (vendored by dev-cadence as files/scripts/ledgerboard.py)
 # Edit it there and release; an edit made in a consumer's copy is overwritten by the next vendor or sync.
 """The ledger and board formats, defined once (SPEC.md).
@@ -13,7 +13,8 @@ What a caller needs from outside the text is passed in — the cross-repo resolv
 ``pickable()``, today's date. Two consumers vendor this file (dev-cadence's scripts, ShiftLead);
 neither keeps a second parser of either format.
 
-Sections: the ledger (entries, ``Fields:``, ``Blocked by``, derived pickable, ``check``); the board
+Sections: the ledger (entries, ``Fields:``, ``Blocked by``, derived pickable, ``check``); the rank
+(cards, keys, the rank file, the pick order); the board
 (items, the item record, keys and refs); edits (``edit_line``, composing an item, the commit
 subject of a write and its parser); line predicates for diff walkers; the format version.
 """
@@ -211,28 +212,38 @@ class _Flags(list):
                           "field": field, "kind": kind, "text": text})
 
 
-def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclared: bool = False) -> dict:
-    """Every live entry, sorted, with its derived pickable, open blockers and raw fields; plus flags.
+def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclared: bool = False,
+             rank_text: str | None = None, repo: str = "") -> dict:
+    """Every live entry in pick order, with its derived pickable, open blockers and raw fields; plus flags.
 
     **Pickable is derived, never written:** an entry is pickable when it has no Blocked by field,
     or every entry it names is archived and it names no decision. ``resolve`` answers a
     ``<repo>#TD-NNN`` item (see ``Resolve``); without one, such an item keeps its block.
-    ``undeclared`` also flags a header field with no vocabulary, when the ledger declares any."""
+    ``undeclared`` also flags a header field with no vocabulary, when the ledger declares any.
+
+    **Pick order is the rank** (SPEC *The rank*): ``rank_text`` is the rank file's text (None or
+    "": no lines), ``repo`` the last component of an implicit key. Each record carries its ``key``
+    (its line's, else its implicit key) and its ``card_key``; entries sort by card, then within a
+    card by dependency, then key."""
     live = entries(ledger)
     live_nums = {_num(e["id"]) for e in live}
     archived = heading_nums(archive)
-    table = {int(m.group(2)): (i, m.group(4))
-             for i, m in enumerate(ROW_RE.finditer(COMMENT_RE.sub("", ledger)))}
+    table = {int(m.group(2)): m.group(4) for m in ROW_RE.finditer(COMMENT_RE.sub("", ledger))}
     vocab, decl_flags = declared(ledger)
     flags = _Flags()
     for text in decl_flags:
         flags.add(text, None, "fields", "fields-decl")
+    lines, rank_flags = rank(rank_text or "")
+    lined = {}
+    for t, k in lines.items():
+        lined.setdefault(_num(t), k)  # by number: a line for TD-7 is TD-007's
+    for text in rank_flags:
+        flags.add(text, None, "rank", "rank")
+    keys: dict[str, str] = {}
     pick, blocked = [], []
-    for pos, e in enumerate(live):
+    for e in live:
         n = _num(e["id"])
-        order, table_prio = table.get(n, (len(table) + pos, None))
-        prio = e["priority"] or table_prio or "?"
-        rank = PRIORITIES.index(prio.lower()) if prio.lower() in PRIORITIES else len(PRIORITIES)
+        prio = e["priority"] or table.get(n) or "?"
         etype = (e["type_raw"] or TYPES[0]).lower()
         for key in e["below"]:
             flags.add(f"ℹ {e['id']}: its {key.capitalize()} line is below the header block — "
@@ -251,9 +262,10 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
                 if key not in CADENCE_FIELDS and key not in vocab:
                     flags.add(f"ℹ {e['id']}: field {key!r} has no vocabulary on the preamble's Fields: line — "
                               "not validated; declare it (cadence.md §2.12)", e["id"], key, "undeclared-field")
+        keys.setdefault(e["id"], lined.get(n) or implicit_key(prio, etype, e["id"], repo))
         rec = {"id": e["id"], "title": e["title"], "priority": prio, "type": etype,
                "blocked_by": [], "cross_repo": [], "pickable": True, "fields": e["fields"],
-               "_key": (rank, TYPES.index(etype), order)}
+               "key": keys[e["id"]], "card_key": ""}
         if e["blocked_raw"] is not None:
             ids, who, bad = parse_blocked(e["blocked_raw"])
             for item in bad:
@@ -290,34 +302,244 @@ def pickable(ledger: str, archive: str, resolve: Resolve | None = None, undeclar
                       f"{'yes' if rec['pickable'] else 'no'} — the line is only a field (cadence.md §2.12)",
                       e["id"], "pickable", "pickable-disagrees")
         (pick if rec["pickable"] else blocked).append(rec)
+    order = _card_order(live, keys, lined)
+    for r in pick + blocked:
+        r["card_key"] = order[r["id"]][1]
     for lst in (pick, blocked):
-        lst.sort(key=lambda r: r["_key"])
-    everything = sorted(pick + blocked, key=lambda r: r["_key"])
-    for r in everything:
-        del r["_key"]
+        lst.sort(key=lambda r: order[r["id"]][0])
+    everything = sorted(pick + blocked, key=lambda r: order[r["id"]][0])
     return {"pickable": pick, "blocked": blocked, "entries": everything, "flags": list(flags),
             "flag_recs": flags.recs, "declared": {k: list(v) for k, v in vocab.items()}}
 
 
-def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | None = None) -> list[dict]:
+def check(ledger: str, archive: str, old: str | None = None, resolve: Resolve | None = None,
+          rank_text: str | None = None) -> list[dict]:
     """The ledger's flags: {level, id, field, kind, text, standing}. ``old`` is the ledger before
     an edit (None: every ⚠ is an error and nothing is standing). With it, a flag on an entry whose
     header block is unchanged — or a Fields: flag under an unchanged declaration — is standing:
-    information, whatever it was. On a changed or new entry, EDIT_ERRORS are errors too."""
-    recs = [dict(r, standing=False) for r in pickable(ledger, archive, resolve, undeclared=True)["flag_recs"]]
+    information, whatever it was. On a changed or new entry, EDIT_ERRORS are errors too. ``rank_text``
+    adds the rank file's flags (never standing: the file is a tool's)."""
+    recs = [dict(r, standing=False)
+            for r in pickable(ledger, archive, resolve, undeclared=True, rank_text=rank_text)["flag_recs"]]
     if old is None:
         return recs
     before = {e["id"]: e["fields"] for e in entries(old)}
     changed = {e["id"] for e in entries(ledger) if before.get(e["id"]) != e["fields"]}
     decl_changed = declarations(old) != declarations(ledger)
     for r in recs:
-        counts = decl_changed if r["id"] is None else r["id"] in changed
+        counts = True if r["kind"] == "rank" else decl_changed if r["id"] is None else r["id"] in changed
         if not counts:
             r["standing"], r["level"] = True, "info"
         elif r["kind"] in EDIT_ERRORS:
             r["level"] = "error"
         r["text"] = ("⚠" if r["level"] == "error" else "ℹ") + r["text"][1:]
     return recs
+
+
+# ---------------------------------------------------------------------------------------------
+# The rank: the person's order of a ledger's entries, and the pick order it gives
+# ---------------------------------------------------------------------------------------------
+
+RANK_LINE_RE = re.compile(r"^(TD-\d+):[ \t]+(\S+)[ \t]*$")
+KEY_RE = re.compile(r"^[0-9A-Za-z][|\w./-]*$", re.ASCII)  # never a leading `|`; the rest of a repo name may ride along
+KEY_SEP = "|"  # the lowest character of the key order, below every other
+KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz"  # what midpoint() writes, in key order
+BANDS = {"high": "1", "medium": "2", "low": "3"}  # an implicit key's first component; anything else is 4
+RANK_HEADER = ("# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n"
+               "# Written by a tool; read only through ledgerboard's rank().\n")
+QUEUE_ACTIONS = ("rank", "join", "prune")
+QUEUE_SUBJECT_RE = re.compile(r"^queue: (?:rank|join|prune) TD-\d+(?:, TD-\d+)* \([^()\s][^()]*\)$")
+
+
+def rank_path(ledger_path: str) -> str:
+    """The rank file of the ledger at ``ledger_path``: ``<ledger stem>_rank.yml`` beside it."""
+    head, sep, name = ledger_path.rpartition("/")
+    stem = name[:-3] if name.endswith(".md") else name
+    return f"{head}{sep}{stem}_rank.yml"
+
+
+def key_order(key: str) -> tuple[int, ...]:
+    """A key's sort value: code point order, except that ``|`` sorts below every other character."""
+    return tuple(-1 if c == KEY_SEP else ord(c) for c in key)
+
+
+def implicit_key(priority: str | None, etype: str | None, tid: str, repo: str = "") -> str:
+    """The key of an entry with no rank line: Priority band, Type index, id number to six digits,
+    then the repo name (``2|0|000642|shiftlead``); no repo, no last component."""
+    band = BANDS.get((priority or "").lower(), "4")
+    t = (etype or TYPES[0]).lower()
+    k = f"{band}{KEY_SEP}{TYPES.index(t) if t in TYPES else 0}{KEY_SEP}{_num(tid):06d}"
+    return f"{k}{KEY_SEP}{repo}" if repo else k
+
+
+def midpoint(a: str | None, b: str | None) -> str:
+    """A key strictly between ``a`` and ``b`` (None: that end is open), written from KEY_DIGITS
+    after a shared prefix, never ending in the lowest digit it writes — so there is room again."""
+    for k in (a, b):
+        if k is not None and not KEY_RE.match(k):
+            raise Refused(f"not a key: {k!r}")
+    lo, hi = a or "", b
+    if hi is not None and key_order(lo) >= key_order(hi):
+        raise Refused(f"no key between {a!r} and {b!r}: they are not in order")
+    out, i, between = [], 0, None
+    while True:
+        ca = lo[i] if i < len(lo) else None
+        cb = hi[i] if hi is not None and i < len(hi) else None
+        if hi is not None and cb is None:
+            if between:  # b ran out while it was followed: the longest prefix of b above a is between
+                return between
+            raise Refused(f"no key between {a!r} and {b!r}")
+        if ca is not None and ca == cb:
+            out.append(ca)
+            i += 1
+            continue
+        low = key_order(ca)[0] if ca is not None else -2
+        high = key_order(cb)[0] if cb is not None else 1 << 21
+        fits = [d for d in KEY_DIGITS[1:] if low < ord(d) < high]
+        if fits:
+            return "".join(out) + fits[len(fits) // 2]
+        if ca is not None:  # keep a's character: from here on anything above a's rest is below b
+            out.append(ca)
+            hi = None
+        elif ord(KEY_DIGITS[0]) < high:  # below b's character only the lowest digit fits: take it, b is passed
+            out.append(KEY_DIGITS[0])
+            hi = None
+        elif cb == KEY_DIGITS[0] and i + 1 < len(hi) or cb == KEY_SEP or not out:  # follow b and go deeper
+            out.append(cb)
+            if len(out) > len(lo) and KEY_RE.match("".join(out)) and "".join(out) != hi:
+                between = "".join(out)  # a proper prefix of b, longer than a: a fallback when b runs out
+        else:  # the separator, the lowest character, is below b's: take it, b is passed
+            out.append(KEY_SEP)
+            hi = None
+        i += 1
+
+
+def rank(text: str) -> tuple[dict[str, str], list[str]]:
+    """A rank file's ``{id: key}`` and flags: ⚠ for a line it cannot read or a repeated id (the
+    first wins), ℹ for a blank line, a comment below the first entry, or lines out of key order."""
+    keys: dict[str, str] = {}
+    flags: list[str] = []
+    seen_entry, last = False, None
+    for n, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            flags.append(f"ℹ rank line {n}: blank — ignored")
+            continue
+        if line.startswith("#"):
+            if seen_entry:
+                flags.append(f"ℹ rank line {n}: a comment below the first entry — comments come first")
+            continue
+        m = RANK_LINE_RE.match(line)
+        if not m or not KEY_RE.match(m.group(2)):
+            flags.append(f"⚠ rank line {n}: cannot read {line!r} — write TD-NNN: <key>")
+            continue
+        seen_entry = True
+        tid, key = m.groups()
+        if tid in keys:
+            flags.append(f"⚠ rank line {n}: {tid} again — its first line holds ({keys[tid]})")
+            continue
+        if last is not None and key_order(key) < key_order(last):
+            flags.append(f"ℹ rank line {n}: {tid} is out of key order — the file is sorted by key")
+        keys[tid], last = key, key
+    return keys, flags
+
+
+def set_rank(text: str, lines: Mapping[str, str | None]) -> str:
+    """The rank file with the given ids' lines set (a key) or removed (None); every other line
+    byte for byte. A new line goes before the first entry line whose key sorts above it."""
+    for tid, key in lines.items():
+        if not ID_ITEM_RE.match(tid):
+            raise Refused(f"not an entry id: {tid!r}")
+        if key is not None and not KEY_RE.match(key):
+            raise Refused(f"not a key: {key!r}")
+    nl = "\r\n" if "\r\n" in text else "\n"  # a new line takes the file's own ending
+    src = text.splitlines(keepends=True) if text else [ln + nl for ln in RANK_HEADER.splitlines()]
+    if src and not src[-1].endswith("\n"):
+        src[-1] += nl
+    kept = []
+    for line in src:
+        m = RANK_LINE_RE.match(line.rstrip("\r\n"))
+        if not (m and m.group(1) in lines):
+            kept.append(line)
+    for tid, key in sorted(((t, k) for t, k in lines.items() if k is not None),
+                           key=lambda tk: (key_order(tk[1]), _num(tk[0]))):
+        at = len(kept)
+        for j, line in enumerate(kept):
+            m = RANK_LINE_RE.match(line.rstrip("\r\n"))
+            if m and (key_order(m.group(2)), _num(m.group(1))) > (key_order(key), _num(tid)):
+                at = j
+                break
+        kept.insert(at, f"{tid}: {key}{nl}")
+    out = "".join(kept)
+    got, _ = rank(out)
+    want = {t: k for t, k in lines.items() if k is not None}
+    if any(got.get(t) != k for t, k in want.items()) or any(t in got for t, k in lines.items() if k is None):
+        raise Refused("the rank file does not read back as written")  # a repeated id it cannot set alone
+    return out
+
+
+def components(ents: list[dict]) -> list[dict]:
+    """The connected components of ``ents`` (``entries()`` of a ledger or an archive) over their
+    Blocked by ids, both directions: ``{ids, others, cross_repo}`` — the members in file order, the
+    local ids they name that are not among ``ents`` (an archived or unknown entry: not a member,
+    joins nothing), and the ``<repo>#TD-NNN`` ids they name, for a caller to join across repos.
+    Components are in the file order of their first member."""
+    order = [e["id"] for e in ents]
+    present: dict[int, str] = {}  # by number, as pickable() reads a blocker: TD-7 is TD-007
+    for t in order:
+        present.setdefault(_num(t), t)
+    parent = {t: t for t in order}
+
+    def find(t: str) -> str:
+        while parent[t] != t:
+            parent[t] = parent[parent[t]]
+            t = parent[t]
+        return t
+    named: dict[str, tuple[list[str], list[str]]] = {}
+    for e in ents:
+        ids = parse_blocked(e["blocked_raw"])[0] if e.get("blocked_raw") else []
+        others, xrepo = [], []
+        for b in ids:
+            if "#" in b:
+                xrepo.append(b)
+            elif _num(b) in present:
+                if _num(b) != _num(e["id"]):
+                    parent[find(present[_num(b)])] = find(e["id"])
+            else:
+                others.append(b)
+        named[e["id"]] = (others, xrepo)
+    groups: dict[str, dict] = {}
+    for t in order:
+        g = groups.setdefault(find(t), {"ids": [], "others": [], "cross_repo": []})
+        if t in g["ids"]:
+            continue  # a repeated heading: one member
+        g["ids"].append(t)
+        for key, vals in zip(("others", "cross_repo"), named[t]):
+            g[key].extend(v for v in vals if v not in g[key])
+    return list(groups.values())
+
+
+def _card_order(live: list[dict], keys: dict[str, str], lined: dict[int, str]) -> dict[str, tuple[tuple, str]]:
+    """Each live entry's (sort value, card key). The card key is the best lined key among the card's
+    members when any has a line, else the best implicit key; the sort value is that key, the card's
+    lowest id, then the entry's place in the card — after every member it is blocked by, else by key."""
+    out: dict[str, tuple[tuple, str]] = {}
+    raw = {e["id"]: e["blocked_raw"] for e in live}
+    for comp in components(live):
+        ids = comp["ids"]
+        card = min((keys[t] for t in ids if _num(t) in lined), key=key_order, default=None) \
+            or min((keys[t] for t in ids), key=key_order)
+        low = min(_num(t) for t in ids)
+        num = {_num(t): t for t in ids}
+        deps = {t: {num[_num(b)] for b in parse_blocked(raw[t] or "")[0]
+                    if "#" not in b and _num(b) in num and num[_num(b)] != t} for t in ids}
+        left, pos = set(ids), 0
+        while left:
+            ready = [t for t in left if not deps[t] & left] or list(left)  # a cycle: key order breaks it
+            nxt = min(ready, key=lambda t: (key_order(keys[t]), _num(t)))
+            out[nxt] = ((key_order(card), low, pos), card)
+            left.discard(nxt)
+            pos += 1
+    return out
 
 
 # ---------------------------------------------------------------------------------------------
@@ -857,8 +1079,23 @@ def subject(tool: str, action: str, text: str, *, to: date | str | None = None, 
     return f"{tool}: {action} {edit_head(text)}{what} (session {who})"
 
 
+def queue_subject(tool: str, action: str, ids: list[str]) -> str:
+    """The one-line commit subject of a rank file write by `tool`: ``queue: rank|join|prune TD-a, TD-b (<tool>)``,
+    the ids in id order. A rank sets a moved card's lines, a join a newcomer's, a prune removes a done card's."""
+    if action not in QUEUE_ACTIONS:
+        raise Refused(f"unknown queue action {action}")
+    if not ids or not all(ID_ITEM_RE.match(t) for t in ids):
+        raise Refused(f"a queue subject names entry ids: {ids!r}")
+    if not tool or not re.fullmatch(r"[^()\s][^()]*", tool):
+        raise Refused(f"not a tool name: {tool!r}")
+    return f"queue: {action} {', '.join(sorted(set(ids), key=_num))} ({tool})"
+
+
 def subject_kind(line: str) -> str | None:
-    """`edit` or `append` for a board write's commit subject (or a PR title carrying one); None otherwise."""
+    """`edit` or `append` for a board write's commit subject, `queue` for a rank file write's (or a PR
+    title carrying one); None otherwise."""
+    if QUEUE_SUBJECT_RE.match(line):
+        return "queue"
     if EDIT_SUBJECT_RE.match(line):
         return "edit"
     if APPEND_SUBJECT_RE.match(line) or any(r.match(line) for r in LEGACY_APPEND_SUBJECT_RES):

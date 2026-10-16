@@ -136,6 +136,7 @@
    "blocked_by": [
     "decision (the owner)"
    ],
+   "card_key": "1|0|000002",
    "cross_repo": [],
    "fields": {
     "added": "2026-01-03",
@@ -144,6 +145,7 @@
     "status": "Open"
    },
    "id": "TD-002",
+   "key": "1|0|000002",
    "pickable": false,
    "priority": "High",
    "title": "A high entry blocked on a decision",
@@ -154,6 +156,7 @@
     "other-repo#TD-020",
     "TD-099"
    ],
+   "card_key": "1|0|000006",
    "cross_repo": [
     {
      "item": "other-repo#TD-020",
@@ -168,45 +171,15 @@
     "status": "Open"
    },
    "id": "TD-006",
+   "key": "1|0|000006",
    "pickable": false,
    "priority": "High",
    "title": "Blocked in another repo",
    "type": "debt"
   },
   {
-   "blocked_by": [
-    "TD-001"
-   ],
-   "cross_repo": [],
-   "fields": {
-    "added": "2026-01-05",
-    "blocked by": "TD-001",
-    "priority": "Medium",
-    "status": "Open"
-   },
-   "id": "TD-004",
-   "pickable": false,
-   "priority": "Medium",
-   "title": "Blocked by an open entry",
-   "type": "debt"
-  },
-  {
    "blocked_by": [],
-   "cross_repo": [],
-   "fields": {
-    "added": "2026-01-06",
-    "blocked by": "TD-010",
-    "priority": "Medium",
-    "status": "Open"
-   },
-   "id": "TD-005",
-   "pickable": true,
-   "priority": "Medium",
-   "title": "Blocked by an archived one",
-   "type": "debt"
-  },
-  {
-   "blocked_by": [],
+   "card_key": "2|0|000004",
    "cross_repo": [],
    "fields": {
     "added": "2026-01-02",
@@ -218,23 +191,29 @@
     "type": "feature"
    },
    "id": "TD-001",
+   "key": "2|1|000001",
    "pickable": true,
    "priority": "Medium",
    "title": "A medium feature",
    "type": "feature"
   },
   {
-   "blocked_by": [],
+   "blocked_by": [
+    "TD-001"
+   ],
+   "card_key": "2|0|000004",
    "cross_repo": [],
    "fields": {
-    "added": "2026-01-04",
-    "priority": "Low",
+    "added": "2026-01-05",
+    "blocked by": "TD-001",
+    "priority": "Medium",
     "status": "Open"
    },
-   "id": "TD-003",
-   "pickable": true,
-   "priority": "Low",
-   "title": "Low debt first in its rank",
+   "id": "TD-004",
+   "key": "2|0|000004",
+   "pickable": false,
+   "priority": "Medium",
+   "title": "Blocked by an open entry",
    "type": "debt"
   },
   {
@@ -242,6 +221,7 @@
     "TD-001",
     "'soon'"
    ],
+   "card_key": "2|0|000004",
    "cross_repo": [],
    "fields": {
     "added": "2026-01-08",
@@ -253,9 +233,43 @@
     "type": "chore"
    },
    "id": "TD-007",
+   "key": "3|0|000007",
    "pickable": false,
    "priority": "Low",
    "title": "Bad fields",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "2|0|000005",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-06",
+    "blocked by": "TD-010",
+    "priority": "Medium",
+    "status": "Open"
+   },
+   "id": "TD-005",
+   "key": "2|0|000005",
+   "pickable": true,
+   "priority": "Medium",
+   "title": "Blocked by an archived one",
+   "type": "debt"
+  },
+  {
+   "blocked_by": [],
+   "card_key": "3|0|000003",
+   "cross_repo": [],
+   "fields": {
+    "added": "2026-01-04",
+    "priority": "Low",
+    "status": "Open"
+   },
+   "id": "TD-003",
+   "key": "3|0|000003",
+   "pickable": true,
+   "priority": "Low",
+   "title": "Low debt first in its rank",
    "type": "debt"
   }
  ],
@@ -304,8 +318,8 @@
   }
  ],
  "pickable": [
-  "TD-005",
   "TD-001",
+  "TD-005",
   "TD-003"
  ],
  "rows": [

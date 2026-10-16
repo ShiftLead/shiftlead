@@ -125,7 +125,14 @@
     "shiftlead: answer A question (from TD-12)",
     "shiftlead: board decide TD-12 (person)",
     "Fix the parser (#12)",
-    "board_edit: finish Ship it (session s-1)"
+    "board_edit: finish Ship it (session s-1)",
+    "queue: rank TD-3, TD-12 (shiftlead)",
+    "queue: join TD-7 (shiftlead)",
+    "queue: prune TD-1, TD-2 (a-tool)",
+    "queue: rank TD-3 TD-12 (shiftlead)",
+    "queue: sort TD-3 (shiftlead)",
+    "queue: rank TD-3",
+    "queue: rank TD-3 (shiftlead) extra"
   ],
   "compose": [
     {
@@ -282,5 +289,255 @@
         "Not right: <what>"
       ]
     }
+  ],
+  "queue_subjects": [
+    {
+      "tool": "shiftlead",
+      "action": "rank",
+      "ids": [
+        "TD-12",
+        "TD-3",
+        "TD-12"
+      ]
+    },
+    {
+      "tool": "shiftlead",
+      "action": "join",
+      "ids": [
+        "TD-7"
+      ]
+    },
+    {
+      "tool": "a-tool",
+      "action": "prune",
+      "ids": [
+        "TD-1",
+        "TD-2"
+      ]
+    },
+    {
+      "tool": "shiftlead",
+      "action": "move",
+      "ids": [
+        "TD-1"
+      ]
+    },
+    {
+      "tool": "shiftlead",
+      "action": "rank",
+      "ids": []
+    },
+    {
+      "tool": "shiftlead",
+      "action": "rank",
+      "ids": [
+        "far#TD-1"
+      ]
+    },
+    {
+      "tool": "a (b)",
+      "action": "rank",
+      "ids": [
+        "TD-1"
+      ]
+    }
+  ],
+  "implicit_keys": [
+    {
+      "priority": "High",
+      "type": "debt",
+      "id": "TD-7",
+      "repo": ""
+    },
+    {
+      "priority": "Medium",
+      "type": "feature",
+      "id": "TD-642",
+      "repo": "shiftlead"
+    },
+    {
+      "priority": "medium",
+      "type": null,
+      "id": "TD-642",
+      "repo": "shiftlead"
+    },
+    {
+      "priority": "Low",
+      "type": "debt",
+      "id": "TD-1234567",
+      "repo": "owner/name"
+    },
+    {
+      "priority": "?",
+      "type": "chore",
+      "id": "TD-3",
+      "repo": ""
+    }
+  ],
+  "key_orders": [
+    [
+      "2|1|000642|shiftlead",
+      "2a",
+      "2|0|000642|shiftlead",
+      "1|0|000700",
+      "2",
+      "2|0|000642",
+      "0h",
+      "z",
+      "2|0|000642|dev-cadence",
+      "1i"
+    ]
+  ],
+  "midpoints": [
+    [
+      null,
+      null
+    ],
+    [
+      null,
+      "1|0|000002"
+    ],
+    [
+      null,
+      "0h"
+    ],
+    [
+      "0h",
+      "1|0|000002"
+    ],
+    [
+      "1|0|000002",
+      "2|0|000004"
+    ],
+    [
+      "2|0|000004",
+      "2|0|000005"
+    ],
+    [
+      "2|0|000642|dev-cadence",
+      "2|0|000642|shiftlead"
+    ],
+    [
+      "2|0|000642",
+      "2|0|000642|shiftlead"
+    ],
+    [
+      "3|0|000003",
+      null
+    ],
+    [
+      "z",
+      null
+    ],
+    [
+      "x",
+      "x0h"
+    ],
+    [
+      "x",
+      "x0"
+    ],
+    [
+      "x",
+      "x|"
+    ],
+    [
+      "b",
+      "a"
+    ],
+    [
+      "a",
+      "a"
+    ],
+    [
+      "|a",
+      "b"
+    ],
+    [
+      null,
+      "0"
+    ],
+    [
+      "a",
+      "a|0|"
+    ],
+    [
+      "0",
+      "0|0|"
+    ]
+  ],
+  "rank_reads": [
+    "# comment\nTD-1: 0h\nTD-2: 2|0|000004\n",
+    "TD-1: 0h\n\n# late comment\nTD-1: 1h\nTD-2: 09\nTD-3 0h\nTD-4: |bad\nTD-5: two words\n",
+    ""
+  ],
+  "rank_writes": [
+    {
+      "text": "",
+      "lines": {
+        "TD-5": "2|0|0003"
+      }
+    },
+    {
+      "text": "# c\nTD-1: 0h\nTD-2: 2|0|000004\n",
+      "lines": {
+        "TD-3": "1i",
+        "TD-9": "0a"
+      }
+    },
+    {
+      "text": "# c\nTD-1: 0h\nTD-2: 2|0|000004\n",
+      "lines": {
+        "TD-1": "3a",
+        "TD-2": null
+      }
+    },
+    {
+      "text": "# c\nTD-1: 0h\nstray line\nTD-2: 2|0|000004",
+      "lines": {
+        "TD-4": "z"
+      }
+    },
+    {
+      "text": "# c\nTD-1: 0h\n",
+      "lines": {
+        "TD-2": "0h"
+      }
+    },
+    {
+      "text": "# c\nTD-1: 0h\n",
+      "lines": {
+        "far#TD-2": "0h"
+      }
+    },
+    {
+      "text": "# c\nTD-1: 0h\n",
+      "lines": {
+        "TD-2": "|0"
+      }
+    },
+    {
+      "text": "# c\r\nTD-1: 0h\r\n",
+      "lines": {
+        "TD-2": "1a",
+        "TD-1": "0z"
+      }
+    },
+    {
+      "text": "",
+      "lines": {
+        "TD-2": "é"
+      }
+    }
+  ],
+  "rank_paths": [
+    "docs/technical_debt.md",
+    "technical_debt.md",
+    "a/b/ledger.md"
+  ],
+  "components": [
+    "ledger/ranked.md",
+    "ledger/ranked.archive.md",
+    "ledger/basic.md"
   ]
 }
