@@ -14289,6 +14289,9 @@ Each reproduction passed with its fix.
 **Related:** TD-730, TD-762, TD-763, TD-740.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1943) — the Repo page's row says *needs a team* after its owner, and under the Technical debt heading's lanes lines are the repo's *needs a team* line (`team_notes`, as `ao repo` prints it) and each stale-team note (`teams.stale_teams`, shared with `ao org check`'s lacks); `entry_add` takes `team` and carries `entry: {repo, type, team}`, blank handing to the first team with a seat in the ledger's `Team` order (`teams.entry_teams`' `declared`), which `/api/entry/plan` and `ao td add` read from the home's repo reading; `ao td add --team` names the team or is refused with the repo's teams.
+
+---
+
 ## TD-788: Held by no test: the rank flush's join and prune PRs, its found-timer and signature guard, and the landed key's expiry (`agent_rank`, #1939)
 
 **Priority:** Medium
