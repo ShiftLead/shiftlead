@@ -12995,6 +12995,47 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 
 **Related:** TD-372 (the *host agent unreachable* banner that flashed on every page change).
 
+## TD-738: The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/templates/inbox_row.html` (a board row's buttons, ~L751–L778: Done, Reply, Decide, Not right, the three Snoozes, each with `data-text="{{ e.text }}"`; ~L373 `board_add`; the rows' `data-find`); `src/shiftlead/ui/static/app.js` (the handlers that read `b.dataset.text`, ~L681, ~L933–L996)
+
+**Why:** TD-737's measurement, 2026-10-15, a read-only GET of the live `/inbox`: 1,454,246 bytes of HTML for ~320 mail rows. `data-text` attributes come to 252,721 bytes and `data-find` to 220,720, together about a third of the page. On a board row the line's whole text is written into `data-text` on every button that acts on the line (seven or so per row), and once more as the row's `data-find`. The browser parses all of it on every page change: first paint came at 0.93–1.11 s and the DOM was ready at 1.05–1.23 s, against 0.46–0.48 s for `/settings` (83 KB).
+
+**Fix:** write the line's text once per row, on the row (as `data-text` beside `data-find`, or derive the find text from it), and have the buttons' handlers read it from `closest(".mailrow")` instead of their own `dataset.text`. Then measure the page again, as above, and put both sizes in the PR.
+- **Tests:** a board row's buttons carry no `data-text`, and each press still sends the line's text (the existing board-press tests, reading it from the row).
+
+**Resolved:** 2026-10-15 by #1862 — a board row writes its line's text once, as the row's `data-text`, and the `board`, `board_reply` and `board_notright` handlers read it from the row (`lineText`); every press sends the same body as before (scratch-home UI check). The live `/inbox` that day: 1,283,406 bytes with 56 board rows, of which ~174 KB was the repeated button `data-text` — about 1,109 KB after.
+
+**Done when** a board row holds its line's text once, the presses send the same bodies as before, and the PR gives the page's size before and after.
+
+**Related:** TD-737 (the measurement), TD-739.
+
+## TD-739: The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (the `/`, `/inbox` and `/repo/{name}` routes and what each reads from the host agent before rendering); `src/shiftlead/ui/org.py`, `inbox.py`, `repo.py`
+
+**Why:** TD-737's measurement, 2026-10-15, read-only GETs of the live UI, three passes each: time to first byte was 0.45–0.57 s for `/` (280 KB), 0.39–0.86 s for `/inbox` (1.46 MB), 0.31–0.79 s for `/repo/shiftlead` (636 KB), and 0.14–0.40 s for `/settings` (83 KB). In headless Chromium, parsing then added 0.1–0.35 s before the DOM was ready. The server's half is the larger, and it is paid on every page change, since each page is a full server-rendered navigation (§4.5 *Browser mechanics*).
+
+**Fix:** profile each route's render on a scratch home loaded to the live home's size (`scripts/look_home.py`, with the fixture's sessions, mail and board raised to the counts the live Inbox shows: ~320 mail rows, ~60 board items). Split the time into the host agent's RPCs, the view's computation and the template, say in the PR where it goes, and fix the largest share, or file each part as its own entry where its fix is in `src/sessionorc/`.
+
+**Resolved:** 2026-10-15 by #1871 — the split, on a scratch home at the live size (320 mail, 60 board lines, this ledger, 12 sessions), per request: `/` 74 ms (RPCs 27, `board_reading` 29, template 3), `/inbox` 304 ms (RPCs 35, `board_reading` 27, template 186), `/repo` 86 ms (RPCs 16, `board_reading` 28, template 27); live, the `repos` RPC is 1.3 MB in 34–55 ms and was read 2–3 times a page. Fixed: `subject_of`/`clip_subject` fold control characters in one `str.translate` (the Inbox's template 186 → ~140 ms, `/inbox` 304 → ~230 ms), and every page reads `repos` once per request (`Readings.repos`, a per-request memo). Filed: TD-746 (the `repos` payload, `src/sessionorc/`), TD-747 (the rest of the Inbox's template time).
+
+**Done when** the PR names each route's split, and the largest share is fixed or filed.
+
+**Related:** TD-737, TD-738.
+
 ## TD-732: `TickMixin._lost_brief`'s eligibility guards, its sender-told filters and its failed-close retry are held by no test (#1837)
 
 **Priority:** Medium
@@ -13014,3 +13055,315 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Done when** each case has a test and fails under its mutation.
 
 **Related:** TD-717, TD-720, #1837.
+
+## TD-735: Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-731's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *A new entry settles before it is pickable* (*Hold*, *A claimed entry is held all the same*, *An entry can land held*), §4.7 `ao td hold` and `ao td next`; `src/sessionorc/settle.py` (`hold`, `observe`, `claim_refusal`), `src/sessionorc/agent_ids.py` (`rpc_td_hold`, `rpc_td_next`, `_ids_give`), `src/sessionorc/agent_inbox.py` (`_lease_holders`), `src/shiftlead/cli.py` (`cmd_td_hold`, `ao td next`'s parser), `src/shiftlead/briefs/entry.md`; `tests/test_settle.py`, `tests/test_td_next.py`
+
+**Why:** TD-731's design. On 2026-10-15 Paul's `ao td hold TD-722` was refused two minutes after TD-722 settled, and its build TD-724 was claimed and under review as #1840 before the design round's findings were in; it had to be stopped by hand.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- `settle.hold`: drop the *has settled* refusal, so any id the clock holds can be held. `rpc_td_hold` still refuses an id that is not an open entry of the reading.
+- `settle.observe`: a sig change on a held record keeps `held` and records the new `sig`; it no longer restarts the window or ends the hold. A held record with no `at` or `sig` (landed held) is read as held on its first reading, its `sig` recorded, and never marked `settling`. An unheld settling entry's edit still restarts its window, as now. A repo's *first* reading is the first that finds no record with an `at` under its key, so a `--held` pre-record does not make every existing id settle as new.
+- `claim_refusal`: the held wording drops *or its text changes* (*no lane takes it until they release it*).
+- `rpc_td_hold` on an entry with live declared leases (`_lease_holders(id)`): the hold is written as on any entry, and each holder whose record is `unattended` gets a `note` from the person, `about` the id, with §4.4's fixed text. Where an unattended holder's claim names a PR (`pr` or `review_pr`), each seat whose inbox holds an open `ask` with that `pr` (a scan of the inboxes of the graph's live records, the states `_lease_holders` skips skipped) gets the second note, once per seat; none where the reader is the person. `rpc_td_hold` reads `entry.get("held")` before the call (`settle.hold` keeps its return), and a hold on an already-held entry mails nobody (`told: []`). The hold is written before any note; a note that fails is collected as *could not tell <name>: <why>* in the reply (as `board_reply_hand` collects its refusals) and never refuses the hold. The reply gains `told: [names]` and `untold: [lines]`. `ao td hold` prints them.
+- `ao td hold`'s parser help (*hold an entry while it settles…*) and its printed line (*…or its text changes*) take §4.7's words; a test holds each.
+- `rpc_td_next(held=True)` (`ao td next --held`): refused to a caller whose record is `unattended`, and to a caller the graph does not hold, in its own words (§4.4 *An entry can land held*), not `person_only`'s. For the person, the person's shell and an interactive session, each id handed out also gets `{held: {at, by}}` written on the settle clock by a new `settle.prehold(key, ids, by, now)` under `_STORE`, keyed by `settle_key(root, remote)` (refused, as `td_hold` is, while the origin is not read), before the reply. `--json` carries `held: true`.
+- `entry.md`: one sentence, *if you are an interactive session and the person is still deciding on the entry, take its id with `ao td next --held`: it lands held until they release it*.
+- Tests, each failing with its line reverted: a settled entry held and then released; a held entry edited stays held and takes the new `sig`; a landed-held id is held at its first reading and never settles; a hold on a claimed entry writes the hold, mails one note to an unattended holder and none to an interactive one, and names the holder in `told`; `td_next --held` from an unattended caller is refused and writes nothing; `claim_refusal`'s new words.
+
+**Resolved:** 2026-10-15 by #1861 — `settle.hold` holds any entry the clock holds; `observe` keeps a hold across an edit and reads a `prehold` record as held from its first reading (a repo's first reading the first that finds a record with an `at`); `rpc_td_hold` mails each unattended lease holder and each seat with an open `ask` on their PR a note from the person, `told` / `readers` / `untold` in the reply; `rpc_td_next(held)` and `ao td next --held`, refused to an unattended or unknown caller; `claim_refusal`, `ao td hold`'s line and help, and `entry.md` in §4.4's and §4.7's words. Tests in `tests/test_settle.py`, `tests/test_td_next.py` and `tests/test_repo_facts.py`.
+
+**Done when** each bullet above is built and tested, and `ao td hold` on a settled, a claimed and a held entry, and `ao td next --held`, say what §4.7 says; the tests live in `tests/test_settle.py` and `tests/test_td_next.py`, among them: pre-holding id X leaves a repo's first reading recording every other id settled; a second hold of a claimed entry sends no note; a failed note leaves the hold written and names the holder in `untold`. Two existing tests assert what this removes and are rewritten: `tests/test_settle.py` ~L90 (an edit ends the hold) and ~L181 (the *has settled* refusal).
+
+**Related:** TD-707, TD-710, TD-731, TD-736.
+
+## TD-716: Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-715's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.4 *An entry says what it waits for* and *In a team's lanes*, §4.7 `ao repo`, §4.8 *A claim is a lease*, §6 rule 6, §4.5a *team card: Repo facet* (the lanes line), *card: compact* (the count) and *Repo page: waits mark*; `src/sessionorc/ledger.py` (`entries`, `lane_matches`, `in_lanes`, `flags`), `src/sessionorc/settle.py` (`mark`, TD-710's), `src/sessionorc/agent_tick.py` (`_read_repo`), the claim refusal in `rpc_progress`, `src/shiftlead/cli.py` (`ao repo`), `src/shiftlead/ui/org.py` and `templates/lanes_line.html`, `repo_part.html`, the card's count in `cards.py`; the role briefs `src/shiftlead/briefs/anchor.md`, `grinder.md` and `designer.md`
+
+**Why:** TD-715's design. On 2026-10-15 `ao repo` read *ao-grind-anchor is out of work with 9 in its lane*, and every one of the nine was waiting on a date, an event or the person, so the closed seat looked like the team's block and a restart like its cure.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). It is blocked by TD-710 because it marks entries in TD-710's settle pass. Slices, each its own PR:
+1. **The reading and the lanes** (`sessionorc`).
+   - `ledger.entries` reads `**Waits:**` (in the header block, after `Kind:`; one below the block draws ledgerboard's ℹ) into `waits: {on, date, why}`: `on` is the first word, `until` or `event`, `date` the first `YYYY-MM-DD` after `until` (or none), and `why` the rest. A first word outside the two is not read; `ledger.py --check` already flags it against the `Fields:` vocabulary.
+   - `flags` gains *TD-NNN: Waits: until names no date* for an `until` with no date. Such an entry waits with no end.
+   - TD-710's marking pass (`settle.mark`, on every reading it carries, and at the declaration-time reading rule 6 uses, its `then` clock) adds `waiting: {on, until}` while the wait stands, whatever `spans` holds (a repo with no `settle:` still marks waits). An `until` stands while the home's local date is before the date; an `event` always stands.
+   - `lane_matches` reads `waiting` as no lane's, as it reads `settling` and `held`, so rule 6's `lane_seen` and rule 8's news wait the same.
+   - `in_lanes` gains `waiting: {until: [ids], event: [ids]}`: the entries a lane would take but for the mark. They are kept out of the kinds' counts and out of `rest`. Each member gains `waiting` ids beside `ids`. `out_of_work` is unchanged (count above 0), and a new `out_of_work_waiting` lists `[{id, name, waiting}]` for a member carrying `out_of_work` whose `ids` is empty and whose `waiting` is not.
+   - `rpc_progress`'s claim on a `waiting` reference is refused, *TD-463 waits until 2026-10-16* or *TD-685 waits: the next cadence-sync PR*, and `force` passes it.
+2. **The words** (`shiftlead`).
+   - `ao repo` prints *waits until 2026-10-16* or *waits: <words>* after a row's owner, and the line *<name> is out of work; its lane waits: 2 until a date (the first 2026-10-16), 2 on an event: <ids>*. `--json` carries `waiting`.
+   - The lanes line adds *· n waiting*, its hover the ids and what each waits on, and *· <name> out of work, its lane waiting*.
+   - The card's count draws *n waiting* in grey in place of 0, never solid, with the design's hover.
+   - The Repo page's row draws the **waits** mark.
+   - The role briefs (`anchor.md`, `grinder.md`, `designer.md`), in their *Out of work* paragraph: an entry your lane takes that you cannot take because it waits on a date or an event gets a `**Waits:**` line, one waiting on the person gets `Blocked by: decision (paul) — <what they must do>`, and an evaluation only the person can run with a session gets `Owner: paul`. Write them in one ledger PR before `ao progress none`, only on entries that do not yet say so.
+3. **This ledger's nine** (a ledger PR, after slice 1 is live). The entries `ao-grind-anchor` named on 2026-10-15, as each still stands then:
+   - TD-460, TD-463 and TD-413: `Waits: until <date>`.
+   - TD-685 and TD-292: `Waits: event — …`.
+   - TD-672 and TD-641: `decision (paul) — …`.
+   - TD-112 and TD-005: `Owner: paul`.
+   A date already passed is not written.
+- **Tests:**
+  - An entry with `Waits: until <tomorrow>` matches no lane and is in `in_lanes`' `waiting`. On its date it matches and is told by rule 6 as new.
+  - `Waits: event` waits until the line goes.
+  - An `until` with no date is flagged (*Waits: until names no date*) and waits.
+  - A member's `waiting` ids are not in its `ids`; rule 8's news waits as rule 6's does.
+  - A member whose lane only waits is in `out_of_work_waiting` and not in `out_of_work`.
+  - A claim on a waiting entry is refused, and `--force` passes.
+  - `ao repo`'s two lines. The lanes line's *waiting* count.
+  - `ledger.py --check` passes this ledger with the new `Fields:` line.
+
+**Resolved:** 2026-10-15 — slice 1 (the reading, the `waiting` mark, the lanes, the claim refusal) by #1843; slice 2 (`ao repo`'s words, the lanes line, the card's grey count, the Repo page's **waits** mark, the role briefs) by #1860 (grinder-ao-2); slice 3 by this PR: `Waits: until` on TD-460 (2026-10-23), TD-463 (2026-10-16) and TD-413 (2026-10-21), `Waits: event` on TD-685 and TD-292, `decision (paul)` on TD-641, `Owner: paul` on TD-112 and TD-005. TD-672 was archived before slice 3 and needs no line. Untested slice-1 behaviours are TD-742.
+
+**Done when** a seat that declares out of work while every entry in its lane waits reads as waiting on `ao repo`, the card and the Repo page, each waiting entry says on what, what waits on the person is counted *for you*, and every listed test passes.
+
+**Related:** TD-715 (the design), TD-710 (the marking pass it extends), TD-707 (settling, the other withheld reason).
+
+## TD-742: TD-716 slice 1's `Waits:` behaviours — a repeat claim, a date-less `until`'s refusal, a capitalised first word, the dash forms, and a held entry — are held by no test (#1843)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1843)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_progress`: `if new_claim and not force and (words := settle_mod.wait_refusal(...))`), `src/sessionorc/settle.py` (`wait_refusal`), `src/sessionorc/ledger.py` (`waits_of`, `in_lanes`); `tests/test_waits.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1843's lines one at a time and running `tests/test_waits.py tests/test_lane_news.py tests/test_settle.py tests/test_repo_facts.py` (80 passed unmutated). Five mutations pass all 80 (six others — dropping `not force`, `mark_waits` out of `_marks`, `date <= today` to `<`, the `rest` withhold, the `out_of_work_waiting` guard, the `live-check` branch — are caught):
+1. `if new_claim and not force and …` changed to `if not force and …`: the docstring says *a declared claim on a waiting entry is refused*, and `new_claim` keeps a session's own repeated `progress` on an entry it already claimed from being refused; no test sends a second write on a claimed waiting entry.
+2. `wait_refusal`'s `and entry["waiting"].get("until"):` changed to `and True:`: an `until` that names no date then reads *TD-003 waits until *; the test only reaches the date and the `event` words.
+3. `waits_of`'s `words.split()[0].lower()` changed to `words.split()[0]`: `Until 2026-10-20` or `Event — …` reads as no wait; every test line is lower case.
+4. `.lstrip("—–-")` changed to `.lstrip("—")`: a hyphen or en dash before the reason stays in `why`, and so in the refusal's words; only the em dash is tested.
+5. `in_lanes`' member `waiting` list without `e["id"] not in held`: a held waiting entry is listed as a member's waiting; the test's `held={"TD-001"}` names an entry that does not wait.
+
+**Fix:** extend `tests/test_waits.py`: (1) after a forced claim of TD-002, a second `progress` on it raises nothing; (2) a `Waits: until` with no date refused with *waits: …* words, not *until *; (3) `Until <date>` and `EVENT — x` read as waits; (4) `until D - why` and `until D – why` give `why == "why"`; (5) `held` naming a waiting entry drops it from the member's `waiting`. Each fails under its mutation above.
+
+**Resolved:** 2026-10-15 by #1864 — five tests in `tests/test_waits.py`, each failing under its mutation. (1) is the claimer's `done` on a waiting entry it took with `--force`, since `new_claim` is every declared claim (a re-claim is refused today); the guard keeps a `done` or `drop` out of the refusal. (4) is parametrised over the hyphen, the en dash and the em dash.
+
+**Done when** the five tests exist and fail under those mutations.
+
+**Related:** TD-715, TD-716, #1843.
+
+## TD-715: A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (ao-paul, with Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — Designed 2026-10-15 (the designer; no mockup: one mark and one count in rows the pages draw already) — §4.4 *An entry says what it waits for*: a repo-declared `**Waits:**` line, `until <date>` or `event`, which the agent's settle pass marks `waiting`, so no lane takes the entry and `in_lanes` counts it apart. A member out of work whose lane only waits reads *its lane waits: …*, never *out of work with n*. What waits on the person is `decision (paul)` or `Owner: paul`, already *for you*. The session that reads such an entry writes the line before it declares. Built by TD-716. Was: Open.
+**Blocked by:** TD-716
+**Location:** design §4.4 *Repo facts* and *In a team's lanes* (the *out of work with n* line, the card's solid count), §4.7 `ao repo`, §6 rule 6 (the `anchor` lane), `sessionorc/ledger.py` (`in_lanes`, `for_page`)
+
+**Why:** on 2026-10-15 Paul asked what blocks the ao-grind team. `ao repo` read *ao-grind-anchor is out of work with 9 in its lane: TD-005, TD-112, TD-292, TD-413, TD-460, TD-463, TD-641, TD-672, TD-685*, and listed seven of them as pickable live checks, so the closed anchor seat looked like the team's biggest block and a restart its cure. It was neither. The seat had run at 2026-10-14 20:58 MDT and declared `ao progress none`, naming a reason for seven of the nine (and TD-297, a live check not among them): TD-460, TD-463 and TD-413 wait for a date (a trial ending about 10-15, CI runs on or after 10-16, a week of journal to 10-20); TD-685 and TD-292 wait for an event nobody can cause (the next sync PR, a look being handed); TD-672 and TD-641 wait on the person (a first certificate on a fresh tailnet name; a `permissions:` rule and a profile's `permission_prompts: ask`); and the two it did not name, TD-112 and TD-005, are evaluations that need an attended session with Paul — TD-112 by his decision of 2026-10-10 (the Gemini spike), TD-005 by its own Fix (the trust-dialog test) — which no seat can do. What the seat knew lives only in its `out_of_work.why` and in each entry's prose. The reader counts a live check *pickable* the moment its build is live, and an evaluation pickable whenever it is unblocked, so the line, the card's solid count and the pick list all say "work waiting" where there is none. A person — or a session answering one — then restarts a seat to read the same nine again, or misses what is really theirs to do (three of the nine).
+
+**Fix** (for the designer to decide):
+- A way for an entry to say what it waits for, read by the reader: a `**Waits:**` line (or `Blocked by:` items) of three shapes — a date (*not before 2026-10-16*, pickable from then), an event (*the next cadence-sync PR*, never pickable until the line is edited), and the person (counted *for you*, with what they must do).
+- An entry the person must run with a session (TD-112, TD-005) leaves the seat's lane: `Owner: paul` with what it needs, or a word the `anchor` lane does not take.
+- `ao repo`, the team card and the Repo page count a waiting entry apart (*9 in its lane, all waiting: 3 on a date, 2 on an event, 4 on you*), and the *out of work with n* line names only what the seat could take; the person-shaped ones join *for you*.
+- Whether the seat's `ao progress none --why` writes those lines back (a PR of its own each run would be churn), or the brief tells it to write each as it reads it.
+
+**Done when** a seat that declares out of work with nothing it can take reads as *waiting* on `ao repo`, the card and the Repo page, each waiting entry says on what, and what waits on the person is counted *for you*.
+
+**Related:** TD-707 (a settle window, the other "not pickable yet" reason), TD-112, TD-005, TD-641, TD-672.
+
+**Resolved:** 2026-10-15 — archived with its last build, TD-716 (slices 1–3 by #1843, #1860, #1863; see its **Resolved:**).
+
+## TD-743: Build TD-734: *waiting* only on a person or another session; an idle session with a live subagent reads *working*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-734's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.2 *Waiting* and *Working on its own*, §4.5 *The card's anatomy* (the composed pills); `src/shiftlead/ui/cards.py` (`review_wait`, the composition at ~L367–376, the slot's ending at ~L1005, `pill_title`, `state_counts` ~L1164); `src/shiftlead/adapters/claude_code/hook.py` (the `agent_id` branch, ~L120); `src/sessionorc/agent_tick.py` (the hook's apply, ~L4042: `subagent_delta`; the exit paths; `_idle_nudge` ~L1069 and `_idle_open` ~L1105); `src/sessionorc/models.py` (`subagents`, `NODE_OWNED` ~L82, the volatile fields at ~L709); `src/sessionorc/agent_serve.py` (`_view`); `src/shiftlead/ui/org.py` (the rollup by `pill_word`, ~L535); `docs/glossary.md` (done in the design PR); the role briefs `src/shiftlead/briefs/grinder.md`, `designer.md`, `anchor.md`; `tests/test_ui_org.py` (~L1663), `tests/test_exit_words.py` (~L126), `tests/test_claude_adapter.py` (the `agent_id` branch's `out or None`)
+
+**Why:** TD-734's design. Paul, 2026-10-15: a session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **`review_wait`** returns a reason only while a seat's `prs_waiting.asks` holds the record's ask for the claim's PR (*review #1302 with the techlead*). A bare open PR returns "", so the record draws plain `idle`, and the slot's ending falls through to what follows it (`open_work`, the doing line). The tests at `test_ui_org.py` ~L1663–1672 and `test_exit_words.py` ~L126 that assert a bare *waiting · review #1302* are rewritten to the new rule.
+- **The adapter**: a tool hook carrying `agent_id` returns `{"subagent_seen": true}` instead of nothing, and `test_claude_adapter.py`'s assertion of `None` there is rewritten. `SubagentStart` and `SubagentStop` carry it beside `subagent_delta`. A `SessionStart` of source `startup`, `resume` or `clear` carries `subagents_reset: true`, and `compact` never does. The core never reads `agent_id` or `source` (§4.3).
+- **Live, one helper**: `subagents_live(record, now)` (`subagents > 0` and `subagent_at` within `STALL_AFTER` of `now`), in `sessionorc`.
+  - `agent_serve._view` carries it as `subagents_live`, and so does the tick's `_finished_view` (~L1942), which today hand-picks its fields.
+  - Page and RPC readers take the field: `cards.py`, `state_counts`, the Org rollup, `work.finished` (`work.finished_alone` reads only dead records and is unchanged). Through the views they reach, `teamrun.finished` (~L312, ~L477) and `cli.py` (~L1067) get it too. `finished`'s `why` names the member, *grinder-dc-1 idle, subagent live*.
+  - Rules 3, 4 and 9 call the helper on the `Session` with the tick's `now`. A test pins that the view's value and the tick's agree.
+  - The tick's time-driven pass keeps each record's last value and calls `_push_changes` when one flips, since no event changes it then.
+- **The record**: `subagent_at` (ISO time, volatile beside `subagents`, in `NODE_OWNED` beside it, carried by `agent_serve._view` and the record's round-trip) is set on any event carrying `subagent_seen`, to the later of the record's `subagent_at` and the event's own `at` (a drained queued event never moves it back), so a replay never revives a stale pill, and a queued `subagents_reset` older than the record's `subagent_at` is not applied. An event with no `state` still writes it through `_apply_event`. `subagents` and `subagent_at` are reset by an event carrying `subagents_reset` (set on `out` before `hook.py`'s `SessionStart` branches part, so every `startup` — at the composer or with a brief, through `STATE_EVENTS` — `resume` and `clear` carries it, and `compact` never does), and on every path that marks the record `exited`: the `SessionEnd` hook, the tick's pane-gone finding and a close.
+- **The card**: an `idle` record with `subagents_live` draws the green *working* pill (`state_class`/`pill_word` `working`, ranked with `working`, `state:working` filter), with the slot ending *working · n subagents* (*1 subagent*). The order is §4.2's: the pill, where a wait reads, *idle · unseen* > *waiting*, and where none does, *working* > *idle · unseen* > `idle`; the slot a declared ending > the wait > *working · n subagents* > *idle · open work*. `pill_title` reads *working · 2 subagents — idle in every payload, its own subagents running*. `state_counts` gains a branch for an idle record whose `pill_word` is `working`, counting it with `working`, so the team header agrees with the pill; the Org rollup follows `pill_word` already. The glyph, the `state:working` filter and every other reader of `pill_word` treat it as working, and the Inbox row, which keys on its own kinds, is unchanged. The old rule's words go: `review_wait`'s docstring, the comment at ~L368, and the bare review hover at ~L1005. The payload's `state` stays `idle`.
+- **The seat close and *finished*** (§6 rule 3, `_seat_has_run` ~L2761, called by `_seat_pass` ~L2445, its `SEAT_IDLE_GRACE` counted from the later of `since` and `subagent_at`; rule 9, `_finished_close` ~L2067, `work.finished`): an idle seat, and an idle member or manager, with a live subagent is not closed and does not count as idle.
+- **The idle nudge** (§6 rule 4): `_idle_nudge` and `_idle_open` pass over a member with a live subagent by `subagents_live`, a standing `idle_open` is not rule 3's `open` cause (`_team_causes` ~L2470) while it is live, and the nudge's twenty minutes count from the later of `since` and `subagent_at`.
+- **The briefs**: each role brief's paragraph on ending a turn says that a turn ended on a background shell wait (CI, a watch) is said with `ao doing "<what, then what>"` first.
+- Tests, each failing with its line reverted:
+  - an idle record with an open, unheld PR draws `idle`, and with the reader's ask *waiting · review #N with the techlead*;
+  - an idle record with `subagents: 2` and a fresh `subagent_at` draws *working · 2 subagents*;
+  - with a `subagent_at` older than `STALL_AFTER` it draws `idle`;
+  - a `SessionStart` `startup` resets the count;
+  - a subagent's tool hook sets `subagent_at` and leaves the state alone;
+  - an open person ask on top of a live subagent draws *waiting*;
+  - a team header counts a member with a live subagent as *working*;
+  - a supervised member idle past `IDLE_NUDGE` with a claim open and a live subagent is not nudged, nor nudged on the tick after its last subagent ends;
+  - a lost `SubagentStop` (count 1, `subagent_at` past `STALL_AFTER`) draws `idle`, and a `SessionStart` `compact` keeps the count;
+  - a queued subagent event replayed late stamps its own `at`;
+  - the Org rollup counts the member *working*, and the `state:working` filter shows it;
+  - an idle seat past `SEAT_IDLE_GRACE` with a live subagent is not closed, and a team whose one member is idle with a live subagent is not finished;
+  - an interactive session with a live subagent and nothing waiting draws *working*, not *idle · unseen*;
+  - `subagents_live` flips false at `STALL_AFTER` with no event, and the tick pushes the record;
+  - a seat whose subagent ended after a long idle stretch is not closed before `SEAT_IDLE_GRACE` from `subagent_at`;
+  - a manager on call is not filled for a member whose standing `idle_open` sits beside a live subagent;
+  - a `SessionStart` `startup` with a brief (through `STATE_EVENTS`) resets the count, and a queued `subagents_reset` older than `subagent_at` is ignored.
+- Ready to close's Focus checklist row one reads *agent not working (turn ended)*, so it does not contradict the *working · 2 subagents* pill beside it. *no subagents running ✗* still refuses Close.
+
+**Done when** the tests above pass, and a session running `/cadence` with an Agent-tool reviewer reads *working* (a reviewer run as a separate `claude -p` session fires no hook and is not read), and one waiting only on its own PR reads *idle*, on a scratch home (§4.9b, a screenshot of each card named in the PR).
+
+**Related:** TD-418, TD-428, TD-201, TD-734.
+
+**Resolved:** 2026-10-15 — slice 1 (the record's `subagent_at`, the adapter's `subagent_seen` / `subagents_reset`, `subagents_live` on the view and in §6 rules 3, 4 and 9, the tick's flip push) by #1869; slice 2 by this PR: `review_wait` reads only a reader's hold on the ask, the card's *working · n subagents* pill, its hover and slot, `state_counts`, Ready to close's *agent not working (turn ended)*, and the grinder, designer and anchor briefs' `ao doing` line for a turn ended on a background shell; checked on a scratch home (`docs/mockups/reviews/2026-10-15-td743-*.png`). TD-734 (the design) is the designer's to archive.
+
+## TD-734: A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — Designed (2026-10-15, the designer): §4.2 *Waiting* (only a person's or a reader's hold on its ask; a bare open PR reads `idle`) and *Working on its own* (an idle session with a live subagent reads *working*, bounded by `STALL_AFTER`, the count reset at a new process or conversation; a background shell task is said with `ao doing`); §4.5 *The card's anatomy*. Built by TD-743.
+**Blocked by:** TD-743
+**Location:** `docs/design/4.2-state-feed.md` (*Waiting*); `docs/design/4.5-ui.md` (*The card's anatomy*, the *waiting* pill, TD-418); `docs/design/4.5a-controls.md` (the **waiting** mark); `src/shiftlead/ui/cards.py` (`review_wait`, and the pill's composition where `d["pill_word"] = "waiting"`); `src/sessionorc/agent_tick.py` (the record's `subagents` count, from `SubagentStart` / `SubagentStop`)
+
+**Why:** Paul, 2026-10-15: *when an agent is running /cadence it shows as WAITING but it should really be shown as WORKING since the session is still moving forward and in full control of the direction of the work. I would expect WAITING to only apply when a session needs input from the user or another session (something outside of its own purview).* The design draws an `idle` session *waiting* when a claim's PR is open in the repo reading (*waiting · review #N*), whoever moves that PR next (§4.2 *Waiting*). During `/cadence` the author ends turns while its own work goes on — a background reviewer subagent, a CI run it will re-check (`docs/procedures/cadence.md`, exit 3: *wait for a running CI and re-run*) — so its record reads `idle`, and with the PR open the pill reads *waiting*. The pill then says *someone else holds this* when nobody does, and the person cannot tell an author mid-cadence from one stuck on a reader or on them. *with the techlead*, and *waiting on you: TD-NNN*, are true waits and stay.
+
+**Fix:** a design round on §4.2 *Waiting*, with Paul's rule as its premise: *waiting* means the session needs a person or another session.
+1. **An `idle` record with live subagents** (`subagents` > 0) is not *waiting*: it reads as working on its own work (the pill *working*, or a composed word the round names). The count is already on the record, and Ready to close reads it (§4.2's *No live subagents*).
+2. **`waiting · review #N` alone** — a PR no reader holds (no seat's `prs_waiting.asks` names it) — the round decides: drawn as `idle` (the author's own next move: cadence, CI, merge), or kept while a required check runs, since CI is outside the session. Paul's words lean to the first.
+3. **A background shell task** (Claude Code's `run_in_background`, `Monitor`) is invisible to the hooks: the round says whether it is read at all, or left as the gap it is.
+
+**Done when** the design says that *waiting* is drawn only for a wait on a person or another session, the card follows it, and a test holds an idle record with a live subagent and an unheld open PR not drawn *waiting*.
+
+**Related:** TD-418, TD-428, TD-201, TD-271.
+
+**Resolved:** 2026-10-15 — archived with its last build, TD-743 (slices 1–2 by #1869, #1870; see its **Resolved:**).
+
+## TD-736: Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release**
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-731's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Blocked by:** TD-735
+**Location:** design §4.5 screen 6 (*The ledger's entries that wait on you*, *A held entry waits on the person too*), §4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry*; `src/shiftlead/ui/repo.py` and `templates/repo_part.html` (the row's button), `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `ledger_rows`), the Inbox's ledger row template, `src/sessionorc/ledger.py` (`added`/`detail` on every open entry); `tests/test_settle_pages.py`, `tests/test_ui_inbox_ledger.py`
+
+**Why:** TD-731's design. With TD-735 a hold has no end but the person's Release, so the Repo page must offer Hold where a lane can take the entry, and a hold must be drawn where the person reads what waits on them, or a forgotten one holds the entry for good.
+
+**Fix:** blocked by TD-735, since a Hold on a settled row is refused until it lands. Its `ledger.py` bullet touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- The Repo page draws **Hold** at the end of every settled row of a `LANE_KINDS` kind (*pickable*, *design*, *live-check*) and every row drawn *held by <name>*. It draws none on *for you*, *blocked*, *evaluation* or *other* rows. The toast reads the reply's `told` (*TD-724 held · grinder-ao-2 told to drop it*).
+- The reading carries `added` and `detail` on every open entry (`ledger.entries`, ~L448, today only on *for you*), since `held` is marked after the parse; the repo facts grow by that much.
+- `ledger_for_you` gains held entries as rows of kind *ledger · held*, in the same groups and order. Each says *claimed by <name>* (not *held by*) while a claim stands, has its age from `held.at`, **Release** (`td_hold {repo, id, release: true}`) and **Open**, and no answers, **Reply** or **Start session**. A held *for you* entry stays one row, the *for you* row, with **Release** beside **Open**. The rail and the find box treat these rows as ledger rows. They are counted nowhere.
+- `ao td hold --json`'s help lists `{repo, id, held, settling, told, untold}` and leaves out `readers` (the techlead's nit on #1861); it adds it.
+- The **Hold** button's title in `repo_part.html` still says *until you release it or its text changes*; since TD-735 an edit no longer ends a hold, so it takes §4.4's words (*until you release it*).
+- The UI change is verified by its builder on a scratch home (§4.9b), with a screenshot of a held row on the Inbox and a **Hold** on a settled Repo page row.
+- Tests: the Hold button on each row kind as listed; a held row's kind, age and buttons; a held *for you* entry drawn once with Release; Release removes the row on the reply.
+
+**Resolved:** 2026-10-15 by #1873 — **Hold** on every settled `LANE_KINDS` row and every row drawn *held by <name>*, none on *for you*, *blocked*, *evaluation* or *other*; the toast reads `told`, `readers` and `untold`; `added` and `detail` on every open entry; held entries are *ledger · held* Inbox rows with **Release** and **Open** (a held *for you* entry one row with **Release**); `ao td hold --json` help lists `readers`. Checked on a scratch home (`docs/mockups/reviews/2026-10-15-td736-*.png`). TD-731 (the design) is the designer's to archive.
+
+**Done when** the two §4.5a rows draw as written and the tests above pass.
+
+**Related:** TD-707, TD-731, TD-735.
+
+## TD-744: TD-731's `_hold_tell` reading a PR only from a declared claim, and `prehold` keeping an id's existing hold, are held by no test (#1861)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1861)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_ids.py` (`_hold_tell`, the `p.status == "claimed" and p.source == "declared" and (p.pr or p.review_pr)` test), `src/sessionorc/settle.py` (`prehold`'s `rec.setdefault("held", …)`); `tests/test_settle.py`, `tests/test_td_next.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1861's lines one at a time and running `tests/test_settle.py tests/test_td_next.py tests/test_repo_facts.py` (94 passed unmutated, main's venv). Ten mutations fail a test (the `review_pr` read, the `(p.pr or p.review_pr)` gate, `not was_held`, the interactive-holder skip, the holder/state skips, `_held_caller`'s interactive pass, `observe`'s first-reading rule, the sig kept on an edit, the reader's PR number). Two pass all 94:
+1. `p.source == "declared"` dropped from `_hold_tell`'s progress loop: the docstring says a PR is read from *a declared lease's claim*, and a non-declared (inferred or scraped) `claimed` line on the same ref carrying a `pr` would add that PR to the readers' set; every test's claim is declared.
+2. `prehold`'s `rec.setdefault("held", {...})` changed to `rec["held"] = {...}`: an id already held (a person's earlier Hold, with its `at` and `by`) is re-stamped with the caller and the new time; no test pre-holds an id that already holds a record.
+
+**Fix:** (1) in `tests/test_settle.py`, a holder with a declared claim on TD-003 and a non-declared claim line carrying `pr=1842`: the seat asking about #1842 is not told; (2) in `tests/test_settle.py`, `prehold` over an id whose record already has `held: {at, by}` leaves both. Each fails under its mutation above.
+
+**Done when** the two tests exist and fail under those mutations.
+
+**Related:** TD-731, #1861.
+
+**Resolved:** 2026-10-15 — two tests in `tests/test_settle.py`: `test_a_pr_is_read_only_from_a_declared_claim` (a derived `claimed` line carrying #1842 names no reader) and `test_pre_holding_an_id_already_held_keeps_its_hold`; each fails under its mutation and passes on main.
+
+## TD-753: `test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_once` is flaky on CI: the first tick's promote pass outlives `park_ticks` and overwrites the test's `_promotes`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-1, on #1875's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_repo_facts.py` (`test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_once`); `src/sessionorc/agent_tick.py` (`_refresh_repos`, the tick's detached `_promote_task`), `src/sessionorc/agent_promote.py` (`_refresh_promotes`)
+
+**Why:** #1875's CI, run 38832457100 attempt 1 (test (3.12), 2026-10-16T01:06Z UTC), failed `assert handed == [None, {"r": "abc"}]` with `[{}, {}]`; it passed on the re-run and five times locally. `park_ticks` cancels the tick loop, but not the passes a tick already started as tasks. The fixture's first tick starts `_refresh_promotes`. Where that pass is slow, it ends after the test has set `_promotes = {"r": {"live": "abc"}}` and `_promotes_read = False`. It then writes its own reading (`{}`, no repo registered) and `_promotes_read = True`. That happens during `_refresh_repos`'s first await (`_ledger_mtimes`), before `live` is read, so both calls hand `{}`. This is reproduced deterministically by making `promote.survey` wait until `_ledger_mtimes` is called. It is the same family as TD-695 (`test_sync_pass.py`'s first-tick tasks).
+
+**Fix:** the test awaits the first tick's `_promote_task` and `_repos_task` after `park_ticks`, before it sets the state they write, as `test_sync_pass.py`'s fixture does.
+
+**Done when** the test passes under the deterministic reproduction above.
+
+**Related:** TD-695, TD-463, TD-752.
+
+**Resolved:** 2026-10-15 — the test awaits both first-tick tasks. It passed under the reproduction, which fails without the fix. The reproduction was a scratch test, not committed.
+
+## TD-746: The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/` — the host agent's `repos` RPC and the repo facts it hands whole (`prs`, `completed`, `ledger`, `boards` per checkout); its readers in `src/shiftlead/ui/app.py` (`Readings.repos`), `inbox.py` (`board_reading`, `ledger_for_you`), `repo.py`, and the cards' `view()`
+
+**Why:** TD-739's measurement, 2026-10-15, read-only calls to the live host agent: `repos` answered 1,325,334 bytes in 34–55 ms, against 22–26 ms for `list` (248 KB) and 1–9 ms for `host`, `usage`, `gate` and `doing_log`. Of it, shiftlead's checkout alone is 796 KB: `prs` 407 KB, `ledger` 201 KB, `completed` 185 KB; samscrape's is 249 KB. Every page reads it once since TD-739 (it was two or three times), and the client parses all of it on each page change, though the Org, the Inbox and the Repo page each draw a small part: the board rows, the ledger rows for the person, one repo's facts.
+
+**Fix:** measure which fields each reader uses, then either give the RPC a `fields`/`root` filter the pages pass (the Repo page one root, the Inbox `boards` and the ledger's person rows, the Org the lanes and counts), or split the heavy parts (`prs`, `completed`) into their own reads. A reading the cards' `view()` takes stays whole where it needs it.
+- **Tests:** each page's request asks only for what it draws (a fake agent records the params), and a filtered reading equals the whole one restricted to those fields.
+
+**Done when** no page reads the whole `repos` reading to draw a part of it, and the PR gives the bytes and the time per page before and after.
+
+**Related:** TD-739 (the measurement), TD-747.
+
+**Resolved:** 2026-10-15 — the `repos` RPC takes `omit`, dotted paths each reading is served without (`reports.omitted`); the Org, the Repo page, Focus and `/api/sessions` leave out `ledger.recent`, the month's PRs' head, base, branch, author, dates and draft flag, and the entries' detail blocks; the Inbox (its page, its poll, a message page and the keeper's recount) the same less the detail and plus `completed`; Settings both. On the live reading of 2026-10-15: 1,449,490 B whole (~31 ms at the agent, 19 ms to encode and parse) → 750,556 B for a page (9 ms), 639,477 B for the Inbox (7 ms), 492,494 B for Settings (6 ms). An omit, not a keep-list, so a key the agent grows reaches every page. The events stream's `repos` events still carry whole readings: TD-754.
+
+## TD-752: `test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again` is flaky on CI: the third `_held_pass` recorded no crossing for #860
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, on #1873's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_held_missed.py` (~L442); `src/sessionorc/agent_*.py` (`_held_pass`, `_held_tried`, `_held_settled`)
+
+**Why:** #1873's CI, run 38830438126 attempt 1 (test (3.12), 2026-10-16T00:44Z UTC; `gh run view 38830438126 --attempt 1 --log-failed`), failed `assert [c["pr"] for c in held.standing(s.held_missed)] == [860]` with `[]`: after a Dismiss and a simulated restart, the pass that should record the next crossing (#860, held and merged) recorded none. The re-run of the same commit passed, and the file passes locally (22 in 1.1 s). #1873 touches nothing under `held`; the test is timing- or state-dependent.
+
+**Fix:** read `_held_pass` for anything throttled by wall time or by `_held_tried` across calls inside one test (the test clears `_held_tried` once, before the second pass, not before the third), reproduce under load (`pytest -p no:randomly --count` or a loop with `taskset`), and pin the pass to what the test means.
+
+**Done when** the test fails with the cause reintroduced and passes 50 runs in a row under load.
+
+**Related:** TD-736 (#1873, where it was seen).
+
+**Resolved:** 2026-10-15 — the cause was the fixture's live tick, not `_held_tried`. Only one test in the file parked the ticks. The first tick runs as the agent starts and launches `_refresh_repos` detached. Under load, that pass can land after `_member` has set `agent._repos["/repo"]`, a root no registry lists, and it drops the root as gone. `_held_pass` skips a member whose root the home holds no reading of. Landing after the second pass, it left the third with nothing to read: CI's `[]` for #860. A scratch test (not committed) reproduced it by running `_refresh_repos` between the passes. This is the same family as TD-695 and TD-753. `tests/test_held_missed.py` now overrides `agent` as `test_sync_pass.py` does: it parks the ticks and awaits the first tick's `_repos_task` and `_held_task`. The held pass reads with the real clock, so it could settle a PR unjudged; it is awaited as well. With the fixture no repos pass runs during a test, and the file passed 50 runs in a row beside a full `pdm run test`.

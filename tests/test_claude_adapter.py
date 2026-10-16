@@ -43,6 +43,7 @@ def test_translate_state_events():
         "adapter_id": "u1",
         "state": "working",
         "pending": None,
+        "subagents_reset": True,
     }
     assert translate({"hook_event_name": "Stop"})["state"] == "idle"
     assert translate({"hook_event_name": "SessionEnd", "reason": "prompt_input_exit"})["state"] == "exited"
@@ -68,7 +69,7 @@ def test_a_resume_lands_at_the_composer():
     """TD-155: `claude --resume` prints the conversation and waits at the composer, and no Stop
     follows, so `working` read `stalled?` at STALL_AFTER and the doorbell never rang it."""
     ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "resume"}
-    assert translate(ev) == {"adapter_id": "u1", "state": "idle", "pending": None}
+    assert translate(ev) == {"adapter_id": "u1", "state": "idle", "pending": None, "subagents_reset": True}
     # a prompt given with the resume is its own turn, reported by UserPromptSubmit after it
     assert translate({"hook_event_name": "UserPromptSubmit", "session_id": "u1"})["state"] == "working"
     assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
@@ -78,7 +79,7 @@ def test_a_clear_lands_at_the_composer():
     """TD-592: `/clear` starts a new conversation in the same process and waits at an empty composer;
     no Stop follows, so `working` sat on the chip until the next turn ended."""
     ev = {"hook_event_name": "SessionStart", "session_id": "u2", "source": "clear"}
-    assert translate(ev) == {"adapter_id": "u2", "state": "idle", "pending": None}
+    assert translate(ev) == {"adapter_id": "u2", "state": "idle", "pending": None, "subagents_reset": True}
     # the SessionEnd before it says nothing: the process lives on
     assert translate({"hook_event_name": "SessionEnd", "session_id": "u1", "reason": "clear"}) is None
 
@@ -89,7 +90,12 @@ def test_a_launch_with_no_prompt_starts_idle():
     and its `startup` reads `idle`. A launch with a prompt, a resume and a `/clear` are as before
     (a `/clear` reads `idle` since TD-592)."""
     ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "startup"}
-    assert translate(ev, at_composer=True) == {"adapter_id": "u1", "state": "idle", "pending": None}
+    assert translate(ev, at_composer=True) == {
+        "adapter_id": "u1",
+        "state": "idle",
+        "pending": None,
+        "subagents_reset": True,
+    }
     assert translate(ev)["state"] == "working"
     assert translate({**ev, "source": "clear"}, at_composer=True)["state"] == "idle"
     assert translate({**ev, "source": "compact"}, at_composer=True) == {"adapter_id": "u1"}
@@ -106,8 +112,9 @@ def test_a_subagents_tool_events_leave_the_state_alone():
     assert translate(ev) == {"adapter_id": "u1", "state": "working", "pending": None, "event": "PreToolUse:Bash"}
     assert translate({**ev, "hook_event_name": "PostToolUse"})["event"] == "PostToolUse:Bash"
     assert translate({"hook_event_name": "PostToolUse"})["event"] == "PostToolUse"  # no tool name: the event's own
-    assert translate({**ev, "agent_id": "a97a5f"}) == {"adapter_id": "u1"}
-    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) is None
+    # and say only that a subagent is alive (TD-734), which the core reads as `subagent_seen`
+    assert translate({**ev, "agent_id": "a97a5f"}) == {"adapter_id": "u1", "subagent_seen": True}
+    assert translate({"hook_event_name": "PostToolUse", "agent_id": "a97a5f"}) == {"subagent_seen": True}
     assert "event" not in translate({"hook_event_name": "UserPromptSubmit"})  # a turn's start is not named
     # a question asked from inside a subagent still stops the session for the person
     ask = {**ev, "agent_id": "a1", "tool_name": "AskUserQuestion", "tool_input": {"questions": [{"question": "q?"}]}}
@@ -157,7 +164,20 @@ def test_translate_permission_and_questions():
     assert n["pending"]["kind"] == "question"  # dialog is in the terminal now
     assert translate({"hook_event_name": "Notification", "notification_type": "auth_success"}) is None
     assert translate({"hook_event_name": "Notification", "notification_type": "idle_prompt", "message": "w"}) is None
-    assert translate({"hook_event_name": "SubagentStart"}) == {"subagent_delta": 1}
+    assert translate({"hook_event_name": "SubagentStart"}) == {"subagent_delta": 1, "subagent_seen": True}
+
+
+def test_a_fresh_conversation_resets_the_subagent_count():
+    """TD-734 (§4.2 *Working on its own*): a SessionStart of source `startup` — at the composer or with a
+    brief — `resume` or `clear` carries `subagents_reset`, since no subagent of the old conversation is
+    alive; a `compact` keeps the conversation and its count. Start and Stop carry `subagent_seen`."""
+    ev = {"hook_event_name": "SessionStart", "session_id": "u1"}
+    for source in ("startup", "resume", "clear"):
+        assert translate({**ev, "source": source})["subagents_reset"] is True, source
+    assert translate({**ev, "source": "startup"}, at_composer=True)["subagents_reset"] is True
+    assert "subagents_reset" not in translate({**ev, "source": "compact"})
+    assert translate({"hook_event_name": "SubagentStop"}) == {"subagent_delta": -1, "subagent_seen": True}
+    assert "subagent_seen" not in translate({"hook_event_name": "Stop"})
 
 
 def test_hooks_settings_shape():
@@ -380,6 +400,7 @@ def test_translate_carries_the_model_when_the_payload_has_one():
         "model": "claude-opus-5",
         "state": "working",
         "pending": None,
+        "subagents_reset": True,
     }
     assert "model" not in translate({"hook_event_name": "SessionStart", "session_id": "u1"})
     assert "model" not in translate({"hook_event_name": "Stop"})

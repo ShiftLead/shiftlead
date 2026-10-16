@@ -26,6 +26,7 @@ from sessionorc import ledgerboard as lb
 from sessionorc import mail as mail_mod
 from sessionorc import promote as promote_mod
 from sessionorc import settings as settings_mod
+from sessionorc import settle as settle_mod
 from sessionorc import shots as shots_mod
 from sessionorc import workorders as workorders_mod
 from sessionorc.agent_common import SEAT_HELD_GRACE, WRAPUP_GRACE
@@ -2192,7 +2193,10 @@ def ledger_rows(lf: Mapping[str, Any] | None) -> list[dict[str, Any]]:
 
 
 def ledger_for_you(
-    repos: Mapping[str, Any], fleet: Collection[dict[str, Any]], named: Mapping[str, str] | None = None
+    repos: Mapping[str, Any],
+    fleet: Collection[dict[str, Any]],
+    named: Mapping[str, str] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """The ledger's rows of the Inbox's **Later** section (design §4.5 screen 6 *The ledger's entries
     that wait on you*, §4.5a **Inbox row: ledger entry**, TD-368, TD-565): the entries §4.4 *Repo
@@ -2207,8 +2211,14 @@ def ledger_for_you(
     open decided line's `Context:` names (the repo's work orders' `refs`) is left out; the team the
     rail's *Teams* picks filter by — the definitions' team for the repo (`named`, by resolved
     checkout), else the team most of its live records carry, else none; the link the Repo page
-    opened on the id. `n` is every row, counted under *Later* alone."""
+    opened on the id. `n` is every row, counted under *Later* alone.
+    A held entry (its reading carries `held`, §4.5a **Inbox row: held entry**, TD-736) is a row too, in
+    the same order: `release` set, for **Release**; one not *for you* is of the kind *ledger · held*, its
+    `at` and `added` the hold's (*held 2h*), no answers — and `claimed` set, so its `held` reads
+    *claimed by*, since on this row *held by* would name the wrong hold."""
     from .repo import PRIORITY_RANK  # repo imports this module: read at call time
+
+    now = now or datetime.now(UTC)
 
     live = [s for s in fleet if s.get("state") not in ("exited", "closed") and s.get("repo")]
     groups: list[dict[str, Any]] = []
@@ -2228,7 +2238,8 @@ def ledger_for_you(
         entries = [
             e
             for e in ((r.get("ledger") or {}).get("entries") or [])
-            if isinstance(e, dict) and e.get("for_page") == "for-you" and e.get("id") not in decided
+            if isinstance(e, dict)
+            and ((e.get("for_page") == "for-you" and e.get("id") not in decided) or isinstance(e.get("held"), dict))
         ]
         if not entries:
             continue
@@ -2251,27 +2262,31 @@ def ledger_for_you(
             ]
             held = [str(s.get("name") or s.get("id")) for s in holders]
             owner = str(e.get("owner") or "").lower() == "paul"
-            answers = [str(a) for a in e.get("answers") or () if str(a).strip()]
+            for_you = e.get("for_page") == "for-you" and e.get("id") not in decided  # else here for its hold
+            hold = e.get("held") if isinstance(e.get("held"), dict) else None
+            answers = [str(a) for a in e.get("answers") or () if str(a).strip()] if for_you else []
             d = e.get("default")
             ok = isinstance(d, int) and not isinstance(d, bool) and 0 <= d < len(answers)
-            added = str(e.get("added") or "")
+            added = str(e.get("added") or "") if for_you else str((hold or {}).get("at") or "")
             rows.append(
                 {
                     "row": "ledger",
                     "id": e["id"],
                     "row_id": f"ledger:{name}:{e['id']}",  # the row's `data-msg` and fold key: an id is per repo
-                    "kind": "ledger · yours" if owner else "ledger · your decision",
+                    "kind": ("ledger · yours" if owner else "ledger · your decision") if for_you else "ledger · held",
                     "name": name,
                     "title": e.get("title") or "",
                     "subject": mail_mod.clip_subject(str(e.get("title") or "")),  # §4.10 *A subject on every entry*
                     "pri": (str(e.get("priority") or "")[:1] or "?").upper(),
                     "held": ", ".join(held),
+                    "claimed": not for_you,  # a held row's claim reads *claimed by*
+                    "release": hold is not None,  # **Release** (§4.5a *Inbox row: held entry*)
                     "holder": str(holders[0].get("id") or "") if holders else "",  # **Open session** (TD-678)
                     "type": str(e.get("type") or ""),  # the role **Start session** takes, by `entries:`
                     "why": "yours" if owner else "decision",  # `repoconfig.WORK_WHY`'s key
                     "team": team,
                     "at": added,
-                    "added": _added_words(added),
+                    "added": _added_words(added) if for_you else settle_mod.words({"held": hold}, now),
                     "detail": "\n".join(str(x) for x in e.get("detail") or () if isinstance(x, str)).strip("\n"),
                     "answers": answers,
                     "default": answers[d] if ok else "",

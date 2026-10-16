@@ -123,8 +123,17 @@ def test_the_pill_hover_takes_the_first_that_applies(tmp_path, monkeypatch):
     # a *waiting* pill says its reason, and a seat on call is read from its record — before the ending
     from shiftlead.ui.cards import pill_title
 
-    waiting = {"state_class": "waiting", "wait_reason": "waiting · review #1302", "confidence": "hook"}
-    assert pill_title(waiting) == "waiting · review #1302 — idle in every payload, on someone else’s move"
+    waiting = {
+        "state_class": "waiting",
+        "wait_reason": "waiting · review #1302 with the techlead",
+        "confidence": "hook",
+    }
+    assert pill_title(waiting) == (
+        "waiting · review #1302 with the techlead — idle in every payload, on someone else’s move"
+    )
+    # an idle record working on its own (§4.2, TD-734) says what runs
+    own = {"state_class": "working", "own_work": "working · 2 subagents", "confidence": "hook"}
+    assert pill_title(own) == "working · 2 subagents — idle in every payload, its own subagents running"
     seat = "a seat on call: read from its record, not from a screen"
     assert pill_title({"seat": True, "confidence": "hook"}) == seat
     assert pill_title({"seat": True, "state": "exited"}, "killed by you · 12:31") == seat

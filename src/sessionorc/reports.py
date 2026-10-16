@@ -166,6 +166,31 @@ def derive(
     return progress, findings, retire
 
 
+def omitted(value: Any, paths: Iterable[str]) -> Any:
+    """`value` without each dotted path of `paths` (the `repos` RPC's `omit`, design §4.4 *Repo facts*,
+    TD-746): a path walks a mapping by key and every item of a list alike, and its last key is left out
+    wherever it lands — `prs.recent.head` takes `head` from every PR of `recent`. A path that names
+    nothing leaves the value as it was, so a reader's omit never fails on an older or a failed
+    reading. `value` itself is never changed."""
+    tree: dict[str, Any] = {}
+    for path in paths:
+        *head, last = str(path).split(".")
+        node: dict[str, Any] | None = tree
+        for k in head:
+            node = node.setdefault(k, {}) if node is not None else None
+        if node is not None:  # under a key already left out whole: nothing more to leave out
+            node[last] = None
+    return _omit(value, tree)
+
+
+def _omit(value: Any, tree: dict[str, Any]) -> Any:
+    if isinstance(value, list):
+        return [_omit(x, tree) for x in value]
+    if not isinstance(value, dict) or not tree:
+        return value
+    return {k: _omit(v, tree[k]) if k in tree else v for k, v in value.items() if not (k in tree and tree[k] is None)}
+
+
 def _merged(pr: dict[str, Any]) -> bool:
     return bool(pr.get("mergedAt")) or str(pr.get("state", "")).upper() == "MERGED"
 

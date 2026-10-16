@@ -1227,18 +1227,66 @@ def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
     return [*(e for e in prs if e.get("sync")), *entries, *work_orders(r), *(e for e in prs if not e.get("sync"))]
 
 
+WAIT_CLAMP = 40  # the Repo page's *waits: <words>*, clamped; the whole line is its hover (§4.5a **waits** mark)
+
+
+def wait_words(e: Mapping[str, Any], short: bool = False) -> str:
+    """What an entry whose wait stands waits for (design §4.4 *An entry says what it waits for*, §4.7
+    `ao repo`, §4.5a *Repo page: waits mark*, TD-716): *waits until 2026-10-16* (`short`: *waits until
+    10-16*), else *waits: <the line's words>* (`short`: clamped); '' while it does not wait. Read from
+    the home's `waiting` mark, so a date passed says nothing."""
+    w = e.get("waiting")
+    if not isinstance(w, dict):
+        return ""
+    if w.get("on") == "until" and (date := str(w.get("until") or "")):
+        return f"waits until {date[5:] if short else date}"
+    why = str((e.get("waits") or {}).get("why") or "") or ("no date" if w.get("on") == "until" else "an event")
+    if short and len(why) > WAIT_CLAMP:
+        why = why[: WAIT_CLAMP - 1].rstrip() + "…"
+    return f"waits: {why}"
+
+
+def wait_line(e: Mapping[str, Any]) -> str:
+    """The entry's `**Waits:**` line, whole, as the Repo page's waits mark shows it on hover (TD-716)."""
+    w = e.get("waits") or {}
+    if not isinstance(w, dict) or not w.get("on"):
+        return ""
+    return " ".join(x for x in ("Waits:", w["on"], w.get("date") or "", f"— {w['why']}" if w.get("why") else "") if x)
+
+
+def waits_tally(ids: Collection[str], entries: Mapping[str, Mapping[str, Any]]) -> str:
+    """How a lane's waiting entries wait (design §4.4 *Counted apart*, TD-716): *2 until a date (the
+    first 2026-10-16), 2 on an event*, each part only where it counts one; an id the reading no longer
+    carries is counted on an event."""
+    dates = []
+    events = 0
+    for i in ids:
+        w = (entries.get(i) or {}).get("waiting") or {}
+        if w.get("on") == "until" and w.get("until"):
+            dates.append(str(w["until"]))
+        else:
+            events += 1
+    parts = [f"{len(dates)} until a date (the first {min(dates)})"] if dates else []
+    if events:
+        parts.append(f"{events} on an event")
+    return ", ".join(parts)
+
+
 def lane_kinds(r: Mapping[str, Any] | None) -> dict[str, Any]:
     """The ledger's counts by the page's kind, a work order — a decided line (§4.5a *Repo page:
     decided lines*, TD-384) or a red PR nobody holds (TD-613) — counted *pickable*, as the lanes take
     them; never in the priorities, which are the ledger's alone. An entry the home's settle clock
-    withholds (`settling` or `held`, §4.4 *What settling withholds*, TD-710) is not counted pickable,
-    as `ao repo` counts it; its page kind is unchanged."""
+    withholds (`settling` or `held`, §4.4 *What settling withholds*, TD-710), and one whose wait stands
+    (`waiting`, §4.4 *An entry says what it waits for*, TD-716), is not counted pickable, as `ao repo`
+    counts it; its page kind is unchanged."""
     led = (r or {}).get("ledger") or {}
     kinds = dict(led.get("by_kind") or {})
     withheld = sum(
         1
         for e in led.get("entries") or ()
-        if isinstance(e, dict) and e.get("for_page") == "pickable" and (e.get("settling") or e.get("held"))
+        if isinstance(e, dict)
+        and e.get("for_page") == "pickable"
+        and (e.get("settling") or e.get("held") or e.get("waiting"))
     )
     if n := len(work_orders(r)) + len(pr_orders(r)) - withheld:
         kinds["pickable"] = max(0, int(kinds.get("pickable") or 0) + n)

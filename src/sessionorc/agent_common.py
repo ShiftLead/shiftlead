@@ -8,6 +8,7 @@ constants patches it here (`sessionorc.agent_common.X`), since here is where it 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import heapq
 import inspect
 import json
@@ -1042,6 +1043,29 @@ def _restart_reading(s: Session, now: datetime) -> dict[str, Any]:
 
 def _parse(iso: str) -> datetime:
     return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+
+
+def subagents_live(s: Session, now: datetime) -> bool:
+    """A **live subagent** (design §4.2 *Working on its own*, TD-734): `subagents` above zero and a
+    subagent's hook within `STALL_AFTER` of `now` (`subagent_at`), so a lost `SubagentStop` never
+    reads live for good. The one reading the view's `subagents_live` and §6 rules 3, 4 and 9 take."""
+    if s.subagents <= 0 or not s.subagent_at:
+        return False
+    try:
+        return now - _parse(s.subagent_at) <= STALL_AFTER
+    except ValueError:
+        return False
+
+
+def idle_from(s: Session) -> datetime | None:
+    """When an idle stretch counts from (§6 rules 3 and 4, TD-734): the later of `since` and
+    `subagent_at`, so a session whose last subagent has just ended is not read idle at once."""
+    times = []
+    for iso in (s.since, s.subagent_at):
+        with contextlib.suppress(ValueError, TypeError):
+            if iso:
+                times.append(_parse(iso))
+    return max(times) if times else None
 
 
 def cache_lapsed(s: Session, now: datetime) -> dict[str, Any] | None:

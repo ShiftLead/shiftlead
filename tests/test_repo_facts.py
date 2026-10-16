@@ -4,6 +4,7 @@ failed read keeping the last reading with the error beside it, never zero."""
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 from datetime import UTC, datetime, timedelta
@@ -72,6 +73,8 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "blocked_ids": [],
         "pickable": "yes",
         "for_page": "pickable",
+        "added": "",
+        "detail": [],
     }
     # an anchor's `Kind: decision` is no longer *for you* (TD-367): it waits on no person, and is the
     # anchor's *evaluation*; a design-first waiting on an open entry is *blocked* (TD-418)
@@ -648,15 +651,30 @@ def test_ao_td_hold_sends_the_main_checkout_and_says_what_it_did(repo, monkeypat
     from shiftlead import cli
 
     sent = []
+    told = {"told": ["grinder-ao-2", "techlead"], "readers": ["techlead"], "untold": ["could not tell g3: full"]}
     monkeypatch.setattr(cli, "_td_repo", lambda r: ("r", str(repo)))
-    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"]})
+    monkeypatch.setattr(
+        cli,
+        "call_sync",
+        lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"], **(told if not kw["release"] else {})},
+    )
     assert cli.main(["td", "hold", "td-707"]) == 0
     assert cli.main(["td", "hold", "TD-707", "--release"]) == 0
     out = capsys.readouterr().out
     assert sent == [("td_hold", {"repo": str(repo), "id": "TD-707", "release": False}),
                     ("td_hold", {"repo": str(repo), "id": "TD-707", "release": True})]  # fmt: skip
-    assert "TD-707 held: no lane takes it until you release it or its text changes" in out
-    assert "TD-707 released: pickable now" in out
+    assert out.splitlines() == [
+        "TD-707 held: no lane takes it until you release it",  # §4.7: a hold ends only at Release (TD-731)
+        "grinder-ao-2 holds its claim and is told to drop it",
+        "techlead reads its PR and is told to leave it unmerged",
+        "could not tell g3: full",
+        "TD-707 released: pickable now",
+    ]
+    td = next(a for a in cli.build_parser()._actions if isinstance(a, argparse._SubParsersAction)).choices["td"]
+    helps = {
+        c.dest: c.help for a in td._actions if isinstance(a, argparse._SubParsersAction) for c in a._choices_actions
+    }
+    assert helps["hold"].startswith("hold any open entry, settling or settled, or release a held one (§4.4)")
 
 
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
@@ -1069,6 +1087,9 @@ async def test_the_repo_facts_read_live_as_unknown_until_the_promote_has_read_on
     """TD-516: `_refresh_repos` hands `_read_repos` no live commits (`None`, unknown) until the promote
     pass has assigned its readings since the start, and the promote's live commits after."""
     await park_ticks(agent)
+    for task in (agent._promote_task, agent._repos_task):  # TD-753: the first tick's passes, finished before
+        if task is not None:  # the test sets `_promotes`, which an in-flight promote pass overwrote on CI
+            await task
     _register(repo)
     monkeypatch.setattr(reports, "pr_reading", lambda d, now, **kw: {"open": [], "at": now.isoformat()})
     handed = []

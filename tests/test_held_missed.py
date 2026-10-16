@@ -21,6 +21,20 @@ LATER = MERGED + held.GRACE + timedelta(minutes=1)
 HELD, FREE = ["src/sessionorc/agent_tick.py", "docs/design.md"], ["src/shiftlead/cli.py"]
 
 
+@pytest.fixture
+async def agent(agent):
+    """The running agent, its ticks parked and the first tick's passes awaited (TD-752), as `test_sync_pass.py`'s
+    is. That tick's repos pass drops every root no registry lists, `_member`'s `/repo` among them, and a held
+    pass skips a member whose root the home holds no reading of: landing between a test's passes (CI), it
+    left the third with no crossing to record. Its held pass reads with the real clock, to which `MERGED` is
+    past half the mail's retention."""
+    await park_ticks(agent)
+    for task in (agent._repos_task, agent._held_task):
+        if task is not None:
+            await task
+    return agent
+
+
 def _rec(reader: str = "techlead") -> Session:
     s = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="", created=CREATED)
     s.review = {**REVIEW, "reader": reader}

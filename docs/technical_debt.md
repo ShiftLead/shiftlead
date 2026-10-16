@@ -57,8 +57,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-703 | A member renamed in `.shiftlead.yml` keeps its old name on rule 8's restart, and a person's Start can leave the old record beside the new one | Medium | Designed — TD-706 builds it |
 | TD-704 | The phase chips (*add*, *design*, *grind*, *review*) are fixed in the UI: define them, and what each matches, beside the roles in `org.yml`, overridable in `.shiftlead.yml` | Medium | Open |
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Built (#1802, #1807, #1818); live check |
-| TD-715 | A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for | Medium | Designed — TD-716 builds it |
-| TD-716 | Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting | Medium | Slice 1 built by #1843 |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-740 builds it |
@@ -68,14 +66,14 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet and the anchor seat on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
-| TD-734 | A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next | Low | Open |
-| TD-735 | Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held | Medium | Open |
-| TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
-| TD-738 | The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button | Medium | Open |
-| TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
-| TD-742 | Five behaviours of TD-716 slice 1 (#1843) are held by no test: a repeat claim on a waiting entry, an `until` with no date's refusal words, a capitalised `Waits:` word, `Waits:` dash forms, and a held entry's `waiting` list | Low | Open |
+| TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
+| TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
+| TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
+| TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
+| TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
+| TD-754 | The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change | Low | Open |
 
 ---
 
@@ -116,7 +114,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 
 **Priority:** Low
 **Added:** 2026-09-06
-**Owner:** anchor
+**Owner:** paul
 **Kind:** evaluation
 **Status:** Open. **Read 2026-10-10 (ao-paul, with Paul): the file edit is the documented route, and its key is too narrow.** Claude Code has no flag, setting or environment variable that only skips the trust dialog (CLI reference, settings reference, env-vars, read 2026-10-10 on 2.1.296). `claude -p` skips it, but that is the headless mode, and bypass mode is not documented to skip it. The permissions page (*What runs before you trust a folder*) documents the manual route as `projects["<path>"].hasTrustDialogAccepted = true` in `~/.claude.json`, *where `<path>` is the repository root*. Its *Project allow rules and workspace trust* section adds that a worktree uses *the main checkout's root*. `pretrust()` keys the entry on `cwd`, each session's own worktree, so it rewrites the tool's file on nearly every new worktree where once per repo would do. That is where the race's exposure comes from. The worktrees page tells a person to run `claude` once in a new directory, which reads against the permissions page, so a test settles it. **Next:** an attended run, as the Fix says.
 **Location:** `src/shiftlead/adapters/claude_code/__init__.py` (`pretrust`)
@@ -255,7 +253,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-22 (the anchor session; the design review)
-**Owner:** anchor
+**Owner:** paul
 **Kind:** evaluation
 **Status:** **Paul, 2026-10-10 (with ao-paul): agreed, a spike, and integration tests with it.** Run as an interactive session, not a member's lane: a second tool must be installed and signed in (neither `codex` nor `gemini` is on kmaster on 2026-10-10; the sign-in is Paul's account or key), the work is judgement (which of the contract's methods are neutral), and its result is an ADR, not a merge. **Paul, 2026-10-13 (the lessons ADR, `docs/decisions/2026-10-13-agent-product-lessons.md` lesson 10):** Gemini CLI is *"a definite fit"*, so it is the spike's tool; Hermes Agent, Muse Code and Grok Bot are not wanted as tools for now. The lasting product is an **adapter conformance suite**: one set of tests every adapter passes against its real tool (launch, the state it reports, `send`, `composer()`, the doorbell and mail, `title()`), so neutrality is checked on every change and not once by the spike. The spike says which of those a scraped adapter can pass and which belong to Claude Code alone. Open — for evaluation. The design's stated moat is one neutral view across tools, and only one agent adapter exists. Since phase 1 the contract (§4.3) gained `composer()`, `title()`, `mail()`, a session id chosen at launch, the doorbell, the trust pre-seed and screen rules, each shaped by Claude Code. Phase 5 puts the second adapter last. Recommendation: a scraped spike now — Codex CLI or Gemini CLI, `state_source: scraped`, no hooks — to see which of the contract's methods are really neutral, what `send` and the doorbell do without a readable composer, and whether the record's fields assume a tool session id. The spike is a branch and an ADR, not a shipped adapter. **Next:** for evaluation, not scheduled.
 **Location:** design §4.3, §7 phase 5, `src/shiftlead/adapters/`
@@ -365,6 +363,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-03 (the designer, TD-290's build; re-scoped the same evening on Paul's note: a look is mail)
 **Owner:** anchor
 **Kind:** live-check #1007
+**Waits:** event — a builder's look after a page PR (a leaned-*Works* steer) and the person's **Send to reviewer** on one
 **Status:** **Read 2026-10-13 (the anchor): a steer carrying shots lapsed with no press, but it is no builder's look.** The live Inbox (headless GET of `/inbox`, read only) draws one `/shot/` screenshot: designer-ao-1's TD-630 design `steer` (`m-10d827d892f8`, `shots: [2026-10-13-td630-add-entry-attach.png]`, the route answering it) closed with *you let it go with its default* and an `outcome · done`, now under *FYI*. That is the steer-with-shots half of the mechanism (the thumbnail drawn on a `steer` row, the lapse to its default with no press) seen live; the *Done when*'s three readings still wait on a builder's look after a page PR (a leaned-*Works* `steer`) and on Paul pressing **Send to reviewer** — no entry is `handed` as a look. **Read 2026-10-12 (the anchor):** no look since — the live Inbox (headless GET of `/inbox`) draws no `/shot/` screenshot, its one *Steering* row is no look, and no entry is `handed`. **Read 2026-10-09 (the anchor): the first look arrived, and its *ask* half holds.** grinder-ao-1's `m-500957934330` (05:13Z, `--kind ask`, re TD-478, two `shots`) is on the live Inbox (headless GET of `/inbox`, read only) under *Needs you* (`data-section="needs"`) with its two screenshots drawn from `/repo/agentorc/shot/…` (the route answers 200, `image/png`) and the pair drawn as **Works** / **Not right…**, beside **Send to reviewer**. Still to read: a leaned-Works look as a `steer` under *Steering* that lapses to *Works* with no press (none has been sent), and **Send to reviewer** pressed by Paul (no entry is `handed`). **Read 2026-10-08 (the anchor, TD-426):** still no look: none of the person inbox's 124 entries carries a shot. **Built; a live check waiting on an event (grinder-ao-2, 2026-10-05).** #1007, the last slice, is live (`ao promote status`: live f8090c2). Read that day with a headless GET of the live Inbox: no look mail is on it — no row draws a `/shot/` screenshot and none carries a seat's reading — so none of the *Done when*'s three readings can be made yet. They wait on the first look a builder sends after a page PR (design §4.9b), and Send to reviewer's on Paul pressing it on one. Nobody can cause that on purpose, so the entry is the anchor's until a look has arrived; whoever reads one then writes what it showed here. Before: the board row's pair on cadence's kind `look` is built: PR #975 (`LOOK_KINDS`), slice 1 of the entry as it was first scoped. Re-scoped 2026-10-03 evening (PR #977) to the mail rows. Slice 1 built — PR #980 (the grinder brief's three cases as mail; the techlead preset's two sentences). Slice 2 built — PR #983 (`ao msg --shot`; `shots` on the envelope, checked whole against `docs/mockups/reviews/<name>.png`). Slice 3, the row, built — PR #982 (`look_shots`, `look_pair`, `GET /repo/<repo>/shot/<name>.png`; this host's registry only, another host's is TD-300). Slice 4a, the host agent's half of Send to reviewer, built — PR #990 (`inbox_hand`, `snoozed_for`, `look`, `looked_by`; the techlead preset's *A look handed to you*). Slice 4b built — PR #1007 (the page's **Send to reviewer**, the seat read from `org.yml`; the snoozed row's *with <seat> since <time>*; the handed `ask` read as a look; the `looked_by` line above the answers). Merged, live look pending: the *Done when*'s Send to reviewer, with a real techlead seat.
 **Location:** `docs/briefs/grinder-ao-1.md` (the paragraph *A change to a page is verified by you*, the one brief that carries it), `src/shiftlead/briefs/techlead.md` (*A screenshot ask*: *The builder then puts a board line before the person*; *what reaches the person is the builder's board line, one road*), `src/shiftlead/cli.py` (`ao msg --shot`), `src/sessionorc/mail.py` and `src/sessionorc/models.py` (`shots`, `snoozed_for`, `read_by` on an envelope), `src/sessionorc/agent_inbox.py` (`inbox_hand`), `src/shiftlead/ui/inbox.py` and `src/shiftlead/ui/app.py` (the row, the screenshot route); design §4.9b *A UI change is verified by its builder*, §4.10 *A look*, §4.7, §4.5a **Inbox row: a look** and **Send to reviewer**; mockup `docs/mockups/Inbox.dc.html`, `docs/mockups/reviews/2026-10-03-td290-look-rows.png`
 
@@ -467,6 +466,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the designer, from TD-410's design)
 **Owner:** anchor
 **Kind:** live-check #1684
+**Waits:** until 2026-10-21 — the journal's week since #1684 went live runs to 2026-10-20 23:07 MDT
 **Status:** **Built 2026-10-13 (grinder-ao-1, PR #1684, TD-660):** rule 8's start writes every unattended seat held; once #1684 is live, read the journal half again — a week of it with no seat closed with nothing due straight after a rule 8 start. **Read 2026-10-14 (the anchor): the week runs to 2026-10-20 23:07 MDT.** #1684 went live with `bc43060` at 2026-10-13 23:07 MDT (the host agent's journal, read only: *promoted `shiftlead` `bc43060` — 11 commits*; `2a6b6dd`, the promote before, lacks it). Since then the journal holds no rule 8 start: the one that day, *rule 8: starting dc-grind again for ['TD-104']* at 23:00, came before the promote and found *no work waiting*. Every *a seat with nothing due* close since is a techlead or an anchor. Read the journal again after the week ends. **Read 2026-10-13 (the anchor): the journal half does not hold — blocked by TD-654.** `journalctl --user -u shiftlead-agent` (read only) since the promote: every *a seat with nothing due* close of a manager follows a fill for a cause (*the seat is due (stalled) — filling it*) or a held create, except two, and both follow a rule 8 start: *rule 8: starting dc-grind again for ['TD-092', 'TD-096'] (4 records)* at 2026-10-12 10:57:36 MDT, `ao-dev-cadence-manager-dc-1` *superseded the closed session* (no *written closed with no pane*) and closed at 10:59:51; and *starting cm-grind again for ['TD-056'] (4 records)* at 2026-10-13 10:06:20, `ao-contractmatch-manager-cm-1` replayed over the link and closed at 10:08:32. Each start's techlead seat went the same way, as did ao-grind's techlead at rule 8's start of 2026-10-11 04:35. `agent_tick._work_start` replays every ended crew record, seats included, through `_replay`, which creates a pane; §6 rule 3's *A Start writes the seat and never fills it* names `ao team start` and Apply alone. The 10-12 read below missed the first of these. The held create of a person's Start still holds. TD-654 says what is wrong; this check is read again once it is built and live. **Read 2026-10-12 (the anchor): the journal half holds so far.** `journalctl --user -u agentorc-agent -u shiftlead-agent` (read only) from 2026-10-08: the last *a seat with nothing due* close of a manager is `ao-samscrape-manager-sam-1` at 15:56 MDT on 2026-10-08, before the promote (19:33); since then such closes are techleads, audits and anchors only. The week ends 2026-10-15. **Read 2026-10-09 (the anchor): the held create holds.** ao-grind's start at 13:22Z left `ao-agentorc-manager-ao-1` `closed` with `closer: {by: start, why: held}`, and samscrape-grind's at 14:30Z did the same for `ao-samscrape-manager-sam-1` (`ao status --json`). The journal half waits on the calendar: the week from the promote runs to 2026-10-15. **Read 2026-10-08 (the anchor, TD-426):** #1287 went live 2026-10-08 19:33 MDT (aebeea3); no team has started since (ao-grind's manager-ao-1 was created at 15:12 that day, filled and closed by the tick as a seat), so the check waits on the next `ao team start`. Built 2026-10-08 (grinder-ao-1, PR #1287), all three slices: `teamrun.start` and `apply` write a manager on call `held` (`on_call_gate`), the line *on call — comes when a member needs a reading*; the held create moves kept mail; a fill's prompt ends with *[agentorc] you are filled for: <by> — <member or question>* (`agent_tick.filled_for`, `restarts` `for: seat_due`); `docs/briefs/manager-ao-1.md`'s first reads under the readings. Tests in `test_anchor_seat.py`, `test_manager_on_call.py`. **The live check:** once #1287 is live (`ao promote status`), read with no press of yours: the next `ao team start` of an on-call team (its output, or `ao status -v`) shows the manager `closed` with `closer: {by: start, why: held}` and no pane; and from the promote on, a week of `journalctl --user -u agentorc-agent` (read only) holds no *a seat with nothing due* close of a manager that was never filled for a cause. TD-410 is archived with this entry. **Read 2026-10-08 19:39 local (grinder-ao-2):** #1287 went live with `aebeea3` at 19:33 (the host agent's journal: *promoted `agentorc` `aebeea3` — 9 commits*); no `ao team start` has run since, so the held create is not yet seen — `ao status --json` shows `ao-agentorc-manager-ao-1` `closed` by `{by: tick, why: seat}` at 21:15Z, a close from before the promote. The journal since the promote holds no *a seat with nothing due* line. **Waits for** the next `ao team start` of an on-call team, and a week of journal from 2026-10-08 19:33 (to 2026-10-15): read both then, and archive or file what is wrong.
 **Location:** `src/shiftlead/teamrun.py` (`start`: `plan.lead`'s create; `apply`: the manager the run lacks; the Start's row words), `src/sessionorc/agent.py` (`rpc_create`'s `held` for a `team` seat, `_schedule(state="closed")`), `src/sessionorc/agent_tick.py` (`_fill` → `_replay`: the closing line on the prompt), `src/shiftlead/briefs/manager_on_call.md` (the first paragraph reads the line), `docs/briefs/manager-ao-1.md` (first reads moved under the readings — a held path), `tests/test_teamrun*.py`, `tests/test_seats*.py` / `tests/test_manager_on_call*.py`
 
@@ -488,6 +488,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from Paul's decision on TD-378: *Pin 1h, restart lapsed, trial 200k*)
 **Owner:** anchor
 **Kind:** live-check #1317
+**Waits:** until 2026-10-23 — the second trial week ends 10-23 04:26Z; read it from then (Paul, 2026-10-15)
 **Status:** **Read 2026-10-15 (the anchor): flat. Paul, 2026-10-15 (board, m-e9930892429c): run another week — the line stays, and the check is read again from 2026-10-23 05:00Z over the second trial week (10-16 04:26Z to 10-23 04:26Z) against the same two weeks; that reading keeps the line or takes it out, a result still unclear going to Paul as a `steer`.** Steer `m-1aa735ccc0cc` to the techlead is overtaken by Paul's answer. Per merged PR the grinders' weighted cost was 1.54M the week before and 1.52M in the trial; mean context fell 191k → 153k, while requests per PR rose 102 → 117 and runs per PR 0.56 → 0.89. The table is in the ADR's Consequences. The second reading's answer is acted on in a PR of its own: the line out of `.shiftlead.yml` (and its comment), or kept and design §4.8 saying this repo's grinder number is measured. Was: Open — the bound is set in `.agentorc.yml` (`roles.grinder.context: {bound: 200k}`) by the PR that filed this entry. Each grinder takes it at its next start, and the trial week runs from the first such start to about 2026-10-15. Until then the check waits on the calendar, which nobody can hurry.
 **Location:** `.shiftlead.yml` (`roles: grinder: context:`); design §4.8 *The bound has two layers*; the usage ledger and the run logs under `~/.shiftlead/` (read only)
 
@@ -507,6 +508,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Added:** 2026-10-08 (the anchor, from the CI read that closed TD-063 and TD-078)
 **Owner:** anchor
 **Kind:** live-check #1332
+**Waits:** until 2026-10-16 — a week of CI runs from #1332's merge, read on or after 10-16
 **Status:** Built by #1332 (2026-10-09); a week of CI is still to read. #1332 fixed three of the four. The board test now waits on its fetching read's start, not a 2 s poll. The mail test now settles its members before the wait's cursor. The forget test had a real cause: `_refresh_git` wrote `_git_checked` for a record forgotten while its git read ran. That is fixed, with a regression test. The fourth, `test_a_screen_rules_state_goes_back_when_its_screen_is_gone`, did not reproduce in 50 runs beside a full suite and is **watched**. **To read on or after 2026-10-16:** CI runs from #1332's merge for any of the four. None failed: archive this entry. One did: a new entry for it, and this one `**Blocked by:**` it. The week is the only thing to wait for, so the owner is the anchor.
 **Location:** `tests/test_ui_board.py`, `tests/test_mail.py`, `tests/test_agent_paths.py` (the tests below)
 
@@ -684,6 +686,7 @@ with the retired brief).
 **Owner:** anchor
 **Kind:** live-check #1714
 **Status:** **Read 2026-10-14 (grinder-ao-2, `b5096ad` live, which holds #1714): it waits for the person's first rule.** A headless GET of the live `/inbox` (read only) draws no row naming *your permissions: rules* — no prompt has been answered by a rule — and a session cannot read `settings.yml` (`ao settings` is the person's own act), so whether a rule is written is not readable from here. The row itself was looked at on a scratch home with #1714. What is left is the person's, and it is two settings, not one: a `permissions:` rule for a grinder role in `settings.yml`, **and** that role's profile set to `permission_prompts: ask` in `profiles.yml` — an unattended profile defaults to `skip`, so no member's prompt reaches the hook until then. The anchor reads the rest once a rules row shows on the Inbox. On a scratch home (grinder-ao-1, mail `m-0a16fbb045f9`, `b5096ad`): with grinder `allow ['Bash(pdm run test:*)', 'Read']` and `deny ['Bash(rm:*)']`, an unattended record's `pdm run test -q` was allowed and its `rm -rf build` denied, each with *rule: …* as the reason; a Read of `~/.claude/settings.json` (always the person), a prompt no rule covers, and an interactive record's covered prompt were each left waiting; the Inbox drew exactly two *your permissions: rules* rows, each offering Dismiss and the team chip only, with no Overrule. Slice 1 built (grinder-ao-1, PR #1697): the rules at the hook, deny before allow, the always-the-person check (`sessionorc/permits.py`), the FYI with answerer `rules` (a reply to it refused), `permissions` on the settings read with `malformed`, `permission_prompts`. Slice 2 built (grinder-ao-2, 2026-10-14, #1714): the *Answered for you* row whose `answered.answerer` is `rules` names *your permissions: rules*, draws the rule in place of a source and **Dismiss** alone; the Settings page's settings.yml card names each `permissions.malformed` value as ignored; a node's asker was already named — the home's fleet carries its record under the same `<id>@<host>` (a test holds it). Slice 3 built (grinder-ao-1, PR #1708): a node answers by rule only while its link is up and once the home has filed the FYI over it (`answered_by_rule`, a request; the home's `_take_answered_by_rule`, the asker by its address); a link down or a filing refused leaves the prompt for the person. **Built; a live check**: once #1714 is live (`ao promote status`), read the *Done when* on the live home — a `permissions:` rule in `settings.yml` for a grinder role, and the next prompt it covers on an unattended member answered at once with *rule: …* as its reason and filed under *Answered for you* (the Inbox read headless, its row drawing Dismiss alone); no prompt of an interactive session answered by it.
+**Blocked by:** decision (paul) — a `permissions:` rule for a grinder role in `settings.yml`, and that role's profile set to `permission_prompts: ask` in `profiles.yml`
 **Location:** design §4.9b *The director seat answers permission prompts for the person* (line 1 and *What always reaches the person*), §4.2 (the relay), §5 `settings.yml` `permissions:`; `src/sessionorc/settings.py` (the key, checked: a role name, `allow`/`deny` lists of strings), the adapter (`src/shiftlead/adapters/claude_code/`: a `rule_matches(rule, tool, input)` in Claude Code's `Tool(pattern)` syntax, the core naming no tool), the host agent's `PermissionRequest` path (`src/sessionorc/agent_hook.py`: match before the waiter; a deny over an allow; answered through the hook with the rule as reason), the always-the-person check (a path under `~/.shiftlead` or `~/.claude`, a systemd unit, outside the record's worktree and checkout — one function, used here and by TD-642's `permit`), the *Answered for you* FYI (`src/sessionorc/agent_mail.py` ~L671 writes one only for a reply with `source` today: a host-written one in the same `answered: {question, asker, answerer, source}` shape, `models.py` ~L390, the prompt as question, the member as asker, `rules` as answerer, the rule as source; the row draws no Overrule for it), the profile key (`src/shiftlead/profiles.py` ~L48 and the adapter ~L533: `permission_prompts: ask | skip`, the skip flag added only under `skip`, the default); `tests/test_hook*.py`, `tests/test_agent*.py`, `tests/test_mail.py`, `tests/test_profiles*.py`
 
 **Why:** TD-636: Paul, 2026-10-13 — *filtering permission prompts*; the first line in front of the person is the person's own rules, at no token cost.
@@ -943,6 +946,7 @@ with the retired brief).
 **Added:** 2026-10-14 (the designer, building TD-681's design)
 **Owner:** anchor
 **Kind:** live-check #1775
+**Waits:** event — the next cadence-sync PR that nobody merges by hand before the home judges it
 **Status:** **Read 2026-10-15 (the anchor): the sync it waited on was merged by hand before the home judged it, so it still waits.** dev-cadence `1145d97`'s `sync-all.sh` ran from the person's dev-cadence session (`ao-dev-cadence-dc-paul`) at 03:30Z, after the 03:29Z promote, and opened shiftlead #1788 and ledgerboard #12. That session merged all six sync PRs itself at 03:45Z, on Paul's *merge the PRs when green* (its transcript). Neither PR carries a `cadence-review: SHIP · sync-check` comment. The reading's `sync` is `{}` for both repos (`~/.shiftlead/repos.json`, read only), and the home's tree exists only for ledgerboard (`~/.shiftlead/sync/ledgerboard/tree`, 03:40Z), so its judge had begun there and no verdict was written before the merge. The mechanical half is unread: it waits for a sync PR that nobody merges by hand within its first reading or two. **Waits for the next sync PR (grinder-ao-2, 2026-10-14):** #1775 is live (`ao promote status`: live 179f7f1, #1775 itself, read 2026-10-15T02:10Z). No `cadence-sync-*` PR has been opened in any ShiftLead repo since it went live: the last are shiftlead #1728 (closed) and ledgerboard #11 (merged), both at 2026-10-14T15:26Z from dev-cadence `517a2b5`, before the build. dev-cadence's main has moved on since (`1145d97`), so the next `sync-all.sh` run makes one. Nobody in ao-grind's lanes can cause it, so the Owner is `anchor` until that PR exists; whoever reads it then reads it as below. Built — slices 1 (#1769), 2 (#1771) and 3 (#1775, the Repos card's **sync** switch with the last verdict beside it; `sync.prune` keeps the newest *merged* entry for it). The live check, once #1775 is live (`ao promote status`), is read only: the next dev-cadence sync PR on a registered repo (`cadence-sync-*`, pushed by the home's `gh` login). Read the repo reading's `sync` entry for it (`ao repo --json`, or the Settings page's Repos card). Mechanical and gated: verdict *merged*, the PR carrying the `cadence-review: SHIP · sync-check` comment and merged by the home, a `system` note in the person inbox, and the card saying *merged #<n> <age> ago*. Not mechanical: *refused* with its reason, and the team's order carrying it as Context. The scenarios themselves are covered by `tests/test_sync_check.py` and `tests/test_sync_pass.py` against a fake `gh`.
 **Location:** design §6 *Sync: a mechanical sync PR is merged at the home*, §4.4 *A sync PR is the team's at once*, §5 `repos.<repo>.sync`, §4.5a *Settings page: Repos*; a new `src/sessionorc/sync.py`, the promote's pass in `src/sessionorc/agent_tick.py`, `set_settings`, `src/sessionorc/workorders.py` (the order narrowed to what the home does not merge), the Settings page's Repos card (`src/shiftlead/ui/`)
 
@@ -1037,6 +1041,7 @@ The other cases:
 **Added:** 2026-10-14 (the designer, building TD-703's design)
 **Owner:** anchor
 **Kind:** live-check #1818
+**Waits:** event — Paul's next Apply or Start of dc-grind; read again 2026-10-15 (the anchor): dc-grind stopped, its card still lists the three old names as removed, every dc record closed
 **Status:** Live check read 2026-10-15 (grinder-ao-2, #1818 live at a235a54): dc-grind was started under its new names at 04:10Z, before #1807 or #1818 was live, so `dc-grinder`, `dc-manager` and `dc-techlead` were created beside `grinder-dc-1`, `manager-dc-1` and `techlead-dc-1` with no `succeeds`, and the Done when's three renames can no longer be read: the new names carry records, so no newcomer is left to pair. What reads now holds for that state: `ao team list` and the page (headless GET) show dc-grind stopped, *definition changed*, *grinder-dc-1: removed from the definition*, *manager-dc-1: …*, *techlead-dc-1: …*, and Start's confirm says *It first applies the definition:* with the same three lines. Left for the event nobody here can cause (Paul's next Apply or Start of dc-grind), to read then: the three old records (now `sit_out: null`) carry `sit_out: {dropped: true}`, none is replayed, and `ao status -v` shows one record per new name; a rename read as a rename on a live card waits for a team renamed after #1818 went live. Owner anchor until then. Was: Slice 3 built 2026-10-15 (grinder-ao-2, #1818): Apply hands a rename as `relaunch` with the newcomer's `name` and a removal as `relaunch {sit_out, dropped}`, a stopped team's too; Start reads the same pairing after its checks and a concluded team's closes, marks each removal, creates each paired or held newcomer with `succeeds`, lists them in `moved` and its confirm, and refuses a session's start of a renamed team or one beside a live orphan; Members…'s Remove takes the sit-out form with `dropped`. **Live check:** once #1818 is live (`ao promote status`), read dc-grind's stopped card for the three renames of the Done when (a headless GET), and after Paul's Apply or Start, `ao status -v` shows one current record per new name and the old ones `superseded_by`. Not built: a rename pairing an orphan on one host with a newcomer on another is refused by the home's `succeeds` (the pairing is by role alone). Before: Slice 1 built 2026-10-14 (grinder-ao-2): `teamrun.renames` pairs the orphans with the newcomers; `differences` reads `rename` and `removed` (a stopped team's too, alone), first, and a paired or held newcomer is no `start`; the card's mark (beside Start on a stopped team), the member's `flow_mark`, `ao team list` and `ao team flow` print the lines. Slice 2 built 2026-10-14 (grinder-ao-1): `RELAUNCH_KEYS` gains `name` (kept when absent, as `profile`), a rename marked `relaunch.name`; `_replay` creates a renamed record under the launch record's new name with `succeeds: <old id>` (rule 7's restart, rule 8's start, rule 3's fill — a held seat's `_schedule` too); `create`'s `succeeds` is admitted as `keep_mail` is (`_check_succeeds`) and `_succeed` moves the mail, writes `superseded_by` and, at the home, `_carry` copies claims in progress and `lane_seen`, rewrites this host's records' and every launch record's `controllers`, and drops the old launch record (a node's own record waits for its next create, design §4.9, TD-712); `_sit_out` takes `dropped`, which lifts its seat refusal and is kept on the mark; `_seat_pass` never fills a sat-out seat. Until slice 3 Apply skips a rename or a removal and says so (*— not applied yet*), creating nothing. Slice 3 (Apply and Start, `src/shiftlead/`) open. Was: slice 1 built.
 **Location:** design §4.9 *A member renamed or removed in the definition* and *Add or remove a member from the team card*, §4.9c *Switching*, §6 *Keeping a team running*, §4.5a *team card: flow changed — Apply*, *team groups* (Apply beside Start on a stopped team) and *Members dialog: Remove*; `src/shiftlead/teamrun.py` (`differences`, `flow_changed`, `flow_view`, `apply`, `start`, `remove_member`, `Difference`), `src/shiftlead/ui/cards.py` (`flow_mark`), `src/shiftlead/ui/org.py` and `src/shiftlead/ui/templates/group_head.html` (the mark and Apply, whose title and confirm name renames and removals, beside Start on a stopped team), `src/shiftlead/cli.py` (`ao team list` ~L1146, `ao team flow` ~L1972), `src/sessionorc/agent_common.py` (`RELAUNCH_KEYS`), `src/sessionorc/agent.py` (`rpc_relaunch`, `_sit_out`, `rpc_create`, `_move_mail`), `src/sessionorc/agent_tick.py` (`_replay`, `_seat_pass`)
 
@@ -1052,78 +1057,6 @@ The other cases:
 
 **Related:** TD-703 (the design), TD-619 (a profile change reaches the team by Apply), TD-163 (Members…), TD-654.
 
----
-
-## TD-715: A seat out of work reads as *out of work with 9 in its lane* when every one of the nine waits on a date, an event or the person: nothing on an entry says what it waits for
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (ao-paul, with Paul)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-15 (the designer; no mockup: one mark and one count in rows the pages draw already) — §4.4 *An entry says what it waits for*: a repo-declared `**Waits:**` line, `until <date>` or `event`, which the agent's settle pass marks `waiting`, so no lane takes the entry and `in_lanes` counts it apart. A member out of work whose lane only waits reads *its lane waits: …*, never *out of work with n*. What waits on the person is `decision (paul)` or `Owner: paul`, already *for you*. The session that reads such an entry writes the line before it declares. Built by TD-716. Was: Open.
-**Blocked by:** TD-716
-**Location:** design §4.4 *Repo facts* and *In a team's lanes* (the *out of work with n* line, the card's solid count), §4.7 `ao repo`, §6 rule 6 (the `anchor` lane), `sessionorc/ledger.py` (`in_lanes`, `for_page`)
-
-**Why:** on 2026-10-15 Paul asked what blocks the ao-grind team. `ao repo` read *ao-grind-anchor is out of work with 9 in its lane: TD-005, TD-112, TD-292, TD-413, TD-460, TD-463, TD-641, TD-672, TD-685*, and listed seven of them as pickable live checks, so the closed anchor seat looked like the team's biggest block and a restart its cure. It was neither. The seat had run at 2026-10-14 20:58 MDT and declared `ao progress none`, naming a reason for seven of the nine (and TD-297, a live check not among them): TD-460, TD-463 and TD-413 wait for a date (a trial ending about 10-15, CI runs on or after 10-16, a week of journal to 10-20); TD-685 and TD-292 wait for an event nobody can cause (the next sync PR, a look being handed); TD-672 and TD-641 wait on the person (a first certificate on a fresh tailnet name; a `permissions:` rule and a profile's `permission_prompts: ask`); and the two it did not name, TD-112 and TD-005, are evaluations that need an attended session with Paul — TD-112 by his decision of 2026-10-10 (the Gemini spike), TD-005 by its own Fix (the trust-dialog test) — which no seat can do. What the seat knew lives only in its `out_of_work.why` and in each entry's prose. The reader counts a live check *pickable* the moment its build is live, and an evaluation pickable whenever it is unblocked, so the line, the card's solid count and the pick list all say "work waiting" where there is none. A person — or a session answering one — then restarts a seat to read the same nine again, or misses what is really theirs to do (three of the nine).
-
-**Fix** (for the designer to decide):
-- A way for an entry to say what it waits for, read by the reader: a `**Waits:**` line (or `Blocked by:` items) of three shapes — a date (*not before 2026-10-16*, pickable from then), an event (*the next cadence-sync PR*, never pickable until the line is edited), and the person (counted *for you*, with what they must do).
-- An entry the person must run with a session (TD-112, TD-005) leaves the seat's lane: `Owner: paul` with what it needs, or a word the `anchor` lane does not take.
-- `ao repo`, the team card and the Repo page count a waiting entry apart (*9 in its lane, all waiting: 3 on a date, 2 on an event, 4 on you*), and the *out of work with n* line names only what the seat could take; the person-shaped ones join *for you*.
-- Whether the seat's `ao progress none --why` writes those lines back (a PR of its own each run would be churn), or the brief tells it to write each as it reads it.
-
-**Done when** a seat that declares out of work with nothing it can take reads as *waiting* on `ao repo`, the card and the Repo page, each waiting entry says on what, and what waits on the person is counted *for you*.
-
-**Related:** TD-707 (a settle window, the other "not pickable yet" reason), TD-112, TD-005, TD-641, TD-672.
-
----
-
-## TD-716: Build TD-715: an entry's `Waits:` line withholds it from every lane, and a lane that only waits reads as waiting
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (the designer, building TD-715's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — slice 1 (the reading, the `waiting` mark, the lanes, the claim refusal; `sessionorc`) built by #1843; slice 2 (the words, `shiftlead`) next, and with it, from #1843's review: `teamrun.lane_kinds` (~L1241) and `ui/repo.py` (~L352) still withhold only `settling`/`held` from the pickable count, so a waiting entry counts pickable there until slice 2 reads `waiting` too; slice 3 (this ledger's nine) once #1843 is live.
-**Location:** design §4.4 *An entry says what it waits for* and *In a team's lanes*, §4.7 `ao repo`, §4.8 *A claim is a lease*, §6 rule 6, §4.5a *team card: Repo facet* (the lanes line), *card: compact* (the count) and *Repo page: waits mark*; `src/sessionorc/ledger.py` (`entries`, `lane_matches`, `in_lanes`, `flags`), `src/sessionorc/settle.py` (`mark`, TD-710's), `src/sessionorc/agent_tick.py` (`_read_repo`), the claim refusal in `rpc_progress`, `src/shiftlead/cli.py` (`ao repo`), `src/shiftlead/ui/org.py` and `templates/lanes_line.html`, `repo_part.html`, the card's count in `cards.py`; the role briefs `src/shiftlead/briefs/anchor.md`, `grinder.md` and `designer.md`
-
-**Why:** TD-715's design. On 2026-10-15 `ao repo` read *ao-grind-anchor is out of work with 9 in its lane*, and every one of the nine was waiting on a date, an event or the person, so the closed seat looked like the team's block and a restart like its cure.
-
-**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b). It is blocked by TD-710 because it marks entries in TD-710's settle pass. Slices, each its own PR:
-1. **The reading and the lanes** (`sessionorc`).
-   - `ledger.entries` reads `**Waits:**` (in the header block, after `Kind:`; one below the block draws ledgerboard's ℹ) into `waits: {on, date, why}`: `on` is the first word, `until` or `event`, `date` the first `YYYY-MM-DD` after `until` (or none), and `why` the rest. A first word outside the two is not read; `ledger.py --check` already flags it against the `Fields:` vocabulary.
-   - `flags` gains *TD-NNN: Waits: until names no date* for an `until` with no date. Such an entry waits with no end.
-   - TD-710's marking pass (`settle.mark`, on every reading it carries, and at the declaration-time reading rule 6 uses, its `then` clock) adds `waiting: {on, until}` while the wait stands, whatever `spans` holds (a repo with no `settle:` still marks waits). An `until` stands while the home's local date is before the date; an `event` always stands.
-   - `lane_matches` reads `waiting` as no lane's, as it reads `settling` and `held`, so rule 6's `lane_seen` and rule 8's news wait the same.
-   - `in_lanes` gains `waiting: {until: [ids], event: [ids]}`: the entries a lane would take but for the mark. They are kept out of the kinds' counts and out of `rest`. Each member gains `waiting` ids beside `ids`. `out_of_work` is unchanged (count above 0), and a new `out_of_work_waiting` lists `[{id, name, waiting}]` for a member carrying `out_of_work` whose `ids` is empty and whose `waiting` is not.
-   - `rpc_progress`'s claim on a `waiting` reference is refused, *TD-463 waits until 2026-10-16* or *TD-685 waits: the next cadence-sync PR*, and `force` passes it.
-2. **The words** (`shiftlead`).
-   - `ao repo` prints *waits until 2026-10-16* or *waits: <words>* after a row's owner, and the line *<name> is out of work; its lane waits: 2 until a date (the first 2026-10-16), 2 on an event: <ids>*. `--json` carries `waiting`.
-   - The lanes line adds *· n waiting*, its hover the ids and what each waits on, and *· <name> out of work, its lane waiting*.
-   - The card's count draws *n waiting* in grey in place of 0, never solid, with the design's hover.
-   - The Repo page's row draws the **waits** mark.
-   - The role briefs (`anchor.md`, `grinder.md`, `designer.md`), in their *Out of work* paragraph: an entry your lane takes that you cannot take because it waits on a date or an event gets a `**Waits:**` line, one waiting on the person gets `Blocked by: decision (paul) — <what they must do>`, and an evaluation only the person can run with a session gets `Owner: paul`. Write them in one ledger PR before `ao progress none`, only on entries that do not yet say so.
-3. **This ledger's nine** (a ledger PR, after slice 1 is live). The entries `ao-grind-anchor` named on 2026-10-15, as each still stands then:
-   - TD-460, TD-463 and TD-413: `Waits: until <date>`.
-   - TD-685 and TD-292: `Waits: event — …`.
-   - TD-672 and TD-641: `decision (paul) — …`.
-   - TD-112 and TD-005: `Owner: paul`.
-   A date already passed is not written.
-- **Tests:**
-  - An entry with `Waits: until <tomorrow>` matches no lane and is in `in_lanes`' `waiting`. On its date it matches and is told by rule 6 as new.
-  - `Waits: event` waits until the line goes.
-  - An `until` with no date is flagged (*Waits: until names no date*) and waits.
-  - A member's `waiting` ids are not in its `ids`; rule 8's news waits as rule 6's does.
-  - A member whose lane only waits is in `out_of_work_waiting` and not in `out_of_work`.
-  - A claim on a waiting entry is refused, and `--force` passes.
-  - `ao repo`'s two lines. The lanes line's *waiting* count.
-  - `ledger.py --check` passes this ledger with the new `Fields:` line.
-
-**Done when** a seat that declares out of work while every entry in its lane waits reads as waiting on `ao repo`, the card and the Repo page, each waiting entry says on what, what waits on the person is counted *for you*, and every listed test passes.
-
-**Related:** TD-715 (the design), TD-710 (the marking pass it extends), TD-707 (settling, the other withheld reason).
 ---
 
 ## TD-717: A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark
@@ -1161,6 +1094,7 @@ The other cases:
 **Added:** 2026-10-15 (the designer, building TD-717's design)
 **Owner:** anchor
 **Kind:** live-check #1838
+**Waits:** event — the next launch whose first hook is lost (a *brief not sent* mark); read again 2026-10-15 (the anchor): no record carries `first_prompt_error`, no `lost-brief` in any `restarts`
 **Status:** Built — slice 1 (recovery of the send: `hook_seen_at`, the seeding at load, the scraped road on the composer, the mark) by #1834; slice 2 (the replay: `_lost_brief`, a seat's fill context, the senders told, *brief lost twice*) by #1837; slice 3 (the hook's traceback: `shiftlead.hook_entry`, `hook-errors.log`, `paths.hook_errors_file`) by #1838, with #1837's review leftovers: a test holds the fill ceiling's `tripped` to a `why: fill` ceiling, and a seat's ceiling with no `why` reads *restarts exhausted*, not *fills exhausted*. **Live check** once #1838 is live (`ao promote status`), read-only: `~/.local/share/shiftlead-venv/bin/shiftlead-hook` imports `shiftlead.hook_entry`, and no live record carries `first_prompt_error` *no hook since launch* without a `lost-brief` entry in its `restarts` or a `restart_ceiling` (`ao status -v --json`). The replay itself waits for the next lost first hook, an event nobody can cause: if none has come, write what was read here and make the **Owner** `anchor`. **Read 2026-10-15 (grinder-ao-1, live `96c68ac`):** the live `shiftlead-hook` imports `shiftlead.hook_entry` (`from shiftlead.hook_entry import main`, the module present in the venv); `ao status -v --json` lists 20 records, every one carrying the `hook_seen_at` field (set on the seven that have had a hook), none with `first_prompt_error`, no `lost-brief` in any `restarts`, and the only `restart_ceiling` is docs-audit-ao-1's `why: fill`. No lost first hook has come since #1838 went live, so the replay is unread: the anchor reads it at the next *brief not sent* mark — the record replayed once with `lost-brief`, its askers told — and archives the entry.
 **Location:** design §4.1 *A launch whose hook never comes is recovered*, §6 rule 1 (*A lost brief*), §4.5a *brief not sent* mark and *Inbox row: restart*; `src/sessionorc/agent_wake.py` (`_first_prompt_road`, `_send_first_prompts`, `_first_prompt_typing`), `src/sessionorc/agent.py` (`_last_hook`'s seeding at load ~L629), `src/sessionorc/agent_hook.py` and `agent_tick.py` ~L3943 (where a hook is applied), `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent_tick.py` (`_keep_running`, `_replay`), `src/shiftlead/adapters/claude_code/hook.py` (`main`), a new `src/shiftlead/hook_entry.py` and `pyproject.toml`'s `shiftlead-hook`, `src/sessionorc/paths.py` (`hook_errors_file`), `src/shiftlead/ui/inbox.py` (`restart_mark`), `src/shiftlead/ui/cards.py` (~L913, ~L951: a seat's `restart_ceiling` words)
 
@@ -1437,124 +1371,6 @@ The other cases:
 
 ---
 
-## TD-734: A session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Open
-**Location:** `docs/design/4.2-state-feed.md` (*Waiting*); `docs/design/4.5-ui.md` (*The card's anatomy*, the *waiting* pill, TD-418); `docs/design/4.5a-controls.md` (the **waiting** mark); `src/shiftlead/ui/cards.py` (`review_wait`, and the pill's composition where `d["pill_word"] = "waiting"`); `src/sessionorc/agent_tick.py` (the record's `subagents` count, from `SubagentStart` / `SubagentStop`)
-
-**Why:** Paul, 2026-10-15: *when an agent is running /cadence it shows as WAITING but it should really be shown as WORKING since the session is still moving forward and in full control of the direction of the work. I would expect WAITING to only apply when a session needs input from the user or another session (something outside of its own purview).* The design draws an `idle` session *waiting* when a claim's PR is open in the repo reading (*waiting · review #N*), whoever moves that PR next (§4.2 *Waiting*). During `/cadence` the author ends turns while its own work goes on — a background reviewer subagent, a CI run it will re-check (`docs/procedures/cadence.md`, exit 3: *wait for a running CI and re-run*) — so its record reads `idle`, and with the PR open the pill reads *waiting*. The pill then says *someone else holds this* when nobody does, and the person cannot tell an author mid-cadence from one stuck on a reader or on them. *with the techlead*, and *waiting on you: TD-NNN*, are true waits and stay.
-
-**Fix:** a design round on §4.2 *Waiting*, with Paul's rule as its premise: *waiting* means the session needs a person or another session.
-1. **An `idle` record with live subagents** (`subagents` > 0) is not *waiting*: it reads as working on its own work (the pill *working*, or a composed word the round names). The count is already on the record, and Ready to close reads it (§4.2's *No live subagents*).
-2. **`waiting · review #N` alone** — a PR no reader holds (no seat's `prs_waiting.asks` names it) — the round decides: drawn as `idle` (the author's own next move: cadence, CI, merge), or kept while a required check runs, since CI is outside the session. Paul's words lean to the first.
-3. **A background shell task** (Claude Code's `run_in_background`, `Monitor`) is invisible to the hooks: the round says whether it is read at all, or left as the gap it is.
-
-**Done when** the design says that *waiting* is drawn only for a wait on a person or another session, the card follows it, and a test holds an idle record with a live subagent and an unheld open PR not drawn *waiting*.
-
-**Related:** TD-418, TD-428, TD-201, TD-271.
-
----
-
-## TD-735: Build TD-731 (1): the person holds any open entry, a hold ends only at Release, a claimed entry's holder is told to drop it, and `ao td next --held` lands an entry held
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (the designer, building TD-731's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *A new entry settles before it is pickable* (*Hold*, *A claimed entry is held all the same*, *An entry can land held*), §4.7 `ao td hold` and `ao td next`; `src/sessionorc/settle.py` (`hold`, `observe`, `claim_refusal`), `src/sessionorc/agent_ids.py` (`rpc_td_hold`, `rpc_td_next`, `_ids_give`), `src/sessionorc/agent_inbox.py` (`_lease_holders`), `src/shiftlead/cli.py` (`cmd_td_hold`, `ao td next`'s parser), `src/shiftlead/briefs/entry.md`; `tests/test_settle.py`, `tests/test_td_next.py`
-
-**Why:** TD-731's design. On 2026-10-15 Paul's `ao td hold TD-722` was refused two minutes after TD-722 settled, and its build TD-724 was claimed and under review as #1840 before the design round's findings were in; it had to be stopped by hand.
-
-**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
-- `settle.hold`: drop the *has settled* refusal, so any id the clock holds can be held. `rpc_td_hold` still refuses an id that is not an open entry of the reading.
-- `settle.observe`: a sig change on a held record keeps `held` and records the new `sig`; it no longer restarts the window or ends the hold. A held record with no `at` or `sig` (landed held) is read as held on its first reading, its `sig` recorded, and never marked `settling`. An unheld settling entry's edit still restarts its window, as now. A repo's *first* reading is the first that finds no record with an `at` under its key, so a `--held` pre-record does not make every existing id settle as new.
-- `claim_refusal`: the held wording drops *or its text changes* (*no lane takes it until they release it*).
-- `rpc_td_hold` on an entry with live declared leases (`_lease_holders(id)`): the hold is written as on any entry, and each holder whose record is `unattended` gets a `note` from the person, `about` the id, with §4.4's fixed text. Where an unattended holder's claim names a PR (`pr` or `review_pr`), each seat whose inbox holds an open `ask` with that `pr` (a scan of the inboxes of the graph's live records, the states `_lease_holders` skips skipped) gets the second note, once per seat; none where the reader is the person. `rpc_td_hold` reads `entry.get("held")` before the call (`settle.hold` keeps its return), and a hold on an already-held entry mails nobody (`told: []`). The hold is written before any note; a note that fails is collected as *could not tell <name>: <why>* in the reply (as `board_reply_hand` collects its refusals) and never refuses the hold. The reply gains `told: [names]` and `untold: [lines]`. `ao td hold` prints them.
-- `ao td hold`'s parser help (*hold an entry while it settles…*) and its printed line (*…or its text changes*) take §4.7's words; a test holds each.
-- `rpc_td_next(held=True)` (`ao td next --held`): refused to a caller whose record is `unattended`, and to a caller the graph does not hold, in its own words (§4.4 *An entry can land held*), not `person_only`'s. For the person, the person's shell and an interactive session, each id handed out also gets `{held: {at, by}}` written on the settle clock by a new `settle.prehold(key, ids, by, now)` under `_STORE`, keyed by `settle_key(root, remote)` (refused, as `td_hold` is, while the origin is not read), before the reply. `--json` carries `held: true`.
-- `entry.md`: one sentence, *if you are an interactive session and the person is still deciding on the entry, take its id with `ao td next --held`: it lands held until they release it*.
-- Tests, each failing with its line reverted: a settled entry held and then released; a held entry edited stays held and takes the new `sig`; a landed-held id is held at its first reading and never settles; a hold on a claimed entry writes the hold, mails one note to an unattended holder and none to an interactive one, and names the holder in `told`; `td_next --held` from an unattended caller is refused and writes nothing; `claim_refusal`'s new words.
-
-**Done when** each bullet above is built and tested, and `ao td hold` on a settled, a claimed and a held entry, and `ao td next --held`, say what §4.7 says; the tests live in `tests/test_settle.py` and `tests/test_td_next.py`, among them: pre-holding id X leaves a repo's first reading recording every other id settled; a second hold of a claimed entry sends no note; a failed note leaves the hold written and names the holder in `untold`. Two existing tests assert what this removes and are rewritten: `tests/test_settle.py` ~L90 (an edit ends the hold) and ~L181 (the *has settled* refusal).
-
-**Related:** TD-707, TD-710, TD-731, TD-736.
-
----
-
-## TD-736: Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release**
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (the designer, building TD-731's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-735
-**Location:** design §4.5 screen 6 (*The ledger's entries that wait on you*, *A held entry waits on the person too*), §4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry*; `src/shiftlead/ui/repo.py` and `templates/repo_part.html` (the row's button), `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `ledger_rows`), the Inbox's ledger row template, `src/sessionorc/ledger.py` (`added`/`detail` on every open entry); `tests/test_settle_pages.py`, `tests/test_ui_inbox_ledger.py`
-
-**Why:** TD-731's design. With TD-735 a hold has no end but the person's Release, so the Repo page must offer Hold where a lane can take the entry, and a hold must be drawn where the person reads what waits on them, or a forgotten one holds the entry for good.
-
-**Fix:** blocked by TD-735, since a Hold on a settled row is refused until it lands. Its `ledger.py` bullet touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
-- The Repo page draws **Hold** at the end of every settled row of a `LANE_KINDS` kind (*pickable*, *design*, *live-check*) and every row drawn *held by <name>*. It draws none on *for you*, *blocked*, *evaluation* or *other* rows. The toast reads the reply's `told` (*TD-724 held · grinder-ao-2 told to drop it*).
-- The reading carries `added` and `detail` on every open entry (`ledger.entries`, ~L448, today only on *for you*), since `held` is marked after the parse; the repo facts grow by that much.
-- `ledger_for_you` gains held entries as rows of kind *ledger · held*, in the same groups and order. Each says *claimed by <name>* (not *held by*) while a claim stands, has its age from `held.at`, **Release** (`td_hold {repo, id, release: true}`) and **Open**, and no answers, **Reply** or **Start session**. A held *for you* entry stays one row, the *for you* row, with **Release** beside **Open**. The rail and the find box treat these rows as ledger rows. They are counted nowhere.
-- The UI change is verified by its builder on a scratch home (§4.9b), with a screenshot of a held row on the Inbox and a **Hold** on a settled Repo page row.
-- Tests: the Hold button on each row kind as listed; a held row's kind, age and buttons; a held *for you* entry drawn once with Release; Release removes the row on the reply.
-
-**Done when** the two §4.5a rows draw as written and the tests above pass.
-
-**Related:** TD-707, TD-731, TD-735.
-
----
-
-## TD-738: The Inbox page is 1.46 MB: each board row repeats its line's whole text in `data-text` on every button
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/inbox_row.html` (a board row's buttons, ~L751–L778: Done, Reply, Decide, Not right, the three Snoozes, each with `data-text="{{ e.text }}"`; ~L373 `board_add`; the rows' `data-find`); `src/shiftlead/ui/static/app.js` (the handlers that read `b.dataset.text`, ~L681, ~L933–L996)
-
-**Why:** TD-737's measurement, 2026-10-15, a read-only GET of the live `/inbox`: 1,454,246 bytes of HTML for ~320 mail rows. `data-text` attributes come to 252,721 bytes and `data-find` to 220,720, together about a third of the page. On a board row the line's whole text is written into `data-text` on every button that acts on the line (seven or so per row), and once more as the row's `data-find`. The browser parses all of it on every page change: first paint came at 0.93–1.11 s and the DOM was ready at 1.05–1.23 s, against 0.46–0.48 s for `/settings` (83 KB).
-
-**Fix:** write the line's text once per row, on the row (as `data-text` beside `data-find`, or derive the find text from it), and have the buttons' handlers read it from `closest(".mailrow")` instead of their own `dataset.text`. Then measure the page again, as above, and put both sizes in the PR.
-- **Tests:** a board row's buttons carry no `data-text`, and each press still sends the line's text (the existing board-press tests, reading it from the row).
-
-**Done when** a board row holds its line's text once, the presses send the same bodies as before, and the PR gives the page's size before and after.
-
-**Related:** TD-737 (the measurement), TD-739.
-
----
-
-## TD-739: The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (the `/`, `/inbox` and `/repo/{name}` routes and what each reads from the host agent before rendering); `src/shiftlead/ui/org.py`, `inbox.py`, `repo.py`
-
-**Why:** TD-737's measurement, 2026-10-15, read-only GETs of the live UI, three passes each: time to first byte was 0.45–0.57 s for `/` (280 KB), 0.39–0.86 s for `/inbox` (1.46 MB), 0.31–0.79 s for `/repo/shiftlead` (636 KB), and 0.14–0.40 s for `/settings` (83 KB). In headless Chromium, parsing then added 0.1–0.35 s before the DOM was ready. The server's half is the larger, and it is paid on every page change, since each page is a full server-rendered navigation (§4.5 *Browser mechanics*).
-
-**Fix:** profile each route's render on a scratch home loaded to the live home's size (`scripts/look_home.py`, with the fixture's sessions, mail and board raised to the counts the live Inbox shows: ~320 mail rows, ~60 board items). Split the time into the host agent's RPCs, the view's computation and the template, say in the PR where it goes, and fix the largest share, or file each part as its own entry where its fix is in `src/sessionorc/`.
-
-**Done when** the PR names each route's split, and the largest share is fixed or filed.
-
-**Related:** TD-737, TD-738.
-
----
-
 ## TD-740: Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick
 
 **Priority:** Medium
@@ -1615,27 +1431,139 @@ The other cases:
 
 ---
 
-## TD-742: TD-716 slice 1's `Waits:` behaviours — a repeat claim, a date-less `until`'s refusal, a capitalised first word, the dash forms, and a held entry — are held by no test (#1843)
+## TD-745: A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1843)
+**Added:** 2026-10-15 (the anchor, found reading its lane)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed (2026-10-15, the designer): §4.4 *A red PR nobody holds is a work order* — a draft is no work order (no order, no note, no Inbox row), ready again it is under the rule at once; `ao repo`, the Repo page's tag and the facet's hover say *no order while a draft*; a draft `is_sync_order` orders is still an order. Built by TD-750.
+**Blocked by:** TD-750
+**Location:** design §4.4 *A red PR nobody holds is a work order*; `teamrun.red_prs`
+
+**Why:** on 2026-10-15 `ao repo` listed #1840 (TD-724's build) and #1850 (TD-722's amendment) as `pr:1840` and `pr:1850`, both High, both *red since …: conflicting*, first in the anchor's lane. Both are drafts that Paul paused in an interactive session. #1840 waits for the amendment, and #1850 is held until its Fable and Sonnet rounds converge (memory `hold-a-design-until-its-round-ends`). The rule's cure, a rebase on the PR's own branch, would reach into a design under the person's review, so the anchor passed over both and named why in its `ao doing` line. Every anchor run until they land will read them first and pass over them again. The rule reads `isDraft` (§4.4, the PR list's fields) but never uses it for an order; §4.4 says a draft only for a sync PR.
+
+**Fix:** a design decision first. A draft is no work order (or one only past a longer bound), or a paused PR names its holder (a `Paused:` line in its body, a label) and the reading counts that as held. Either way, `ao repo` says why it does not list the PR.
+
+**Done when** a draft PR the person paused is not a pickable `pr:<n>` in any lane, and the design says what makes it so.
+
+**Related:** TD-613 (the rule), TD-722, TD-724.
+
+---
+
+## TD-747: The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/sessionorc/agent.py` (`rpc_progress`: `if new_claim and not force and (words := settle_mod.wait_refusal(...))`), `src/sessionorc/settle.py` (`wait_refusal`), `src/sessionorc/ledger.py` (`waits_of`, `in_lanes`); `tests/test_waits.py`
+**Location:** `src/shiftlead/ui/templates/inbox_row.html` (the `row` macro and the macros under it), `inbox_rows.html`; `src/shiftlead/ui/render.py` (`inline`, `render`, the closed markdown subset each row's text goes through); `src/shiftlead/ui/inbox.py` (`row_find`, `row_subject`)
 
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1843's lines one at a time and running `tests/test_waits.py tests/test_lane_news.py tests/test_settle.py tests/test_repo_facts.py` (80 passed unmutated). Five mutations pass all 80 (six others — dropping `not force`, `mark_waits` out of `_marks`, `date <= today` to `<`, the `rest` withhold, the `out_of_work_waiting` guard, the `live-check` branch — are caught):
-1. `if new_claim and not force and …` changed to `if not force and …`: the docstring says *a declared claim on a waiting entry is refused*, and `new_claim` keeps a session's own repeated `progress` on an entry it already claimed from being refused; no test sends a second write on a claimed waiting entry.
-2. `wait_refusal`'s `and entry["waiting"].get("until"):` changed to `and True:`: an `until` that names no date then reads *TD-003 waits until *; the test only reaches the date and the `event` words.
-3. `waits_of`'s `words.split()[0].lower()` changed to `words.split()[0]`: `Until 2026-10-20` or `Event — …` reads as no wait; every test line is lower case.
-4. `.lstrip("—–-")` changed to `.lstrip("—")`: a hyphen or en dash before the reason stays in `why`, and so in the refusal's words; only the em dash is tested.
-5. `in_lanes`' member `waiting` list without `e["id"] not in held`: a held waiting entry is listed as a member's waiting; the test's `held={"TD-001"}` names an entry that does not wait.
+**Why:** TD-739's profile, 2026-10-15: on a scratch home with 320 mail entries, 60 board lines, this repo's ledger and 12 sessions, `/inbox` took ~230 ms, of which the template was ~135 ms (it was ~186 ms before TD-739's `subject_of` fix). What is left is spread across ~1,200 macro calls: Jinja's own call overhead, ~56,000 `markupsafe.escape` calls, `render.inline` on every row's text (~3,900 calls) and `row_find`'s lowercased copy of each row. No one function is above ~10% of it.
 
-**Fix:** extend `tests/test_waits.py`: (1) after a forced claim of TD-002, a second `progress` on it raises nothing; (2) a `Waits: until` with no date refused with *waits: …* words, not *until *; (3) `Until <date>` and `EVENT — x` read as waits; (4) `until D - why` and `until D – why` give `why == "why"`; (5) `held` naming a waiting entry drops it from the member's `waiting`. Each fails under its mutation above.
+**Fix:** profile again (the harness in TD-739's PR body), then take the cheapest of: render each mail row's `md()` once per entry revision and keep it (the person inbox's `rev`, TD-616); move the per-row constant `title` strings out of the loop; or draw *FYI* folded with its rows fetched on open. Say in the PR which, and the time before and after.
+- **Tests:** the page's HTML is byte-identical before and after for a fixture inbox (or differs only where the PR says).
 
-**Done when** the five tests exist and fail under those mutations.
+**Done when** `/inbox` at the live size renders its template in under ~70 ms on a scratch home, and the PR gives the split.
 
-**Related:** TD-715, TD-716, #1843.
+**Related:** TD-739, TD-738, TD-746.
 
 ---
+
+## TD-748: The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Agreed 2026-10-15 — [ADR 2026-10-15](decisions/2026-10-15-queue.md), reviewed by Fable (four rounds converged, final AGREE) and Sonnet (three rounds, READY). Next: a mockup drawn from the real ledger and inbox, reviewed with Paul; then the design round. The builds will wait on a dev-cadence entry (the rank file's format and order in ledgerboard, the `queue-edit` audit class), filed when the design names it.
+**Blocked by:** decision (paul) — the real-data mockup reviewed with Paul before the design text
+**Location:** `docs/decisions/2026-10-15-queue.md`; the design text it rewrites: §4.4 *Repo facts*, §4.5 screens 6 and 11 (4.5-ui.md:511–512, 1058), §4.5a a row per new control, §4.7 `ao rank` and `ao repo`, §4.8 *Choosing in a free-pick lane* (4.8-capabilities-roles.md:531–540), §4.10 (4.10-messages.md:719), the grinder and designer briefs
+
+**Why:** Paul, 2026-10-15: *what I really care about is — where is TD/feature X that I added recently (already done, being worked, waiting to be worked, needs me for something)*, and *I want to know that my teams are working, and working the things I think are important first (dependencies considered)*. The Inbox is per message and orders by `Due:` dates he finds arbitrary; picks go by High/Medium/Low (36 of 56 open entries are Medium at filing) and nothing lets him say what comes next.
+
+**Fix:** the ADR, whole: a `/queue` page of cards (connected `Blocked by:` components, a shared non-design prerequisite its own card), each with its rows' states and its asks; groups Recently completed / In progress / Up next; the person drags cards, the rank written to `docs/technical_debt_rank.yml` one line per member by debounced tool PRs, every undragged entry ranked implicitly by Priority, Type and id; the rank is the pick order by convention; the Inbox draws only what names no TD. Slices: (1) ledgerboard rank file + order + `ao rank` + briefs; (2) the Repo page's cards; (3) the Queue page. A two-week trial from slice 3, read by passed-over flags, idle-while-work lines and the oldest unanswered TD ask.
+
+**Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
+
+**Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
+
+---
+
+## TD-749: The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, in an interactive session; TD-748's review)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — Paul decided 2026-10-15 to drop the split now, ahead of TD-748.
+**Location:** `docs/briefs/grinder-ao-1.md:15` (*Your half of the team*); `docs/briefs/grinder-ao-2.md` (its *Lane* heading and the split rule)
+
+**Why:** the doing log (`~/.shiftlead/doing.jsonl`) since 2026-10-10 has two lines where a grinder declared out of work because the open builds were the sibling's package (2026-10-15 00:07Z *the open grinder builds are all sessionorc (the sibling's)*, 00:24Z *TD-687 and TD-690 are sessionorc-led (the sibling's)*), and five where a grinder picked an entry over a higher one in the other half (TD-428, TD-593, TD-616, TD-689, TD-691) — the pass-over §4.8 *Choosing in a free-pick lane* says needs a reason, manufactured by the brief. Merge safety is `held:` review, not the split; a conflict between two grinders costs a rebase.
+
+**Fix:** remove the split from both briefs: each grinder picks the highest pickable unclaimed entry in its lane (priority, then the ledger's order) whatever package it touches; a claim names files a live sibling's claim also touches. Lanes by role and stage are unchanged.
+
+**Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
+
+**Related:** TD-108, TD-748.
+
+---
+
+## TD-750: Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-745's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *A red PR nobody holds is a work order* (*A draft is no work order*), §4.7 `ao repo`, §4.5a *Inbox row: red PR*; `src/sessionorc/workorders.py` (`red_prs` ~L492), `src/shiftlead/teamrun.py` (`red_prs` ~L1341, its `whose`), `src/shiftlead/cli.py` (`ao repo`'s open-PR line, ~L1786); `src/shiftlead/ui/templates/repo_part.html` (the Open PRs tag, which already draws *draft*), `src/shiftlead/ui/org.py` (`red` ~L245, `red_title` ~L276, the facet's hover) and `ui/repo.py`, the `whose` readers; `tests/test_workorders.py`, `tests/test_ui_red_prs.py`
+
+**Why:** TD-745's design. On 2026-10-15 #1840 and #1850, drafts Paul had paused during a design round, were listed first in the anchor's lane as High `pr:` orders, and every anchor run passed over them.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- `workorders.red_prs`: a PR whose reading carries `draft` and is not a sync order (`is_sync_order`) is skipped right after the told memory is carried (`kept[key] = was`, ~L527), so no order and no note, and the memory of an earlier non-draft spell survives the draft. A sync PR is skipped only where `is_sync_order` would not order it, so a pending or `not_run` sync draft waits as any sync PR does. Its `red_since` is the reading's own, so it is kept, and the PR is an order on the first reading after it is marked ready, if red past `ORPHAN_AFTER` and unheld.
+- Every other reader takes `pr_orders`, so it drops a draft with no change of its own: the Inbox's red-PR row (`ui/inbox.py`), `ao repo`'s first-line count of *red PRs nobody holds* (`cli.py` ~L1518), rule 6's news and rule 8's lane counts. Tests hold the count and the Inbox row.
+- `teamrun.red_prs`: an unheld draft past `ORPHAN_AFTER` has `whose` *no order while a draft*, where today it is ''. A held one stays *held by …*. The Repo page's Open PRs tag and the facet's hover draw it.
+- `ao repo`: a draft's open-PR line reads *(draft · red since <t>: no order while a draft)* where `teamrun.red_prs` gives it that `whose` (the one test, `ORPHAN_AFTER` included), `red_since` printed as the order line prints it, and *(draft)* otherwise, as today.
+- Tests, each failing with its line reverted:
+  - a red draft unheld past `ORPHAN_AFTER` is no order;
+  - a red draft held by idle holders past `ORPHAN_AFTER`, and again a second `after` later, is no order, sends no note and writes no told entry;
+  - the same PR, no longer a draft, is an order on the next reading;
+  - a draft sync PR is still an order;
+  - a held PR told once, then drafted and readied within `after` of the tell, is not told again; readied past `after`, it is an order at once, with no second tell;
+  - a held draft keeps *held by …* in `whose` and gets no note;
+  - a pending sync draft is no order and no *no order while a draft* either;
+  - `ao repo`'s count and the Inbox's red-PR row omit a draft;
+  - `teamrun.red_prs`'s `whose` for an unheld draft;
+  - `ao repo`'s draft line.
+
+**Done when** the tests above pass, `ao repo` on a repo with a red, unheld draft lists no `pr:` order and says why on the PR's line, and the Repo page's tag and the facet's hover read *no order while a draft* while the facet's *· n red* still counts it.
+
+**Related:** TD-613, TD-684, TD-745.
+
+---
+
+## TD-754: The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, building TD-746)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py`, `agent_inbox.py`, `agent_sync.py` (each `_broadcast({"event": "repos", …, "repo": self._repo_view(root)})`), `agent_serve.py:193` (the subscriber's seed); `src/shiftlead/ui/app.py` (`fan_seed`, which reads the reading whole: a websocket has no request memo)
+
+**Why:** TD-746 gave the `repos` RPC an `omit` and every page's read one, halving what a page is sent (1.45 MB → 0.75 MB on the live home, 2026-10-15). The pushed stream was left as it was: each `repos` event is `_repo_view(root)` whole — `ledger.recent`, the month's PRs with every field, every entry's detail — and the UI's fan-out keeps it in the events run's `repos`, which draws the same facets and cards a page draws from the omitted reading. The reading changes at least every five minutes per repo, and on every ledger edit, settle mark and PR order.
+
+**Fix:** let a subscription say its `omit` (the `events` subscribe carries it, the agent applies `reports.omitted` per subscriber before the send, or once per distinct omit), the UI's fan-out asking for `REPOS_OMIT_PAGE`; `fan_seed` reads with the same omit.
+- **Tests:** a subscriber with an omit receives `repos` events without those paths; one without receives them whole.
+
+**Done when** no `repos` event the UI receives carries a part its pages omit.
+
+**Related:** TD-746, TD-739.

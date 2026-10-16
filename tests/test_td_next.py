@@ -13,6 +13,7 @@ from conftest import park_ticks
 
 from sessionorc import agent_ids, modes, paths
 from sessionorc.agent_common import RpcError
+from sessionorc.models import Session
 from shiftlead import cli
 
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
@@ -442,3 +443,48 @@ def test_the_cli_passes_an_origins_owner_repo_through(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead"]) == 0
     assert sent == {"repo": "ShiftLead/shiftlead", "count": 1}
+
+
+# -- TD-731: an entry can land held (§4.4 *An entry can land held*) ---------------------------------------
+
+
+@pytest.mark.integration
+async def test_held_lands_each_id_held_for_the_person_and_an_interactive_session(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    home.sessions["ao-i"] = Session(id="ao-i", name="i", kind="agent", adapter="claude-code", dir="", unattended=False)
+    got = await home.rpc_td_next(repo="shiftlead", count=2, held=True, caller="ao-i")
+    assert got["ids"] == ["TD-003", "TD-004"] and got["held"] is True
+    seen = json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]
+    assert set(seen) == {"TD-003", "TD-004"} and seen["TD-003"]["held"]["by"] == "ao-i" and "at" not in seen["TD-003"]
+    got = await home.rpc_td_next(repo="shiftlead", held=True)
+    assert got["ids"] == ["TD-005"] and got["held"] is True
+    assert json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]["TD-005"]["held"]["by"] == "person"
+    plain = await home.rpc_td_next(repo="shiftlead", caller="ao-i")
+    assert (
+        "held" not in plain and "TD-006" not in json.loads(paths.ledger_seen_file().read_text())["shiftlead/shiftlead"]
+    )
+
+
+@pytest.mark.integration
+async def test_held_is_refused_to_an_unattended_caller_and_one_the_graph_does_not_hold(home, gh, tmp_path):
+    _one(tmp_path, gh)
+    home.sessions["ao-w"] = Session(id="ao-w", name="w", kind="agent", adapter="claude-code", dir="", unattended=True)
+    with pytest.raises(RpcError, match="--held is the person's and an interactive session's: ao-w is unattended"):
+        await home.rpc_td_next(repo="shiftlead", held=True, caller="ao-w")
+    with pytest.raises(RpcError, match="ao-gone is not a session this home holds"):
+        await home.rpc_td_next(repo="shiftlead", held=True, caller="ao-gone")
+    assert not paths.ledger_seen_file().exists() and not paths.ids_file().exists(), "nothing written, no id given"
+
+
+@pytest.mark.unit
+def test_the_cli_sends_held_and_says_so_in_json(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    _register()
+    sent = {}
+    monkeypatch.setattr(
+        cli, "call_sync", lambda m, **p: sent.update(p) or {"ids": ["TD-001"], "unread": [], "held": True}
+    )
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["td", "next", "--repo", "ShiftLead/shiftlead", "--held", "--json"]) == 0
+    assert sent == {"repo": "ShiftLead/shiftlead", "count": 1, "held": True}
+    assert json.loads(capsys.readouterr().out)["held"] is True

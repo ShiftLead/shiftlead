@@ -1521,8 +1521,13 @@ def _repo_line(r: dict[str, Any]) -> str:
         decided += f", {len(syncs)} sync PR{'' if len(syncs) == 1 else 's'} to land" if syncs else ""
         decided += f", {n} red PR{'' if n == 1 else 's'} nobody holds" if n else ""
         orders = [*orders, *reds]
-        # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710)
-        withheld = sum(1 for e in led["entries"] if e.get("for_page") == "pickable" and _settle_mark(e))
+        # an entry the settle clock withholds is counted not pickable, its page kind unchanged (§4.7, TD-710),
+        # and so is one whose wait stands (§4.4 *An entry says what it waits for*, TD-716)
+        withheld = sum(
+            1
+            for e in led["entries"]
+            if e.get("for_page") == "pickable" and (_settle_mark(e) or teamrun.wait_words(e))
+        )
         # the page's seven kinds as the kind bar names them (§4.4 *Repo facts*, §4.7, TD-418)
         led_part = (
             f"{len(led['entries'])} open entries{decided}: "
@@ -1820,14 +1825,22 @@ def cmd_repo(args: argparse.Namespace) -> int:
                     # withheld by the home's settle clock (§4.4, TD-710): said after the owner
                     if settling := _settle_mark(e):
                         owner += f" {settling}"
+                    # what it waits for (§4.4 *An entry says what it waits for*, TD-716): said after the owner
+                    if waits := teamrun.wait_words(e):
+                        owner += f" {waits}"
                     print(f"  {kind:<12} {e['id']}  {prio:<6}  {owner:<11}  {_live_mark(e)}{e['title']}")
             for h in r.get("holds", []):
                 pr = f" → #{h['pr']}" if h.get("pr") else ""
                 print(f"  holds        {h['ref']}{pr}  {h['id']}")
             # a member out of work with unheld work in its own lane (§4.4 *In a team's lanes*, TD-361)
+            # and one whose lane only waits (§4.4 *Counted apart*, TD-716): it waits, it is not work left
+            by_id = {e["id"]: e for e in (r.get("ledger") or {}).get("entries") or [] if isinstance(e, dict)}
             for x in (r.get("lanes") or {}).values():
                 for m in x["out_of_work"]:
                     print(f"  {m['name']} is out of work with {len(m['ids'])} in its lane: {', '.join(m['ids'])}")
+                for m in x.get("out_of_work_waiting") or []:
+                    tally = teamrun.waits_tally(m["waiting"], by_id)
+                    print(f"  {m['name']} is out of work; its lane waits: {tally}: {', '.join(m['waiting'])}")
             board = r.get("board") or {}
             if board.get("error"):
                 print(f"  board: could not look — {board['error']}")
@@ -2808,9 +2821,10 @@ def _origin_key(root: str) -> str:
 
 
 def cmd_td_next(args: argparse.Namespace) -> int:
-    """`ao td next [--repo <name>] [--count <n>]` (design §4.7 *Entries*, §4.4 *A ledger entry's id is
-    handed out by the home*; TD-696): the next free ledger id of the repo, or `n` in a row, from the home's
-    `td_next`, one a line. Open to every session and the person. The repo goes by its registered name, or by
+    """`ao td next [--repo <name>] [--count <n>] [--held]` (design §4.7 *Entries*, §4.4 *A ledger entry's id
+    is handed out by the home*; TD-696): the next free ledger id of the repo, or `n` in a row, from the home's
+    `td_next`, one a line. Open to every session and the person; `--held` (§4.4 *An entry can land held*,
+    TD-731) lands each id held, the person's and an interactive session's. The repo goes by its registered name, or by
     its origin's `owner/repo` when checkouts of different origins share that name; an open PR the home could
     not read is said on standard error."""
     if args.repo and re.fullmatch(r"[\w.-]+/[\w.-]+", args.repo) and not pathlib.Path(args.repo).expanduser().exists():
@@ -2827,26 +2841,37 @@ def cmd_td_next(args: argparse.Namespace) -> int:
 
 
 def _td_next_send(args: argparse.Namespace, name: str) -> int:
-    got = call_sync("td_next", repo=name, count=args.count)  # the home's budget, 45 s, is under the client's 120
+    extra = {"held": True} if getattr(args, "held", False) else {}
+    got = call_sync("td_next", repo=name, count=args.count, **extra)  # the home's 45 s budget is under the client's
     for line in got.get("unread") or ():
         print(line, file=sys.stderr)
     out = {"repo": got.get("repo"), "ids": got.get("ids") or [], "unread": got.get("unread") or []}
+    if got.get("held"):
+        out["held"] = True
     return emit(args, out, lambda: print("\n".join(out["ids"])))
 
 
 def cmd_td_hold(args: argparse.Namespace) -> int:
-    """`ao td hold <id> [--repo <name>] [--release]` (design §4.7 *Entries*, §4.4 *Hold*; TD-710 slice 2):
-    the home's `td_hold` on the repo's main checkout, by path as `ao td add`'s — hold an entry while it
-    settles, or release a held one. A person's own: the host agent refuses every session but the
-    person's own shell."""
+    """`ao td hold <id> [--repo <name>] [--release]` (design §4.7 *Entries*, §4.4 *Hold*; TD-710 slice 2,
+    TD-731): the home's `td_hold` on the repo's main checkout, by path as `ao td add`'s — hold any open
+    entry, settling or settled, or release a held one. On a claimed entry, a line per holder and reader
+    the hold told (the reply's `told`) and per note it could not send (`untold`). A person's own: the host
+    agent refuses every session but the person's own shell."""
     _, root = _td_repo(args.repo)
     tid = str(args.entry).strip().upper()
     got = call_sync("td_hold", repo=root, id=tid, release=bool(args.release))
     if args.release:
-        words = f"{tid} released: pickable now"
+        lines = [f"{tid} released: pickable now"]
     else:
-        words = f"{tid} held: no lane takes it until you release it or its text changes"
-    return emit(args, got, lambda: print(words))
+        lines = [f"{tid} held: no lane takes it until you release it"]
+        readers = set(got.get("readers") or ())
+        for name in got.get("told") or ():
+            if name in readers:
+                lines.append(f"{name} reads its PR and is told to leave it unmerged")
+            else:
+                lines.append(f"{name} holds its claim and is told to drop it")
+        lines += [str(u) for u in got.get("untold") or ()]
+    return emit(args, got, lambda: print("\n".join(lines)))
 
 
 def _settle_mark(e: dict[str, Any], now: datetime | None = None) -> str:
@@ -4136,9 +4161,21 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="{repo, ids, unread}")
     q.add_argument("--repo", help="a registered repo's name, or its origin's owner/repo (default: this directory's)")
     q.add_argument("--count", type=int, default=1, help="how many ids in a row, 1 to 10 (default: 1)")
+    q.add_argument(
+        "--held",
+        action="store_true",
+        help="land each id held until the person's Release (§4.4); the person's and an interactive session's",
+    )
     q.set_defaults(fn=cmd_td_next)
-    q = dsub.add_parser("hold", help="hold an entry while it settles, or release a held one (§4.4); the person's own")
-    q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="{repo, id, held, settling}")
+    q = dsub.add_parser(
+        "hold", help="hold any open entry, settling or settled, or release a held one (§4.4); the person's own"
+    )
+    q.add_argument(
+        "--json",
+        action="store_true",
+        default=argparse.SUPPRESS,
+        help="{repo, id, held, settling, told, readers, untold}",
+    )
     q.add_argument("entry", metavar="id", help="the entry's id, TD-NNN")  # `id` is resolved as a session's
     q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
     q.add_argument("--release", action="store_true", help="release a held entry: pickable at once")
