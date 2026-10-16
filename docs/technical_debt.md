@@ -76,6 +76,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
 | TD-766 | Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9 | Medium | Built — live check #1905 |
 | TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
+| TD-773 | The pre-start lane count reads an entry's team through no test: `teamrun.lanes` passes the team name to `lane_matches` and nothing fails without it (#1902) | Low | Open |
+| TD-774 | The anchor-record retirement's three branches — a suspended record skipped, a node's record removed over its link, a scheduled start cancelled — are held by no test (#1900) | Low | Open |
 
 ---
 
@@ -1594,3 +1596,43 @@ The other cases:
 **Done when** a session idle on a background shell reads *working · 1 shell*, Ready to close names the shell and fails, and every listed test passes.
 
 **Related:** TD-761, TD-766, TD-734.
+
+---
+
+## TD-773: The pre-start lane count reads an entry's team through no test: `teamrun.lanes` passes the team name to `lane_matches` and nothing fails without it (#1902)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1902)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/teamrun.py` (`lanes`, `ledger_mod.lane_matches(x.lane, e, name)`); `tests/test_cli_teams.py`, `tests/test_entry_team.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1902's (TD-762) lines one at a time. Deleting the `name` argument in `lanes` (`lane_matches(x.lane, e, name)` → `lane_matches(x.lane, e)`) leaves every test green: 409 pass with `-k "team or lanes or lane"` over `tests/`, and 92 pass over `tests/test_cli_teams.py`, the only file that calls `teamrun.lanes`. The docstring of `lane_matches` says an entry with a `team` matches only a lane of that team, so the Start's *what the lanes hold, before the start* line would count another team's entries and a `needs_team`-withheld one's team-less sibling as the team's own. Every other call site #1902 changed fails a test when reverted (`rpc_progress`'s `team_refusal`, `in_lanes`' `withheld` and `ours`, `cli`'s `needs_team` withheld count); this one has none, and `tests/test_entry_team.py` never reaches `teamrun.lanes`.
+
+**Fix:** in `tests/test_cli_teams.py`, beside the existing `lanes` tests: a repo reading holding one entry tagged for the team and one tagged for another, and the team's plan; the line and `roles[...]["n"]` count only the team's. Fails under the mutation above.
+
+**Done when** the test exists and fails with the `name` argument removed.
+
+**Related:** TD-762, TD-730, #1902.
+
+---
+
+## TD-774: The anchor-record retirement's three branches — a suspended record skipped, a node's record removed over its link, a scheduled start cancelled — are held by no test (#1900)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1900)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_retire_anchors`); `tests/test_anchor_retired.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1900's (TD-757) `_retire_anchors` one line at a time and running `tests/test_anchor_retired.py tests/test_no_anchor_seat.py tests/test_agent.py tests/test_link.py tests/test_models.py tests/test_manager_on_call.py` (6 `test_link.py` tests fail in this worktree unmutated, for a reason outside the PR; the count is 6 before and after each mutation below, so each of these passes every test that passes unmutated). Mutations that fail a test: `clean = True`, and the `exited and not clean` skip. Three that do not: (1) `and not r.suspended` removed from the selection — the docstring says *a suspended one is the person's (§4.8a) and never forgotten here*, and no test suspends an anchor record; (2) `await self._route_act("remove", {"id": s.id}, None, s.host)` replaced by `pass` — a node's anchor record is never removed, and no test has one (the docstring promises *a node's removed*); (3) `if s.state == "scheduled" and s.host == self.host:` replaced by `if False:` — `await self._cancel_start(s)` is never called, and the existing scheduled case (`test_the_tick_forgets_a_closed_anchor_record...`, `e-anchor`) still passes because the fall-through forgets the record anyway, so it does not say the start was cancelled (a pending timer could still fire into a forgotten record).
+
+**Fix:** in `tests/test_anchor_retired.py`: (1) a suspended anchor record, idle and clean, is still in `agent.sessions` after `_retire_anchors`; (2) a node's anchor record in `agent.remote` with its link present: the `remove` act is routed to that host, and with the link down the record stays; (3) the scheduled case asserts the start's timer is cancelled (`_cancel_start` called, or no start task remains). Each fails under its mutation above.
+
+**Done when** the tests exist and fail under those three mutations.
+
+**Related:** TD-757, #1900.
