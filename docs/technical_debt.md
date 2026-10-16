@@ -68,6 +68,7 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
 | TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
+| TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Open |
 | TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 
@@ -1386,6 +1387,26 @@ The other cases:
 **Done when** the two tests exist and fail under those mutations.
 
 **Related:** TD-731, #1861.
+
+---
+
+## TD-745: A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the anchor, found reading its lane)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.4 *A red PR nobody holds is a work order*; `teamrun.red_prs`
+
+**Why:** on 2026-10-15 `ao repo` listed #1840 (TD-724's build) and #1850 (TD-722's amendment) as `pr:1840` and `pr:1850`, both High, both *red since …: conflicting*, first in the anchor's lane. Both are drafts that Paul paused in an interactive session. #1840 waits for the amendment, and #1850 is held until its Fable and Sonnet rounds converge (memory `hold-a-design-until-its-round-ends`). The rule's cure, a rebase on the PR's own branch, would reach into a design under the person's review, so the anchor passed over both and named why in its `ao doing` line. Every anchor run until they land will read them first and pass over them again. The rule reads `isDraft` (§4.4, the PR list's fields) but never uses it for an order; §4.4 says a draft only for a sync PR.
+
+**Fix:** a design decision first. A draft is no work order (or one only past a longer bound), or a paused PR names its holder (a `Paused:` line in its body, a label) and the reading counts that as held. Either way, `ao repo` says why it does not list the PR.
+
+**Done when** a draft PR the person paused is not a pickable `pr:<n>` in any lane, and the design says what makes it so.
+
+**Related:** TD-613 (the rule), TD-722, TD-724.
 
 ---
 
