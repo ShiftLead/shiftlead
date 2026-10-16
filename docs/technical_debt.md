@@ -35,7 +35,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-410 | Every team Start fills the on-call manager, which reads ~60k tokens of design to find nothing due: 14 fills since 2026-10-03, all *nothing to do* | Medium | Designed — TD-413 builds it |
 | TD-413 | Build TD-410: a Start writes the on-call manager held — no pane until a reading is due — the fill's cause line, and the on-call briefs' first reads | Medium | Built (#1287, #1684); live check: a week's journal once #1684 is live |
 | TD-460 | Read back the one-week trial of a 200k context bound on ao-grind's grinders | Medium | Open |
-| TD-463 | Four CI flakes since 2026-10-03, one of them seen four times | Medium | Open |
 | TD-512 | A PR that truncates `docs/technical_debt_archive.md` passes every gate: the ledger tests and the cadence check's ledger row read neither its length nor what it lost | Low | Open |
 | TD-553 | Drop the `.agentorc.yml` fallback once samscrape, contractmatch and dev-cadence have renamed theirs | Low | Blocked by the three repos' renames |
 | TD-623 | No document says how a repo gets its first ShiftLead team: what to write, in which repo, what is the person's | Medium | Open — blocked: Paul says when guardians-devenv TD-028's gap list is enough |
@@ -77,6 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
+| TD-768 | Two CI flakes with no entry: `test_attachment_life`'s tick test (three times) and `test_promote`'s press under auto (once, on main) | Medium | Open |
 
 ---
 
@@ -504,29 +504,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** after a week on 200k (from about 2026-10-15), compare ao-grind's grinders' usage-window percentage per merged PR against the week before (2026-10-01–08). Count their restarts per merged PR alongside. Write the reading into the ADR's Consequences. Then keep the line in `.agentorc.yml` (and design §4.8 says this repo's grinder number is measured), or take it out (the 300k default returns), in a PR. A result that is unclear goes to Paul as a `steer` with the reading. **Done when** the line stays or goes with a written reading behind it.
 
 **Related:** TD-378 (archived), [ADR 2026-10-08](decisions/2026-10-08-prompt-cache.md) option 4, TD-249 (the bound's last change), TD-459.
-
-## TD-463: Four CI flakes since 2026-10-03, one of them seen four times
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-08 (the anchor, from the CI read that closed TD-063 and TD-078)
-**Owner:** grinder
-**Kind:** live-check #1332
-**Waits:** until 2026-10-16 — a week of CI runs from #1332's merge, read on or after 10-16
-**Status:** Built by #1332 (2026-10-09); a week of CI is still to read. #1332 fixed three of the four. The board test now waits on its fetching read's start, not a 2 s poll. The mail test now settles its members before the wait's cursor. The forget test had a real cause: `_refresh_git` wrote `_git_checked` for a record forgotten while its git read ran. That is fixed, with a regression test. The fourth, `test_a_screen_rules_state_goes_back_when_its_screen_is_gone`, did not reproduce in 50 runs beside a full suite and is **watched**. **To read on or after 2026-10-16:** CI runs from #1332's merge for any of the four. None failed: archive this entry. One did: a new entry for it, and this one `**Blocked by:**` it. The week is the only thing to wait for, so the owner is the anchor.
-**Location:** `tests/test_ui_board.py`, `tests/test_mail.py`, `tests/test_agent_paths.py` (the tests below)
-
-**Why:**
-- A red run on main stops the promote policy (*not now: checks on main are failed*), and a red PR costs a re-run.
-- The anchor's read of 2026-10-08 covered every run from 09-27 to 10-09, including the first attempts of re-runs. It found these four failing after every earlier flake had its fix:
-  - `tests/test_ui_board.py::test_one_fetching_read_at_a_time_and_a_press_never_waits_on_it` — **four times**, on both Pythons: run 37111273858 (10-03, `td294-host-reads`), 37175483747 (10-04, `td292-look-shots`), 37253443447 (10-05, **main**), 37320649134 (10-05, `td099-live-check`). Each time `assert ['plain'] == ['plain', 'fetch']`: the fetching read had not started when the test looked.
-  - `tests/test_mail.py::test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wakes_its_manager` — once, run 37252493668 (10-05, main, 3.12): *ao-test-asks-waiting-counts-open-0-mgr never blocked in wait*. The same job also failed `test_link.py`'s supersession test, which was TD-326's, fixed by #1058 at 07:29Z that day.
-  - `tests/test_agent_paths.py::test_a_screen_rules_state_goes_back_when_its_screen_is_gone` — once, run 37574592141 (10-07, main, 3.13): `assert False`.
-  - `tests/test_agent_paths.py::test_forget_leaves_no_side_table_entry` — once, run 37748462010 (10-08, `td397-checkout-held-tests`, 3.12): the forgotten id was still in a side table.
-
-**Fix:** take the four-time one first. Reproduce each under load (the file in a loop beside a full suite, as TD-078 did), then bound each wait on the signal it waits for rather than on a duration (TD-033, TD-261). A test that does not reproduce in 50 loaded runs is named as such here and watched. **Done when** each is fixed or watched, and none has failed in CI for a week.
-
-**Related:** TD-063 and TD-078 (archived; the same family), TD-285, TD-289, TD-326 (archived flakes, each fixed by waiting on its signal).
 
 ## TD-512: A PR that truncates `docs/technical_debt_archive.md` passes every gate: nothing reads what the archive lost
 
@@ -1646,3 +1623,25 @@ The other cases:
 **Done when** the two tests exist and fail under those mutations.
 
 **Related:** TD-754, #1886.
+
+## TD-768: Two CI flakes with no entry: `test_attachment_life`'s tick test (three times) and `test_promote`'s press under auto (once, on main)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-463's week of CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_attachment_life.py` (`test_the_tick_reads_a_record_as_live_until_it_ends`, ~L54); `tests/test_promote.py` (`test_the_press_under_auto_promotes_at_once_skipping_the_settle`, ~L811); `tests/conftest.py` (`park_ticks`); `src/sessionorc/agent_tick.py` (the first tick's detached `_promote_task`, the run-log sweep's `_pruned_at`)
+
+**Why:** a red run on main stops the promote policy, and a red PR costs a re-run. TD-463's read of every CI run from 2026-10-09 to 2026-10-16 found two flaking tests that no entry names:
+- `tests/test_attachment_life.py::test_the_tick_reads_a_record_as_live_until_it_ends` failed **three times** on 3.12: run 38027920135 (2026-10-10, `td504-service-install-tests`), 38177136833 attempt 1 (2026-10-11, `td060-ledger-split`, passed on the re-run) and 38338872935 (2026-10-13, **main**). Each time `assert f["ao-run-5/old.png"].exists() and not f["ao-end-6/old.png"].exists()` failed: the tick had passed the right live ids (the assertion before held), yet the ended session's old file was still there. The test never parks the fixture's tick loop, so a concurrent tick can take the sweep (and its `_pruned_at`) around the test's own.
+- `tests/test_promote.py::test_the_press_under_auto_promotes_at_once_skipping_the_settle` failed **once**, on 3.12, run 38336561646 (2026-10-13, **main**): `assert agent._promotes["repo"]["auto"] is True` read `False` at L822 after the press. This is TD-753's shape: `park_ticks` cancels the loop, but the first tick's detached promote pass can still write `_promotes` after the test has set it.
+
+Neither test has changed since it failed (`git log` on both files: the last change to either test is 2026-10-12 or earlier).
+
+**Fix:** for each, reproduce first (slow the racing pass, as TD-695 slowed `promote.survey`, or loop the file beside a full suite), then own the clock. `test_promote`'s test awaits the first tick's `_promote_task` (and `_repos_task`) after `park_ticks`, before it sets `_promotes`, as TD-753 did. `test_attachment_life`'s test calls `park_ticks` first, and awaits any first-tick task that sweeps, then takes its one tick by hand.
+
+**Done when** each test passes under a reproduction that fails without its fix.
+
+**Related:** TD-463 (archived; the read that found them), TD-753, TD-752, TD-695 (the same family: a first tick racing a test).
