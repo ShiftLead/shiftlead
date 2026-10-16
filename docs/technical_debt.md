@@ -69,6 +69,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-787 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Designed — built by TD-789, TD-790 |
 | TD-790 | Build TD-787 (2): *unasked* shown — the Repo page's tag and *i* panel, `ao repo`'s line and `--json`, `ao pr held`'s *the repo holds* line | Medium | Open |
+| TD-793 | No test holds that `asked` is the *first* ask: the sort by `at` in `held.asks` and the earlier-wins merge in `_red_prs` can be reversed and every test passes | Low | Open |
 
 ---
 
@@ -1418,3 +1419,21 @@ The other cases:
 **Done when** tests hold: the tag and its title on the Repo page, the two-team reader in the Org's order on the page and in `cmd_repo` alike and the named-set reader (a `ui` stage not named for a PR outside its set), a reader-less repo drawing nothing; `cmd_repo`'s line and `--json`, a session's `ao repo` (no mail standing) printing the tag and its reader; `ao pr held`'s added lines on both *not held* branches — unasked, asked, not yet read, no reading. §4.5a is untouched (the standing is no control); `grep -ln 4.5a tests` before changing the *i* panel's text.
 
 **Related:** TD-787, TD-789.
+
+---
+
+## TD-793: No test holds that `asked` is the *first* ask: the sort by `at` in `held.asks` and the earlier-wins merge in `_red_prs` can be reversed and every test passes
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1956)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/held.py` (`asks`); `src/sessionorc/agent_tick.py` (`_red_prs`, the `asked = {…}` merge); `tests/test_held_reading.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. TD-789's Fix says `asked` is "the first `ask` carrying `pr`" and kept past the mail's prune. Two mutations leave `tests/test_held_reading.py`, `tests/test_held_missed.py` and `tests/test_pr_held.py` at 21 passed: (1) `key=lambda x: str(x[0].at or "")` → `key=lambda x: 0` in `held.asks` (a later ask of the same PR then wins over the earlier by mail order); (2) `asked = {**(found.get(root) or {}), **(old.get("asked") or {})}` → `{**(old.get("asked") or {}), **(found.get(root) or {})}` in `_red_prs` (a fresh ask then overwrites the kept first one, so `at`/`to` drift on each pass). Run as `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_held_reading.py tests/test_held_missed.py tests/test_pr_held.py`. TD-789's Done-when names "kept past the mail's prune" only; the one test with two asks on a PR (`test_held_reading.py`, #12) lists them earliest first and from the same seat, so a stable sort that ignores `at` keeps the right answer; none lists the later ask first or has different seats.
+
+**Fix:** a test with two asks of one PR (different `at`, listed latest first in the inbox, to different seats) whose `asked[n]` is the earlier's `{at, to}`; and one where a second ask arrives on a later pass, `asked[n]` still the first's.
+
+**Done when** both mutations above fail a test.
