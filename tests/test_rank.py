@@ -295,6 +295,116 @@ async def test_a_flush_is_due_rank_flush_after_the_last_move(agent, tmp_path, mo
     assert flushed == [5]
 
 
+# TD-788: the joins and prunes of a flush, their timer and guard, the landed key's expiry, and the queue event
+
+
+def _join_and_prune(tmp_path) -> tuple[str, dict[str, Any]]:
+    """A lined card with a later build unlined (a join: TD-006) and a line whose card is all archived (a prune:
+    TD-009)."""
+    return _repo(tmp_path, "r", [*FIVE, _entry(6, "a later build", Priority="Low", Blocked_by="TD-001")],
+                 archive=[_entry(9, "done", Resolved="2026-10-16")], lines="TD-001: 0|1\nTD-009: 0|2\n")  # fmt: skip
+
+
+def _age_found(agent) -> None:
+    state = agent.rank_store.load()
+    state["found_at"] = float(state["found_at"]) - rank.RANK_FLUSH - 1
+    agent.rank_store.save(state)
+
+
+async def test_a_join_and_a_prune_land_a_pr_each_rank_flush_after_they_are_found(agent, tmp_path, monkeypatch):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, r = _join_and_prune(tmp_path)
+    agent._repos = {root: r}
+    await agent._queue_pass(NOW)
+    landed: list[tuple[str, dict, str]] = []
+    monkeypatch.setattr(
+        board, "land_rank", lambda root, rel, lines, msg: landed.append((rel, dict(lines), msg)) or {"pr": 3}
+    )
+    await agent._rank_pass(NOW)
+    state = agent.rank_store.load()
+    assert state["found_at"] is not None and agent._rank_task is None and landed == []  # found: not due yet
+    _age_found(agent)
+    await agent._rank_pass(NOW)
+    await agent._rank_task
+    assert [(lines, msg) for _, lines, msg in landed] == [
+        ({"TD-006": "0|1"}, lb.queue_subject(rank.TOOL, "join", ["TD-006"])),
+        ({"TD-009": None}, lb.queue_subject(rank.TOOL, "prune", ["TD-009"])),
+    ]
+    assert {rel for rel, _, _ in landed} == {"docs/technical_debt_rank.yml"}
+    state = agent.rank_store.load()
+    assert state["found_at"] is None and state["flushed"] == [["r#TD-006", "0|1"], ["r#TD-009", None]]
+    # the checkout has not pulled the lines yet: the same joins and prunes are found, and nothing is started
+    agent._rank_task = None
+    await agent._rank_pass(NOW)
+    assert agent.rank_store.load()["found_at"] is None and agent._rank_task is None
+
+
+async def test_a_join_that_did_not_land_is_found_again(agent, tmp_path, monkeypatch):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, r = _join_and_prune(tmp_path)
+    agent._repos = {root: r}
+    await agent._queue_pass(NOW)
+
+    def land(root, rel, lines, msg):
+        if msg.startswith("queue: join"):
+            raise board.Refused("the forge refused it")
+        return {"pr": 4}
+
+    monkeypatch.setattr(board, "land_rank", land)
+    await agent._rank_pass(NOW)
+    _age_found(agent)
+    await agent._rank_pass(NOW)
+    await agent._rank_task
+    assert agent.rank_store.load()["flushed"] == []  # missed: the guard does not hide it
+    agent._rank_task = None
+    await agent._rank_pass(NOW)
+    assert agent.rank_store.load()["found_at"] is not None  # found again, flushed RANK_FLUSH on
+
+
+async def test_a_landed_key_stands_in_for_landed_keep_and_no_longer(agent, tmp_path):
+    from conftest import park_ticks
+
+    from sessionorc import agent_rank
+
+    await park_ticks(agent)
+    root, r = _repo(tmp_path, "r", FIVE)
+    agent._repos = {root: r}
+    await agent._queue_pass(NOW)
+    state = agent.rank_store.load()
+    t = time.time()
+    state["landed"] = {
+        "r#TD-005": {"key": "0|0", "at": t - agent_rank.LANDED_KEEP - 1},  # the reading never showed it
+        "r#TD-004": {"key": "0|0a", "at": t},
+    }
+    agent.rank_store.save(state)
+    await agent._rank_pass(NOW)
+    assert list(agent.rank_store.load()["landed"]) == ["r#TD-004"]
+
+
+async def test_a_move_tells_the_page_and_a_move_where_it_is_does_not(agent, tmp_path, monkeypatch):
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root, r = _repo(tmp_path, "r", FIVE)
+    agent._repos = {root: r}
+    await agent._queue_pass(NOW)
+    told: list[dict[str, Any]] = []
+
+    async def broadcast(ev):
+        told.append(ev)
+
+    monkeypatch.setattr(agent, "_broadcast", broadcast)
+    await agent.rpc_rank_move(ids=["r#TD-005"], prev=None, next="r#TD-001")
+    assert [e["event"] for e in told] == ["queue"] and told[0]["queue"]["cards"][0]["id"] == "r#TD-005"
+    told.clear()
+    await agent.rpc_rank_move(ids=["r#TD-005"], prev=None, next="r#TD-001")  # where it is now
+    assert told == []
+
+
 # -- ao rank --------------------------------------------------------------------------------------------------
 
 
