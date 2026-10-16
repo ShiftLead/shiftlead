@@ -82,7 +82,7 @@ def test_a_team_start_hands_each_member_its_prompt_from(world):  # noqa: F811
 def test_ao_new_sends_prompt_from_with_a_role_and_never_with_a_typed_prompt(world):  # noqa: F811
     tmp_path, state = world
     write_org(tmp_path, org_doc(tmp_path, two_repos=True))
-    assert cli.main(["new", "solo", "--project", "ao", "--role", "hunter"]) == 0
+    assert cli.main(["new", "solo", "--role", "hunter"]) == 0  # in shiftlead: its project's block
     p = creates(state)[0]
     assert fill(p["prompt_from"]) == p["prompt"] and p["prompt_from"]["prefix"].startswith("## Project: ao")
     state["calls"].clear()

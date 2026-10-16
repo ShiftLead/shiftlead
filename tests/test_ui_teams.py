@@ -576,38 +576,35 @@ def test_stopping_a_team_with_nothing_live_says_so(world, client):
     assert r.status_code == 400 and "nothing to stop" in r.json()["detail"]
 
 
-# ── New session's Project picker (design §4.5a **Project** picker) ────────────────────────────
+# ── New session: the badge and the block are the directory's repo's (design §4.9 *Home and reach*) ──
 
 
-def test_the_picker_offers_each_project_with_its_repos_checkouts_on_this_host(world, client):
-    tmp_path, fleet = world
+def test_there_is_no_project_picker(world, client):
+    """TD-722: no Project picker and no `project` field — the form reads the badge from the directory."""
     html = client.get("/new").text
-    assert 'name="project"' in html and ">No project<" in html
-    assert f'"path": "{tmp_path / "shiftlead"}"' in html  # the narrowing data rides with the option
-    assert '"repo": "ao-api"' in html and '"hosts": ["devenv", "kmaster"]' in html
-    projects = {p["name"]: p for p in uiapp.projects_view()}
-    assert [r["repo"] for r in projects["wide"]["repos"]] == ["ao-api"]  # a repo sits in one project (TD-722)
-    assert projects["ao"]["repos"][0]["path"] == str(tmp_path / "shiftlead")
+    assert 'name="project"' not in html and ">No project<" not in html and 'id="projectnote"' not in html
 
 
-def test_no_project_is_the_default_and_changes_nothing(world, client):
+def test_a_session_in_a_projects_repo_carries_its_badge_and_one_in_no_checkout_neither(world, client):
     tmp_path, fleet = world
-    r = client.post(
-        "/new", data={"name": "x", "dir": str(tmp_path / "shiftlead"), "prompt": "go"}, follow_redirects=False
-    )
-    assert r.status_code == 303
-    (made,) = fleet.creates()
-    assert made["project"] == "" and made["prompt"] == "go"
+    (tmp_path / "elsewhere").mkdir()
+    for d in (tmp_path / "shiftlead", tmp_path / "shiftlead" / ".claude" / "worktrees" / "w", tmp_path / "elsewhere"):
+        d.mkdir(parents=True, exist_ok=True)
+        r = client.post("/new", data={"name": "x", "dir": str(d), "prompt": "go"}, follow_redirects=False)
+        assert r.status_code == 303
+    # a one-repo project badges with no block; a worktree under the checkout is its repo's; elsewhere, none
+    assert [p["project"] for p in fleet.creates()] == ["ao", "ao", ""]
+    assert {p["prompt"] for p in fleet.creates()} == {"go"}
 
 
-def test_choosing_a_project_badges_the_session_and_puts_the_project_block_in_front(world, client):
+def test_a_session_in_a_two_repo_projects_repo_gets_the_project_block_in_front(world, client):
     tmp_path, fleet = world
     doc = org_doc(tmp_path)  # shiftlead moves under the wide heading: a project of two repos
     doc["projects"]["wide"]["repos"]["shiftlead"] = doc["projects"].pop("ao")["repos"]["shiftlead"]
     write_org(tmp_path, doc)
     r = client.post(
         "/new",
-        data={"name": "x", "dir": str(tmp_path / "shiftlead"), "prompt": "go", "project": "wide"},
+        data={"name": "x", "dir": str(tmp_path / "shiftlead"), "prompt": "go", "project": "ignored"},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -617,18 +614,6 @@ def test_choosing_a_project_badges_the_session_and_puts_the_project_block_in_fro
     assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your repo" in made["prompt"]
     assert "ao-api: not checked out on kmaster" not in made["prompt"]  # it is checked out here
     assert made["prompt"].endswith("go")
-
-
-def test_a_one_repo_project_badges_without_a_block_and_an_undefined_name_still_badges(world, client):
-    tmp_path, fleet = world
-    for project in ("ao", "nosuch"):
-        client.post(
-            "/new",
-            data={"name": project, "dir": str(tmp_path / "shiftlead"), "prompt": "go", "project": project},
-            follow_redirects=False,
-        )
-    assert [p["project"] for p in fleet.creates()] == ["ao", "nosuch"]
-    assert {p["prompt"] for p in fleet.creates()} == {"go"}  # no reach to describe either way
 
 
 def test_a_background_lead_stop_that_fails_is_reported_rather_than_dropped(world, client, monkeypatch):

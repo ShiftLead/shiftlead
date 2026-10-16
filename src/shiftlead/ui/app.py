@@ -148,7 +148,6 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     node_org_note,  # noqa: F401
     org_here,  # noqa: F401
     page_origin,  # noqa: F401
-    projects_view,  # noqa: F401
     repos_of,  # noqa: F401
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
@@ -551,7 +550,8 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     # `capabilities` and `ledger` are the create's, not the form's — §4.5a says capabilities are
     # **not carried**, and the form derives both from the Role picker. `host` is the Host pick's
     # (TD-284 slice 3), carried only when it is another host's record, as the create sends it.
-    q = {k: v for k, v in got.items() if k in RESUME_CARRIES and k not in ("lane", "controllers") and v}
+    # no `project` in the form's query: the form reads the badge from the directory (§4.9 *Home and reach*)
+    q = {k: v for k, v in got.items() if k in RESUME_CARRIES and k not in ("lane", "controllers", "project") and v}
     if got.get("host"):
         q["host"] = got["host"]
     q["resume"] = got["resume"]
@@ -1809,7 +1809,6 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         dir: str = "",
         adapter: str = "claude-code",
         resume: str = "",
-        project: str = "",
         # design §4.5a **Resume with changes…** (TD-081 step 2): the same fields a one-press
         # Resume carries, filled into the form instead of used. `why` is set when a press that
         # should have been silent landed here, and the form says so rather than leaving a person
@@ -1887,18 +1886,12 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "grant_notes": {g: GRANT_NOTES.get(g) or UNDESCRIBED_GRANT for g in GRANTS},
                 "roles": roles["roles"],
                 "default_controllers": roles.get("controllers") or [],
-                # design §4.5a New session **Project** picker (§4.9): the projects defined on this
-                # host, each carrying its repos' checkouts so the form can narrow the directory
-                # list without another round trip. "No project" is the default and is what every
-                # session was before.
-                "projects": projects_view(),
                 # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173)
                 "form_teams": teams_for_form(sessions_now),
                 "prefill": {
                     "dir": dir,
                     "adapter": adapter,
                     "resume": resume,
-                    "project": project,
                     "name": name,
                     "profile": profile or tool_profile(profs, default, adapter),
                     "role": role,
@@ -1993,7 +1986,6 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         worktree: str = Form(""),
         role: str = Form(""),
         lane: str = Form(""),
-        project: str = Form(""),
         team: str = Form(""),
         until: str = Form(""),
         at: str = Form(""),
@@ -2047,10 +2039,6 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         brief, made_from = preset.compose(refs or None, **ids)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
-        # design §4.5a New session **Project** picker (§4.9 "Home and reach"): the same block
-        # `ao new --project` puts in front of the brief, from the same function — each of the
-        # project's repos on this host and which one is home. A one-repo project adds nothing, and
-        # a name with no definition still badges the session: the badge grants nothing (§9 invariant 9).
         # design §4.5a New session **Team** picker (§4.9 *A person in the team*, TD-173): a role's own
         # `review:` wins, else the team's reader, as `ao new --team` fills it. The Controllers
         # picker was ticked with the team's live manager when the team was picked.
@@ -2066,13 +2054,15 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         text = prompt.strip() or brief
         # what the brief was made from (design §6 rule 7, TD-217): only when the brief is the preset's
         made_from = None if prompt.strip() else made_from
-        if project.strip():
-            block, _note = teams.reach_block(
-                orgmod.load(), project.strip(), dir.strip() or os.getcwd(), away or host_name()
-            )
-            if block:
-                text = block + text if text else block
-                made_from = repoconfig.prefixed(made_from, block)
+        # §4.9 *Home and reach*: the badge and the Project block are the directory's repo's, as
+        # `ao new`'s are, from the same function — there is no Project picker (TD-722). A one-repo
+        # project adds no block, and a directory in no known checkout carries neither.
+        project, block = await asyncio.to_thread(
+            lambda: teams.reach_block(org_here()[0], dir.strip() or os.getcwd(), away or host_name())
+        )
+        if block and adapter != "shell":
+            text = block + text if text else block
+            made_from = repoconfig.prefixed(made_from, block)
         s = await call(
             "create",
             name=name.strip() or "session",
@@ -2097,7 +2087,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             **({"prompt_from": made_from} if made_from else {}),
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
-            project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)
+            project=project,  # a badge (§9 invariant 9): the directory's repo's project, as `ao new` sets it
             team=team.strip(),  # the badge and the group, as `ao new --team` sets it (§4.9)
             **stop_fields(until, unattended == "on"),
             **start_fields(at, unattended == "on"),

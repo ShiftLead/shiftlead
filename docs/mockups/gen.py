@@ -933,7 +933,7 @@ def focus_orchestrator():
 def new_session():
     """The shipped form (`src/shiftlead/ui/templates/new.html`), field for field: TD-277's design
     (2026-10-02), built by TD-284. The form read as one thing, in the order a person starts a
-    session — who (Name, Host, Role, Profile), where (Team, Project, Repo, the worktree-first
+    session — who (Name, Host, Role, Profile), where (Team, Repo, the worktree-first
     Where), the job (Lane, Until and At under an unattended role, the prompt), who may act on it.
     No Adapter field (the profile names its tool; *shell* closes the Profile list), no Unattended
     switch (a role runs unattended; *Interactive* is the Role pick's first choice), no Directory
@@ -950,9 +950,8 @@ def new_session():
     <div class="field"><label>Role</label><span class="input">grinder · unattended<span class="muted">▾</span></span><span class="note">first choice: <b>Interactive</b> (no role, yours). A role fills the brief, lane and grants and <b>runs unattended</b> — <span {lk}>run it under me instead</span></span></div>
     <div class="field"><label>Profile</label><span class="input">the role's: claude-code · paul (max) · opus<span class="muted">▾</span></span><span class="note">tool · account · model the session starts with — from <span class="mono">profiles.yml</span> · <span {lk}>Open file</span>; the list ends with <i>shell (no agent)</i></span></div>
     <div class="field"><label>Team</label><span class="input">ao-grind<span class="muted">▾</span></span><span class="note">optional: brings its repo and host, its manager as a controller, and its reader: <b>held PRs read by techlead-ao-1</b></span></div>
-    <div class="field"><label>Project</label><span class="input" style="color: #9ca3af;">none<span class="muted">▾</span></span><span class="note">optional: narrows Repo to its repos — from <span class="mono">org.yml</span> <span class="mono">projects:</span> · <span {lk}>Open file</span></span></div>
   </div>
-  <div class="field"><label>Repo</label><span class="input">shiftlead <span class="mono muted" style="margin-left: 8px;">/home/kmaster/shiftlead</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">a registered checkout on kmaster. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo</span></div>
+  <div class="field"><label>Repo</label><span class="input">shiftlead <span class="mono muted" style="margin-left: 8px;">/home/kmaster/shiftlead</span><span style="flex-grow: 1;"></span><span class="muted">▾</span></span><span class="note">a registered checkout on kmaster. The list ends with <i>another directory…</i> — a typed path, for a shell or a directory outside any repo</span><span class="note">the session's project is its repo's heading — from <span class="mono">org.yml</span> <span class="mono">projects:</span> · <span {lk}>Open file</span></span></div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div class="radio on"><span class="rb"></span><div><div>Worktree <span class="mono">td-302</span> · new</div><div class="note"><span class="mono">.claude/worktrees/td-302</span> on branch <span class="mono">td-302</span>, from origin's default branch</div>

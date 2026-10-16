@@ -630,21 +630,25 @@ def test_every_subcommand_takes_a_bare_name(subprocess_agent, tmp_path, capsys, 
 
 
 def test_ao_new_team_and_project_badges(subprocess_agent, tmp_path, capsys):
-    """TD-040 step (b), design §4.9: `ao new --team --project` pass two plain strings through to
-    the record; `status --json` carries them and `status -v` prints one line each when set."""
-    argv = ["--json", "new", "g", "-a", "shell", "-d", str(tmp_path), "--team", "ao-grind", "--project", "shiftlead"]
+    """TD-040 step (b), design §4.9: `ao new --team` passes a plain string through to the record;
+    `status --json` carries it and `status -v` prints one line each when set. There is no
+    `--project` (TD-722): the badge is the directory's repo's, and `tmp_path` is in no repo."""
+    with pytest.raises(SystemExit):
+        cli.main(["new", "p", "-a", "shell", "-d", str(tmp_path), "--project", "shiftlead"])  # an unknown flag
+    capsys.readouterr()
+    argv = ["--json", "new", "g", "-a", "shell", "-d", str(tmp_path), "--team", "ao-grind"]
     assert cli.main(argv) == 0
     s = json.loads(capsys.readouterr().out)
-    assert (s["team"], s["project"]) == ("ao-grind", "shiftlead")
+    assert (s["team"], s["project"]) == ("ao-grind", "")
     assert cli.main(["--json", "shell", "-d", str(tmp_path)]) == 0  # `ao shell` has no flags: empty badges
     sh = json.loads(capsys.readouterr().out)
     assert (sh["team"], sh["project"]) == ("", "")
     assert cli.main(["--json", "status"]) == 0
     by_id = {r["id"]: r for r in json.loads(capsys.readouterr().out)}
-    assert (by_id[s["id"]]["team"], by_id[s["id"]]["project"]) == ("ao-grind", "shiftlead")
+    assert (by_id[s["id"]]["team"], by_id[s["id"]]["project"]) == ("ao-grind", "")
     assert cli.main(["status", "-v"]) == 0
     shown = capsys.readouterr().out
-    assert "team:   ao-grind" in shown and "project: shiftlead" in shown
+    assert "team:   ao-grind" in shown and "project:" not in shown
     assert shown.count("team:") == 1  # the shell session shows neither line
     for sid in (s["id"], sh["id"]):
         call_sync("kill", id=sid)

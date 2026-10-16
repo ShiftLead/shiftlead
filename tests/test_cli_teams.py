@@ -1,4 +1,4 @@
-"""`ao team start|stop|status|list`, `ao new --project` and the role `profile` precedence (design
+"""`ao team start|stop|status|list`, `ao new`'s project badge and the role `profile` precedence (design
 §4.9, TD-040 step c), with the RPC mocked as `test_cli_roles.py` does — no tmux, no real session.
 What the agent does with `create` is tested against the agent elsewhere."""
 
@@ -1026,7 +1026,7 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     assert "ao-shiftlead-me" not in closes() and sorted(closes()) == sorted(f"ao-shiftlead-{n}" for n in names)
 
 
-# ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────
+# ── the profile precedence chain, and `ao new`'s project badge ──────────────────────────────────────
 
 
 def test_profile_precedence_built_in_org_repo_member_flag(world):
@@ -1071,24 +1071,33 @@ def test_ao_new_and_ao_roles_read_the_org_overlay_too(world, capsys):
     assert "profile: repo-grind" in capsys.readouterr().out
 
 
-def test_ao_new_project_adds_the_reach_block_and_the_badge(world, capsys):
+def test_ao_new_takes_the_badge_and_the_reach_block_from_its_directorys_repo(world, capsys, monkeypatch):
+    """§4.9 *Home and reach* (TD-722): a hand-started session in a registered repo carries its repo's
+    project badge and, where the project has more than one repo, its Project block — read from the
+    directory, as a team session's are from its team's repo. There is no `--project`."""
     tmp_path, state = world
     write_org(tmp_path, org_doc(tmp_path, two_repos=True))
-    assert cli.main(["new", "solo", "--project", "ao", "--role", "hunter"]) == 0
+    assert cli.main(["new", "solo", "--role", "hunter"]) == 0
     p = creates(state)[0]
     assert p["project"] == "ao" and p["prompt"].startswith("## Project: ao")
     assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your repo" in p["prompt"]  # started in that checkout
     assert "## Area: free" in p["prompt"]
     state["calls"].clear()
-    # an undefined project is still a badge (step b landed it as a plain string): one line, no block
-    assert cli.main(["new", "x", "--project", "nope"]) == 0
-    assert "not defined in" in capsys.readouterr().err
-    assert creates(state)[0]["project"] == "nope" and "## Project" not in (creates(state)[0]["prompt"] or "")
-    state["calls"].clear()
     # a one-repo project has no reach to describe: the badge is set and the brief is untouched
     write_org(tmp_path, org_doc(tmp_path))
-    assert cli.main(["new", "y", "--project", "ao", "--role", "hunter"]) == 0
+    assert cli.main(["new", "y", "--role", "hunter"]) == 0
     assert creates(state)[0]["project"] == "ao" and "## Project" not in creates(state)[0]["prompt"]
+    state["calls"].clear()
+    # a repo no project lists badges with its own name; a directory in no checkout carries neither
+    write_org(tmp_path, {**org_doc(tmp_path), "projects": {}})
+    assert cli.main(["new", "z", "--role", "hunter"]) == 0
+    assert creates(state)[0]["project"] == "shiftlead"
+    state["calls"].clear()
+    (tmp_path / "loose").mkdir()
+    assert cli.main(["new", "w", "-d", str(tmp_path / "loose")]) == 0
+    assert creates(state)[0]["project"] == ""
+    with pytest.raises(SystemExit):
+        cli.main(["new", "v", "--project", "ao"])  # an unknown flag
 
 
 # ── TD-042: a brief describes the job, not the run ────────────────────────────────────────────

@@ -2053,13 +2053,13 @@ def test_restart_from_the_page_is_the_rpc_and_its_refusal_is_the_toast(client, s
 
 def test_the_new_session_form_asks_in_the_order_a_person_starts_a_session(client, tmp_path):
     """§4.5a New session **the reworked form** (TD-277; TD-284 slice 1): Name and Host first, then
-    Role and Profile, Team and Project, the directory, Where, Lane, At and Until, the opening prompt,
+    Role and Profile, Team, the directory, Where, Lane, At and Until, the opening prompt,
     Controllers, and Grants and the Resume id under a folded **More ▸** that opens when a Resume id
     is set; the fixed *One agent session per directory* block is gone, an occupied checkout being the
     Where choice's pill."""
     page = client.get("/new").text
     labels = ["<label>Name</label>", "<label>Host</label>", "<label>Role</label>", "<label>Profile</label>",
-              "<label>Team</label>", "<label>Project</label>", "<label>Repo</label>", "<label>Where</label>",
+              "<label>Team</label>", "<label>Repo</label>", "<label>Where</label>",
               "<label>Lane</label>", "<label>At (optional)</label>", "<label>Until (optional)</label>",
               "<label>Opening prompt (optional)</label>", "<label>Controllers</label>", "<summary>More ▸",
               "<label>Grants</label>", "<label>Resume (optional)</label>"]  # fmt: skip
@@ -2073,7 +2073,7 @@ def test_the_new_session_form_asks_in_the_order_a_person_starts_a_session(client
 def test_profile_is_the_one_tool_pick(client, tmp_path):
     """§4.5a New session **the reworked form** (TD-284 slice 2): no Adapter field — every profile
     names its adapter and the two could disagree — the Profile list ending with *shell (no agent)*,
-    and each of Host, Project and Profile naming its file; a shell picked there starts a shell."""
+    and each of Host, the repo's project and Profile naming its file; a shell picked there starts a shell."""
     from shiftlead.ui.app import SHELL_PICK
 
     page = client.get("/new").text
