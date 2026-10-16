@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from sessionorc import adapters, ledger
+from sessionorc import adapters, held, ledger
 from sessionorc import ledgerboard as lb
 from sessionorc.models import PR_CLOSED, FindingEntry, ProgressEntry, normalize_ref
 
@@ -696,6 +696,36 @@ def _sync_flag(directory: Path | str, p: dict[str, Any], was: dict[str, Any], ti
         p["sync"], p["sync_head"] = was["sync"], was.get("sync_head")
 
 
+def _held_flags(
+    directory: Path | str,
+    prs: list[dict[str, Any]],
+    olds: dict[Any, dict[str, Any]],
+    key: list[str] | None,
+    timeout: float,
+) -> None:
+    """Sets `held` on the open PRs (design §4.4 *A held PR nobody asked is marked, never ordered*,
+    TD-789): the changed files `key`'s globs name (`held.match`), with `held_head` and `held_key`, the
+    head and the key they were read at — carried from `olds` as `sync_head` is, and read again for a
+    changed head or key. A sync PR is never read; a draft is. At most `held.HELD_READS` reads, of
+    the rows never read or read at another head or key, oldest first. A read that failed keeps the
+    last word, and a PR never read carries no `held`. No key (None, or empty): nothing is read, and
+    the last word is kept, so a repo whose readers are gone keeps its key and its `held`."""
+    todo = []
+    for p in prs:
+        if p.get("sync"):
+            continue
+        was = olds.get(p["number"]) or {}
+        if isinstance(was.get("held"), list):
+            p["held"], p["held_head"], p["held_key"] = was["held"], was.get("held_head"), was.get("held_key")
+        if key and p["head"] and (p.get("held_head"), p.get("held_key")) != (p["head"], key):
+            todo.append(p)
+    todo.sort(key=lambda p: p["created"] or "")
+    for p in todo[: held.HELD_READS]:
+        files = pr_files(directory, p["number"], timeout)
+        if not isinstance(files, str):
+            p["held"], p["held_head"], p["held_key"] = held.match(files, key or []), p["head"], list(key or [])
+
+
 def _gh_counts(directory: Path | str, now: datetime, timeout: float) -> dict[str, dict[str, int]] | str:
     """Each window's PRs *opened* (`created` in it) and *closed* (`closed` in it, a merge being one)
     as GitHub counts them — `issueCount` of one search per window and word, six in one GraphQL
@@ -740,6 +770,7 @@ def pr_reading(
     limit: int = 1000,
     timeout: float = 30.0,
     old: dict[str, Any] | None = None,
+    held: list[str] | None = None,
 ) -> dict[str, Any]:
     """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): three
     `gh` reads — the open PRs, every PR updated in the longest window, and the windows' counts — kept as `open` (oldest
@@ -756,7 +787,9 @@ def pr_reading(
     (`_sync_flag`), and for one `sync_since`, the first reading that saw it open, kept as `red_since`
     is (TD-684). In a repo whose `origin` is GitHub, a red PR whose failing items all are Actions jobs
     that never started reads `checks: not_run` with `not_run: {reason, kind, runs}`, and every red one
-    keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686)."""
+    keeps its jobs' verdicts as `jobs` (`classify_failing`, TD-686). `held` is the repo's held key
+    (`held.repo_key`): each open PR but a sync PR carries `held`, the paths of it the key names, read
+    once per head and key (`_held_flags`, TD-789)."""
     if not Path(directory).is_dir():
         return {"error": f"{directory} is not a directory here"}
     since = now - PR_WINDOWS["month"]
@@ -790,6 +823,7 @@ def pr_reading(
             # one waiting on CI that never started counts from the reading it conflicts (TD-686)
             waits = p["checks"] == "not_run" and not p["conflicting"]
             p["sync_since"] = (not waits and was.get("sync_since")) or now.isoformat()
+    _held_flags(directory, open_, olds, held, timeout)
     day = since.date().isoformat()
     prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
     if isinstance(prs, str):

@@ -68,7 +68,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-787 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Designed — built by TD-789, TD-790 |
-| TD-789 | Build TD-787 (1): the reading marks a held PR — `held.repo_key`, `pr_reading`'s per-head `held` read under `HELD_READS`, `pr_orders.asked` from the review seats' and the person's mail | Medium | Open |
 | TD-790 | Build TD-787 (2): *unasked* shown — the Repo page's tag and *i* panel, `ao repo`'s line and `--json`, `ao pr held`'s *the repo holds* line | Medium | Open |
 | TD-791 | Nothing asserts the remedy line of `ao org check`'s two-team lack: the left-out names can be dropped from `orgcheck.team_lacks`' `Team = …` suggestion and every test passes | Low | Open |
 | TD-792 | No test holds Claude Code's `permission_channel = True`: the conformance suite checks only that the value is a bool, so flipping it to False passes | Low | Open |
@@ -1400,31 +1399,6 @@ The other cases:
 **Related:** TD-658 (an ask refused until the PR is green), TD-745 (a draft is no order), TD-652 (a red PR's holders), TD-613 (a red PR nobody holds), TD-684 (the reading's sync read, the per-head cache), TD-686 (*CI never ran*), #1842.
 
 ---
-## TD-789: Build TD-787 (1): the reading marks a held PR — `held.repo_key`, `pr_reading`'s per-head `held` read under `HELD_READS`, `pr_orders.asked` from the review seats' and the person's mail
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (TD-787's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *A held PR nobody asked is marked, never ordered*; `src/sessionorc/held.py` (new `match`, which `held_paths` calls; new `repo_key`; `HELD_READS`), `src/sessionorc/reports.py` (`pr_reading`'s new `held=`, `pr_files`, `_sync_flag` as the model for carrying from `old`), `src/sessionorc/ledger.py` (`ledger_path`, the direct `.shiftlead.yml` read to copy), `src/sessionorc/agent_tick.py` (where `pr_reading` is called; `_red_prs`, its `pr_orders` and save comparison; the stale *never reads `.shiftlead.yml`* comment; `by_remote` ~L3208), `src/sessionorc/store.py` (`RepoStore`); tests beside `tests/test_held.py` and the reading's tests
-
-**Why:** TD-787: a green held PR nobody asked read the same blank as one outside `held:` (#1842, 17 hours). This is the reading's half: the marks the Repo page and `ao repo` draw (TD-790).
-
-**Fix:** as design §4.4 says, bullet by bullet:
-- **The key**: `held.repo_key(root, records)` — the repo's `held:` from `.shiftlead.yml` (a list, or named sets' union), else the union of `review_links` globs on live records whose `repo` is the root; sorted; empty for neither. The tick passes it to `pr_reading` as `held=`.
-- **The held read**: per open PR that is not a sync PR (a draft included), the changed files once per head and per key; the row's `held`, `held_head`, `held_key`, carried from `old`; `held.match(files, globs)`; at most `HELD_READS` (5) a pass, unread or stale rows first, oldest first; a failed read keeps the last word, an unread PR carries no `held`.
-- **The key's scope**: live is §6 *Balance*'s (not `exited`/`closed`, no `superseded_by`); `_read_repos` takes `{root: key}`, computed by the tick from its graph before the read; roots grouped by their reading's `remote`, each remote's union passed to every root of it (`by_remote`); on a first pass, with no `remote` read yet, a second checkout takes the first's reading at the first's key and the union re-reads it next pass.
-- **Asked**: `_red_prs` keeps `pr_orders.asked: {n: {at, to}}` — the first `ask` carrying `pr` in the record mail of every seat `review.standing` reads (techlead records and any record with a `seat`, auditors included) and in `person_inbox`; `to` the addressee it was found under; counted for every checkout of the sender's record's repo's `remote`; a sender with no record, or whose record's `repo` is no registered root (a node's session): every registered repo the seat's team's live records name, in `person_inbox` every repo of the sender's `team` stamp, else every repo; pruned when the PR closes, in the save comparison; nothing seeded.
-- **`unasked`**: `_red_prs` writes `pr_orders.unasked: [n, …]` — `held` non-empty, no `asked`, not a draft, not a sync PR, not conflicting, `checks` *green* or *none*, and a live record of the remote carrying a `review` — in its save comparison; the rows keep only `held`, `held_head`, `held_key`.
-
-**Done when** tests hold: the key from `held:` (a list and named sets) and its fallback to the live records' `review`, an empty key reading nothing; `held`/`held_head`/`held_key` carried through `old`, a changed key re-reading at the same head, a draft read, a failed read keeping the last word, the `HELD_READS` cap and its order; `asked` from a seat's mail and from `person_inbox`, kept past the mail's prune and across a `RepoStore` reload, pruned on close; an ask for #12 from a session of repo A leaving repo B's #12 unasked, and the person's ask counting for each repo of the seat's team; a wound-down repo keeping its `held` and listing nothing unasked, its key unchanged; an exited or superseded record's `review` not counted; an ask of an auditor seat counting as asked; an ask from a forgotten sender, one from a node's session, and one in `person_inbox` with and without a `team` stamp; two checkouts of one remote at the union of keys; `pr_orders.unasked`'s precedence (draft, sync, conflicting, red, pending, *not run*), kept across a re-read of the rows.
-
-**Related:** TD-787, TD-790, TD-684 (the per-head sync read), TD-613 (`pr_orders`).
-
----
-
 ## TD-790: Build TD-787 (2): *unasked* shown — the Repo page's tag and *i* panel, `ao repo`'s line and `--json`, `ao pr held`'s *the repo holds* line
 
 **Priority:** Medium
