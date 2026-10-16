@@ -68,7 +68,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
-| TD-755 | Two behaviours of TD-736 (#1873) are held by no test: a held entry a decided line names stays a held row, not a *for you* one, and the held row's footer reads *held in … ledger* | Low | Open |
 
 ---
 
@@ -932,9 +931,6 @@ with the retired brief).
 
 ---
 
-
----
-
 ## TD-685: Build TD-681 (2): §6 *Sync* — the home's sync check (the replay with `post_sync`), its review evidence, the gate and the merge; the Repos card's **sync** switch
 
 **Priority:** Medium
@@ -1380,23 +1376,3 @@ The other cases:
 **Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
 
 **Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
-
----
-
-## TD-755: TD-736's held row for an entry a decided line names, and its footer text, are held by no test (#1873)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (test-audit-ao-1, auditing #1873)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `for_you = … and e.get("id") not in decided`; the `held in {{ e.name }}'s ledger` footer in `src/shiftlead/ui/templates/inbox_row.html`); `tests/test_ui_inbox_ledger.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1873's lines one at a time and running `tests/test_ui_inbox_ledger.py tests/test_settle_pages.py tests/test_ledger_derived.py tests/test_repo_facts.py` (main's venv, `PYTHONPATH=$PWD/src`). Eleven mutations fail a test. Two pass all of them: (1) `for_you = e.get("for_page") == "for-you" and e.get("id") not in decided` reduced to `e.get("for_page") == "for-you"`: the docstring says a held entry is a row "here for its hold" when it is not *for you*, so a held *for you* entry that an open decided line names must draw as a *ledger · held* row without answers, and with the mutation it draws the answers row; no test holds a decided entry. (2) the held row's footer `held in {{ e.name }}'s ledger — no lane takes it until you release it` replaced by `x`: the test asserts the badge, *claimed by*, **Release** and **Open**, never the footer.
-
-**Fix:** in `tests/test_ui_inbox_ledger.py`, (1) an entry with `for_page` *for-you*, `held` set and its id in the repo's decided refs: one row, `kind` *ledger · held*, `answers` `[]`, `release` true; (2) assert the footer's words in the existing held-row test. Each fails under its mutation above.
-
-**Done when** the two assertions exist and fail under those mutations.
-
-**Related:** TD-736, #1873.

@@ -13484,3 +13484,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-746, #1880.
 
 **Resolved:** 2026-10-15 — `tests/test_ui_repos_omit.py`'s `PAGES` holds `/focus/<sid>` (`REPOS_OMIT_PAGE`) and `/inbox/<mid>` (`REPOS_OMIT_INBOX`), the fake answering `seen` with a whole record; each fails with its route's `repos_omit` call deleted (checked by hand, the rest passing).
+
+## TD-755: TD-736's held row for an entry a decided line names, and its footer text, are held by no test (#1873)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1873)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `for_you = … and e.get("id") not in decided`; the `held in {{ e.name }}'s ledger` footer in `src/shiftlead/ui/templates/inbox_row.html`); `tests/test_ui_inbox_ledger.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1873's lines one at a time and running `tests/test_ui_inbox_ledger.py tests/test_settle_pages.py tests/test_ledger_derived.py tests/test_repo_facts.py` (main's venv, `PYTHONPATH=$PWD/src`). Eleven mutations fail a test. Two pass all of them: (1) `for_you = e.get("for_page") == "for-you" and e.get("id") not in decided` reduced to `e.get("for_page") == "for-you"`: the docstring says a held entry is a row "here for its hold" when it is not *for you*, so a held *for you* entry that an open decided line names must draw as a *ledger · held* row without answers, and with the mutation it draws the answers row; no test holds a decided entry. (2) the held row's footer `held in {{ e.name }}'s ledger — no lane takes it until you release it` replaced by `x`: the test asserts the badge, *claimed by*, **Release** and **Open**, never the footer.
+
+**Fix:** in `tests/test_ui_inbox_ledger.py`, (1) an entry with `for_page` *for-you*, `held` set and its id in the repo's decided refs: one row, `kind` *ledger · held*, `answers` `[]`, `release` true; (2) assert the footer's words in the existing held-row test. Each fails under its mutation above.
+
+**Done when** the two assertions exist and fail under those mutations.
+
+**Related:** TD-736, #1873.
+
+**Resolved:** 2026-10-16 — `tests/test_ui_inbox_ledger.py`: `test_a_held_for_you_entry_an_open_decided_line_names_is_its_held_row` holds a held *for you* entry that an open decided line names as one *ledger · held* row, no answers, **Release**; the held-row test asserts the footer *held in agentorc's ledger — no lane takes it until you release it*. Each fails under its mutation (the `not in decided` dropped; the footer replaced by `x`).
