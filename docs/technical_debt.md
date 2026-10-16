@@ -70,7 +70,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
-| TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-769 | Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs | Medium | Open |
 | TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
@@ -1454,27 +1453,6 @@ The other cases:
 **Done when** no `anchor.md` is left, the grinder brief carries the live-copy rule, no brief tells an agent to file `Owner: anchor`, and the brief tests pass.
 
 **Related:** TD-757, TD-722.
-
----
-
-## TD-761: Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-15, the designer): §4.2 *Working on its own* — a background shell is read from the process tree by the adapter's `background` (Claude Code: the `claude` process's `shell-snapshots` command-wrapper children, `cmd` the wrapper's first child), into the record's `shells` and `shells_at` on the tick, with no reset or bound needed since a reading is of what is there now; the pill reads *working · 1 shell*, Ready to close gains *no background shells running* (so *ready to close ✓* and **Close session** wait), and `shells_live` (within `SHELL_WAIT`, two hours) holds §6 rules 3, 4 and 9 as a live subagent does. Built by TD-766 (the read and the rules) and TD-767 (the pages).
-**Blocked by:** TD-766, TD-767
-**Location:** design §2 goal 11 (`docs/design/2-goals.md`); §4.2 *Working on its own* (`docs/design/4.2-state-feed.md`, *A background shell task … fires no hook and is not read*); `src/shiftlead/ui/cards.py` (`ready_to_close`); the Claude Code adapter under `src/shiftlead/adapters/claude_code/`
-
-**Why:** 2026-10-15, 22:56 MDT. Paul's own session `ao-paul` ended its turn on a background Bash call (`sleep 20; timeout 1200 gh pr checks …`, *Running in the background*), waiting on CI before the cadence check and the merge. Claude Code's own footer read *1 shell still running* and *1 shell*. ShiftLead's pill read *IDLE*, the header read ***ready to close ✓***, and the Ready to close card passed all six rows (*agent not working (turn ended)*, tree clean, branch pushed, no subagents running, outcomes reported, mail read), with **Close session** offered. One press would have killed the CI wait and the merge after it. Goal 11 says the checklist includes *no subagents or background tasks running*, but §4.2 says a background shell task *fires no hook and is not read*. TD-734/TD-743 left it to an `ao doing` line, which the role briefs ask of unattended members. A person's own interactive session has no brief, and an `ao doing` line does not stop a Close anyway. The check is missing exactly on the sessions where Close is the next act offered (§4.5a *Close session*: the person's own session).
-
-**Fix:** a design round first, since §4.2 rejects reading it today. Options the round weighs: (1) the adapter counts background tasks from the hooks it already gets: a `PreToolUse`/`PostToolUse` of `Bash` with `run_in_background`, or `Monitor`, opens one, and the round finds what closes it (the tool's task-end notification, a `BashOutput`/`KillShell` result, the process ending), reset as the subagent count is (`subagents_reset`); (2) the host agent reads the agent process's descendants for a live shell that is not an MCP server or the tool's own helper; (3) a scraped read of the tool's footer (*n shell*), advisory as every scraped read is. Whatever reads it, Ready to close gains a row, *no background shells running*, that fails while one runs. The round also decides whether the pill and the slot draw it as *working* (as §4.2 does for subagents) and how the count is bounded, so a lost end never holds a session unready for good.
-
-**Done when** the design says how a background shell task is read and what Ready to close and the card do with it, its build entries are filed, and this entry's `Blocked by:` names them; a session idle on a background shell no longer reads *ready to close ✓*.
-
-**Related:** TD-734, TD-743 (subagents read, background shells left to `ao doing`), TD-079 (the checklist's outcome row).
 
 ---
 
