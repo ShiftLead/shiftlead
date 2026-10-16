@@ -41,6 +41,7 @@ from shiftlead import teamrun
 from . import render as rendermod
 from .cards import _clock, _first_line, alarm_note, alarm_to_view
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
+from .queue import item_home
 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
@@ -1807,6 +1808,7 @@ def inbox_sections(
     boards: Collection[dict[str, Any]] = (),
     handed: Collection[dict[str, Any]] = (),
     fleet: Collection[Mapping[str, Any]] = (),
+    cards: Mapping[str, tuple[str, str]] | None = None,
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -1856,7 +1858,13 @@ def inbox_sections(
     - **Answered for you** (§4.9b, TD-075 step 2) — the FYI the home files when a teammate answers
       a question from the record (a reply carrying `source`): it carries `answered`, and is here
       instead of in FYI, uncounted, newest first, so what was decided in the person's name is
-      never mixed in with the notes."""
+      never mixed in with the notes.
+
+    **Where a row is drawn** (§4.5 screen 6, TD-748, built by TD-771): with `cards`, the open Queue
+    cards' entries (`ui.queue.card_index`), every row is tagged `home: inbox|queue` with the `on_card` and
+    `on_row` it is drawn on and its `mentions` (`ui.queue.item_home`); a view rule, so the sections and the
+    counts are what they were, and `queue_n` is how many counted rows the Queue draws. Without `cards`
+    every row is `home: inbox`."""
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
@@ -1929,7 +1937,11 @@ def inbox_sections(
     # the Needs you board items past their `Due:` date — a civil date, so read in this host's calendar
     today = at.astimezone().date().isoformat()
     overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)
-    return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue}
+    for k, rows in out.items():
+        # a snoozed row stays the Inbox's: the Queue has no Snooze (§4.5 screen 12)
+        out[k] = [{**e, **item_home(e, cards if k != "snoozed" else None)} for e in rows]
+    queue_n = sum(1 for e in out["needs"] if e["home"] == "queue")
+    return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"]), "overdue_n": overdue, "queue_n": queue_n}
 
 
 # -- the rail (design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**; TD-129,
@@ -2071,7 +2083,8 @@ def rail_rows(
     (`none` for no team), its repo, coarse kind and find text. A board row carries its repo (`repo`,
     the pick's value, and `repo_label`, its words) and, as its teams, every team whose repo it is —
     `none` where no team works it — so a team pick narrows board rows to the team's repo (TD-722,
-    built by TD-741); every other row carries its one team and no repo. The snoozed list is in no count. `ahead` is
+    built by TD-741); every other row carries its one team and no repo. The snoozed list is in no count, and
+    a row the Queue draws (`home: queue`) is on no line here. `ahead` is
     the board's rows coming up (TD-220), in section `coming`, and `ledger` the ledger's *for you*
     rows (`ledger_rows`), in section `later`: both counted under *Later* (TD-565); the fold's rows
     (`unshown`) join only once it is opened, in the browser."""
@@ -2086,6 +2099,7 @@ def rail_rows(
         }
         for sec, rows in [*((s, sections.get(s) or ()) for s in RAIL_SECTIONS), ("coming", ahead), ("later", ledger)]
         for e in rows
+        if e.get("home") != "queue"  # drawn on its Queue card, not on this page (§4.5 screen 6 *Where a row is drawn*)
     ]
 
 

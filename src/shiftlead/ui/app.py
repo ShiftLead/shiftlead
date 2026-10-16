@@ -26,6 +26,7 @@ from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, WebSocket
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
+from markupsafe import Markup
 
 from sessionorc import gitinfo, hosts, mail, naming, paths
 from sessionorc import settle as settle_mod
@@ -352,7 +353,7 @@ from .pty_bridge import (
     scroll_argv,
     watch_clients,
 )
-from .queue import WINDOW_LABEL, WINDOW_WORD, queue_view
+from .queue import WINDOW_LABEL, WINDOW_WORD, attach, card_index, queue_view
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
     COMPLETED_WORD,  # noqa: F401
@@ -435,7 +436,7 @@ def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
 
 # design §4.5a Org top bar **Inbox** (TD-611): what `/api/person/inbox?counts=1` answers — the top
 # bar's numbers, the team headers' *answered for you* marks and the build chip, and nothing rendered
-INBOX_COUNTS = ("needs", "fyi_n", "overdue_n", "snoozed_n", "answered_marks", "build_chip", "agent_down")
+INBOX_COUNTS = ("needs", "fyi_n", "overdue_n", "snoozed_n", "queue_n", "answered_marks", "build_chip", "agent_down")
 # The counts with the host agent down: not zero — nothing is *known* to be waiting, which is not
 # *nothing is* — and the team headers and the rollup keep what they showed (TD-069, TD-178).
 COUNTS_DOWN: dict[str, Any] = {k: None for k in INBOX_COUNTS} | {"snoozed_n": 0, "agent_down": True}
@@ -473,6 +474,9 @@ def counts_of(sections: Mapping[str, Any], build: Any) -> dict[str, Any]:
         "fyi_n": sections["fyi_n"],
         "overdue_n": sections["overdue_n"],  # the Org rollup's *m overdue* (TD-178)
         "snoozed_n": len(sections["snoozed"]),
+        # the counted rows the Queue draws on their cards (§4.5 screen 6 *Where a row is drawn*, TD-771):
+        # while any is, the top bar's number links to the Queue's needs-you filter
+        "queue_n": sections.get("queue_n", 0),
         # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
         # time, and nothing it says — the browser counts those newer than it last opened the group
         # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
@@ -764,6 +768,15 @@ class Readings:
         self.needs_cache: dict[str, Any] = {"rows": []}
         self.waits_cache: dict[str, Any] = {"at": 0.0, "waits": None}
 
+    async def queue_cards(self) -> dict[str, tuple[str, str]]:
+        """The open Queue cards' entries (`ui.queue.card_index`), which say where an Inbox row is drawn
+        (§4.5 screen 6 *Where a row is drawn*, TD-771): empty from a home that serves no Queue, so every
+        row is the Inbox's, as before it."""
+        try:
+            return card_index(await self.call("queue", omit=["completed"]))
+        except Exception:  # an older home, a node's link down: the Inbox draws everything
+            return {}
+
     async def defs(self) -> orgmod.Org:
         """The team definitions, read at most once in `DEFS_TTL` seconds: the events stream
         re-renders every header on every delta — a definition edited by hand shows within that."""
@@ -1043,6 +1056,7 @@ class Readings:
             handed=got.get("handed") or (),
             boards=hz["due"] + hz["waiting"],
             fleet=fleet,
+            cards=await self.queue_cards(),
         )
         self.needs_cache["rows"] = sections["needs"]  # the Org's *asked you* lines, as the full read keeps it (TD-354)
         return counts_of(sections, build)
@@ -1243,6 +1257,7 @@ def create_app() -> FastAPI:
         board_view=board_view,
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
+        queue_cards=rd.queue_cards,  # where an Inbox row is drawn (§4.5 screen 6, TD-771)
         needs_cache=needs_cache,  # the Inbox's needs rows for the Org's *asked you* lines (TD-354)
         # the Inbox's counts, kept once and pushed (§4.4, TD-616); `LocalClient` read when it connects
         counts=CountsKeeper(counts_now, client=lambda: LocalClient(), omit=REPOS_OMIT_PAGE),
@@ -1273,7 +1288,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         repos_omit(REPOS_OMIT_PAGE)
         agent_down = False
         usage: dict[str, Any] = {}
-        person_needs = person_fyi = person_overdue = 0
+        person_needs = person_fyi = person_overdue = person_queue_n = 0
         info: dict[str, Any] | None = None
         entries: list[dict[str, Any]] = []
         handed: Any = ()
@@ -1341,8 +1356,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 boards=boards,
                 fleet=sessions,
                 handed=handed_rows(handed, {s.get("id"): s for s in sessions}, datetime.now(UTC)),
+                cards=await h.queue_cards(),
             )
             person_needs, person_fyi, person_overdue = secs["count"], secs["fyi_n"], secs["overdue_n"]
+            person_queue_n = secs["queue_n"]
             h.needs_cache["rows"] = secs["needs"]
         return templates.TemplateResponse(
             request,
@@ -1374,6 +1391,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
                 "person_needs": person_needs,
+                "person_queue_n": person_queue_n,
                 "person_overdue": person_overdue,
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
@@ -3098,8 +3116,31 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 agent_down = True
             else:
                 why = f"the home did not serve the Queue: {e.detail}"  # an older home: no `queue` RPC
+        fleet: list[dict[str, Any]] = []
+        mail: dict[str, Any] = {}
+        if got is not None:
+            # what is attached to a row (§4.5 screen 12, TD-771): the Inbox's own sections over the same
+            # reads, each `home: queue` row drawn under its row by the Inbox's own renderer
+            repos_omit(REPOS_OMIT_INBOX)
+            with contextlib.suppress(HTTPException):
+                fleet = await call("list")
+                inbox, states = await h.person_inbox(fleet), await h.person_states(fleet)
+                hz = with_standings((await h.board_view())[0], fleet)
+                sections = inbox_sections(
+                    inbox["entries"],
+                    states=states,
+                    trail=inbox.get("trail") or (),
+                    attention_snoozed=inbox.get("attention_snoozed"),
+                    handed=inbox.get("handed") or (),
+                    boards=hz["due"] + hz["waiting"],
+                    fleet=fleet,
+                    cards=card_index(got),
+                )
+                one = templates.get_template("queue_mail.html")
+                origin = page_origin(request)
+                mail = attach(sections, lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin)))
         ctx = {
-            "q": queue_view(got, datetime.now(UTC)),
+            "q": queue_view(got, datetime.now(UTC), mail),
             "labels": WINDOW_LABEL,
             "words": WINDOW_WORD,
             "why": why,
@@ -3107,9 +3148,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         }
         if request.query_params.get("part"):
             return templates.TemplateResponse(request, "queue_part.html", ctx)
-        fleet: list[dict[str, Any]] = []
         with contextlib.suppress(HTTPException):
-            fleet = [] if agent_down else await call("list")
+            fleet = fleet or ([] if agent_down else await call("list"))
         return templates.TemplateResponse(
             request,
             "queue.html",
@@ -3462,6 +3502,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # the *waiting on …* words
             boards=hz["due"] + hz["waiting"],
             fleet=fleet,
+            cards={} if agent_down else await h.queue_cards(),
         )
         picks = rail_picks(request.query_params)
         lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet)
@@ -3478,6 +3519,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "ledger": lf,
                 "board_choices": board_choices(),
                 "person_needs": sections["count"],
+                "person_queue_n": sections["queue_n"],
+                "on_queue": sections["queue_n"],
                 "person_fyi": sections["fyi_n"],
                 "host": host_name(),
                 "active": "Inbox",
@@ -3626,6 +3669,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         lf = await ledger_view(fleet)
         origin = page_origin(request)
         gz = gzip_ok(request)
+        cards = await h.queue_cards()
 
         def read() -> tuple[list[dict[str, Any]], bytes]:
             """Everything after the awaits, on a worker thread (TD-611 slice 2): the sections, the
@@ -3640,6 +3684,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 handed=got.get("handed") or (),
                 boards=hz["due"] + hz["waiting"],
                 fleet=fleet,
+                cards=cards,
             )
             got["board_note"] = board_note
             got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}

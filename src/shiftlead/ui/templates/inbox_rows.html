@@ -1,4 +1,5 @@
 {# One section's rows. The page renders each section with this template and so does the poll
    (`inbox_html`), so what a refresh puts back is exactly what the page was rendered with. Imported
-   with context so a row's text knows the page's `origin` (TD-138). #}
-{% import "inbox_row.html" as r with context %}{% set firsts = origin_firsts(rows) %}{% for e in rows %}{{ r.row(e, section, e.id in firsts) }}{% endfor %}
+   with context so a row's text knows the page's `origin` (TD-138). A row the Queue draws on its card
+   (`home: queue`, §4.5 screen 6 *Where a row is drawn*) is not drawn here. #}
+{% import "inbox_row.html" as r with context %}{% set firsts = origin_firsts(rows) %}{% for e in rows if e.home != 'queue' %}{{ r.row(e, section, e.id in firsts) }}{% endfor %}

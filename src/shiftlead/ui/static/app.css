@@ -835,6 +835,13 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qrow.stalled { border-left: 2px dashed var(--ended); }
 .qrow:target, .qhead:target { background: var(--alarm-bg); }
 .qbuilds .bstate { color: var(--muted); }
+/* the Inbox items on a row (TD-771): the Inbox's own rows, set in from the row's id, the top entry's in its header */
+.qmail { flex: 1 0 100%; padding: 4px 0 2px calc(6ch + 2.4em); cursor: auto; }
+.qrow .qmail { padding-left: 2ch; }
+.qmail > * { margin: 4px 0; }
+.qmention { font-style: italic; }
+.qmail details.more { display: none; }  /* every row's Snooze: the Queue has no Snooze (§4.5 screen 12) */
+.railqueue { display: block; padding: 2px 0 2px 1.6em; font-size: var(--t-small); }
 .qwhy { margin: 4px 0 8px; color: var(--needs-fg); }
 #debt .rlist + .qcards { margin-top: 8px; }
 /* The Queue page (design §4.5 screen 12, TD-771): the Inbox's centred column, its three groups a panel

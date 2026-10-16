@@ -62,8 +62,10 @@ def test_it_serves_the_org_with_fixture_sessions_and_leaves_nothing(tmp_path):
         assert sock.startswith("ao-look-")
         page = urllib.request.urlopen(url, timeout=20).read().decode()
         assert "look-shell-1" in page and "look-shell-2" in page and "look-shell-3" not in page
-        inbox = urllib.request.urlopen(url + "inbox", timeout=30).read().decode()
-        assert "A fixture act line." in inbox  # the fixture board, read by the reader the fixture repo carries
+        queue = urllib.request.urlopen(url + "queue", timeout=30).read().decode()
+        # the fixture board, read by the reader the fixture repo carries; its lines name TD-001, so they are
+        # drawn on that entry's Queue card (design §4.5 screen 6 *Where a row is drawn*, TD-771)
+        assert "A fixture act line." in queue
     finally:
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=30) == 0

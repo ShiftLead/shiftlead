@@ -32,7 +32,7 @@
 {%- endfor %}
 {%- endmacro %}
 
-{% macro rail_html(rail, picks, needs_title) -%}
+{% macro rail_html(rail, picks, needs_title, on_queue=0) -%}
 <aside class="rail" id="rail" aria-label="Filters">
   <button type="button" class="btn sm railclear" id="railclear"{% if not rail.filtered %} disabled{% endif %} title="clear every pick and the find">Clear filters</button>
   <div class="railfind">
@@ -43,6 +43,11 @@
     <div class="railh" id="railh-sec">Urgency</div>
     {%- for s in rail_sections %}
     {{ line('sec', s, rail_section_names[s], rail.sections[s], picks, rail.filtered, needs_title if s == 'needs' else '') }}
+    {%- if s == 'needs' %}
+    {#- the counted rows the Queue draws on their cards (§4.5 screen 6 *Where a row is drawn*, TD-771): the
+        top bar's number is this line and this one together, so the page never hides that the Queue holds some #}
+    <a class="railqueue meta" id="railqueue" href="/queue?filter=needs-you" title="questions about an entry on the Queue: drawn on its card there, and counted in the top bar's number"{% if not on_queue %} hidden{% endif %}>+ <span id="railqueuen">{{ on_queue }}</span> on the Queue</a>
+    {%- endif %}
     {%- endfor %}
   </div>
   <div class="railgroup" role="group" aria-labelledby="railh-team">
