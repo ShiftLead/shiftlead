@@ -13256,3 +13256,31 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-418, TD-428, TD-201, TD-271.
 
 **Resolved:** 2026-10-15 — archived with its last build, TD-743 (slices 1–2 by #1869, #1870; see its **Resolved:**).
+
+## TD-736: Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release**
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (the designer, building TD-731's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Blocked by:** TD-735
+**Location:** design §4.5 screen 6 (*The ledger's entries that wait on you*, *A held entry waits on the person too*), §4.5a *Repo page: Hold / Release on an entry* and *Inbox row: held entry*; `src/shiftlead/ui/repo.py` and `templates/repo_part.html` (the row's button), `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `ledger_rows`), the Inbox's ledger row template, `src/sessionorc/ledger.py` (`added`/`detail` on every open entry); `tests/test_settle_pages.py`, `tests/test_ui_inbox_ledger.py`
+
+**Why:** TD-731's design. With TD-735 a hold has no end but the person's Release, so the Repo page must offer Hold where a lane can take the entry, and a hold must be drawn where the person reads what waits on them, or a forgotten one holds the entry for good.
+
+**Fix:** blocked by TD-735, since a Hold on a settled row is refused until it lands. Its `ledger.py` bullet touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- The Repo page draws **Hold** at the end of every settled row of a `LANE_KINDS` kind (*pickable*, *design*, *live-check*) and every row drawn *held by <name>*. It draws none on *for you*, *blocked*, *evaluation* or *other* rows. The toast reads the reply's `told` (*TD-724 held · grinder-ao-2 told to drop it*).
+- The reading carries `added` and `detail` on every open entry (`ledger.entries`, ~L448, today only on *for you*), since `held` is marked after the parse; the repo facts grow by that much.
+- `ledger_for_you` gains held entries as rows of kind *ledger · held*, in the same groups and order. Each says *claimed by <name>* (not *held by*) while a claim stands, has its age from `held.at`, **Release** (`td_hold {repo, id, release: true}`) and **Open**, and no answers, **Reply** or **Start session**. A held *for you* entry stays one row, the *for you* row, with **Release** beside **Open**. The rail and the find box treat these rows as ledger rows. They are counted nowhere.
+- `ao td hold --json`'s help lists `{repo, id, held, settling, told, untold}` and leaves out `readers` (the techlead's nit on #1861); it adds it.
+- The **Hold** button's title in `repo_part.html` still says *until you release it or its text changes*; since TD-735 an edit no longer ends a hold, so it takes §4.4's words (*until you release it*).
+- The UI change is verified by its builder on a scratch home (§4.9b), with a screenshot of a held row on the Inbox and a **Hold** on a settled Repo page row.
+- Tests: the Hold button on each row kind as listed; a held row's kind, age and buttons; a held *for you* entry drawn once with Release; Release removes the row on the reply.
+
+**Resolved:** 2026-10-15 by #1873 — **Hold** on every settled `LANE_KINDS` row and every row drawn *held by <name>*, none on *for you*, *blocked*, *evaluation* or *other*; the toast reads `told`, `readers` and `untold`; `added` and `detail` on every open entry; held entries are *ledger · held* Inbox rows with **Release** and **Open** (a held *for you* entry one row with **Release**); `ao td hold --json` help lists `readers`. Checked on a scratch home (`docs/mockups/reviews/2026-10-15-td736-*.png`). TD-731 (the design) is the designer's to archive.
+
+**Done when** the two §4.5a rows draw as written and the tests above pass.
+
+**Related:** TD-707, TD-731, TD-735.
