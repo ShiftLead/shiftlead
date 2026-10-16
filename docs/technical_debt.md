@@ -76,6 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-762 | Build TD-730 (1): an entry's `Team:` read, `needs_team` marked and withheld, `lane_matches` by the record's team, the claim refusals, `ao repo`'s lines | Medium | Open |
 | TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
+| TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
 
 ---
 
@@ -1626,3 +1627,22 @@ The other cases:
 **Done when** the Repo page shows what needs a team and what is stale, Add entry's and `ao td add`'s team reaches the seat as `entry.team`, and every listed test passes.
 
 **Related:** TD-730, TD-762, TD-763, TD-740.
+
+
+## TD-765: A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1886)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_serve.py` (`_handle_conn`: `self._sub_omit.pop(writer, None)  # a subscribe again says its omit again`; `_send`: `self._sub_omit.pop(w, None)`); `tests/test_ui_repos_omit.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1886's (TD-754) lines one at a time and running `tests/test_ui_repos_omit.py tests/test_ui_counts.py tests/test_ui_fanout.py tests/test_ui_events_light.py tests/test_ui_events_paths.py` (47 pass unmutated; main's venv, `PYTHONPATH=$PWD/src`). Four mutations fail a test (the `_handle_conn` cleanup pop, `CountsKeeper`'s `omit=`, `fan_seed`'s memo omit, the client's `omit or None`). Two pass all 47: (1) the `_handle_conn` pop on a subscribe again deleted — the comment says *a subscribe again says its omit again*, so a connection that subscribes a second time with no `omit` must be sent `repos` events whole, and with the line gone it keeps the first subscribe's omit; no test subscribes twice on one connection. (2) the `_send` failure path's `self._sub_omit.pop(w, None)` deleted — a send that fails drops the subscriber, and its omit must go with it; no test fails a send.
+
+**Fix:** in `tests/test_ui_repos_omit.py`, (1) one connection that sends `subscribe` with an `omit` and then `subscribe` without: the second seed and the next `repos` event after it are whole; (2) a subscriber whose writer raises `ConnectionError` on `_send`: `agent._sub_omit` is empty after. Each fails under its mutation above.
+
+**Done when** the two tests exist and fail under those mutations.
+
+**Related:** TD-754, #1886.
