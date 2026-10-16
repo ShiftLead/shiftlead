@@ -70,6 +70,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
 | TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
+| TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
+| TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
 
 ---
 
@@ -1430,5 +1432,46 @@ The other cases:
 **Done when** `/inbox` at the live size renders its template in under ~70 ms on a scratch home, and the PR gives the split.
 
 **Related:** TD-739, TD-738, TD-746.
+
+---
+
+## TD-748: The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Agreed 2026-10-15 — [ADR 2026-10-15](decisions/2026-10-15-queue.md), reviewed by Fable (four rounds converged, final AGREE) and Sonnet (three rounds, READY). Next: a mockup drawn from the real ledger and inbox, reviewed with Paul; then the design round. The builds will wait on a dev-cadence entry (the rank file's format and order in ledgerboard, the `queue-edit` audit class), filed when the design names it.
+**Blocked by:** decision (paul) — the real-data mockup reviewed with Paul before the design text
+**Location:** `docs/decisions/2026-10-15-queue.md`; the design text it rewrites: §4.4 *Repo facts*, §4.5 screens 6 and 11 (4.5-ui.md:511–512, 1058), §4.5a a row per new control, §4.7 `ao rank` and `ao repo`, §4.8 *Choosing in a free-pick lane* (4.8-capabilities-roles.md:531–540), §4.10 (4.10-messages.md:719), the grinder and designer briefs
+
+**Why:** Paul, 2026-10-15: *what I really care about is — where is TD/feature X that I added recently (already done, being worked, waiting to be worked, needs me for something)*, and *I want to know that my teams are working, and working the things I think are important first (dependencies considered)*. The Inbox is per message and orders by `Due:` dates he finds arbitrary; picks go by High/Medium/Low (38 of 59 open entries are Medium) and nothing lets him say what comes next.
+
+**Fix:** the ADR, whole: a `/queue` page of cards (connected `Blocked by:` components, a shared non-design prerequisite its own card), each with its rows' states and its asks; groups Recently completed / In progress / Up next; the person drags cards, the rank written to `docs/technical_debt_rank.yml` one line per member by debounced tool PRs, every undragged entry ranked implicitly by Priority, Type and id; the rank is the pick order by convention; the Inbox draws only what names no TD. Slices: (1) ledgerboard rank file + order + `ao rank` + briefs; (2) the Repo page's cards; (3) the Queue page. A two-week trial from slice 3, read by passed-over flags, idle-while-work lines and the oldest unanswered TD ask.
+
+**Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
+
+**Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
+
+---
+
+## TD-749: The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, in an interactive session; TD-748's review)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — Paul decided 2026-10-15 to drop the split now, ahead of TD-748.
+**Location:** `docs/briefs/grinder-ao-1.md:15` (*Your half of the team*); `docs/briefs/grinder-ao-2.md` (its *Lane* heading and the split rule)
+
+**Why:** the doing log (`~/.shiftlead/doing.jsonl`) has seven lines since 2026-10-10 where a grinder declared out of work while the sibling's package had pickable builds (*the open grinder builds are all sessionorc (the sibling's)*), and grinders took Low entries past High and Medium ones because those were in the other half — the pass-over §4.8 *Choosing in a free-pick lane* says needs a reason, manufactured by the brief. Merge safety is `held:` review, not the split; a conflict between two grinders costs a rebase.
+
+**Fix:** remove the split from both briefs: each grinder picks the highest pickable unclaimed entry in its lane (priority, then the ledger's order) whatever package it touches; a claim names files a live sibling's claim also touches. Lanes by role and stage are unchanged.
+
+**Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
+
+**Related:** TD-108, TD-748.
 
 ---
