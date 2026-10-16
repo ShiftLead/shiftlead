@@ -69,7 +69,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
-| TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
 | TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
 | TD-754 | The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change | Low | Open |
 
@@ -1403,26 +1402,6 @@ The other cases:
 **Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
 
 **Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
-
----
-
-## TD-749: The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (Paul, in an interactive session; TD-748's review)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — Paul decided 2026-10-15 to drop the split now, ahead of TD-748.
-**Location:** `docs/briefs/grinder-ao-1.md:15` (*Your half of the team*); `docs/briefs/grinder-ao-2.md` (its *Lane* heading and the split rule)
-
-**Why:** the doing log (`~/.shiftlead/doing.jsonl`) since 2026-10-10 has two lines where a grinder declared out of work because the open builds were the sibling's package (2026-10-15 00:07Z *the open grinder builds are all sessionorc (the sibling's)*, 00:24Z *TD-687 and TD-690 are sessionorc-led (the sibling's)*), and five where a grinder picked an entry over a higher one in the other half (TD-428, TD-593, TD-616, TD-689, TD-691) — the pass-over §4.8 *Choosing in a free-pick lane* says needs a reason, manufactured by the brief. Merge safety is `held:` review, not the split; a conflict between two grinders costs a rebase.
-
-**Fix:** remove the split from both briefs: each grinder picks the highest pickable unclaimed entry in its lane (priority, then the ledger's order) whatever package it touches; a claim names files a live sibling's claim also touches. Lanes by role and stage are unchanged.
-
-**Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
-
-**Related:** TD-108, TD-748.
 
 ---
 

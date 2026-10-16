@@ -13367,3 +13367,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-736 (#1873, where it was seen).
 
 **Resolved:** 2026-10-15 — the cause was the fixture's live tick, not `_held_tried`. Only one test in the file parked the ticks. The first tick runs as the agent starts and launches `_refresh_repos` detached. Under load, that pass can land after `_member` has set `agent._repos["/repo"]`, a root no registry lists, and it drops the root as gone. `_held_pass` skips a member whose root the home holds no reading of. Landing after the second pass, it left the third with nothing to read: CI's `[]` for #860. A scratch test (not committed) reproduced it by running `_refresh_repos` between the passes. This is the same family as TD-695 and TD-753. `tests/test_held_missed.py` now overrides `agent` as `test_sync_pass.py` does: it parks the ticks and awaits the first tick's `_repos_task` and `_held_task`. The held pass reads with the real clock, so it could settle a PR unjudged; it is awaited as well. With the fixture no repos pass runs during a test, and the file passed 50 runs in a row beside a full `pdm run test`.
+
+## TD-749: The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, in an interactive session; TD-748's review)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/briefs/grinder-ao-1.md:15` (*Your half of the team*); `docs/briefs/grinder-ao-2.md` (its *Lane* heading and the split rule)
+
+**Why:** the doing log (`~/.shiftlead/doing.jsonl`) since 2026-10-10 has two lines where a grinder declared out of work because the open builds were the sibling's package (2026-10-15 00:07Z *the open grinder builds are all sessionorc (the sibling's)*, 00:24Z *TD-687 and TD-690 are sessionorc-led (the sibling's)*), and five where a grinder picked an entry over a higher one in the other half (TD-428, TD-593, TD-616, TD-689, TD-691) — the pass-over §4.8 *Choosing in a free-pick lane* says needs a reason, manufactured by the brief. Merge safety is `held:` review, not the split; a conflict between two grinders costs a rebase.
+
+**Fix:** remove the split from both briefs: each grinder picks the highest pickable unclaimed entry in its lane (priority, then the ledger's order) whatever package it touches; a claim names files a live sibling's claim also touches. Lanes by role and stage are unchanged.
+
+**Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
+
+**Related:** TD-108, TD-748.
+
+**Resolved:** 2026-10-15 — `docs/briefs/grinder-ao-1.md` (*One lane for both grinders* replaces *Your half of the team*) and `docs/briefs/grinder-ao-2.md` (*One lane, both packages* replaces the package lane): each grinder picks the highest pickable entry nobody holds whatever package it touches, and a claim names the files a live sibling's claim also touches; `grep -n "Your half" docs/briefs` finds nothing.
