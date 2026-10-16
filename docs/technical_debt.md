@@ -1456,7 +1456,6 @@ The other cases:
 
 ---
 
-
 ## TD-764: Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team`
 
 **Priority:** Medium
