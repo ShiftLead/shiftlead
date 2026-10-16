@@ -96,6 +96,8 @@ def test_the_linux_reader_reads_children_and_argv_and_falls_back_to_ppid(monkeyp
                 raise FileNotFoundError(path)
             return real(path, *a, **kw)
 
+        real_exists = os.path.exists
+        monkeypatch.setattr(os.path, "exists", lambda p: False if str(p).endswith("/children") else real_exists(p))
         monkeypatch.setattr(builtins, "open", no_children_file)
         assert child.pid in proc.children(os.getpid()), "a kernel without the file: read by ppid"
     finally:
@@ -215,7 +217,7 @@ async def test_the_tick_writes_an_idle_records_shells_and_keeps_them_otherwise(
         assert rec.shells[0]["pid"] == 8
         # every exit clears them
         await agent.rpc_hook(sid, state="exited", pending=None)
-        assert rec.shells == []
+        assert rec.shells == [] and rec.shells_at is None
         await person.call("kill", id=sid)
 
 

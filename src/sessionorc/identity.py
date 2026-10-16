@@ -126,15 +126,16 @@ class LinuxProc:
             tids = os.listdir(f"/proc/{int(pid)}/task")
         except (OSError, ValueError):
             return None
+        if not os.path.exists(f"/proc/{int(pid)}/task/{int(pid)}/children"):
+            # no such file on this kernel — or the process went under the read, which the scan says
+            return self._children_by_ppid(int(pid)) if self.stat(int(pid)) is not None else None
         found: set[int] = set()
-        try:
-            for tid in tids:
+        for tid in tids:
+            try:
                 with open(f"/proc/{int(pid)}/task/{tid}/children", encoding="ascii") as f:
                     found.update(int(x) for x in f.read().split())
-        except FileNotFoundError:
-            return self._children_by_ppid(int(pid))
-        except (OSError, ValueError):
-            pass  # a thread that ended under the read: what the others named stands
+            except (OSError, ValueError):
+                continue  # a thread that ended under the read: what the others named stands
         return sorted(found)
 
     def _children_by_ppid(self, pid: int) -> list[int]:

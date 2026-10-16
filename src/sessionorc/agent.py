@@ -592,6 +592,7 @@ class HostAgent(
         self._derived_at: dict[str, datetime] = {}
         self._model_checked: dict[str, datetime] = {}
         self._context_checked: dict[str, datetime] = {}  # the context reading's cadence (TD-190)
+        self._shells_saved: dict[str, datetime] = {}  # when a record's `shells_at` was last saved (TD-766)
         self._links_checked: dict[str, datetime] = {}  # the links read's cadence (TD-543)
         # the links read's byte cursor per record, with the tool session it is into (TD-543): in memory,
         # so a restart reads the transcript again from 0 and the merge drops what the record holds

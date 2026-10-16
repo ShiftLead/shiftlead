@@ -1444,7 +1444,7 @@ class Session:
             self.ended = None  # a run that came back has not ended
         else:
             self.subagents, self.subagent_at = 0, None  # no subagent outlives its process (§4.2, TD-734)
-            self.shells = []  # nor a shell task (§4.2 *A background shell task*, TD-766)
+            self.shells, self.shells_at = [], None  # nor a shell task (§4.2 *A background shell task*, TD-766)
 
     def report_progress(self, entry: ProgressEntry) -> bool:
         """Upsert a `progress` entry by reference, in place so the lane order the session declared

@@ -140,6 +140,11 @@ def _carry_live(reading: dict[str, Any], old: dict[str, Any]) -> None:
             e["live"] = was[str(e.get("id"))]
 
 
+# how often a record whose only change is `shells_at` is written to disk (§4.2 *A background shell task*,
+# TD-766): it moves every tick in memory, and a minute's lag on disk only matters across a restart
+SHELLS_SAVE_EVERY = timedelta(minutes=1)
+
+
 def _orders(r: dict[str, Any] | None) -> list[Any]:
     """A repo reading's work orders: the board's decided lines (TD-384), then its red PRs nobody holds
     (`pr_orders`, TD-613)."""
@@ -3506,7 +3511,8 @@ class TickMixin:
         whose adapter has `background` — read off the loop with the pane's pid. `shells` is written
         with `since` kept for a task (`pid`, `start`) seen before, and `shells_at` moves to `now` while
         one is within `SHELL_WAIT`, never back. Any other record, and a read that cannot tell (None),
-        keeps its last reading. The record is pushed when its list changes."""
+        keeps its last reading. The record is pushed when its list changes, and saved then, or once a
+        `SHELLS_SAVE_EVERY` while only `shells_at` moves."""
         due = []
         for s in self.sessions.values():
             pane = panes.get(s.id)
@@ -3526,8 +3532,14 @@ class TickMixin:
         changed = False
         at = now.isoformat()
         for (s, _, _), result in zip(due, results, strict=True):
+            if isinstance(result, BaseException):
+                log.warning("%s: the background-shell read failed: %r", s.id, result)
+                continue
             live = self.sessions.get(s.id)
-            if live is None or live.state != "idle" or not isinstance(result, list):
+            # read again after the thread: a turn, or a subagent's foreground call, may have begun under it
+            if live is None or live.state != "idle" or agent_common.subagents_live(live, now):
+                continue
+            if not isinstance(result, list):
                 continue
             was = {(sh.get("pid"), sh.get("start")): sh.get("since") for sh in live.shells if isinstance(sh, dict)}
             shells = [
@@ -3546,8 +3558,11 @@ class TickMixin:
                 live.shells_at, moved_at = at, True
             else:
                 moved_at = False
-            if moved or moved_at:
+            # `shells_at` moves every tick in memory; on disk once a `SHELLS_SAVE_EVERY` unless the list moved
+            last = self._shells_saved.get(s.id)
+            if moved or (moved_at and (last is None or now - last >= SHELLS_SAVE_EVERY)):
                 self.store.save(live)
+                self._shells_saved[s.id] = now
             changed = changed or moved
         if changed:
             await self._push_changes()
