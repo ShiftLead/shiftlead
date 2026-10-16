@@ -254,7 +254,7 @@ def test_neither_writes_a_file_or_calls_anything_that_changes_a_record(world, ca
     capsys.readouterr()
     after = {p: p.stat().st_mtime_ns for p in tmp_path.rglob("*") if p.is_file() and ".git" not in p.parts}
     assert after == before
-    assert set(calls) <= {"host_repos", "host_files", "host_dir"}  # reads, when anything is asked at all
+    assert set(calls) <= {"host_repos", "host_files", "host_dir", "repos"}  # reads, when anything is asked at all
 
 
 def test_a_place_on_a_host_whose_registry_cannot_be_asked_is_one_lack_not_two(world, capsys):
@@ -296,3 +296,48 @@ def test_a_repo_held_only_on_a_node_is_listed_and_warned_of_and_an_unread_regist
     assert cli.main(["org"]) == 0
     out = capsys.readouterr().out
     assert "note: devenv: its registry could not be read (" in out and "held only on" not in out
+
+
+def _reading(world, monkeypatch, led: dict) -> None:
+    """The home's `repos` reading of `alpha`, which `ao org check` reads the ledger's Team from (TD-763)."""
+    tmp_path = world[0]
+    base = cli.call_sync
+
+    def agent(method, **params):
+        if method == "repos":
+            return {str(tmp_path / "alpha"): {"name": "alpha", "ledger": led}}
+        return base(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", agent)
+
+
+def test_a_declared_name_no_definition_holds_is_lacking_and_names_its_entries(world, monkeypatch, capsys):
+    """§4.4 *A stale team*: alpha holds alpha-grind and span; `gone` is declared and defined nowhere."""
+    entries = [{"id": "TD-001", "team": "gone"}, {"id": "TD-002", "team": "span"}]
+    _reading(world, monkeypatch, {"declared_teams": ["alpha-grind", "span", "gone"], "entries": entries})
+    code, got = check(capsys)
+    assert code == 1 and len(got["lacks"]) == 1
+    assert got["lacks"][0].startswith(
+        "alpha: its ledger declares team gone, which no definition of the repo holds (TD-001 carry it)"
+    )
+
+
+@pytest.mark.parametrize("declared", [[], ["span"]])
+def test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking(world, monkeypatch, capsys, declared):
+    _reading(world, monkeypatch, {"declared_teams": declared, "entries": []})
+    code, got = check(capsys)
+    assert code == 1 and len(got["lacks"]) == 2 - len(declared)
+    assert any(
+        x.startswith("alpha: has 2 teams and its ledger's Fields: line does not declare alpha-grind")
+        for x in got["lacks"]
+    )
+
+
+def test_entries_that_need_a_team_where_no_team_has_a_techlead_seat_are_lacking(world, monkeypatch, capsys):
+    led = {"declared_teams": ["alpha-grind", "span"], "entries": [], "needs_team": ["TD-003"]}
+    _reading(world, monkeypatch, led)
+    code, got = check(capsys)
+    assert code == 1 and got["lacks"] == [
+        "alpha: TD-003 need a team, and no team of the repo has a techlead seat to tag them — tag them by PR, "
+        "or give a team a techlead (design §4.4 An entry names its team)"
+    ]

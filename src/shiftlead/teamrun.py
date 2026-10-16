@@ -131,6 +131,38 @@ def live(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [s for s in sessions if s["state"] not in DEAD]
 
 
+def tagging_seat(fleet: list[dict[str, Any]], root: Path, declared: list[str]) -> tuple[str, str]:
+    """Who tags the repo's entries that need a team (§4.4 *An untagged or unknown entry is handed to a
+    techlead*, TD-730), as the tick picks it: `(name, "")` for the seat it hands them to — among the
+    repo's records carrying `seat.tags` whose team is live, the first in `declared`'s order, a team it
+    leaves out after, by name — else `("", why)`, why nobody is, in `ao repo`'s words."""
+    order = [str(t).casefold() for t in declared]
+    mine = [
+        s
+        for s in fleet
+        if not s.get("superseded_by") and s.get("repo") and Path(s["repo"]).resolve() == root and s.get("seat")
+    ]
+    up = {s.get("team") for s in fleet if s.get("team") and s.get("unattended") and s.get("state") not in DEAD}
+
+    def first(seats: list[dict[str, Any]]) -> dict[str, Any]:
+        def key(s: dict[str, Any]) -> tuple[int, int, str]:
+            team = str(s.get("team") or "").casefold()
+            return (0, order.index(team), "") if team in order else (1, 0, team)
+
+        return min(seats, key=key)
+
+    tags = [s for s in mine if s["seat"].get("tags")]
+    live = [s for s in tags if s.get("team") in up and s.get("unattended") and not s.get("suspended")]
+    if live:
+        return str(first(live).get("name") or first(live)["id"]), ""
+    if tags:
+        return "", f"{first(tags).get('name') or first(tags)['id']}'s team is stopped"
+    techleads = [s for s in mine if s["seat"].get("trigger") == "asks" and s.get("team")]
+    if techleads:
+        return "", f"no techlead seat carries tags yet — the next Start of {first(techleads)['team']} writes it"
+    return "", "no techlead seat to tag them"
+
+
 def on_call(s: dict[str, Any]) -> bool:
     """A seat with nobody in it (§4.9b, §6 rule 3): a record carrying `seat` that is `exited` or
     `closed`. Its id and its grants survive the close, so whoever fills it is the controller a
@@ -478,6 +510,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # a seat on call, filled when a member needs a reading, or a standing session (§4.9, TD-247)
                 "on_call": t.manager.on_call,
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
+                # its start writes `seat.tags`: a candidate for the repo's tagging seat (§4.4, TD-730)
+                "techlead_tags": t.techlead is not None,
                 # the role Add entry's **Open a session** starts, per Type (§4.9, TD-219), each said
                 "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
@@ -635,6 +669,47 @@ def keep_mail_for(
     return keeps, notes
 
 
+def readings_via(call: Call) -> dict[str, Any]:
+    """The home's repo readings (the `repos` RPC), or {} where it cannot be asked: what `ao org check`
+    reads a ledger's `Team` declaration from (§4.4 *A stale team*, TD-730), as a start does."""
+    try:
+        got = call("repos")
+    except Exception:  # noqa: BLE001 — no reading says nothing, never a failed check
+        return {}
+    return got if isinstance(got, dict) else {}
+
+
+def undeclared(call: Call, org: orgmod.Org, plan: teams.Plan, host: str) -> str | None:
+    """Why a start is refused for a team its repo's ledger does not declare (§4.4 *The move from one
+    team to two*, TD-730), or None: where the definitions of the team's repo hold two or more teams
+    and the `declared_teams` of the home's reading (the `repos` RPC, so a start on another host reads
+    the home's checkout) leave this one out. A repo with no reading, or a ledger that did not parse,
+    passes, and `ao org check` names the lack once a reading exists."""
+    roots = list(dict.fromkeys(str(x.dir) for x in plan.launches))
+    try:
+        got = call("repos")
+        readings = got if isinstance(got, dict) else {}
+    except Exception:  # noqa: BLE001 — no reading passes, as a ledger that did not parse does
+        return None
+    for root in roots:
+        here = Path(root).resolve()
+        r = next((v for k, v in readings.items() if isinstance(v, dict) and Path(k).resolve() == here), {})
+        led = r.get("ledger") or {}
+        if "declared_teams" not in led or "error" in led:
+            continue
+        declared = [str(t) for t in led.get("declared_teams") or []]
+        defined = [t["team"] for t in teams.entry_teams(org, str(here), plan.host or host)]
+        if len(defined) < 2 or plan.team.casefold() in {t.casefold() for t in declared}:
+            continue
+        names = [*declared, *(t for t in defined if t.casefold() not in {d.casefold() for d in declared})]
+        return (
+            f"{plan.team}: {r.get('name') or root} has {len(defined)} teams and its ledger's Fields: line does "
+            f"not declare {plan.team} — add `Team = {' | '.join(names)}`, and a Team: line on each open entry "
+            "a lane takes, by PR (design §4.4 The move from one team to two)"
+        )
+    return None
+
+
 def start(
     call: Call, org: orgmod.Org, name: str, host: str, *, profile: str | None = None, caller: str | None = None
 ) -> tuple[teams.Plan, dict[str, Any]]:
@@ -656,6 +731,8 @@ def start(
     plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
+    if why := undeclared(call, org, plan, host):
+        raise teams.TeamError(why)
     on = {"host": plan.host} if plan.host else {}
     if plan.host:
         # Design §4.4a "Teams across hosts": *every checkout exists on the record's host*, asked of

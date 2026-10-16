@@ -187,10 +187,48 @@ def test_ao_repo_says_needs_a_team_and_json_carries_the_three_fields(git_repo, m
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert "1 pickable (db 1)" in out, "a marked entry is not counted pickable"
-    assert "  needs a team: TD-002, TD-003\n" in out
+    assert "  needs a team: TD-002, TD-003 — no techlead seat to tag them\n" in out
     assert "grinder needs a team" in next(line for line in out.splitlines() if " TD-002 " in line)
     assert "needs a team" not in next(line for line in out.splitlines() if " TD-001 " in line)
     assert cli.main(["--json", "repo"]) == 0
     r = json.loads(capsys.readouterr().out)[0]
     assert r["declared_teams"] == ["db", "ops"] and r["needs_team"] == ["TD-002", "TD-003"]
     assert [e["team"] for e in r["ledger"]["entries"]] == ["db", "", "qa"]
+
+
+@pytest.mark.parametrize(
+    ("seats", "said"),
+    [
+        ([("tl-ops", "ops", True, "idle"), ("tl-db", "db", True, "closed")], "handed to tl-db"),
+        ([("tl-ops", "ops", True, "closed")], "tl-ops's team is stopped"),
+        ([("tl-db", "db", False, "closed")], "no techlead seat carries tags yet — the next Start of db writes it"),
+        ([], "no techlead seat to tag them"),
+    ],
+)
+def test_ao_repo_names_the_tagging_seat_or_why_there_is_none(git_repo, monkeypatch, capsys, seats, said):
+    """§4.4 *Shown where it is read* (TD-763): the first declared live team's seat carrying `tags`."""
+    from shiftlead import cli
+
+    led = ledger.entries(_ledger(_entry(2)))
+    led_reading = {"entries": led, "by_kind": {}, "declared_teams": ["db", "ops"], "needs_team": ["TD-002"]}
+    reading = {str(git_repo): {"name": "r", "root": str(git_repo), "prs": {"open": []}, "ledger": led_reading}}
+    fleet = [
+        {
+            "id": n,
+            "name": n,
+            "state": st,
+            "repo": str(git_repo),
+            "team": team,
+            "unattended": True,
+            "seat": {"trigger": "asks", **({"tags": True} if tags else {})},
+        }
+        for n, team, tags, st in seats
+    ]
+    # a live grinder of db keeps db live; ops has nothing live but its seat, when that is idle
+    fleet.append({"id": "g", "name": "g", "state": "idle", "repo": str(git_repo), "team": "db", "unattended": True})
+    monkeypatch.setattr(
+        cli, "call_sync", lambda rpc, **kw: {"repos": reading, "list": fleet, "doing_log": {}, "inbox": {}}[rpc]
+    )
+    monkeypatch.chdir(git_repo)
+    assert cli.main(["repo"]) == 0
+    assert f"  needs a team: TD-002 — {said}\n" in capsys.readouterr().out

@@ -1650,7 +1650,7 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert all(p["supervised"] is True for p in made)  # every session a team start creates (§6, TD-103)
     # a seat says so on its record, with its trigger, so no crash restart acts on one (§6 rule 1)
     seats = {p["name"]: p.get("seat") for p in made}
-    assert seats["techlead-ao"] == {"trigger": "asks"}
+    assert seats["techlead-ao"] == {"trigger": "asks", "tags": True}
     assert seats["audit-ao"]["trigger"] == "every" and seats["audit-ao"]["after"]  # as the definition gives it
     assert seats["orc-ao"] == {"trigger": "team"}  # the manager, on call by default (§4.9 `on_call`, TD-259)
     assert all(seats[n] is None for n in ("grind-1", "grind-2", "hunt"))  # never sent unset
@@ -2333,3 +2333,44 @@ def test_a_start_counts_every_lane_it_creates_by_kind_the_managers_too(world, ca
     state["repos"] = {checkout: {"ledger": {"entries": []}}}
     picks = teamrun.lanes(call, cli._org_here(), "ao-grind", HOST)
     assert picks["line"] == "manager: 0 · grinder: 0 · hunter: 0" and picks["empty"] is True
+
+
+# ── a team its repo's ledger does not declare (§4.4 *The move from one team to two*, TD-763) ─────
+
+
+def _two_teams(tmp_path, state, declared):
+    doc = org_doc(tmp_path)
+    doc["teams"]["ops"] = {
+        "projects": ["ao"],
+        "manager": {"role": "person"},
+        "members": [{"role": "grinder", "name": "ops-grind", "lane": "free-pick", "home": "shiftlead"}],
+    }
+    write_org(tmp_path, doc)
+    if declared is not None:
+        led = {"entries": [], "declared_teams": declared}
+        state["repos"] = {str(tmp_path / "shiftlead"): {"name": "shiftlead", "ledger": led}}
+
+
+def test_a_start_is_refused_for_a_team_a_two_team_repos_ledger_does_not_declare(world, capsys):
+    tmp_path, state = world
+    _two_teams(tmp_path, state, ["ao-grind"])
+    assert cli.main(["team", "start", "ops", "--anyway"]) != 0
+    err = capsys.readouterr().err
+    assert "ops: shiftlead has 2 teams and its ledger's Fields: line does not declare ops" in err
+    assert "add `Team = ao-grind | ops`" in err
+    assert creates(state) == [], "refused before anything is created"
+
+
+@pytest.mark.parametrize("declared", [["ao-grind", "OPS"], None])
+def test_a_declared_team_or_a_repo_with_no_reading_starts(world, declared):
+    tmp_path, state = world
+    _two_teams(tmp_path, state, declared)
+    assert cli.main(["team", "start", "ops", "--anyway"]) == 0
+    assert [p["name"] for p in creates(state)] == ["ops-grind"]
+
+
+def test_a_one_team_repo_starts_with_nothing_declared(world):
+    tmp_path, state = world
+    state["repos"] = {str(tmp_path / "shiftlead"): {"name": "shiftlead", "ledger": {"declared_teams": []}}}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert creates(state)

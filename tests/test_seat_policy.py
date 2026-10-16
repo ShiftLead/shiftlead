@@ -303,3 +303,177 @@ async def test_rule_three_leaves_an_unsupervised_or_attended_seat_alone(agent, t
         for sid, rec in recs.items():
             assert agent.sessions[sid] is rec and rec.seat_due is None, sid
             await person.call("kill", id=sid)
+
+
+# -- the tagging seat (§4.4 *An entry names its team*, TD-730, TD-763) ------------------------------
+
+
+async def _tl(person, tmp_path, team: str, seat=None):
+    """A techlead seat of `team` as `ao team start` writes it: `{trigger: asks, tags: true}`."""
+    return await _seat(
+        person,
+        tmp_path,
+        name=f"tl-{team}",
+        team=team,
+        repo=str(tmp_path),
+        seat=seat or {"trigger": "asks", "tags": True},
+    )
+
+
+async def _crew(person, tmp_path, team: str) -> str:
+    """An unattended member carrying `team`'s badge, live: what makes the team live (§4.9)."""
+    params = {
+        "name": f"g-{team}",
+        "dir": str(tmp_path),
+        "adapter": "shell",
+        "argv": ["bash", "--norc", "--noprofile"],
+        "unattended": True,
+        "team": team,
+        "repo": str(tmp_path),
+    }
+    return (await person.call("create", **params))["id"]
+
+
+def _needs(agent, tmp_path, ids: list[str], declared=("db", "compliance")) -> None:
+    agent._repos[str(tmp_path)] = {"ledger": {"declared_teams": list(declared), "needs_team": list(ids)}}
+
+
+async def test_the_first_declared_live_teams_seat_is_filled_once_per_id_set(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        comp, db = await _tl(person, tmp_path, "compliance"), await _tl(person, tmp_path, "db")
+        crew = [await _crew(person, tmp_path, "compliance"), await _crew(person, tmp_path, "db")]
+        for sid in (comp, db):
+            _end(agent, sid)
+        _needs(agent, tmp_path, ["TD-801", "TD-802"])
+        agent._profile_gated = lambda *a: True
+        await agent._keep_running(now)
+        first = agent.sessions[db]
+        assert first.seat_due == {"at": first.seat_due["at"], "by": "tag", "ids": ["TD-801", "TD-802"]}
+        assert agent.sessions[comp].seat_due is None, "db is declared first: compliance's seat is not the one"
+        del agent._profile_gated
+        await agent._keep_running(now)
+        new = agent.sessions[db]
+        assert new is not first, "filled for the tag"
+        assert [{k: v for k, v in e.items() if k != "at"} for e in new.seat_filled] == [
+            {"by": "tag", "ids": ["TD-801", "TD-802"]}
+        ]
+        _end(agent, db)
+        await agent._keep_running(now)
+        assert agent.sessions[db] is new and new.seat_due is None, "a set filled once is not filled again"
+        # TD-801 tagged, TD-803 joined: a due for TD-803 alone, the fill's entry kept while TD-802 stands
+        _needs(agent, tmp_path, ["TD-802", "TD-803"])
+        agent._profile_gated = lambda *a: True
+        await agent._keep_running(now)
+        assert new.seat_due["ids"] == ["TD-803"] and len(new.seat_filled) == 1
+        # every id the fill was for gone: its entry drops
+        _needs(agent, tmp_path, ["TD-803"])
+        await agent._keep_running(now)
+        assert new.seat_filled == [] and new.seat_due["ids"] == ["TD-803"]
+        del agent._profile_gated
+        for sid in (comp, db, *crew):
+            await person.call("kill", id=sid)
+
+
+async def test_a_stopped_teams_seat_is_never_the_tagging_seat(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        comp, db = await _tl(person, tmp_path, "compliance"), await _tl(person, tmp_path, "db")
+        crew = await _crew(person, tmp_path, "compliance")
+        for sid in (comp, db):
+            _end(agent, sid)
+        _needs(agent, tmp_path, ["TD-801"])
+        agent._profile_gated = lambda *a: True
+        await agent._keep_running(now)
+        assert agent.sessions[db].seat_due is None, "db has nothing live: stopped"
+        assert agent.sessions[comp].seat_due["by"] == "tag"
+        del agent._profile_gated
+        for sid in (comp, db, crew):
+            await person.call("kill", id=sid)
+
+
+async def test_no_seat_carrying_tags_means_no_tag_due(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _tl(person, tmp_path, "db", seat={"trigger": "asks"})
+        crew = await _crew(person, tmp_path, "db")
+        _end(agent, sid)
+        _needs(agent, tmp_path, ["TD-801"])
+        await agent._keep_running(now)
+        assert agent.sessions[sid].seat_due is None
+        for s in (sid, crew):
+            await person.call("kill", id=s)
+
+
+async def test_a_question_holds_the_tagging_seats_due_as_asks_and_tag_follows(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid, crew = await _tl(person, tmp_path, "db"), await _crew(person, tmp_path, "db")
+        rec = agent.sessions[sid]
+        _end(agent, sid)
+        _needs(agent, tmp_path, ["TD-801"])
+        agent._profile_gated = lambda *a: True
+        rec.asks_waiting = lambda **kw: 1
+        await agent._keep_running(now)
+        assert rec.seat_due["by"] == "asks", "a question waits: asks first"
+        await agent._keep_running(now + timedelta(minutes=1))
+        assert rec.seat_due["by"] == "asks", "a question left standing still holds it"
+        rec.asks_waiting = lambda **kw: 0
+        await agent._keep_running(now)
+        assert rec.seat_due["by"] == "tag" and rec.seat_due["ids"] == ["TD-801"], "then tag"
+        rec.asks_waiting = lambda **kw: 1
+        await agent._keep_running(now)
+        assert rec.seat_due["by"] == "asks" and "ids" not in rec.seat_due, "a standing tag due becomes asks"
+        del agent._profile_gated
+        for s in (sid, crew):
+            await person.call("kill", id=s)
+
+
+async def test_an_idle_tagging_seat_with_a_tag_due_is_closed_and_filled_an_asks_due_holds_it(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid, crew = await _tl(person, tmp_path, "db"), await _crew(person, tmp_path, "db")
+        rec = agent.sessions[sid]
+        _needs(agent, tmp_path, [])
+        rec.asks_waiting = lambda **kw: 1
+        _idle(agent, sid, now)
+        await agent._keep_running(now)
+        assert rec.seat_due["by"] == "asks" and rec.state == "idle", "an asks due holds an idle seat"
+        rec.asks_waiting = lambda **kw: 0
+        _needs(agent, tmp_path, ["TD-801"])
+        await agent._keep_running(now)
+        assert rec.state == "closed" and rec.seat_due["by"] == "tag", "a tag due is the next fill's"
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not rec and [e["ids"] for e in new.seat_filled] == [["TD-801"]]
+        for s in (sid, crew):
+            await person.call("kill", id=s)
+
+
+async def test_an_asks_fill_of_a_tagging_seat_writes_no_seat_filled_entry(agent, tmp_path):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid, crew = await _tl(person, tmp_path, "db"), await _crew(person, tmp_path, "db")
+        rec = agent.sessions[sid]
+        _end(agent, sid)
+        _needs(agent, tmp_path, ["TD-801"])
+        rec.asks_waiting = lambda **kw: 1
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not rec and new.seat_filled == [], "an asks fill carries no cause, as today"
+        for s in (sid, crew):
+            await person.call("kill", id=s)
+
+
+def test_filled_for_names_a_tag_causes_ids():
+    from sessionorc.agent_tick import filled_for
+
+    assert filled_for({"by": "tag", "ids": ["TD-801", "TD-802"]}) == (
+        "[shiftlead] you are filled for: tag — TD-801, TD-802"
+    )

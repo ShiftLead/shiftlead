@@ -122,6 +122,7 @@ class Launch:
     lead: bool = False
     seat: bool = False  # a seat of the team: its techlead, or one with a trigger (§4.9b)
     trigger: dict[str, str] | None = None  # a seat's `{trigger, after?}`, written on its record (§6, TD-103)
+    tags: bool = False  # the techlead seat's `tags: true` beside its trigger: it tags its repo's entries (TD-730)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
     review: dict[str, Any] | None = None  # who reads its PRs, from its role (design §4.9b *The reader*)
@@ -158,7 +159,7 @@ class Launch:
             # every session a team start creates is one someone chose to keep running (§6, TD-103)
             "supervised": True,
             # a seat's ending is its own: the record says it is one, so no crash restart acts on it
-            **({"seat": dict(self.trigger)} if self.trigger else {}),
+            **({"seat": {**self.trigger, **({"tags": True} if self.tags else {})}} if self.trigger else {}),
             **({"review": dict(self.review)} if self.review else {}),
             **({"context_bound": self.context_bound} if self.context_bound else {}),
             **({"prompt_from": self.prompt_from} if self.prompt_from else {}),
@@ -1023,6 +1024,8 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             under=under,
             seat=True,
         )
+        # a candidate for its repo's tagging seat (§4.4 *An untagged or unknown entry is handed to a techlead*)
+        p.techlead.tags = True
         missing = _primer_missing(seat, p.techlead.dir, host, here, files)
         if missing:
             p.notes.append(missing)

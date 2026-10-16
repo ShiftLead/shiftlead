@@ -828,6 +828,7 @@ def cmd_org(args: argparse.Namespace) -> int:
             files=teamrun.files_via(call_sync),
             settings=settings_mod.read(),
             repos_of=teamrun.repos_via(call_sync),
+            readings=teamrun.readings_via(call_sync),
         )
 
         def verdict() -> None:
@@ -1772,6 +1773,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
             led = r.get("ledger") or {}
             r["declared_teams"] = list(led.get("declared_teams") or [])
             r["needs_team"] = [e["id"] for e in led.get("entries") or [] if isinstance(e, dict) and e.get("needs_team")]
+            if r["needs_team"]:
+                seat, why = teamrun.tagging_seat(fleet, root, r["declared_teams"])
+                r["tagging_seat"] = {"seat": seat, "why": why}
 
     def prose() -> None:
         if not picked:
@@ -1788,7 +1792,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 print(f"  {flag}")
             # an entry no team's lane takes until it names one (§4.7, §4.4 *An entry names its team*, TD-730)
             if r.get("needs_team"):
-                print(f"  needs a team: {', '.join(r['needs_team'])}")
+                tag = r.get("tagging_seat") or {}
+                to = f" — handed to {tag['seat']}" if tag.get("seat") else f" — {tag['why']}" if tag.get("why") else ""
+                print(f"  needs a team: {', '.join(r['needs_team'])}{to}")
             # a draft is no order, and its line says so where it would be one (§4.4 *A draft is no work order*, TD-745)
             waits = {
                 x["number"]: x for x in teamrun.red_prs(r, [], datetime.now(UTC)) if x["whose"] == teamrun.DRAFT_WHOSE
@@ -2709,6 +2715,7 @@ def _doctor_org(files: dict[str, Any], node: bool) -> list[dict[str, Any]]:
         files=teamrun.files_via(call_sync),
         settings=settings_mod.read(),
         repos_of=teamrun.repos_via(call_sync),
+        readings=teamrun.readings_via(call_sync),
     )
     return doctor.org(got, files, len(org.teams), node)
 
