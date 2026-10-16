@@ -480,7 +480,7 @@ def wound_down_words(r: dict[str, Any]) -> str:
 
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | None = None) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
-    the name, the file it came from, its projects, how many sessions it starts, how many carrying
+    the name, the file it came from, its repo and project, how many sessions it starts, how many carrying
     its badge are live, and — when none are and every one of them said why — when it wound down;
     when some are and every one is idle and declared, when it concluded (TD-099), or else why it
     has not (`not_concluded`, the reading's `why`; TD-241).
@@ -505,7 +505,9 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 "source": str(t.source) if t.source else None,
                 # the org file's own definition, which the card's Members… may edit (TD-172); a repo's is read
                 "in_org": bool(t.source and org.path and Path(t.source) == Path(org.path)),
-                "projects": list(t.projects),
+                # the team's one repo and its project's heading (§4.9 *Teams*, TD-722)
+                "repo": t.repo,
+                "project": org.project_of(t.repo),
                 "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
                 # a seat on call, filled when a member needs a reading, or a standing session (§4.9, TD-247)
                 "on_call": t.manager.on_call,

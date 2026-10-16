@@ -159,13 +159,13 @@ def test_lane_words_are_rule_6s_a_named_items_or_a_hunters_area(tmp_path):
 
 
 def test_flows_on_a_team_is_a_list_of_names_each_once(tmp_path):
-    t = orgmod._team("t", {"projects": ["p"], "flows": ["td", "build"]}, "teams.t", source=tmp_path)
+    t = orgmod._team("t", {"repo": "p", "flows": ["td", "build"]}, "teams.t", source=tmp_path)
     assert t.flows == ["td", "build"]
-    assert orgmod._team("t", {"projects": ["p"]}, "teams.t", source=tmp_path).flows == []
+    assert orgmod._team("t", {"repo": "p"}, "teams.t", source=tmp_path).flows == []
     with pytest.raises(ValueError, match="listed twice"):
-        orgmod._team("t", {"projects": ["p"], "flows": ["td", "td"]}, "teams.t", source=tmp_path)
+        orgmod._team("t", {"repo": "p", "flows": ["td", "td"]}, "teams.t", source=tmp_path)
     with pytest.raises(ValueError, match="list of flow names"):
-        orgmod._team("t", {"projects": ["p"], "flows": "td"}, "teams.t", source=tmp_path)
+        orgmod._team("t", {"repo": "p", "flows": "td"}, "teams.t", source=tmp_path)
 
 
 @pytest.mark.unit
@@ -229,7 +229,7 @@ def _with(tmp_path: Path, **team) -> orgmod.Org:
 
 def test_a_team_listing_a_flow_it_can_follow_plans_and_one_it_cannot_is_refused(world, tmp_path):  # noqa: F811
     root = tmp_path / "shiftlead"
-    techlead = {"name": "techlead-ao", "home": "shiftlead"}
+    techlead = {"name": "techlead-ao"}
     # nothing held: the review stage would hold every path
     org = _with(tmp_path, flows=["build-review"], techlead=techlead)
     with pytest.raises(
@@ -257,7 +257,7 @@ def test_a_team_listing_a_flow_it_can_follow_plans_and_one_it_cannot_is_refused(
 def test_a_team_with_no_flows_plans_as_before_and_its_slots_take_their_kind(world, tmp_path):  # noqa: F811
     teams.plan(orgmod.load(), "ao-grind", HOST)  # the fixture's team: no flows, unchanged
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
-    doc["teams"]["ao-grind"]["members"].append({"role": "techlead", "name": "tl", "home": "shiftlead"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "techlead", "name": "tl"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     with pytest.raises(teams.TeamError, match="a member takes a worker role, and 'techlead' is a seat"):
         teams.plan(orgmod.load(), "ao-grind", HOST)
@@ -352,7 +352,7 @@ def test_a_session_started_into_a_team_reads_its_current_flow(world, tmp_path): 
     root = tmp_path / "shiftlead"
     (root / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     cfg = repoconfig.load(root)
-    org = _with(tmp_path, flows=["build-review", "build"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    org = _with(tmp_path, flows=["build-review", "build"], techlead={"name": "techlead-ao"})
     ids = teams.brief_ids(org, "ao-grind", HOST, "grinder", cfg)
     seat = ids["techlead"]
     assert seat and ids["flow"].text == (
@@ -465,7 +465,7 @@ def test_a_start_under_a_flow_compiles_lanes_the_reader_and_the_path(world, tmp_
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**, docs/briefs/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t.update(flows=["build-review"], techlead={"name": "techlead-ao"})
     del t["members"][0]["lane"]  # the grinders take the stage's lane
     doc["roles"]["grinder"]["review"] = {"reader": "techlead", "held": ["src/shiftlead/**"]}
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
@@ -502,8 +502,8 @@ def test_a_member_the_current_flow_does_not_use_sits_out(world, tmp_path):  # no
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao"})
+    t["members"].append({"role": "designer", "name": "designer-ao"})
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     assert p.sit_out == ["designer-ao"] and "designer-ao" not in [x.name for x in p.launches]
     assert "designer-ao: sits out under build-review" in p.notes
@@ -524,7 +524,7 @@ def test_a_session_started_into_a_team_takes_the_flows_reader(world, tmp_path): 
     root = tmp_path / "shiftlead"
     (root / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     cfg = repoconfig.load(root)
-    org = _with(tmp_path, flows=["build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    org = _with(tmp_path, flows=["build-review"], techlead={"name": "techlead-ao"})
     team = org.teams["ao-grind"]
     reader = {"reader": "techlead", "held": ["src/sessionorc/**"], "bound": teams.REVIEW_BOUND}
     assert teams.flow_review(org, team, cfg) == (True, reader)
@@ -547,8 +547,8 @@ def test_remove_refuses_the_last_member_of_a_role_a_listed_flow_needs(world, tmp
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = org_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    t.update(flows=["build-review", "td"], techlead={"name": "techlead-ao"})
+    t["members"].append({"role": "designer", "name": "designer-ao"})
     path = tmp_path / "home" / "org.yml"
     path.write_text(yaml.safe_dump(doc, default_flow_style=None))
     before = path.read_text()
@@ -569,7 +569,7 @@ def test_a_feature_entry_opens_the_flows_design_stage(world, tmp_path):  # noqa:
     """§4.9c item 4: `entries.feature` defaults to the role of the current flow's stage whose lane
     holds `design-first`; a debt stays the techlead's; the team's own `entries:` wins."""
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
-    org = _with(tmp_path, flows=["td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
+    org = _with(tmp_path, flows=["td"], techlead={"name": "techlead-ao"})
     team = org.teams["ao-grind"]
     assert teams.entry_role(org, team, "feature", HOST, HOST) == "designer"
     assert teams.entry_role(org, team, "debt", HOST, HOST) == "techlead"
@@ -597,8 +597,8 @@ def test_the_person_picks_a_listed_flow_and_an_unlisted_pick_reads_as_the_first(
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao"})
+    t["members"].append({"role": "designer", "name": "designer-ao"})
     org = _write(tmp_path, doc)
     assert teams.current_flow(org.teams["ao-grind"]) == "td"
     picked = orgmod.with_settings(org, {"ao-grind": {"flow": "build-review"}, "other": {"flow": "td"}})
@@ -621,9 +621,7 @@ def test_ao_team_flow_lists_the_flows_and_writes_the_pick(world, tmp_path, capsy
     _, state = world
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
-    doc["teams"]["ao-grind"].update(
-        flows=["build", "td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"}
-    )
+    doc["teams"]["ao-grind"].update(flows=["build", "td", "build-review"], techlead={"name": "techlead-ao"})
     _write(tmp_path, doc)
     assert cli.main(["team", "flow", "ao-grind"]) == 0
     assert capsys.readouterr().out.splitlines() == [
@@ -664,8 +662,8 @@ def test_ao_team_list_carries_the_flows_and_the_feature_role(world, tmp_path, ca
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    t.update(flows=["td", "build-review"], techlead={"name": "techlead-ao"})
+    t["members"].append({"role": "designer", "name": "designer-ao"})
     _write(tmp_path, doc)
     assert cli.main(["--json", "team", "list"]) == 0
     row = next(r for r in json.loads(capsys.readouterr().out)["teams"] if r["name"] == "ao-grind")
@@ -732,7 +730,7 @@ def test_ao_org_check_warns_of_each_key_the_flow_fills_the_same(world, tmp_path,
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text(held + review)
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td"], techlead={"name": "techlead-ao", "home": "shiftlead"}, entries={"feature": "designer"})
+    t.update(flows=["td"], techlead={"name": "techlead-ao"}, entries={"feature": "designer"})
     t["members"][0]["lane"] = ["free-pick", "owner:grinder"]
     t["members"].append({"role": "designer", "name": "design", "lane": ["owner:designer", "design-first"]})
     org = _write(tmp_path, doc)
@@ -771,9 +769,9 @@ def _switching(world, tmp_path, monkeypatch, flows):  # noqa: F811
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=flows, techlead={"name": "techlead-ao", "home": "shiftlead"})
+    t.update(flows=flows, techlead={"name": "techlead-ao"})
     del t["members"][0]["lane"]
-    t["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    t["members"].append({"role": "designer", "name": "designer-ao"})
     org = _write(tmp_path, doc)
     plan, _ = teamrun.start(cli.call_sync, org, "ao-grind", HOST)
     for x, rec in zip(plan.launches, state["sessions"], strict=True):
@@ -1179,7 +1177,7 @@ def test_a_node_team_member_naming_an_org_role_is_refused_at_its_start(world, tm
     define_role(repoconfig.org_roles_dir(), "security", "kind: worker\n", "sec {lane}\n")
     doc = yaml.safe_load((tmp_path / "home" / "org.yml").read_text())
     doc["projects"]["ao"]["repos"]["shiftlead"]["contractmatch"] = "/srv/cm/shiftlead"
-    doc["teams"]["ao-grind"]["members"].append({"role": "security", "name": "sec", "home": "shiftlead"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "security", "name": "sec"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     org = orgmod.load()
     teams.plan(org, "ao-grind", HOST)  # on the home, the org's role is the team's to use
@@ -1214,7 +1212,7 @@ def test_a_hunt_flow_in_the_orgs_directory_starts_its_members_from_it(world, tmp
     t["flows"] = ["hunt"]
     for m in t["members"]:
         m.pop("lane", None)
-    t["members"].append({"role": "security", "name": "security-ao", "home": "shiftlead"})
+    t["members"].append({"role": "security", "name": "security-ao"})
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
     assert p.flow == "hunt"
     by = {x.role: x for x in p.members}
@@ -1324,8 +1322,8 @@ def test_the_compile_writes_the_chain_in_the_flows_order(world, tmp_path):  # no
     repo_flow(root, "td-ui", stages, {"b.md": "x\n"})
     doc = _team_doc(tmp_path)
     t = doc["teams"]["ao-grind"]
-    t.update(flows=["td-ui"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    t["seats"] = [{"name": "ui-reader-ao", "role": "auditor", "trigger": "asks", "home": "shiftlead"}]
+    t.update(flows=["td-ui"], techlead={"name": "techlead-ao"})
+    t["seats"] = [{"name": "ui-reader-ao", "role": "auditor", "trigger": "asks"}]
     for m in t["members"]:
         m.pop("lane", None)
     p = teams.plan(_write(tmp_path, doc), "ao-grind", HOST)
@@ -1588,8 +1586,8 @@ def test_orphans_pair_by_created_within_a_role_and_a_persons_session_is_never_on
     _, state = world
     doc = _team_doc(tmp_path)
     doc["teams"]["ao-grind"]["members"] = [
-        {"role": "grinder", "count": 2, "name": "mill", "home": "shiftlead"},
-        {"role": "designer", "name": "design", "home": "shiftlead"},
+        {"role": "grinder", "count": 2, "name": "mill"},
+        {"role": "designer", "name": "design"},
     ]
     org = _write(tmp_path, doc)
     plan = teams.plan(org, "ao-grind", HOST, files=teamrun.files_via(cli.call_sync))

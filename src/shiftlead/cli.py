@@ -860,9 +860,8 @@ def cmd_org(args: argparse.Namespace) -> int:
             print(f"no team defined in {org.path or 'org.yml'} or any registered checkout's {repoconfig.FILE}")
         w = max((len(n) for n in [*(r["name"] for r in rows), *got["shadowed"], *got["refused"]]), default=0)
         for r in rows:
-            repos = ", ".join(r["repos"]) or "none"
             lands = f"on {r['host']} ({r['why']})" if r["host"] else "lands nowhere"
-            print(f"{r['name']:<{w}}  repo{'' if len(r['repos']) == 1 else 's'}: {repos}  {lands}  [{r['source']}]")
+            print(f"{r['name']:<{w}}  repo: {r['repo']}  project: {r['project']}  {lands}  [{r['source']}]")
         for name, files in got["shadowed"].items():
             for f in files:
                 print(f"{name:<{w}}  shadowed by {org.path.name if org.path else 'org.yml'}  [{f}]")
@@ -1138,7 +1137,7 @@ def cmd_team_list(args: argparse.Namespace) -> int:
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")
                 + (f"seats: {', '.join(s['name'] for s in r['seats'])}  " if r.get("seats") else "")
                 + f"members: {r['members']}  "
-                f"projects: {', '.join(r['projects'])}  [{r['source']}]"
+                f"repo: {r['repo']}  project: {r['project']}  [{r['source']}]"
             )
             if r.get("flow"):  # *flow: td — design → build → review → you, through techlead-ao-1*
                 now = next((f for f in r["flows"] if f["current"]), {})
@@ -2154,7 +2153,8 @@ WHERE = (
     ("hosts.yml", "this host: name, home, identity, nodes, link, VS Code alias, retention",
      "local.name, home: and local.identity at the host agent's start; the rest on use"),
     ("profiles.yml", "profiles: tool, account, model, config directory, billing", "on every use"),
-    ("org.yml", "projects, teams, the org-wide roles overlay", "by the clients on every use; never the host agent"),
+    ("org.yml", "project headings, teams, the org-wide roles overlay",
+     "by the clients on every use; never the host agent"),
     ("<repo>/.shiftlead.yml", "a repo's roles, controllers, ledger, teams, promote",
      "by the clients on every use; promote: alone also by the host agent at the home, every five minutes"),
     ("systemd units", "the UI's bind and port, PATH, the home", "at `ao service install`"),

@@ -64,7 +64,13 @@ def world(tmp_path, monkeypatch):
     (home / "profiles.yml").write_text(yaml.safe_dump({"default": "paul", "profiles": {"paul": {"account": "paul"}}}))
     org = {
         "projects": {"both": {"repos": {"alpha": {HOST: str(tmp_path / "alpha")}}}},
-        "teams": {"span": {"projects": ["both"], "manager": {"role": "person"}, "members": [{"role": "hunter"}]}},
+        "teams": {
+            "span": {
+                "repo": "alpha",
+                "manager": {"role": "person"},
+                "members": [{"role": "hunter", "name": "span-hunt"}],
+            }
+        },
     }
     (home / "org.yml").write_text(yaml.safe_dump(org))
 
@@ -91,7 +97,8 @@ def test_ao_org_prints_each_team_its_file_its_repo_and_where_it_lands(world, cap
     assert rows["alpha-grind"] == {
         "name": "alpha-grind",
         "source": str(tmp_path / "alpha" / ".shiftlead.yml"),
-        "repos": ["alpha"],
+        "repo": "alpha",
+        "project": "both",
         "host": HOST,
         "why": "registered here",
     }
@@ -108,7 +115,8 @@ def test_ao_org_prints_each_team_its_file_its_repo_and_where_it_lands(world, cap
     }
     assert cli.main(["org"]) == 0
     out = capsys.readouterr().out
-    assert f"alpha-grind  repo: alpha  on {HOST} (registered here)  [{tmp_path / 'alpha' / '.shiftlead.yml'}]" in out
+    src = tmp_path / "alpha" / ".shiftlead.yml"
+    assert f"alpha-grind  repo: alpha  project: both  on {HOST} (registered here)  [{src}]" in out
     assert "no history yet" in out and "settings.yml  not there" in out
 
 
@@ -118,13 +126,13 @@ def test_ao_org_says_a_placed_a_shadowed_and_a_twice_named_team_and_each_files_l
         yaml.safe_dump({"teams": {"alpha-grind": TEAM, "twice": TEAM, "span": TEAM}})
     )
     (tmp_path / "beta" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": {"twice": TEAM}}))
-    org["projects"]["alpha"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "devenv": "/work/alpha"}}}
+    org["projects"]["both"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "devenv": "/work/alpha"}}}
     assert defs.init(home)
     (home / "org.yml").write_text(yaml.safe_dump({**org, "place": {"alpha-grind": "devenv"}}))
     assert defs.commit("org: placed alpha-grind", home=home)
     assert cli.main(["org"]) == 0
     out = capsys.readouterr().out
-    assert "alpha-grind  repo: alpha  on devenv (place)" in out
+    assert "alpha-grind  repo: alpha  project: both  on devenv (place)" in out
     assert f"span         shadowed by org.yml  [{tmp_path / 'alpha' / '.shiftlead.yml'}]" in out
     assert "twice        refused: team 'twice' is defined twice" in out and out.count("defined twice") == 1
     # each file's last commit, the one never written said so
@@ -164,12 +172,12 @@ def test_a_profile_not_held_a_missing_brief_and_a_place_on_no_linked_host_are_ea
     tmp_path, home, org = world
     teams_ = {
         "alpha-grind": {**TEAM, "members": [{"role": "hunter", "profile": "nope"}]},
-        "alpha-brief": {**TEAM, "members": [{"role": "hunter", "brief": "docs/briefs/absent.md"}]},
-        "alpha-far": TEAM,
+        "alpha-brief": {**TEAM, "members": [{"role": "hunter", "name": "hunt-b", "brief": "docs/briefs/absent.md"}]},
+        "alpha-far": {**TEAM, "members": [{"role": "hunter", "name": "hunt-far"}]},
     }
     (tmp_path / "alpha" / ".shiftlead.yml").write_text(yaml.safe_dump({"teams": teams_}))
     git(tmp_path / "alpha", "commit", "-qam", "teams")
-    org["projects"]["alpha"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "mars": "/work/alpha"}}}
+    org["projects"]["both"] = {"repos": {"alpha": {HOST: str(tmp_path / "alpha"), "mars": "/work/alpha"}}}
     (home / "org.yml").write_text(yaml.safe_dump({**org, "place": {"alpha-far": "mars"}}))
     code, got = check(capsys)
     assert code == 1
@@ -200,12 +208,28 @@ def test_a_team_naming_one_session_twice_is_lacking(world, capsys):
         "team span names hunter twice — take one of its lines out of org.yml (Members… → Remove keeps the session)"
     ]
     # a repo's team is changed by PR: no Members… hint
+    org["teams"]["span"]["members"] = [{"role": "hunter", "name": "span-hunt"}]
+    (home / "org.yml").write_text(yaml.safe_dump(org))
     (tmp_path / "alpha" / ".shiftlead.yml").write_text(
         yaml.safe_dump({"teams": {"alpha-grind": {**TEAM, "members": [{"role": "hunter"}, {"role": "hunter"}]}}})
     )
     git(tmp_path / "alpha", "commit", "-qam", "twice")
     _, got = check(capsys)
     assert "team alpha-grind names hunter twice — take one of its lines out of .shiftlead.yml" in got["lacks"]
+
+
+def test_a_name_two_teams_on_one_repo_give_is_lacking_naming_both(world, capsys):
+    """§4.9 *Names are the org's*: an agent's name is its repo's, so the org file's `span` and alpha's
+    own `alpha-grind`, both on alpha, cannot both start a `hunter`; the check names the two and the name."""
+    tmp_path, home, org = world
+    org["teams"]["span"]["members"] = [{"role": "hunter"}]
+    (home / "org.yml").write_text(yaml.safe_dump(org))
+    code, got = check(capsys)
+    assert code == 1
+    assert any(
+        "teams span and alpha-grind both start a session called 'hunter' on alpha — an agent's name is its repo's" in x
+        for x in got["lacks"]
+    ), got["lacks"]
 
 
 def test_a_checkout_off_its_default_branch_or_holding_changes_warns_and_does_not_fail(world, capsys):

@@ -27,7 +27,7 @@ def world(tmp_path, *, team: bool = True, entries: dict | None = None, seat: boo
     (home / "hosts.yml").write_text(f"local:\n  name: kmaster\n  local: true\n  repos_registry: {roster}\n")
     doc: dict = {"projects": {"sam": {"repos": {"samscrape": {"kmaster": str(repo)}}}}, "roles": {"designer": {}}}
     if team:
-        t = {"projects": ["sam"], "manager": {"name": "manager-sam"}}
+        t = {"repo": "samscrape", "manager": {"name": "manager-sam"}}
         if seat:
             t["techlead"] = {"name": "techlead-sam"}
         t["members"] = [{"role": "grinder"}]

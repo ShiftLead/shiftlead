@@ -105,7 +105,7 @@ def view(
     linked: Collection[str] = (),
     repos_of: orgmod.ReposOf | None = None,
 ) -> dict[str, Any]:
-    """The org as the clients aggregate it: each team with its source file, its repos, the host it
+    """The org as the clients aggregate it: each team with its source file, its repo and project, the host it
     lands on and why; the names a repo's definition lost to the org file's (`shadowed`) and the
     ones two repos define (`refused`); then the remainder's files with their last commit, and each
     repo a linked host holds that this one does not (`held_elsewhere`, with its `unread` notes)."""
@@ -118,7 +118,8 @@ def view(
             {
                 "name": name,
                 "source": str(team.source) if team.source else "",
-                "repos": org.team_repos(team),
+                "repo": team.repo,
+                "project": org.project_of(team.repo),
                 "host": host,
                 "why": why,
             }

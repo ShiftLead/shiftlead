@@ -31,12 +31,13 @@ def _org(tmp_path: Path, monkeypatch, teams_doc: dict, *, repos=("alpha",)) -> o
     return orgmod.load()
 
 
-def _team(**extra) -> dict:
+def _team(sfx: str = "", **extra) -> dict:
+    """A team on `alpha`; `sfx` keeps a second team's names its own (an agent's name is its repo's, §4.9)."""
     return {
-        "projects": ["p"],
-        "manager": {"role": "manager", "name": "lead"},
-        "techlead": {"name": "tl"},
-        "members": [{"role": "grinder", "name": "g"}],
+        "repo": "alpha",
+        "manager": {"role": "manager", "name": f"lead{sfx}"},
+        "techlead": {"name": f"tl{sfx}"},
+        "members": [{"role": "grinder", "name": f"g{sfx}"}],
         **extra,
     }
 
@@ -67,9 +68,9 @@ def test_an_anchor_key_on_a_team_is_refused_as_retired(tmp_path, monkeypatch, va
 
 
 def test_anchor_false_on_a_team_is_read_and_passed_over(tmp_path, monkeypatch):
-    org = _org(tmp_path, monkeypatch, {"t": _team(anchor=False), "u": _team()})
-    for name in ("t", "u"):
-        assert org.teams[name].session_names() == ["lead", "tl", "g"]
+    org = _org(tmp_path, monkeypatch, {"t": _team(anchor=False), "u": _team("-u")})
+    for name, sfx in (("t", ""), ("u", "-u")):
+        assert org.teams[name].session_names() == [f"lead{sfx}", f"tl{sfx}", f"g{sfx}"]
         assert not hasattr(org.teams[name], "anchor")
 
 
@@ -151,7 +152,7 @@ def test_a_start_writes_the_manager_on_call_held_and_its_members_name_it(tmp_pat
     org = _org(
         tmp_path,
         monkeypatch,
-        {"t": _team(), "s": _team(manager={"role": "manager", "name": "boss", "on_call": False})},
+        {"t": _team(), "s": _team("-s", manager={"role": "manager", "name": "boss", "on_call": False})},
     )
     call, calls = _fake()
     _, out = teamrun.start(call, org, "t", HOST)

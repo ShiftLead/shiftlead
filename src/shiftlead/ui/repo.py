@@ -569,7 +569,7 @@ def team_groups(
                 "manager_elsewhere": manager_elsewhere,  # its card sits under its own badge, not here
                 "members": members,
                 "ids": [m["id"] for m in members],
-                "projects": projects or list(row.get("projects") or []),
+                "projects": projects or ([row["project"]] if row.get("project") else []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "prs_waiting": waiting,
                 "summary": summary,

@@ -410,7 +410,7 @@ def test_a_team_card_sets_the_stop_time_and_priority(client, subprocess_agent):
     org = subprocess_agent.home / "org.yml"
     org.write_text(
         f"projects:\n  sp:\n    repos:\n      sp: {{kmaster: {subprocess_agent.home}}}\n"
-        "teams:\n  sett-team:\n    projects: [sp]\n    manager: {role: manager}\n"
+        "teams:\n  sett-team:\n    repo: sp\n    manager: {role: manager}\n"
         "    members: [{role: grinder, count: 2}]\n"
     )
     try:
@@ -480,7 +480,7 @@ def test_a_team_card_draws_balance_and_writes_its_lines_whole(client, subprocess
     org = subprocess_agent.home / "org.yml"
     org.write_text(
         f"projects:\n  sp:\n    repos:\n      sp: {{kmaster: {subprocess_agent.home}}}\n"
-        "teams:\n  bal-team:\n    projects: [sp]\n    manager: {role: manager}\n"
+        "teams:\n  bal-team:\n    repo: sp\n    manager: {role: manager}\n"
         "    members: [{role: grinder, count: 2}]\n"
     )
     post = lambda body: client.post("/api/settings/teams", json={"team": "bal-team", **body})  # noqa: E731

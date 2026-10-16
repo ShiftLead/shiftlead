@@ -479,7 +479,7 @@ def profile_cards(profiles: Mapping[str, profiles_mod.Profile], default: str) ->
 
 
 def org_cards(defs: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """**Org** (§4.5 screen 8): each team the org defines, read-only — its projects, its manager,
+    """**Org** (§4.5 screen 8): each team the org defines, read-only — its repo, its manager,
     its techlead seat, its members by role and count, the host it lands on."""
     out = []
     for name, d in defs.items():
@@ -488,7 +488,7 @@ def org_cards(defs: Mapping[str, Any]) -> list[dict[str, Any]]:
             key = f"team {m.team}" if m.team else m.role
             members[key] = members.get(key, 0) + (m.count or 1)
         rows = [
-            _row("projects", d.projects),
+            _row("repo", d.repo),
             _row("manager", f"{d.manager.name} · {d.manager.role}"),
             _row("techlead", d.techlead.name if d.techlead else None, is_default=d.techlead is None),
             _row("members", " · ".join(f"{k} ×{n}" for k, n in members.items()) or "none"),

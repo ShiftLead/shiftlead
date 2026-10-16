@@ -13,8 +13,8 @@ Every command below is one you can run. Nothing here explains why — design §4
 (roles), §4.4a (nodes) and §5 (a repo's own file) do that, and this points at them where it helps.
 
 **What a team is.** A named definition of sessions to start together: a **manager** and its
-**members**, each under a **role**, all of them over one or more **projects** (a project is repos,
-and where each repo is checked out on each host). `ao team start` reads the definition, checks
+**members**, each under a **role**, all of them on **one repo** (a repo has any number of teams; a
+**project** is a heading over repos, design §4.9 *Projects*). `ao team start` reads the definition, checks
 everything first, then creates the manager and each member with the manager as its controller. Nothing
 about a team is stored on a session's record but two strings, `team` and `project`, and nothing
 keys on them (§9 invariant 9) — the definition is the whole of it. **One exception, for mail
@@ -73,21 +73,27 @@ a `container:` block. **The one-time human steps are not `ao`'s**: the node's `e
 `claude` login inside it for each profile the team uses. A node whose link is down is not a team
 you can start — `ao team start` refuses before it creates anything.
 
-## 2. Say what the project is
+## 2. Say where the repo is
 
-In `~/.shiftlead/org.yml` — a project is repos, and a repo is where it is checked out per host:
+A repo is its checkout's directory name, and a checkout registered on this host (a line in
+`repos.txt` under the home, design §5 *Repos*) is all a team on this host needs. A **project** is optional: a heading over
+repos in `~/.shiftlead/org.yml`, with an optional `title`, which also says where a repo is checked
+out on a host the registry does not cover:
 
 ```yaml
 projects:
   contractmatch:
+    title: ContractMatch
     repos:
       contractmatch: {kmaster: ~/contractmatch, contractmatch: /home/kmaster/contractmatch}
+      samscrape:     {kmaster: ~/samscrape}
 ```
 
 The key under a repo is a **host name**, and the value that host's checkout. This machine's
-name is `local: {name: …}` in `~/.shiftlead/hosts.yml`, else its short hostname (`hostname -s`). A team's sessions are
-started in the checkouts of the repos of its projects, so a missing entry for the host the team
-runs on is what `ao team start` refuses on.
+name is `local: {name: …}` in `~/.shiftlead/hosts.yml`, else its short hostname (`hostname -s`). **A repo
+sits in at most one project**; a repo in none is a heading of its own. A team's sessions are started
+in its repo's checkout, so a repo with no checkout on the host the team runs on is what `ao team
+start` refuses on.
 
 ## 3. Say what the team is
 
@@ -96,7 +102,7 @@ Beside `projects:` in the same file:
 ```yaml
 teams:
   cm-grind:
-    projects: [contractmatch]
+    repo: contractmatch          # the one repo the team works: required in org.yml
     host: contractmatch          # omit to run on the machine you start it from
     manager: {role: manager, name: manager-cm}
     members:
@@ -104,7 +110,7 @@ teams:
 ```
 
 - **`manager:`** — always a mapping. `role` (default `manager`), `name` (default `<team>-lead`), and
-  optionally `home`, `profile`, `lane`, `brief`, `grants`, `unattended`, `on_call`. **A `manager`-role
+  optionally `profile`, `lane`, `brief`, `grants`, `unattended`, `on_call`. **A `manager`-role
   manager is on call by default** (design §6 *A manager on call*): no manager session stands while
   the team runs; the home starts one when a member needs a reading no policy makes (a question to
   it, a permission, a `stalled?` member, one idle with open work) and it is closed once it has acted. `ao team list` marks it
@@ -113,14 +119,14 @@ teams:
   refused — *teams.<name>.manager must be a mapping, not str*.) `lead:`, its name until
   2026-09-20 (TD-076), is refused as an unknown key.
 - **`techlead:`** — optional, one per team: the go-between that answers teammates' questions
-  before they reach you (design §4.9b). `name` (default `<team>-techlead`), and optionally `home`,
+  before they reach you (design §4.9b). `name` (default `<team>-techlead`), and optionally
   `profile`, `brief`, `context`; no `role` and no `grants`. It is started after the manager, under
   it, and every brief in the team names it as `{techlead}`. Without one, questions come to you as
-  now. **`context:`** is the seat's **primer** — a path in its home checkout that its brief reads
+  now. **`context:`** is the seat's **primer** — a path in the team's checkout that its brief reads
   first (`{context}`); `ao team start` says so, and starts anyway, when it is missing. See
   *A techlead's primer* below before the first start with a seat.
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
-  sessions are `<name>-1`, `<name>-2`, … Each also takes, as the manager does, `home`, `profile`,
+  sessions are `<name>-1`, `<name>-2`, … Each also takes, as the manager does, `profile`,
   `lane`, `brief`, `grants` and `unattended` — so a member's `profile:` goes on its line, not in a
   `roles:` overlay — and `team` (below); any other key is refused.
   **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
@@ -138,12 +144,14 @@ teams:
   does not start. Run an on-call manager alone (leave `members:` out) or one member, and start it with
   `ao team start <name> --anyway` where a lane it starts is empty.
 
-A team whose only project is one repo can live in **that repo's** `.shiftlead.yml` under `teams:`
-instead, and travels with the checkout. The org file wins a name collision. **Which file:** the
-repo's, when the team works that one repo from its checkout on the machine you start it from —
-its `projects:` defaults to the repo, and the project is made from the checkout it was read in;
-`org.yml`, when the team spans repos or nests another, because only `org.yml` says where a
-checkout is on a host. A repo's team that should run on a node stays in the repo: `org.yml` places
+A team can live in **its repo's** `.shiftlead.yml` under `teams:` instead, and travels with the
+checkout. The org file wins a name collision. **Which file:** the repo's, when the team works that
+repo from its checkout on the machine you start it from — its `repo:` is unsaid there (the repo
+itself; one naming another repo is refused), and its project is the `org.yml` heading that lists
+the repo, else none; `org.yml`, when the team nests another, because only `org.yml` says how teams
+relate. **`projects:` on a team and `home:` on its sessions**, written before TD-722, are read for
+one release with a warning that names the fix (`write repo: <repo>`) where they name one repo, and
+the team is refused by name where they name two (design §4.9 *A definition written before TD-722*). A repo's team that should run on a node stays in the repo: `org.yml` places
 it with `place: {<team>: <host>}`, and its checkout there is that host's registry entry of the
 repo's name (a repo's file never names a host). **A public repo's team goes in `org.yml`**, whatever its
 shape and wherever it runs: the repo's file is published with the repo, and with it the definition's
@@ -344,8 +352,8 @@ they are about behaving inside a session; these are about setting one up.
    already defined is edited, not re-added under a second name.
 2. **Write the definition, then check it, then start it.** `ao team list` fails loudly on a
    malformed file and names the key; fix it there rather than at `start`.
-3. **Never invent a host, a repo path or a profile.** A checkout that is not in `projects:` for the
-   host the team runs on is a refusal, not a guess — ask the person for the path.
+3. **Never invent a host, a repo path or a profile.** A repo with no checkout on the host the team runs
+   on — in its registry or under its `projects:` heading — is a refusal, not a guess — ask the person for the path.
 4. **Check the profile before you name it.** A `profile:` in a role or a member must be a key in
    `~/.shiftlead/profiles.yml`; `ao team start` refuses one that is not, and the file is the only
    place that says which exist.
