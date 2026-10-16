@@ -31,6 +31,31 @@ def _marked(root: str) -> dict:
 
 
 @pytest.mark.unit
+def test_a_settled_row_draws_hold_where_a_lane_takes_it(tmp_path):
+    """§4.5a *Repo page: Hold / Release on an entry* (TD-736): a settled row of a `LANE_KINDS` kind
+    (*pickable*, *design*, *live-check*) and any row drawn *held by <name>* draws **Hold**; a *for you*,
+    *blocked*, *evaluation* or *other* row none, since no lane takes it."""
+    r = reading(str(tmp_path))
+    kinds = ("pickable", "design", "live-check", "for-you", "blocked", "evaluation", "other")
+    r["ledger"]["entries"] = [
+        {"id": f"TD-9{n:02d}", "title": k, "priority": "low", "owner": "grinder", "kind": "", "for_page": k}
+        for n, k in enumerate(kinds)
+    ] + [{"id": "TD-990", "title": "claimed", "priority": "low", "owner": "grinder", "kind": "", "for_page": "other"}]
+    motion = [{"ref": "TD-990", "members": [{"name": "grinder-ao-2"}]}]
+    rows = {e["title"]: e["settle_mark"] for x in ledger_lists(r, motion, None, T0) for e in x["rows"]}
+    assert rows == {
+        "pickable": "settled",
+        "design": "settled",
+        "live-check": "settled",
+        "for-you": "",
+        "blocked": "",
+        "evaluation": "",
+        "other": "",
+        "claimed": "settled",
+    }
+
+
+@pytest.mark.unit
 def test_the_marks_words_and_the_settle_field_parse():
     assert settle.words({"settling": {"until": (T0 + timedelta(minutes=7)).isoformat()}}, T0) == "settles in 7m"
     assert settle.words({"settling": {"until": T0.isoformat()}}, T0) == "", "a mark past its until says nothing"
@@ -55,12 +80,12 @@ def test_a_marked_row_carries_its_words_and_its_press(tmp_path):
     rows = {e["id"]: e for x in ledger_lists(_marked(str(tmp_path)), [], None, T0) for e in x["rows"]}
     assert (rows["TD-301"]["settle"], rows["TD-301"]["settle_mark"]) == ("settles in 7m", "settling")
     assert (rows["TD-310"]["settle"], rows["TD-310"]["settle_mark"]) == ("held 2h", "held")
-    assert (rows["TD-311"]["settle"], rows["TD-311"]["settle_mark"]) == ("", "")
+    assert (rows["TD-311"]["settle"], rows["TD-311"]["settle_mark"]) == ("", "settled"), "a lane takes it: Hold"
     # the claim's *held by* keeps its key: the settle clock's hold is `settle_mark`
     assert rows["TD-310"]["held"] == ""
     lists = ledger_lists(_marked(str(tmp_path)), [], None, T0 + timedelta(minutes=8))
     late = {e["id"]: e for x in lists for e in x["rows"]}
-    assert late["TD-301"]["settle_mark"] == "", "a window that ran out offers no Hold before the next reading"
+    assert late["TD-301"]["settle_mark"] == "settled", "a window that ran out offers the settled row's Hold"
 
 
 @pytest.mark.unit
@@ -99,7 +124,9 @@ def test_the_repo_page_draws_hold_and_release_and_the_press_reaches_td_hold(tmp_
     assert 'data-tdhold="TD-301" data-repo="samscrape"' in row
     row = html[html.index('id="TD-310"') : html.index("</div>", html.index('id="TD-310"'))]
     assert "· held 2h</span>" in row and 'data-release="1"' in row and ">Release</button>" in row
-    assert html.count("data-tdhold=") == 2, "a settled entry draws neither"
+    assert html.count("data-tdhold=") == 6, "every pickable row, settled ones too; the for-you row none"
+    row = html[html.index('id="TD-311"') : html.index("</div>", html.index('id="TD-311"'))]
+    assert ">Hold</button>" in row and "until you release it (design" in row and "text changes" not in row
     got = c.post("/api/ledger/hold", json={"repo": "samscrape", "id": "TD-301"})
     assert got.status_code == 200 and got.json()["held"] == {"at": "x"}
     assert c.post("/api/ledger/hold", json={"repo": "samscrape", "id": "TD-310", "release": True}).json()["ok"]

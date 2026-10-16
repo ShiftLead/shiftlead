@@ -298,8 +298,9 @@ def ledger_lists(
     and, held by nobody, `pickable_by`: the teams whose lanes (`teamrun.repo_lanes`') take it, None
     where the ledger was not read and the lanes could not be (`lanes` None or the entries unread).
     An entry the home's settle clock withholds carries `settle`, *settles in 7m* or *held 2h*, and
-    `settle_mark`, `settling` or `held`, which the row draws with **Hold** or **Release** (§4.5a *Repo
-    page: Hold / Release on a settling entry*, TD-710); one whose wait stands carries `wait`, *waits
+    `settle_mark`, `settling` or `held`, which the row draws with **Hold** or **Release**; a settled row a
+    lane can take or is taking carries `settled`, drawn with **Hold** (§4.5a *Repo page: Hold / Release
+    on an entry*, TD-710, TD-736); one whose wait stands carries `wait`, *waits
     until 10-16* or *waits: <words>*, and `wait_line`, its `Waits:` line whole (TD-716); `held` is the
     claim's, as ever."""
     now = now or datetime.now(UTC)
@@ -330,7 +331,7 @@ def ledger_lists(
                     **e,
                     "held": held.get(e["id"], ""),
                     "settle": settle_mod.words(e, now),
-                    "settle_mark": settle_mark(e, now),
+                    "settle_mark": settle_mark(e, now, lane=key in ledger.LANE_KINDS or bool(held.get(e["id"]))),
                     # what it waits for (§4.5a *Repo page: waits mark*, TD-716): the line whole on hover
                     "wait": teamrun.wait_words(e, short=True),
                     "wait_line": teamrun.wait_line(e),
@@ -349,12 +350,16 @@ def ledger_lists(
     return out
 
 
-def settle_mark(e: Mapping[str, Any], now: datetime) -> str:
-    """Which press the settle clock's mark on an entry gives its Repo page row (§4.5a, TD-710): `held`
-    (**Release**), `settling` (**Hold**) while its window runs, else ''."""
+def settle_mark(e: Mapping[str, Any], now: datetime, lane: bool = False) -> str:
+    """Which press the settle clock's mark on an entry gives its Repo page row (§4.5a *Repo page: Hold /
+    Release on an entry*, TD-710, TD-736): `held` (**Release**), `settling` (**Hold**) while its window
+    runs, `settled` (**Hold**) once it has settled on a row a lane can take or is taking (`lane`: a
+    `LANE_KINDS` kind, or a row drawn *held by <name>*), else ''."""
     if isinstance(e.get("held"), dict):
         return "held"
-    return "settling" if settle_mod.words(dict(e), now).startswith("settles") else ""
+    if settle_mod.words(dict(e), now).startswith("settles"):
+        return "settling"
+    return "settled" if lane else ""
 
 
 def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:

@@ -1033,6 +1033,19 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
+      // design §4.5a *Inbox row: held entry* → **Release** (TD-736): the Repo page's `td_hold` with
+      // `release`, the person's own act on the home's record; the row leaves on the refresh
+      if (action === "ledger_release") {
+        pressed();
+        const got = await fetch("/api/ledger/hold", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref, release: true }),
+        });
+        if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
+        say(`${b.dataset.ref} released: pickable now`, true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       // design §4.5a *Inbox row: ledger entry* → **Start session** / **Open session** (TD-678): one press —
       // the session that holds the entry or its name (`focus`), the one it started (`id`), or the New
       // session form filled in with the reason (`form`), as **Resume**'s press lands
@@ -3252,7 +3265,7 @@
           body: JSON.stringify({ repo: b.dataset.repo, id, release }),
         });
         if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
-        w.settle(release ? `${id} released: pickable now` : `${id} held: no lane takes it until you release it`, true);
+        w.settle(release ? `${id} released: pickable now` : AO.heldWords(id, await r.json().catch(() => ({}))), true);
         reread();
       } catch (err) {
         b.disabled = false;
@@ -3278,7 +3291,7 @@
       if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
       const more = e.target.closest("[data-unfold]");
       if (more) return unfold(more.dataset.unfold);
-      // **Hold** / **Release** on a settling entry (§4.5a, TD-710): the home's clock, no ledger edit
+      // **Hold** / **Release** on an entry (§4.5a, TD-710, TD-736): the home's clock, no ledger edit
       const hold = e.target.closest("[data-tdhold]");
       if (hold && !hold.disabled) return holdEntry(hold);
       // a board row's team badge: here it opens the Org filtered to that team (in the Inbox it picks the rail)
@@ -3297,6 +3310,15 @@
       if (!["repos", "doing", "session", "gone"].includes(ev.event)) return;
       clearTimeout(soon); soon = setTimeout(reread, 1500);
     }, "light=1");
+  };
+
+  // The toast of a **Hold** (§4.5a *Repo page: Hold / Release on an entry*, TD-736): what the hold did,
+  // from the reply's `told` (a reader among them, `readers`, is told to leave its PR unmerged) and
+  // `untold`, each line *could not tell <name>: <why>*
+  AO.heldWords = function (id, got) {
+    const readers = new Set(got.readers || []);
+    const told = (got.told || []).map((n) => `${n} told to ${readers.has(n) ? "leave its PR unmerged" : "drop it"}`);
+    return [`${id} held`, ...told, ...(got.untold || [])].join(" · ");
   };
 
   // ---- New session: the anchor rule, shown before you press Start ----
