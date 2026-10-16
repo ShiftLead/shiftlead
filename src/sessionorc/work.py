@@ -7,10 +7,11 @@ record's `seat` field here and the definition's name on the card, and a test hol
 from __future__ import annotations
 
 from collections.abc import Collection, Iterable, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sessionorc import ledger as ledger_mod
+from sessionorc.agent_common import FINISHED_SETTLE
 from sessionorc.models import Session, has_control, reference_of
 
 DEAD = ("exited", "closed")
@@ -76,6 +77,67 @@ def team_wound_down(records: Iterable[Session]) -> str | None:
     return wound_down(said, seats)
 
 
+def team_stopped(records: Iterable[Session]) -> dict[str, str] | None:
+    """Whether a team **stopped** (design §6 rule 8 *A team that stopped*, TD-781): none of its crew live, not
+    wound down (`team_wound_down`), and at least one crew record — `stopped_by`'s `{by, at}`, else None.
+    Rule 8 never starts such a team, and reads its lanes all the same."""
+    mine = crew(records)
+    if not mine or any(r.state not in DEAD for r in mine) or team_wound_down(mine) is not None:
+        return None
+    return stopped_by(mine)
+
+
+def record_end(r: Session) -> str | None:
+    """A record's end (§6 rule 8 *A team that stopped*): its `ended.at` where `ended` stands, else `closer.at`,
+    else `closed_at` — so a Close that tidies an exited card later does not move it; None where none is written."""
+    for mark in (r.ended, r.closer):
+        if isinstance(mark, Mapping) and mark.get("at"):
+            return str(mark["at"])
+    return r.closed_at or None
+
+
+def _instant(v: Any) -> datetime | None:
+    try:
+        at = datetime.fromisoformat(str(v))
+    except (TypeError, ValueError):
+        return None
+    return at if at.tzinfo else at.replace(tzinfo=UTC)
+
+
+def _how_stopped(r: Session) -> str | None:
+    """One record's word on how its team stopped: `person`, `until`, or None for neither. Its end's own mark is
+    `ended` where it stands, else `closer`: a Close after a kill never overrides the kill."""
+    mark = r.ended if isinstance(r.ended, Mapping) else r.closer if isinstance(r.closer, Mapping) else {}
+    if mark.get("by") == "person":
+        return "person"
+    if mark.get("why") == "stop time":
+        return "until"
+    if mark.get("by"):
+        return None  # ended by a session, or by the tick for another cause
+    # it ended naming nobody: after a wrap-up, the person's (Wind down, Wrap up) or the stop time's own
+    mine = _instant(r.wrapup_at) if r.wrapup_by == "person" else None
+    clock = _instant(r.wrapup_sent_at)
+    if mine and clock:
+        return "person" if mine >= clock else "until"
+    return "person" if mine else "until" if clock else None
+
+
+def stopped_by(records: Iterable[Session]) -> dict[str, str]:
+    """How a team stopped (§6 rule 8 *A team that stopped*): `{by, at}` over its **current** crew records (not
+    superseded, not sat out). `at` is the newest end among them (`record_end`), and `by` is read from the
+    records whose end falls within `FINISHED_SETTLE` of it alone — the team's ending, not a member a person
+    closed a day earlier: `person` where one was ended by the person, else `until` where one was ended by the
+    stop time, else `other`."""
+    current = [r for r in crew(records) if not r.superseded_by and not sat_out(r)]
+    ends = [(r, at) for r in current if (at := _instant(record_end(r))) is not None]
+    if not ends:
+        return {"by": "other", "at": ""}
+    last = max(at for _, at in ends)
+    words = {_how_stopped(r) for r, at in ends if last - at <= FINISHED_SETTLE}
+    by = "person" if "person" in words else "until" if "until" in words else "other"
+    return {"by": by, "at": last.isoformat()}
+
+
 def finished_alone(records: Iterable[Session]) -> list[Session]:
     """The crew members that finished while their team runs on (design §6 rule 8 *A member that
     finished while its team runs on*, TD-457): not a seat, not the manager, `closed` or `exited`
@@ -83,7 +145,7 @@ def finished_alone(records: Iterable[Session]) -> list[Session]:
     one a person closed (its `closer` names the person: *stopped*, left alone) or that was killed (a
     kill destroys the pane, `pane: False`, and writes no closer: never read as a finish), nor one its
     flow sat out, nor a record a successor took over. Only for a team that **runs on** — a seat or a
-    member live: one with nobody live that is not wound down is *stopped*, which rule 8 leaves alone."""
+    member live: one with nobody live that is not wound down is *stopped*, which rule 8 never starts."""
     mine = crew(records)
     if not any(r.state not in DEAD for r in mine):
         return []

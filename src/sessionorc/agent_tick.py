@@ -100,6 +100,13 @@ from sessionorc.models import (
 from sessionorc.tmux import PaneInfo
 
 
+def _stamped(mark: dict[str, Any], stopped: dict[str, str] | None) -> dict[str, Any]:
+    """A `work_waiting` mark with `stopped` as the team reads now (§6 rule 8 *A team that stopped*, TD-781): set
+    for a stopped team, dropped for one that reads wound down or runs on, every other field kept."""
+    bare = {k: v for k, v in mark.items() if k != "stopped"}
+    return {**bare, "stopped": stopped} if stopped else bare
+
+
 def _asked(questions: list[Any], members: dict[str, list[str]] | None = None) -> dict[str, list[str]]:
     """A `work_waiting` mark's members with each question's reference under the name that asked it
     (§6 rule 8 *A question's end is work*, TD-274): `members` (a lane's new ids) copied, or none."""
@@ -1607,40 +1614,7 @@ class TickMixin:
                 at = None
             if root and rel and at is not None:
                 decl = dict(s.out_of_work or {})
-
-                name = Path(str(root)).name
-                commit = self._live_commits().get(name)
-
-                def both() -> tuple[Any, str, Any]:
-                    resolve = ledger_mod.Registry(hosts.local_host().repos())
-                    # a live check stood in the lane at the declaration when its build was live then
-                    # (§4.9b, §6 rule 6): known when the promote that made today's live commit live
-                    # concluded before it, so the ledger then is read against that commit; unknown,
-                    # it is read without, and a check live now is told once as new
-                    was = promote_mod.last(name) or {}
-                    try:
-                        before = bool(commit) and was.get("sha") == commit and _parse(str(was.get("at"))) <= at
-                    except (ValueError, TypeError):
-                        before = False
-                    live = ledger_mod.LiveReader(root, commit)
-                    then, why = ledger_mod.entries_before(
-                        root, str(rel), at, resolve=resolve, live=live if before else None
-                    )
-                    if then is None:
-                        return then, why, None
-                    # the tip read as the checkout's reading is, with its live checks' `live`, or a
-                    # live one would read as the checkout's own and be seen untold
-                    tip = ledger_mod.entries_before(root, str(rel), None, resolve=resolve, live=live)[0]
-                    # both marked by the settle clock as it stands, so an entry still settling is not
-                    # seen now and is told once it settles (§4.4, TD-710)
-                    # `then` as the clock stood at the declaration, so one settling then is told when it settles
-                    remote = str((self._repos.get(s.repo or "") or {}).get("remote") or "")
-                    for got, when in ((then, at), (tip, datetime.now(UTC))):
-                        if got is not None:
-                            TickMixin._settle(str(root), remote, got, when, fresh=False)
-                    return then, why, tip
-
-                then, why, tip = await asyncio.to_thread(both)
+                then, why, tip = await asyncio.to_thread(self._ledger_then, s, str(root), str(rel), at)
                 if s.out_of_work != decl or s.lane_seen is not None:
                     return  # the declaration moved while git was read: the next tick looks afresh
                 if then is not None and tip is not None:
@@ -1689,6 +1663,37 @@ class TickMixin:
         )
         self._save(s)
         log.info("%s: told of %s new in its lane", self._address(s), count)
+
+    def _ledger_then(self, s: Session, root: str, rel: str, at: datetime) -> tuple[Any, str, Any]:
+        """The ledger's entries as `origin/<default>` held them before `at`, what was read, and its tip read as
+        the checkout's reading is (`(None, why, None)` where the history cannot be read) — rule 6's first write
+        at a declaration (TD-227) and rule 8's baseline at a record's end (TD-781). Blocking: git is read."""
+        name = Path(root).name
+        commit = self._live_commits().get(name)
+        resolve = ledger_mod.Registry(hosts.local_host().repos())
+        # a live check stood in the lane at `at` when its build was live then (§4.9b, §6 rule 6): known when
+        # the promote that made today's live commit live concluded before it, so the ledger then is read
+        # against that commit; unknown, it is read without, and a check live now is told once as new
+        was = promote_mod.last(name) or {}
+        try:
+            before = bool(commit) and was.get("sha") == commit and _parse(str(was.get("at"))) <= at
+        except (ValueError, TypeError):
+            before = False
+        live = ledger_mod.LiveReader(root, commit)
+        then, why = ledger_mod.entries_before(root, rel, at, resolve=resolve, live=live if before else None)
+        if then is None:
+            return then, why, None
+        # the tip read as the checkout's reading is, with its live checks' `live`, or a live one would read
+        # as the checkout's own and be seen untold
+        tip = ledger_mod.entries_before(root, rel, None, resolve=resolve, live=live)[0]
+        # both marked by the settle clock as it stands, so an entry still settling is not seen now and is told
+        # once it settles (§4.4, TD-710); `then` as the clock stood at `at`, so one settling then is told when
+        # it settles
+        remote = str((self._repos.get(s.repo or "") or {}).get("remote") or "")
+        for got, when in ((then, at), (tip, datetime.now(UTC))):
+            if got is not None:
+                TickMixin._settle(root, remote, got, when, fresh=False)
+        return then, why, tip
 
     def _lane_drops(self, s: Session, held: list[str]) -> list[tuple[str, str, str]]:
         """Rule 6's dropped lease (design §6, TD-258): of the ids `s` has seen and its lane still
@@ -1761,9 +1766,11 @@ class TickMixin:
                 rec = teams.get(team) or {}
                 old = rec.get("work_waiting")
                 on_work = (settings.get(team) or {}).get("on_work", settings_mod.ON_WORK_DEFAULT)
-                new = self._work_mark(team, old, by_team.get(team) or [], on_work, now, firsts)
+                # a record never read for news gets its baseline first, and has none on this tick (TD-781)
+                fresh = await self._work_baselines(by_team.get(team) or []) if on_work != "off" else set()
+                new = self._work_mark(team, old, by_team.get(team) or [], on_work, now, firsts, fresh)
                 starts = rec.get("work_started")
-                if new is not None and on_work == "start":
+                if new is not None and on_work == "start" and not new.get("stopped"):  # a stopped team: never
                     new = await self._work_start(team, new, rec, by_team.get(team) or [], settings.get(team) or {}, now)
                 elif isinstance(new, dict) and "held" in new:
                     new = {k: v for k, v in new.items() if k != "held"}  # `ask` again: no start to hold back
@@ -1775,7 +1782,8 @@ class TickMixin:
                     log.info("rule 8: %s has no work waiting", team)
                 else:
                     rec["work_waiting"] = new
-                    log.info("rule 8: %s wound down with work waiting: %s", team, new["members"])
+                    how = "stopped" if new.get("stopped") else "wound down"
+                    log.info("rule 8: %s %s with work waiting: %s", team, how, new["members"])
                 if rec:
                     teams[team] = rec
                 else:
@@ -1798,18 +1806,22 @@ class TickMixin:
         on_work: str,
         now: datetime,
         firsts: dict[tuple[str, str], datetime],
+        fresh: set[str] | frozenset[str] = frozenset(),
     ) -> dict[str, Any] | None:
         """One team's `work_waiting` as it reads now (`_work_marks`), or None. Its repo is the ledger's
         — a registry root, since two repos may hold one id — and a team whose members' news is in two
         repos is written for the first registry root in order; the other's waits for the next
         wind-down. A crew member's ledger that cannot be read keeps what stands: *could not look*
-        is not *no id new* (the techlead's read of #788)."""
+        is not *no id new* (the techlead's read of #788). A **stopped** team (§6 rule 8 *A team that
+        stopped*, TD-781) is read as a wound-down one, its mark carrying `stopped: {by, at}`, which no
+        start follows; `fresh` are the records whose baseline this tick wrote, which have no news on it."""
         if on_work == "off":
             return None
         wound = work_mod.team_wound_down(records) is not None
+        stopped = None if wound else work_mod.team_stopped(records)
         # a team that runs on: only its members that finished alone are read (§6 rule 8 *A member that
         # finished while its team runs on*, TD-457); none, and there is nothing for this rule
-        alone = None if wound else {r.id for r in work_mod.finished_alone(records)}
+        alone = None if wound or stopped else {r.id for r in work_mod.finished_alone(records)}
         if alone is not None and not alone:
             return None
         # a question's end (§6 rule 8 *A question's end is work*, TD-274) is written once, at the
@@ -1821,12 +1833,14 @@ class TickMixin:
                 continue  # a member its flow sat out has no lane that is the team's work (§4.9c)
             if alone is not None and r.id not in alone:
                 continue  # live, or not finished: rule 6's, or nobody's
+            if r.id in fresh:
+                continue  # its baseline was written on this tick: news from the next one (TD-781)
             led = (self._repos.get(r.repo or "") or {}).get("ledger") or {}
             if "error" in led or not isinstance(led.get("entries"), list):
                 if isinstance(old, dict):
                     # the settle's memory kept too, so the ids read back later need no second settle
                     firsts.update({k: t for k, t in self._work_first.items() if k[0] == team})
-                    return old
+                    return _stamped(old, stopped)
                 continue
             ids = news.setdefault(str(r.repo), {}).setdefault(r.name, [])
             # the repo's work orders count as entries do (§6 rule 8, TD-384): a decided line starts its team
@@ -1845,12 +1859,67 @@ class TickMixin:
             firsts.setdefault((team, i), self._work_first.get((team, i), now)) for ids in members.values() for i in ids
         )
         if now - newest < agent_common.WORK_SETTLE:
-            return old if isinstance(old, dict) else None  # still settling: what stands, stands
+            return _stamped(old, stopped) if isinstance(old, dict) else None  # still settling: what stands, stands
         at = old.get("at") if isinstance(old, dict) and old.get("at") else now_iso()
         if questions:  # the questions' references and repo are the mark's own, the lanes' news beside them
             members = _asked(questions, members)
             return {"at": at, "repo": old.get("repo") or repo, "members": members, "questions": questions}
-        return {"at": at, "repo": repo, "members": members}
+        return _stamped({"at": at, "repo": repo, "members": members}, stopped)
+
+    async def _work_baselines(self, records: list[Session]) -> set[str]:
+        """Rule 8's baseline (§6 rule 8 *How the lanes are read*, TD-781): each record `_work_mark` reads whose
+        `lane_seen` is None — never read for news, as rule 6 writes the memory only at a supervised member's
+        declaration — or holds a `base` older than the record's `created` (one a supersede carried onto a run
+        that ended undeclared) gets `{at, ids, base: true}`: the ledger's entries matching its lane as
+        `origin/<default>` held them before the record's end (`work.record_end`), the work orders matching now,
+        and the matching entries the checkout's reading holds and the ref's tip does not, pruned as `reread`
+        prunes. A read that fails writes nothing, and the next tick tries again. The ids written to."""
+        wound = work_mod.team_wound_down(records) is not None
+        stopped = not wound and work_mod.team_stopped(records) is not None
+        alone = None if wound or stopped else {r.id for r in work_mod.finished_alone(records)}
+        done: set[str] = set()
+        for r in work_mod.crew(records):
+            if r.seat is not None or r.superseded_by or work_mod.sat_out(r):
+                continue
+            if alone is not None and r.id not in alone:
+                continue
+            seen = r.lane_seen
+            if seen is not None and not (seen.get("base") and str(seen.get("at") or "") < r.created):
+                continue
+            facts = self._repos.get(r.repo or "") or {}
+            led = facts.get("ledger") or {}
+            if "error" in led or not isinstance(led.get("entries"), list):
+                continue
+            root, rel = facts.get("root") or r.repo, r.ledger or led.get("path")
+            try:
+                end = _parse(str(work_mod.record_end(r)))
+            except (ValueError, TypeError):
+                continue
+            if not (root and rel):
+                continue
+            then, why, tip = await asyncio.to_thread(self._ledger_then, r, str(root), str(rel), end)
+            if then is None or tip is None or r.lane_seen is not seen:
+                continue  # could not read it, or rule 6 wrote it while git was read: the next tick looks again
+
+            def matching(got: list[Any], r: Session = r) -> list[str]:
+                return [
+                    str(e["id"])
+                    for e in got
+                    if isinstance(e, dict) and e.get("id") and ledger_mod.lane_matches(r.lane, e, r.team)
+                ]
+
+            orders = _orders(facts)
+            ids = matching(then)
+            ids += [i for i in matching(orders) if i not in ids]  # orders keep no history: those standing now
+            # an entry the checkout holds and origin's tip does not (a branch checked out here) is seen, untold
+            on_tip = set(matching(tip))
+            ids += [i for i in matching(led["entries"]) if i not in on_tip and i not in ids]
+            r.lane_seen = {"at": now_iso(), "ids": ids, "base": True}
+            r.lane_seen = work_mod.reread(r, [*led["entries"], *orders])[0]
+            self._save(r)
+            done.add(r.id)
+            log.info("%s: rule 8's baseline from the ledger at its end (%s)", self._address(r), why)
+        return done
 
     def _question_end(self, e: Any, how: str) -> None:
         """§6 rule 8 *A question's end is work* (TD-271, TD-274 slice 4): an orphaned question that lapsed (`how:
@@ -1859,7 +1928,8 @@ class TickMixin:
         how, kind}` (the Inbox row says *steer* or *ask*) — with no settle, a standing mark gaining the question and
         keeping its `at`. Under `on_work: off`, or for a team stopped rather than wound down, or one live again, nothing
         is written: a live member is waiting (§4.9a), and a stopped team's note waits in the mailbox for the person's
-        Start. The next tick's `_work_marks` does what the team's `on_work` says. Never on a node."""
+        Start, while that team's lanes are read (*A team that stopped*, TD-781). The next tick's `_work_marks` does
+        what the team's `on_work` says. Never on a node."""
         o = e.orphaned if isinstance(e.orphaned, dict) else {}
         team, name, ref = str(o.get("team") or ""), str(o.get("name") or ""), str(o.get("ref") or "")
         if self.mode != "home" or not (team and name and ref):
@@ -1919,6 +1989,10 @@ class TickMixin:
         and a standing manager replay live. A member on a node whose link is down holds the whole
         start as `held: {why: link, host, hosts}` — every down host, `host` the first — looked at
         again on the next tick."""
+        if mark.get("stopped"):
+            # a stopped team is never started by this rule (§6 rule 8 *A team that stopped*, TD-781): its
+            # Start is the card's
+            return {k: v for k, v in mark.items() if k != "held"}
         started = [t for t in rec.get("work_started") or [] if _recent(t, now, agent_common.WORK_DAY)]
         if started != (rec.get("work_started") or []):
             rec["work_started"] = started  # a start older than the day counts for nothing

@@ -113,14 +113,23 @@ class NotifyMixin:
         }
         for team, rec in (self._host_rec.get("teams") or {}).items():
             mark = rec.get("work_waiting") if isinstance(rec, dict) else None
-            if (
-                not isinstance(mark, dict)
-                or mark.get("held")
-                or on_work.get(team, settings_mod.ON_WORK_DEFAULT) != "ask"
-            ):
+            if not isinstance(mark, dict):
+                continue
+            stopped = mark.get("stopped") if isinstance(mark.get("stopped"), dict) else None
+            if stopped is not None:
+                # a stopped team is never started, so its row is told under `ask` and `start` alike — unless the
+                # person stopped it, which is a fact kept in view, not a question (§6 rule 8, TD-781)
+                if stopped.get("by") == "person":
+                    continue
+            elif mark.get("held") or on_work.get(team, settings_mod.ON_WORK_DEFAULT) != "ask":
                 continue  # under `on_work: start` a held mark is the home's own wait, and nobody's stop
             if ids := _work_ids(mark):
                 k = f"work:{team}"
+                if stopped is not None:
+                    rows[k] = _Row(
+                        str(mark.get("at") or ""), notify.work_line(team, len(ids), stopped=True), k, f"{k}|work"
+                    )
+                    continue
                 # a team that runs on names its finished members (TD-466): the home wrote the mark for them alone
                 # *runs on* as the home reads it: its crew alone, a person's session in it keeps nothing live
                 crew = work_mod.crew(r for r in graph.values() if r.team == team)

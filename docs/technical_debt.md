@@ -1255,7 +1255,7 @@ The other cases:
 **Added:** 2026-10-16 (TD-781's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Building — slice 1 (the home: `work.team_stopped`, `stopped_by`, `record_end`; `wrapup_by`; the baseline `lane_seen`; `stopped` on the mark, never started, `work_start` refused; Telegram's *stopped* line; the `lanes` row kind) by #1952. Next: slice 2, the page and the CLI — the row, the no-record row and card note from `teamrun.lanes`, the board hint, `ao team list`, the help text, the UI check.
 **Location:** design §6 rule 8 *A team that stopped*, *A team with no record*; §4.5a *Inbox row: team start*, *team card: work waiting note*; §4.7 `ao team list`; `src/sessionorc/work.py` (a `team_stopped` reading beside `team_wound_down`), `src/sessionorc/agent_tick.py` (`_work_marks`, `_work_mark`, `_work_start` ~L1731–1960), `src/sessionorc/agent_inbox.py` (`rpc_clear_work`; `rpc_attention_snooze`'s row kinds ~L246–265), `src/sessionorc/agent_notify.py` (the Telegram tell ~L115–127), `src/shiftlead/ui/inbox.py` (the team-start row ~L898, `work_note` ~L978), `src/shiftlead/ui/repo.py` (~L604: the note's `wound_down` gate, which must take the stopped case too; and the no-record note from `teamrun.lanes`), `src/shiftlead/ui/templates/group_head.html` (~L51, the card's note), `src/shiftlead/cli.py` (`ao team list` ~L1092–1135), `src/shiftlead/ui/help.py` (`Help("on-work", …)` ~L400)
 
 **Why:** TD-781: dc-grind stood stopped for seven hours with TD-119, the Queue's first build, in its lane, and nothing was drawn, since rule 8 reads only a wound-down team.

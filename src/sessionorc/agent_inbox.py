@@ -237,7 +237,8 @@ class InboxMixin:
         agent_common.person_only(caller, "snooze the person's rows", "§4.10", self._graph())
         # `promote` (§4.5a *Inbox row: promote*, TD-132): keyed `promote:<repo>`, a repo and not a
         # record, so Snooze is by time alone and a later merge does not wake the row; `work`
-        # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`
+        # (§4.5a *Inbox row: team start*, §6 rule 8) the same way, keyed `work:<team>`, and `lanes` — a defined
+        # team with no record (§6 rule 8 *A team with no record*, TD-781) — keyed `lanes:<team>`
         # `idle_open` (§4.5a *Inbox row: idle · open work*, TD-259): a record's row, keyed as `stalled` is
         # `cadence:<pr>` (§4.5a *Inbox row: cadence check failed*, TD-258): a record's row and one a
         # PR, so the key carries the PR's number
@@ -253,6 +254,7 @@ class InboxMixin:
             "idle_open",
             "promote",
             "work",
+            "lanes",
             "red_pr",
             "ci_not_run",
         )
@@ -260,7 +262,7 @@ class InboxMixin:
             raise RpcError(
                 f"unknown row kind {kind!r}; the state rows are: "
                 f"{', '.join(ATTENTION_KINDS)}, alarm, restart, idle_open, cadence:<pr>, promote, work, "
-                "red_pr, ci_not_run"
+                "lanes, red_pr, ci_not_run"
             )
         key = f"{self._addr(id)}|{kind}"
         if until:
@@ -1108,6 +1110,11 @@ class InboxMixin:
         mark = rec.get("work_waiting")
         if not isinstance(mark, dict):
             return {"team": team, "started": False, "ids": [], "held": None}
+        if mark.get("stopped"):
+            raise RpcError(
+                f"{team} stopped: rule 8 never starts a stopped team — Start it from its card (design §6 rule 8 "
+                "*A team that stopped*)"
+            )
         ids = sorted({str(i) for v in (mark.get("members") or {}).values() if isinstance(v, list) for i in v})
         records = [r for r in self._graph().values() if r.team == team]
         conf = settings_mod.teams(settings_mod.load()).get(team) or {}

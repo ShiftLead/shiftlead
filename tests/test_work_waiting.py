@@ -144,7 +144,10 @@ async def test_a_build_seen_then_made_a_live_check_is_work_once_live(agent, tmp_
     assert waiting()["members"] == {"grinder-ao-1": ["TD-005"], "grinder-ao-2": ["TD-005"]}
 
 
-async def test_a_stopped_team_and_on_work_off_write_nothing(agent, tmp_path):
+async def test_on_work_off_writes_nothing_and_a_stopped_team_is_read(agent, tmp_path):
+    """`off` writes nothing; a team with nobody live that is not wound down is *stopped* and its lanes are read
+    all the same (§6 rule 8 *A team that stopped*, TD-781), the mark carrying `stopped`; once it reads wound
+    down, `stopped` goes and its ids stay."""
     await park_ticks(agent)
     now = datetime.now(UTC)
     repo = str(tmp_path)
@@ -156,14 +159,16 @@ async def test_a_stopped_team_and_on_work_off_write_nothing(agent, tmp_path):
     await agent._work_marks(now + WORK_SETTLE)
     assert "g" not in (agent._host_rec.get("teams") or {}), "off: nothing written"
     settings_mod.save({})
-    member.out_of_work = None  # killed by a person before it declared: stopped, not wound down
+    member.out_of_work = None  # stopped before it declared: stopped, not wound down
     await agent._work_marks(now + 2 * WORK_SETTLE)
-    assert "g" not in (agent._host_rec.get("teams") or {})
-    member.out_of_work = DECLARED
+    assert "g" not in (agent._host_rec.get("teams") or {}), "the settle starts once `off` is gone"
     await agent._work_marks(now + 3 * WORK_SETTLE)
-    assert "g" not in (agent._host_rec.get("teams") or {}), "the settle starts again for an id no longer new"
+    mark = agent._host_rec["teams"]["g"]["work_waiting"]
+    assert mark["members"] == {"grinder-ao-1": ["TD-002"]} and mark["stopped"]["by"] == "other"
+    member.out_of_work = DECLARED
     await agent._work_marks(now + 4 * WORK_SETTLE)
-    assert agent._host_rec["teams"]["g"]["work_waiting"]["members"] == {"grinder-ao-1": ["TD-002"]}
+    mark = agent._host_rec["teams"]["g"]["work_waiting"]
+    assert mark["members"] == {"grinder-ao-1": ["TD-002"]} and "stopped" not in mark
 
 
 async def test_a_ledger_that_cannot_be_read_keeps_the_mark(agent, tmp_path):

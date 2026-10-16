@@ -64,11 +64,11 @@ def restart_line(name: str, team: str) -> str:
     return f"{PREFIX} · {team + ': ' if team else ''}{name} was not restarted"
 
 
-def work_line(team: str, n: int, finished: list[str] | None = None) -> str:
+def work_line(team: str, n: int, finished: list[str] | None = None, stopped: bool = False) -> str:
     """A wound-down team whose lanes gained work: *shiftlead · cm-grind wound down and has work: 3 entries*;
     for a team that runs on, its finished members (§6 rule 8, TD-466): *… ao-grind's grinder-ao-1 finished
-    and has work: 1 entry*."""
-    who = f"'s {', '.join(finished)} finished" if finished else " wound down"
+    and has work: 1 entry*; for a stopped team (TD-781): *… dc-grind stopped and has work: 1 entry*."""
+    who = " stopped" if stopped else f"'s {', '.join(finished)} finished" if finished else " wound down"
     return f"{PREFIX} · {team}{who} and has work: {n} entr{'y' if n == 1 else 'ies'}"
 
 
