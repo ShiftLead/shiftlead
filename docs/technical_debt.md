@@ -60,13 +60,13 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
-| TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-784 | Build TD-112 (1): the adapter conformance suite — `tests/conformance/`, offline fixtures in CI, `pdm run conformance <adapter>` live by hand; Claude Code passes it | Medium | Open |
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-793 | No test holds that `asked` is the *first* ask: the sort by `at` in `held.asks` and the earlier-wins merge in `_red_prs` can be reversed and every test passes | Low | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
+| TD-795 | The Queue's two `src/sessionorc/` leftovers from TD-771 — *held until <the words after the dash>* and Telegram's card link for an item drawn on the Queue | Low | Open |
 
 ---
 
@@ -1148,33 +1148,6 @@ The other cases:
 
 ---
 
-## TD-771: Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (TD-748's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (grinder-ao-2): `/queue` with its three groups (Recently completed with the window picker and counts, In progress with the *other work* lines, Up next numbered with the grip and ⤒ ↑ ↓), `AO.qcards` shared with the Repo page, the top bar's **Queue** tab, and the reading's `Resolved:` read wherever an archived entry writes it. Slice 2 (grinder-ao-2): the mail on its card — `inbox_sections` tags each row `home: inbox|queue` (`ui.queue.card_index`, `item_home`), the Inbox and its rail draw the `home: inbox` rows with *+ n on the Queue*, the top bar's number opens `/queue?filter=needs-you` while a counted row is on a card, each item drawn on its row by the Inbox's renderer (the top entry's in the header) with *also mentioned in …*, the card raised to *needs you* or *steer*, and the page re-read when the counts move. Slice 3 (grinder-ao-2): the ledger's *for you* and held rows leave *Later* for their cards (`ui.queue.split_later`, `ledger_home`), drawn by the Inbox's ledger renderer with **Done** (*yours to do*) and **Lift the hold** (a decision; no Start session), each the Reply road with its fixed words, and *held (person)* with **Release**; the board's lines not yet due whose `Context:` names a card's entry drawn on that row with their due date; *Later* keeps what no open card holds, and the rail's *ledger entries* line is drawn only while a ledger row is there. Slice 4 (grinder-ao-2): the filter row — **All**, **Needs you (n)** with *+ n in the Inbox*, **Steering**, a chip per team, the repo pick, the kind pick and the find box, carried in the URL (`ui.queue.queue_picks`, `apply_picks`), what a pick hides hidden and never dropped; a find naming an id no open card holds offers the Repo page in the archive; `/queue?card=…&row=…&item=…` and `/queue#TD-n` open, scroll and ring; the message page's Back, `j` and `k` return to the Queue for an item drawn there; the passed-over line held by a test; the `Queue.dc.html` artboard, and the Queue tab on every artboard's top bar. Left, all in `src/sessionorc/`: `about` from the claim (`agent_mail`, grinder-ao-1's package, a line or two); *held until <the words after the dash>* — the reading carries `decision (paul)` without its words (`sessionorc/ledger.py`), so the row reads *held until your decision*; Telegram's link for a TD item, `/queue?card=…&row=…&item=…` (`sessionorc/notify.py` builds it, today `/inbox/<id>`); and TD-772's `Waits:` line in the last slice's PR.
-**Location:** design §4.5 screen 12, screen 6 (*Where a row is drawn*, *The ledger's entries that wait on you*, the held rows), §4.5a the *Queue* rows and *Org top bar: Queue tab*, §4.10 (`about` from the claim); `src/shiftlead/ui/inbox.py` (`inbox_sections` ~L1793, `ledger_for_you` ~L2154); a new `src/shiftlead/ui/queue.py`; `src/shiftlead/ui/app.py` (`/inbox` ~L3315, a new `/queue`); `src/shiftlead/ui/templates/base.html` (the top bar), `inbox.html`, `inbox_rail.html`, `ledger_for_you.html`, a new `queue.html`; `src/sessionorc/agent_mail.py` (the send's `about`); `docs/mockups/gen.py` (a `Queue.dc.html` artboard from the reviewed mockup, `docs/mockups/reviews/2026-10-16-td748-queue-*.png`)
-
-**Why:** TD-748, slice 3: the page Paul asked for — *where is TD/feature X* and *are my teams working the things I think are important first*.
-
-**Fix** (in slices if it is long, each its own PR, `ao progress done --slice`):
-- **Mail on its card**: `inbox_sections` tags each row `home: inbox|queue` (screen 6 *Where a row is drawn*; an item whose TD's card is completed is `inbox`); `shiftlead.ui.queue` attaches the `home: queue` rows to their cards' rows (`about`, else the first `TD-n` of the text with the others as mentions; a board line's `Context:`; a red PR's claim or branch) and raises the card's status to *needs you* or *steer*; the counts are untouched; the top bar's number alone (never the word *Inbox*) links to `/queue?filter=needs-you` when any counted row is `home: queue`, and the rail reads *+ n on the Queue*.
-- **`about` from the claim**: a send with no `about` takes the sender's one live claim, declared else derived, canonical (§4.10); a mentioned id's row draws *also mentioned in …*.
-- **The page** `/queue`: Recently completed (one line a card, and one per open card's archived row, *on TD-n's card*, opening to each `Resolved:` and its PR; the **4 h · day · week · month** picker with counts), In progress (green stripe, *d/m done*, the *other work* lines), Up next (numbered, the large quarter-strength number, grip and moves from TD-770); the header's questions on a folded card; the needs-you blocks by the Inbox's renderers — answers with **Reply** in one row, *yours to do* with **Reply**, **Open**, **Start session**, **Done**, *held until …* with **Lift the hold**, **Reply** (the ledger row's Reply road with *go ahead*) and **Open**, **Done** on *yours to do* (the same road with *done*), *held (person)* with **Release**; no Snooze; the passed-over line; the filters and the find box falling through to the archive; `/queue?card=…&row=…` and `/queue#TD-n`; Telegram's link for a TD item; narrow below 720 px.
-- **The Inbox**: the ledger rows and held rows leave *Later*, which keeps the board's not-yet-due items; the *ledger entries* kind leaves the rail, and the rail reads *+ n on the Queue*; `/inbox/<id>`'s Back, `j` and `k` return to the list the row is drawn in.
-- **The top bar**: a **Queue** tab after Inbox on every page, no number; Settings after it.
-- **The trial**: in the PR that lands the last slice, write TD-772's `**Waits:** until <the merge date + 14 days>` line.
-- **Tests** (`tests/test_ui_inbox.py`, `tests/test_ui_inbox_ledger.py`, a new `tests/test_ui_queue.py`, `tests/test_mail.py`): rows tagged by home; a question about a TD drawn on its card and still counted; a ledger row not in *Later*; the number's link; `about` filled from one claim and left empty with two; the groups' membership and order; Lift the hold writes one decided line; the window counts; find by id and title, and into the archive; a passed-over line drawn and not drawn for a waiting row; an In progress card draws *d/m done* and *stalled* beside it; a held (person) card reads *needs you*.
-
-**Done when** `/queue` draws every open card in rank order with its questions, the Inbox draws only what names no TD while every number is unchanged, every listed control works, every listed test passes, with screenshots in each slice's PR (design §4.9b), and TD-772 carries its `Waits:` line.
-
-**Related:** TD-748, TD-769, TD-770, TD-772, TD-734, TD-604 (Recently completed), TD-731 (Hold).
-
----
-
 ## TD-772: Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask
 
 **Priority:** Medium
@@ -1182,8 +1155,8 @@ The other cases:
 **Added:** 2026-10-16 (TD-748's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — TD-771's last slice writes this entry's `Waits:` line, fourteen days after its merge
-**Blocked by:** TD-771
+**Status:** Open — waits for the trial's two weeks since TD-771's last slice merged (#1967, 2026-10-16)
+**Waits:** until 2026-10-30 — the Queue's two-week trial, from TD-771's last merge on 2026-10-16
 **Location:** design §4.5 screen 12 (*A trial*); [ADR 2026-10-15](decisions/2026-10-15-queue.md) §7; the doing log (`doing.jsonl`), the `queue` reading's passed-over flags, the person inbox's open asks (read only)
 
 **Why:** TD-748: Paul decides from the trial whether the Queue keeps its place beside the Inbox, and what changes in the lanes; no lane change is made before it reads back (ADR §7).
@@ -1320,3 +1293,25 @@ The other cases:
 **Done when** the evaluation's measurements are written here, the debounce has landed or been shown not to help, and any design change has a filed entry of its own.
 
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
+
+---
+
+## TD-795: The Queue's two `src/sessionorc/` leftovers from TD-771 — *held until <the words after the dash>* and Telegram's card link for an item drawn on the Queue
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-16 (grinder-ao-2, split from TD-771)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Queue card: what needs the person* (*held until <the words after the dash, as written>*), §4.10 *What a message says* (the link for an item `home: queue`); `src/sessionorc/ledger.py` (the reading's `blocked_by` keeps `decision (paul)` without the words after its dash), `src/sessionorc/notify.py` (`mail_link`, today `/inbox/<id>`); `src/shiftlead/ui/templates/inbox_row.html` (the ledger row's *held until your decision*)
+
+**Why:** TD-771 built the Queue page in `src/shiftlead/`; these two need the home's reading and notifier, the other package, and were more than a line or two there.
+
+**Fix:**
+- The reading carries the words after a `decision (paul) — …` item's dash (beside `blocked_by`, which stays as `ledger.py` lists it), and the Queue card's row reads *held until <those words>*, else *held until your decision*.
+- Telegram's link for a question whose item is `home: queue` is `/queue?card=<top id>&row=<TD-n>&item=<entry id>`: the notifier resolves the item's entry against the open cards as `ui.queue.item_home` does (`about`, else the first `TD-n` of its text), else `/inbox/<id>` as now.
+
+**Done when** tests hold both: a `decision (paul) — after the trial` entry's row reads *held until after the trial*; a question `about` an open card's entry is linked to its card, one about no open entry to `/inbox/<id>`.
+
+**Related:** TD-771, TD-748.

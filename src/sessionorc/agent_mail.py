@@ -39,6 +39,17 @@ from sessionorc.models import (
 )
 
 
+def _claim_about(rec: Any) -> str | None:
+    """The sender's one live claim as a message's `about` (design §4.10, TD-748): its one declared
+    claim, else its one derived claim, as `normalize_ref` wrote it; none when it holds none or several."""
+    claimed = [p for p in rec.progress if p.status == "claimed"]
+    for source in ("declared", "derived"):
+        refs = list(dict.fromkeys(p.ref for p in claimed if p.source == source))
+        if refs:
+            return refs[0] if len(refs) == 1 else None
+    return None
+
+
 def _shots(shots: Any, kind: str) -> list[str]:
     """A look's screenshots (design §4.10 *A look*, TD-292), checked whole before anything else is
     done with them: a list of repo-relative paths, each a `.png` directly under
@@ -598,6 +609,13 @@ class MailMixin:
                         f"{sid}'s inbox holds {mail.MAILBOX_DEPTH} unread entries: the send is refused, not dropped "
                         f"(design §4.10)"
                     )
+        # -- `about` from the sender's one live claim, declared, else derived (§4.10, TD-748): what a
+        # Queue card reads to draw the message on its row; none, or several, and it stays empty. A
+        # reply keeps its thread's, so one thread is never about two entries --
+        if not about and replied is not None:
+            about = replied.about
+        if not about and me is not None:
+            about = _claim_about(me)
         # -- land it ----------------------------------------------------------------------------------
         mid = "m-" + secrets.token_hex(6)
         root = root or mid
