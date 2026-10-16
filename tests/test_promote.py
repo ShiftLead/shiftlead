@@ -812,6 +812,9 @@ async def test_the_press_under_auto_promotes_at_once_skipping_the_settle(agent, 
     """§6 *Promote*, §4.7 (TD-581): the settle and the wait are the policy's clocks, not
     preconditions — a person's press under `auto: true` promotes main's head a moment after it moved."""
     await park_ticks(agent)
+    for task in (agent._promote_task, agent._repos_task):  # TD-768: the first tick's passes, finished before
+        if task is not None:  # the test sets `_promotes`, which an in-flight promote pass replaced on CI
+            await task
     _register(checkout)
     main = _merge(checkout, "b")
     agent._promotes["repo"] = {"auto": True}

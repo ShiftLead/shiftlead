@@ -9,6 +9,7 @@ import os
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 
 from sessionorc import paths
 
@@ -56,6 +57,9 @@ async def test_the_tick_reads_a_record_as_live_until_it_ends(agent, tmp_path):
     goes on the sweep, a running one's stays."""
     from sessionorc.models import Session
 
+    # TD-768: the fixture's loop could take the sweep this test resets `_pruned_at` for, and the
+    # test's tick then skipped it and returned while the loop's sweep still ran in its thread
+    await park_ticks(agent)
     (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
     run = Session(id="ao-run-5", name="r", kind="interactive", adapter="shell", dir=str(tmp_path))
     ended = Session(id="ao-end-6", name="e", kind="interactive", adapter="shell", dir=str(tmp_path))
