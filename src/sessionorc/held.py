@@ -18,9 +18,12 @@ import subprocess
 from collections.abc import Iterable
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from sessionorc import naming
+import yaml
+
+from sessionorc import naming, paths
 from sessionorc.models import PERSON, Session, review_links
 
 GH_TIMEOUT = 30.0
@@ -28,6 +31,7 @@ GH_TIMEOUT = 30.0
 # reader merges first and replies after, and the home may read in between.
 GRACE = timedelta(minutes=15)
 READS = 5  # the PRs one pass of the tick reads: one `gh pr view` each
+HELD_READS = 5  # the open PRs' files one repo reading reads for `held` (§4.4, TD-789), apart from READS
 NAMED = 3  # the paths one line names; the rest are *and n more*
 ROW = 2  # the crossings of one member, not dismissed, that are the Inbox row
 
@@ -62,13 +66,44 @@ def matches(path: str, glob: str) -> bool:
     return _pattern(glob).fullmatch(path.lstrip("/")) is not None
 
 
+def match(files: Iterable[str], globs: Iterable[str]) -> list[str]:
+    """The files any of `globs` names, in their order."""
+    globs = list(globs)
+    return [f for f in files if any(matches(f, g) for g in globs)]
+
+
 def held_paths(files: Iterable[str], review: dict[str, Any] | None) -> list[str]:
     """The PR's changed files that its record's `review` holds — empty when there is no `review`,
     which is the case §4.9b says merges as the cadence does."""
     if not review:
         return []
-    globs = [g for link in review_links(review) for g in link["held"]]  # every link's: a chain holds their union
-    return [f for f in files if any(matches(f, g) for g in globs)]
+    return match(files, (g for link in review_links(review) for g in link["held"]))  # a chain holds their union
+
+
+def live(s: Session) -> bool:
+    """Live as §6 *Balance* counts it: neither exited nor closed, and not superseded."""
+    return s.state not in ("exited", "closed") and not s.superseded_by
+
+
+def repo_key(root: Path | str, records: Iterable[Session]) -> list[str]:
+    """The repo's held key (design §4.4 *A held PR nobody asked is marked, never ordered*, TD-789): its
+    `held:` from `.shiftlead.yml` — a list, or the union of its named sets — read directly, as
+    `ledger.ledger_path` reads `ledger:`; else the union of the `review` globs on the live records
+    whose `repo` is the root. Sorted; empty for neither, and then nothing is held."""
+    try:
+        doc = yaml.safe_load(paths.repo_file(root).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        doc = None
+    got = doc.get("held") if isinstance(doc, dict) else None
+    globs: set[str] = set()
+    if isinstance(got, dict):
+        globs = {str(g) for v in got.values() if isinstance(v, list) for g in v if str(g).strip()}
+    elif isinstance(got, list):
+        globs = {str(g) for g in got if str(g).strip()}
+    if not globs:
+        root = str(root)
+        globs = {g for s in records if s.repo == root and live(s) for x in review_links(s.review) for g in x["held"]}
+    return sorted(globs)
 
 
 def pr_read(pr: int, cwd: str | None = None) -> tuple[list[str], datetime | None]:
@@ -108,6 +143,77 @@ def pr_read(pr: int, cwd: str | None = None) -> tuple[list[str], datetime | None
 def pr_files(pr: int, cwd: str | None = None) -> list[str]:
     """The PR's changed files alone, as `ao pr held` reads them."""
     return pr_read(pr, cwd)[0]
+
+
+# ── a held PR nobody asked (§4.4 *A held PR nobody asked is marked, never ordered*, TD-789) ─────────
+
+
+def _remote(root: str, repos: dict[str, dict[str, Any]]) -> str:
+    return str((repos.get(root) or {}).get("remote") or "") or root
+
+
+def _of_remote(roots: Iterable[str], repos: dict[str, dict[str, Any]]) -> set[str]:
+    """Every registered checkout of the remotes of `roots`."""
+    remotes = {_remote(r, repos) for r in roots if r in repos}
+    return {r for r in repos if _remote(r, repos) in remotes}
+
+
+def _team_roots(team: str | None, graph: dict[str, Session], repos: dict[str, dict[str, Any]]) -> set[str]:
+    """The registered repos a team's live records name (§6 *Balance* reads a team's repos so)."""
+    if not team:
+        return set()
+    return _of_remote({s.repo for s in graph.values() if s.team == team and live(s) and s.repo}, repos)
+
+
+def asks(
+    graph: dict[str, Session], person_inbox: Iterable[Any], repos: dict[str, dict[str, Any]]
+) -> dict[str, dict[str, dict[str, str]]]:
+    """The asks the home's mail holds, by root and PR number (as a string, as the reading is saved):
+    `{at, to}` of the first `ask` carrying `pr` in the inbox of a seat the standing reads (a techlead
+    record, and any record with a `seat`) — `to` the seat's id — or in `person_inbox` (`to` the
+    person). An ask counts for every checkout of its sender's record's repo's remote; a sender with no
+    record, or whose `repo` is no registered root (a node's session), counts for every repo the seat's
+    team's live records name — in `person_inbox`, its `team` stamp's — else every repo."""
+    found: list[tuple[Any, str, str | None]] = []
+    for sid, s in graph.items():
+        if s.seat or s.role == "techlead":
+            found += [(e, sid, s.team) for e in s.inbox]
+    found += [(e, PERSON, None) for e in person_inbox]
+    out: dict[str, dict[str, dict[str, str]]] = {}
+    for e, to, team in sorted(found, key=lambda x: str(x[0].at or "")):
+        pr = e.pr
+        if e.kind != "ask" or not isinstance(pr, int) or isinstance(pr, bool):
+            continue
+        sender = graph.get(e.from_) or graph.get(_bare(e.from_))
+        if sender is not None and sender.repo in repos:
+            roots = _of_remote([sender.repo], repos)
+        else:
+            roots = _team_roots(e.team if to == PERSON else team, graph, repos) or set(repos)
+        for root in roots:
+            out.setdefault(root, {}).setdefault(str(pr), {"at": str(e.at), "to": to})
+    return out
+
+
+def has_reader(root: str, graph: dict[str, Session], repos: dict[str, dict[str, Any]]) -> bool:
+    """Whether one of the root's remote's live records carries a `review`: a held PR in a repo with
+    none has nobody to ask, and is never *unasked*."""
+    mine = _of_remote([root], repos) | {root}
+    return any(s.repo in mine and live(s) and review_links(s.review) for s in graph.values())
+
+
+def unasked(prs: Iterable[dict[str, Any]], asked: dict[str, Any], reader: bool) -> list[int]:
+    """The held PRs nobody asked: `held` non-empty, no `asked`, not a draft, a sync PR or conflicting,
+    `checks` *green* or *none* — and none at all where the repo has no reader."""
+    if not reader:
+        return []
+    return sorted(
+        int(p["number"])
+        for p in prs
+        if isinstance(p, dict) and isinstance(p.get("number"), int)
+        if p.get("held") and str(p["number"]) not in asked
+        if not (p.get("draft") or p.get("sync") or p.get("conflicting"))
+        if p.get("checks") in ("green", "none")
+    )
 
 
 # ── rule 11: merged without its read ────────────────────────────────────────────────────────────

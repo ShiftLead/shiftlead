@@ -2936,8 +2936,8 @@ class TickMixin:
             # a checkout read for the first time gets the whole reading at once, not in five minutes
             full = {r for r in todo if due or r not in self._repos}
             live = self._live_commits() if self._promotes_read else None  # None: unknown (TD-516)
-            read = self._read_repos
-            got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards) if todo else {}
+            read, keys = self._read_repos, self._held_keys(roots)
+            got = await asyncio.to_thread(read, todo, prev, full, roots, live, ledgers, boards, keys) if todo else {}
             if due:
                 self._repos_read_at = time.monotonic()  # after the read: a read that raised is retried next tick
             if boards:
@@ -2976,9 +2976,13 @@ class TickMixin:
         records of that repo — an unheld one is a `pr:<n>` order under the reading's `pr_orders`, an
         idle holder is told once per red spell (a `system` note, outside the wake budget), and `after`
         that, still idle, no longer holds it. A sync PR is an order from the first reading that sees
-        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684). A change is saved and
-        pushed as a `repos` event."""
-        records = [r for r in self._graph().values() if r.repo]
+        it, first in the list (§4.4 *A sync PR is the team's at once*, TD-684). It keeps the first ask
+        of each open PR the mail holds, `asked`, and lists the held PRs nobody asked, `unasked` (§4.4 *A
+        held PR nobody asked is marked, never ordered*, TD-789). A change is saved and pushed as a
+        `repos` event."""
+        graph = self._graph()
+        records = [r for r in graph.values() if r.repo]
+        found = held_mod.asks(graph, self.person_inbox, self._repos)
         sync_on, at = self._sync_on(), datetime.now(UTC)
         for root, r in list(self._repos.items()):
             try:
@@ -2996,11 +3000,19 @@ class TickMixin:
                     self._system_note(self._address(rec), workorders.pr_note(pr), wake="uncharged", team=rec.team)
                     log.info("%s: told PR #%s is red with it idle", sid, pr["number"])
                 held = workorders.red_holders(prs, mine, now, ORPHAN_AFTER)  # the pages' *held by* (TD-652)
-                new = {"orders": orders, "told": told, "held": held}
+                # the first ask is kept past the mail's prune, and dropped once its PR closes
+                asked = {**(found.get(root) or {}), **(old.get("asked") or {})}
+                if "open" in (r.get("prs") or {}):
+                    numbers = {str(p.get("number")) for p in prs if isinstance(p, dict)}
+                    asked = {n: a for n, a in asked.items() if n in numbers}
+                unasked = held_mod.unasked(prs, asked, held_mod.has_reader(root, graph, self._repos))
+                new = {"orders": orders, "told": told, "held": held, "asked": asked, "unasked": unasked}
                 if new == {
                     "orders": old.get("orders") or [],
                     "told": old.get("told") or {},
                     "held": old.get("held") or {},
+                    "asked": old.get("asked") or {},
+                    "unasked": old.get("unasked") or [],
                 }:
                     continue
                 if (cur := self._repos.get(root)) is None:
@@ -3198,6 +3210,18 @@ class TickMixin:
         commit could not be read — names none, and unknown is never live."""
         return {name: str(r["live"]) for name, r in self._promotes.items() if r.get("live") and not r.get("live_why")}
 
+    def _held_keys(self, roots: list[str]) -> dict[str, list[str]]:
+        """Each root's held key for the PR read (§4.4 *A held PR nobody asked is marked*, TD-789):
+        `held.repo_key` from the graph, and the union over the roots of one remote (`by_remote` reads
+        it once for them all, at the first root's key on a pass where no `remote` is read yet)."""
+        records = list(self._graph().values())
+        own = {r: held_mod.repo_key(r, records) for r in roots}
+        union: dict[str, set[str]] = {}
+        for r in roots:
+            remote = str((self._repos.get(r) or {}).get("remote") or "") or r
+            union.setdefault(remote, set()).update(own[r])
+        return {r: sorted(union[str((self._repos.get(r) or {}).get("remote") or "") or r]) for r in roots}
+
     @staticmethod
     def _read_repos(
         roots: list[str],
@@ -3207,6 +3231,7 @@ class TickMixin:
         live: dict[str, str] | None = None,
         ledgers: set[str] | None = None,
         boards: bool = False,
+        keys: dict[str, list[str]] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Each checkout's reading, in a thread: `{name, root, remote, ledger, prs, at}`. A root in
         `full` has its PRs and the ledger's history read; the others their ledger's entries alone,
@@ -3218,7 +3243,7 @@ class TickMixin:
         host agent started — is unknown, not *not live*: each live check keeps the `live` its last
         reading gave it (§6 rule 6, TD-516), so a restart never takes one out of a lane and brings
         it back as new. A promote pass that keeps failing keeps it unknown, and nothing goes live
-        while it does."""
+        while it does. `keys` is each root's held key (`_held_keys`): the thread has no records."""
         now = datetime.now(UTC)
         stamp = now.isoformat()
         by_remote: dict[str, dict[str, Any]] = {}
@@ -3232,8 +3257,9 @@ class TickMixin:
                 reader = ledger_mod.LiveReader(root, (live or {}).get(Path(root).name))
                 led = ledgers is None or root in ledgers or "ledger" not in old
                 out[root] = TickMixin._read_repo(
-                    root, old, root in full, now, by_remote, resolve, reader, ledger=led, boards=boards
-                )
+                    root, old, root in full, now, by_remote, resolve, reader, ledger=led, boards=boards,
+                    held=(keys or {}).get(root),
+                )  # fmt: skip
                 if live is None:  # no promote reading yet since the start: unknown is not *not live* (TD-516)
                     _carry_live(out[root], old)
             except Exception as e:  # noqa: BLE001 — one checkout's surprise is its reading's error, not the batch's
@@ -3262,6 +3288,7 @@ class TickMixin:
         *,
         ledger: bool = True,
         boards: bool = False,
+        held: list[str] | None = None,
     ) -> dict[str, Any]:
         """One checkout's reading (`_read_repos`): `by_remote` holds the PR readings taken in this
         pass, so two checkouts of one remote are one `gh` read. `ledger` False keeps the last
@@ -3284,7 +3311,7 @@ class TickMixin:
             if remote and remote in by_remote:
                 prs = by_remote[remote]
             else:
-                fresh = reports.pr_reading(root, now, old=prs)
+                fresh = reports.pr_reading(root, now, old=prs, held=held)
                 prs = {**(prs or {}), "error": fresh["error"], "failed_at": stamp} if "error" in fresh else fresh
                 if remote:
                     by_remote[remote] = prs
@@ -3579,7 +3606,7 @@ class TickMixin:
         results = await asyncio.gather(
             *(
                 # the ledger path the client read from the repo's config at create (design §5
-                # `ledger:`), else the default — this package never reads `.shiftlead.yml` itself
+                # `ledger:`), else the default — the record's own, never a re-read of `.shiftlead.yml`
                 asyncio.to_thread(
                     reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left, reviews
                 )
