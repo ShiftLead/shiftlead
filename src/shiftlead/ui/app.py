@@ -268,6 +268,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     kind_subject,  # noqa: F401
+    lanes_hold,  # noqa: F401
+    lanes_rows,  # noqa: F401
     ledger_for_you,  # noqa: F401
     ledger_rows,  # noqa: F401
     live_look,  # noqa: F401
@@ -745,6 +747,7 @@ async def agent_call(method: str, **params: Any) -> Any:
 # long-lived request never holds a stale one.
 _REPOS_MEMO: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("repos_memo", default=None)
 REPOS_MEMO_TTL = 2.0
+LANES_WAIT = 5.0  # seconds a team's lanes reading waits on one RPC from its worker thread (TD-781)
 
 # What a page leaves out of the `repos` reading (the RPC's `omit`, design §4.4 *Repo facts*, TD-746):
 # the parts no reader of the page draws — the ledger's month of history (`ledger.recent`, which only the
@@ -781,6 +784,7 @@ class Readings:
         self.pull_cache: dict[str, Any] = {"at": float("-inf")}
         self.needs_cache: dict[str, Any] = {"rows": []}
         self.waits_cache: dict[str, Any] = {"at": 0.0, "waits": None}
+        self.lanes_cache: dict[str, tuple[float, Any]] = {}
 
     async def queue_cards(self) -> dict[str, tuple[str, str]]:
         """The open Queue cards' entries (`ui.queue.card_index`), which say where an Inbox row is drawn
@@ -918,15 +922,70 @@ class Readings:
         # §4.5a *Inbox row: team start* (§6 rule 8, TD-227): the home's `work_waiting` marks, each
         # with the card's own *wound down* instant
         work = home.get("work") or {}
+        # …and a defined team with no record whose lanes hold work (§6 rule 8, TD-781): the client's own row
+        org = await self.defs()
+        teams = [{"name": n, "repo": t.repo} for n, t in org.teams.items()]
         return (
             rows
             + promote_rows(home.get("promotes"))
             + work_rows(work, self.wound_of(fleet) if work else None, records=fleet)
+            + lanes_rows(teams, await self.team_lanes(teams, fleet), records=fleet)
             # §4.5a *Inbox row: red PR* (TD-613): a repo no team services, from the repo readings
             + red_pr_rows(repos, fleet)
             # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
             + await asyncio.to_thread(ci_not_run_kinds, ci_not_run_rows(home.get("ci_spells")))
         )
+
+    async def team_lanes(self, teams: list[dict[str, Any]], fleet: list[dict[str, Any]]) -> dict[str, Any]:
+        """`teamrun.lanes` for each defined team no unattended record carries (§6 rule 8 *A team with no
+        record*, TD-781): what its card's note and its Inbox row say, by team, read off the loop at most
+        once in `DEFS_TTL` per team — a plan reads files and the `repos` reading. A read that fails is
+        None, which says nothing; a node reads no definition, so has none."""
+        if hosts.is_node():
+            return {}
+        manned = {str(r.get("team") or "") for r in fleet if r.get("unattended") and r.get("team")}
+        want = [str(t["name"]) for t in teams if t.get("name") and t["name"] not in manned]
+        now = time.monotonic()
+        stale = [n for n in want if n not in self.lanes_cache or now - self.lanes_cache[n][0] > DEFS_TTL]
+        if stale:
+            org, loop, repos = await self.defs(), asyncio.get_running_loop(), None
+            with contextlib.suppress(Exception):  # the request's one `repos` reading (TD-739); none is *unknown*
+                repos = await self.repos()
+
+            def call(method: str, **params: Any) -> Any:  # this reader's own RPCs, from the worker thread
+                if method == "repos":
+                    return repos
+                fut = asyncio.run_coroutine_threadsafe(self.call(method, **params), loop)
+                try:
+                    return fut.result(LANES_WAIT)
+                finally:
+                    fut.cancel()  # a call past its wait is not left running on the loop
+
+            def read() -> dict[str, Any]:
+                out: dict[str, Any] = {}
+                for n in stale:
+                    try:
+                        out[n] = teamrun.lanes(call, org, n, host_name())
+                    except Exception:  # noqa: BLE001 — one team's read costs its own row and note
+                        out[n] = None
+                return out
+
+            self.lanes_cache.update({n: (now, got) for n, got in (await asyncio.to_thread(read)).items()})
+        return {n: self.lanes_cache[n][1] for n in want}
+
+    async def with_lanes(self, rows: list[dict[str, Any]], fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The definitions' rows (`teamrun.rows`) with what a team with no crew record holds (§4.5a team
+        card **work waiting** note, TD-781): `lanes_hold`, the distinct ids its lanes match (None unread),
+        and `lanes_line`, Start's *What the lanes hold, before the start*, the note's tooltip."""
+        got = await self.team_lanes([r for r in rows if not r.get("records")], fleet)
+        for r in rows:
+            reading = got.get(str(r.get("name") or "")) if not r.get("records") else None
+            ids = lanes_hold(reading)
+            r["lanes_hold"], r["lanes_line"] = (
+                (len(ids) if ids is not None else None),
+                (reading or {}).get("line") or "",
+            )
+        return rows
 
     def wound_of(self, fleet: list[dict[str, Any]]) -> dict[str, Any]:
         """`{team: instant}` for the teams the card reads as wound down (`teamrun.rows`)."""
@@ -1114,8 +1173,8 @@ def create_app() -> FastAPI:
         return await call_next(request)
 
     async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The definitions' rows for a delta's headers."""
-        return _aged(teamrun.rows(await defs(), sessions, await home_waiting()))
+        """The definitions' rows for a delta's headers, with what a team with no record holds (TD-781)."""
+        return await rd.with_lanes(_aged(teamrun.rows(await defs(), sessions, await home_waiting())), sessions)
 
     flow_cache: dict[str, Any] = {"flows": {}}
 
@@ -1263,6 +1322,7 @@ def create_app() -> FastAPI:
         flow_views=flow_views,
         repo_facts=repo_facts,
         repos=rd.repos,  # the `repos` reading, once per request (TD-739)
+        with_lanes=rd.with_lanes,  # what a team with no record holds, its card's note (TD-781)
         identity_info=identity_info,
         person_states=person_states,
         person_view=person_view,
@@ -1343,6 +1403,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
         counts.update({k: sum(1 for v in vs if v["state"] == k) for k in ("limited", "stalled?")})
         strip = teams_view(sessions, (info or {}).get("waiting") or {})
+        if not agent_down:  # what a team with no record holds, its card's note (§6 rule 8, TD-781)
+            await h.with_lanes(strip["teams"], sessions)
         id_info = {} if agent_down else await identity_info()
         boards = [] if agent_down else (await board_items())[0]
         # §4.5a *Inbox row: promote* (TD-132 slice 3): the same rows the Inbox counts, from the
@@ -1462,6 +1524,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         with contextlib.suppress(Exception):  # an older agent or a node's link down: the headers lose their notes
             info = dict(await call("host"))
         strip = teams_view(sessions, info.get("waiting") or {})
+        await h.with_lanes(strip["teams"], sessions)  # what a team with no record holds (TD-781)
         # the Org's own groups and layout (§4.9 *The Org page*), cut to this repo's items (TD-740)
         groups = team_groups(
             vs,

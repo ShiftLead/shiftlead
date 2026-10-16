@@ -11,9 +11,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
+from shiftlead import teamrun
 from shiftlead.ui import app as uiapp
 from shiftlead.ui.app import inbox_sections
-from shiftlead.ui.inbox import work_held, work_note, work_rows, work_started
+from shiftlead.ui.inbox import lanes_hold, lanes_rows, work_held, work_note, work_rows, work_started
 
 pytestmark = pytest.mark.unit
 
@@ -349,7 +350,7 @@ def test_a_stopped_teams_row_says_how_it_stopped_and_is_never_a_running_teams():
     assert down["held"] == "" and down["stopped"] == "" and not down["later"]
     s = inbox_sections([], states=list(rows.values()))
     assert s["count"] == 2 and sorted(e["stopped"] for e in s["needs"]) == ["other", "until"]
-    assert all(e.get("stopped") != "person" for k in s if isinstance(s[k], list) for e in s[k])
+    assert [e["stopped"] for e in s["later"]] == ["person"]  # Later's, uncounted (TD-782 slice 3)
 
 
 def test_a_stopped_teams_row_and_card_on_the_pages(page):
@@ -367,4 +368,77 @@ def test_a_stopped_teams_row_and_card_on_the_pages(page):
     assert '<span class="meta">stopped</span>' in org and "1 entry waiting since" in org
     work["wt"]["stopped"]["by"] = "person"
     assert c.get("/api/person/inbox").json()["needs"] == 0
-    assert "wt · stopped" not in c.get("/inbox").text
+    # the person's own Stop: under Later, uncounted (TD-782 slice 3), its Start the card's
+    later = c.get("/inbox").text.split('id="rows-later"', 1)[1].split("</section>", 1)[0]
+    assert "wt · stopped by you" in later and 'data-act="work_start" data-id="person" data-team="wt"' in later
+    assert 'data-act="clear_work"' in later  # a stored mark: Dismiss clears it
+
+
+def lanes(*ids, n=None):
+    """A `teamrun.lanes` reading: one grinder role holding `ids`, or `n` None for a ledger unread."""
+    got = len(ids) if n is None else n
+    return {
+        "line": f"grinder: {len(ids)} pickable",
+        "empty": not ids,
+        "roles": {"grinder": {"n": got}},
+        "ids": list(ids),
+    }
+
+
+def test_a_team_with_no_record_is_a_later_row_of_what_its_lanes_hold():
+    """§6 rule 8 *A team with no record* (TD-781, TD-782 slice 3): *dc-grind · stopped · its lanes hold 1
+    entry: TD-119*, under Later, uncounted, under `ask` and `start` and never `off`; drawn only while no
+    unattended record carries the badge (a person's own session does not take it away), and only for a
+    reading that holds an entry — an unread ledger is *unknown*, never a row."""
+    teams = [{"name": "dc-grind", "repo": "/home/k/dev-cadence"}, {"name": "ao-grind", "repo": "agentorc"}]
+    readings = {"dc-grind": lanes("TD-119"), "ao-grind": lanes(*(f"TD-{i}" for i in range(1, 8)))}
+    rows = lanes_rows(teams, readings, on_work=lambda t: "ask")
+    dc, ao = sorted(rows, key=lambda r: r["team"], reverse=True)
+    assert dc["row"] == "lanes" and dc["sid"] == "lanes:dc-grind" and dc["later"] and dc["repo"] == "dev-cadence"
+    assert dc["text"] == "dc-grind · stopped · its lanes hold 1 entry: TD-119" and dc["ids"] == ["TD-119"]
+    assert ao["n"] == 7 and ao["ids"] == ["TD-1", "TD-2", "TD-3", "TD-4", "TD-5"] and ao["more"] == 2
+    assert ao["text"].endswith("TD-4, TD-5 and 2 more")
+    assert len(lanes_rows(teams, readings, on_work=lambda t: "start")) == 2
+    assert lanes_rows(teams, readings, on_work=lambda t: "off") == []
+    mine = [{"id": "ao-p", "team": "dc-grind", "unattended": False}]
+    assert len(lanes_rows(teams, readings, records=mine, on_work=lambda t: "ask")) == 2
+    crew = [{"id": "ao-w", "team": "dc-grind", "unattended": True, "state": "closed"}]
+    assert [r["team"] for r in lanes_rows(teams, readings, records=crew, on_work=lambda t: "ask")] == ["ao-grind"]
+    unread = {"dc-grind": lanes(n=None) | {"roles": {"grinder": {"n": None}}}, "ao-grind": lanes()}
+    assert lanes_rows(teams, unread, on_work=lambda t: "ask") == [] and lanes_rows(teams, {}) == []
+    assert lanes_hold(None) is None and lanes_hold(unread["dc-grind"]) is None and lanes_hold(lanes()) == []
+    # Later's, never counted; a snooze under `lanes:<team>` sets it aside as any state row's
+    s = inbox_sections([], states=[dc], now=NOW)
+    assert s["count"] == 0 and [e["id"] for e in s["later"]] == ["lanes:dc-grind"] and not s["needs"]
+    until = (NOW + timedelta(days=1)).isoformat()
+    s = inbox_sections([], states=[dc], attention_snoozed={"lanes:dc-grind|lanes": until}, now=NOW)
+    assert not s["later"] and [e["id"] for e in s["snoozed"]] == ["lanes:dc-grind"]
+
+
+def test_a_team_with_no_record_on_the_inbox_and_its_card(page, monkeypatch):
+    """The Inbox draws the no-record row under Later with Start and Snooze kept under `lanes:<team>` and no
+    Dismiss; the Org card reads *· its lanes hold n entries* beside *stopped*, its tooltip Start's line; the
+    lanes are read at most once in `DEFS_TTL` (§4.5a *team card: work waiting note*, TD-781)."""
+    c, _calls, work = page
+    reads: list[str] = []
+
+    def fake(call, org, name, host):
+        reads.append(name)
+        return lanes("TD-119", "TD-120")
+
+    monkeypatch.setattr(teamrun, "lanes", fake)
+    work.clear()
+    c.app.state.answers["list"] = []
+    html = c.get("/inbox").text
+    later = html.split('id="rows-later"', 1)[1].split("</section>", 1)[0]
+    assert "wt · stopped · its lanes hold 2 entries:" in later and 'data-row="lanes"' in later
+    assert '<a class="mono" href="/repo/r#TD-119">TD-119</a>' in later
+    assert 'data-act="work_start" data-id="person" data-team="wt"' in later and "data-running" not in later
+    assert 'data-sid="lanes:wt" data-row="lanes" data-when="1d"' in later and "clear_work" not in later
+    assert c.get("/api/person/inbox").json()["needs"] == 0
+    org = c.get("/").text
+    assert '<span class="meta lanesheld" title="grinder: 2 pickable">· its lanes hold 2 entries</span>' in org
+    assert reads == ["wt"]  # the Inbox, the poll and the Org within `DEFS_TTL`: one reading
+    # an unattended record carrying the badge takes the row and the note away
+    c.app.state.answers["list"] = [_session("g", closed_at="2026-09-30T00:56:00+00:00")]
+    assert "its lanes hold" not in c.get("/inbox").text and "its lanes hold" not in c.get("/").text

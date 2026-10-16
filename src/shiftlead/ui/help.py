@@ -407,7 +407,8 @@ HELP: tuple[Help, ...] = (
             "closed is started alone when its lane gains an entry. Start the team is the default; pick ask me where "
             "you want to look first. A start it would make is still held back, the row saying why, by the usage line, "
             "a passed stop time, three starts in a day, a start in the last thirty minutes, or the team's balance "
-            "line."
+            "line. A team that stopped is never started for its work; the Inbox says its lanes gained it — under "
+            "Later if you stopped it yourself."
         ),
     ),
     Help(

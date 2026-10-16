@@ -19,7 +19,7 @@
   'steering': 'Each says what it will do unless you say otherwise, and when. Soonest first. Doing nothing is a valid answer: at the time shown the sender goes with its default, and nothing has failed. Reply says otherwise; Go with it closes it now; Pause stops the clock.',
   'waiting': 'Questions you have answered whose asker still owes you the outcome — what came of your answer (§4.10) — and board items you decided or replied to, until a session closes them; one nobody has acted on in three days comes back to Needs you. Never counted: it waits on a session, not on you. Dismiss says you do not need to hear back — the debt ends and the asker is told. When an asker exits without reporting, or reports that it is blocked, that row is under Needs you instead, because only you or its manager can move it.',
   'answered': 'Questions a teammate answered for you from the record — the design, the ledger, a brief, a decision of yours — each with the question, who asked, the answer, who answered and where it is written down. Never counted: nothing waits on you. It is here so a confident wrong answer cannot steer a team unseen. Overrule sends your word to the one who asked, on the question’s own thread, with a copy to the one who answered; it outranks theirs, and the asker owes you what came of it. Dismiss removes the row, and Dismiss all removes the ones on screen once you have read them, their Overrule with them — never one that arrived after the page was drawn. Newest first.',
-  'later': 'Not counted. What waits on you and is not pressing: the board’s items not yet due, as your setting draws them, and the ledger’s entries that are yours or wait on your decision — each with its answers and a Reply.',
+  'later': 'Not counted. What waits on you and is not pressing: the board’s items not yet due, as your setting draws them, and the ledger’s entries that are yours or wait on your decision — each with its answers and a Reply — and a team whose lanes hold work that you stopped yourself, or that has never run.',
   'fyi': 'Notes, what the home reported about your own messages, late replies, outcomes under the questions they close, the trail of rows that resolved without you, and what lapsed or was declined — kept for 12 hours and then pruned. Its own number is never added to the one beside it: that one is what needs you. This section opens itself when it holds something this browser has not seen. Newest first. Dismiss removes an entry, and Dismiss all removes the ones on screen — never mail that arrived after the page was drawn.',
 } %}
 {% import "inbox_rail.html" as rl %}
@@ -105,9 +105,11 @@
   {# design §4.5a **Inbox: Later section** (§4.5 screen 6 *Later*, TD-560; built — TD-565): after
      *Answered for you*, before FYI — what waits on the person and is not pressing: the board's rows
      coming up with their fold and line (`#boardhorizon`, TD-220) and the ledger's *for you* rows
-     (`#ledgerforyou`, TD-368), the board's first, each its own box the poll puts back. Counted in no
-     number that means *due now*; the rail lists it with its count. Nothing drawn at zero. #}
-  {%- set later_has = (horizon and (horizon.ahead or horizon.hidden)) or (ledger and ledger.n) %}
+     (`#ledgerforyou`, TD-368), the board's first, each its own box the poll puts back, then the team
+     start rows of a team the person stopped or one with no record (`#rows-later`, §6 rule 8, TD-781),
+     a section's rows. Counted in no number that means *due now*; the rail lists it with its count.
+     Nothing drawn at zero. #}
+  {%- set later_has = (horizon and (horizon.ahead or horizon.hidden)) or (ledger and ledger.n) or sections.later %}
   <section class="isec{% if not later_has %} hidden{% endif %}" id="sec-later">
     <div class="row gap wrap sechead"><span class="h2">Later</span><span class="meta" id="n-later">{{ headn('later') }}</span><span class="meta">not pressing · not counted</span>{{ imark('later', 'Later') }}</div>
     <p class="note secinfo" id="info-later" hidden>{{ info['later'] }}</p>
@@ -115,6 +117,8 @@
     <div id="boardhorizon">{% with hz = horizon %}{% include "board_horizon.html" %}{% endwith %}</div>
     {#- the ledger's entries that wait on you (TD-368, TD-565): its own box, which the poll puts back -#}
     <div id="ledgerforyou">{% with lf = ledger %}{% include "ledger_for_you.html" %}{% endwith %}</div>
+    {#- a team that stopped by your own Stop, or has no record, and whose lanes hold work (TD-781) -#}
+    <div class="inboxrows" id="rows-later">{% with rows = sections.later, section = 'later' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is coming up.</div>
   </section>
 
