@@ -9,7 +9,7 @@
 - [Design goals: effective and non-intrusive](design-goals-effective-non-intrusive.md) — mechanical sync direct; repo-judgement work by that repo's sessions; tool wiring in adapters
 - [No VS Code windows for agent worktrees](no-vscode-windows-for-agent-worktrees.md) — open_worktree.sh opens `code -n`; use git worktree add for session-only worktrees
 - [Live system restart authorized 2026-09-13](live-system-restart-authorized.md) — stop all agents and the system; restart once teams (TD-040) exist; sweep worktrees first
-- [Design review loop with Sonnet](design-review-loop-with-sonnet.md) — Fable findings → adopt → Fable and Sonnet rounds both iterate until they agree → PR with fact-check
+- [Design review loop with Sonnet](design-review-loop-with-sonnet.md) — Fable findings → adopt → Fable and Sonnet rounds both iterate until they agree → PR with fact-check; a mechanism that keeps failing rounds: ask if it is needed
 - [Scratchpad too long for unix sockets](scratchpad-too-long-for-unix-sockets.md) — a scratch SHIFTLEAD_HOME needs a short path like ~/.cache/ao<topic>
 - [How a design round runs from a cloud session](cloud-design-round.md) — park on the board first, propose in chat, Sonnet rounds to READY, fact-check on the PR, one branch
 - [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — the designer's stacked PRs may already hold the design (a restarted run's own too: `gh pr list` before the first claim); compare and reconcile, never design twice
