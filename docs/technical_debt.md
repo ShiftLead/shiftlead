@@ -76,7 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
 | TD-778 | A shell's `cmd` cut exactly at a word's end loses that word: *python3 scripts/check_cadence.py --pr 1917* is drawn *python3 …* (#1916) | Low | Open |
 | TD-779 | Focus's *more ▾ → Close* confirm over a stale shell (`app.js`'s `cm.dataset.confirm = v.shell_close || …`, #1916) is held by no test: the line can go and the confirm stops naming the shell | Low | Open |
-| TD-780 | `view`'s `live_shells = … and bool(shells)` (#1916) is held by no test: a record with `shells_live` true and no shells is drawn *working* | Low | Open |
+| TD-780 | `view`'s `s.get("shells_live") is True and bool(shells)` (#1916) is held by no test: a record with `shells_live` true and no shells is drawn *working* | Low | Open |
 
 ---
 
@@ -1605,9 +1605,9 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/shiftlead/ui/cards.py` (`view`: `live_shells = s.get("shells_live") is True and bool(shells)`); `tests/test_ui_org.py`
+**Location:** `src/shiftlead/ui/cards.py` (`view`: the tuple assignment `live_subs, live_shells = …, s.get("shells_live") is True and bool(shells)`); `tests/test_ui_org.py`
 
-**Why:** `test-audit-ao-1`, 2026-10-16. Changing `live_shells = s.get("shells_live") is True and bool(shells)` to `s.get("shells_live") is True` leaves both #1916 tests green. The guard exists so a record whose `shells_live` is true and `shells` is empty or malformed (shells_of drops a non-dict entry) does not draw *working* with no part to name (`own_work` would be bare `working`, and `shells[0]` would raise in the slot's ending). No test builds that record.
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `live_shells`'s right-hand side `s.get("shells_live") is True and bool(shells)` to `s.get("shells_live") is True` leaves both #1916 tests green. The guard exists so a record whose `shells_live` is true and `shells` is empty or malformed (shells_of drops a non-dict entry) does not draw *working* with no part to name (`own_work` would be bare `working`, and `shells[0]` would raise in the slot's ending). No test builds that record.
 
 **Fix:** in `tests/test_ui_org.py` beside the shell tests: `view(_card(git=clean, shells=[], shells_live=True))` and one with `shells=["x"]` stay *idle*, `own_work == ""`, and do not raise. Fails under the mutation above.
 
