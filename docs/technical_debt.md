@@ -67,7 +67,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
-| TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
 | TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
 | TD-754 | The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change | Low | Open |
@@ -1360,27 +1359,6 @@ The other cases:
 **Done when** a draft PR the person paused is not a pickable `pr:<n>` in any lane, and the design says what makes it so.
 
 **Related:** TD-613 (the rule), TD-722, TD-724.
-
----
-
-## TD-747: The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/inbox_row.html` (the `row` macro and the macros under it), `inbox_rows.html`; `src/shiftlead/ui/render.py` (`inline`, `render`, the closed markdown subset each row's text goes through); `src/shiftlead/ui/inbox.py` (`row_find`, `row_subject`)
-
-**Why:** TD-739's profile, 2026-10-15: on a scratch home with 320 mail entries, 60 board lines, this repo's ledger and 12 sessions, `/inbox` took ~230 ms, of which the template was ~135 ms (it was ~186 ms before TD-739's `subject_of` fix). What is left is spread across ~1,200 macro calls: Jinja's own call overhead, ~56,000 `markupsafe.escape` calls, `render.inline` on every row's text (~3,900 calls) and `row_find`'s lowercased copy of each row. No one function is above ~10% of it.
-
-**Fix:** profile again (the harness in TD-739's PR body), then take the cheapest of: render each mail row's `md()` once per entry revision and keep it (the person inbox's `rev`, TD-616); move the per-row constant `title` strings out of the loop; or draw *FYI* folded with its rows fetched on open. Say in the PR which, and the time before and after.
-- **Tests:** the page's HTML is byte-identical before and after for a fixture inbox (or differs only where the PR says).
-
-**Done when** `/inbox` at the live size renders its template in under ~70 ms on a scratch home, and the PR gives the split.
-
-**Related:** TD-739, TD-738, TD-746.
 
 ---
 

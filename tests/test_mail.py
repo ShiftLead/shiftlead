@@ -2779,6 +2779,29 @@ def test_a_subject_is_the_first_sentence_else_the_text_clipped_at_a_word():
     assert mail.subject_of("a\x00b\x07c\x7fd. e") == "a b c\x7fd."  # every control character a space (TD-739)
 
 
+@pytest.mark.unit
+def test_a_subject_folded_from_a_prefix_is_the_whole_texts():
+    """TD-747: `subject_of` folds only a prefix of the text; on texts built to break that — a long first
+    sentence, runs of whitespace and control characters wider than the prefix, a stop right at its edge,
+    a word cut by it — it draws what folding the whole text draws."""
+    import random
+
+    def whole(text: str) -> str:
+        flat = " ".join("".join(" " if ord(c) < 32 else c for c in text).split())
+        m = mail._SENTENCE.match(flat)
+        return mail.clip_subject(m.group(1) if m else flat)
+
+    rnd = random.Random(747)
+    parts = ["word", "a.b", "end.", "why?", "x!", " ", "  ", "\n", "\n\n", "\t", "\x00", "\x1b", "—", "é", "y" * 90]
+    texts = [
+        rnd.choice(["", " " * 400, "\n" * 1500]) + "".join(rnd.choices(parts, k=rnd.randint(0, 400)))
+        for _ in range(3000)
+    ]
+    n = 4 * mail.SUBJECT_CHARS
+    texts += ["a" * (n - 1) + ". tail", "a" * n + " b. c", " " * (n - 3) + "Hi. there", "word " * 200 + "end."]
+    assert all(mail.subject_of(t) == whole(t) for t in texts)
+
+
 async def test_mail_the_person_reads_carries_a_subject_given_derived_or_its_questions(agent, tmp_path):
     """Design §4.10 *A subject on every entry* (TD-566): `--subject` is the envelope's; mail to the person
     with none takes its first sentence and the reply says so in `warnings`; one past 80 is clipped and

@@ -49,6 +49,25 @@ templates.env.globals["role_svg"] = role_svg
 # so the page slices by the host agent's own constant.
 templates.env.globals["attach_piece"] = paths.ATTACH_PIECE_BYTES
 
+_DICT_NAMES = frozenset(dir(dict))
+_jinja_getattr = templates.env.getattr
+
+
+def _getattr(obj: Any, attribute: str) -> Any:
+    """`e.text` on a plain dict, which is what every row is, read as its key at once (TD-747). Jinja tries
+    the attribute first and pays a raised `AttributeError` per lookup — about 25,000 of them a render of
+    the Inbox at the live size. A name a `dict` itself has (`items`, `get`, …) still goes Jinja's way, so
+    what any lookup draws is unchanged."""
+    if type(obj) is dict and attribute not in _DICT_NAMES:
+        try:
+            return obj[attribute]
+        except KeyError:
+            return templates.env.undefined(obj=obj, name=attribute)
+    return _jinja_getattr(obj, attribute)
+
+
+templates.env.getattr = _getattr
+
 
 @functools.cache
 def static_url(name: str) -> str:
