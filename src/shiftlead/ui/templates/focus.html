@@ -136,7 +136,8 @@
           <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
           {# Close for a team member (TD-156, Paul): its team's Wind down or Start closes it, so the
              act is here and not on the acts line; enabled only when Ready to close passes #}
-          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.close_confirm }}"{% if not (close_now or (s.agent and s.ready_ok)) %} disabled{% endif %}
+          {#- …or, on the person's own session, past a shell's SHELL_WAIT with the shell its only failing row (TD-761) #}
+          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="{{ s.shell_close or s.close_confirm }}"{% if not (close_now or (s.agent and (s.ready_ok or s.shell_close))) %} disabled{% endif %}
                   title="{{ help_title('close') }}">Close</button>
           <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="{{ help_title('kill') }}">✕ Kill</button>
         </div>

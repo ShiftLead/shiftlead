@@ -60,6 +60,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     FLOWS,  # noqa: F401
     NO_TEAM,  # noqa: F401
     NODE_RESTART,  # noqa: F401
+    SHELL_CMD_CUT,  # noqa: F401
     _clock,  # noqa: F401
     _count,  # noqa: F401
     _declared,  # noqa: F401
@@ -87,6 +88,8 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     restarted_view,  # noqa: F401
     review_wait,  # noqa: F401
     seat_occupant,  # noqa: F401
+    shell_cmd,  # noqa: F401
+    shells_of,  # noqa: F401
     state_counts,  # noqa: F401
     suspended_note,  # noqa: F401
     view,  # noqa: F401

@@ -374,13 +374,29 @@ def view(
     if state == "idle" and not d["unseen"] and d["wait_reason"]:
         d["state_class"] = d["state_label"] = d["pill_word"] = "waiting"
         d["rank"] = STATE_RANK["working"] + 0.25  # after `working`, before an unseen `idle` (idle - 0.5)
-    # **working on its own** (§4.2 *Working on its own*, TD-734): an `idle` session with a live subagent
-    # (the view's `subagents_live`) and nothing waiting is drawn *working*, ranked and filtered with it,
-    # over *idle · unseen*, whose cue shows again once the subagent ends; idle in every payload.
+    # **working on its own** (§4.2 *Working on its own*, TD-734, TD-761): an `idle` session with a live
+    # subagent or a live background shell (the view's `subagents_live`, `shells_live`) and nothing waiting
+    # is drawn *working*, ranked and filtered with it, over *idle · unseen*, whose cue shows again once its
+    # own work ends; idle in every payload. The ending joins the parts that are live, never *0 subagents*.
     n = s.get("subagents") if isinstance(s.get("subagents"), int) else 0
-    d["own_work"] = ""
-    if state == "idle" and s.get("subagents_live") is True and not d["wait_reason"]:
-        d["own_work"] = f"working · {n} subagent{'' if n == 1 else 's'}"
+    shells = shells_of(s)
+    d["own_work"] = d["own_slot"] = d["own_what"] = ""
+    live_subs, live_shells = s.get("subagents_live") is True, s.get("shells_live") is True and bool(shells)
+    if state == "idle" and (live_subs or live_shells) and not d["wait_reason"]:
+        parts, what = ["working"], []
+        if live_subs and n:
+            parts.append(f"{n} subagent{'' if n == 1 else 's'}")
+            what.append("subagents")
+        if live_shells:
+            parts.append(f"{len(shells)} shell{'' if len(shells) == 1 else 's'}")
+            what.append("background shells")
+        d["own_work"] = " · ".join(parts)
+        d["own_what"] = " and ".join(what) or "subagents"
+        # the slot's ending names the oldest shell and its age (§4.2 *What it draws*)
+        d["own_slot"] = d["own_work"]
+        if live_shells:
+            age = _age(shells[0].get("since"), now)
+            d["own_slot"] += f": {shell_cmd(shells[0])}" + (f" · {age}" if age else "")
         d["state_class"] = d["state_label"] = d["pill_word"] = "working"
         d["rank"], d["unseen"] = STATE_RANK["working"], False
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
@@ -521,7 +537,7 @@ def view(
     d["holds_control"] = has_control(s.get("capabilities"))
     # `fleet_known=False`: the caller asked for the fleet and did not get it. An empty members list
     # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
-    d["ready"] = ready_to_close(s, d["members"] if fleet_known else None) if d["agent"] else []
+    d["ready"] = ready_to_close(s, d["members"] if fleet_known else None, now=now) if d["agent"] else []
     # a record with no agent is closed without the checks (§4.5a *A record with no agent*): Close is
     # offered wherever it is drawn, and closing it kills the shell and reaps nothing
     d["ready_ok"] = (bool(d["ready"]) and all(ok for _, ok in d["ready"])) or not d["agent"]
@@ -531,6 +547,14 @@ def view(
         else f"Close {s.get('name')}? The shell is killed; the directory is left as it is."
     )
     d["not_ready"] = [name for name, ok in d["ready"] if not ok]  # what *more ▾ → Close* says it waits on
+    # §4.2 *A shell that never ends*, §4.5a *Close session* (TD-761): on the person's own session, a
+    # checklist whose only failing row is a shell past `SHELL_WAIT` offers *more ▾ → Close*, its confirm
+    # naming the shell. The page's gate alone: the Close RPC checks nothing of Ready to close.
+    stale = shells and s.get("shells_live") is False and d["own"]
+    d["shell_close"] = ""
+    if stale and len(d["not_ready"]) == 1 and "background shell" in d["not_ready"][0]:
+        age = _age(shells[0].get("since"), now)
+        d["shell_close"] = f"Close kills: {shell_cmd(shells[0])}" + (f" · running {age}" if age else "")
     # §6 rule 4 (TD-103): nudged once in this idle stretch and still idle another twenty minutes
     # later — the host agent is done, and it is for a person or its manager to judge
     # `idle_open` on the record is that reading, the tick's (§6 rule 3, TD-259): the slot, the seat's
@@ -563,7 +587,7 @@ def pill_title(d: Mapping[str, Any], ending: str = "") -> str:
     if d.get("state_class") == "waiting":
         return f"{d.get('wait_reason') or ''} — idle in every payload, on someone else’s move"
     if d.get("own_work"):
-        return f"{d['own_work']} — idle in every payload, its own subagents running"
+        return f"{d['own_work']} — idle in every payload, its own {d.get('own_what') or 'subagents'} running"
     if d.get("seat"):
         return "a seat on call: read from its record, not from a screen"
     if ending:
@@ -995,9 +1019,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             f"{text}: the reader holds its ask for its claim's pull request — idle on someone else's move (design §4.2)"
         )
     elif d.get("own_work"):
-        # §4.2 *Working on its own* (TD-734): its turn ended, its own subagents still run
-        text = d["own_work"]
-        full = f"{text}: its turn ended and its own subagents are running — idle in every payload (design §4.2)"
+        # §4.2 *Working on its own* (TD-734, TD-761): its turn ended, its own subagents or shells still run
+        text = d.get("own_slot") or d["own_work"]
+        what = d.get("own_what") or "subagents"
+        full = f"{text}: its turn ended and its own {what} are running — idle in every payload (design §4.2)"
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (
@@ -1069,9 +1094,31 @@ def next_act(d: dict[str, Any]) -> str:
     return "focus"
 
 
-def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ()) -> list[tuple[str, bool]]:
+def shells_of(s: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The record's background shells (§4.2 *A background shell task*, TD-761), oldest `since` first;
+    a malformed entry is left out rather than costing the card."""
+    got = [sh for sh in (s.get("shells") or []) if isinstance(sh, dict)] if isinstance(s.get("shells"), list) else []
+    return sorted(got, key=lambda sh: str(sh.get("since") or ""))
+
+
+SHELL_CMD_CUT = 32  # characters of a shell's `cmd` a row, a slot or a confirm draws before *…*
+
+
+def shell_cmd(sh: Mapping[str, Any]) -> str:
+    """A shell's `cmd` as a row draws it: cut at a word near `SHELL_CMD_CUT`, *…* after the cut
+    (*timeout 1500 gh pr checks 1893 …*)."""
+    cmd = " ".join(str(sh.get("cmd") or "").split()) or "a shell"
+    if len(cmd) <= SHELL_CMD_CUT:
+        return cmd
+    head = cmd[:SHELL_CMD_CUT]
+    return (head.rsplit(" ", 1)[0] if " " in head else head) + " …"
+
+
+def ready_to_close(
+    s: dict[str, Any], members: list[dict[str, Any]] | None = (), now: datetime | None = None
+) -> list[tuple[str, bool]]:
     """Phase 1 subset of the checklist (design §4.2): the agent not working, tree clean, branch pushed,
-    no subagents — and,
+    no subagents, no background shells — and,
     for a session other sessions list as a controller, no live member. That last one comes from the
     control graph, not from a role: it covers a lead, a director over leads, and a session attached
     by hand with `ao control`, and a session that controls nothing never sees it. A lead idle
@@ -1102,6 +1149,17 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
         )  # noqa: E501
         checks.append((label, pushed))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
+    # §4.2 *No background shells running* (TD-761): a Close kills the tool's background tasks, so any
+    # shell on the record fails the row — the oldest named; past `SHELL_WAIT` (the view's `shells_live`
+    # false) its age, from the oldest `since` at `now`, and what to do. Every row label reads *background shell*.
+    shells = shells_of(s)
+    if not shells:
+        checks.append(("no background shells running", True))
+    else:
+        many = f"{len(shells)} background shell{'' if len(shells) == 1 else 's'} running"
+        age = _age(shells[0].get("since"), now) if now and s.get("shells_live") is False else ""
+        stale = f"{many} {age} — stop it in the session, or Close kills it"
+        checks.append((stale if age else f"{many} — {shell_cmd(shells[0])}", False))
     # design §4.2 / §4.10 *Outcomes* (TD-079): the person answered this session's question and has
     # not been told what came of it. `ao progress none` is refused on the same fact; this row is
     # for a session that exits some other way and never declares anything.
