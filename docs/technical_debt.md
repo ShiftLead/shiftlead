@@ -75,6 +75,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
 | TD-778 | A shell's `cmd` cut exactly at a word's end loses that word: *python3 scripts/check_cadence.py --pr 1917* is drawn *python3 …* (#1916) | Low | Open |
+| TD-779 | Focus's *more ▾ → Close* confirm over a stale shell (`app.js`'s `cm.dataset.confirm = v.shell_close || …`, #1916) is held by no test: the line can go and the confirm stops naming the shell | Low | Open |
+| TD-780 | `view`'s `s.get("shells_live") is True and bool(shells)` (#1916) is held by no test: a record with `shells_live` true and no shells is drawn *working* | Low | Open |
 
 ---
 
@@ -1570,5 +1572,45 @@ The other cases:
 **Fix:** in `shell_cmd`, keep `head` whole when the character after it is a space (the cut lands at a word's end); drop the partial word only otherwise. A test in `tests/test_ui_org.py` beside the shell tests: `python3 scripts/check_cadence.py --pr 1917` → *python3 scripts/check_cadence.py …*; a cut inside a word still drops it (*timeout 1500 gh pr checks 1893 …*).
 
 **Done when** a word ending at the cut is kept and the test passes.
+
+**Related:** TD-767, TD-761.
+
+---
+
+## TD-779: Focus's *more ▾ → Close* confirm over a stale shell (#1916) is held by no test: the `app.js` line that sets it can go
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1916)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (the `#fclosemenu` block in the checklist refresh); `tests/test_ui_org.py` (`test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_the_own_session`)
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Deleting the line `cm.dataset.confirm = v.shell_close || v.close_confirm || cm.dataset.confirm;` from `app.js` leaves `pdm run pytest tests/test_ui_org.py -k "background_shell or shell_wait"` at 2 passed (main's venv, `PYTHONPATH=$PWD/src`). The test reads `app.js` for one string only, `cm.disabled = !(ready || v.shell_close)`. The template renders `data-confirm` once, at page load; after a live refresh it is this line alone that makes Close over a shell past `SHELL_WAIT` say *Close kills: <cmd> · running <age>* and not the stale or empty confirm the button was rendered with, which is #1916's stated point (§4.5a *Close session*).
+
+**Fix:** in that test, assert the `app.js` text also holds the `cm.dataset.confirm = v.shell_close || v.close_confirm` assignment (as it already does for `cm.disabled`), or better run the refresh block in the Playwright/JS harness if the suite has one. Fails under the deletion above.
+
+**Done when** deleting that line fails a test.
+
+**Related:** TD-767, TD-761.
+
+---
+
+## TD-780: `view`'s `shells_live is True and bool(shells)` (#1916) is held by no test: a record with `shells_live` true and no shells is drawn *working*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1916)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/cards.py` (`view`: the tuple assignment `live_subs, live_shells = …, s.get("shells_live") is True and bool(shells)`); `tests/test_ui_org.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `live_shells`'s right-hand side `s.get("shells_live") is True and bool(shells)` to `s.get("shells_live") is True` leaves both #1916 tests green. The guard exists so a record whose `shells_live` is true and `shells` is empty or malformed (shells_of drops a non-dict entry) does not draw *working* with no part to name (`own_work` would be bare `working`, and `shells[0]` would raise in the slot's ending). No test builds that record.
+
+**Fix:** in `tests/test_ui_org.py` beside the shell tests: `view(_card(git=clean, shells=[], shells_live=True))` and one with `shells=["x"]` stay *idle*, `own_work == ""`, and do not raise. Fails under the mutation above.
+
+**Done when** the mutation fails a test.
 
 **Related:** TD-767, TD-761.
