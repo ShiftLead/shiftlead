@@ -48,6 +48,13 @@ class Adapter(Protocol):
         ...
 
     # Optional, looked up with getattr:
+    #   implements: frozenset[str]                        which of `OPTIONAL_METHODS` an agent adapter
+    #                                                      implements: the conformance suite tests each one
+    #                                                      declared and asserts each other one absent (design
+    #                                                      §4.3 *The conformance suite*, TD-112); unset, none
+    #   permission_channel: bool                          whether a pending permission is answered through
+    #                                                      the hook channel (Allow / Deny, §4.5a): True where
+    #                                                      unset, as `agent` is; `shell` has no permissions
     #   agent: bool                                       False when what is typed at it is no prompt an agent
     #                                                      runs a turn on — `shell` and `command`; True where
     #                                                      unset. Read through `has_agent`, never an adapter's
@@ -145,6 +152,17 @@ class Adapter(Protocol):
     #                                                      (§4.2a, TD-151): the home reads it before the cap
     #                                                      rule, and prices the turns with it. No method, or
     #                                                      None: a subscription — never guessed
+
+
+# The optional methods an agent adapter declares in `implements` (design §4.3 *The conformance suite*,
+# TD-112): what the suite tests where declared and finds absent where not.
+OPTIONAL_METHODS = ("background", "composer", "context", "links", "mail", "spend", "title", "usage_report")
+
+
+def implements(adapter: object) -> frozenset[str]:
+    """The optional methods `adapter` declares (design §4.3 *The conformance suite*): its `implements`,
+    each one of `OPTIONAL_METHODS`; none where unset."""
+    return frozenset(getattr(adapter, "implements", None) or ())
 
 
 # -- the transcript's neutral shape (design §4.5 screen 9 *The adapter renders, the core draws*) --
@@ -287,6 +305,7 @@ class ShellAdapter:
     label = "Shell"  # a display name like any adapter's; a shell reports no quota, so it draws no chip
     state_source: Confidence = "scraped"
     agent = False  # what is typed at it runs as a command line, never a turn (§4.3, TD-665)
+    permission_channel = False  # a shell asks no permission (§4.3, TD-112)
 
     def launch(
         self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""

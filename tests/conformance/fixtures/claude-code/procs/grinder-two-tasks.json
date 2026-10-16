@@ -1,0 +1,112 @@
+{
+ "pane_pid": 3489905,
+ "procs": {
+  "3489905": {
+   "comm": "claude",
+   "children": [
+    3832883,
+    3833120
+   ],
+   "cmdline": [
+    "claude",
+    "--settings",
+    "/home/kmaster/.shiftlead/claude-hooks/grind+unattended.json",
+    "--session-id",
+    "c052bdd3-041c-4c72-98dc-b35189b732dc",
+    "--name",
+    "grinder-ao-2",
+    "--model",
+    "opus",
+    "--dangerously-skip-permissions",
+    "--append-system-prompt-file",
+    "/home/kmaster/.shiftlead/launch/c052bdd3-041c-4c72-98dc-b35189b732dc.context.md"
+   ],
+   "stat": {
+    "ppid": 4068338,
+    "sid": 3489905,
+    "tty_nr": 34826,
+    "start": 484565456
+   }
+  },
+  "3832883": {
+   "comm": "bash",
+   "children": [
+    3832884
+   ],
+   "cmdline": [
+    "/bin/bash",
+    "-c",
+    "source /home/kmaster/.claude/shell-snapshots/snapshot-bash-1792175105634-ifet28.sh 2>/dev/null || true && shopt -u extglob 2>/dev/null || true && { \\builtin una\u2026"
+   ],
+   "stat": {
+    "ppid": 3489905,
+    "sid": 3832883,
+    "tty_nr": 0,
+    "start": 484833762
+   }
+  },
+  "3832884": {
+   "comm": "timeout",
+   "children": [
+    3832885
+   ],
+   "cmdline": [
+    "timeout",
+    "300",
+    "sleep",
+    "290"
+   ],
+   "stat": {
+    "ppid": 3832883,
+    "sid": 3832883,
+    "tty_nr": 0,
+    "start": 484833762
+   }
+  },
+  "3832885": {
+   "comm": "sleep",
+   "children": [],
+   "cmdline": [
+    "sleep",
+    "290"
+   ],
+   "stat": {
+    "ppid": 3832884,
+    "sid": 3832883,
+    "tty_nr": 0,
+    "start": 484833762
+   }
+  },
+  "3833120": {
+   "comm": "bash",
+   "children": [
+    3833123
+   ],
+   "cmdline": [
+    "/bin/bash",
+    "-c",
+    "source /home/kmaster/.claude/shell-snapshots/snapshot-bash-1792175105634-ifet28.sh 2>/dev/null || true && shopt -u extglob 2>/dev/null || true && { \\builtin una\u2026"
+   ],
+   "stat": {
+    "ppid": 3489905,
+    "sid": 3833120,
+    "tty_nr": 0,
+    "start": 484834610
+   }
+  },
+  "3833123": {
+   "comm": "python3",
+   "children": [],
+   "cmdline": [
+    "python3",
+    "procs.py"
+   ],
+   "stat": {
+    "ppid": 3833120,
+    "sid": 3833120,
+    "tty_nr": 0,
+    "start": 484834611
+   }
+  }
+ }
+}
