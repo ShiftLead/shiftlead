@@ -71,6 +71,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-787 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Designed — built by TD-789, TD-790 |
 | TD-789 | Build TD-787 (1): the reading marks a held PR — `held.repo_key`, `pr_reading`'s per-head `held` read under `HELD_READS`, `pr_orders.asked` from the review seats' and the person's mail | Medium | Open |
 | TD-790 | Build TD-787 (2): *unasked* shown — the Repo page's tag and *i* panel, `ao repo`'s line and `--json`, `ao pr held`'s *the repo holds* line | Medium | Open |
+| TD-791 | Nothing asserts the remedy line of `ao org check`'s two-team lack: the left-out names can be dropped from `orgcheck.team_lacks`' `Team = …` suggestion and every test passes | Low | Open |
 
 ---
 
@@ -1471,3 +1472,21 @@ The other cases:
 **Done when** tests hold: the tag and its title on the Repo page, the two-team reader in the Org's order on the page and in `cmd_repo` alike and the named-set reader (a `ui` stage not named for a PR outside its set), a reader-less repo drawing nothing; `cmd_repo`'s line and `--json`, a session's `ao repo` (no mail standing) printing the tag and its reader; `ao pr held`'s added lines on both *not held* branches — unasked, asked, not yet read, no reading. §4.5a is untouched (the standing is no control); `grep -ln 4.5a tests` before changing the *i* panel's text.
 
 **Related:** TD-787, TD-789.
+
+---
+
+## TD-791: Nothing asserts the remedy line of `ao org check`'s two-team lack: the left-out names can be dropped from `orgcheck.team_lacks`' `Team = …` suggestion and every test passes
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1943)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/orgcheck.py` `team_lacks` (`names = [*declared, *…left-out…]`); `tests/test_cli_org.py` `test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `names = [*declared, *(s["team"] for s in stale if s["kind"] == "left-out")]` to `names = [*declared]` in `orgcheck.team_lacks` (the lines #1943 rewrote onto `teams.stale_teams`) leaves `pdm run pytest -q tests/test_cli_org.py tests/test_cli_teams.py` green. The lack's remedy, `add `Team = ao-grind | ops``, then names only the declared teams, so a person who follows it declares nothing new and the lack stays. `test_cli_org.py` asserts only the message's prefix (`startswith("alpha: has 2 teams and its ledger's Fields: line does not declare alpha-grind")`); the `add `Team = …`` assertion in `tests/test_cli_teams.py` reads `teamrun`'s own start-refusal message, a different function.
+
+**Fix:** extend the two-team lack test to assert the whole remedy: with `declared = []` the lack says `Team = alpha-grind | span`; with `["span"]`, `Team = span | alpha-grind`.
+
+**Done when** the mutation above fails a test.
