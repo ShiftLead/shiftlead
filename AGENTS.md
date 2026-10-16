@@ -125,8 +125,8 @@ Self-authored PRs get an independent cheaper-model review before merge; doc-only
 fact-check against the repo. A PR that `ao pr held <n>` says is held waits for its reader only once
 the author asks: when it is green, post its review, then send `ao msg --kind ask --pr <n> <reader> "…"`
 (design §4.9b *How the reader hears of a PR*) — nothing else sends the first ask. The Repo page and
-`ao repo` tag such a PR *unasked* by the repo's `held:` whoever wrote it; a session whose own `ao pr held`
-says *not held* merges on the cadence and lets the tag stand.
+`ao repo` tag such a PR *unasked* by the repo's `held:` (else its teams' roles') whoever wrote it; a
+session with no `review` on its record (its `ao pr held` says so) merges on the cadence and lets the tag stand.
 
 ## If you are a cloud session (claude.ai/code)
 
