@@ -583,7 +583,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      **unattended** sessions as the card's reading is (§4.9 *A person in the team*): none of them
      live, and every one that is not a seat — the record's `seat` field, since the home reads no
      definition — having declared `out_of_work`; a member killed or closed by a person makes it
-     *stopped*, which this rule leaves alone, and a person's own session in the team changes
+     *stopped*, which this rule never starts but still reads (*A team that stopped*, below), and a person's own session in the team changes
      nothing. The reading is written once (`sessionorc.work`), and the card's is the same function
      given the definition's seat names. When a wound-down team's member's lane holds a matching id
      its `lane_seen` does not — the memory pruned as rule 6 prunes it for a member that is gone, so
@@ -656,8 +656,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      **member by member** as well. A crew member — not a seat, not the manager — that is `closed` or
      `exited` after declaring `out_of_work` (closed by rule 9's pass, by its manager, or by itself;
      one a person closed — its `closer` names the person, §4.7 — or anyone killed — a kill writes no
-     closer and destroys the pane, `pane: false` — is *stopped* and left alone, as a stopped team
-     is), while a seat or a member of its team is live (nobody live and not wound down is
+     closer and destroys the pane, `pane: false` — is *stopped* and left unread while its team
+     runs on — *A team that stopped*, below, reads only a team with nobody live), while a seat or a member of its team is live (nobody live and not wound down is
      *stopped*), whose lane holds a matching id its `lane_seen` lacks while its team is not wound
      down, is this rule's news as a wound-down team's member is: after `WORK_SETTLE` the home writes
      the same `work_waiting` mark, `members` naming it, and the team's `on_work` follows. **What a
@@ -693,13 +693,109 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      closed record's mail (§4.10 *The name coming back adopts it*), so the successor reads the lapse
      note or the `handed` answer at its first `ao inbox` and owes the outcome. Dismiss clears the
      mark; a question ends once, so nothing is added to `lane_seen` for it. A team that is *stopped*
-     rather than wound down — a stop time, a person's Stop — is left alone as this rule leaves it:
-     the note waits in the mailbox for the person's Start, which keeps it the same way. A member
+     rather than wound down — a stop time, a person's Stop — is never started for it: the note
+     waits in the mailbox for the person's Start, which keeps it the same way, while the team's
+     lanes are read (*A team that stopped*, below). A member
      whose team is live when its question ends is not this rule's: it is waiting (§4.9a *Waiting is
      read, never declared*), and the answer or the lapse rings it where it sits. A `steer` whose
      asker merely `exited` is not orphaned (§4.10), and one whose bound passes inside the
      wind-down's settle lapses as any does, its note waiting in the mailbox for the next Start: the
      window is `FINISHED_SETTLE` wide and is left as it is.
+     **A team that stopped** (TD-781). A team with **nobody live** that is not wound down is
+     *stopped*: a person's Stop, Wind down, Close or Kill, its stop time, a kill by a session, a
+     crash the restart rules gave up on, or a member that ended without declaring. This rule
+     **starts none of them**, under any `on_work`, since each stop is someone's word or a rule's
+     judgement already made. **It reads their lanes all the same**, so work that arrives at a
+     stopped team is said rather than left to wait in silence (Paul, 2026-10-16: dc-grind stood
+     seven hours, nothing drawn, with TD-119, the Queue's first build, the one pickable entry of
+     its ledger).
+
+     **How the lanes are read.** The tick reads a stopped team's records exactly as it reads a
+     wound-down team's: the crew less its seats, superseded records and members the flow sat out,
+     the manager included where its role carries a lane. It uses the same reading of ledger
+     entries and the repo's work orders, the same `gained`, the same `WORK_SETTLE`. **A baseline**
+     is added for both kinds of team:
+     - A record that this pass reads and whose `lane_seen` is None has never been read for news,
+       because rule 6 writes the memory only at a supervised member's declaration. Today that is a
+       member stopped before it declared, a manager with a lane (rule 9 closes it without one), or
+       an unsupervised member.
+     - Such a record gets one, **`lane_seen: {at, ids, base: true}`**, on the first tick that reads
+       it. It is written as rule 6 writes its first: the ledger's entries as `origin/<default>` held
+       them before the record's end (`ledger.entries_before` at the record's **end**:
+       its `ended.at` where `ended` stands, else `closer.at`, else `closed_at` — so a Close that
+       tidies an exited card later does not move its end), with the work orders standing at the reading, since
+       orders keep no history, and, as rule 6's first write does, the entries the checkout's reading
+       holds and that ref's tip does not, seen untold. An entry filed after the record ended is news, even if the home was
+       down in between. The work it held when it stopped, and the decided lines and red PRs
+       standing then, are not news. A ledger that cannot be read at that commit writes nothing,
+       and the next tick tries again.
+     - A `base` memory older than the record's `created` is written again the same way. That is a
+       baseline a supersede carried onto a run that ended without declaring (`lane_seen` holds
+       across the name, §4.9 *A member renamed or removed in the definition*, TD-706). A declaration writes rule 6's memory, which has no `base`.
+     - `_work_mark` writes the memory pruned as `reread` prunes it, since rule 6 never prunes a
+       record with no `out_of_work`.
+
+     **A finished member stays out of it.** A member a person closed, or anyone killed, while its
+     team runs on stays unread, as *A member that finished while its team runs on* says. This
+     reading is for a team with nobody live.
+
+     **The mark** is the same `work_waiting`, with **`stopped: {by, at}`** beside `members`, read
+     over the team's **current** crew records (not superseded, not sat out):
+     - A record's **end** is its `ended.at` where `ended` stands, else `closer.at`, else
+       `closed_at` (a record closed before those fields existed). A Close that tidies an exited
+       card later does not move it. `at` is the newest end among those records.
+     - `by` is read from **the team's ending** alone: the records whose end falls within
+       `FINISHED_SETTLE` of `at`. A member the person closed a day earlier, while the team ran
+       on, does not decide how the team stopped. It is `person` where one of those records was
+       ended by the person:
+       - its `ended.by`, or for a record with no `ended` its `closer.by`, names the person (Stop
+         now, a Close, a Kill); or
+       - it left on its own after a wrap-up the person sent (Wind down, Wrap up). Such a record's
+         end names nobody, so the wrap-up send stamps **`wrapup_by`** beside `wrapup_at`, read
+         from the caller as `closer` is.
+
+       Otherwise it is `until` where one's `ended.why` or `closer.why` is the stop time's own word,
+       `stop time`, as the tick writes it when it ends a record at its `run_until`, or where one
+       whose end names nobody carries `wrapup_sent_at`, the stop time's own wrap-up stamp (§4.4a),
+       as `wrapup_by` is the person's. Otherwise it is `other`.
+
+     It is removed as a wound-down team's is: by a crew session live again, by no id new, by `off`,
+     by Start or by Dismiss. A team whose reading turns *wound down* has its mark rewritten without
+     `stopped`, its ids kept, and the rule above follows.
+
+     **What follows** is the same under `ask` and `start`: the Inbox row *team start*, never a
+     start.
+     - For `until` and `other` the row is under *Needs you*, counted, and told on Telegram as the
+       `ask` row is (§4.10), since no start follows under either setting.
+     - For `person` it is under *Later*, uncounted and never told. The person's own Stop is not a
+       question the home asks back, only a fact it keeps in view.
+     - `off` writes nothing.
+
+     A question's end on a stopped team still waits in the mailbox for the person's Start, as
+     above, while the team's lanes are read.
+
+     **A team with no record** carrying its badge (defined and never started, or every record
+     Forgotten) has no lane on any record. The home reads no definition, so it cannot read that
+     team's lanes; the client, which reads the definitions, says what they hold.
+     - Its reading is `teamrun.lanes` (§4.5a team card **Start**, *What the lanes hold, before the
+       start*), with *n* the **distinct** ids its lanes match (an entry two roles take counts
+       once). It is read at most once in `DEFS_TTL` on the page, and once per run of
+       `ao team list`.
+     - It draws the team card's note, `ao team list`'s line, and, under `ask` and `start`, an Inbox
+       row under *Later*, uncounted and never told: *dc-grind · stopped · its lanes hold 1 entry:
+       TD-119*. That row has **Start** and **Snooze** (kept in the attention store as a new row
+       kind, `lanes`, its `sid` `lanes:<team>` as the mark's row's is `work:<team>`, which
+       `attention_snooze` accepts as it accepts `work`) and no Dismiss, since nothing is stored to clear.
+       It leaves when an **unattended** record carries the badge; a person's own session in the
+       team does not take it away.
+     - It makes no start. There was no earlier reading for an entry to be new against, and a first
+       start from a definition is a person's press (§4.9 *A member renamed or removed in the
+       definition*).
+
+     A team whose members were renamed still has records under the old names. So it is a stopped
+     or a wound-down team as its records read, and not this case. TD-781's own incident (records
+     gone after the Start that rewrote them) is read either way: as a stopped team if its records
+     stood, or by this row if none did.
   9. **Finished is the home's reading** (`sessionorc.work.finished`, which the page's *concluded*
      returns; the tick's `_finished_pass`). Whether a team had finished was the manager's judgement
      (§4.9a *The manager runs the stop itself*), and a manager judges from what it remembers; every
