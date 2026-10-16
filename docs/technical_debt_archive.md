@@ -14215,3 +14215,23 @@ Each reproduction passed with its fix.
 **Related:** TD-721 (the design), TD-722, TD-725, TD-741, TD-730, TD-176.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1936) — the Repo page is the repo's items of the Org's own layout (`repo_items` over `team_groups` and `org_layout`), drawn by one partial, `org_item.html`, which the Org draws with too: the repo's line with its Repo facet once, every servicing team's whole card and the no-team strip. The cards take the Org's `/events` deltas through the shared `groupsEvent(ev, repo)` (`AO.repoItems`, `syncGroups(gs, drop)`), and fold by the Org's per-team choice. The lists, title line and seams keep the `?part=1` poll, re-read on this repo's events. Doing is every servicing team's calls, with team chips where two or more serve the repo (`repo_doing`, `doing_chips`). *Waiting on you* links `/inbox?repo=…&kind=board`. Add entry has an optional **Team** pick (`entry_plan(…, pick)`, `/api/entry/hand` `team`). Tests in `tests/test_ui_repo_org.py`; UI check on a scratch home (`docs/mockups/reviews/2026-10-16-td740-*.png`).
+
+---
+
+## TD-783: No test reads a rank file with bytes that are not UTF-8: `ledger.reading` decodes it with `errors="replace"` and a strict read passes every rank test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1930)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #1942
+**Location:** `src/sessionorc/ledger.py` `reading` (the `rank_text` read, `errors="replace"`); `tests/test_rank_order.py`, `tests/test_repo_facts.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `(Path(root) / lb.rank_path(rel)).read_text(encoding="utf-8", errors="replace")` to `read_text(encoding="utf-8")` leaves `pdm run pytest -q tests/test_rank_order.py tests/test_repo_facts.py` at 49 passed. The `errors="replace"` is the line that keeps a rank file with a stray non-UTF-8 byte from raising `UnicodeDecodeError` (a `ValueError`, not the `OSError` the `except` catches) out of the whole ledger reading of the repo; no test writes such a file.
+
+**Fix:** a `test_repo_facts.py` test that writes a rank file holding a byte like `\xff` beside a ledger and asserts `reading` still returns its entries (the bad line is ledgerboard's to flag, not a crash).
+
+**Done when** the mutation above fails a test.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1942) — `tests/test_rank_order.py`'s `test_a_rank_file_with_a_byte_that_is_not_utf8_still_reads_the_ledger` writes a rank file holding a `\xff` line beside a good one; `reading` returns every entry and the good line still ranks its entry. Dropping `errors="replace"` fails it.

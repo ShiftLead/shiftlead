@@ -67,7 +67,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-781 | A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start` | Medium | Open |
-| TD-783 | No test reads a rank file with bytes that are not UTF-8: `ledger.reading` decodes it with `errors="replace"` and a strict read passes every rank test | Low | Open |
 
 ---
 
@@ -1316,21 +1315,3 @@ The other cases:
 **Done when** the design says what a stopped team with waiting work shows and does under each `on_work`, and its build entry is filed and named in this entry's `Blocked by:`.
 
 **Related:** TD-214, TD-227, TD-457, TD-748, TD-769.
-
----
-
-## TD-783: No test reads a rank file with bytes that are not UTF-8: `ledger.reading` decodes it with `errors="replace"` and a strict read passes every rank test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1930)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/ledger.py` `reading` (the `rank_text` read, `errors="replace"`); `tests/test_rank_order.py`, `tests/test_repo_facts.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16. Changing `(Path(root) / lb.rank_path(rel)).read_text(encoding="utf-8", errors="replace")` to `read_text(encoding="utf-8")` leaves `pdm run pytest -q tests/test_rank_order.py tests/test_repo_facts.py` at 49 passed. The `errors="replace"` is the line that keeps a rank file with a stray non-UTF-8 byte from raising `UnicodeDecodeError` (a `ValueError`, not the `OSError` the `except` catches) out of the whole ledger reading of the repo; no test writes such a file.
-
-**Fix:** a `test_repo_facts.py` test that writes a rank file holding a byte like `\xff` beside a ledger and asserts `reading` still returns its entries (the bad line is ledgerboard's to flag, not a crash).
-
-**Done when** the mutation above fails a test.
