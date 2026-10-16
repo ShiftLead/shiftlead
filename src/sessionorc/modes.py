@@ -107,7 +107,7 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # The readings the home takes (§4.4 *Repo facts*, TD-176): a node holds none of them, so while the
 # link is down a read of one is refused rather than answered with nothing — an empty answer would
 # say *no PRs*, and the truth is *not known from here*.
-HOME_READS = frozenset({"repos", "doing_log"})
+HOME_READS = frozenset({"repos", "doing_log", "queue"})  # `queue`: the Queue's reading (§4.4, TD-769)
 # The ledger ids the home gives (§4.4 *A ledger entry's id is handed out by the home*, TD-696): `ids.json` is the
 # home's alone, so `td_next` is forwarded while the link is up and refused offline — a person's call too, checked
 # before the person-is-served return, or a node would give its own ids and the counter would split per host. It is
