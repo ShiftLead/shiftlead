@@ -259,6 +259,14 @@ def test_pre_holding_an_id_leaves_a_repos_first_reading_recording_every_other_id
     assert "settling" in got["TD-003"]
 
 
+def test_pre_holding_an_id_already_held_keeps_its_hold():
+    """TD-744: `prehold` over an id the person holds already leaves that hold's `at` and `by` as they were."""
+    settle.prehold("o/r", ["TD-002"], "person", T0)
+    settle.prehold("o/r", ["TD-002"], "ao-i", T0 + timedelta(minutes=3))
+    rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-002"]
+    assert rec == {"held": {"at": T0.isoformat(), "by": "person"}}
+
+
 def test_the_claim_refusal_names_the_window_or_the_hold():
     got = _settling_two()
     words = settle.claim_refusal(got["TD-002"], T0)
@@ -400,6 +408,19 @@ async def test_a_note_that_cannot_be_sent_leaves_the_hold_written_and_names_the_
     assert got["held"]["at"] and got["told"] == [] and got["untold"] == ["could not tell ao-gw: ao-gw's inbox is full"]
     assert "held" in json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]
     assert "held" in _by_id(entries)["TD-003"]
+
+
+async def test_a_pr_is_read_only_from_a_declared_claim(agent, tmp_path):
+    """TD-744 (`_hold_tell`): a PR is read from a declared lease's claim only — a derived `claimed` line on
+    the same id carrying a PR names no reader."""
+    await park_ticks(agent)
+    root, _ = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
+    worker.progress.append(ProgressEntry(ref="TD-003", pr=1842, source="derived"))
+    reader = _put(agent, "ao-tl", unattended=True)
+    reader.inbox.append(MailEntry(id="m-a1", from_="ao-gw", to=["ao-tl"], at="t", kind="ask", text="read", pr=1842))
+    got = await agent.rpc_td_hold(repo=root, id="TD-003")
+    assert got["told"] == ["ao-gw"] and got["readers"] == [] and _notes(reader, "TD-003") == []
 
 
 async def test_a_reviewers_pr_and_a_live_seat_are_read_once_and_a_holder_is_not_told_twice(agent, tmp_path):
