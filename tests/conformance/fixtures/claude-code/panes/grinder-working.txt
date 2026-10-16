@@ -14,7 +14,7 @@
      … +28 lines (ctrl+o to expand)
 
 ● Bash(cd /tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/c052bdd3-041c-4c72-98dc-b35189b732
-      dc/scratchpad/cap && grep -o -i "paulandheather[^\"…)
+      dc/scratchpad/cap && grep -o -i "<redacted>\"…)
   ⎿  Shell cwd was reset to /home/kmaster/shiftlead/.claude/worktrees/grinder-ao-2
 
 ● Bash(S=/tmp/claude-1000/-home-kmaster-shiftlead--claude-worktrees-grinder-ao-2/c052bdd3-041c-4c72-98dc-b35189b732d
