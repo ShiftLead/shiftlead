@@ -43,8 +43,9 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    stranded-work flags; each page gets its top-bar tab when it is built (TD-123). **Not
    started**, except the board's Snooze / Done write-back, built for the Inbox's board rows
    (TD-069 step 3); the Attention tab is struck (§4.5 screen 7).
-5. **Second adapter.** Gemini CLI (hook-fed if the OSC 9 / hooks story verifies) or a scraped
-   plain-shell adapter, whichever proves the contract better. Publish to PyPI, write the
+5. **Second adapter.** Gemini CLI, hook-fed with its terminal title as the check (§4.3 *The second
+   adapter*, TD-112; designed, built by TD-785 and TD-786), and the adapter conformance suite every
+   adapter passes (§4.3, TD-784, built first). Publish to PyPI, write the
    adapter-author guide. **Not started**, except that `ao --skill` and `ao team --skill` are
    built; what remains of TD-019 here is offering to install the skill from the New session
    flow.

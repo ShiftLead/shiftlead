@@ -16,8 +16,8 @@
    that wants the *person* writes to the org's person inbox instead. Mail to an interactive
    target **lands and never wakes**, whatever wake budget the general rule would allow: the
    mediator there is a person, and nothing starts a turn in their session but them.
-6. The core never types a menu choice into a pane; permissions are answered through the hook,
-   everything else in the terminal.
+6. The core never types a menu choice into a pane; permissions are answered through the hook
+   where the tool has one (§4.3 `permission_channel`), everything else in the terminal.
 7. The host agent's edits to a repo's board file are always committed, never left in the tree.
 8. A session's process is launched as the adapter's argv, never through the person's
    interactive shell (§4.1); tmux, not the host agent, holds the process, and on the installed home
