@@ -13930,3 +13930,63 @@ Each reproduction passed with its fix.
 **Related:** TD-757, TD-722.
 
 **Resolved:** 2026-10-16 (grinder-ao-2) — `docs/briefs/anchor.md` and `src/shiftlead/briefs/anchor.md` deleted. The grinder brief already carried the live-copy rule: its lane paragraph's *A live check* (design §4.9b) says the live copy is **read, never pressed** — `ao status -v`, a record's fields, `ao promote status`, a transcript, a headless GET — and a press only on a scratch home, so no paragraph was added; its ~L12 and ~L14 no longer named `Owner: anchor` (TD-757). `docs/briefs/docs-audit.md` and `docs/briefs/test-audit.md` file `paul` or `grinder` with a `**Waits:**` line where they said `anchor`; `src/shiftlead/team_skill.md`'s gate example waits for the techlead (its *anchor seat has a lane too* line was already gone).
+
+## TD-778: A shell's `cmd` cut exactly at a word's end loses that word: *python3 scripts/check_cadence.py --pr 1917* is drawn *python3 …* (#1916)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-767's live check)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/cards.py` (`shell_cmd`, `SHELL_CMD_CUT`); `tests/test_ui_org.py`
+
+**Why:** TD-767's live read, 2026-10-16 10:42:53Z: grinder-ao-1's background `python3 scripts/check_cadence.py --pr 1917` read *1 background shell running — python3 …* on Ready to close and the slot. `shell_cmd` takes the first `SHELL_CMD_CUT` (32) characters and drops the last partial word with `rsplit(" ", 1)`; `python3 scripts/check_cadence.py` is exactly 32 characters, so the whole word that ends at the cut is dropped as if it were partial, and the row names nothing a person can recognise.
+
+**Fix:** in `shell_cmd`, keep `head` whole when the character after it is a space (the cut lands at a word's end); drop the partial word only otherwise. A test in `tests/test_ui_org.py` beside the shell tests: `python3 scripts/check_cadence.py --pr 1917` → *python3 scripts/check_cadence.py …*; a cut inside a word still drops it (*timeout 1500 gh pr checks 1893 …*).
+
+**Done when** a word ending at the cut is kept and the test passes.
+
+**Related:** TD-767, TD-761.
+
+**Resolved:** 2026-10-16 (grinder-ao-2) — `shell_cmd` keeps `head` whole when the character after the cut is a space, and drops the partial word only otherwise; `tests/test_ui_org.py::test_a_shells_cmd_cut_at_a_words_end_keeps_the_word` holds *python3 scripts/check_cadence.py …* (32 characters, the word kept), *timeout 1500 gh pr checks 1893 …* (a cut inside a word), a 40-character word cut at 32, and a short `cmd` whole. Fails under the old `rsplit` alone.
+
+## TD-779: Focus's *more ▾ → Close* confirm over a stale shell (#1916) is held by no test: the `app.js` line that sets it can go
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1916)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/static/app.js` (the `#fclosemenu` block in the checklist refresh); `tests/test_ui_org.py` (`test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_the_own_session`)
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Deleting the line `cm.dataset.confirm = v.shell_close || v.close_confirm || cm.dataset.confirm;` from `app.js` leaves `pdm run pytest tests/test_ui_org.py -k "background_shell or shell_wait"` at 2 passed (main's venv, `PYTHONPATH=$PWD/src`). The test reads `app.js` for one string only, `cm.disabled = !(ready || v.shell_close)`. The template renders `data-confirm` once, at page load; after a live refresh it is this line alone that makes Close over a shell past `SHELL_WAIT` say *Close kills: <cmd> · running <age>* and not the stale or empty confirm the button was rendered with, which is #1916's stated point (§4.5a *Close session*).
+
+**Fix:** in that test, assert the `app.js` text also holds the `cm.dataset.confirm = v.shell_close || v.close_confirm` assignment (as it already does for `cm.disabled`), or better run the refresh block in the Playwright/JS harness if the suite has one. Fails under the deletion above.
+
+**Done when** deleting that line fails a test.
+
+**Related:** TD-767, TD-761.
+
+**Resolved:** 2026-10-16 (grinder-ao-2) — `test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_the_own_session` also asserts `app.js` holds `cm.dataset.confirm = v.shell_close || v.close_confirm`; deleting the line fails it.
+
+## TD-780: `view`'s `shells_live is True and bool(shells)` (#1916) is held by no test: a record with `shells_live` true and no shells is drawn *working*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1916)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/cards.py` (`view`: the tuple assignment `live_subs, live_shells = …, s.get("shells_live") is True and bool(shells)`); `tests/test_ui_org.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `live_shells`'s right-hand side `s.get("shells_live") is True and bool(shells)` to `s.get("shells_live") is True` leaves both #1916 tests green. The guard exists so a record whose `shells_live` is true and `shells` is empty or malformed (shells_of drops a non-dict entry) does not draw *working* with no part to name (`own_work` would be bare `working`, and `shells[0]` would raise in the slot's ending). No test builds that record.
+
+**Fix:** in `tests/test_ui_org.py` beside the shell tests: `view(_card(git=clean, shells=[], shells_live=True))` and one with `shells=["x"]` stay *idle*, `own_work == ""`, and do not raise. Fails under the mutation above.
+
+**Done when** the mutation fails a test.
+
+**Related:** TD-767, TD-761.
+
+**Resolved:** 2026-10-16 (grinder-ao-2) — `tests/test_ui_org.py::test_a_live_shell_flag_with_no_shell_to_name_stays_idle`: `shells_live` true over `shells=[]` and `shells=["x"]` draws `idle` with no `own_work`, and does not raise; fails with `and bool(shells)` removed.
