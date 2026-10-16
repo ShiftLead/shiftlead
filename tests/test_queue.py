@@ -276,3 +276,26 @@ async def test_the_home_serves_the_reading_and_pushes_it_when_it_changes(agent, 
     await agent._queue_pass(NOW + timedelta(seconds=2))  # nothing changed but `at`: no push
     assert len(sent) == 1
     assert "completed" not in await agent.rpc_queue(omit=["completed"])
+
+
+def test_review_findings_designer_wait_archived_claim_person_hold_one_flag(tmp_path):
+    """#1933's review: a designer's decision beside an open id waits; a claim on an archived id is other
+    work; the person's hold is a row's word even on the person's own entry; one flag per worker."""
+    root, r = _repo(tmp_path, "r", [
+        _entry(1, "open", Priority="High", Owner="grinder", Waits="event — a thing"),
+        _entry(2, "after it and the designer", Priority="High", Blocked_by="TD-001, decision (designer)"),
+        _entry(3, "the person's, held", Priority="High", Owner="paul"),
+        _entry(4, "unclaimed, high", Priority="High", Owner="grinder"),
+        _entry(5, "low", Priority="Low", Owner="grinder"),
+        _entry(6, "low too", Priority="Low", Owner="grinder", Blocked_by="TD-005"),
+    ], archive=[_entry(9, "archived", Resolved=f"{TODAY} — (PR #9).")])  # fmt: skip
+    ents = {e["id"]: e for e in r["ledger"]["entries"]}
+    ents["TD-001"]["waiting"] = {"on": "event", "until": ""}
+    ents["TD-003"]["held"] = {"at": NOW.isoformat()}
+    w = _rec("w", root, "TD-005", "TD-006", "TD-009", lane=["free-pick"])
+    q = _cards({root: r}, [w])
+    cards = _by_id(q)
+    assert cards["r#TD-001"]["status"] == "waiting"
+    assert cards["r#TD-003"]["top"]["state"] == "held (person)"
+    assert [f["by"] for f in cards["r#TD-004"]["passed_over"]] == ["w"]
+    assert [o["ref"] for o in q["other_work"]] == ["TD-009"]

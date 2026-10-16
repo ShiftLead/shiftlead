@@ -2943,7 +2943,8 @@ class TickMixin:
         aside. A surprise is a log line, and the last reading stands."""
         try:
             graph = list(self._graph().values())
-            waiting = set(work_mod.waiting_of(self.person_inbox))
+            # by record id: an inbox names a node's sender `id@host`, as the readers' asks do
+            waiting = {naming.split_address(k)[0] for k in work_mod.waiting_of(self.person_inbox)}
             for r in graph:
                 for a in (r.prs_waiting(home=self.host) or {}).get("asks") or ():
                     if isinstance(a, dict) and a.get("from"):

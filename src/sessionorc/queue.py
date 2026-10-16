@@ -266,7 +266,7 @@ def reading(
                 continue
             if home and (q := qid(home, p.ref) if re.fullmatch(r"TD-\d+", p.ref) else None) in open_:
                 held.setdefault(q, []).append((rec, p))
-            elif not re.fullmatch(r"TD-\d+", p.ref) or not home:
+            else:  # `board:<key>`, a PR, or an id no reading holds open
                 other.append({"ref": p.ref, "pr": p.pr or p.review_pr, "holder": _holder(rec)})
     prs: dict[str, dict[str, Any]] = {}  # an open entry → the open PR that names it
     for name, r in rs.by_name.items():
@@ -359,12 +359,12 @@ def _state(
     """A row's one state word, the first that applies (§4.4 *A row's state*), and what it needs of the
     person — `owner` (`Owner: paul`) or `decision` (`decision (paul)`) — when it waits on them, which
     draws no word."""
+    if e.get("held"):
+        return "held (person)", None
     if str(e.get("owner") or "").lower() == PERSON:
         return "", "owner"
     if ledger_mod.decided_by(dict(e), PERSON):
         return "", "decision"
-    if e.get("held"):
-        return "held (person)", None
     red = pr is not None and (pr.get("conflicting") or pr.get("checks") == "red" or pr.get("failing"))
     if any(_holder_stuck(rec, waiting, now) for rec, _ in claims):
         return "stalled", None
@@ -479,7 +479,8 @@ def _status(rows: list[dict[str, Any]], ents: list[Mapping[str, Any]]) -> str:
             return True
         if e.get("kind") == "live-check" and e.get("live") != "yes":
             return True
-        ids = e.get("blocked_by") or []
+        # blocked only by open ids: a designer's decision beside one is the designer's lane, not a wait
+        ids = [b for b in e.get("blocked_by") or [] if b.lower() != f"decision ({DESIGNER})"]
         return bool(ids) and all(not b.startswith("decision (") for b in ids)
 
     if all(waits(e) for e in ents):
@@ -518,6 +519,8 @@ def _passed_over(
                 ]
                 if not takes:
                     continue
+                if any(f["by"] == rec.id for f in c["passed_over"]):
+                    continue  # one flag per worker on a card, whichever of its claims sits below it
                 why = _first_doing(doing.get(rec.team or "", []), rec.id, p.at)
                 c["passed_over"].append({"by": rec.id, "name": rec.name, "holding": q, "ids": takes, "why": why})
 
