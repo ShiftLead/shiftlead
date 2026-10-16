@@ -777,7 +777,7 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "name": t.name,
                 "host": host,
                 "dirs": dirs,
-                "roles": sorted({m.role for m in t.members if m.team is None and m.role}),
+                "roles": sorted({m.role for m in t.members if m.role}),
                 "manager": mid if mid and teamrun.can_control(sessions, mid) else "",
             }
         )

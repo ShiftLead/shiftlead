@@ -366,7 +366,7 @@ def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, 
     whens = _seat_whens(team)
     if not whens:
         return {}
-    members = {n for m in team.members if m.team is None for n in m.names()}
+    members = {n for m in team.members for n in m.names()}
     # a manager is a seat by its **record**, not by the definition alone: a team keeps the shape it was
     # started with until its next Start (§4.9 `on_call`), so a standing manager started before the
     # definition read *on call* is no seat — nothing would fill it, and it still declares
@@ -423,8 +423,7 @@ def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
     for seat in t.seats:
         add(seat.role, [seat.name], True)
     for m in t.members:
-        if m.team is None:
-            add(m.role, m.names(), False)
+        add(m.role, m.names(), False)
     return list(out.values())
 
 
@@ -518,7 +517,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
                 "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
-                "members": sum(len(m.names()) for m in t.members if m.team is None),
+                "members": sum(len(m.names()) for m in t.members),
                 # the definition's roles in its order, each with the names that hold it — the team's
                 # *who for what* lines (design §4.5a ***i*** mark, TD-171)
                 "roles": role_holders(t),
@@ -1717,9 +1716,6 @@ def members_view(
     repo = Path(team.source).parent.name if team.source else "the repo"
     entries = []
     for i, m in enumerate(team.members):
-        if m.team is not None:
-            entries.append({"index": i, "nested": m.team, "sessions": []})
-            continue
         entries.append(
             {
                 "index": i,
@@ -1742,14 +1738,14 @@ def members_view(
         "techlead": held(team.techlead.name) if team.techlead else None,
         "members": entries,
         "twice": twice,
-        "next": {r: team.next_name(r) for r in [*(roles or []), *(m.role for m in team.members if m.team is None)]},
+        "next": {r: team.next_name(r) for r in [*(roles or []), *(m.role for m in team.members)]},
     }
     return out
 
 
 def _names(org: orgmod.Org, name: str) -> list[str]:
     team = teams.find(org, name)
-    return [n for m in team.members if m.team is None for n in m.names()]
+    return [n for m in team.members for n in m.names()]
 
 
 def _commit(call: Call, message: str) -> None:
@@ -1824,13 +1820,13 @@ def remove_member(call: Call, path: Path, name: str, *, index: int, role: str, h
     if not 0 <= index < len(team.members):
         raise teams.TeamError(f"team {name} has no member entry {index + 1} — reload and try again")
     m = team.members[index]
-    if m.team is None and m.role and team.flows:
-        left = sum(len(x.names()) for x in team.members if x.team is None and x.role == m.role) - 1
+    if m.role and team.flows:
+        left = sum(len(x.names()) for x in team.members if x.role == m.role) - 1
         here = hosts.local_host().name
         need = teams.flow_needs(org, team, m.role, team.host or host or here, here, files_via(call)) if left < 1 else ""
         if need:
             raise teams.TeamError(f"{need} needs a {m.role}: drop {need} from flows: first")
-    gone = team.members[index].names()[-1] if team.members[index].team is None else ""
+    gone = team.members[index].names()[-1]
     did = orgmod.edit_members(path, name, remove=index, role=role)
     _commit(call, f"org: {name} {did}")
     out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}

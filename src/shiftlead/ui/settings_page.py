@@ -485,8 +485,7 @@ def org_cards(defs: Mapping[str, Any]) -> list[dict[str, Any]]:
     for name, d in defs.items():
         members: dict[str, int] = {}
         for m in d.members:
-            key = f"team {m.team}" if m.team else m.role
-            members[key] = members.get(key, 0) + (m.count or 1)
+            members[m.role] = members.get(m.role, 0) + (m.count or 1)
         rows = [
             _row("repo", d.repo),
             _row("manager", f"{d.manager.name} · {d.manager.role}"),

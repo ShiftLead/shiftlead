@@ -15,7 +15,6 @@ teams:
     entries: {feature: designer}      # optional: the role Add entry's session takes, per Type (§4.9)
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
-      - {team: ao-ui}                 # a nested team
   cm-grind:
     repo: contractmatch
     host: contractmatch               # every session lands on that node (§4.4a "Teams across hosts")
@@ -145,7 +144,6 @@ class MemberDef:
     profile: str | None = None
     grants: list[str] | None = None  # None: the role's
     unattended: bool = True
-    team: str | None = None  # set: this member is a nested team, and the other fields are unused
 
     def names(self) -> list[str]:
         """The session names this member starts: the prefix, suffixed `-1`, `-2`, … above one."""
@@ -188,7 +186,7 @@ class TeamDef:
         out = [self.manager.name] if self.manager.role != PERSON and self.manager.name else []
         if self.techlead is not None:
             out.append(self.techlead.name)
-        return out + [n for m in self.members if m.team is None for n in m.names()]
+        return out + [n for m in self.members for n in m.names()]
 
     def started_names(self) -> list[str]:
         """Every session name a start of the team gives — its manager, techlead, seats and members —
@@ -213,7 +211,7 @@ class TeamDef:
         free. Otherwise never a name the definition already holds (TD-268); a counted entry's next is
         what its bump makes whatever the box says, and Add refuses it when another entry holds it."""
         taken = set(self.session_names())
-        same = [m for m in self.members if m.team is None and m.role == role]
+        same = [m for m in self.members if m.role == role]
         counted = next((m for m in same if m.count > 1), None)
         if counted is not None:
             return f"{counted.name}-{counted.count + 1}"
@@ -340,8 +338,8 @@ def merge_repo_teams(
     The repo is the team's repo, unsaid (TD-722): the checkout's directory name, on this host at
     `repo_root` — a path the org file's project already gives for this host is used as it stands —
     and its project the heading that lists it, else none. A `repo:` naming another repo is refused;
-    so are placing and nesting, which are the org file's: a `projects:` key, a `host:` and a nested
-    `{team: …}` member are each refused naming the key (§4.9 *The org is an aggregate*)."""
+    so is placing, which is the org file's: a `projects:` key and a `host:` are each refused naming the
+    key (§4.9 *The org is an aggregate*), and a `{team: …}` member is refused as it is in the org file."""
     repo_root = Path(repo_root).expanduser().resolve()
     rname = repo_root.name
     merged = org.copy()
@@ -363,11 +361,8 @@ def merge_repo_teams(
                 "(`place:`, design §4.9 *The org is an aggregate*)"
             )
         for i, m in enumerate(raw.get("members") or []):
-            if isinstance(m, dict) and "team" in m:
-                raise ValueError(
-                    f"{key}.members[{i}].team: a nested team is the org file's, not a repo's "
-                    "(design §4.9 *The org is an aggregate*)"
-                )
+            if isinstance(m, dict) and "team" in m:  # before the shadow check: a refused shape is refused anywhere
+                raise ValueError(f"{key}.members[{i}].team: {NO_NESTING}")
     if teams:  # no project is made for it: a repo in no project is a heading of its own (§4.9 *Projects*)
         merged.checkouts.setdefault(rname, {}).setdefault(hosts.local_host().name, repo_root)
     for tname, raw in teams.items():
@@ -619,7 +614,12 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 PROJECT_KEYS = ("repos", "title")
 MANAGER_KEYS = ("role", "name", "profile", "lane", "brief", "grants", "unattended", "on_call")
 # a member is never on call (§4.9): the key is the manager's alone, so on a member it is a stray one
-MEMBER_KEYS = (*(k for k in MANAGER_KEYS if k != "on_call"), "count", "team")
+MEMBER_KEYS = (*(k for k in MANAGER_KEYS if k != "on_call"), "count")
+# a member that is `{team: <name>}` is refused by name, in the design's words (§4.9 *Teams*, TD-722, TD-775)
+NO_NESTING = (
+    "no team holds another — teams that work together are teams on one repo, or on repos under one heading, "
+    "and settle things by mail: delete the entry and start that team on its own (design §4.9 *Teams*)"
+)
 TEAM_KEYS = ("repo", "manager", "techlead", "anchor", "seats", "members", "host", "entries", "flows")
 # the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
 ENTRY_TYPES = ("debt", "feature")
@@ -656,15 +656,12 @@ def _old(raw: dict[str, Any], who: str, key: str, into: dict[str, Any]) -> None:
 def _member(raw: Any, key: str, old: dict[str, Any], who: str) -> MemberDef:
     raw = _mapping(raw, key)
     if "team" in raw:
-        extra = sorted(k for k in raw if k != "team")
-        if extra:
-            raise ValueError(f"{key}: a nested team member is `{{team: <name>}}` alone; unexpected {extra}")
-        return MemberDef(team=_str(raw["team"], f"{key}.team"))
+        raise ValueError(f"{key}.team: {NO_NESTING}")
     _no_stray(raw, MEMBER_KEYS, key, OLD_KEYS)
     _old(raw, who, key, old)
     role = _str(raw.get("role"), f"{key}.role")
     if not role:
-        raise ValueError(f"{key}.role is required (or `team:` for a nested team)")
+        raise ValueError(f"{key}.role is required")
     return MemberDef(
         role=role,
         count=_count(raw.get("count"), f"{key}.count"),
@@ -853,12 +850,7 @@ def _validate(org: Org, label: str) -> None:
                 f"{key}.repo: a team works one repo — name it, `repo: <repo>`: a repo a project lists, "
                 "or a registered checkout's directory name (design §4.9 *Teams*)"
             )
-        for i, m in enumerate(team.members):
-            # a team two repos define is refused, not unknown: its own refusal says why (§4.9)
-            if m.team is not None and m.team not in org.teams and m.team not in org.refused:
-                raise ValueError(f"{key}.members[{i}].team: {m.team!r} is not a defined team ({sorted(org.teams)})")
     _names_per_repo(org, label)
-    _no_cycles(org, label)
 
 
 def _refuse_old(org: Org, team: TeamDef, key: str) -> None:
@@ -909,25 +901,10 @@ def _entries_resolve(org: Org, team: TeamDef, key: str, repo_roles: Collection[s
     `roles:`, an org role directory, a role the repo defines (its directories, design §4.9c), or one
     the team's own definition starts."""
     known = [*repoconfig.role_names(repoconfig.RepoConfig()), *org.roles, *repo_roles]
-    known += [m.role for m in team.members if m.team is None and m.role] + [s.role for s in team.seats]
+    known += [m.role for m in team.members if m.role] + [s.role for s in team.seats]
     for t, role in team.entries.items():
         if role not in known:
             raise ValueError(f"{key}.{t}: unknown role {role!r}; known: {', '.join(dict.fromkeys(known))}")
-
-
-def _no_cycles(org: Org, label: str) -> None:
-    """A team that nests itself, directly or through others, would never finish starting."""
-    for root in org.teams:
-        seen: list[str] = []
-        stack = [root]
-        while stack:
-            t = stack.pop()
-            if t in seen:
-                if t == root:
-                    raise ValueError(f"{label}: teams.{root} nests itself ({' → '.join([*seen, root])})")
-                continue
-            seen.append(t)
-            stack.extend(m.team for m in org.teams[t].members if m.team is not None and m.team in org.teams)
 
 
 # ── Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ──
@@ -1040,7 +1017,7 @@ def edit_members(
     `- {role, name, lane}` line after the block's last item. **Remove** (`remove`, the entry's index
     in the block, `role` its role, checked) decrements that entry's `count:` — the highest-numbered
     member goes — or deletes its one line. Refused with the reason when the edit cannot be one
-    line: a multi-line member, a `{team: …}` member, a team without a `members:` block. After the
+    line: a multi-line member, a team without a `members:` block. After the
     write the file is parsed again; a parse that fails restores the bytes and refuses, so a
     definition is never left unreadable. Returns what was done, in words."""
     if path.name in (
@@ -1104,8 +1081,6 @@ def edit_members(
         i, body, one = items[remove]
         if not one:
             raise ValueError(f"team {team}'s member entry {remove + 1} spans several lines — edit it by hand")
-        if "team" in body:
-            raise ValueError(f"member entry {remove + 1} is the nested team {body['team']} — edit it by hand")
         if role and body.get("role") != role:
             raise ValueError(f"team {team}'s member entry {remove + 1} is not a {role} any more — reload and try again")
         n = body.get("count", 1)

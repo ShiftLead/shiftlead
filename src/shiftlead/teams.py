@@ -7,9 +7,9 @@ own. `shiftlead.cli` runs the plan: the name checks (the `name_check` RPC, §4.1
 then each member with `controllers: [lead id]`.
 
 Design §4.9 "Starting and stopping" and "Home and reach". Two things that section describes are
-deliberately not built here and say so rather than pretending: a member that is `{team: <name>}` (a
-nested team) is refused with its name, and a repo whose checkout entry names a host the team is not
-on is reported as out of reach.
+deliberately not built here and say so rather than pretending: a repo whose checkout entry names a
+host the team is not on is reported as out of reach. (A member that is `{team: <name>}` never reaches
+here: no team holds another, and the org file's loader refuses it by name, TD-722.)
 
 A team lands on one host (design §4.4a "Teams across hosts", TD-057 step 4a): its definition's
 `host:`, else the host the start runs on. Checkouts are resolved on *that* host; the roles and
@@ -386,7 +386,7 @@ def flow_rows(
     except (TeamError, ValueError, OSError) as e:
         why = str(e).strip(chr(34))
         return [{"name": n, "current": n == now, "strip": "", "cannot": "", "unread": why} for n in team.flows]
-    staffed = {m.role for m in team.members if m.team is None and m.role}
+    staffed = {m.role for m in team.members if m.role}
     out: list[dict[str, Any]] = []
     for name in team.flows:
         row: dict[str, Any] = {"name": name, "current": name == now, "strip": "", "cannot": ""}
@@ -580,7 +580,7 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
             continue  # an unknown role is `org._entries_resolve`'s line, said where the file is read
         if kind not in ("worker", "seat"):
             raise TeamError(f"{where}: entries.{t} takes a worker or a seat, and {rname!r} is a {kind} (design §4.9c)")
-    staffed = {m.role for m in team.members if m.team is None and m.role}
+    staffed = {m.role for m in team.members if m.role}
     for name in team.flows:
         try:
             flow = flowdefs.load(name, cfg, org.roles, read=read)
@@ -747,7 +747,7 @@ def flow_redundant(
     flow, out = under.flow, []
     src = team.source.name if team.source else "its definition"
     for m in team.members:
-        stage = flow.stage_of(m.role) if m.team is None and m.lane else None
+        stage = flow.stage_of(m.role) if m.lane else None
         if stage is not None and not stage.review and m.lane == stage.lane:
             out.append(
                 f"team {team.name}: {m.name}'s lane: {', '.join(m.lane)} is what flow {flow.name} fills — "
@@ -761,7 +761,7 @@ def flow_redundant(
     reader, cfg = under.reader, under.cfg
     if reader is None or cfg is None:
         return out
-    roles = dict.fromkeys(m.role for m in team.members if m.team is None and m.role)
+    roles = dict.fromkeys(m.role for m in team.members if m.role)
     for role in roles:
         stage = flow.stage_of(role)
         review = (cfg.roles.get(role) or {}).get("review")
@@ -892,8 +892,6 @@ def team_review(team: orgmod.TeamDef, roles: dict[str, Any]) -> dict[str, Any] |
         return None
     held: set[str] = set()
     for m in team.members:
-        if m.team is not None:
-            continue  # a nested team is its own definition, with its own reader
         review = getattr(roles.get(m.role), "review", None)
         if review:
             held.update(review.get("held") or [])
@@ -942,7 +940,7 @@ def team_roles(team: orgmod.TeamDef, cfg: repoconfig.RepoConfig, overlay: dict[s
     safety net, and a start must not fail on a role it would only have read."""
     out: dict[str, Any] = {}
     for m in team.members:
-        if m.team is None and m.role and m.role not in out:
+        if m.role and m.role not in out:
             try:
                 out[m.role] = repoconfig.resolve_role(cfg, m.role, overlay)
             except (KeyError, ValueError):
@@ -1055,11 +1053,6 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             )
         )
     for member in team.members:
-        if member.team is not None:
-            raise TeamError(
-                f"team {team.name}: member {{team: {member.team}}} is a nested team, which is not built yet "
-                f"(design §4.9: the flat case ships first) — start it on its own with `ao team start {member.team}`"
-            )
         if under is not None and under.sits_out(member.role):
             # §4.9c: not started at a Start, interactive or not — a definition's member is the team's
             # to start; what an interactive member is spared is the switch's wind-down (slice 5)

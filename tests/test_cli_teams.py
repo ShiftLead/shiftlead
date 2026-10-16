@@ -321,14 +321,16 @@ def test_a_planned_member_carries_its_profiles_adapter(world):
     assert by["orc-ao"].create_params([])["adapter"] == "claude-code"
 
 
-def test_a_nested_team_member_says_it_is_not_built_rather_than_pretending(world, capsys):
+def test_a_team_member_is_refused_when_the_file_is_read_and_nothing_starts(world, capsys):
+    """§4.9 *Teams* (TD-775): no team holds another — `{team: …}` fails the load, naming the key."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
     doc["teams"]["inner"] = {"repo": "shiftlead", "manager": {"role": "person"}, "members": []}
     doc["teams"]["ao-grind"]["members"].append({"team": "inner"})
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1
-    assert "nested team, which is not built yet" in capsys.readouterr().err and not creates(state)
+    err = capsys.readouterr().err
+    assert "members[1].team: no team holds another" in err and not creates(state)
 
 
 def test_an_unknown_team_names_the_defined_ones(world, capsys):
@@ -633,7 +635,7 @@ def test_the_org_is_one_aggregate_of_the_registered_checkouts(world, capsys, mon
     org, notes = orgmod.with_repos(orgmod.load(), cli.hosts.local_host().repos())
     assert "twice" in org.teams and not org.refused and notes == []
     reg.write_text("".join(f"{tmp_path / r}\n" for r in ("shiftlead", "ao-api")))
-    # spanning, placing and nesting are the org file's: the repo is skipped and named
+    # spanning and placing are the org file's, and no team holds another: the repo is skipped and named
     for bad, key in (
         ({"projects": ["ao"]}, "projects"),
         ({"host": "devenv"}, "host"),
@@ -1360,21 +1362,19 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
 
 
 @pytest.mark.unit
-def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_path, monkeypatch):
-    """The failure a guide dies of, second kind: a shape the **loader** accepts and the **planner**
-    refuses. `{team: other-team}` parses — `org.py` carries it in its own docstring example — and
-    `ao team list` shows it, so it reads as built; `teams.plan()` raises *is a nested team, which
-    is not built yet*. The first draft of this file told people to use it (fact-check of PR #302).
+def test_the_recipe_does_not_tell_anyone_to_write_what_the_loader_refuses(tmp_path, monkeypatch):
+    """The failure a guide dies of, second kind: a shape the recipe presents as working that the code
+    refuses. `{team: other-team}` once parsed and was refused only at `start`, and the first draft of
+    this file told people to use it (fact-check of PR #302); since TD-775 the loader refuses it by name
+    (no team holds another, design §4.9 *Teams*).
 
-    So the recipe is held to the planner as well as to the loader: it may not present a shape as
-    working unless `plan()` accepts it, and where it names one that does not work it must say so."""
+    So the recipe is held to the loader: where it names a shape that does not work it says so."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     import importlib
 
     import yaml
 
     from shiftlead import org as orgmod
-    from shiftlead import teams
     from shiftlead.cli import team_skill_text
 
     importlib.reload(orgmod)
@@ -1387,15 +1387,13 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
             },
         })
     )  # fmt: skip
-    org = orgmod.load()
-    assert org.teams["outer"].members[0].team == "inner"  # the loader takes it…
-    with pytest.raises(teams.TeamError, match="is a nested team, which is not built yet"):
-        teams.plan(org, "outer", host="h")  # …and the planner does not
+    with pytest.raises(ValueError, match=r"teams\.outer\.members\[0\]\.team: no team holds another"):
+        orgmod.load()  # the loader refuses it by name
 
     # so the recipe says exactly that, rather than presenting it as a feature
     text = team_skill_text()
-    assert "{team: other-team}" in text and "refused at `start`" in text
-    assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters
+    assert "**`{team: other-team}` is refused when the file is read**" in text
+    assert "no team holds another" in text
 
 
 def test_the_recipe_covers_a_repos_first_team():
