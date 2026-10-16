@@ -69,7 +69,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-787 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Open |
-| TD-788 | Held by no test: the rank flush's join and prune PRs, its found-timer and signature guard, and the landed key's expiry (`agent_rank`, #1939) | Medium | Open |
 
 ---
 
@@ -1388,25 +1387,3 @@ The other cases:
 **Related:** TD-658 (an ask refused until the PR is green), TD-745 (a draft is no order), TD-652 (a red PR's holders), TD-613 (a red PR nobody holds), TD-684 (the reading's sync read, the per-head cache), TD-686 (*CI never ran*), #1842.
 
 ---
-## TD-788: Held by no test: the rank flush's join and prune PRs, its found-timer and signature guard, and the landed key's expiry (`agent_rank`, #1939)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1939)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_rank.py` (`_rank_flush`, `_rank_pass`), `tests/test_rank.py`
-
-**Why:** #1939 added `_rank_flush`'s three batches — `("rank", lines)`, `("join", …)`, `("prune", …)` — and `_rank_pass`'s timing for them. `tests/test_rank.py` runs the flush only with a move pending (`test_the_flush_lands_per_repo_…`, `test_a_flush_is_due_…` stubs `_rank_flush`); the join and prune halves are tested only as the pure `rank.joins` / `rank.prunes` (`test_a_lined_card_keeps_its_place_…`) and `_rank_lined`. Probes, each applied alone to `agent_rank.py` in a worktree and restored, and `pytest tests/test_rank.py` run (the first also with `test_ui_events_light.py test_board.py test_queue.py`) — all still **pass**:
-- delete the `("join", …)` and `("prune", …)` tuples from `batches` — no join or prune PR is ever landed; green;
-- `found and t - float(state["found_at"] or t) >= rank_mod.RANK_FLUSH` → `found` — a join or prune flushes at once, not `RANK_FLUSH` after it was first found (design §4.4 *A move lands*); green;
-- `if _signature(found) == self.rank_store.load()["flushed"]:` → `if False:` — a checkout that has not caught up is flushed again on every tick; green;
-- `state["flushed"] = [] if missed else …` → `[] if False else …`, and `missed = missed or kind != "rank"` → `pass` — a join or prune that failed to land is never found again; green;
-- drop `and t - float(v.get("at") or 0) < LANDED_KEEP` — a landed key stands in forever; green;
-- `if it is not None and self._queue:` (`rpc_rank_move`'s broadcast) → `if False:` — the page is not told of a move; green (no test reads the `queue` event).
-The suite's full run with the first mutation applied failed only in `test_link.py`, `test_settle.py` and `test_ui.py` (20 tests, none naming the rank).
-
-**Done when** a test per probe above goes red against it: a flush with a pending join and one with a pending prune land one `queue: join` / `queue: prune` PR per repo; neither is due before `RANK_FLUSH` after it is found; a flush whose signature equals `flushed` starts nothing; a join that failed to land clears `flushed`; a landed key older than `LANDED_KEEP` is dropped by `_rank_pass`; `rpc_rank_move` broadcasts a `queue` event for a move and none for a move that leaves the card where it is.
-
-**Related:** TD-769 (the build), TD-779, TD-780 (the same kind of gap in #1916).

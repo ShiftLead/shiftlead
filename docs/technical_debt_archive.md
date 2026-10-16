@@ -14289,3 +14289,29 @@ Each reproduction passed with its fix.
 **Related:** TD-730, TD-762, TD-763, TD-740.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1943) — the Repo page's row says *needs a team* after its owner, and under the Technical debt heading's lanes lines are the repo's *needs a team* line (`team_notes`, as `ao repo` prints it) and each stale-team note (`teams.stale_teams`, shared with `ao org check`'s lacks); `entry_add` takes `team` and carries `entry: {repo, type, team}`, blank handing to the first team with a seat in the ledger's `Team` order (`teams.entry_teams`' `declared`), which `/api/entry/plan` and `ao td add` read from the home's repo reading; `ao td add --team` names the team or is refused with the repo's teams.
+## TD-788: Held by no test: the rank flush's join and prune PRs, its found-timer and signature guard, and the landed key's expiry (`agent_rank`, #1939)
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1939)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #1947
+**Location:** `src/sessionorc/agent_rank.py` (`_rank_flush`, `_rank_pass`), `tests/test_rank.py`
+
+**Why:** #1939 added `_rank_flush`'s three batches — `("rank", lines)`, `("join", …)`, `("prune", …)` — and `_rank_pass`'s timing for them. `tests/test_rank.py` runs the flush only with a move pending (`test_the_flush_lands_per_repo_…`, `test_a_flush_is_due_…` stubs `_rank_flush`); the join and prune halves are tested only as the pure `rank.joins` / `rank.prunes` (`test_a_lined_card_keeps_its_place_…`) and `_rank_lined`. Probes, each applied alone to `agent_rank.py` in a worktree and restored, and `pytest tests/test_rank.py` run (the first also with `test_ui_events_light.py test_board.py test_queue.py`) — all still **pass**:
+- delete the `("join", …)` and `("prune", …)` tuples from `batches` — no join or prune PR is ever landed; green;
+- `found and t - float(state["found_at"] or t) >= rank_mod.RANK_FLUSH` → `found` — a join or prune flushes at once, not `RANK_FLUSH` after it was first found (design §4.4 *A move lands*); green;
+- `if _signature(found) == self.rank_store.load()["flushed"]:` → `if False:` — a checkout that has not caught up is flushed again on every tick; green;
+- `state["flushed"] = [] if missed else …` → `[] if False else …`, and `missed = missed or kind != "rank"` → `pass` — a join or prune that failed to land is never found again; green;
+- drop `and t - float(v.get("at") or 0) < LANDED_KEEP` — a landed key stands in forever; green;
+- `if it is not None and self._queue:` (`rpc_rank_move`'s broadcast) → `if False:` — the page is not told of a move; green (no test reads the `queue` event).
+The suite's full run with the first mutation applied failed only in `test_link.py`, `test_settle.py` and `test_ui.py` (20 tests, none naming the rank).
+
+**Done when** a test per probe above goes red against it: a flush with a pending join and one with a pending prune land one `queue: join` / `queue: prune` PR per repo; neither is due before `RANK_FLUSH` after it is found; a flush whose signature equals `flushed` starts nothing; a join that failed to land clears `flushed`; a landed key older than `LANDED_KEEP` is dropped by `_rank_pass`; `rpc_rank_move` broadcasts a `queue` event for a move and none for a move that leaves the card where it is.
+
+**Related:** TD-769 (the build), TD-779, TD-780 (the same kind of gap in #1916).
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #1947) — `tests/test_rank.py` gains four tests: a join and a prune that land one `queue: join` and one `queue: prune` PR `RANK_FLUSH` after they are found and none before, with the signature guard holding while the checkout has not pulled; a join that failed to land clears `flushed` and is found again; a landed key older than `LANDED_KEEP` is dropped and a fresh one kept; `rpc_rank_move` broadcasts a `queue` event for a move and none for a move where the card already is. Each of the six probes above, applied alone, turns the file red.
+
+---
