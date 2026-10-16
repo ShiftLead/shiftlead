@@ -532,7 +532,7 @@ templates.env.globals.update(origin_note=origin_note, origin_firsts=origin_first
 
 
 def board_reading(
-    repos: Mapping[str, Any] | None, teams: Mapping[str, str] | None = None
+    repos: Mapping[str, Any] | None, repos_of: Mapping[str, Mapping[str, Any]] | None = None
 ) -> tuple[list[dict[str, Any]], str]:
     """The Inbox's board rows (`board_rows`) from the host agent's repo readings — the `repos` RPC,
     each checkout's `boards` (§4.4 *Each reading has one owner*, *The boards*, TD-615) — and a note
@@ -549,7 +549,7 @@ def board_reading(
             if workorders_mod.board_path(str(root))[0] != "absent":  # a reading from before its first board read
                 notes.append(f"the board of {name} has not been read yet")
             continue
-        own = board_rows(got, teams)
+        own = board_rows(got, repos_of)
         if got.get("error"):
             since = f" since {got['failed_at']}" if got.get("failed_at") else ""
             shown = "its rows are the last reading" if own else "no row is shown"
@@ -1443,11 +1443,14 @@ def board_subject_text(text: str) -> str:
     return lb.CONTEXT_RE.sub("", text[: due.start()] if due else text).strip() or text
 
 
-def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+def board_rows(report: Any, repos_of: Mapping[str, Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
     """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per open item of the report — its repo, its due words, the whole text, and the board at that
-    line in the editor — with `due_now` saying which are due (`board_due_now`) and `ahead` the due
-    words of one that is not (TD-220). `at` is the due date, so *oldest first* in **Needs you**
+    line in the editor — with no team: the board is the repo's (TD-722, built by TD-741), so `repo`
+    is the repo's words (`repo_boards`' `label`, *ContractMatch · samscrape* where its project has
+    several repos), `repo_name` the rail's `repo` pick and `teams` every team whose repo it is; with
+    `due_now` saying which are due (`board_due_now`) and `ahead` the due words of one that is not
+    (TD-220). `at` is the due date, so *oldest first* in **Needs you**
     puts the longest overdue first among the states and the mail. The text is the board's, shown as
     text: nothing here is a control built from it (TD-071 item 8)."""
     rows: list[dict[str, Any]] = []
@@ -1458,8 +1461,10 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
             continue
         root = str(b.get("root") or "")
         board = str(b.get("board") or "")
-        label = str(b.get("label") or Path(root).name)
-        team = (teams or {}).get(str(Path(root).resolve()), "") if root else ""
+        of = (repos_of or {}).get(str(Path(root).resolve()), {}) if root else {}
+        repo_name = str(of.get("name") or (Path(root).name if root else ""))
+        label = str(of.get("label") or b.get("label") or Path(root).name)
+        teams = [str(t) for t in of.get("teams") or () if t]
         for it in b.get("items") or ():
             if not isinstance(it, dict) or not it.get("text"):
                 continue
@@ -1475,10 +1480,12 @@ def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict
                     # (TD-615), drawn on the row and sent as `key` with every press; empty where none
                     "key": str(it.get("key") or ""),
                     "repo": label,
+                    "repo_name": repo_name,
                     "root": root,
                     "board": board,
                     "line": line,
-                    "team": team,
+                    "team": "",
+                    "teams": teams,
                     "text": text,
                     # §4.5a **answers** / **Go with it** (§4.4 *Decide*, TD-255): the reader's own
                     # fields, never read out of the prose here — the item's answers in the order
@@ -1537,9 +1544,9 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
     An answered row that is not stale (`board_waits`, TD-305) is in none of the three but `waiting`,
     drawn under *Waiting on them* and taking no place.
 
-    - `next:<n>`: per team, the n soonest open items of its boards, the due ones among them, so
-      what is due takes places first; a due row whose date could not be read takes none. A board
-      no team works is its repo's own group. The team is the row's badge (`repo_teams`).
+    - `next:<n>`: per repo, the n soonest open items of its board, the due ones among them, so
+      what is due takes places first; a due row whose date could not be read takes none. A board is
+      the repo's and is counted once, whichever teams work the repo (TD-722, built by TD-741).
     - `due`: nothing ahead. `<n>d`: what falls due within n days of `today`; an undated item is
       hidden. `all`: every open item.
 
@@ -1566,7 +1573,7 @@ def board_horizon(rows: Collection[dict[str, Any]], mode: str | None = None, tod
         n = int(mode.split(":", 1)[1])
 
         def group(r: Mapping[str, Any]) -> str:
-            return f"team:{r['team']}" if r.get("team") else f"repo:{r.get('root') or r.get('repo') or ''}"
+            return str(r.get("root") or r.get("repo") or "")
 
         places: dict[str, int] = {}
         for r in due:
@@ -1625,7 +1632,7 @@ def horizon_of(h: Mapping[str, Any], root: str | Path) -> dict[str, Any]:
 
 def board_line(h: Mapping[str, Any]) -> dict[str, Any]:
     """The line that closes the board rows (§4.5 screen 6 *The board's horizon*, §4.5a): the page
-    saying its mode — *showing the next 10 board items per team* — then what it hides, *14 not shown,
+    saying its mode — *showing the next 10 board items per repo* — then what it hides, *14 not shown,
     the next due Oct 12*, or *nothing hidden*. `n` is the count hidden: with none there is no fold
     and no **show**."""
     mode = str(h.get("mode") or settings_mod.BOARD_SHOW_DEFAULT)
@@ -1639,7 +1646,7 @@ def board_line(h: Mapping[str, Any]) -> dict[str, Any]:
         says = f"showing board items due within {mode[:-1]} days"
     else:
         n = int(mode.split(":", 1)[1]) if mode.startswith("next:") else 10
-        says = f"showing the next {n} board item{'' if n == 1 else 's'} per team"
+        says = f"showing the next {n} board item{'' if n == 1 else 's'} per repo"
     hidden = len(h.get("hidden") or ())
     nd = _civil(h.get("next_due"))
     if not hidden:
@@ -2039,8 +2046,8 @@ def find_matches(text: str, words: Collection[str]) -> bool:
 
 
 def rail_picks(query: Mapping[str, Any]) -> dict[str, Any]:
-    """The picks a page's URL carries (§4.5 screen 6 *The rail*): `team`, `sec` and `kind` as comma
-    lists — `none` is *no team* — and `find`. An unknown section or kind is dropped, never an error:
+    """The picks a page's URL carries (§4.5 screen 6 *The rail*): `team`, `repo`, `sec` and `kind` as
+    comma lists — `none` is *no team* — and `find`. An unknown section or kind is dropped, never an error:
     a link survives a renamed line by showing a little more."""
 
     def lst(key: str) -> list[str]:
@@ -2048,6 +2055,7 @@ def rail_picks(query: Mapping[str, Any]) -> dict[str, Any]:
 
     return {
         "team": lst("team"),
+        "repo": lst("repo"),
         "sec": [x for x in lst("sec") if x in RAIL_SECTIONS],
         "kind": [x for x in lst("kind") if x in RAIL_KINDS],
         "find": str(query.get("find") or "").strip(),
@@ -2059,15 +2067,20 @@ def rail_rows(
     ahead: Collection[Mapping[str, Any]] = (),
     ledger: Collection[Mapping[str, Any]] = (),
 ) -> list[dict[str, str]]:
-    """Every row on the page that the rail counts, as the four things a pick reads: its section,
-    team (`none` for no team), coarse kind and find text. The snoozed list is in no count. `ahead` is
+    """Every row on the page that the rail counts, as the things a pick reads: its section, its teams
+    (`none` for no team), its repo, coarse kind and find text. A board row carries its repo (`repo`,
+    the pick's value, and `repo_label`, its words) and, as its teams, every team whose repo it is —
+    `none` where no team works it — so a team pick narrows board rows to the team's repo (TD-722,
+    built by TD-741); every other row carries its one team and no repo. The snoozed list is in no count. `ahead` is
     the board's rows coming up (TD-220), in section `coming`, and `ledger` the ledger's *for you*
     rows (`ledger_rows`), in section `later`: both counted under *Later* (TD-565); the fold's rows
     (`unshown`) join only once it is opened, in the browser."""
     return [
         {
             "section": sec,
-            "team": str(e.get("team") or "") or RAIL_NO_TEAM,
+            "teams": _rail_teams(e),
+            "repo": str(e.get("repo_name") or "") if e.get("row") == "board" else "",
+            "repo_label": str(e.get("repo") or e.get("repo_name") or "") if e.get("row") == "board" else "",
             "kind": rail_kind(e),
             "find": row_find(e, sec),
         }
@@ -2076,51 +2089,71 @@ def rail_rows(
     ]
 
 
-def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -> dict[str, Any]:
+def _rail_teams(e: Mapping[str, Any]) -> list[str]:
+    """The teams a row is counted under and picked by: a board row's are its repo's (TD-741)."""
+    if e.get("row") == "board":
+        return [str(t) for t in e.get("teams") or () if t] or [RAIL_NO_TEAM]
+    return [str(e.get("team") or "") or RAIL_NO_TEAM]
+
+
+def rail_counts(rows: Collection[Mapping[str, Any]], picks: Mapping[str, Any]) -> dict[str, Any]:
     """The rail's counts and the section headings' (§4.5 screen 6 *The rail*): **every count is a
     count of rows on the page now**. Within a group the picks are OR'd, across groups AND'd, and a
     group with nothing picked means all of it; the find is a fourth group. For a line: a picked line
     reads its share of the page; an unpicked line in a group with a pick reads 0; an unpicked line
     in a group without one reads its share under the other groups' picks. `all` is the line's count
     with no filter at all. A **team** line counts that team's *Needs you* rows — *which team needs
-    me* (TD-135's steer to the techlead, 2026-09-25). `app.js`'s `AO.railCounts` is this function
+    me* (TD-135's steer to the techlead, 2026-09-25) — a board row among them under each team whose
+    repo it is, so a team's count and the page narrowed to it agree; a **repo** line counts that
+    repo's *Needs you* rows the same way (TD-741). `app.js`'s `AO.railCounts` is this function
     again, over the rows in the DOM, and a test holds the two to one answer."""
     words = find_words(picks.get("find") or "")
-    pick = {g: set(picks.get(g) or ()) for g in ("team", "sec", "kind")}
-    key = {"team": "team", "sec": "section", "kind": "kind"}
+    pick = {g: set(picks.get(g) or ()) for g in ("team", "repo", "sec", "kind")}
 
-    def passes(r: Mapping[str, str], skip: str = "") -> bool:
+    def vals(r: Mapping[str, Any], group: str) -> list[str]:
+        if group == "team":
+            return list(r["teams"])
+        if group == "repo":
+            return [r["repo"]] if r["repo"] else []
+        return [RAIL_UNDER.get(r["section"], r["section"])] if group == "sec" else [r["kind"]]
+
+    def passes(r: Mapping[str, Any], skip: str = "") -> bool:
         for g, want in pick.items():
-            v = RAIL_UNDER.get(r[key[g]], r[key[g]]) if g == "sec" else r[key[g]]
-            if g != skip and want and v not in want:
+            if g != skip and want and not want.intersection(vals(r, g)):
                 return False
         return find_matches(r["find"], words)
 
-    teams = sorted({r["team"] for r in rows if r["team"] != RAIL_NO_TEAM})
-    if any(r["team"] == RAIL_NO_TEAM for r in rows):
+    teams = sorted({t for r in rows for t in r["teams"] if t != RAIL_NO_TEAM})
+    if any(RAIL_NO_TEAM in r["teams"] for r in rows):
         teams.append(RAIL_NO_TEAM)
     # a picked team no row carries still gets its line, so the pick can be undone
     teams += [t for t in picks.get("team") or () if t not in teams]
+    labels: dict[str, str] = {}
+    for r in rows:
+        if r["repo"]:
+            labels.setdefault(r["repo"], r["repo_label"] or r["repo"])
+    repos = sorted(labels)
+    repos += [x for x in picks.get("repo") or () if x not in repos]
 
-    def val(r: Mapping[str, str], group: str) -> str:
-        return RAIL_UNDER.get(r[key[group]], r[key[group]]) if group == "sec" else r[key[group]]
-
-    def line(group: str, value: str, among: Collection[Mapping[str, str]]) -> dict[str, int]:
-        mine = [r for r in among if val(r, group) == value]
+    def line(group: str, value: str, among: Collection[Mapping[str, Any]]) -> dict[str, int]:
+        mine = [r for r in among if value in vals(r, group)]
         shown = 0 if pick[group] and value not in pick[group] else sum(1 for r in mine if passes(r, group))
         return {"shown": shown, "all": len(mine)}
 
     needs = [r for r in rows if r["section"] == "needs"]
     return {
-        "filtered": bool(pick["team"] or pick["sec"] or pick["kind"] or words),
+        "filtered": bool(pick["team"] or pick["repo"] or pick["sec"] or pick["kind"] or words),
         "sections": {s: line("sec", s, rows) for s in RAIL_SECTIONS},
         "teams": {t: line("team", t, needs) for t in teams},
         "team_order": teams,
+        "repos": {x: line("repo", x, needs) for x in repos},
+        "repo_order": repos,
+        "repo_labels": {x: labels.get(x, x) for x in repos},
         "kinds": {k: line("kind", k, rows) for k in RAIL_KINDS},
         "heads": {
             s: {
-                "shown": sum(1 for r in rows if val(r, "sec") == s and passes(r)),
-                "all": sum(1 for r in rows if val(r, "sec") == s),
+                "shown": sum(1 for r in rows if vals(r, "sec") == [s] and passes(r)),
+                "all": sum(1 for r in rows if vals(r, "sec") == [s]),
             }
             for s in RAIL_SECTIONS
         },

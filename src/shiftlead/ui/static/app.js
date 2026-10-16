@@ -2314,7 +2314,7 @@
     // always the page as seen; a press is a history entry, so Back undoes it; typing is not.
     const fromUrl = AO.railPicks(location.search);
     const landing = AO.rowOfKey(new URLSearchParams(location.search).get("row"));  // read before the picks rewrite the URL
-    const any = (p) => !!(p.team.length || p.sec.length || p.kind.length || p.find);
+    const any = (p) => !!(p.team.length || p.repo.length || p.sec.length || p.kind.length || p.find);
     rail = any(fromUrl) ? fromUrl : AO.railPicks(store.get("inboxpicks", ""));
     const save = (push) => {
       const q = AO.railQuery(rail);
@@ -2660,6 +2660,9 @@
     // the rail's *Teams* lines come with the rows: a team appears or goes with its mail
     const rt = $("#railteams");
     if (rt && typeof got.html.rail_teams === "string" && !rt.contains(document.activeElement)) rt.innerHTML = got.html.rail_teams;
+    // …and its *Repos* lines with the board's rows (TD-741)
+    const rr = $("#railrepos");
+    if (rr && typeof got.html.rail_repos === "string" && !rr.contains(document.activeElement)) rr.innerHTML = got.html.rail_repos;
     markAnsweredSeen();
     // §4.10: **FYI opens itself when its count is higher than this browser last saw it**, and is
     // otherwise as the person left it. That comparison is the browser's own — nothing on an entry
@@ -2697,7 +2700,7 @@
   const RAIL_SECS = ["needs", "steering", "waiting", "answered", "later", "fyi"];
   const RAIL_KINDS = ["questions", "steering", "states", "board", "ledger", "notes", "trail"];
   const FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>";
-  let rail = { team: [], sec: [], kind: [], find: "" };
+  let rail = { team: [], repo: [], sec: [], kind: [], find: "" };
   const findOpened = new Set();
   // the Inbox's `?row=<key>` (§4.10 *Told on Telegram*, TD-319 slice 3): a Telegram message's link names
   // its row by the home's key — `<session>|<kind>` for a state row, `work:<team>` for a team with work —
@@ -2713,6 +2716,7 @@
     const lst = (k) => (q.get(k) || "").split(",").map((x) => x.trim()).filter(Boolean);
     return {
       team: lst("team"),
+      repo: lst("repo"),
       sec: lst("sec").filter((x) => RAIL_SECS.includes(x)),
       kind: lst("kind").filter((x) => RAIL_KINDS.includes(x)),
       find: (q.get("find") || "").trim(),
@@ -2720,7 +2724,7 @@
   };
   AO.railQuery = function (p) {
     const parts = [];
-    ["team", "sec", "kind"].forEach((k) => { if (p[k].length) parts.push(`${k}=${p[k].map(encodeURIComponent).join(",")}`); });
+    ["team", "repo", "sec", "kind"].forEach((k) => { if (p[k].length) parts.push(`${k}=${p[k].map(encodeURIComponent).join(",")}`); });
     if (p.find) parts.push(`find=${encodeURIComponent(p.find)}`);
     return parts.length ? "?" + parts.join("&") : "";
   };
@@ -2728,34 +2732,39 @@
     const trim = (w) => { let a = 0, b = w.length; while (a < b && FIND_EDGE.includes(w[a])) a++; while (b > a && FIND_EDGE.includes(w[b - 1])) b--; return w.slice(a, b); };
     return String(find || "").toLowerCase().split(/\s+/).map(trim).filter(Boolean);
   };
-  const railKey = { team: "team", sec: "section", kind: "kind" };
   // the board's rows coming up and the fold's (TD-220) sit under *Later* (TD-565), counted and picked with it
   const RAIL_UNDER = { coming: "later", unshown: "later" };
-  const railVal = (r, g) => (g === "sec" ? RAIL_UNDER[r.section] || r.section : r[railKey[g]]);
+  // the values a row has in a group: a board row's teams are its repo's, and only a board row has a repo (TD-741)
+  const railVals = (r, g) => (g === "team" ? r.teams : g === "repo" ? (r.repo ? [r.repo] : []) : g === "sec" ? [RAIL_UNDER[r.section] || r.section] : [r.kind]);
   function railPasses(r, picks, words, skip) {
-    for (const g of ["team", "sec", "kind"]) {
-      const v = railVal(r, g);
-      if (g !== skip && picks[g].length && !picks[g].includes(v)) return false;
+    for (const g of ["team", "repo", "sec", "kind"]) {
+      if (g !== skip && picks[g].length && !railVals(r, g).some((v) => picks[g].includes(v))) return false;
     }
     return words.every((w) => r.find.includes(w));
   }
   AO.railCounts = function (rows, picks) {
     const words = AO.findWords(picks.find);
-    const teams = [...new Set(rows.map((r) => r.team).filter((t) => t !== "none"))].sort();
-    if (rows.some((r) => r.team === "none")) teams.push("none");
+    const teams = [...new Set(rows.flatMap((r) => r.teams).filter((t) => t !== "none"))].sort();
+    if (rows.some((r) => r.teams.includes("none"))) teams.push("none");
     (picks.team || []).forEach((t) => { if (!teams.includes(t)) teams.push(t); });
+    const labels = {};
+    rows.forEach((r) => { if (r.repo && !(r.repo in labels)) labels[r.repo] = r.repo_label || r.repo; });
+    const repos = Object.keys(labels).sort();
+    (picks.repo || []).forEach((x) => { if (!repos.includes(x)) repos.push(x); });
     const line = (group, value, among) => {
-      const mine = among.filter((r) => railVal(r, group) === value);
+      const mine = among.filter((r) => railVals(r, group).includes(value));
       const shown = picks[group].length && !picks[group].includes(value) ? 0 : mine.filter((r) => railPasses(r, picks, words, group)).length;
       return { shown, all: mine.length };
     };
     const needs = rows.filter((r) => r.section === "needs");
-    const out = { filtered: !!(picks.team.length || picks.sec.length || picks.kind.length || words.length), sections: {}, teams: {}, team_order: teams, kinds: {}, heads: {} };
+    const out = { filtered: !!(picks.team.length || picks.repo.length || picks.sec.length || picks.kind.length || words.length), sections: {}, teams: {}, team_order: teams, repos: {}, repo_order: repos, repo_labels: {}, kinds: {}, heads: {} };
+    const inSec = (r, s) => railVals(r, "sec")[0] === s;
     RAIL_SECS.forEach((s) => {
       out.sections[s] = line("sec", s, rows);
-      out.heads[s] = { shown: rows.filter((r) => railVal(r, "sec") === s && railPasses(r, picks, words)).length, all: rows.filter((r) => railVal(r, "sec") === s).length };
+      out.heads[s] = { shown: rows.filter((r) => inSec(r, s) && railPasses(r, picks, words)).length, all: rows.filter((r) => inSec(r, s)).length };
     });
     teams.forEach((t) => { out.teams[t] = line("team", t, needs); });
+    repos.forEach((x) => { out.repos[x] = line("repo", x, needs); out.repo_labels[x] = labels[x] || x; });
     RAIL_KINDS.forEach((k) => { out.kinds[k] = line("kind", k, rows); });
     return out;
   };
@@ -2821,7 +2830,12 @@
   AO.ledgerFilter = function (root) {
     $$(".inboxpage .ledgergroup", root).forEach((g) => { g.hidden = !$$(".ledgerrow", g).some((el) => !el.hidden); });
   };
-  const railRow = (el) => ({ section: el.dataset.section || "", team: el.dataset.team || "none", kind: el.dataset.rkind || "", find: el.dataset.find || "" });
+  // a board row carries its repo and its repo's teams (TD-741); every other row its one team
+  const railRow = (el) => {
+    const board = el.dataset.teams !== undefined;
+    const teams = board ? el.dataset.teams.split(" ").filter(Boolean) : [el.dataset.team || "none"];
+    return { section: el.dataset.section || "", teams: teams.length ? teams : ["none"], repo: board ? el.dataset.repo || "" : "", repo_label: board ? el.dataset.repoLabel || el.dataset.repo || "" : "", kind: el.dataset.rkind || "", find: el.dataset.find || "" };
+  };
 
   function inboxFilter() {
     const box = $("#ifilter"); if (!box) return;
@@ -2844,9 +2858,16 @@
         rt.insertAdjacentHTML("beforeend", `<button type="button" class="railline" data-group="team" data-value="${esc(t)}" aria-pressed="false"><span class="raillabel">${esc(t === "none" ? "no team" : t)}</span><span class="railn"></span></button>`);
       }
     });
+    // …and a repo line for a picked repo the poll no longer carries (TD-741)
+    const rr = $("#railrepos");
+    if (rr) c.repo_order.forEach((x) => {
+      if (!$$(".railline", rr).some((b) => b.dataset.value === x)) {
+        rr.insertAdjacentHTML("beforeend", `<button type="button" class="railline" data-group="repo" data-value="${esc(x)}" aria-pressed="false" title="${esc(c.repo_labels[x] || x)}"><span class="raillabel">${esc(c.repo_labels[x] || x)}</span><span class="railn"></span></button>`);
+      }
+    });
     $$(".rail .railline").forEach((b) => {
       const g = b.dataset.group, v = b.dataset.value;
-      const cnt = g === "sec" ? c.sections[v] : g === "kind" ? c.kinds[v] : c.teams[v] || { shown: 0, all: 0 };
+      const cnt = g === "sec" ? c.sections[v] : g === "kind" ? c.kinds[v] : g === "repo" ? c.repos[v] || { shown: 0, all: 0 } : c.teams[v] || { shown: 0, all: 0 };
       b.setAttribute("aria-pressed", rail[g].includes(v) ? "true" : "false");
       $(".railn", b).textContent = num(cnt, c.filtered);
       b.classList.toggle("dim", c.filtered && !cnt.shown);
@@ -2856,7 +2877,7 @@
     AO.ledgerFilter(document);
     // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
     // the same counts, picked first so a pick never scrolls out of sight
-    const pn = rail.team.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);
+    const pn = rail.team.length + rail.repo.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);
     const pe = $("#picksn"); if (pe) pe.textContent = pn ? `${pn}` : "";
     const ct = $("#chipteams");
     if (ct) {

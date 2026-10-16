@@ -670,9 +670,10 @@
     actionable as any (TD-264): the write-back works on origin's line. -#}
 {%- set on = origin_note(e) if origin_first else none %}
 {%- if on %}<div class="originnote meta{% if on.warn %} warnish{% endif %}">{{ on.text }}</div>{% endif %}
+{#- the board is the repo's (TD-722, built by TD-741): the row names its repo — *ContractMatch ·
+    samscrape* where its project has several repos — and carries no team badge -#}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.board }}">{{ e.repo }}</span>
-  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-board">board</span>
   {#- §4.5a *Inbox board row: standing* (TD-142): where a Reply goes, said before the press, beside
       the sender's name — *still on TD-122 — grinder-ao-2 holds it*, *moved on* or *gone* — from the
@@ -738,7 +739,7 @@
       *Works* decides at once, as any answer; the form opens the Reply composer with *Not right:*
       begun and decides with the text typed, then hands an entry to the repo's techlead. -#}
   {%- set form = e.pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ e.repo }}'s board" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo }}'s techlead as an entry"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}data-act="board_notright" data-id="person" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-repo="{{ e.name }}" data-head="{{ e.head }}" data-name="{{ e.repo_name or e.repo }}'s board" title="say what is off: your words are written on the line as Decided: Not right: …, one commit, and handed to {{ e.repo_name or e.repo }}'s techlead as an entry"{% else %}data-act="board" data-id="person" data-board-act="decide" data-answer="{{ a }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ a }}"{% endif %}>{% if e.pair %}<span class="alabel">{{ 'Not right…' if form else ('Go with it: Works' if e.default == a else 'Works') }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -746,16 +747,16 @@
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair and not waits %}
 <div class="row gap wrap mfoot">
   {%- if waits %}
-  <span class="st">on the board — Reply writes on its line and Done checks it off, each one edit landed on {{ e.repo }}'s origin by shiftlead's own pull request</span>
+  <span class="st">on the board — Reply writes on its line and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- else %}
-  <span class="st">on the board — Reply writes on its line, Snooze moves its <code>Due:</code> date and Done checks it off, each one edit landed on {{ e.repo }}'s origin by shiftlead's own pull request</span>
+  <span class="st">on the board — Reply writes on its line, Snooze moves its <code>Due:</code> date and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- endif %}
   <span class="grow"></span>
   {%- if e.editor %}{% from "file_link.html" import file_link %}{{ file_link(e.editor, 'Open board', "open " ~ e.board ~ " at line " ~ e.line, "btn sm ghost") }}{% endif %}
-  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo }}'s board" title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
+  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-refs='{{ (e.refs or [])|tojson }}' data-name="{{ e.repo_name or e.repo }}'s board" title="your words appended to this line of the board landed on origin; the line stays due{% if e.standing and e.standing.holder %} — and mailed to {{ e.standing.holder }} (holds {{ e.standing.ref }}){% endif %}">Reply</button>
   {#- §4.5a **Go with it** on a board row (TD-255): drawn when one answer is the default, in the
       steer row's words and place; the one press records the default — the same `decide`. -#}
-  {%- if gwi %}<button class="btn sm ghost" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo }}'s board as your decision.">Go with it</button>{% endif %}
+  {%- if gwi %}<button class="btn sm ghost" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
   {%- if not waits %}
   <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
     <div class="menu">
@@ -765,7 +766,7 @@
     </div>
   </details>
   {%- endif %}
-  <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
+  <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
 </div>
 {%- endmacro %}
 
@@ -991,7 +992,7 @@
     carries its line's text once, as `data-text`, and its buttons read it from the row (TD-738) -#}
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
-<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}" data-text="{{ e.text }}">
+<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}" data-find="{{ row_find(e, section) }}" data-text="{{ e.text }}">
 {{ board(e, section, origin_first) }}
 <div class="st rowerr" role="alert" hidden></div>
 </div>

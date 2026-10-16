@@ -100,24 +100,32 @@ def test_the_board_rows_are_the_host_agents_reading_and_what_it_could_not_read_i
 
 
 @pytest.mark.unit
-def test_a_board_row_carries_its_repo_team_due_words_text_and_the_board_at_its_line(tmp_path, monkeypatch):
+def test_a_board_row_carries_its_repo_due_words_text_and_the_board_at_its_line(tmp_path, monkeypatch):
+    """§4.5 screen 6 (TD-722, built by TD-741): the board is the repo's, so a row carries its repo and
+    no team — the repo's teams ride along for the rail, never as a badge."""
     host(tmp_path, monkeypatch)
     from shiftlead.ui.app import board_rows
 
     root = tmp_path / "samscrape"
+    of = {"name": "samscrape", "label": "samscrape", "teams": ["sam-grind", "sam-audit"]}
     rows = board_rows(
-        report(root, item(7, "Decide X. Due: 2026-09-20.", "2026-09-20", "2d overdue")),
-        {str(root.resolve()): "sam-grind"},
+        report(root, item(7, "Decide X. Due: 2026-09-20.", "2026-09-20", "2d overdue")), {str(root.resolve()): of}
     )
     assert len(rows) == 1
     r = rows[0]
-    assert r["row"] == "board" and r["repo"] == "samscrape" and r["team"] == "sam-grind"
+    assert r["row"] == "board" and r["repo"] == "samscrape" and r["repo_name"] == "samscrape" and r["team"] == ""
+    assert r["teams"] == ["sam-grind", "sam-audit"]
     assert r["due_tag"] == "2d overdue" and r["at"] == "2026-09-20" and r["line"] == 7
     assert r["id"] == f"board:{root}:7"
     assert r["editor"]["url"].startswith("vscode://file") and "user_attention.md:7" in r["editor"]["url"]
     assert "decide x" in r["find"] and "samscrape" in r["find"]
-    # a repo no team's projects hold carries none (the filter's `team:`), and junk is skipped
-    assert board_rows(report(root, item(1, "t", "2026-09-20", "due")), {})[0]["team"] == ""
+    # a repo no team works carries no team, named by its checkout; junk is skipped
+    bare = board_rows(report(root, item(1, "t", "2026-09-20", "due")), {})[0]
+    assert bare["teams"] == [] and bare["repo"] == bare["repo_name"] == "samscrape"
+    # a repo in a project of several repos reads *Project · repo*; its pick is still the repo's name
+    of = {"name": "samscrape", "label": "ContractMatch · samscrape", "teams": []}
+    (cm,) = board_rows(report(root, item(1, "t", "2026-09-20", "due")), {str(root.resolve()): of})
+    assert cm["repo"] == "ContractMatch · samscrape" and cm["repo_name"] == "samscrape"
     assert board_rows({"boards": [{"root": str(root), "items": [{"line": 2}, "x"]}, 3]}) == []
     assert board_rows(None) == [] and board_rows({"boards": "x"}) == []
 
@@ -139,6 +147,90 @@ def test_a_repo_maps_to_the_first_team_whose_repo_it_is(tmp_path):
         },
     )
     assert repo_teams(org, "kmaster") == {str(here.resolve()): "ao-grind"}
+
+
+@pytest.mark.unit
+def test_a_board_row_names_its_repo_and_every_team_that_works_it(tmp_path):
+    """§4.5 screen 6, §4.5a *the rail* (TD-722, built by TD-741): the board is the repo's — a row of it
+    names the repo, *ContractMatch · samscrape* where its project has several repos, else the repo's
+    name, and carries every team whose `repo:` it is in definition order; a checkout no team works is
+    named all the same."""
+    from shiftlead import org as orgmod
+    from shiftlead.ui.app import repo_boards
+
+    ao, sam, web, solo = (tmp_path / n for n in ("ao", "samscrape", "web", "solo"))
+    org = orgmod.Org(
+        projects={
+            "cm": orgmod.Project("cm", repos={"samscrape": {}, "web": {}}, title="ContractMatch"),
+            "one": orgmod.Project("one", repos={"shiftlead": {}}, title="ShiftLead"),
+        },
+        checkouts={
+            "shiftlead": {"kmaster": ao},
+            "samscrape": {"kmaster": sam},
+            "web": {"other": web},
+            "solo": {"kmaster": solo},
+        },
+        teams={
+            "ao-grind": orgmod.TeamDef("ao-grind", repo="shiftlead"),
+            "sam-grind": orgmod.TeamDef("sam-grind", repo="samscrape"),
+            "ao-audit": orgmod.TeamDef("ao-audit", repo="shiftlead"),
+            "web-grind": orgmod.TeamDef("web-grind", repo="web"),
+        },
+    )
+    assert repo_boards(org, "kmaster") == {
+        str(ao.resolve()): {"name": "shiftlead", "label": "shiftlead", "teams": ["ao-grind", "ao-audit"]},
+        str(sam.resolve()): {"name": "samscrape", "label": "ContractMatch · samscrape", "teams": ["sam-grind"]},
+        str(solo.resolve()): {"name": "solo", "label": "solo", "teams": []},
+    }
+
+
+@pytest.mark.unit
+def test_the_rail_narrows_board_rows_by_repo_and_a_team_pick_by_its_repo():
+    """§4.5a *Inbox page: the rail* (TD-722, built by TD-741): a **Repos** group, each repo a board row
+    on the page carries with its count, picked by the URL's `repo`; a team pick narrows board rows to
+    the team's repo, and a team's count takes in its repo's board rows, so the count and the page
+    narrowed to it agree — for each of two teams on one repo."""
+    from shiftlead.ui.app import rail_counts, rail_picks, rail_rows
+
+    b1 = {"row": "board", "id": "b1", "teams": ["ao-grind", "ao-audit"], "repo": "shiftlead",
+          "repo_name": "shiftlead", "find": "one"}  # fmt: skip
+    b2 = {"row": "board", "id": "b2", "teams": ["sam-grind"], "repo": "ContractMatch · samscrape",
+          "repo_name": "samscrape", "find": "two"}  # fmt: skip
+    ask = {"kind": "ask", "id": "m-1", "team": "ao-grind", "text": "q"}
+    rows = rail_rows({"needs": [b1, b2, ask]})
+    got = rail_counts(rows, rail_picks({}))
+    assert got["teams"]["ao-grind"]["all"] == 2 and got["teams"]["ao-audit"]["all"] == 1
+    assert got["teams"]["sam-grind"]["all"] == 1 and "none" not in got["teams"]
+    assert got["repo_order"] == ["samscrape", "shiftlead"]
+    assert got["repo_labels"] == {"samscrape": "ContractMatch · samscrape", "shiftlead": "shiftlead"}
+    assert got["repos"]["shiftlead"] == {"shown": 1, "all": 1}
+    # ?repo= narrows to its board rows; a row with no repo is not one of them
+    picked = rail_counts(rows, rail_picks({"repo": "shiftlead"}))
+    assert picked["filtered"] and picked["heads"]["needs"]["shown"] == 1
+    assert picked["repos"]["samscrape"]["shown"] == 0 and picked["teams"]["ao-audit"]["shown"] == 1
+    # a team pick shows its repo's board rows: the second team on the repo sees the row and no mail
+    audit = rail_counts(rows, rail_picks({"team": "ao-audit"}))
+    assert audit["heads"]["needs"]["shown"] == audit["teams"]["ao-audit"]["shown"] == 1
+    grind = rail_counts(rows, rail_picks({"team": "ao-grind"}))
+    assert grind["heads"]["needs"]["shown"] == grind["teams"]["ao-grind"]["shown"] == 2
+    # a repo no team works is under *no team*; a picked repo no row carries keeps its line
+    lone = rail_rows({"needs": [{**b1, "teams": []}]})
+    assert rail_counts(lone, rail_picks({}))["teams"] == {"none": {"shown": 1, "all": 1}}
+    gone = rail_counts(rows, rail_picks({"repo": "gone"}))
+    assert gone["repo_order"][-1] == "gone" and gone["repos"]["gone"] == {"shown": 0, "all": 0}
+
+
+@pytest.mark.unit
+def test_next_n_draws_n_per_repo_whichever_teams_work_it():
+    """§4.5 screen 6 *The board's horizon* (TD-722, built by TD-741): `next:<n>` is each repo's board's
+    n soonest open items — a board counted once, though two teams work its repo."""
+    from shiftlead.ui.app import board_horizon
+
+    a = [_row(i, f"2026-10-{i:02d}", root="/a", teams=["g", "h"]) for i in range(1, 6)]
+    b = [_row(10 + i, f"2026-10-{i:02d}", root="/b", teams=["g"]) for i in range(1, 6)]
+    got = board_horizon(a + b, "next:3")
+    assert sorted(r["line"] for r in got["ahead"]) == [1, 2, 3, 11, 12, 13]
+    assert len(got["hidden"]) == 4
 
 
 @pytest.mark.unit
@@ -172,9 +264,12 @@ def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_
 
     root = tmp_path / "samscrape"
     text = '<b>Allow</b> the "rm". Due: 2026-09-20.'
-    rows = board_rows(report(root, item(9, text, "2026-09-20", "2d overdue")), {str(root.resolve()): "sam"})
+    of = {"name": "samscrape", "label": "samscrape", "teams": ["sam", "sam2"]}
+    rows = board_rows(report(root, item(9, text, "2026-09-20", "2d overdue")), {str(root.resolve()): of})
     html = templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
-    assert 'data-kind="board"' in html and 'data-team="sam"' in html and 'class="mailrow boardrow"' in html
+    assert 'data-kind="board"' in html and 'data-teams="sam sam2"' in html and 'class="mailrow boardrow"' in html
+    # the board is the repo's (TD-741): its repo on the row, and no team badge
+    assert 'data-repo="samscrape"' in html and "badge team" not in html and "data-team=" not in html
     assert "&lt;b&gt;Allow&lt;/b&gt;" in html and "<b>Allow</b>" not in html
     assert ">samscrape<" in html and "2d overdue" in html and ">board<" in html
     assert "Open board" in html and "user_attention.md:9" in html
@@ -304,7 +399,7 @@ def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monke
     from shiftlead.ui import app as uiapp
 
     got = {str(root): {"name": "proj", "root": str(root), "boards": workorders.read_boards(root, fetch=False)}}
-    rows, note = uiapp.board_reading(got, uiapp.repo_teams(uiapp.org_here()[0], uiapp.host_name()))
+    rows, note = uiapp.board_reading(got, uiapp.repo_boards(uiapp.org_here()[0], uiapp.host_name()))
     assert note == ""
     assert all(r["key"] == workorders.ref(root, r["text"]) and r["key"].startswith("board:") for r in rows)
     # every open item is read (TD-220), the ones due now marked; the closed one is not an item
@@ -319,7 +414,12 @@ def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monke
         f"due in 7 d · {date.today() + timedelta(days=7):%b} {(date.today() + timedelta(days=7)).day}",
     ]
     rows = [r for r in rows if r["due_now"]]
-    assert rows[0]["line"] == 3 and rows[0]["repo"] == "proj" and rows[0]["team"] == "proj-grind"
+    assert (
+        rows[0]["line"] == 3
+        and rows[0]["repo"] == "proj"
+        and rows[0]["teams"] == ["proj-grind"]
+        and rows[0]["team"] == ""
+    )
     assert "overdue" in rows[0]["due_tag"]
 
 
@@ -412,8 +512,10 @@ def _row(line, due, team="t", *, due_now=False, **kw):
         "id": f"board:r:{line}",
         "line": line,
         "repo": "r",
+        "repo_name": "r",
         "root": "/r",
-        "team": team,
+        "team": "",
+        "teams": [team] if team else [],
         "due": due,
         "due_now": due_now,
         "today": "2026-09-28",
@@ -454,9 +556,10 @@ def test_the_horizon_sorts_the_rows_by_the_mode():
     got = board_horizon(quiet, "next:10")
     assert ids(got["ahead"]) == [100 + i for i in range(8)] and ids(got["hidden"]) == [108, 109, 110, 111]
     assert got["next_due"] == "2026-10-09"
-    # a team that works two boards shows n across both; a board no team works is its repo's own group
+    # n per repo (TD-741): a team's two repos are two boards, each its own n
     two = [_row(1, "2026-10-01", root="/a"), _row(2, "2026-10-02", root="/b"), _row(3, "2026-10-03", root="/a")]
-    assert ids(board_horizon(two, "next:2")["ahead"]) == [1, 2]
+    assert ids(board_horizon(two, "next:2")["ahead"]) == [1, 2, 3]
+    assert ids(board_horizon(two, "next:1")["ahead"]) == [1, 2]
     lone = [_row(1, "2026-10-01", ""), _row(2, "2026-10-02", "", root="/other")]
     assert ids(board_horizon(lone, "next:1")["ahead"]) == [1, 2]
     # a due_error row is a due row and takes no place of the n
@@ -527,12 +630,12 @@ def test_the_line_says_the_mode_and_what_it_hides():
         return board_line({"mode": mode, "hidden": [{}] * hidden, "next_due": next_due})
 
     assert line("next:10", 14, "2026-10-12") == {
-        "says": "showing the next 10 board items per team",
+        "says": "showing the next 10 board items per repo",
         "rest": "14 not shown, the next due Oct 12",
         "n": 14,
     }
     assert line("next:10")["rest"] == "nothing hidden" and line("next:10")["n"] == 0
-    assert line("next:1")["says"] == "showing the next 1 board item per team"
+    assert line("next:1")["says"] == "showing the next 1 board item per repo"
     assert line("due", 5, "2026-10-04")["says"] == "showing board items that are due"
     assert line("7d", 3)["says"] == "showing board items due this week" and line("7d", 3)["rest"] == "3 not shown"
     assert line("14d")["says"] == "showing board items due within 14 days"
@@ -551,11 +654,11 @@ def test_the_repo_page_cuts_the_inboxs_horizon_to_its_repo():
         _row(4, "2026-10-20", root="/a"),
         _row(5, "2026-10-05", root="/b"),
     ]
-    h = board_horizon(rows, "next:3")  # one team: the due row, then 2 and 3 take the places
+    h = board_horizon(rows, "next:2")  # per repo: /a's due row and 2; /b's 3 and 5
     got = horizon_of(h, "/a")
     assert [r["line"] for r in got["due"]] == [1] and [r["line"] for r in got["ahead"]] == [2]
     assert [r["line"] for r in got["hidden"]] == [4] and got["next_due"] == "2026-10-20"
-    assert h["next_due"] == "2026-10-05" and got["mode"] == "next:3"
+    assert h["next_due"] == "2026-10-20" and got["mode"] == "next:2"
     # the line is the repo's own: its hidden count and next date, not the Inbox's
     got = horizon_of({**h, "line": {"says": "x", "rest": "y", "n": 2}}, "/a")
     assert got["line"]["rest"] == "1 not shown, the next due Oct 20" and got["line"]["n"] == 1
@@ -604,7 +707,7 @@ def test_coming_up_the_fold_and_the_line_are_drawn_and_counted_nowhere(tmp_path,
             assert 'shown by your <a href="/settings#sec-you"' in page and ">board items shown</a> setting" in page
             assert "due in 3 d · Oct 1" in page and 'data-section="coming"' in page
             assert "<summary>not shown (3)</summary>" in page and "later item 11" in page
-            assert "showing the next 10 board items per team · 3 not shown, the next due Oct 10" in page
+            assert "showing the next 10 board items per repo · 3 not shown, the next due Oct 10" in page
             assert 'class="boardshow"' in page and 'href="/settings#sec-you"' in page
             # the rail's *board items* counts every board row on the page; its *Needs you* the due one
             assert 'data-value="board"' in page
@@ -629,8 +732,8 @@ def test_the_rail_counts_coming_up_as_board_items_and_under_later():
     *Later* pick keeps them, as they sit in its section (TD-565)."""
     from shiftlead.ui.app import rail_counts, rail_picks, rail_rows
 
-    due = {"row": "board", "id": "b1", "team": "t", "find": "now"}
-    later = {"row": "board", "id": "b2", "team": "t", "find": "later"}
+    due = {"row": "board", "id": "b1", "teams": ["t"], "find": "now"}
+    later = {"row": "board", "id": "b2", "teams": ["t"], "find": "later"}
     rows = rail_rows({"needs": [due]}, [later])
     got = rail_counts(rows, rail_picks({}))
     assert got["kinds"]["board"]["all"] == 2 and got["sections"]["needs"]["all"] == 1
