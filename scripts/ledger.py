@@ -27,8 +27,12 @@ So archiving a blocker makes its dependents pickable with no further edit. A wri
 An entry may also carry ``**Type:** debt | feature`` (cadence.md §2.11); no field reads as debt.
 Within one Priority, debt is picked before features.
 
-``--pickable`` prints the pick order — Priority (High, Medium, Low, then anything else), then Type (debt
-before feature), then summary-table order — then the blocked entries with their blockers, then flags: a blocker that names no
+``--pickable`` prints the pick order — the rank (ledgerboard SPEC *The rank*, TD-119): entries fall into
+cards (joined by Blocked by), cards go by key, and within a card an entry follows what it is blocked by. An
+entry's key is its line in the rank file beside the ledger (``<ledger stem>_rank.yml``,
+``docs/technical_debt_rank.yml``) when it has one, else Priority (High, Medium, Low, then anything else),
+then Type (debt before feature), then id; a card's key is its best lined key, else its best one — then
+the blocked entries with their blockers, then flags: a rank file line it cannot read, a blocker that names no
 entry in the ledger or the archive, an item the field cannot read, a Type it does not know
 (read as debt), and a block whose
 blockers are all archived (pickable now; the field can go). Which entries a given picker
@@ -49,7 +53,7 @@ at all — a header field that is neither the cadence's nor declared. Standing f
 printed. ``--json``: ``{"flags": [{"level": error|info, "id", "field", "kind", "text", "standing"}],
 "errors": N}`` — key on ``kind`` and ``field``, never on the sentence. Kinds: fields-decl, below-header,
 type, vocabulary, blocked-item, cross-repo, blocked-unknown, blockers-archived, pickable-disagrees,
-undeclared-field. ``check_cadence.py``'s ``ledger`` row runs the same check on a PR's ledger edit.
+undeclared-field, rank (a rank file line). ``check_cadence.py``'s ``ledger`` row runs the same check on a PR's ledger edit.
 
 Defaults: ``docs/technical_debt.md`` and ``docs/technical_debt_archive.md`` at the top of
 the git work tree the command runs in. Offline, read-only. Exit 0 (``--check``: 1 on an error);
@@ -179,14 +183,16 @@ class Roster:
         return out
 
 
-def pickable(ledger: str, archive: str, roster: Roster | None = None, undeclared: bool = False) -> dict:
-    """ledgerboard's pickable, with this machine's roster resolving ``<repo>#TD-NNN`` items."""
-    return LB.pickable(ledger, archive, (roster or Roster()).resolve, undeclared)
+def pickable(ledger: str, archive: str, roster: Roster | None = None, undeclared: bool = False,
+             rank_text: str | None = None) -> dict:
+    """ledgerboard's pickable, in rank order, with this machine's roster resolving ``<repo>#TD-NNN`` items."""
+    return LB.pickable(ledger, archive, (roster or Roster()).resolve, undeclared, rank_text=rank_text)
 
 
-def check(ledger: str, archive: str, old: str | None = None, roster: Roster | None = None) -> list[dict]:
-    """ledgerboard's check (--check's flags), with this machine's roster resolving cross-repo items."""
-    return LB.check(ledger, archive, old, (roster or Roster()).resolve)
+def check(ledger: str, archive: str, old: str | None = None, roster: Roster | None = None,
+          rank_text: str | None = None) -> list[dict]:
+    """ledgerboard's check (--check's flags, the rank file's too), with this machine's roster resolving cross-repo items."""
+    return LB.check(ledger, archive, old, (roster or Roster()).resolve, rank_text=rank_text)
 
 
 def _at_ref(ledger: Path, ref: str) -> tuple[str | None, str]:
@@ -319,6 +325,10 @@ def main(argv: list[str] | None = None) -> int:
         arch = archive.read_text(encoding="utf-8", errors="replace")
     except OSError:
         arch = ""  # no archive yet: nothing is archived
+    try:
+        rank_text = Path(LB.rank_path(str(ledger))).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        rank_text = None  # no rank file: every entry's key is its implicit one
     if mode == "check":
         old = None
         if a.since is not None:
@@ -326,7 +336,7 @@ def main(argv: list[str] | None = None) -> int:
             if old is None:
                 print(f"ledger: --since: {why}", file=sys.stderr)
                 return 2
-        recs = check(text, arch, old)
+        recs = check(text, arch, old, rank_text=rank_text)
         errors = [r for r in recs if r["level"] == "error"]
         if a.json:
             print(json.dumps({"flags": recs, "errors": len(errors)}, indent=2, ensure_ascii=False))
@@ -338,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ledger check: {len(errors)} error(s)"
               + (f"; {standing} standing flag(s) on entries unchanged since {a.since}, not shown" if standing else ""))
         return 1 if errors else 0
-    res = pickable(text, arch)
+    res = pickable(text, arch, rank_text=rank_text)
 
     if mode == "pickable":
         if a.json:

@@ -1,12 +1,12 @@
 # Written by ShiftLead/dev-cadence sync.sh — do not edit by hand.
 source: https://github.com/ShiftLead/dev-cadence
-commit: 1145d97
-files_commit: 3384140659c48f4910299bf302e33490b5ffb3a5
-synced: 2026-10-15T03:30:31Z
-file: docs/cadence.md 5c9a6210d392d4f729386c7d70e9f7badac37ab951d96f9f1786286333239ee3 644
-file: docs/cadence-rationale.md fab9b6a108160149893c084c84359810285029378282ad8449598426d5569582 644
+commit: fbe86d0
+files_commit: fbe86d0dbc31a661b16d9f9dbddedbac762f9a63
+synced: 2026-10-16T14:42:00Z
+file: docs/cadence.md d47da86715e45e09dea33b29caed28de2f7572aef098a8c0fdbe6749ece5282f 644
+file: docs/cadence-rationale.md d76f61bb6bef763bcdaf25961cd1b28b95212ead26abd5d16f3961d5f13528d0 644
 file: docs/cadence-incidents.md 62e15c17b0655a51aec92f27b298b0e8bb0b631aa2207b8ead445bcd185b81bd 644
-file: docs/cadence-changes.md 1eff1925522ddb8508383f028f7d36f45cc180d747470062cd2b4af4f8a77804 644
+file: docs/cadence-changes.md 49b2791e92ab1470e5af0427d3591c3a43929dafc7378f2bf1f6c2e3f5965dfb 644
 file: docs/adr-template.md 659ff503a79bd4a2eda9555ccd7c0559eba71e4cb78bfa23cf56b6a73e917225 644
 file: docs/procedures/stranded-work.md b844dfe2dfc0499224e8f2a58fb00e1eae8a81fda958ba8e869b29948296a7ee 644
 file: docs/procedures/attention.md b8e34f505851eb9b012ec05d5058ecb330df21e3d6178ee6fe4931350f8bad3e 644
@@ -20,8 +20,8 @@ file: scripts/agent_sessions.py 0a98470dac0e8db4117977f7600961da8630bed03161106a
 file: scripts/forge.py fe13336dcf6a62262870f1ccc3b0861fa9295b9eaa5d0652f605308cd6629b5f 755
 file: scripts/nudge_user_attention.py df48a5ee42d971b918fbe9b8c57cab299cbc042910fa7c02baa6b7e14cb9b332 755
 file: scripts/board_edit.py 0c054ee1909f651a66ca699a62540c6773bb31d06d258d7ceb48cfd1b35ce08b 755
-file: scripts/ledger.py 02ba0c2e9ee757b6e28757e262a68e5a2f7b5bc74da7a502bfaaaea8a0076ade 755
-file: scripts/ledgerboard.py 1879074a638fcb12af2db7976e1a5db2cc16ef4257c31fc5b368d8b092efbfee 644
+file: scripts/ledger.py 478ee45c3d95bf56966ede409fc12b4cef875d9b22d76fd6e102071796ea8309 755
+file: scripts/ledgerboard.py 5a3a8f9ac5daee9fb336ed44cf3fbf03d2a4ca1cebb132c834b66ef04105d7a9 644
 file: scripts/list_sessions.py f70646ee12c952d3bc6c623aaf91a776578a2558118053498fa7d904fdd00b5d 755
 file: scripts/generate_session_index.sh ed0372ee7b85790956ac3eeadfa9ef937b32892cc9b9fccdfaf8ec13f12966d6 755
 file: scripts/generate_workspace.sh 099aa8a76ab66d9cfa7b64653338eb2d107b9c87c59333c72637d4355937d702 755
@@ -29,8 +29,8 @@ file: scripts/open_worktree.sh fadcc2fcddced633f57c0e118c61c2d28a1f9ca4b87c5e1a1
 file: scripts/hydrate_worktree.sh 33a380810af2866b7b6f8195ea5a0f94357fbd2345cce7c5653e6f74fc4c3bd1 755
 file: scripts/reap_worktrees.sh ebfee478c2ac050338e6174ecf8f4ae2e7781a6830633c2634ac51d163abcd82 755
 file: scripts/adopt_repo_settings.sh 42594967c61718b183af614529e92f6ef2ed3eb68b97f5ce032e78d06d8edb46 755
-file: scripts/check_cadence.py 5fbe30e6b5c5682163270347f0f5ab088359f2895b3644381df79cc05624b491 755
-file: scripts/precheck.py e0596398000e892c3379a6f96201b92735fd53dba2f41e81420100c37532a992 755
+file: scripts/check_cadence.py 69324d40c7e7e2ac47b47ec7e820bf6b237d840fc488dddbf2c30e54bb5c1cf7 755
+file: scripts/precheck.py ea9860ecc3c0d739f4b45eb4395ff4b0419dbd062486eeeed37f256272351469 755
 file: scripts/check_base.py f7c3515af0232de98c8e352852ed6d359a26b116c8e5ca68cec6b85a678bc49a 755
 file: scripts/cadence_changes.py 4701e2097087dd9dd76650dda53c68dc1471d28f3a97b6de225c41dd3cce8714 755
 file: scripts/cadence_config.py cdf51c8201f3c276f9815da395367cc0d117faf0ea5e53ed81f49ed38880b387 755

@@ -12,6 +12,10 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (ShiftLead design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-10-16 — The pick order is the rank, and a `queue:` rank PR is a tool edit
+Do: pick in `ledger.py --pickable`'s order as before — it now reads `docs/technical_debt_rank.yml` (a tool's, never typed) and moves joined entries as one card; with no file, ties go by id. A `queue: rank|join|prune TD-… (<tool>)` PR touching only that file passes review with no comment.
+See: cadence.md §2.4, §7.9; ledgerboard SPEC *The rank*; TD-119.
+
 ## 2026-10-15 — `precheck` records its verdict on GitLab too
 Do: on a GitLab repo with `precheck` set, run `python3 scripts/precheck.py --pr <n>` before the cadence check as on GitHub — it now records `cadence/precheck` on the MR's head, and the `ci` row reads it; a GitLab MR no longer stays *unknown* for want of it.
 See: cadence.md §4.12, `docs/procedures/cadence.md` step 2; TD-118.
