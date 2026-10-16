@@ -60,7 +60,7 @@ def test_the_red_prs_say_their_word_and_past_the_bound_whose_they_are():
     assert sorted(got) == [802, 803, 804]  # a green PR is never one
     assert (got[802]["word"], got[802]["whose"], got[802]["failing"]) == (
         "red",
-        "nobody's — the anchor's order",
+        "nobody's — the grinders' order",
         ["test", "lint"],
     )
     assert (got[803]["word"], got[803]["whose"]) == ("conflicting", "held by g1")
@@ -73,7 +73,7 @@ def test_the_red_prs_say_their_word_and_past_the_bound_whose_they_are():
     naive = reading(root)
     naive["prs"]["open"][1]["red_since"] = (now() - timedelta(hours=3)).replace(tzinfo=None).isoformat()
     assert {x["number"]: x["whose"] for x in teamrun.red_prs(naive, [holder], now())}[802].startswith("nobody's")
-    # where no team services the repo the order is the Inbox's, not the anchor's
+    # where no team services the repo the order is the Inbox's, not the grinders'
     assert {x["number"]: x["whose"] for x in teamrun.red_prs(reading(root), [], now())}[802] == "nobody's"
 
 
@@ -84,7 +84,7 @@ def test_the_facet_counts_the_red_prs_with_a_hover_of_each():
     f = repo_facet(reading(root), now(), fleet=[rec("g1", root, git={"branch": "td9"})])["prs"]
     assert [x["number"] for x in f["red"]] == [802, 803, 804]
     assert f["red_title"].splitlines() == [
-        "#802 · red 3h 0m · nobody's — the anchor's order",
+        "#802 · red 3h 0m · nobody's — the grinders' order",
         "#803 · conflicting 2h 0m · held by g1",
         "#804 · red 20m",
     ]
@@ -168,7 +168,7 @@ def test_the_repo_page_tags_the_red_prs_and_the_card_marks_them(tmp_path, monkey
     fleet = [rec("g1", root, git={"branch": "td9"})]
     c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet))
     html = c.get("/repo/samscrape").text
-    assert ">red 3h 0m · nobody&#39;s — the anchor&#39;s order</span>" in html
+    assert ">red 3h 0m · nobody&#39;s — the grinders&#39; order</span>" in html
     assert ">conflicting 2h 0m · held by g1</span>" in html and ">red 20m</span>" in html
     assert 'title="test, lint"' in html
     assert ">· 3 red</span>" in c.get("/").text

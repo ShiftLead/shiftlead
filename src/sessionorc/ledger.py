@@ -198,7 +198,6 @@ class LiveReader:
 
 PERSON_OWNER = "paul"  # the person's owner word, as this ledger's `Fields:` line declares it (§4.4 *Repo facts*)
 DESIGNER_OWNER = "designer"
-ANCHOR_OWNER = "anchor"  # the anchor seat's owner word and lane word (§4.9b *The anchor seat*, §6 rule 6)
 
 
 def decided_by(entry: dict[str, Any], who: str) -> bool:
@@ -217,8 +216,9 @@ def kind_of(entry: dict[str, Any]) -> str:
     id, a cross-repo or unreadable one), whatever the Kind and whatever decision stands beside it;
     *design* — `Kind: design-first`, or blocked by `decision (designer)` alone; *live check* —
     `Kind: live-check`, its build live or not; *pickable* — pickable, `Kind: build` or none;
-    *evaluation* — `Kind: evaluation`, an entry blocked by `decision (anchor)` alone, or an unblocked
-    `Kind: decision` the anchor owns; else *other*, a residue that should be empty (`flags`)."""
+    *evaluation* — `Kind: evaluation`, which no lane takes since the anchor seat is retired (§4.9b
+    *No anchor seat*), so `flags` names each; else *other*, a residue that should be empty (`flags`),
+    an unblocked `Kind: decision` that is not the person's among it."""
     if str(entry.get("owner") or "").lower() == PERSON_OWNER or decided_by(entry, PERSON_OWNER):
         return "for-you"
     if any(not b.startswith("decision (") for b in entry.get("blocked_by") or []):
@@ -229,23 +229,23 @@ def kind_of(entry: dict[str, Any]) -> str:
         return "live-check"
     if entry.get("pickable") == "yes" and entry.get("kind") in ("", "build"):
         return "pickable"
-    anchors = str(entry.get("owner") or "").lower() == ANCHOR_OWNER
-    if entry.get("kind") == "evaluation" or decided_by(entry, ANCHOR_OWNER):
-        return "evaluation"
-    if entry.get("kind") == "decision" and anchors:  # unblocked: the tests above took what is blocked
+    if entry.get("kind") == "evaluation":
         return "evaluation"
     return "other"
 
 
 NO_KIND = "fits no page kind — check its Owner, Kind and Blocked by"
+NO_LANE = "no lane takes an evaluation — write it as a build whose Fix is the write-up, or as design-first"
 NO_DATE = "Waits: until names no date"  # it waits with no end (§4.4 *What a wait does*, TD-716)
 
 
 def flags(entries: list[dict[str, Any]]) -> list[str]:
-    """This reader's flag on each entry no page kind takes (§4.4 *Repo facts*, TD-418), and on each
-    `Waits: until` that names no date (TD-716): the Repo page's *other* list and `ao repo` say it, and
-    the bar still draws the entry."""
+    """This reader's flag on each entry no page kind takes (§4.4 *Repo facts*, TD-418), on each
+    evaluation, which no lane takes (§4.9b *No anchor seat*, TD-757), and on each `Waits: until` that
+    names no date (TD-716): the Repo page's *other* list and `ao repo` say it, and the bar still draws
+    the entry."""
     out = [f"{e['id']}: {NO_KIND}" for e in entries if e.get("for_page") == "other"]
+    out += [f"{e['id']}: {NO_LANE}" for e in entries if e.get("for_page") == "evaluation"]
     return out + [
         f"{e['id']}: {NO_DATE}"
         for e in entries
@@ -266,34 +266,23 @@ def lane_matches(lane: list[str], entry: dict[str, Any]) -> bool:
     (§4.9b, TD-323), so a live check not yet live, an evaluation and a decision match no lane; a
     reference, or any other word, matches nothing until a role gives it a meaning here. **An
     `owner:<word>` narrows the rest** (TD-214, TD-227): with one or more, the entry's `Owner:` must
-    be one named or absent, so `[free-pick, owner:grinder]` leaves the anchor's entries out; it
+    be one named or absent, so `[free-pick, owner:grinder]` leaves the designer's entries out; it
     matches nothing by itself. An entry blocked by `decision (designer)` is the designer's
     (TD-367): `design-first` takes it pickable or not, and its owner reads `designer`. A **work
     order** — a decided board line, `board:<key>` (§4.4 *Board write-back*, TD-384) — is in every
-    `free-pick` lane, whatever `owner:` words stand beside it, and in every `anchor` lane; a red PR's,
-    `pr:<n>` (TD-613), is in every `anchor` lane, and in a `free-pick` one only when it carries
-    `free_pick` (no team servicing the repo has an anchor seat). **`anchor`**
-    (TD-381, TD-386: the anchor seat's lane, which a person's own anchor session reads the same) is
-    every pickable entry whose `Owner:` is `anchor`, of any kind — a live check once its build is
-    live — any entry blocked by `decision (anchor)`, pickable or not, its owner then reading
-    `anchor`, and every work order. **An entry still settling, or held** (`settling`, `held`: the home's
+    `free-pick` lane, whatever `owner:` words stand beside it, and so is a red PR's, `pr:<n>` (TD-613):
+    the grinders' pick list, since the anchor seat is retired (§4.9b *No anchor seat*, TD-757). **An
+    entry still settling, or held** (`settling`, `held`: the home's
     marks, §4.4 *A new entry settles before it is pickable*, TD-710), **or waiting** (`waiting`, §4.4 *An
     entry says what it waits for*, TD-716), matches no lane."""
     if entry.get("settling") or entry.get("held") or entry.get("waiting"):
         return False
     owners = {o for w in lane if (o := owner_word(w))}
     if entry.get("work_order"):
-        # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384); a red
-        # PR's (TD-613) is the anchor's, and `free-pick`'s only where the team context set `free_pick`
-        words = (ANCHOR_OWNER,) if entry.get("pr_order") and not entry.get("free_pick") else ("free-pick", ANCHOR_OWNER)
-        return any(w in words and entry.get("pickable") == "yes" for w in lane)
-    mine = (
-        DESIGNER_OWNER
-        if decided_by(entry, DESIGNER_OWNER)
-        else ANCHOR_OWNER
-        if decided_by(entry, ANCHOR_OWNER)
-        else str(entry.get("owner") or "").lower()
-    )
+        # a decided board line has no owner, and `owner:<word>` never narrows one out (TD-384); nor a
+        # red PR's (TD-613): both are on the grinders' pick list (§4.9b *No anchor seat*)
+        return "free-pick" in lane and entry.get("pickable") == "yes"
+    mine = DESIGNER_OWNER if decided_by(entry, DESIGNER_OWNER) else str(entry.get("owner") or "").lower()
     if owners and mine and mine not in owners:
         return False
     return any(_word_matches(w, entry) for w in lane if owner_word(w) is None)
@@ -382,13 +371,8 @@ def _unwaited(entry: dict[str, Any]) -> dict[str, Any]:
 def _word_matches(word: str, entry: dict[str, Any]) -> bool:
     if word == "design-first" and decided_by(entry, DESIGNER_OWNER):
         return True
-    if word == ANCHOR_OWNER and decided_by(entry, ANCHOR_OWNER):
-        return True  # a decision the anchor owes is its to make, as the designer's is (§6 rule 6)
     if entry.get("pickable") != "yes":
         return False
-    if word == ANCHOR_OWNER:
-        live = entry.get("kind") != "live-check" or entry.get("live") == "yes"
-        return str(entry.get("owner") or "").lower() == ANCHOR_OWNER and live
     if word == "design-first":
         return entry.get("kind") == "design-first"
     if word == "free-pick":

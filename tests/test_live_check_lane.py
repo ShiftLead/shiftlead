@@ -114,7 +114,7 @@ def test_the_repo_facts_carry_live_from_the_promote_reading(tmp_path, monkeypatc
 def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     """TD-516, §6 rule 6 *Unknown is not* not live: before the promote's first reading since a start
     (`_read_repos` given `live=None`), a live check keeps the `live` its checkout's last reading gave
-    it, so the anchor's `lane_seen` neither loses it nor is told it again when the survey lands; a
+    it, so a lane's `lane_seen` neither loses it nor is told it again when the survey lands; a
     known reading (`{}` — no live commit for the repo) still reads `no`, and a live check the last
     reading did not hold reads `no` until the promote is known."""
     from sessionorc import work
@@ -124,11 +124,11 @@ def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     root = tmp_path / "r"
     (root / "docs").mkdir(parents=True)
     _git(root, "init", "-q", "-b", "main")
-    text = _ledger("live-check #5", owner="anchor") + (
-        "\n## TD-002: a check after the restart\n\n**Priority:** High\n**Owner:** anchor\n"
+    text = _ledger("live-check #5", owner="checker") + (
+        "\n## TD-002: a check after the restart\n\n**Priority:** High\n**Owner:** checker\n"
         "**Kind:** live-check #5\n**Status:** Built\n"
     )
-    (root / "docs" / "technical_debt.md").write_text(_ledger("live-check #5", owner="anchor"))
+    (root / "docs" / "technical_debt.md").write_text(_ledger("live-check #5", owner="checker"))
     _git(root, "add", "-A")
     _git(root, "commit", "-qm", "the build (#5)")
     _git(root, "update-ref", "refs/remotes/origin/main", "HEAD")
@@ -141,7 +141,7 @@ def test_an_unknown_live_commit_keeps_each_live_checks_last_reading(tmp_path):
     before = TickMixin._read_repos([r], {}, {r}, None, {"r": sha})  # the reading saved before the restart
     assert live_of(before) == {"TD-001": "yes"}
     seat = Session(
-        id="ao-r-anchor", name="anchor", kind="interactive", adapter="shell", dir=r, lane=["anchor"],
+        id="ao-r-c", name="c", kind="interactive", adapter="shell", dir=r, lane=["free-pick", "owner:checker"],
         lane_seen={"at": "x", "ids": ["TD-001"]},
     )  # fmt: skip
     (root / "docs" / "technical_debt.md").write_text(text)  # an entry added while the agent was down

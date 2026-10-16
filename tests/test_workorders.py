@@ -418,12 +418,12 @@ def test_an_idle_holder_is_told_once_then_after_a_second_bound_the_pr_is_an_orde
 
 
 @pytest.mark.unit
-def test_a_red_pr_order_is_the_anchor_lanes_and_free_picks_only_with_free_pick():
+def test_a_red_pr_order_is_every_free_pick_lanes():
+    """§4.9b *No anchor seat* (TD-757): the grinders' pick list, whatever owner words stand beside it."""
     o = workorders.pr_order(_red())
-    assert ledger_mod.lane_matches(["anchor"], o)
-    assert not ledger_mod.lane_matches(["free-pick"], o)
-    assert not ledger_mod.lane_matches(["free-pick", "owner:grinder"], o)
-    assert ledger_mod.lane_matches(["free-pick"], {**o, "free_pick": True})
+    assert not ledger_mod.lane_matches(["anchor"], o)
+    assert ledger_mod.lane_matches(["free-pick"], o)
+    assert ledger_mod.lane_matches(["free-pick", "owner:grinder"], o)
     assert not ledger_mod.lane_matches(["design-first"], o)
 
 

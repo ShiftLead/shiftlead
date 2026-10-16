@@ -27,7 +27,6 @@ NAMED = {
     "manager": {"{board}", "{cadence_rules}", "{design_dir}", "{gate}", "{test}"},
     "techlead": {"{board}", "{design_dir}", "{gate}", "{ledger}"},
     "auditor": {"{cadence_rules}", "{design_dir}", "{gate}", "{ledger}", "{test}"},
-    "anchor": {"{board}", "{cadence_rules}", "{design_dir}", "{test}"},
     "designer": {"{board}", "{cadence_rules}"},
 }
 ROLES = tuple(NAMED)
@@ -81,8 +80,3 @@ def test_this_repos_brief_reads_its_own_layout(role):
             assert given[slot] == words and words in text, slot
     if "{gate}" in given:
         assert "python3 scripts/check_cadence.py --pr <n>" in text
-
-
-def test_the_anchors_repo_part_names_the_scratch_home():
-    text, _ = repoconfig.resolve_role(repoconfig.load(REPO), "anchor").compose()
-    assert "scripts/look_home.py" in text and "## This repo's rules" in text

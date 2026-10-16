@@ -261,7 +261,7 @@ def reread(
     member: Session, entries: list[Any], lane: list[str] | None = None
 ) -> tuple[dict[str, Any] | None, list[str]]:
     """The one reading of a lane's memory (design §6 rule 6 *`lane_seen` is the lane's memory, never
-    the ledger's*, TD-407, TD-411), for rule 6, rule 8 and the anchor seat's `work` trigger alike:
+    the ledger's*, TD-407, TD-411), for rule 6 and rule 8 alike:
     `member`'s `lane_seen` pruned of every id the reading holds and `lane` (the member's own when
     not given) no longer matches — its `dropped` mark with it — and the ids that match now and the
     pruned memory lacks, in the reading's order. An id the reading does not hold is kept: an entry

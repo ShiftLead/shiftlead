@@ -106,7 +106,7 @@ def test_repo_init_writes_a_ledger_the_seam_reading_reads_and_refuses_a_second_t
     assert ledgerboard.entries(text) == [] and "| ID | Title | Priority | Status |" in text
     assert ledgerboard.declared(text) == (
         {
-            "owner": ("anchor", "designer", "grinder", "paul"),
+            "owner": ("designer", "grinder", "paul"),
             "kind": ("build", "design-first", "live-check", "evaluation", "decision"),
         },
         [],

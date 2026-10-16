@@ -453,9 +453,8 @@ def pr_note(pr: dict[str, Any]) -> str:
 
 def pr_order(pr: dict[str, Any]) -> dict[str, Any]:
     """A red PR nobody holds as the lanes and the pages read an entry: `pr:<n>`, the PR's title, High,
-    pickable, its `Context` the URL and the failing checks. `pr_order` marks it: the `anchor` lane
-    takes it, a `free-pick` lane only where it carries `free_pick` (no servicing team has an anchor
-    seat, which only the team context can tell). A sync PR's (TD-684) is marked `sync`, with
+    pickable, its `Context` the URL and the failing checks. `pr_order` marks it, and every `free-pick`
+    lane takes it: the grinders' pick list (§4.9b *No anchor seat*, TD-757). A sync PR's (TD-684) is marked `sync`, with
     `sync_since` and its `reason` (`sync_reason`), which is its `Context` beside the URL."""
     failing = list(pr.get("failing") or [])
     sync = is_sync_order(pr)

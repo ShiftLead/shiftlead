@@ -745,7 +745,7 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     def e(i, page, owner, kind="build"):
         return {"id": i, "title": i, "for_page": page, "owner": owner, "kind": kind, "pickable": "yes"}
 
-    entries = [e(f"TD-{100 + i}", "pickable", "anchor") for i in range(20)]
+    entries = [e(f"TD-{100 + i}", "pickable", "designer") for i in range(20)]
     entries += [e(f"TD-{200 + i}", "pickable", "dev-cadence") for i in range(4)]
     entries += [e("TD-300", "design", "designer", "design-first")] + [e("TD-301", "design", "x", "design-first")]
     r = reading("/r/samscrape")
@@ -758,7 +758,7 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
     ]
     s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)
     html = ui.templates.get_template("team_summary.html").render(g={"team": "grind", "summary": s})
-    text = "in grind&#39;s lanes: 0 pickable, 1 design · the other 24 pickable: anchor 20, dev-cadence 4"
+    text = "in grind&#39;s lanes: 0 pickable, 1 design · the other 24 pickable: designer 20, dev-cadence 4"
     assert f'<span class="tipmark" tabindex="0" role="img" aria-label="{text}" title="{text}">i</span>' in html
     assert "laneline" not in html  # the card carries the *i*, the Repo page the line
 
@@ -773,9 +773,9 @@ def test_the_lanes_line_says_what_the_teams_lanes_take_and_who_is_out_of_work():
         and ">1 design</a>" in line
         and "live check" not in line
     )
-    assert "· the other 24 pickable: " in line and ">anchor 20</a>, " in line and ">dev-cadence 4</a>" in line
+    assert "· the other 24 pickable: " in line and ">designer 20</a>, " in line and ">dev-cadence 4</a>" in line
     assert 'href="/repo/samscrape#debt-pickable"' in line and "lanewarn" not in line
-    assert 'title="24 pickable · 0 in grind&#39;s lanes · anchor 20, dev-cadence 4"' in html
+    assert 'title="24 pickable · 0 in grind&#39;s lanes · designer 20, dev-cadence 4"' in html
     assert 'title="2 design · 1 in grind&#39;s lanes"' in html  # *wait on a build* is retired (TD-418)
     entries.append(e("TD-355", "pickable", "grinder"))
     s = ui.team_summary("grind", members, {"/r/samscrape": r}, {}, now=NOW)

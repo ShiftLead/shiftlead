@@ -243,22 +243,27 @@ def test_the_page_kinds_in_order():
     assert kind("**Kind:** live-check #12\n**Blocked by:** decision (anchor)") == "live-check"
     assert kind("**Kind:** build") == "pickable" and kind("") == "pickable"
     assert kind("**Kind:** evaluation") == "evaluation"
-    assert kind("**Kind:** build\n**Blocked by:** decision (anchor)") == "evaluation"
-    assert kind("**Owner:** anchor\n**Kind:** decision") == "evaluation"
-    # the residue, flagged: a decision owed to anyone else, and a `Kind: decision` the anchor does not own
+    # the residue, flagged: a decision owed to anyone but the person or the designer, and a `Kind:
+    # decision` not the person's (§4.9b *No anchor seat*, TD-757)
+    assert kind("**Kind:** build\n**Blocked by:** decision (anchor)") == "other"
+    assert kind("**Owner:** anchor\n**Kind:** decision") == "other"
     assert kind("**Kind:** build\n**Blocked by:** decision (techlead)") == "other"
     assert kind("**Owner:** grinder\n**Kind:** decision") == "other"
     got = ledger.entries("## TD-040: x\n\n**Blocked by:** decision (techlead)\n\n## TD-042: y\n")
     assert ledger.flags(got) == ["TD-040: fits no page kind — check its Owner, Kind and Blocked by"]
+    got = ledger.entries("## TD-043: z\n\n**Kind:** evaluation\n")
+    assert ledger.flags(got) == [
+        "TD-043: no lane takes an evaluation — write it as a build whose Fix is the write-up, or as design-first"
+    ]
     assert ledger.KINDS == ("for-you", "blocked", "design", "live-check", "pickable", "evaluation", "other")
 
 
 def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_designers():
     """TD-367/TD-368, design §4.4 *Repo facts* and §6 rule 6: *for you* is `Owner: paul` or a
     `decision (paul)`, any case; an entry of any kind on `decision (designer)` is *design* and
-    in the designer's lane, pickable or not, though its `Owner:` is the grinder's; the anchor's
-    `Kind: decision` and a build on `decision (anchor)` are its *evaluation* (TD-418) and in no grinder
-    or designer lane."""
+    in the designer's lane, pickable or not, though its `Owner:` is the grinder's; a `Kind: decision`
+    that is not the person's and a build on `decision (anchor)` are *other* since the anchor seat is
+    retired (TD-757), and in no grinder or designer lane."""
     text = (
         "## TD-050: the person's\n\n**Owner:** paul\n**Kind:** evaluation\n\n"
         "## TD-051: on the person's decision\n\n**Owner:** grinder\n**Kind:** build\n"
@@ -272,8 +277,8 @@ def test_for_you_is_what_waits_on_the_person_and_a_designer_decision_is_the_desi
         "TD-050": "for-you",
         "TD-051": "for-you",
         "TD-052": "design",
-        "TD-053": "evaluation",
-        "TD-054": "evaluation",
+        "TD-053": "other",
+        "TD-054": "other",
     }
     designer, grinder = ["design-first", "owner:designer"], ["free-pick", "owner:grinder"]
     assert [i for i, e in got.items() if ledger.lane_matches(designer, e)] == ["TD-052"]

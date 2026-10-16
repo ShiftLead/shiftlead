@@ -210,19 +210,6 @@ async def test_a_failed_lost_brief_entry_is_no_second_loss(agent, tmp_path):
         await person.call("kill", id=sid)
 
 
-async def test_a_work_seats_replay_keeps_its_lane_seen(agent, tmp_path):
-    await park_ticks(agent)
-    async with LocalClient() as person:
-        sid = await _create(person, tmp_path, "anchor", supervised=True, prompt="the brief", seat={"trigger": "work"})
-        rec = agent.sessions[sid]
-        rec.lane_seen = {"repo": {"TD-1": "sig"}}
-        _lose(agent, sid)
-        assert await agent._lost_brief(rec, datetime.now(UTC)) is True
-        new = agent.sessions[sid]
-        assert new is not rec and new.lane_seen == {"repo": {"TD-1": "sig"}}
-        await person.call("kill", id=sid)
-
-
 async def test_each_open_asker_is_told_once_and_the_person_and_the_system_never(agent, tmp_path, monkeypatch):
     await park_ticks(agent)
     async with LocalClient() as person:

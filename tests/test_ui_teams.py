@@ -33,7 +33,6 @@ class Fleet:
         self.verdicts: dict[str, dict] = {}
         self.repos: dict[str, dict] = {}
         self.waiting: dict[str, list] = {}  # the `host` reading's (TD-274)
-        self.held: dict | None = None  # `checkout_held`'s reading of the anchor's checkout (§4.9b)
 
     def handle(self, method: str, params: dict):
         self.calls.append((method, params))
@@ -45,8 +44,6 @@ class Fleet:
             return dict(self.repos)
         if method == "recent_dirs":
             return []
-        if method == "checkout_held":
-            return {"held": self.held}
         if method == "adapters":
             return ["claude-code", "shell"]
         if method == "name_check":
@@ -467,33 +464,26 @@ def test_a_start_reads_the_lanes_and_every_lane_empty_asks_start_anyway(world, c
     assert 'data-closes="a, b"' in head
     js = (Path(__file__).parents[1] / "src" / "shiftlead" / "ui" / "static" / "app.js").read_text()
     assert 'if (b && b.dataset.teamAct === "start") return startPress(b);' in js
-    assert (
-        "Nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts."
-        in js
-    )
+    assert "Nothing to pick: every lane is empty, so the team will wind down as soon as it starts." in js
     assert "if (picks && picks.empty)" in js and "It first closes ${b.dataset.closes}." in js
 
 
-def test_a_start_whose_members_lanes_are_empty_and_the_anchors_not_opens_no_dialog(world, client):
+def test_a_start_whose_grinders_lane_holds_a_live_check_opens_no_dialog_and_names_no_anchor(world, client):
     """design §4.5a team card **Start**, *What the lanes hold, before the start* (TD-558, built by
-    TD-563): the anchor seat's lane is one the start creates, so work there is no empty team — the
-    press starts, the line saying the anchor's count by kind, and a held checkout names its holder."""
+    TD-563): a live check in a grinder's lane is work, so the press starts, the line saying the count by
+    kind — and no anchor seat's lane is read, nor its checkout (§4.9b *No anchor seat*, TD-757)."""
     tmp_path, fleet = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"]["anchor"] = True
     doc["teams"]["ao-grind"]["members"][0]["lane"] = ["free-pick", "owner:grinder"]
     write_org(tmp_path, doc)
     checkout = str(tmp_path / "shiftlead")
-    live = {"id": "TD-9", "pickable": "yes", "kind": "live-check", "live": "yes", "owner": "anchor"}
+    live = {"id": "TD-9", "pickable": "yes", "kind": "live-check", "live": "yes", "owner": "grinder"}
     fleet.repos = {checkout: {"ledger": {"entries": [{**live, "for_page": "live-check"}]}}}
     got = client.get("/api/teams/ao-grind/lanes").json()
-    assert (got["line"], got["empty"]) == ("grinder: 0 · anchor: 1 live check", False)
-    fleet.held = {"by": "shiftlead-90", "why": "held by shiftlead-90"}
-    got = client.get("/api/teams/ao-grind/lanes").json()
-    assert got["line"] == "grinder: 0 · anchor: 1 live check · held by shiftlead-90"
-    anchor = got["roles"]["anchor"]
-    assert (anchor["n"], anchor["by_kind"]["live-check"], anchor["held"]) == (1, 1, "shiftlead-90")
+    assert (got["line"], got["empty"]) == ("grinder: 1 live check", False) and "anchor" not in got["roles"]
     assert client.post("/api/teams/ao-grind/start", json={}).status_code == 200 and fleet.creates()
+    assert not any(m == "checkout_held" for m, _ in fleet.calls)
+    assert not any(p["name"].endswith("-anchor") for m, p in fleet.calls if m == "create")
 
 
 def test_start_runs_the_shared_sequence_and_the_members_carry_controllers_lead(world, client):
@@ -1032,21 +1022,15 @@ def test_a_live_team_whose_records_differ_reads_flow_changed_and_apply_relaunche
 
 def test_a_live_team_with_no_flow_that_lacks_a_seat_reads_definition_changed(world, client, monkeypatch):
     """§4.9c, §4.5a (TD-399, built by TD-400): a live team that runs no flow is compared on its seats
-    alone — the anchor it lacks reads *definition changed* and **Apply** names the start; so does the
-    manager on call it has no record of (§6 rule 3, TD-410, built by TD-413)."""
-    from shiftlead import org as orgmod
-
-    monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", True)
+    alone — the manager on call it has no record of (§6 rule 3, TD-410, built by TD-413) reads
+    *definition changed* and **Apply** names the start."""
     tmp_path, fleet = world
     write_org(tmp_path, org_doc(tmp_path))
     fleet.sessions = [{**badged("ao-shiftlead-grind-1", "ao-grind", state="idle"), "name": "grind-1", "tail": []}]
     head = _head(client.get("/").text)
-    lines = "orc-ao: starts&#10;ao-grind-anchor: starts"
+    lines = "orc-ao: starts"
     assert f'<span class="meta flowchanged" title="{lines}">definition changed</span>' in head
-    assert (
-        'data-confirm="Apply the definition to ao-grind? orc-ao: starts; ao-grind-anchor: starts.">Apply</button>'
-        in head
-    )
+    assert 'data-confirm="Apply the definition to ao-grind? orc-ao: starts.">Apply</button>' in head
     assert "flow:" not in head and ">flow changed<" not in head
 
 

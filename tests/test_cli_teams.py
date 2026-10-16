@@ -1365,7 +1365,6 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
     from shiftlead.cli import team_skill_text
 
     importlib.reload(orgmod)
-    monkeypatch.setattr(orgmod, "ANCHOR_DEFAULT", False)  # the reload took conftest's off back (anchor: tests' own)
     (tmp_path / "org.yml").write_text(
         yaml.safe_dump({
             "projects": {"p": {"repos": {"r": {"h": str(tmp_path)}}}},
@@ -1397,8 +1396,8 @@ def test_the_recipe_covers_a_repos_first_team():
     step = text[text.index("## 0b. Is the repo ready?") : text.index("## 1. Decide where the team runs")]
     assert "ao doctor repos" in step and "ao repo init" in step
     assert "**A repo with little or no work**" in text and "--anyway" in text
-    # the implied anchor seat has a lane, so a manager alone on an empty ledger needs --anyway too
-    assert PRESETS["anchor"]["lane"] and "the team's anchor seat has a lane too" in text
+    # no anchor seat (§4.9b *No anchor seat*, TD-757): the recipe says none, and no preset is one
+    assert "anchor" not in PRESETS and "anchor seat" not in text
     assert "**A public repo's team goes in `org.yml`**" in text
     assert "## For an agent session told to do this" in text and "Claude session" not in text
 
@@ -1453,7 +1452,9 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
             repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, {}, tmp_path / ".shiftlead.yml")
     src = Path(repoconfig.__file__).read_text(encoding="utf-8")
     body = src[src.index("def _apply(") : src.index("def _mapping(")]
-    assert set(re.findall(r'"(\w+)"', body)) == set(accepted)  # nothing the loader takes is left out
+    # nothing the loader takes is left out; `anchor` is there only to pass `anchor: false` over (§5, TD-757)
+    assert set(re.findall(r'"(\w+)"', body)) == {*accepted, "anchor"}
+    repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), "anchor", False, tmp_path / ".shiftlead.yml")
 
 
 def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world, capsys, monkeypatch):
@@ -2271,7 +2272,8 @@ def test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway
     state["repos"] = {checkout: {"ledger": {"entries": [entry(4, "no"), entry(5, kind="design-first")]}}}
     assert cli.main(["team", "start", "ao-grind"]) == 1
     err = capsys.readouterr().err
-    assert "nothing to pick: every lane is empty, the anchor seat's too" in err and "(grinder: 0 · hunter: 0)" in err
+    assert "nothing to pick: every lane is empty, so the team" in err and "(grinder: 0 · hunter: 0)" in err
+    assert "anchor" not in err  # no seat's lane to name (§4.9b *No anchor seat*, TD-757)
     assert "--anyway" in err and not creates(state)
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 1
     got = json.loads(capsys.readouterr().out)
@@ -2285,75 +2287,49 @@ def test_a_start_says_what_the_lanes_hold_and_stops_at_empty_lanes_unless_anyway
     assert capsys.readouterr().out.splitlines()[0] == "grinder: ledger unreadable · hunter: ledger unreadable"
 
 
-def test_a_start_counts_every_lane_it_creates_by_kind_the_anchor_seats_and_the_managers_too(world, capsys):
+def test_a_start_counts_every_lane_it_creates_by_kind_the_managers_too(world, capsys):
     """design §4.5a team card **Start**, *What the lanes hold, before the start* (TD-558, built by
-    TD-563): the line reads every lane the start creates — the manager's where it carries one, each
-    member role's once, the anchor seat's — by the page's kinds in the kind bar's order; members'
-    lanes empty and the anchor's not is no refusal; a held anchor checkout is named after its count,
-    which still stands; `--json`'s `roles` is `{n, by_kind, held}`."""
+    TD-563): the line reads every lane the start creates — the manager's where it carries one and each
+    member role's once — by the page's kinds in the kind bar's order; `--json`'s `roles` is
+    `{n, by_kind}`. No anchor seat's lane and no checkout reading (§4.9b *No anchor seat*, TD-757)."""
     tmp_path, state = world
     checkout = str(tmp_path / "shiftlead")
     doc = org_doc(tmp_path)
     team = doc["teams"]["ao-grind"]
-    team["anchor"] = True
     team["manager"]["lane"] = "design-first"  # a manager whose role carries a lane: counted, once
-    team["members"][0]["lane"] = ["free-pick", "owner:grinder"]  # as a grinder's is: the anchor's left out
+    team["members"][0]["lane"] = ["free-pick", "owner:grinder"]  # as a grinder's is
     team["members"].append({"role": "grinder", "name": "grind-x", "lane": "free-pick", "home": "shiftlead"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
-    held: dict = {}
-
     real = cli.call_sync
 
     def call(method, **params):
-        if method == "checkout_held":
-            state["calls"].append((method, params))
-            return {"held": held.get("now")}
+        assert method != "checkout_held", "the RPC is gone (TD-757)"
         return real(method, **params)
 
     cli.call_sync = call  # the fixture's monkeypatch restores the original at teardown
-    anchor = [
-        {"id": "TD-60", "pickable": "yes", "kind": "build", "owner": "anchor", "for_page": "pickable"},
+    grinders = [
+        {"id": "TD-60", "pickable": "yes", "kind": "build", "owner": "grinder", "for_page": "pickable"},
         *(
-            {"id": f"TD-7{i}", "pickable": "yes", "kind": "live-check", "live": "yes", "owner": "anchor",
+            {"id": f"TD-7{i}", "pickable": "yes", "kind": "live-check", "live": "yes", "owner": "grinder",
              "for_page": "live-check"}
             for i in range(6)
         ),
     ]  # fmt: skip
     design = {"id": "TD-80", "pickable": "yes", "kind": "design-first", "owner": "designer", "for_page": "design"}
-    state["repos"] = {checkout: {"ledger": {"entries": [*anchor, design]}}}
+    state["repos"] = {checkout: {"ledger": {"entries": [*grinders, design]}}}
     assert cli.main(["team", "start", "ao-grind"]) == 0 and creates(state)
     line = capsys.readouterr().out.splitlines()[0]
-    assert line == "manager: 1 design · grinder: 0 · hunter: 0 · anchor: 1 pickable, 6 live check"
-    # held: named after the count, the count still standing against *empty*
+    assert line == "manager: 1 design · grinder: 1 pickable, 6 live check · hunter: 0"
+    assert not any(p.get("name", "").endswith("-anchor") for m, p in state["calls"] if m == "create")
     for s in state["sessions"]:
         s["state"] = "closed"
     state["sessions"].clear()
-    held["now"] = {"by": "shiftlead-90", "why": "held by shiftlead-90 (claude)"}
-    state["repos"] = {checkout: {"ledger": {"entries": anchor}}}
+    state["repos"] = {checkout: {"ledger": {"entries": grinders}}}
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
     got = json.loads(capsys.readouterr().out)["lanes"]
-    assert (
-        got["line"] == "manager: 0 · grinder: 0 · hunter: 0 · anchor: 1 pickable, 6 live check · held by shiftlead-90"
-    )
-    assert got["empty"] is False
-    assert got["roles"]["anchor"]["n"] == 7 and got["roles"]["anchor"]["held"] == "shiftlead-90"
-    assert got["roles"]["anchor"]["by_kind"]["live-check"] == 6 and "held" not in got["roles"]["grinder"]
-    assert [m for m, _ in state["calls"]].count("checkout_held") >= 1
-    # every lane empty, the anchor's too: refused, and a held checkout still said on the line
-    state["calls"].clear()
-    state["sessions"].clear()
+    assert got["line"] == "manager: 0 · grinder: 1 pickable, 6 live check · hunter: 0" and got["empty"] is False
+    assert got["roles"]["grinder"]["n"] == 7 and got["roles"]["grinder"]["by_kind"]["live-check"] == 6
+    assert "anchor" not in got["roles"] and "held" not in got["roles"]["grinder"]
     state["repos"] = {checkout: {"ledger": {"entries": []}}}
-    held["now"] = {"by": "checkout", "why": "the checkout has uncommitted changes"}
-    assert cli.main(["team", "start", "ao-grind"]) == 1 and not creates(state)
-    err = capsys.readouterr().err
-    assert "(manager: 0 · grinder: 0 · hunter: 0 · anchor: 0 · the checkout has uncommitted changes)" in err
-
-    # the anchor's reading failing says nothing of the checkout
-    def broken(method, **params):
-        if method == "checkout_held":
-            raise cli.AgentError("unknown method: checkout_held")
-        return real(method, **params)
-
-    cli.call_sync = broken
-    picks = teamrun.lanes(broken, cli._org_here(), "ao-grind", HOST)
-    assert picks["line"] == "manager: 0 · grinder: 0 · hunter: 0 · anchor: 0" and picks["empty"] is True
+    picks = teamrun.lanes(call, cli._org_here(), "ao-grind", HOST)
+    assert picks["line"] == "manager: 0 · grinder: 0 · hunter: 0" and picks["empty"] is True
