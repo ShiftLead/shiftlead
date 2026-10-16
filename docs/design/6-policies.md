@@ -613,7 +613,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      nothing. The reading is written once (`sessionorc.work`), and the card's is the same function
      given the definition's seat names. **The repo's anchor seat is a seat of every team whose
      manager its `controllers` name** (§4.9b *The anchor seat*; it carries no `team` badge): its
-     lane's news goes into the `work_waiting` of each such team that is wound down, on the repo, and
+     lane's news goes into the `work_waiting` of each wound-down team whose records' `repo` is the
+     seat's — by the repo, since rule 9 has taken those teams' managers out of its `controllers` —
+     and
      a replay of a team that finds the seat ended replays it with that team's manager as its
      controller, each other team's manager added again as its team comes back. When a wound-down team's member's lane holds a matching id
      its `lane_seen` does not — the memory pruned as rule 6 prunes it for a member that is gone, so
@@ -783,8 +785,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      members' half is `ao team stop --close`'s (§4.9a) — each finished member is closed under the
      wrap-up's own safety check, one with uncommitted or unpushed work left open and the Inbox row
      it is after any wrap-up — and the manager's half is this rule's own; and the home takes the team's manager out of the
-     repo's anchor seat's `controllers`, winding the seat down when none is left and no live record
-     of any team names the seat's repo (§4.9b), a person-led team's sessions keeping it running. The manager, if live and
+     repo's anchor seat's `controllers`, and on any tick on which none is left and no live record with
+     a `team` badge has the seat's `repo`, the home winds the seat down (§4.9b), a person-led team's
+     sessions keeping it running. The manager, if live and
      on the home, gets **one** send of fixed text, *[shiftlead] your team is finished: every member
      has declared. Make your last acts — `ao progress none`, the note to the person — then `ao
      close` yourself*, typed only into an idle composer as rule 4's line is, and
