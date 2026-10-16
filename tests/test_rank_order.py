@@ -97,6 +97,22 @@ def test_the_reading_reads_the_rank_file_beside_the_ledger(tmp_path):
     assert got["TD-012"]["key"].endswith("|shiftlead")  # the checkout's name, lower-cased
 
 
+def test_a_rank_file_with_a_byte_that_is_not_utf8_still_reads_the_ledger(tmp_path):
+    # TD-783: a stray byte raises UnicodeDecodeError, a ValueError the reading's `except OSError` would not
+    # catch; the bad line is ledgerboard's to flag, and the good one still ranks its entry
+    root = tmp_path / "shiftlead"
+    (root / "docs").mkdir(parents=True)
+    (root / "docs" / "technical_debt.md").write_text(LEDGER, encoding="utf-8")
+    key = lb.midpoint(None, "1|0|000013|shiftlead")
+    good = lb.set_rank("", {"TD-011": key}).encode("utf-8")
+    (root / lb.rank_path("docs/technical_debt.md")).write_bytes(good + b"TD-012: \xff\n")
+    got = ledger.reading(root, datetime.now(UTC), with_history=False)
+    assert "error" not in got and len(got["entries"]) == 6
+    by = {e["id"]: e for e in got["entries"]}
+    assert by["TD-011"]["lined"] and by["TD-011"]["key"] == key and by["TD-011"]["order"] == 0
+    assert not by["TD-012"]["lined"]
+
+
 def test_ao_repos_order_is_ledger_py_pickables_from_the_rank_file_alone(tmp_path):
     """For single-repo cards the home's order is the script's: one rank file, one ledgerboard."""
     (tmp_path / "docs").mkdir()
