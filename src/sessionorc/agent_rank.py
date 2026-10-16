@@ -133,18 +133,19 @@ class RankMixin:
                 c["place"] = n
         return {**got, "cards": out}
 
-    def _rank_repos(self) -> dict[str, tuple[str, str]]:
-        """Repo name (as the Queue names it) → (checkout root, the rank file's path in it)."""
-        out: dict[str, tuple[str, str]] = {}
+    def _rank_repos(self) -> dict[str, tuple[str, str, Mapping[str, Any]]]:
+        """Repo name (as the Queue names it) → (checkout root, the rank file's path in it, its ledger reading),
+        taken on the event loop so the flush's thread never reads `self._repos` while a tick replaces it."""
+        out: dict[str, tuple[str, str, Mapping[str, Any]]] = {}
         for root, v in self._repos.items():
             led = (v or {}).get("ledger") if isinstance(v, Mapping) else None
             if not isinstance(led, Mapping) or not led.get("path"):
                 continue
             name = str(v.get("name") or Path(root).name)
-            out.setdefault(name, (str(v.get("root") or root), lb.rank_path(str(led["path"]))))
+            out.setdefault(name, (str(v.get("root") or root), lb.rank_path(str(led["path"])), led))
         return out
 
-    def _rank_found(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str]]) -> dict[str, Any]:
+    def _rank_found(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str, Any]]) -> dict[str, Any]:
         """The joins and prunes the rank files and the cards call for now (`{qid: key or None}`)."""
         return {**rank_mod.joins(cards), **rank_mod.prunes(cards, self._rank_lined(repos))}
 
@@ -189,7 +190,7 @@ class RankMixin:
         if due:
             self._rank_task = asyncio.create_task(self._rank_run(cards, repos))
 
-    async def _rank_run(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str]]) -> None:
+    async def _rank_run(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str, Any]]) -> None:
         """The flush off the event loop, then the page told what it changed (`pending` gone, `not_landed`)."""
         try:
             await asyncio.to_thread(self._rank_flush, cards, repos)
@@ -198,7 +199,7 @@ class RankMixin:
         if self._queue:
             await self._broadcast({"event": "queue", "queue": self._queue_ranked(self._queue)})
 
-    def _rank_flush(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str]]) -> None:
+    def _rank_flush(self, cards: list[dict[str, Any]], repos: Mapping[str, tuple[str, str, Any]]) -> None:
         """One flush (§4.4 *A move lands*): every intent re-derived against `cards` in the order made, its
         lines landed as one `queue: rank` PR per repo; then the joins and the prunes, each kind a PR per
         repo. A repo whose rank PR fails after its retry keeps every intent that touches it, retried at the
@@ -234,7 +235,7 @@ class RankMixin:
             for repo, ls in rank_mod.by_repo(want).items():
                 if repo not in repos:
                     continue  # a repo the home no longer reads: nothing to write
-                root, rel = repos[repo]
+                root, rel, _ = repos[repo]
                 try:
                     got = board_mod.land_rank(root, rel, ls, lb.queue_subject(rank_mod.TOOL, kind, list(ls)))
                 except Exception as e:  # noqa: BLE001 — a refusal, or gh or git failing under it: kept, retried
@@ -267,14 +268,12 @@ class RankMixin:
                 state["moved_at"] = None
             self.rank_store.save(state)
 
-    def _rank_lined(self, repos: Mapping[str, tuple[str, str]]) -> dict[str, list[str]]:
+    def _rank_lined(self, repos: Mapping[str, tuple[str, str, Any]]) -> dict[str, list[str]]:
         """Repo name → the ids its checkout's rank file gives a line that are open or archived — what a prune
         may weigh. A repo whose ledger reading failed or holds no entry, or whose archive cannot be read, is
         left out: a reading that is missing must never read as every line's card archived."""
         out: dict[str, list[str]] = {}
-        views = {str(v.get("name") or Path(r).name): v for r, v in self._repos.items() if isinstance(v, Mapping)}
-        for name, (root, rel) in repos.items():
-            led = (views.get(name) or {}).get("ledger") or {}
+        for name, (root, rel, led) in repos.items():
             if led.get("error") or not led.get("entries"):
                 continue
             try:
