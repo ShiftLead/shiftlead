@@ -1479,7 +1479,7 @@ The other cases:
 **Status:** Open
 **Location:** `tests/test_held_missed.py` (~L442); `src/sessionorc/agent_*.py` (`_held_pass`, `_held_tried`, `_held_settled`)
 
-**Why:** #1873's first CI run (test (3.12), 2026-10-16T00:44Z UTC) failed `assert [c["pr"] for c in held.standing(s.held_missed)] == [860]` with `[]`: after a Dismiss and a simulated restart, the pass that should record the next crossing (#860, held and merged) recorded none. The re-run of the same commit passed, and the file passes locally (22 in 1.1 s). #1873 touches nothing under `held`; the test is timing- or state-dependent.
+**Why:** #1873's CI, run 38830438126 attempt 1 (test (3.12), 2026-10-16T00:44Z UTC; `gh run view 38830438126 --attempt 1 --log-failed`), failed `assert [c["pr"] for c in held.standing(s.held_missed)] == [860]` with `[]`: after a Dismiss and a simulated restart, the pass that should record the next crossing (#860, held and merged) recorded none. The re-run of the same commit passed, and the file passes locally (22 in 1.1 s). #1873 touches nothing under `held`; the test is timing- or state-dependent.
 
 **Fix:** read `_held_pass` for anything throttled by wall time or by `_held_tried` across calls inside one test (the test clears `_held_tried` once, before the second pass, not before the third), reproduce under load (`pytest -p no:randomly --count` or a loop with `taskset`), and pin the pass to what the test means.
 
