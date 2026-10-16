@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from sessionorc.client import AgentError
 from shiftlead.ui.inbox import inbox_sections, rail_rows
-from shiftlead.ui.queue import attach, card_index, item_home, queue_view
+from shiftlead.ui.queue import attach, card_index, item_home, queue_view, split_later
 
 pytestmark = pytest.mark.unit
 
@@ -143,7 +143,7 @@ def test_a_resolved_date_with_no_time_is_in_the_day_it_names():
     assert ln["wins"] == ["day", "week", "month"]  # no time of day: never in *4 h*
 
 
-def fake(q: dict | None, entries: list | None = None):
+def fake(q: dict | None, entries: list | None = None, repos: dict | None = None, calls: list | None = None):
     class Fake:
         def __init__(self, *a, **k):
             pass
@@ -161,6 +161,11 @@ def fake(q: dict | None, entries: list | None = None):
                 return q
             if method == "inbox":
                 return {"entries": [dict(e) for e in entries or ()]}
+            if method == "repos" and repos is not None:
+                return repos
+            if method == "ledger_decide" and calls is not None:
+                calls.append(kw)
+                return {"decided": kw.get("words")}
             return {"list": [], "usage": {}, "host": {"name": "kmaster"}}.get(method, {})
 
     return Fake
@@ -310,3 +315,80 @@ def test_with_nothing_on_the_queue_the_number_links_to_the_inbox(tmp_path, monke
     inbox = c.get("/inbox").text
     assert "data-href" not in inbox[inbox.index('id="personinbox"') : inbox.index('id="queuetab"')]
     assert 'id="railqueue"' in inbox and "about nothing" in inbox
+
+
+def ledger_repos() -> dict:
+    """The repo facts' *for you* and held entries of repo `s`: TD-21 yours to do (`Owner: paul`), TD-20 your
+    decision (`decision (paul)`), TD-30 held by the person; and TD-99, which no card holds."""
+    e = lambda i, **kw: {"id": i, "title": f"entry {i}", "priority": "medium", "for_page": "for-you", **kw}  # noqa: E731
+    return {"/r/s": {"name": "s", "root": "/r/s", "ledger": {"entries": [
+        e("TD-21", owner="paul"),
+        e("TD-20", owner="grinder", blocked_by=["decision (paul)"]),
+        e("TD-30", owner="grinder", for_page="pickable", held={"at": at(2)}),
+        e("TD-99", owner="paul"),
+    ]}}}  # fmt: skip
+
+
+def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
+    """§4.5 screen 6 *Where a row is drawn*, screen 12 *What needs the person* (TD-771 slice 3): a ledger row
+    whose entry a card holds is drawn on that row — *yours to do* with Done and Start session, a decision with
+    Lift the hold and no Start session, *held (person)* with Release — and leaves the Inbox's *Later*; one no
+    card holds stays there."""
+    c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos()))
+    html = c.get("/queue").text
+    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
+    card30 = html[html.index('data-card="s#TD-30"') :]
+    assert "held until your decision" in card20 and ">Lift the hold</button>" in card20
+    assert 'data-words="go ahead"' in card20
+    assert "yours to do" in card20 and 'data-words="done"' in card20 and ">Done</button>" in card20
+    assert card20.count(">Start session</button>") == 1  # the decision has none
+    assert "held (person)" in card30 and 'data-act="ledger_release"' in card30
+    assert "entry TD-99" not in html
+    inbox = c.get("/inbox").text
+    later = inbox[inbox.index('id="ledgerforyou"') :]
+    assert "entry TD-99" in later and "entry TD-21" not in later and "entry TD-20" not in later
+    rail = inbox[inbox.index('id="railh-kind"') :]
+    assert 'data-value="ledger"' in rail  # TD-99 is still the Inbox's
+    poll = c.get("/api/person/inbox").json()["html"]["ledger"]
+    assert "entry TD-99" in poll and "entry TD-21" not in poll
+
+
+def test_the_ledger_kind_leaves_the_rail_once_every_row_is_on_a_card(tmp_path, monkeypatch):
+    repos = ledger_repos()
+    repos["/r/s"]["ledger"]["entries"].pop()  # TD-99: every row is now on a card
+    inbox = client(monkeypatch, tmp_path, fake(queue(), [], repos)).get("/inbox").text
+    assert 'data-value="ledger"' not in inbox[inbox.index('id="railh-kind"') :]
+
+
+def test_lift_the_hold_and_done_send_the_ledger_rows_reply_road(tmp_path, monkeypatch):
+    """§4.5a *Queue card: what needs the person*: each press is the ledger row's Reply with its fixed words —
+    one `ledger_decide`, one decided board line."""
+    calls: list = []
+    c = client(monkeypatch, tmp_path, fake(queue(), [], ledger_repos(), calls))
+    for words in ("go ahead", "done"):
+        got = c.post("/api/person/ledger", json={"repo": "/r/s", "id": "TD-20", "words": words})
+        assert got.status_code == 200 and got.json()["decided"] == words
+    assert calls == [
+        {"repo": "/r/s", "id": "TD-20", "words": "go ahead"},
+        {"repo": "/r/s", "id": "TD-20", "words": "done"},
+    ]
+
+
+def test_a_held_person_card_reads_needs_you():
+    v = queue_view(queue(), NOW)
+    (c30,) = [c for c in v["up_next"] if c["id"] == "s#TD-30"]
+    assert c30["status"] == "needs you" and v["n"]["needs_you"] == 1
+
+
+def test_a_board_line_not_yet_due_is_drawn_on_its_row_and_leaves_later():
+    """§4.5 screen 12 *What is attached to a row*: a board line is drawn on its row whether or not it is due;
+    one not yet due leaves *Later*'s *Not due yet* for it, uncounted."""
+    ahead = [
+        {"row": "board", "id": "b1", "text": "decide the layout. Context: TD-21. Due: 2026-10-30."},
+        {"row": "board", "id": "b2", "text": "something else. Due: 2026-10-30."},
+    ]
+    lf, rest, moved = split_later({"n": 0, "groups": []}, ahead, card_index(queue()))
+    assert [e["id"] for e in rest] == ["b2"] and lf["n"] == 0
+    assert [(e["id"], e["on_row"], e["later_section"]) for e in moved] == [("b1", "s#TD-21", "coming")]
+    got = attach({}, lambda e, sec: f"<{e['id']}:{sec}>", moved)
+    assert got["s#TD-21"]["items"] == [{"section": "coming", "id": "b1", "html": "<b1:coming>"}]

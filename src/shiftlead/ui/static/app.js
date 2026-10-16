@@ -1025,7 +1025,8 @@
           const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote });
           if (!m) return;
           want.words = m.text;
-        } else if (b.dataset.go) want.go = true;
+        } else if (b.dataset.words) want.words = b.dataset.words;  // Done, Lift the hold: fixed words (TD-771)
+        else if (b.dataset.go) want.go = true;
         else want.answer = Number(b.dataset.index);
         pressed();
         const res = await act("person", "ledger", want);
@@ -3474,6 +3475,8 @@
     apply();
     showHash();
     setInterval(reread, 30000);
+    // a press on a row drawn here by the Inbox's renderer refreshes this page's lists (TD-771)
+    if (typeof AO.refreshInboxPage !== "function") AO.refreshInboxPage = reread;
     let soon = null;
     connectEvents((ev) => {
       if (ev.event !== "queue") return;

@@ -355,7 +355,7 @@ from .pty_bridge import (
     scroll_argv,
     watch_clients,
 )
-from .queue import WINDOW_LABEL, WINDOW_WORD, attach, card_index, queue_view
+from .queue import WINDOW_LABEL, WINDOW_WORD, attach, card_index, queue_view, split_later
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
     COMPLETED_WORD,  # noqa: F401
@@ -3125,6 +3125,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # what is attached to a row (§4.5 screen 12, TD-771): the Inbox's own sections over the same
             # reads, each `home: queue` row drawn under its row by the Inbox's own renderer
             repos_omit(REPOS_OMIT_INBOX)
+            index = card_index(got)
             with contextlib.suppress(HTTPException):
                 fleet = await call("list")
                 inbox, states = await h.person_inbox(fleet), await h.person_states(fleet)
@@ -3137,11 +3138,17 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     handed=inbox.get("handed") or (),
                     boards=hz["due"] + hz["waiting"],
                     fleet=fleet,
-                    cards=card_index(got),
+                    cards=index,
                 )
+                # *Later*'s ledger rows and the board's lines not yet due whose entry a card holds (TD-771)
+                later = split_later(await h.ledger_view(fleet), hz["ahead"], index)[2]
                 one = templates.get_template("queue_mail.html")
                 origin = page_origin(request)
-                mail = attach(sections, lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin)))
+                mail = attach(
+                    sections,
+                    lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=board_choices())),
+                    later,
+                )
         ctx = {
             "q": queue_view(got, datetime.now(UTC), mail),
             "labels": WINDOW_LABEL,
@@ -3473,6 +3480,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             named = repo_teams(await h.defs(), host_name())
         return ledger_for_you(repos, fleet, named)
 
+    h.ledger_view = ledger_view  # the Queue draws these rows on their cards (TD-771)
+
     @app.get("/inbox", response_class=HTMLResponse)
     async def inbox_page(request: Request):
         """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the
@@ -3495,6 +3504,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             else await board_view()
         )
         hz = with_standings(hz, fleet)
+        cards = {} if agent_down else await h.queue_cards()
         sections = inbox_sections(
             got["entries"],
             states=states,
@@ -3505,10 +3515,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # the *waiting on …* words
             boards=hz["due"] + hz["waiting"],
             fleet=fleet,
-            cards={} if agent_down else await h.queue_cards(),
+            cards=cards,
         )
         picks = rail_picks(request.query_params)
         lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet)
+        # the ledger's rows and the board's lines not yet due whose entry a Queue card holds are drawn there
+        # (§4.5 screen 6 *Where a row is drawn*, TD-771): *Later* keeps the rest
+        lf, ahead, _ = split_later(lf, hz["ahead"], cards)
+        hz = {**hz, "ahead": ahead}
         return templates.TemplateResponse(
             request,
             "inbox.html",
@@ -3673,6 +3687,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         origin = page_origin(request)
         gz = gzip_ok(request)
         cards = await h.queue_cards()
+        lf, ahead, _ = split_later(lf, hz["ahead"], cards)  # what a Queue card holds is drawn there (TD-771)
+        hz = {**hz, "ahead": ahead}
 
         def read() -> tuple[list[dict[str, Any]], bytes]:
             """Everything after the awaits, on a worker thread (TD-611 slice 2): the sections, the

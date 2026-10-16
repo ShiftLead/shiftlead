@@ -100,6 +100,47 @@ def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None)
     return {"home": "queue", "on_card": card, "on_row": row, "mentions": list(dict.fromkeys(mentions))}
 
 
+def ledger_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
+    """Where a ledger row of the Inbox's (`ledger_for_you`'s, §4.5 screen 6 *The ledger's entries that wait on
+    you*) is drawn: on the card that holds its entry, `<repo>#TD-n`, as its block of what needs the person
+    (screen 12, TD-771); in *Later* where no open card holds it — a home that serves no Queue, an entry found
+    nowhere — so nothing is lost."""
+    refs = _refs(f"{e.get('name') or ''}#{e.get('id') or ''}")
+    if not index or not refs or refs[0] not in index:
+        return {"home": "inbox", "on_card": "", "on_row": "", "mentions": []}
+    card, row = index[refs[0]]
+    return {"home": "queue", "on_card": card, "on_row": row, "mentions": []}
+
+
+def split_later(
+    lf: Mapping[str, Any] | None, ahead: Any, index: Mapping[str, tuple[str, str]] | None
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    """*Later*'s rows split by where each is drawn (§4.5 screen 6 *Where a row is drawn*, TD-771): the ledger's
+    rows (`lf`, `ledger_for_you`'s groups) and the board's lines not yet due (`ahead`) whose entry an open card
+    holds leave the Inbox for their card. Answers the Inbox's `lf` and `ahead` and the rows the Queue draws,
+    each tagged `home: queue` with its card and row and its section — `later` a ledger row, `coming` a board
+    line, which is drawn with its due date and counted nowhere, as the board's horizon says."""
+    groups, moved = [], []
+    for g in (lf or {}).get("groups") or []:
+        keep = []
+        for e in g.get("rows") or []:
+            home = ledger_home(e, index)
+            if home["home"] == "queue":
+                moved.append({**e, **home, "later_section": "later"})
+            else:
+                keep.append(e)
+        if keep:
+            groups.append({**g, "rows": keep})
+    rest = []
+    for e in ahead or ():
+        home = item_home(e, index)
+        if home["home"] == "queue":
+            moved.append({**e, **home, "later_section": "coming"})
+        else:
+            rest.append(e)
+    return {"n": sum(len(g["rows"]) for g in groups), "groups": groups}, rest, moved
+
+
 def _plain(text: Any) -> str:
     """A `Resolved:` line as the card opens to it: the ledger's emphasis and code marks dropped, its
     words kept (no Markdown is rendered on the page)."""
@@ -158,14 +199,28 @@ def _row(r: Mapping[str, Any], one_repo: bool, mail: Mapping[str, Any] | None = 
     }
 
 
-def attach(sections: Mapping[str, Any], drawn: Any) -> dict[str, dict[str, list[Any]]]:
+def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str, dict[str, list[Any]]]:
     """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the row
     each is attached to (§4.5 screen 12 *What is attached to a row*): `items`, each `{section, id, html}`
     with the row drawn by the Inbox's own renderer (`drawn(e, section)`), in the Inbox's order — what
     needs the person first — and `mentioned`, a quiet line's words on each row an item names beside its own.
-    The snoozed list is the Inbox's alone: no Snooze on the Queue."""
+    The snoozed list is the Inbox's alone: no Snooze on the Queue. `later` is `split_later`'s rows: a ledger
+    row is the row's own block of what needs the person and is drawn first; a board line not yet due after
+    the questions."""
     out: dict[str, dict[str, list[Any]]] = {}
-    for sec in ("needs", "steering", "waiting", "answered", "fyi"):
+    for e in later or ():
+        if e.get("later_section") == "later":
+            out.setdefault(e["on_row"], {"items": [], "mentioned": []})["items"].append(
+                {"section": "later", "id": str(e.get("row_id") or ""), "html": drawn(e, "later")}
+            )
+    for sec in ("needs", "steering", "coming", "waiting", "answered", "fyi"):
+        if sec == "coming":
+            for e in later or ():
+                if e.get("later_section") == "coming":
+                    out.setdefault(e["on_row"], {"items": [], "mentioned": []})["items"].append(
+                        {"section": "coming", "id": str(e.get("id") or ""), "html": drawn(e, "coming")}
+                    )
+            continue
         for e in sections.get(sec) or ():
             if e.get("home") != "queue":
                 continue
