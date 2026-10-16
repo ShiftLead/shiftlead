@@ -1294,7 +1294,7 @@ The other cases:
 **Added:** 2026-10-16 (TD-748's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Building — slice 1 (ledgerboard v1.2 synced and vendored; the ledger reading's `key`, `lined`, `card_key` and `order`; `ao repo` in rank order) by #1930. Next: `sessionorc.queue` and the `queue` reading, then `rank_move`, its flush and `ao rank`, then the briefs.
 **Blocked by:** dev-cadence#TD-119
 **Location:** design §4.4 *The Queue: cards, and the rank that orders them*, §4.7 `ao rank`, `ao repo`, §4.8 *Choosing in a free-pick lane*; `scripts/ledgerboard.py` and `src/sessionorc/ledgerboard.py` (the vendored release); `src/sessionorc/ledger.py` (`reading` ~L672, the `lb.pickable` call ~L406, `blocked_ids` ~L140); a new `src/sessionorc/queue.py`; `src/sessionorc/board.py` (`_land` ~L329, its tree and `still()` ~L517); `src/sessionorc/agent.py` (`rpc_repos` ~L863, beside it `rpc_queue` and `rpc_rank_move`); `src/sessionorc/agent_ids.py` (`rpc_td_hold` ~L100, the person-or-interactive check `rpc_td_next(held)` ~L206 makes); `src/shiftlead/cli.py` (`cmd_repo` ~L1724, a new `cmd_rank`); `src/shiftlead/briefs/grinder.md`, `designer.md`, `work.md`; `docs/briefs/` (held: the techlead reads it)
 
