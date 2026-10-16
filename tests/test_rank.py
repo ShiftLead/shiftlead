@@ -53,7 +53,8 @@ def _ups(cards: list[dict[str, Any]], keys: dict[str, str] | None = None) -> lis
     return [c["id"] for c in rank.order(cards, keys) if c["group"] == "up_next"]
 
 
-FIVE = [_entry(n, f"entry {n}", Priority=p) for n, p in ((1, "High"), (2, "High"), (3, "Medium"), (4, "Low"), (5, "Low"))]
+PRIORITIES = ((1, "High"), (2, "High"), (3, "Medium"), (4, "Low"), (5, "Low"))
+FIVE = [_entry(n, f"entry {n}", Priority=p) for n, p in PRIORITIES]
 
 
 def test_a_move_is_an_intent_between_two_adjacent_up_next_cards(tmp_path):
@@ -64,7 +65,8 @@ def test_a_move_is_an_intent_between_two_adjacent_up_next_cards(tmp_path):
     assert it["ids"] == ["r#TD-005"] and it["prev"] == "r#TD-001" and it["next"] == "r#TD-002"
     assert it["prevs"] == [] and it["nexts"] == ["r#TD-003", "r#TD-004"]
     card, key = rank.derive(it, cards, keys := {})
-    assert card["id"] == "r#TD-005" and lb.key_order(cards[0]["key"]) < lb.key_order(key) < lb.key_order(cards[1]["key"])
+    assert card["id"] == "r#TD-005"
+    assert lb.key_order(cards[0]["key"]) < lb.key_order(key) < lb.key_order(cards[1]["key"])
     assert _ups(cards, keys) == ["r#TD-001", "r#TD-005", "r#TD-002", "r#TD-003", "r#TD-004"]
     assert rank.place(cards, "r#TD-005", keys) == 2
     # the top: no prev, the first Up next card next
@@ -99,7 +101,7 @@ def test_an_intent_is_re_derived_after_its_neighbour_archives(tmp_path):
     it = rank.intent(cards, ["r#TD-005"], "r#TD-002", "r#TD-003", "person", NOW.isoformat())
     # TD-002 and TD-003 archive before the flush: the nearest surviving card the intent remembers stands in
     root, r = _repo(tmp_path, "r", [FIVE[0], FIVE[3], FIVE[4]],
-                    archive=[_entry(2, "entry 2", Resolved="2026-10-16"), _entry(3, "x", Resolved="2026-10-16")])  # fmt: skip
+                    archive=[_entry(2, "e", Resolved="2026-10-16"), _entry(3, "x", Resolved="2026-10-16")])  # fmt: skip
     later = _cards({root: r})
     card, key = rank.derive(it, later, keys := {})
     assert _ups(later, keys) == ["r#TD-001", "r#TD-005", "r#TD-004"]
@@ -121,8 +123,8 @@ def test_a_lined_card_keeps_its_place_through_a_priority_edit_and_joins_and_prun
     cards = _cards({root: r})
     assert rank.joins(cards) == {"r#TD-007": "0|5"}
     # a line whose whole card is archived goes; an archived row of an open card keeps its line
-    root, r = _repo(tmp_path, "r", [FIVE[0], _entry(2, "after 9", Priority="High", Blocked_by="TD-009")],
-                    archive=[_entry(9, "done", Resolved="2026-10-16"), _entry(8, "done too", Resolved="2026-10-16")])  # fmt: skip
+    done = [_entry(9, "done", Resolved="2026-10-16"), _entry(8, "d", Resolved="2026-10-16")]
+    root, r = _repo(tmp_path, "r", [FIVE[0], _entry(2, "after 9", Priority="High", Blocked_by="TD-009")], archive=done)
     cards = _cards({root: r})
     assert rank.prunes(cards, {"r": ["TD-009", "TD-008"]}) == {"r#TD-008": None}
 

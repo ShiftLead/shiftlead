@@ -342,9 +342,10 @@ def _land(
     prefix: str = "board",
 ) -> dict[str, Any]:
     """Commit the tree's board (or the file at `rel`: a rank file, §4.4 *A move lands*) and land it on
-    `origin/<want>` by the one road the forge's rule allows (§4.4): a branch of the host agent's own, a PR it opens and squash-merges at once. A
-    refused merge closes the PR and deletes the branch, and refuses the press as a moved line when
-    `still()` — origin's board read again — no longer holds the item, else as unreachable."""
+    `origin/<want>` by the one road the forge's rule allows (§4.4): a branch of the host agent's own, a PR
+    it opens and squash-merges at once. A refused merge closes the PR and deletes the branch, and refuses
+    the press as a moved line when `still()` — origin's board read again — no longer holds the item, else
+    as unreachable."""
     base = _git(t, "rev-parse", "HEAD").stdout.strip()
     rel = rel or str(workorders.board_rel(root))
     cp = _git(
