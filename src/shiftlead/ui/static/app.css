@@ -837,6 +837,30 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qbuilds .bstate { color: var(--muted); }
 .qwhy { margin: 4px 0 8px; color: var(--needs-fg); }
 #debt .rlist + .qcards { margin-top: 8px; }
+/* The Queue page (design §4.5 screen 12, TD-771): the Inbox's centred column, its three groups a panel
+   each; Recently completed one line a card, opening to what was done, under the window picker */
+.queuepage { max-width: 1100px; width: 100%; margin: 0 auto; }
+.queuepage .qtitlebar { align-items: baseline; }
+.queuepage .needsword { color: var(--needs-fg); }
+.queuepage .qsub { color: var(--muted); font-size: var(--t-small); }  /* words in the sans face: mono is for ids alone */
+.qdres .qsub { display: block; overflow-wrap: anywhere; }
+.qdbody[hidden], .qdline[hidden] { display: none; }
+.queuepage .rsec { margin-top: 18px; }
+.queuepage .rsh { align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
+.queuepage .rlist { background: var(--card); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; }
+.queuepage .rrow { padding: 9px 14px; }
+.qwins { display: inline-flex; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.qwin { border: 0; border-left: 1px solid var(--border); background: transparent; color: var(--fg); font: inherit; font-size: var(--t-small); padding: 3px 10px; cursor: pointer; }
+.qwin:first-child { border-left: 0; }
+.qwin[aria-pressed="true"] { background: var(--hover); color: var(--strong); font-weight: 600; }
+.qdline { border-top: 1px solid var(--line2); }
+.qdline:first-child { border-top: 0; }
+.qdhead { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; padding: 8px 14px; }
+.qdline.opens > .qdhead { cursor: pointer; }
+.qdline.opens > .qdhead:hover { background: var(--hover); }
+.qage { flex: none; min-width: 3.5em; text-align: right; }
+.qdbody { padding: 0 14px 10px calc(3.5em + 22px); display: grid; gap: 6px; font-size: var(--t-small); }
+.qother { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px 8px 17px; border-top: 1px solid var(--line); font-size: var(--t-small); }
 @media (max-width: 720px) {
   .qhead { grid-template-columns: 1em 1.6em 1fr; column-gap: 6px; }
   .qplace { font-size: calc(var(--t-body) * 1.4); }

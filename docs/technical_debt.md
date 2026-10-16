@@ -1160,8 +1160,7 @@ The other cases:
 **Added:** 2026-10-16 (TD-748's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
-**Blocked by:** TD-770
+**Status:** In progress — slice 1 (grinder-ao-2): `/queue` with its three groups (Recently completed with the window picker and counts, In progress with the *other work* lines, Up next numbered with the grip and ⤒ ↑ ↓), `AO.qcards` shared with the Repo page, the top bar's **Queue** tab, and the reading's `Resolved:` read wherever an archived entry writes it. Left: (2) the mail on its card — `inbox_sections`' `home`, `shiftlead.ui.queue` attaching rows, the status raised, the top bar number's link, the rail's *+ n on the Queue*, the page's re-read on mail; `about` from the claim (`agent_mail`); (3) the Inbox's ledger and held rows leaving *Later* and drawn on their cards with Lift the hold, Done, Reply, Open, Release; (4) the filters, find, kind pick, passed-over line on the page, `/queue?card=…&row=…`, Telegram's link, the `Queue.dc.html` artboard; TD-772's `Waits:` line in the last slice's PR.
 **Location:** design §4.5 screen 12, screen 6 (*Where a row is drawn*, *The ledger's entries that wait on you*, the held rows), §4.5a the *Queue* rows and *Org top bar: Queue tab*, §4.10 (`about` from the claim); `src/shiftlead/ui/inbox.py` (`inbox_sections` ~L1793, `ledger_for_you` ~L2154); a new `src/shiftlead/ui/queue.py`; `src/shiftlead/ui/app.py` (`/inbox` ~L3315, a new `/queue`); `src/shiftlead/ui/templates/base.html` (the top bar), `inbox.html`, `inbox_rail.html`, `ledger_for_you.html`, a new `queue.html`; `src/sessionorc/agent_mail.py` (the send's `about`); `docs/mockups/gen.py` (a `Queue.dc.html` artboard from the reviewed mockup, `docs/mockups/reviews/2026-10-16-td748-queue-*.png`)
 
 **Why:** TD-748, slice 3: the page Paul asked for — *where is TD/feature X* and *are my teams working the things I think are important first*.

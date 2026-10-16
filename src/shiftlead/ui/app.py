@@ -352,6 +352,7 @@ from .pty_bridge import (
     scroll_argv,
     watch_clients,
 )
+from .queue import WINDOW_LABEL, WINDOW_WORD, queue_view
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
     COMPLETED_WORD,  # noqa: F401
@@ -3081,6 +3082,46 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
     session — and every read of `settings.yml` through its `settings` read; this process reads only
     the files the clients read (`profiles.yml`, `hosts.yml`, the org, each repo's `.shiftlead.yml`)."""
     call = h.call
+
+    @app.get("/queue", response_class=HTMLResponse)
+    async def queue_page(request: Request):
+        """design §4.5 screen 12 / §4.5a **Queue page** (TD-748, built by TD-771): one card per effort,
+        ranked by the person, in three groups — Recently completed with its window picker, In progress
+        with the other work, Up next numbered with the grip and ⤒ ↑ ↓ — from the home's `queue`
+        reading (`ui.queue.queue_view`). `part=1` is the lists alone, which the page re-reads on its
+        poll and on the `queue` event."""
+        agent_down, got, why = False, None, ""
+        try:
+            got = await call("queue")
+        except HTTPException as e:
+            if e.status_code == 503:
+                agent_down = True
+            else:
+                why = f"the home did not serve the Queue: {e.detail}"  # an older home: no `queue` RPC
+        ctx = {
+            "q": queue_view(got, datetime.now(UTC)),
+            "labels": WINDOW_LABEL,
+            "words": WINDOW_WORD,
+            "why": why,
+            "agent_down": agent_down,
+        }
+        if request.query_params.get("part"):
+            return templates.TemplateResponse(request, "queue_part.html", ctx)
+        fleet: list[dict[str, Any]] = []
+        with contextlib.suppress(HTTPException):
+            fleet = [] if agent_down else await call("list")
+        return templates.TemplateResponse(
+            request,
+            "queue.html",
+            {
+                **ctx,
+                "host": host_name(),
+                "active": "Queue",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call, fleet),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
 
     @app.get("/settings", response_class=HTMLResponse)
     async def settings_view(request: Request):

@@ -1,0 +1,53 @@
+{% import "queue_card.html" as qc %}
+{% from "queue_row.html" import pbadge, holder %}
+{# The Queue page's lists (design §4.5 screen 12; TD-771), re-read whole with `?part=1` #}
+<div class="row gap qtitlebar"><span class="h1">Queue</span>
+  {% if q.served %}<span class="qsub">{{ q.n.cards }} card{{ '' if q.n.cards == 1 else 's' }}: {{ q.n.in_progress }} in progress, {{ q.n.up_next }} up next.{% if q.n.needs_you %} <b class="needsword">{{ q.n.needs_you }} need{{ 's' if q.n.needs_you == 1 else '' }} you.</b>{% endif %}</span>{% endif %}
+</div>
+{% if agent_down %}<div class="warn">the host agent is not answering — nothing to draw</div>
+{% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
+{% else %}
+
+{# Recently completed — the completed cards and the open cards' archived rows in the window, newest first #}
+<section class="rsec" id="qcompleted">
+  <div class="row gap rsh"><span class="h2">Recently completed</span>
+    {% for w, label in labels.items() %}<span class="qsub qwinword" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>{{ q.completed.counts[w] }} {{ words[w] }}</span>{% endfor %}
+    <span class="grow"></span>
+    <span class="qwins" role="group" aria-label="the window">{% for w, label in labels.items() %}<button type="button" class="qwin" data-win="{{ w }}" aria-pressed="{{ 'true' if w == 'day' else 'false' }}">{{ label }} ({{ q.completed.counts[w] }})</button>{% endfor %}</span>
+  </div>
+  <div class="rlist qdone">
+  {% for ln in q.completed.lines %}
+    <div class="qdline{% if ln.entries %} opens{% endif %}" data-key="{{ ln.kind }}:{{ ln.show }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
+      <div class="qdhead"{% if ln.entries %} role="button" tabindex="0" aria-expanded="false" title="what was done"{% endif %}>
+        <span class="qsub qage">{{ ln.age }}</span><span class="qid mono strong">{{ ln.show }}</span>{{ pbadge(ln.priority) }}<span class="qtitle">{{ ln.title }}</span>
+        <span class="qright">{% if ln.kind == 'row' %}<a class="qsub" href="#{{ ln.on }}" data-qcard="{{ ln.on }}">on {{ ln.on }}'s card</a>{% elif ln.n > 1 %}<span class="qsub">{{ ln.n }} entries</span>{% endif %}</span>
+      </div>
+      {% if ln.entries %}<div class="qdbody" hidden>{% for e in ln.entries %}<div class="qdres"><span class="qid mono">{{ e.show }}</span>{% if e.pr %} <span class="mono">#{{ e.pr }}</span>{% endif %}{% if ln.entries | length > 1 %} <span class="qsub">{{ e.title }}</span>{% endif %}<div class="qsub">{{ e.resolved or 'no Resolved line' }}</div></div>{% endfor %}</div>{% endif %}
+    </div>
+  {% endfor %}
+    <div class="rrow qsub qdnone"{% if q.completed.counts.day %} hidden{% endif %}>nothing closed {{ words.day }}</div>
+  </div>
+</section>
+
+{# In progress — a card an open member of which a session holds, or a PR naming one names; then the other work #}
+<section class="rsec" id="qinprogress">
+  <div class="row gap rsh"><span class="h2">In progress</span> <span class="qsub">{{ q.n.in_progress }}</span> <span class="qsub">someone holds an entry, or its PR is open</span></div>
+  {% if q.in_progress or q.other %}
+  <div class="qcards">
+  {% for c in q.in_progress %}{{ qc.card(c) }}{% endfor %}
+  {% for o in q.other %}<div class="qother"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
+  </div>
+  {% else %}<div class="rlist"><div class="rrow qsub">nobody holds an entry</div></div>{% endif %}
+</section>
+
+{# Up next — every other open card, numbered in the pick order, with the grip and ⤒ ↑ ↓ #}
+<section class="rsec" id="qupnext">
+  <div class="row gap rsh"><span class="h2">Up next</span> <span class="qsub">{{ q.n.up_next }}</span> <span class="qsub">worked from the top: drag a card by its grip, or use its arrows, to change the order</span></div>
+  <div class="qwhy meta" id="qwhy" hidden></div>
+  {% if q.up_next %}
+  <div class="qcards" id="qcards" data-upnext='{{ q.upnext | tojson }}'>
+  {% for c in q.up_next %}{{ qc.card(c) }}{% endfor %}
+  </div>
+  {% else %}<div class="rlist"><div class="rrow qsub">nothing is waiting to be picked</div></div>{% endif %}
+</section>
+{% endif %}
