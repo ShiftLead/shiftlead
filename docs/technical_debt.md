@@ -67,12 +67,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
-| TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
 | TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
 | TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
 | TD-752 | `test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again` failed once on CI (3.12) and passed on a re-run: the third `_held_pass` recorded no crossing for #860 | Low | Open |
+| TD-754 | The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change | Low | Open |
 
 ---
 
@@ -1365,27 +1365,6 @@ The other cases:
 
 ---
 
-## TD-746: The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/` — the host agent's `repos` RPC and the repo facts it hands whole (`prs`, `completed`, `ledger`, `boards` per checkout); its readers in `src/shiftlead/ui/app.py` (`Readings.repos`), `inbox.py` (`board_reading`, `ledger_for_you`), `repo.py`, and the cards' `view()`
-
-**Why:** TD-739's measurement, 2026-10-15, read-only calls to the live host agent: `repos` answered 1,325,334 bytes in 34–55 ms, against 22–26 ms for `list` (248 KB) and 1–9 ms for `host`, `usage`, `gate` and `doing_log`. Of it, shiftlead's checkout alone is 796 KB: `prs` 407 KB, `ledger` 201 KB, `completed` 185 KB; samscrape's is 249 KB. Every page reads it once since TD-739 (it was two or three times), and the client parses all of it on each page change, though the Org, the Inbox and the Repo page each draw a small part: the board rows, the ledger rows for the person, one repo's facts.
-
-**Fix:** measure which fields each reader uses, then either give the RPC a `fields`/`root` filter the pages pass (the Repo page one root, the Inbox `boards` and the ledger's person rows, the Org the lanes and counts), or split the heavy parts (`prs`, `completed`) into their own reads. A reading the cards' `view()` takes stays whole where it needs it.
-- **Tests:** each page's request asks only for what it draws (a fake agent records the params), and a filtered reading equals the whole one restricted to those fields.
-
-**Done when** no page reads the whole `repos` reading to draw a part of it, and the PR gives the bytes and the time per page before and after.
-
-**Related:** TD-739 (the measurement), TD-747.
-
----
-
 ## TD-747: The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739
 
 **Priority:** Low
@@ -1502,3 +1481,22 @@ The other cases:
 **Related:** TD-736 (#1873, where it was seen).
 
 ---
+
+## TD-754: The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, building TD-746)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py`, `agent_inbox.py`, `agent_sync.py` (each `_broadcast({"event": "repos", …, "repo": self._repo_view(root)})`), `agent_serve.py:193` (the subscriber's seed); `src/shiftlead/ui/app.py` (`fan_seed`, which reads the reading whole: a websocket has no request memo)
+
+**Why:** TD-746 gave the `repos` RPC an `omit` and every page's read one, halving what a page is sent (1.45 MB → 0.75 MB on the live home, 2026-10-15). The pushed stream was left as it was: each `repos` event is `_repo_view(root)` whole — `ledger.recent`, the month's PRs with every field, every entry's detail — and the UI's fan-out keeps it in the events run's `repos`, which draws the same facets and cards a page draws from the omitted reading. The reading changes at least every five minutes per repo, and on every ledger edit, settle mark and PR order.
+
+**Fix:** let a subscription say its `omit` (the `events` subscribe carries it, the agent applies `reports.omitted` per subscriber before the send, or once per distinct omit), the UI's fan-out asking for `REPOS_OMIT_PAGE`; `fan_seed` reads with the same omit.
+- **Tests:** a subscriber with an omit receives `repos` events without those paths; one without receives them whole.
+
+**Done when** no `repos` event the UI receives carries a part its pages omit.
+
+**Related:** TD-746, TD-739.
