@@ -587,7 +587,7 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
 
 def _stopped(mark: Any) -> bool:
     """Whether a `work_waiting` mark is a stopped team's (§6 rule 8 *A team that stopped*, TD-781)."""
-    return isinstance(mark, Mapping) and isinstance(mark.get("stopped"), Mapping)
+    return isinstance(mark, Mapping) and isinstance(got := mark.get("stopped"), Mapping) and bool(got)
 
 
 def team_groups(
