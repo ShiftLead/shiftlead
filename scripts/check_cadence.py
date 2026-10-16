@@ -47,6 +47,12 @@ never a fake pass):
               squash whose subject ends `(#n)`; open, the only commit past the default
               branch — is the one-item edit the direct audit's board-edit class
               accepts, read from this clone; unreadable, the row asks for a review.
+              A tool-made rank PR (cadence §2.4, TD-119; class `queue-edit`) passes the
+              same way: its title is a `queue: rank|join|prune TD-… (<tool>)` subject
+              (subject_kind `queue`), it and its one commit change the rank file
+              (docs/technical_debt_rank.yml) alone, every changed line is `TD-NNN: <key>`
+              (a `#` comment too where the commit creates the file), and the file it
+              leaves has no ⚠ flag. A PR touching anything else needs its review.
     ci        every check run — and, on GitHub, every commit status (TD-117) — on the
               head commit either succeeded or was SKIPPED by
               the workflow, and at least one actually ran. A skip never fails the row
@@ -72,7 +78,10 @@ never a fake pass):
               Closed unmerged: na. No clone: na (the default is read from origin);
               no origin/<default> to read: unknown, never an assumed `main`.
     ledger    a TD-NNN named in the PR TITLE means the PR touches the ledger or the
-              archive (status line, new entry, or the move to the archive). And a PR
+              archive (status line, new entry, or the move to the archive) — except
+              under a rank write's `queue:` subject on a PR touching the rank file
+              alone, whose ids are the entries it orders, not work on them (na;
+              TD-119). And a PR
               that edits the ledger — title or no title — gets `ledger.py --check
               --since` run on that edit (TD-073): the ledger at the PR's head against
               its merge-base with the default branch (merged: the merge commit against
@@ -469,7 +478,7 @@ def _precheck() -> tuple[str | None, str | None]:
         return None, None
     try:
         v, _ = C.resolve("precheck", C.sources(C.repo_root(".")))
-        return v, None
+        return (None if v is None else str(v)), None   # a repo key is a checked string
     except C.ConfigError as e:
         return None, str(e)
 
@@ -669,6 +678,9 @@ def row_ledger(pr, root=None):
     tds = sorted({f"TD-{int(n):03d}" for n in TD_RE.findall(pr.get("title") or "")})
     if not tds:
         return row("ledger", "na", f"no TD named in the title{note}")
+    if _lb().subject_kind(pr.get("title") or "") == "queue" \
+            and list(pr.get("files") or []) == [_lb().rank_path(LEDGER)]:
+        return row("ledger", "na", f"a rank write's `queue:` title names the entries it orders, not work on them{note}")
     paths = set(pr.get("files") or [])
     touched = [p for p in LEDGER_FILES if p in paths]
     if touched:
@@ -981,6 +993,7 @@ def row_deploy(pr, root):
 # first-parent commit in the --since window that no PR made is classified by what it
 # touches, and anything outside the carve-outs is a fail ("landed without review").
 BOARD = "docs/user_attention.md"
+LEDGER = "docs/technical_debt.md"  # its rank file, the pick order (TD-119), is named from it by ledgerboard's rank_path()
 SWEEP_STAMPS = ("Swept", "Swept-deep")  # the stamp lines a sweep writes (cadence §3); their shape is ledgerboard's
 
 
@@ -1015,9 +1028,9 @@ def default_ref(root):
     return f"origin/{default_branch(root)}"
 
 
-def _board_diff(root, sha):
-    """(removed lines, [(new line number, added line)]) of the board in `sha`, or None."""
-    out = git(["diff", "-U0", "--no-color", f"{sha}^", sha, "--", BOARD], cwd=root)
+def _board_diff(root, sha, path=BOARD):
+    """(removed lines, [(new line number, added line)]) of the board (or `path`) in `sha`, or None."""
+    out = git(["diff", "-U0", "--no-color", f"{sha}^", sha, "--", path], cwd=root)
     if out is None:
         return None
     removed, added, nxt = [], [], 0
@@ -1070,19 +1083,12 @@ def classify_direct(root, sha, subject, files):
     return "fail", f"board change outside the carve-outs (-{len(removed)} +{len(new)} lines)"
 
 
-def row_board_edit_pr(pr, root):
-    """TD-083, cadence §4.5: a tool lands a board edit by a PR of its own, merged at once.
-    Its review is the person's click, so the review row passes it — when the title is
-    board_edit.py's fixed message, the PR touches the board alone, and its commit is the
-    one-item edit the direct audit accepts (classify_direct, the same rules). That commit is
-    the whole PR only when it is one commit: merged, a single-parent squash whose subject
-    ends `(#n)` (a rebase merge's last commit carries no such suffix, and its earlier ones
-    would go unread); open, the one commit between the default branch and the head. None
-    when it is not one, or its commit is not in this clone: the ordinary review row decides."""
-    if not root or _lb().subject_kind(pr.get("title") or "") != "edit":
-        return None
-    if list(pr.get("files") or []) != [BOARD]:
-        return None
+def _tool_pr_commit(pr, root):
+    """(sha, files) of the one commit that is a tool-made PR's whole change, or None. That commit is
+    the whole PR only when it is one commit: merged, a single-parent squash whose subject ends `(#n)`
+    (a rebase merge's last commit carries no such suffix, and its earlier ones would go unread);
+    open, the one commit between the default branch and the head. None when it is not one, or its
+    commit is not in this clone."""
     sha = pr.get("merge_sha") if pr["state"] == "merged" else pr.get("head_sha")
     if not sha:
         return None
@@ -1097,7 +1103,23 @@ def row_board_edit_pr(pr, root):
     elif (git(["rev-list", "--count", f"{default_ref(root)}..{sha}"], cwd=root) or "").strip() != "1":
         return None
     names = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "-z", sha], cwd=root)
-    files = [f for f in (names or "").split("\0") if f]
+    return sha, [f for f in (names or "").split("\0") if f]
+
+
+def row_board_edit_pr(pr, root):
+    """TD-083, cadence §4.5: a tool lands a board edit by a PR of its own, merged at once.
+    Its review is the person's click, so the review row passes it — when the title is
+    board_edit.py's fixed message, the PR touches the board alone, and its commit
+    (_tool_pr_commit) is the one-item edit the direct audit accepts (classify_direct, the same
+    rules). None otherwise: the ordinary review row decides."""
+    if not root or _lb().subject_kind(pr.get("title") or "") != "edit":
+        return None
+    if list(pr.get("files") or []) != [BOARD]:
+        return None
+    found = _tool_pr_commit(pr, root)
+    if not found:
+        return None
+    sha, files = found
     cls, _ = classify_direct(root, sha, pr["title"], files)
     if cls != "board-edit":
         return None
@@ -1105,11 +1127,50 @@ def row_board_edit_pr(pr, root):
                "one item's line — the person's action is the review; no comment needed")
 
 
+def row_queue_edit_pr(pr, root):
+    """TD-119, cadence §2.4: a tool (ShiftLead's Queue) lands a rank edit — the person moved a card —
+    by a PR of its own, under ledgerboard's `queue: rank|join|prune TD-… (<tool>)` subject. The
+    review row passes it, as a tool edit (class `queue-edit`), when the title is that subject, the
+    PR and its one commit (_tool_pr_commit) change the rank file alone, every changed line is a
+    `TD-NNN: <key>` line (a `#` comment line too, only where the commit creates the file), and the
+    file it leaves reads with no ⚠ flag (a CRLF line does not read as one: such a file asks for a
+    review). None otherwise: the ordinary review row decides — a deleted rank file too. A rank
+    edit is always a PR, so classify_direct has no such class."""
+    if not root or _lb().subject_kind(pr.get("title") or "") != "queue":
+        return None
+    rank = _lb().rank_path(LEDGER)
+    if list(pr.get("files") or []) != [rank]:
+        return None
+    found = _tool_pr_commit(pr, root)
+    if not found or found[1] != [rank]:
+        return None
+    sha = found[0]
+    diff = _board_diff(root, sha, rank)
+    if diff is None:
+        return None
+    removed, added = diff
+    created = git(["cat-file", "-e", f"{sha}^:{rank}"], cwd=root) is None
+    for line in removed + [a for _, a in added]:
+        m = _lb().RANK_LINE_RE.match(line)
+        if not (m and _lb().KEY_RE.match(m.group(2)) or created and line.startswith("#")):
+            return None
+    _, flags = _lb().rank(git(["show", f"{sha}:{rank}"], cwd=root) or "")
+    if any(f.startswith("⚠") for f in flags):
+        return None
+    n = len({m.group(1) for m in map(_lb().RANK_LINE_RE.match, removed + [a for _, a in added]) if m})
+    return row("review", "pass", f"tool-made rank edit (queue-edit, cadence §2.4): {pr['title'].split(' (')[0]} — "
+               f"{rank} alone, {n} line(s) — the person's move is the review; no comment needed")
+
+
 def board_edit_or_review(pr, root):
-    try:
-        found = row_board_edit_pr(pr, root)
-    except Exception:  # the carve-out unreadable: the ordinary review row still reads the comments
-        found = None
+    found = None
+    for carve_out in (row_board_edit_pr, row_queue_edit_pr):
+        try:
+            found = carve_out(pr, root)
+        except Exception:  # the carve-out unreadable: the ordinary review row still reads the comments
+            found = None
+        if found:
+            break
     return found or row_review(pr)
 
 

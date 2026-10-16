@@ -1625,9 +1625,13 @@ def _live_mark(e: dict[str, Any]) -> str:
     return f"waits for its build to be live ({prs or 'no PR on its Kind: line'}): "
 
 
-def _pick_key(e: dict[str, Any]) -> tuple[int, int]:
-    """Where an entry sits in cadence's pick order (§2.11): its priority, then debt before a feature."""
-    return PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)), int(e.get("type") == "feature")
+def _pick_key(e: dict[str, Any]) -> tuple[int, int, int]:
+    """Where an entry sits in the pick order: the rank, the reading's `order` (§4.4 *The Queue*,
+    TD-769); a reading from before it has none, and falls back to cadence's order (§2.11) — its
+    priority, then debt before a feature, ties in file order."""
+    if isinstance(e.get("order"), int):
+        return 0, 0, e["order"]
+    return PICK_ORDER.get(str(e.get("priority") or ""), len(PICK_ORDER)), int(e.get("type") == "feature"), 0
 
 
 def _promote_line(name: str, r: dict[str, Any]) -> str:
@@ -1834,9 +1838,9 @@ def cmd_repo(args: argparse.Namespace) -> int:
                 print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
             for kind in ("pickable", "design", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
-                # the pick order is cadence's (design §4.4 *Repo facts*, §4.8 *Choosing in a free-pick
-                # lane*, TD-202, TD-228): High, then Medium, then Low, then an entry with none; debt
-                # before a feature within a priority; ties in file order (a stable sort)
+                # the pick order is the rank (design §4.4 *The Queue*, §4.8 *Choosing in a free-pick lane*,
+                # TD-769): the reading's `order`, ledgerboard's — cards by key, the person's line else the
+                # implicit key (High, Medium, Low; debt before a feature; then id), dependency within a card
                 ids.sort(key=_pick_key)
                 for e in ids:
                     prio = str(e.get("priority") or "").capitalize() or "-"

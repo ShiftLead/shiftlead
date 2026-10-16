@@ -8,6 +8,128 @@
   "decide 2026-01-05 (session s-1) — Pick one. Context: TD-004. Due: 2026-01-20. Answers: a | b.": null,
   "decide 2026-01-05 (session s-1) — Pick one. Due: 2026-01-20. Answers: **a** | b.": "a"
  },
+ "components": {
+  "ledger/basic.md": [
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-001",
+     "TD-004",
+     "TD-007"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-002"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-003"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-005"
+    ],
+    "others": [
+     "TD-010"
+    ]
+   },
+   {
+    "cross_repo": [
+     "other-repo#TD-020"
+    ],
+    "ids": [
+     "TD-006"
+    ],
+    "others": [
+     "TD-099"
+    ]
+   }
+  ],
+  "ledger/ranked.archive.md": [
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-020",
+     "TD-021"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-022"
+    ],
+    "others": []
+   }
+  ],
+  "ledger/ranked.md": [
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-010"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-011",
+     "TD-012"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-013",
+     "TD-014"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-015"
+    ],
+    "others": [
+     "TD-020"
+    ]
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-016",
+     "TD-017"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [],
+    "ids": [
+     "TD-018"
+    ],
+    "others": []
+   },
+   {
+    "cross_repo": [
+     "far#TD-002"
+    ],
+    "ids": [
+     "TD-019"
+    ],
+    "others": []
+   }
+  ]
+ },
  "compose": [
   {
    "ok": "- [ ] 2026-01-15 (session `w-1` on box-1) — Look at the dashboard. Context: TD-4. Due: 2026-01-20.\n"
@@ -69,6 +191,86 @@
    "ok": "- [ ] 2026-01-05 (session s-1) — Plain. Due: 2026-01-20."
   }
  },
+ "implicit_keys": [
+  "1|0|000007",
+  "2|1|000642|shiftlead",
+  "2|0|000642|shiftlead",
+  "3|0|1234567|owner/name",
+  "4|0|000003"
+ ],
+ "key_orders": [
+  [
+   "0h",
+   "1|0|000700",
+   "1i",
+   "2",
+   "2|0|000642",
+   "2|0|000642|dev-cadence",
+   "2|0|000642|shiftlead",
+   "2|1|000642|shiftlead",
+   "2a",
+   "z"
+  ]
+ ],
+ "midpoints": [
+  {
+   "ok": "i"
+  },
+  {
+   "ok": "0i"
+  },
+  {
+   "ok": "09"
+  },
+  {
+   "ok": "0r"
+  },
+  {
+   "ok": "1i"
+  },
+  {
+   "ok": "2|0|000004i"
+  },
+  {
+   "ok": "2|0|000642|l"
+  },
+  {
+   "ok": "2|0|000642|e"
+  },
+  {
+   "ok": "k"
+  },
+  {
+   "ok": "zi"
+  },
+  {
+   "ok": "x09"
+  },
+  {
+   "ok": "x|i"
+  },
+  {
+   "refused": "no key between 'x' and 'x|'"
+  },
+  {
+   "refused": "no key between 'b' and 'a': they are not in order"
+  },
+  {
+   "refused": "no key between 'a' and 'a': they are not in order"
+  },
+  {
+   "refused": "not a key: '|a'"
+  },
+  {
+   "refused": "no key between None and '0'"
+  },
+  {
+   "ok": "a|0"
+  },
+  {
+   "ok": "0|0"
+  }
+ ],
  "not_right_fills": {
   "another-answer": {
    "ok": null
@@ -186,10 +388,102 @@
    "row_id": "TD-012"
   }
  },
+ "queue_subjects": [
+  {
+   "ok": "queue: rank TD-3, TD-12 (shiftlead)"
+  },
+  {
+   "ok": "queue: join TD-7 (shiftlead)"
+  },
+  {
+   "ok": "queue: prune TD-1, TD-2 (a-tool)"
+  },
+  {
+   "refused": "unknown queue action move"
+  },
+  {
+   "refused": "a queue subject names entry ids: []"
+  },
+  {
+   "refused": "a queue subject names entry ids: ['far#TD-1']"
+  },
+  {
+   "refused": "not a tool name: 'a (b)'"
+  }
+ ],
+ "rank_paths": {
+  "a/b/ledger.md": "a/b/ledger_rank.yml",
+  "docs/technical_debt.md": "docs/technical_debt_rank.yml",
+  "technical_debt.md": "technical_debt_rank.yml"
+ },
+ "rank_reads": [
+  [
+   {
+    "TD-1": "0h",
+    "TD-2": "2|0|000004"
+   },
+   []
+  ],
+  [
+   {
+    "TD-1": "0h",
+    "TD-2": "09"
+   },
+   [
+    "ℹ rank line 2: blank — ignored",
+    "ℹ rank line 3: a comment below the first entry — comments come first",
+    "⚠ rank line 4: TD-1 again — its first line holds (0h)",
+    "ℹ rank line 5: TD-2 is out of key order — the file is sorted by key",
+    "⚠ rank line 6: cannot read 'TD-3 0h' — write TD-NNN: <key>",
+    "⚠ rank line 7: cannot read 'TD-4: |bad' — write TD-NNN: <key>",
+    "⚠ rank line 8: cannot read 'TD-5: two words' — write TD-NNN: <key>"
+   ]
+  ],
+  [
+   {},
+   []
+  ]
+ ],
+ "rank_writes": [
+  {
+   "ok": "# The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).\n# Written by a tool; read only through ledgerboard's rank().\nTD-5: 2|0|0003\n"
+  },
+  {
+   "ok": "# c\nTD-9: 0a\nTD-1: 0h\nTD-3: 1i\nTD-2: 2|0|000004\n"
+  },
+  {
+   "ok": "# c\nTD-1: 3a\n"
+  },
+  {
+   "ok": "# c\nTD-1: 0h\nstray line\nTD-2: 2|0|000004\nTD-4: z\n"
+  },
+  {
+   "ok": "# c\nTD-1: 0h\nTD-2: 0h\n"
+  },
+  {
+   "refused": "not an entry id: 'far#TD-2'"
+  },
+  {
+   "refused": "not a key: '|0'"
+  },
+  {
+   "ok": "# c\r\nTD-1: 0z\r\nTD-2: 1a\r\n"
+  },
+  {
+   "refused": "not a key: 'é'"
+  }
+ ],
  "subject_kinds": {
   "Fix the parser (#12)": null,
   "board_edit: done Ship it (session s-1)": "edit",
   "board_edit: finish Ship it (session s-1)": null,
+  "queue: join TD-7 (shiftlead)": "queue",
+  "queue: prune TD-1, TD-2 (a-tool)": "queue",
+  "queue: rank TD-3": null,
+  "queue: rank TD-3 (shiftlead) extra": null,
+  "queue: rank TD-3 TD-12 (shiftlead)": null,
+  "queue: rank TD-3, TD-12 (shiftlead)": "queue",
+  "queue: sort TD-3 (shiftlead)": null,
   "shiftlead: answer A question (from TD-12)": "append",
   "shiftlead: append A new item (session w-1)": "append",
   "shiftlead: board A new item (from TD-12)": "append",

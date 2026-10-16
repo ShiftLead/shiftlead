@@ -72,6 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     if not cmd:
         print("precheck: no `precheck` in docs/cadence.toml — nothing to run (cadence.md §4.12)")
         return 2
+    cmd = str(cmd)   # resolve() typed it object; a repo key is a checked non-empty string
 
     try:
         fg = F.backend(root)

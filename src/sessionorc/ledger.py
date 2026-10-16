@@ -418,7 +418,13 @@ def team_need(entry: dict[str, Any], teams: Collection[str]) -> str:
 
 
 def entries(
-    text: str, archive: str | None = None, resolve: Resolve | None = None, live: Live | None = None
+    text: str,
+    archive: str | None = None,
+    resolve: Resolve | None = None,
+    live: Live | None = None,
+    *,
+    rank_text: str | None = None,
+    repo: str = "",
 ) -> list[dict[str, Any]]:
     """Every entry of one version of the file, in file order: `id`, `title`, the header fields
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
@@ -438,14 +444,22 @@ def entries(
     An entry whose header block carries a `**Waits:**` line has `waits` (`waits_of`, TD-716); whether it
     still waits is the home's clock's, its `waiting` mark (`settle`). `team` is its `**Team:**` line's first
     word ('' for none), and `needs_team: {why}` marks an entry `team_need` finds lacking (§4.4 *An entry
-    names its team*, TD-730)."""
+    names its team*, TD-730).
+    **The rank** (§4.4 *The Queue*, TD-769): `rank_text` is the rank file's text beside the ledger
+    (`lb.rank_path`; None, no lines) and `repo` the implicit key's last part, so each entry carries its
+    `key` — its rank line's, else its implicit key — `lined` (it has a line), its card's `card_key`, and
+    `order`, its place in ledgerboard's pick order (the rank: cards by key, then dependency within a
+    card); the list itself stays in file order."""
     t = strip_comments(text)
     teams = declared_teams(text)
     heads = list(lb.HEADING_RE.finditer(t))
     derived: dict[str, list[str]] = {}
-    for r in lb.pickable(t, archive or "", resolve)["entries"]:
+    ranked: dict[str, dict[str, Any]] = {}
+    for n, r in enumerate(lb.pickable(t, archive or "", resolve, rank_text=rank_text, repo=repo)["entries"]):
         got = derived.setdefault(r["id"], [])
         got += [b for b in r["blocked_by"] if b not in got]
+        ranked.setdefault(r["id"], {"key": r["key"], "card_key": r["card_key"], "order": n})
+    lined = {int(tid[3:]) for tid in lb.rank(rank_text or "")[0]}
     out: list[dict[str, Any]] = []
     for m, read in zip(heads, lb.entries(t), strict=True):
         nxt = lb.SECTION_RE.search(t, m.end())
@@ -462,6 +476,8 @@ def entries(
             "blocked_by": blocked_by,
             "blocked_ids": blocked_ids(read["blocked_raw"]),
             "pickable": "no" if blocked_by else "yes",
+            **ranked[m.group(1)],
+            "lined": int(m.group(1)[3:]) in lined,
             "sig": hashlib.sha256(t[m.start() : nxt.start() if nxt else len(t)].encode()).hexdigest()[:16],
         }
         if waits := waits_of(read["fields"].get("waits", "")):  # the header block's line alone (§4.4)
@@ -712,6 +728,12 @@ def _count(stamps: list[datetime], now: datetime) -> dict[str, int]:
     return {w: sum(1 for t in stamps if t > now - span) for w, span in WINDOWS.items()}
 
 
+def repo_key(root: Path | str) -> str:
+    """A repo's name as an implicit key's last part (§4.4 *The rank*): the checkout's directory name,
+    lower-cased into ledgerboard's key alphabet."""
+    return Path(root).name.lower()
+
+
 def reading(
     root: Path | str,
     now: datetime,
@@ -721,16 +743,16 @@ def reading(
     resolve: Resolve | None = None,
     live: Live | None = None,
 ) -> dict[str, Any]:
-    """The ledger reading of one checkout (§4.4 *Repo facts*): `{path, entries, by_priority,
-    by_kind, archived, windows, recent, at}`, or `{path, error}` when the file cannot be read. The archive
-    beside the ledger (`archive_path`; none there, nothing archived) and `resolve` — the home's
-    `Registry` — derive each entry's `pickable`; `live` — the home's `LiveReader` — a live check's
-    `live`. `windows` is `{day|week|month: {opened, closed}}`
-    from the history and `recent` the entries opened or closed in the longest window, newest first —
-    both absent when the history was not read, and marked `history_error` when git could not be
-    asked. `archived` is the archived ids some entry's `blocked_ids` names, never the whole archive
-    (§4.5 screen 11 *Its builds*, TD-693). `declared_teams` is the `Fields:` line's `Team` vocabulary in
-    its order, and `needs_team` the ids marked so (§4.4 *An entry names its team*, TD-730)."""
+    """The ledger reading of one checkout (§4.4 *Repo facts*): `{path, entries, by_priority, by_kind, archived,
+    windows, recent, at}`, or `{path, error}` when the file cannot be read. The archive beside the ledger
+    (`archive_path`; none there, nothing archived) and `resolve` — the home's `Registry` — derive each entry's
+    `pickable`; `live` — the home's `LiveReader` — a live check's `live`; the rank file beside the ledger
+    (`lb.rank_path`) gives each entry its `key` and `order`. `windows` is `{day|week|month: {opened, closed}}` from
+    the history and `recent` the entries opened or closed in the longest window, newest first — both absent when the
+    history was not read, and marked `history_error` when git could not be asked. `archived` is the archived ids
+    some entry's `blocked_ids` names, never the whole archive (§4.5 screen 11 *Its builds*, TD-693).
+    `declared_teams` is the `Fields:` line's `Team` vocabulary in its order, and `needs_team` the ids marked so
+    (§4.4 *An entry names its team*, TD-730)."""
     rel = rel or ledger_path(root)
     try:
         text = (Path(root) / rel).read_text(encoding="utf-8")
@@ -740,7 +762,11 @@ def reading(
         archive: str | None = (Path(root) / archive_path(rel)).read_text(encoding="utf-8")
     except OSError:
         archive = None
-    got = entries(text, archive, resolve, live)
+    try:
+        rank_text: str | None = (Path(root) / lb.rank_path(rel)).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        rank_text = None  # no rank file: every entry's key is its implicit one
+    got = entries(text, archive, resolve, live, rank_text=rank_text, repo=repo_key(root))
     out: dict[str, Any] = {
         "path": rel,
         "entries": got,
