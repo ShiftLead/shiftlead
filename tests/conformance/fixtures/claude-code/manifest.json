@@ -1,0 +1,30 @@
+{
+  "panes": [
+    {"file": "../../../fixtures/screens/first-run-login.txt", "state": "needs-you"},
+    {"file": "../../../fixtures/screens/first-run-theme.txt", "state": "needs-you"},
+    {"file": "../../../fixtures/screens/held-peer-message.txt", "state": "needs-you"},
+    {"file": "../../../fixtures/screens/plain-prompt.txt", "state": null, "composer": ""},
+    {"file": "../../../fixtures/screens/rate-limited-429.txt", "state": "limited"},
+    {"file": "../../../fixtures/screens/remote-control-standdown.txt", "state": "stalled?"},
+    {"file": "../../../fixtures/screens/trust-dialog.txt", "state": "needs-you", "composer": null},
+    {"file": "../../../fixtures/screens/usage-limit-hit.txt", "state": "limited"},
+    {"file": "../../../fixtures/screens/usage-limit-reached.txt", "state": "limited"},
+    {"file": "panes/grinder-working.txt", "state": null, "composer": ""}
+  ],
+  "transcripts": [
+    {
+      "file": "transcripts/grinder-doorbell.jsonl",
+      "turns": 1,
+      "kinds": ["prompt", "text", "tool"],
+      "links": [
+        "https://github.com/ShiftLead/shiftlead/actions/runs/38950712915/job/117141081653",
+        "https://github.com/ShiftLead/shiftlead/actions/runs/38950712915/job/117141082070"
+      ],
+      "context": {"tokens": 101875, "window": 1000000},
+      "spend_turns": 10
+    }
+  ],
+  "procs": [
+    {"file": "procs/grinder-two-tasks.json", "background": ["timeout 300 sleep 290", "python3 procs.py"]}
+  ]
+}

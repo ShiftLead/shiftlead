@@ -509,6 +509,11 @@ class ClaudeCodeAdapter:
     label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
     start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
+    permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
+    # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
+    # session of this tool is handed its mail by a pane write (§4.10)
+    implements = frozenset({"background", "composer", "context", "links", "spend", "title", "usage_report"})
+    usage_report = staticmethod(usage_report)  # the status line's windows, read by the hook command (§4.4 *Usage*)
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
         self.binary = binary or "claude"
