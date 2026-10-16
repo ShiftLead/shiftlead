@@ -13,7 +13,7 @@ from conftest import park_ticks
 from sessionorc import reports
 from sessionorc.agent import FILL_CEILING, SEAT_IDLE_GRACE, SEAT_PR_WAIT
 from sessionorc.client import LocalClient
-from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry
+from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry, Session
 
 pytestmark = pytest.mark.integration
 
@@ -469,6 +469,64 @@ async def test_an_asks_fill_of_a_tagging_seat_writes_no_seat_filled_entry(agent,
         assert new is not rec and new.seat_filled == [], "an asks fill carries no cause, as today"
         for s in (sid, crew):
             await person.call("kill", id=s)
+
+
+def _rec(sid: str, root: str, **kw) -> Session:
+    """A record of `root` for the tagging-seat helpers, read directly (TD-776): a good tagging seat
+    unless `kw` says otherwise."""
+    r = Session(id=sid, name=sid, kind="interactive", adapter="shell", dir=root)
+    r.repo, r.team, r.state = root, "db", "working"
+    r.seat, r.supervised, r.unattended = {"trigger": "asks", "tags": True}, True, True
+    for k, v in kw.items():
+        setattr(r, k, v)
+    return r
+
+
+async def test_a_repo_with_no_reading_yet_keeps_a_standing_tag_due(agent, tmp_path):
+    """*A repo with no reading yet changes nothing* (TD-776): a ledger reading with no `needs_team`
+    leaves a seat's `tag` due as it stands."""
+    await park_ticks(agent)
+    root = str(tmp_path)
+    due = {"at": "2026-10-01T00:00:00+00:00", "by": "tag", "ids": ["TD-801"]}
+    seat = _rec("tl", root, seat_due=due)
+    agent._repos[root] = {"ledger": {"declared_teams": ["db"]}}
+    assert agent._tag_cause(seat, [seat]) is due
+
+
+async def test_the_same_uncovered_ids_keep_the_dues_first_at(agent, tmp_path):
+    """Two ticks over the same uncovered ids: the second returns the first's due, `at` and all
+    (TD-776), so a standing due is not made new each tick."""
+    await park_ticks(agent)
+    root = str(tmp_path)
+    seat = _rec("tl", root)
+    _needs(agent, tmp_path, ["TD-801", "TD-802"], declared=("db",))
+    first = agent._tag_cause(seat, [seat])
+    assert first["ids"] == ["TD-801", "TD-802"]
+    seat.seat_due = {**first, "at": "2026-10-01T00:00:00+00:00"}
+    assert agent._tag_cause(seat, [seat]) is seat.seat_due
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"supervised": False},
+        {"unattended": False},
+        {"superseded_by": "tl-next"},
+        {"suspended": {"at": "2026-10-16T00:00:00+00:00", "by": "paul", "why": "identity alarm"}},
+    ],
+    ids=["unsupervised", "attended", "superseded", "suspended"],
+)
+async def test_only_a_supervised_unattended_current_unsuspended_seat_is_the_tagging_seat(agent, tmp_path, bad):
+    """Each of `_tagging_seat`'s seat filters (TD-776): a candidate that fails one, listed before a
+    good one of the same team, is passed over, and gets no `tag` due."""
+    await park_ticks(agent)
+    root = str(tmp_path)
+    worse, good = _rec("tl-bad", root, **bad), _rec("tl-good", root)
+    _needs(agent, tmp_path, ["TD-801"], declared=("db",))
+    records = [worse, good]
+    assert agent._tagging_seat(root, records) is good
+    assert agent._tag_cause(worse, records) is None
+    assert agent._tag_cause(good, records)["ids"] == ["TD-801"]
 
 
 def test_filled_for_names_a_tag_causes_ids():
