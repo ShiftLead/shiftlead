@@ -268,6 +268,8 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
     kind_subject,  # noqa: F401
+    lanes_hold,  # noqa: F401
+    lanes_rows,  # noqa: F401
     ledger_for_you,  # noqa: F401
     ledger_rows,  # noqa: F401
     live_look,  # noqa: F401
@@ -745,7 +747,7 @@ async def agent_call(method: str, **params: Any) -> Any:
 # long-lived request never holds a stale one.
 _REPOS_MEMO: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("repos_memo", default=None)
 REPOS_MEMO_TTL = 2.0
-LANES_WAIT = 10.0  # seconds a team's lanes reading waits on one RPC from its worker thread (TD-781)
+LANES_WAIT = 5.0  # seconds a team's lanes reading waits on one RPC from its worker thread (TD-781)
 
 # What a page leaves out of the `repos` reading (the RPC's `omit`, design §4.4 *Repo facts*, TD-746):
 # the parts no reader of the page draws — the ledger's month of history (`ledger.recent`, which only the
@@ -927,7 +929,7 @@ class Readings:
             rows
             + promote_rows(home.get("promotes"))
             + work_rows(work, self.wound_of(fleet) if work else None, records=fleet)
-            + inbox_mod.lanes_rows(teams, await self.team_lanes(teams, fleet), records=fleet)
+            + lanes_rows(teams, await self.team_lanes(teams, fleet), records=fleet)
             # §4.5a *Inbox row: red PR* (TD-613): a repo no team services, from the repo readings
             + red_pr_rows(repos, fleet)
             # §4.5a *Inbox row: CI not starting* (TD-687): the home's spells, Open's billing page off the loop
@@ -953,7 +955,11 @@ class Readings:
             def call(method: str, **params: Any) -> Any:  # this reader's own RPCs, from the worker thread
                 if method == "repos":
                     return repos
-                return asyncio.run_coroutine_threadsafe(self.call(method, **params), loop).result(LANES_WAIT)
+                fut = asyncio.run_coroutine_threadsafe(self.call(method, **params), loop)
+                try:
+                    return fut.result(LANES_WAIT)
+                finally:
+                    fut.cancel()  # a call past its wait is not left running on the loop
 
             def read() -> dict[str, Any]:
                 out: dict[str, Any] = {}
@@ -974,7 +980,7 @@ class Readings:
         got = await self.team_lanes([r for r in rows if not r.get("records")], fleet)
         for r in rows:
             reading = got.get(str(r.get("name") or "")) if not r.get("records") else None
-            ids = inbox_mod.lanes_hold(reading)
+            ids = lanes_hold(reading)
             r["lanes_hold"], r["lanes_line"] = (
                 (len(ids) if ids is not None else None),
                 (reading or {}).get("line") or "",
