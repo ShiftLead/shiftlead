@@ -66,11 +66,12 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team, the header's place the host alone | Medium | Open |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
-| TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Open |
+| TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
 | TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
 | TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
 | TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
+| TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
 | TD-752 | `test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again` failed once on CI (3.12) and passed on a re-run: the third `_held_pass` recorded no crossing for #860 | Low | Open |
 
 ---
@@ -1350,7 +1351,8 @@ The other cases:
 **Added:** 2026-10-15 (the anchor, found reading its lane)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-15, the designer): §4.4 *A red PR nobody holds is a work order* — a draft is no work order (no order, no note, no Inbox row), ready again it is under the rule at once; `ao repo`, the Repo page's tag and the facet's hover say *no order while a draft*; a draft `is_sync_order` orders is still an order. Built by TD-750.
+**Blocked by:** TD-750
 **Location:** design §4.4 *A red PR nobody holds is a work order*; `teamrun.red_prs`
 
 **Why:** on 2026-10-15 `ao repo` listed #1840 (TD-724's build) and #1850 (TD-722's amendment) as `pr:1840` and `pr:1850`, both High, both *red since …: conflicting*, first in the anchor's lane. Both are drafts that Paul paused in an interactive session. #1840 waits for the amendment, and #1850 is held until its Fable and Sonnet rounds converge (memory `hold-a-design-until-its-round-ends`). The rule's cure, a rebase on the PR's own branch, would reach into a design under the person's review, so the anchor passed over both and named why in its `ao doing` line. Every anchor run until they land will read them first and pass over them again. The rule reads `isDraft` (§4.4, the PR list's fields) but never uses it for an order; §4.4 says a draft only for a sync PR.
@@ -1443,6 +1445,41 @@ The other cases:
 **Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
 
 **Related:** TD-108, TD-748.
+
+---
+
+## TD-750: Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-745's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *A red PR nobody holds is a work order* (*A draft is no work order*), §4.7 `ao repo`, §4.5a *Inbox row: red PR*; `src/sessionorc/workorders.py` (`red_prs` ~L492), `src/shiftlead/teamrun.py` (`red_prs` ~L1341, its `whose`), `src/shiftlead/cli.py` (`ao repo`'s open-PR line, ~L1786); `src/shiftlead/ui/templates/repo_part.html` (the Open PRs tag, which already draws *draft*), `src/shiftlead/ui/org.py` (`red` ~L245, `red_title` ~L276, the facet's hover) and `ui/repo.py`, the `whose` readers; `tests/test_workorders.py`, `tests/test_ui_red_prs.py`
+
+**Why:** TD-745's design. On 2026-10-15 #1840 and #1850, drafts Paul had paused during a design round, were listed first in the anchor's lane as High `pr:` orders, and every anchor run passed over them.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- `workorders.red_prs`: a PR whose reading carries `draft` and is not a sync order (`is_sync_order`) is skipped right after the told memory is carried (`kept[key] = was`, ~L527), so no order and no note, and the memory of an earlier non-draft spell survives the draft. A sync PR is skipped only where `is_sync_order` would not order it, so a pending or `not_run` sync draft waits as any sync PR does. Its `red_since` is the reading's own, so it is kept, and the PR is an order on the first reading after it is marked ready, if red past `ORPHAN_AFTER` and unheld.
+- Every other reader takes `pr_orders`, so it drops a draft with no change of its own: the Inbox's red-PR row (`ui/inbox.py`), `ao repo`'s first-line count of *red PRs nobody holds* (`cli.py` ~L1518), rule 6's news and rule 8's lane counts. Tests hold the count and the Inbox row.
+- `teamrun.red_prs`: an unheld draft past `ORPHAN_AFTER` has `whose` *no order while a draft*, where today it is ''. A held one stays *held by …*. The Repo page's Open PRs tag and the facet's hover draw it.
+- `ao repo`: a draft's open-PR line reads *(draft · red since <t>: no order while a draft)* where `teamrun.red_prs` gives it that `whose` (the one test, `ORPHAN_AFTER` included), `red_since` printed as the order line prints it, and *(draft)* otherwise, as today.
+- Tests, each failing with its line reverted:
+  - a red draft unheld past `ORPHAN_AFTER` is no order;
+  - a red draft held by idle holders past `ORPHAN_AFTER`, and again a second `after` later, is no order, sends no note and writes no told entry;
+  - the same PR, no longer a draft, is an order on the next reading;
+  - a draft sync PR is still an order;
+  - a held PR told once, then drafted and readied within `after` of the tell, is not told again; readied past `after`, it is an order at once, with no second tell;
+  - a held draft keeps *held by …* in `whose` and gets no note;
+  - a pending sync draft is no order and no *no order while a draft* either;
+  - `ao repo`'s count and the Inbox's red-PR row omit a draft;
+  - `teamrun.red_prs`'s `whose` for an unheld draft;
+  - `ao repo`'s draft line.
+
+**Done when** the tests above pass, `ao repo` on a repo with a red, unheld draft lists no `pr:` order and says why on the PR's line, and the Repo page's tag and the facet's hover read *no order while a draft* while the facet's *· n red* still counts it.
+
+**Related:** TD-613, TD-684, TD-745.
 
 ---
 
