@@ -13408,3 +13408,38 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-739, TD-738, TD-746.
 
 **Resolved:** 2026-10-15 — `/inbox`'s template 164 → 64 ms (whole request 303 → ~185 ms) in an in-process harness at the live size (the live home's `list` and `repos` readings, 320 person-inbox entries, ~970 rows, 1.6 MB of HTML), the page byte-identical before and after. Three changes: Jinja's attribute lookup reads a plain dict's key at once (`common._getattr`; it raised an `AttributeError` per row field, ~25,000 a render); `render.render` is kept per argument triple and `row_subject` per text; `mail._CONTROLS` is a pattern and `subject_of` folds only the prefix a clipped subject reads. Tests: `tests/test_ui_render_fast.py`, `test_a_subject_folded_from_a_prefix_is_the_whole_texts` in `tests/test_mail.py`. FYI fetched on open was not needed.
+
+## TD-750: Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-745's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.4 *A red PR nobody holds is a work order* (*A draft is no work order*), §4.7 `ao repo`, §4.5a *Inbox row: red PR*; `src/sessionorc/workorders.py` (`red_prs` ~L492), `src/shiftlead/teamrun.py` (`red_prs` ~L1341, its `whose`), `src/shiftlead/cli.py` (`ao repo`'s open-PR line, ~L1786); `src/shiftlead/ui/templates/repo_part.html` (the Open PRs tag, which already draws *draft*), `src/shiftlead/ui/org.py` (`red` ~L245, `red_title` ~L276, the facet's hover) and `ui/repo.py`, the `whose` readers; `tests/test_workorders.py`, `tests/test_ui_red_prs.py`
+
+**Why:** TD-745's design. On 2026-10-15 #1840 and #1850, drafts Paul had paused during a design round, were listed first in the anchor's lane as High `pr:` orders, and every anchor run passed over them.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- `workorders.red_prs`: a PR whose reading carries `draft` and is not a sync order (`is_sync_order`) is skipped right after the told memory is carried (`kept[key] = was`, ~L527), so no order and no note, and the memory of an earlier non-draft spell survives the draft. A sync PR is skipped only where `is_sync_order` would not order it, so a pending or `not_run` sync draft waits as any sync PR does. Its `red_since` is the reading's own, so it is kept, and the PR is an order on the first reading after it is marked ready, if red past `ORPHAN_AFTER` and unheld.
+- Every other reader takes `pr_orders`, so it drops a draft with no change of its own: the Inbox's red-PR row (`ui/inbox.py`), `ao repo`'s first-line count of *red PRs nobody holds* (`cli.py` ~L1518), rule 6's news and rule 8's lane counts. Tests hold the count and the Inbox row.
+- `teamrun.red_prs`: an unheld draft past `ORPHAN_AFTER` has `whose` *no order while a draft*, where today it is ''. A held one stays *held by …*. The Repo page's Open PRs tag and the facet's hover draw it.
+- `ao repo`: a draft's open-PR line reads *(draft · red since <t>: no order while a draft)* where `teamrun.red_prs` gives it that `whose` (the one test, `ORPHAN_AFTER` included), `red_since` printed as the order line prints it, and *(draft)* otherwise, as today.
+- Tests, each failing with its line reverted:
+  - a red draft unheld past `ORPHAN_AFTER` is no order;
+  - a red draft held by idle holders past `ORPHAN_AFTER`, and again a second `after` later, is no order, sends no note and writes no told entry;
+  - the same PR, no longer a draft, is an order on the next reading;
+  - a draft sync PR is still an order;
+  - a held PR told once, then drafted and readied within `after` of the tell, is not told again; readied past `after`, it is an order at once, with no second tell;
+  - a held draft keeps *held by …* in `whose` and gets no note;
+  - a pending sync draft is no order and no *no order while a draft* either;
+  - `ao repo`'s count and the Inbox's red-PR row omit a draft;
+  - `teamrun.red_prs`'s `whose` for an unheld draft;
+  - `ao repo`'s draft line.
+
+**Done when** the tests above pass, `ao repo` on a repo with a red, unheld draft lists no `pr:` order and says why on the PR's line, and the Repo page's tag and the facet's hover read *no order while a draft* while the facet's *· n red* still counts it.
+
+**Related:** TD-613, TD-684, TD-745.
+
+**Resolved:** 2026-10-15 — `workorders.red_prs` skips a draft that `is_sync_order` does not order, right after the spell's told memory is carried, so a draft gets no order, no note and no told entry. `teamrun.red_prs` gives an unheld non-sync draft past `ORPHAN_AFTER` the `whose` *no order while a draft* (`teamrun.DRAFT_WHOSE`), which the Repo page's tag and the facet's hover draw. `ao repo`'s PR line reads *(draft · red since <t>: no order while a draft)* there, and *(draft)* otherwise. Tests in `tests/test_workorders.py` and `tests/test_ui_red_prs.py`: each fails with its line reverted, and the memory test fails with the skip moved before the memory is carried. TD-745 (the design) is the designer's to archive.
