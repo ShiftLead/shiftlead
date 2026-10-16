@@ -1187,7 +1187,8 @@ async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_l
     real_broadcast = agent._broadcast
 
     async def broadcast(ev: dict) -> None:
-        events.append(ev)
+        if ev.get("event") == "repos":  # the tick's own `queue` pushes are not the re-read's (TD-769)
+            events.append(ev)
         await real_broadcast(ev)
 
     monkeypatch.setattr(agent, "_broadcast", broadcast)

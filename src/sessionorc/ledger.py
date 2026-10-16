@@ -148,6 +148,16 @@ def blocked_ids(raw: str | None) -> list[str]:
     return out
 
 
+def xrepo_ids(raw: str | None) -> list[str]:
+    """An entry's `<repo>#TD-NNN` `Blocked by:` items, in order, each id written `TD-NNN` — the edges
+    that join a card across repos (§4.4 *The Queue*, TD-769), whether they still block or not."""
+    out: list[str] = []
+    for item in lb.parse_blocked(raw)[0] if raw else []:
+        if (m := lb.XREPO_ITEM_RE.match(item)) and (x := f"{m.group(1)}#{_norm(m.group(2))}") not in out:
+            out.append(x)
+    return out
+
+
 def ids_in(text: str | None) -> set[str]:
     """The ids with a `## TD-NNN:` heading in a ledger or an archive, comments dropped."""
     return {f"TD-{n:03d}" for n in lb.heading_nums(text)}
@@ -429,8 +439,8 @@ def entries(
     """Every entry of one version of the file, in file order: `id`, `title`, the header fields
     `priority`, `owner`, `kind` as their first word ('' when absent), `type` (`debt` unwritten or
     unknown), `blocked_by` — what still blocks, as the script lists it: open ids, `decision (<who>)`,
-    an unread item quoted — `blocked_ids`, the whole line's local ids, archived ones kept — and
-    `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
+    an unread item quoted — `blocked_ids`, the whole line's local ids, archived ones kept —
+    `xrepo_ids`, its `<repo>#TD-NNN` ids — and `pickable`, `yes` or `no`, derived by cadence §2.4's rule (§4.4
     *Repo facts*, TD-228) as ledgerboard's `pickable` derives it (TD-585): blocked while `Blocked by:`
     names an id not in `archive` (open, or in neither file), a decision, or an item it cannot read;
     an id headed twice is blocked by what blocks either (ledgerboard keys its reading by id). A
@@ -475,6 +485,7 @@ def entries(
             "type": etype if etype in TYPES else TYPES[0],
             "blocked_by": blocked_by,
             "blocked_ids": blocked_ids(read["blocked_raw"]),
+            "xrepo_ids": xrepo_ids(read["blocked_raw"]),
             "pickable": "no" if blocked_by else "yes",
             **ranked[m.group(1)],
             "lined": int(m.group(1)[3:]) in lined,

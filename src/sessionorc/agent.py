@@ -715,6 +715,9 @@ class HostAgent(
         self._boards_pressed: dict[str, float] = {}
         self._ledger_mtime: dict[str, float | None] = {}
         self._repos_task: asyncio.Task[None] | None = None
+        # the Queue's reading (§4.4 *The Queue*, TD-769): derived each tick at the home from the repo
+        # readings, the claims and the archive (`_queue_pass`), served by `queue`, pushed when it changes
+        self._queue: dict[str, Any] | None = None
         # The home's own `host` record (§6 *Balance*, TD-239): a team's balance mark, kept in `host.json`.
         self.host_store = HostStore()
         self._host_rec: dict[str, Any] = self.host_store.load()
@@ -873,6 +876,14 @@ class HostAgent(
         what it never draws. The home's; a node forwards it (§4.4a)."""
         views = {root: v for root in self._repos if (v := self._repo_view(root)) is not None}
         return {root: reports.omitted(v, omit) for root, v in views.items()} if omit else views
+
+    async def rpc_queue(self, omit: list[str] | None = None) -> dict[str, Any]:
+        """The Queue's reading (design §4.4 *The Queue: cards, and the rank that orders them*, TD-769):
+        the cards in rank order, In progress first, the completed cards and the other work, as
+        `sessionorc.queue.reading` derives them; `omit` as the `repos` RPC takes it. The home's: a
+        node, or a home before its first tick, serves an empty reading."""
+        got = self._queue or {"cards": [], "completed": [], "other_work": [], "at": None}
+        return reports.omitted(got, omit) if omit else got
 
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty
