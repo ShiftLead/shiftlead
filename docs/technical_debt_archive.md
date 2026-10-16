@@ -13161,3 +13161,54 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-707 (a settle window, the other "not pickable yet" reason), TD-112, TD-005, TD-641, TD-672.
 
 **Resolved:** 2026-10-15 — archived with its last build, TD-716 (slices 1–3 by #1843, #1860, #1863; see its **Resolved:**).
+
+## TD-743: Build TD-734: *waiting* only on a person or another session; an idle session with a live subagent reads *working*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (the designer, building TD-734's design)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** design §4.2 *Waiting* and *Working on its own*, §4.5 *The card's anatomy* (the composed pills); `src/shiftlead/ui/cards.py` (`review_wait`, the composition at ~L367–376, the slot's ending at ~L1005, `pill_title`, `state_counts` ~L1164); `src/shiftlead/adapters/claude_code/hook.py` (the `agent_id` branch, ~L120); `src/sessionorc/agent_tick.py` (the hook's apply, ~L4042: `subagent_delta`; the exit paths; `_idle_nudge` ~L1069 and `_idle_open` ~L1105); `src/sessionorc/models.py` (`subagents`, `NODE_OWNED` ~L82, the volatile fields at ~L709); `src/sessionorc/agent_serve.py` (`_view`); `src/shiftlead/ui/org.py` (the rollup by `pill_word`, ~L535); `docs/glossary.md` (done in the design PR); the role briefs `src/shiftlead/briefs/grinder.md`, `designer.md`, `anchor.md`; `tests/test_ui_org.py` (~L1663), `tests/test_exit_words.py` (~L126), `tests/test_claude_adapter.py` (the `agent_id` branch's `out or None`)
+
+**Why:** TD-734's design. Paul, 2026-10-15: a session running `/cadence` on its own PR is drawn *waiting*, though nobody but itself moves it next.
+
+**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
+- **`review_wait`** returns a reason only while a seat's `prs_waiting.asks` holds the record's ask for the claim's PR (*review #1302 with the techlead*). A bare open PR returns "", so the record draws plain `idle`, and the slot's ending falls through to what follows it (`open_work`, the doing line). The tests at `test_ui_org.py` ~L1663–1672 and `test_exit_words.py` ~L126 that assert a bare *waiting · review #1302* are rewritten to the new rule.
+- **The adapter**: a tool hook carrying `agent_id` returns `{"subagent_seen": true}` instead of nothing, and `test_claude_adapter.py`'s assertion of `None` there is rewritten. `SubagentStart` and `SubagentStop` carry it beside `subagent_delta`. A `SessionStart` of source `startup`, `resume` or `clear` carries `subagents_reset: true`, and `compact` never does. The core never reads `agent_id` or `source` (§4.3).
+- **Live, one helper**: `subagents_live(record, now)` (`subagents > 0` and `subagent_at` within `STALL_AFTER` of `now`), in `sessionorc`.
+  - `agent_serve._view` carries it as `subagents_live`, and so does the tick's `_finished_view` (~L1942), which today hand-picks its fields.
+  - Page and RPC readers take the field: `cards.py`, `state_counts`, the Org rollup, `work.finished` (`work.finished_alone` reads only dead records and is unchanged). Through the views they reach, `teamrun.finished` (~L312, ~L477) and `cli.py` (~L1067) get it too. `finished`'s `why` names the member, *grinder-dc-1 idle, subagent live*.
+  - Rules 3, 4 and 9 call the helper on the `Session` with the tick's `now`. A test pins that the view's value and the tick's agree.
+  - The tick's time-driven pass keeps each record's last value and calls `_push_changes` when one flips, since no event changes it then.
+- **The record**: `subagent_at` (ISO time, volatile beside `subagents`, in `NODE_OWNED` beside it, carried by `agent_serve._view` and the record's round-trip) is set on any event carrying `subagent_seen`, to the later of the record's `subagent_at` and the event's own `at` (a drained queued event never moves it back), so a replay never revives a stale pill, and a queued `subagents_reset` older than the record's `subagent_at` is not applied. An event with no `state` still writes it through `_apply_event`. `subagents` and `subagent_at` are reset by an event carrying `subagents_reset` (set on `out` before `hook.py`'s `SessionStart` branches part, so every `startup` — at the composer or with a brief, through `STATE_EVENTS` — `resume` and `clear` carries it, and `compact` never does), and on every path that marks the record `exited`: the `SessionEnd` hook, the tick's pane-gone finding and a close.
+- **The card**: an `idle` record with `subagents_live` draws the green *working* pill (`state_class`/`pill_word` `working`, ranked with `working`, `state:working` filter), with the slot ending *working · n subagents* (*1 subagent*). The order is §4.2's: the pill, where a wait reads, *idle · unseen* > *waiting*, and where none does, *working* > *idle · unseen* > `idle`; the slot a declared ending > the wait > *working · n subagents* > *idle · open work*. `pill_title` reads *working · 2 subagents — idle in every payload, its own subagents running*. `state_counts` gains a branch for an idle record whose `pill_word` is `working`, counting it with `working`, so the team header agrees with the pill; the Org rollup follows `pill_word` already. The glyph, the `state:working` filter and every other reader of `pill_word` treat it as working, and the Inbox row, which keys on its own kinds, is unchanged. The old rule's words go: `review_wait`'s docstring, the comment at ~L368, and the bare review hover at ~L1005. The payload's `state` stays `idle`.
+- **The seat close and *finished*** (§6 rule 3, `_seat_has_run` ~L2761, called by `_seat_pass` ~L2445, its `SEAT_IDLE_GRACE` counted from the later of `since` and `subagent_at`; rule 9, `_finished_close` ~L2067, `work.finished`): an idle seat, and an idle member or manager, with a live subagent is not closed and does not count as idle.
+- **The idle nudge** (§6 rule 4): `_idle_nudge` and `_idle_open` pass over a member with a live subagent by `subagents_live`, a standing `idle_open` is not rule 3's `open` cause (`_team_causes` ~L2470) while it is live, and the nudge's twenty minutes count from the later of `since` and `subagent_at`.
+- **The briefs**: each role brief's paragraph on ending a turn says that a turn ended on a background shell wait (CI, a watch) is said with `ao doing "<what, then what>"` first.
+- Tests, each failing with its line reverted:
+  - an idle record with an open, unheld PR draws `idle`, and with the reader's ask *waiting · review #N with the techlead*;
+  - an idle record with `subagents: 2` and a fresh `subagent_at` draws *working · 2 subagents*;
+  - with a `subagent_at` older than `STALL_AFTER` it draws `idle`;
+  - a `SessionStart` `startup` resets the count;
+  - a subagent's tool hook sets `subagent_at` and leaves the state alone;
+  - an open person ask on top of a live subagent draws *waiting*;
+  - a team header counts a member with a live subagent as *working*;
+  - a supervised member idle past `IDLE_NUDGE` with a claim open and a live subagent is not nudged, nor nudged on the tick after its last subagent ends;
+  - a lost `SubagentStop` (count 1, `subagent_at` past `STALL_AFTER`) draws `idle`, and a `SessionStart` `compact` keeps the count;
+  - a queued subagent event replayed late stamps its own `at`;
+  - the Org rollup counts the member *working*, and the `state:working` filter shows it;
+  - an idle seat past `SEAT_IDLE_GRACE` with a live subagent is not closed, and a team whose one member is idle with a live subagent is not finished;
+  - an interactive session with a live subagent and nothing waiting draws *working*, not *idle · unseen*;
+  - `subagents_live` flips false at `STALL_AFTER` with no event, and the tick pushes the record;
+  - a seat whose subagent ended after a long idle stretch is not closed before `SEAT_IDLE_GRACE` from `subagent_at`;
+  - a manager on call is not filled for a member whose standing `idle_open` sits beside a live subagent;
+  - a `SessionStart` `startup` with a brief (through `STATE_EVENTS`) resets the count, and a queued `subagents_reset` older than `subagent_at` is ignored.
+- Ready to close's Focus checklist row one reads *agent not working (turn ended)*, so it does not contradict the *working · 2 subagents* pill beside it. *no subagents running ✗* still refuses Close.
+
+**Done when** the tests above pass, and a session running `/cadence` with an Agent-tool reviewer reads *working* (a reviewer run as a separate `claude -p` session fires no hook and is not read), and one waiting only on its own PR reads *idle*, on a scratch home (§4.9b, a screenshot of each card named in the PR).
+
+**Related:** TD-418, TD-428, TD-201, TD-734.
+
+**Resolved:** 2026-10-15 — slice 1 (the record's `subagent_at`, the adapter's `subagent_seen` / `subagents_reset`, `subagents_live` on the view and in §6 rules 3, 4 and 9, the tick's flip push) by #1869; slice 2 by this PR: `review_wait` reads only a reader's hold on the ask, the card's *working · n subagents* pill, its hover and slot, `state_counts`, Ready to close's *agent not working (turn ended)*, and the grinder, designer and anchor briefs' `ao doing` line for a turn ended on a background shell; checked on a scratch home (`docs/mockups/reviews/2026-10-15-td743-*.png`). TD-734 (the design) is the designer's to archive.

@@ -45,8 +45,9 @@ def member(sid: str, root: str, **kw) -> dict:
 
 
 def client(monkeypatch, tmp_path):
-    """A host agent stub: an idle member holding TD-301, whose PR #811 the repo reading holds open; one
-    idle with an open ask to the person; a working one; `subscribe` yields the first one's delta once."""
+    """A host agent stub: an idle member holding TD-301, whose PR #811 the repo reading holds open and a
+    techlead seat holds its ask for (a bare open PR is no wait, TD-734); one idle with an open ask to the
+    person; a working one; `subscribe` yields the first one's delta once."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     root = str(tmp_path / "samscrape")
     waiting = member(
@@ -60,6 +61,15 @@ def client(monkeypatch, tmp_path):
         waiting,
         member("g2", root, state="working"),
         member("g3", root, supervised=True, idle_open={"at": NOW, "ref": "TD-222"}),
+        # the reader, in a team of its own and mid-turn, so the grind counts stay the members'
+        member(
+            "tl",
+            root,
+            team="review",
+            state="working",
+            role="techlead",
+            prs_waiting={"n": 1, "oldest": NOW, "asks": [{"from": "g1", "pr": 811}]},
+        ),
     ]
     # g3 waits on the person: an open ask whose `about` names a reference (TD-274)
     ask = {"id": "m-a", "from": "g3", "to": ["person"], "kind": "ask", "about": "TD-222", "text": "q?", "at": NOW}
@@ -105,7 +115,7 @@ def test_the_events_streams_heads_and_rollup_read_waiting(tmp_path, monkeypatch)
             ev = json.loads(ws.receive_text())
     assert ev["event"] == "session" and ev["session"]["pill_word"] == "waiting"  # the card's own view
     (head,) = [g for g in ev["groups"] if g["team"] == "grind"]
-    # both waits — the claim's open PR (`repos`) and the ask to the person (`waits`)
+    # both waits — the reader holding the claim's open PR (`repos`) and the ask to the person (`waits`)
     assert '<span class="meta counts foldonly">· 1 working · 2 waiting</span>' in head["html"]
     assert 'data-state-filter="waiting"' in ev["rollup"] and "waiting (2)</button>" in ev["rollup"]
     assert "idle (1)" not in ev["rollup"]
@@ -113,7 +123,7 @@ def test_the_events_streams_heads_and_rollup_read_waiting(tmp_path, monkeypatch)
 
 def test_the_inbox_state_rows_read_waiting(tmp_path, monkeypatch):
     """`person_states`: each member's *idle · open work* row carries the Org card's pill, *waiting* —
-    g1's from its claim's open PR (`repos`), g3's from its ask to the person (`waits`)."""
+    g1's from the reader holding its claim's open PR (`repos`), g3's from its ask to the person (`waits`)."""
     html = client(monkeypatch, tmp_path).get("/inbox").text
     for sid in ("g1", "g3"):
         row = html[html.index(f'data-msg="{sid}:idle_open"') :]
@@ -140,8 +150,8 @@ def test_the_repo_page_builds_its_views_with_the_reading_and_the_waits(tmp_path,
 
 
 def test_the_org_pages_cards_read_waiting(tmp_path, monkeypatch):
-    """The Org page, the surface the others are measured against (TD-499): g1's card waits on its claim's
-    open PR (`repos`), g3's on its ask to the person (`waits`)."""
+    """The Org page, the surface the others are measured against (TD-499): g1's card waits on the reader holding
+    its claim's open PR (`repos`), g3's on its ask to the person (`waits`)."""
     html = client(monkeypatch, tmp_path).get("/").text
     for sid in ("g1", "g3"):
         at = html.index(f'id="card-{sid}"')
