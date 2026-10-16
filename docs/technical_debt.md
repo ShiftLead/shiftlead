@@ -68,13 +68,17 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
-| TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15), amended from the mockup (#1887); Paul lifted the hold — the design next |
+| TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
 | TD-766 | Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9 | Medium | Built — live check #1905 |
 | TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
+| TD-769 | Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs | Medium | Open |
+| TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
+| TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
+| TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-773 | The pre-start lane count reads an entry's team through no test: `teamrun.lanes` passes the team name to `lane_matches` and nothing fails without it (#1902) | Low | Open |
 | TD-774 | The anchor-record retirement's three branches — a suspended record skipped, a node's record removed over its link, a scheduled start cancelled — are held by no test (#1900) | Low | Open |
 
@@ -1416,7 +1420,8 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Agreed 2026-10-15 — [ADR 2026-10-15](decisions/2026-10-15-queue.md), reviewed by Fable (four rounds converged, final AGREE) and Sonnet (three rounds, READY). A mockup drawn from the real ledger and inbox was reviewed with Paul over seven rounds the same evening, and the ADR amended from it (§9: one card rule with no exception, the header the top entry, no red, *waiting* beside *blocked*, `decision (paul)` drawn as a hold, no Snooze on the Queue, move buttons; round 6: the Queue's look from a frontend-design pass, titles wrapped in full, completed cards opening to each entry's `Resolved:`); Fable and Sonnet rounds on the amendment converged (round 2 READY) and round 6 was fact-checked by Sonnet; merged as #1887. **Paul lifted the hold 2026-10-15 23:44 MDT** (in an interactive session): the design round is next, the designer's. The builds will wait on a dev-cadence entry (the rank file's format and order in ledgerboard, the `queue-edit` audit class), filed when the design names it.
+**Status:** Designed (2026-10-16, the designer): §4.4 *The Queue: cards, and the rank that orders them* (components with no exception, the top entry, rows and their state words, *stalled* at `QUEUE_STALL_AFTER`, the card's status, completed cards, lined and implicit keys, the rank file `<ledger stem>_rank.yml`, intents flushed as `queue: rank` PRs by the board's road, the rank the pick order); §4.5 screen 12 *Queue*, screen 6 *Where a row is drawn* (`home: inbox|queue`, the numbers unchanged) with its ledger and held rows on their cards, screen 11 item 2 the repo's cards; §4.5a nine Queue rows; §4.7 `ao rank`; §4.8 *Choosing in a free-pick lane* by rank; §4.10 `about` from the sender's claim and *The Inbox is a queue* renamed *Nothing leaves the Inbox without an answer*; glossary *Queue*, *card*, *rank*, *stalled*. Built by TD-769, TD-770, TD-771, which wait on dev-cadence#TD-119 (ledgerboard's components, keys and rank file; cadence's `queue-edit` class); the trial read back by TD-772. Was: Agreed 2026-10-15 — [ADR 2026-10-15](decisions/2026-10-15-queue.md), reviewed by Fable (four rounds converged, final AGREE) and Sonnet (three rounds, READY). A mockup drawn from the real ledger and inbox was reviewed with Paul over seven rounds the same evening, and the ADR amended from it (§9: one card rule with no exception, the header the top entry, no red, *waiting* beside *blocked*, `decision (paul)` drawn as a hold, no Snooze on the Queue, move buttons; round 6: the Queue's look from a frontend-design pass, titles wrapped in full, completed cards opening to each entry's `Resolved:`); Fable and Sonnet rounds on the amendment converged (round 2 READY) and round 6 was fact-checked by Sonnet; merged as #1887. **Paul lifted the hold 2026-10-15 23:44 MDT** (in an interactive session): the design round is next, the designer's. The builds will wait on a dev-cadence entry (the rank file's format and order in ledgerboard, the `queue-edit` audit class), filed when the design names it.
+**Blocked by:** TD-769, TD-770, TD-771, TD-772
 **Location:** `docs/decisions/2026-10-15-queue.md`; the design text it rewrites: §4.4 *Repo facts*, §4.5 screens 6 and 11 (4.5-ui.md:511–512, 1058), §4.5a a row per new control, §4.7 `ao rank` and `ao repo`, §4.8 *Choosing in a free-pick lane* (4.8-capabilities-roles.md:531–540), §4.10 (4.10-messages.md:719), the grinder and designer briefs
 
 **Why:** Paul, 2026-10-15: *what I really care about is — where is TD/feature X that I added recently (already done, being worked, waiting to be worked, needs me for something)*, and *I want to know that my teams are working, and working the things I think are important first (dependencies considered)*. The Inbox is per message and orders by `Due:` dates he finds arbitrary; picks go by High/Medium/Low (36 of 56 open entries are Medium at filing) and nothing lets him say what comes next.
@@ -1569,6 +1574,107 @@ The other cases:
 **Done when** a session idle on a background shell reads *working · 1 shell*, Ready to close names the shell and fails, and every listed test passes.
 
 **Related:** TD-761, TD-766, TD-734.
+
+---
+
+## TD-769: Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-748's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** dev-cadence#TD-119
+**Location:** design §4.4 *The Queue: cards, and the rank that orders them*, §4.7 `ao rank`, `ao repo`, §4.8 *Choosing in a free-pick lane*; `scripts/ledgerboard.py` and `src/sessionorc/ledgerboard.py` (the vendored release); `src/sessionorc/ledger.py` (`reading` ~L672, the `lb.pickable` call ~L406, `blocked_ids` ~L140); a new `src/sessionorc/queue.py`; `src/sessionorc/board.py` (`_land` ~L329, its tree and `still()` ~L517); `src/sessionorc/agent.py` (`rpc_repos` ~L863, beside it `rpc_queue` and `rpc_rank_move`); `src/sessionorc/agent_ids.py` (`rpc_td_hold` ~L100, the person-or-interactive check `rpc_td_next(held)` ~L206 makes); `src/shiftlead/cli.py` (`cmd_repo` ~L1724, a new `cmd_rank`); `src/shiftlead/briefs/grinder.md`, `designer.md`, `work.md`; `docs/briefs/` (held: the techlead reads it)
+
+**Why:** TD-748. The rank is the Queue's spine: the cards, their keys and the pick order land first, with no page, so the order can be read in `ao repo` and the briefs before anything draws it.
+
+**Fix:**
+- **Vendor** dev-cadence#TD-119's ledgerboard release into both copies (sync PR); `components()`, the key alphabet, `midpoint()`, the implicit key, the rank file's reader and writer, and `pickable()`'s rank order come from it, never re-derived here.
+- **`sessionorc.queue`**: over every registered repo's ledger reading, the cards of §4.4 — components joined across repos by `<repo>#TD-n`, the top entry, the rows' tree (breadth first, a second parent noted), archived rows one hop, each row's state word from the readings the home holds (claims, the PR reading, `settling`, `held`, `waiting`), *stalled* at `QUEUE_STALL_AFTER` (24 h, beside `ORPHAN_AFTER`; §4.2's `STALL_AFTER` is another bound), the ledger's part of each card's status, keys (lined from each repo's `<ledger stem>_rank.yml`, else implicit) and key(card); completed cards over the whole archive, cached by the archive's blob sha; passed-over flags from the claims and the lanes (`ledger.in_lanes`). Served as the `queue` RPC and a `queue` event when it changes (§4.4 *Each reading has one owner*), with an `omit` as `repos` takes.
+- **`rank_move {ids, prev, next}`**: the person's, and an interactive session's; refused to an unattended one. It stores an intent in `ranks.json` beside `repos.json`. **The flush**, `RANK_FLUSH` (60 s) after the last move: re-derive each intent against the cards as they are then (§4.4 *A move lands*), write the lines on `origin/<default>` in the board's own tree per repo, one PR per repo per flush, subject `queue: rank TD-a, TD-b (shiftlead)`, squash-merged at once by `board._land`'s road; the loser of a one-line conflict retries once, and a PR failing after that keeps its intent for the next flush and marks the card *not landed*; `queue: join TD-n (shiftlead)` for an unlined open member of a lined card, or a lined one whose line is not its card's key and `queue: prune TD-a, TD-b (shiftlead)` for a wholly archived card's lines, each a flush of its own kind, looked for at every flush and on every tick whose ledger reading changed; the subjects from ledgerboard's `queue_subject()`. Neighbours are named by a member id, re-resolved at the flush, always the adjacent Up next cards of the whole order; an In-progress card's ids are refused.
+- **`ao rank <TD-n> (--above|--below <TD-m> | --top) [--repo]`** and `ao rank --list` (§4.7); `ao repo` lists in rank order; `ao repo --json` carries each entry's `key` and `lined` (§4.7).
+- **The briefs**: `grinder.md`, `designer.md` and `work.md` say *work orders first, then the highest-ranked pickable entry in your lane that nobody holds*; `docs/briefs/techlead-context.md`'s §4.10 pointer reads *Nothing leaves the Inbox without an answer* (a held path: the PR waits for the techlead); the code and test comments that cite *The Inbox is a queue* are left, the heading naming its old title.
+- **Tests**: components across two repos and both directions; the top entry (a design that names its builds; no design; a tie); a two-parent row; archived rows one hop; each state word and *stalled*; status precedence, *decision (designer)* reading *ready*; implicit keys sort High < Medium < Low and by Type, then id; a lined card keeps its place through a Priority edit; split, merge, join and prune; an intent re-derived after a neighbour archives; two flushes on one line; `ao rank` refused unattended; `ao repo`'s order equals `ledger.py --pickable`'s from the rank file alone for single-repo cards; a failed rank PR keeps its intent.
+
+**Done when** `ao rank` moves a card and the move lands as one `queue: rank` PR per repo, `ao repo` and `pickable()` print the rank order the rank file gives, the `queue` reading serves every card's rows, states and keys, and every listed test passes.
+
+**Related:** TD-748 (the design), TD-770, TD-771, TD-772, dev-cadence#TD-119, TD-734 (the holder state).
+
+---
+
+## TD-770: Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-748's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-769
+**Location:** design §4.5 screen 11 item 2, screen 12 (*A card*), §4.5a *Repo page: Technical debt cards*, *Queue page: card*, *Queue page, Up next: grip / ⤒ ↑ ↓*; `src/shiftlead/ui/app.py` (`/repo/{name}` ~L1364); `src/shiftlead/ui/templates/repo.html`, `repo_part.html`; new partials `queue_card.html` and `queue_row.html`, which screen 12 reuses; `src/shiftlead/ui/static/app.js`, `app.css`
+
+**Why:** TD-748, slice 2: the cards drawn first where one repo's are, so the card's look and its moves are tried before the cross-repo page.
+
+**Fix:**
+- **The partials**: a card (header the top entry: id, Priority badge right of the id, the whole title wrapped, the holder's pill, state word, count, status; the header tinted when open and folding the card, no chevron, the open set remembered in the browser) and a row (id, badge, title, state word, holder's pill, two letters of indent a level, *also after TD-n*), from the `queue` reading, the look of screen 12 (amber only on what needs the person, a green stripe in progress, *stalled* grey dashed, no red, IBM Plex Sans with the mono face for ids).
+- **Screen 11 item 2**: the repo's cards in rank order; the kind lists become the heading's count line and each row's tag; *Its builds* and the back-link stay as rows' words, and each row keeps its owner after the title, *needs a team*, and **Hold** / **Release** at its end (§4.5a *Repo page: Hold / Release on an entry*); a card spanning repos is drawn whole on each of its repos' pages; `/repo/<name>#TD-n` opens the card that holds the entry and scrolls to its row.
+- **Moves**: the grip (HTML drag and drop, with a keyboard fallback being the buttons) and **⤒ ↑ ↓** on every Up next card (no open member — the top entry or a row — claimed by a session, no PR naming one open; a card the person holds moves), calling `rank_move`; the card moves at once and goes back, with the reason under the heading, when the home refuses.
+- **Tests** (`tests/test_ui_repo_page.py`, a new `tests/test_ui_queue_cards.py`): a two-entry card renders its header and indented row; an In-progress card has no grip and a *held (person)* card has one; a move posts `rank_move` with the two neighbours; a refused move restores the order; the deep link opens the right card; a row carries its owner, *needs a team* and Hold or Release; a cross-repo card is drawn on both repos' pages.
+
+**Done when** the Repo page draws the repo's cards in rank order, a drag or a move button there lands a rank PR, and every listed test passes, with screenshots in the PR (design §4.9b).
+
+**Related:** TD-748, TD-769, TD-771.
+
+---
+
+## TD-771: Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-748's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-770
+**Location:** design §4.5 screen 12, screen 6 (*Where a row is drawn*, *The ledger's entries that wait on you*, the held rows), §4.5a the *Queue* rows and *Org top bar: Queue tab*, §4.10 (`about` from the claim); `src/shiftlead/ui/inbox.py` (`inbox_sections` ~L1793, `ledger_for_you` ~L2154); a new `src/shiftlead/ui/queue.py`; `src/shiftlead/ui/app.py` (`/inbox` ~L3315, a new `/queue`); `src/shiftlead/ui/templates/base.html` (the top bar), `inbox.html`, `inbox_rail.html`, `ledger_for_you.html`, a new `queue.html`; `src/sessionorc/agent_mail.py` (the send's `about`); `docs/mockups/gen.py` (a `Queue.dc.html` artboard from the reviewed mockup, `docs/mockups/reviews/2026-10-16-td748-queue-*.png`)
+
+**Why:** TD-748, slice 3: the page Paul asked for — *where is TD/feature X* and *are my teams working the things I think are important first*.
+
+**Fix** (in slices if it is long, each its own PR, `ao progress done --slice`):
+- **Mail on its card**: `inbox_sections` tags each row `home: inbox|queue` (screen 6 *Where a row is drawn*; an item whose TD's card is completed is `inbox`); `shiftlead.ui.queue` attaches the `home: queue` rows to their cards' rows (`about`, else the first `TD-n` of the text with the others as mentions; a board line's `Context:`; a red PR's claim or branch) and raises the card's status to *needs you* or *steer*; the counts are untouched; the top bar's number alone (never the word *Inbox*) links to `/queue?filter=needs-you` when any counted row is `home: queue`, and the rail reads *+ n on the Queue*.
+- **`about` from the claim**: a send with no `about` takes the sender's one live claim, declared else derived, canonical (§4.10); a mentioned id's row draws *also mentioned in …*.
+- **The page** `/queue`: Recently completed (one line a card, and one per open card's archived row, *on TD-n's card*, opening to each `Resolved:` and its PR; the **4 h · day · week · month** picker with counts), In progress (green stripe, *d/m done*, the *other work* lines), Up next (numbered, the large quarter-strength number, grip and moves from TD-770); the header's questions on a folded card; the needs-you blocks by the Inbox's renderers — answers with **Reply** in one row, *yours to do* with **Reply**, **Open**, **Start session**, **Done**, *held until …* with **Lift the hold**, **Reply** (the ledger row's Reply road with *go ahead*) and **Open**, **Done** on *yours to do* (the same road with *done*), *held (person)* with **Release**; no Snooze; the passed-over line; the filters and the find box falling through to the archive; `/queue?card=…&row=…` and `/queue#TD-n`; Telegram's link for a TD item; narrow below 720 px.
+- **The Inbox**: the ledger rows and held rows leave *Later*, which keeps the board's not-yet-due items; the *ledger entries* kind leaves the rail, and the rail reads *+ n on the Queue*; `/inbox/<id>`'s Back, `j` and `k` return to the list the row is drawn in.
+- **The top bar**: a **Queue** tab after Inbox on every page, no number; Settings after it.
+- **The trial**: in the PR that lands the last slice, write TD-772's `**Waits:** until <the merge date + 14 days>` line.
+- **Tests** (`tests/test_ui_inbox.py`, `tests/test_ui_inbox_ledger.py`, a new `tests/test_ui_queue.py`, `tests/test_mail.py`): rows tagged by home; a question about a TD drawn on its card and still counted; a ledger row not in *Later*; the number's link; `about` filled from one claim and left empty with two; the groups' membership and order; Lift the hold writes one decided line; the window counts; find by id and title, and into the archive; a passed-over line drawn and not drawn for a waiting row; an In progress card draws *d/m done* and *stalled* beside it; a held (person) card reads *needs you*.
+
+**Done when** `/queue` draws every open card in rank order with its questions, the Inbox draws only what names no TD while every number is unchanged, every listed control works, every listed test passes, with screenshots in each slice's PR (design §4.9b), and TD-772 carries its `Waits:` line.
+
+**Related:** TD-748, TD-769, TD-770, TD-772, TD-734, TD-604 (Recently completed), TD-731 (Hold).
+
+---
+
+## TD-772: Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (TD-748's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open — TD-771's last slice writes this entry's `Waits:` line, fourteen days after its merge
+**Blocked by:** TD-771
+**Location:** design §4.5 screen 12 (*A trial*); [ADR 2026-10-15](decisions/2026-10-15-queue.md) §7; the doing log (`doing.jsonl`), the `queue` reading's passed-over flags, the person inbox's open asks (read only)
+
+**Why:** TD-748: Paul decides from the trial whether the Queue keeps its place beside the Inbox, and what changes in the lanes; no lane change is made before it reads back (ADR §7).
+
+**Fix:** once its `Waits:` date has passed, read over the fourteen days: the passed-over flags per week (from the claims' first `ao doing` lines against the rank at the time, since the flags are not kept), the doing log's lines of a member idle or out of work while its lane held unclaimed pickable work, and the age of the oldest unanswered `ask` about a TD on each day; put them to Paul as one `ask` with the ADR's choices, his answer written into TD-748's ADR and, where it changes the design, a design-first entry.
+
+**Done when** the three readings are written in this entry's Status and Paul's decision is recorded.
+
+**Related:** TD-748, TD-771, TD-460 (the same shape of trial read).
 
 ---
 
