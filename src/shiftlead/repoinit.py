@@ -15,7 +15,7 @@ from . import repoconfig
 # the owner and kind words the lanes filter on (§4.8 *Choosing in a free-pick lane*), the person's
 # owner word the one the repo facts count as *for you* (§4.4 *Repo facts*)
 FIELDS = (
-    f"Fields: Owner = anchor | designer | grinder | {ledger_mod.PERSON_OWNER}; "
+    f"Fields: Owner = designer | grinder | {ledger_mod.PERSON_OWNER}; "
     "Kind = build | design-first | live-check | evaluation | decision"
 )
 

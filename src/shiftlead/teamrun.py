@@ -320,8 +320,6 @@ def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
     a manager on call (§4.9, TD-259) — with what would make it come, in the card's words
     (`SeatDef.when`, `org.MANAGER_WHEN`)."""
     out = {team.techlead.name: "comes on the next question"} if team.techlead is not None else {}
-    if team.anchor is not None:  # §6 rule 3's `work` trigger (§4.9b *The anchor seat*, TD-381)
-        out[team.anchor.name] = orgmod.ANCHOR_WHEN
     out.update({s.name: s.when() for s in team.seats})
     if team.manager.on_call and team.manager.name:  # §4.9, §6 rule 3's `team` trigger (TD-259)
         out[team.manager.name] = orgmod.MANAGER_WHEN
@@ -341,11 +339,7 @@ def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, 
     # started with until its next Start (§4.9 `on_call`), so a standing manager started before the
     # definition read *on call* is no seat — nothing would fill it, and it still declares
     lead = team.manager.name if team.manager.on_call else None
-    named = (
-        {s.name for s in team.seats}
-        | ({team.techlead.name} if team.techlead is not None else set())
-        | ({team.anchor.name} if team.anchor is not None else set())
-    )
+    named = {s.name for s in team.seats} | ({team.techlead.name} if team.techlead is not None else set())
     out: dict[str, str] = {}
     for s in sessions:
         n = str(s.get("name") or "")
@@ -394,8 +388,6 @@ def role_holders(t: orgmod.TeamDef) -> list[dict[str, Any]]:
         add(t.manager.role, [t.manager.name], False)
     if t.techlead:
         add("techlead", [t.techlead.name], True)
-    if t.anchor:
-        add(orgmod.ANCHOR_ROLE, [t.anchor.name], True)
     for seat in t.seats:
         add(seat.role, [seat.name], True)
     for m in t.members:
@@ -486,8 +478,6 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # a seat on call, filled when a member needs a reading, or a standing session (§4.9, TD-247)
                 "on_call": t.manager.on_call,
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
-                # the anchor seat (§4.9b, TD-381): the name and the home repo, None under `anchor: false`
-                "anchor": {"name": t.anchor.name, "home": t.anchor.home} if t.anchor else None,
                 # the role Add entry's **Open a session** starts, per Type (§4.9, TD-219), each said
                 "entries": {k: t.entry_role(k) for k in orgmod.ENTRY_TYPES},
                 # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
@@ -550,9 +540,7 @@ def repos_via(call: Call) -> orgmod.ReposOf:
     return repos_of
 
 
-NOTHING_TO_PICK = (
-    "nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts"
-)
+NOTHING_TO_PICK = "nothing to pick: every lane is empty, so the team will wind down as soon as it starts"
 # the page's kinds in the kind bar's order, each in its word (§4.4 *Repo facts*; `ui.repo.LEDGER_LISTS`,
 # written out since the page imports this module): how a lane's count reads by kind before a start
 LANE_WORDS = (
@@ -567,7 +555,7 @@ LANE_WORDS = (
 
 
 def _lane_count(role: str, got: dict[str, Any]) -> str:
-    """One role's part of the lanes line: *anchor: 1 pickable, 6 live check · held by shiftlead-90*."""
+    """One role's part of the lanes line: *grinder: 1 pickable, 6 live check*."""
     n, by_kind = got["n"], got["by_kind"]
     count = (
         "ledger unreadable"
@@ -576,30 +564,24 @@ def _lane_count(role: str, got: dict[str, Any]) -> str:
         if n
         else "0"
     )
-    held = got.get("held")
-    if held:
-        # a session holds the checkout, by its id; a dirty tree or one off its branch, by its words (§4.9b)
-        count += f" · held by {held}" if held != "checkout" else f" · {got.get('held_why') or 'checkout not free'}"
     return f"{role}: {count}"
 
 
 def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] | None:
     """What every lane the start creates holds before it (design §4.5a team card **Start**, *What the
     lanes hold, before the start*; TD-262, built by TD-265; TD-558, built by TD-563): the manager's where
-    its role carries one, each member role's once, and the anchor seat's — the lanes the team's records
-    carry once it runs — each read against its checkout's ledger as rules 6 and 8 read it
-    (`ledger.lane_matches` over the home's `repos` reading, whatever the entry's page kind) and said by
-    the page's kinds: *grinder: 3 pickable · designer: 0 · anchor: 1 pickable, 6 live check*. A held
-    anchor checkout (`checkout_held`, the reading the start gates the seat on) is named after its count,
-    which still stands. Returns `{line, empty, roles}`, `roles` as `{role: {n, by_kind, held}}` — `n`
-    None for a ledger that cannot be read, which is *unknown*, never empty; `held` the holder, absent
-    when free. `empty` only when every lane was read and none matched. None when there is nothing to
+    its role carries one and each member role's once — the lanes the team's records carry once it runs
+    — each read against its checkout's ledger as rules 6 and 8 read it (`ledger.lane_matches` over the
+    home's `repos` reading, whatever the entry's page kind) and said by the page's kinds: *grinder: 3
+    pickable, 1 live check · designer: 0*. Returns `{line, empty, roles}`, `roles` as `{role: {n,
+    by_kind}}` — `n` None for a ledger that cannot be read, which is *unknown*, never empty. `empty`
+    only when every lane was read and none matched. None when there is nothing to
     say: no launch has a lane, or the plan itself fails, which the start reports in its own words."""
     try:
         plan = teams.plan(org, name, host, files=files_via(call))
     except (teams.TeamError, ValueError, OSError):
         return None
-    holders = [x for x in [plan.lead, *plan.members, plan.anchor] if x is not None and x.lane]
+    holders = [x for x in [plan.lead, *plan.members] if x is not None and x.lane]
     if not holders:
         return None
     try:
@@ -619,14 +601,6 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
             roles[x.role] = {"n": len(mine), "by_kind": by_kind}
         else:
             roles[x.role] = {"n": None, "by_kind": {}}
-        if x is plan.anchor:
-            try:
-                held = (call("checkout_held", host=x.host, dir=str(x.dir)) or {}).get("held")
-            except Exception:  # noqa: BLE001 — a reading that failed says nothing of the checkout
-                held = None
-            if isinstance(held, dict) and held.get("by"):
-                roles[x.role]["held"] = str(held["by"])
-                roles[x.role]["held_why"] = str(held.get("why") or "")
     line = " · ".join(_lane_count(role, got) for role, got in roles.items())
     return {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles}
 
@@ -762,22 +736,6 @@ def start(
                     f"the techlead started as {rec['id']}, but the briefs name {plan.techlead_id} — "
                     "a stale tmux session holds that id; tell the team, or restart it once that session is gone"
                 )
-        if plan.anchor:
-            # The anchor seat (§4.9b, TD-381): created after the techlead, in the home checkout itself,
-            # gated as §6 rule 3's fill is (TD-395) — a session holding it (§9 invariant 2), or a tree
-            # dirty or off its default branch (the person's work) — then the rest of the team starts,
-            # the seat's record is written alone, closed with no pane and `seat_held` saying why, and
-            # rule 3 fills it once the checkout is free (TD-386), said rather than failing the start
-            x = plan.anchor
-            held = call("checkout_held", host=x.host, dir=str(x.dir)).get("held")
-            if held:
-                created.append(call("create", **params(x, [lead_id] if lead_id else []), held=True, held_reason=held))
-                notes.append(
-                    f"{x.name} waits: {held['why']} ({x.dir}) — the anchor seat works only in a free, clean "
-                    "checkout on its default branch (§4.9b); it is on call, filled once the checkout is free"
-                )
-            else:
-                created.append(call("create", **params(x, [lead_id] if lead_id else [])))
         for x in plan.seats:
             # A seat with a trigger (§4.9b, TD-098): started with the team, as the techlead is, so it
             # runs once now and is on call after; its manager fills it again when its trigger is met.
@@ -1032,7 +990,7 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
     """How a live team's records differ from what its current flow compiles to (design §4.9c
     *Switching*), member by member: lane, `review`, the `{stage}` file's path, and who should be
     running — never `{flow}`'s text, which names no member, and nothing of a person's session but
-    that the flow sits it out. A seat the definition names — the techlead, the anchor, a `seats:`
+    that the flow sits it out. A seat the definition names — the techlead, a `seats:`
     entry, a manager on call (§6 rule 3, TD-410) — with no record is a `start` on any live team (§4.9c,
     TD-399), and a team that runs no flow is compared on its seats alone. The profile the definition
     resolves is compared too, on every live unattended member and every seat, running or closed
@@ -1047,7 +1005,7 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
         return moved
     taken = set(held) | {x.name for _, x in pairs}  # a paired or held newcomer is no start of its own
     on_call_lead = plan.lead if plan.lead is not None and on_call_gate(plan.lead) else None
-    seats = {x.name for x in (plan.techlead, plan.anchor, on_call_lead, *plan.seats) if x is not None}
+    seats = {x.name for x in (plan.techlead, on_call_lead, *plan.seats) if x is not None}
     if plan.flow is None:
         out = list(moved)
         for x in plan.launches:
@@ -1077,7 +1035,7 @@ def differences(plan: teams.Plan, sessions: list[dict[str, Any]]) -> list[Differ
             continue
         rec = _current(x.name, mine)
         if rec is None or sat_out(rec):
-            # a seat the run lacks — the anchor a team predates among them — is Apply's to create (TD-399)
+            # a seat the run lacks is Apply's to create (TD-399)
             out.append(Difference(x.name, "start", record=rec, launch=x, seat=rec is None and x.name in seats))
             continue
         if rec.get("sit_out"):
@@ -1205,14 +1163,10 @@ def work_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
 
 def pr_orders(r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """A repo reading's red PRs nobody holds, `pr:<n>` (§4.4 *A red PR nobody holds is a work order*,
-    TD-613), as entries, each owned by the anchor seat whose lane takes it — so a lane that does not
-    reads it as the anchor's, never as unowned; none from an agent that predates them."""
+    TD-613), as entries — owned by no one: every `free-pick` lane takes one (§4.9b *No anchor seat*,
+    TD-757); none from an agent that predates them."""
     got = ((r or {}).get("pr_orders") or {}).get("orders")
-    if not isinstance(got, list):
-        return []
-    return [
-        {**e, "owner": e.get("owner") or ledger_mod.ANCHOR_OWNER} for e in got if isinstance(e, dict) and e.get("id")
-    ]
+    return [e for e in got if isinstance(e, dict) and e.get("id")] if isinstance(got, list) else []
 
 
 def lane_entries(r: Mapping[str, Any] | None) -> list[dict[str, Any]] | None:
@@ -1310,11 +1264,6 @@ def repo_lanes(
         for p in s.get("progress") or []
         if isinstance(p, dict) and p.get("status") == "claimed"
     }
-    # a red PR's order is the anchor seat's, and every `free-pick` lane's where no team servicing the
-    # repo has one (§4.4 *A red PR nobody holds is a work order*, TD-613): a team has an anchor seat
-    # when one of its records here carries the `anchor` lane word, live or ended
-    if not any(ledger_mod.ANCHOR_OWNER in (s.get("lane") or ()) for s in mine if s.get("team")):
-        entries = [{**e, "free_pick": True} if e.get("pr_order") else e for e in entries]
     out: dict[str, dict[str, Any]] = {}
     for team in sorted({str(s["team"]) for s in mine if s.get("team")}):
         got = ledger_mod.in_lanes(entries, [s for s in mine if s.get("team") == team], held)
@@ -1347,7 +1296,7 @@ def red_prs(
     """A reading's open PRs that read red or conflicting (§4.4 *A red PR nobody holds is a work order*,
     TD-613), as the facet's *· n red* and the Repo page's tags draw them, oldest red first: `number`,
     `title`, `url`, `author`, `word` (*red*, else *conflicting*), `failing`, `red_since`, and `whose`
-    — past `ORPHAN_AFTER`, *nobody's — the anchor's order* for one the reading lists as an order
+    — past `ORPHAN_AFTER`, *nobody's — the grinders' order* for one the reading lists as an order
     (*nobody's* where no team services the repo: its row is the Inbox's), *held by <names>* for one a
     live record of the repo holds, as the reading names them (`pr_orders.held`, TD-652), *no order while
     a draft* for a draft (not a sync PR) nobody holds (TD-745); before it, ''.
@@ -1356,7 +1305,7 @@ def red_prs(
     mine = in_repo(sessions, str(r.get("root") or "")) if r.get("root") else []
     orders = {e.get("pr") for e in pr_orders(r)}
     holders = ((r.get("pr_orders") or {}).get("held")) or {}
-    nobody = "nobody's — the anchor's order" if any(s.get("team") for s in mine) else "nobody's"
+    nobody = "nobody's — the grinders' order" if any(s.get("team") for s in mine) else "nobody's"
     out = []
     for p in ((r.get("prs") or {}).get("open")) or []:
         if not isinstance(p, dict) or not isinstance(p.get("number"), int) or not p.get("red_since"):
@@ -1481,17 +1430,10 @@ def apply(call: Call, org: orgmod.Org, name: str, host: str, *, caller: str | No
                 keeps, said = keep_mail_for(call, {x.name: verdict}, caller, concluded=False)
                 keep = {"keep_mail": True} if keeps else {}
                 ctl = [lead_id] if lead_id and x is not plan.lead else []
-                held = None
-                if x is plan.anchor:
-                    # the anchor seat, gated as `start` and the fill are (§6 rule 3, TD-395, TD-399): not
-                    # free, its record is written alone with `seat_held`, and rule 3 fills it once it is
-                    held = call("checkout_held", host=x.host, dir=str(x.dir)).get("held")
-                gate = {"held": True, "held_reason": held} if held else on_call_gate(x) if x is plan.lead else {}
+                gate = on_call_gate(x) if x is plan.lead else {}
                 got = call("create", **x.create_params(ctl), **keep, **gate)
                 row["id"] = got.get("id")
-                if held:
-                    row["line"] = f"{x.name}: waits — {held.get('why') or 'the checkout is not free'}"
-                elif gate:
+                if gate:
                     row["line"] = f"{x.name}: {ON_CALL_LINE}"
                 row["line"] += "".join(f" — {n}" for n in said)
         except (AgentError, teams.TeamError) as e:
@@ -1719,8 +1661,6 @@ def members_view(
         "live": bool(live(crew(name, sessions))),
         "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
         "techlead": held(team.techlead.name) if team.techlead else None,
-        # the anchor seat (§4.5a *card: on call — the anchor seat's words*, TD-387): listed, never removable
-        "anchor": held(team.anchor.name) if team.anchor else None,
         "members": entries,
         "twice": twice,
         "next": {r: team.next_name(r) for r in [*(roles or []), *(m.role for m in team.members if m.team is None)]},

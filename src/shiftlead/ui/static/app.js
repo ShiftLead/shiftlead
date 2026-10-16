@@ -2082,7 +2082,7 @@
   // second wrap-up prompt to every member (review of PR #183). The team's name is the guard.
   const pendingTeams = new Set();
   // design §4.5a team card **Start** (TD-262, built by TD-265; TD-563): what every lane the start creates —
-  // the members', the manager's where it has one, the anchor seat's — holds is read on
+  // the members', the manager's where it has one — holds is read on
   // the press. Every lane empty opens the Start anyway / Cancel dialog in place of starting — one
   // confirm, a concluded team's closes as its second line; otherwise a concluded team's own confirm
   // carries the lane line, and the start's toast says it. A ledger that cannot be read opens nothing.
@@ -2102,7 +2102,7 @@
     if (picks && picks.empty) {
       const dlg = $("#startdlg");
       $("#starthead").textContent = `Start ${name}?`;
-      $("#starttext").textContent = "Nothing to pick: every lane is empty, the anchor seat's too, so the team will wind down as soon as it starts.";
+      $("#starttext").textContent = "Nothing to pick: every lane is empty, so the team will wind down as soon as it starts.";
       // the definition's renames and removals (§4.9, TD-706), then a concluded team's closes
       const first = [b.dataset.moved || "", b.dataset.closes ? `It first closes ${b.dataset.closes}.` : ""].filter(Boolean);
       $("#startcloses").textContent = first.join(" ");
@@ -2940,7 +2940,6 @@
       const rows = [];
       if (v.manager) rows.push(`<div class="row gap"><span class="meta">manager</span> ${who(v.manager)}</div>`);
       if (v.techlead) rows.push(`<div class="row gap"><span class="meta">techlead seat</span> ${who(v.techlead)}</div>`);
-      if (v.anchor) rows.push(`<div class="row gap"><span class="meta">anchor seat</span> ${who(v.anchor)}</div>`);  // TD-387: not removable
       v.members.forEach((e) => {
         if (e.nested) { rows.push(`<div class="row gap"><span class="meta">team</span> ${esc(e.nested)} <span class="meta">— nested, edited by hand</span></div>`); return; }
         const held = (e.sessions || []).map(who).join(", ");

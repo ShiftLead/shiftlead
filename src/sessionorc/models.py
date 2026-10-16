@@ -127,7 +127,6 @@ HOME_OWNED = frozenset(
         "seat_due",
         "seat_count",
         "seat_filled",
-        "seat_held",
         "idle_open",
         "checks",
         "conventions_seen",
@@ -674,8 +673,8 @@ def reference_of(about: str | None) -> str | None:
 
 # A lane's words that are no reference (design §4.8, §6 rule 6): `free-pick` and `design-first` name
 # what a member may pick, and `owner:<word>` narrows it (TD-214, TD-227). None is counted, nudged
-# about or offered to `ao progress` as something held. `anchor` is the anchor seat's (§4.9b, TD-381).
-LANE_WORDS = ("free-pick", "design-first", "anchor")
+# about or offered to `ao progress` as something held.
+LANE_WORDS = ("free-pick", "design-first")
 OWNER_WORD = "owner:"
 
 
@@ -1186,13 +1185,6 @@ class Session:
     # made for, carried across the fill and dropped when the cause has gone, so a cause still
     # standing fills once. The home's.
     seat_filled: list[dict[str, Any]] = field(default_factory=list)
-    # Why a due anchor seat's fill waits (§6 rule 3 *The anchor seat*, TD-386): `{by, why, since}` —
-    # `by` the session holding its checkout, or `checkout` for the tree itself — `why` the words the
-    # card's slot draws (*held by ao-x (working)*, *branch td-x, 2 files uncommitted*), and `since` the
-    # first tick that read this `by` (a held Start's: the record's `created`; TD-559), from which the
-    # Inbox row and the team header's mark age. Written when the fill is refused, the next tick tries
-    # again, and cleared by the fill or once nothing is due. The home's.
-    seat_held: dict[str, Any] | None = None
     # `{at, ref}` on a supervised member, not a seat, still hook-confirmed idle `IDLE_NUDGE` after
     # rule 4's nudge with work open (§6 rule 3, TD-259): *idle · open work*, the one reading the
     # card's slot, a manager on call's `open` trigger and the person-led team's Inbox row draw.

@@ -118,7 +118,6 @@ from sessionorc.agent_common import (  # re-exported: callers and tests read the
     RESTART_WINDOW,  # noqa: F401
     RESUME_MIN,  # noqa: F401
     ROUND_LINE_CAP,  # noqa: F401
-    SEAT_HELD_GRACE,  # noqa: F401
     SEAT_IDLE_GRACE,  # noqa: F401
     SEAT_PR_WAIT,  # noqa: F401
     SEND_STALL_SECONDS,  # noqa: F401
@@ -962,7 +961,6 @@ class HostAgent(
         start_at: str | None = None,
         start_of: str | None = None,
         held: bool = False,
-        held_reason: dict[str, Any] | None = None,
         team_start: bool = False,
         draft: str = "",
         succeeds: str | None = None,
@@ -987,14 +985,10 @@ class HostAgent(
         replay, or a controller of the old record — and refused beside `resume`, `keep_mail` or
         `start_of`, or when the old record is live, superseded, or holds this name already.
 
-        `held` (design §4.9b *The anchor seat*, TD-386): a seat's record written alone, `closed`
-        with no pane, for a team's start whose seat's checkout is not free — held by another session,
-        dirty, or off its default branch, as the fill reads it (`checkout_held`, TD-395) — so §6 rule 3
-        fills it once the checkout is free. `held_reason` is that reading, `{by, why}`, written as the
-        record's `seat_held` so its card says why before the first tick. Refused without `seat` and
-        `unattended`, and beside `start_at` or a resume; `held_reason` without `held`. A manager on
-        call is written so by every Start (§6 rule 3 *A Start writes the seat and never fills it*,
-        TD-410), with no `held_reason`; with `keep_mail` the held record takes the mail as a fill does.
+        `held` (design §6 rule 3 *A Start writes the seat and never fills it*, TD-410): a seat's record
+        written alone, `closed` with no pane, so rule 3 fills it only for a cause — a manager on call at
+        every Start, and a seat replayed by rule 8. Refused without `seat` and `unattended`, and beside
+        `start_at` or a resume; with `keep_mail` the held record takes the mail as a fill does.
 
         `start_at` (design §6 *Start time*, TD-152): an instant ahead; the create makes the
         **record** now — the name taken, the worktree made, the launch record written, the slot held
@@ -1034,16 +1028,10 @@ class HostAgent(
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
         reading, bound = _review(review), _context_bound(context_bound)
         starts = _start_time(start_at, unattended, run_until)
-        if held_reason is not None and (
-            not held
-            or not isinstance(held_reason, dict)
-            or not all(isinstance(held_reason.get(k), str) and held_reason[k].strip() for k in ("by", "why"))
-        ):
-            raise RpcError("held_reason is a held seat's {by, why}, both words, and only beside held (TD-395)")
         if held and (not (seat and unattended) or starts or resume):
             raise RpcError(
                 "held writes a seat's record alone, closed, for rule 3 to fill: it takes a seat and unattended, "
-                "and no start_at or resume (design §4.9b The anchor seat)"
+                "and no start_at or resume (design §6 rule 3)"
             )
         # the scheduled record this create starts (the tick's replay, §6 *Start time*), if it is one
         starting = self.sessions.get(str(start_of)) if start_of else None
@@ -1318,9 +1306,8 @@ class HostAgent(
         written (the one the tick replays at the instant), the directory's slot held by being a
         record that is neither exited nor closed — and no pane, no run log, no conversation yet.
         Called from `create` under its locks, with `given` its own arguments as they stand. With
-        `state="closed"` it is a `held` seat's record (§4.9b *The anchor seat*, TD-386): the same
-        record, holding no slot, whose `lane_seen` is empty so everything in its lane is the first
-        fill's."""
+        `state="closed"` it is a `held` seat's record (§6 rule 3, TD-410): the same record, holding no
+        slot, whose `lane_seen` is empty so everything in its lane is the first fill's."""
         if given.get("resume"):
             raise RpcError("start_at is a fresh start: a resume runs now or not at all (design §6 Start time)")
         previous_run, freed = await self._take_name(holder)
@@ -1364,9 +1351,6 @@ class HostAgent(
             s.closed_at = s.created
             s.closer = {"by": "start", "why": "held"}
             s.lane_seen = {"at": s.created, "ids": []}
-            if given.get("held_reason"):
-                why = given["held_reason"]
-                s.seat_held = {"by": str(why["by"]), "why": str(why["why"]), "since": s.created}  # TD-559
         # a held seat's record keeps the mail as its fill would (§6 rule 3, TD-410): a question to the
         # last run's manager is in its inbox, so the first tick reads it as due and fills the seat
         kept = state == "closed" and bool(given.get("keep_mail")) and isinstance(holder, Session)
@@ -3076,14 +3060,7 @@ class HostAgent(
         if status == "none":
             s.out_of_work = {"at": now_iso(), "why": why.strip()}
             s.balance_refused = None  # taken, so the mark has gone: nothing left to ring
-            # a second `none` is a declaration like the first: the tick looks afresh — but a `work` seat's
-            # (§6 rule 3, TD-386) is the reading now, so an id that lands before the next tick fills it
-            ids = self._seat_lane(s) if (s.seat or {}).get("trigger") == "work" else None
-            if ids and s.host == self.host and await asyncio.to_thread(self._checkout_tree, Path(s.dir)):
-                # …unless the checkout was not its own to work in (dirty, or off its default branch, TD-395):
-                # what it could not reach is not its stretch, so the same ids fill it once the tree is clean
-                ids = []
-            s.lane_seen = {"at": now_iso(), "ids": ids} if ids is not None else None
+            s.lane_seen = None  # a second `none` is a declaration like the first: the tick looks afresh
         else:
             # The word stands whenever it is said — it is the session's — but one said inside
             # `RESTART_EARLY` of this record's own start is marked, and a controller does not act

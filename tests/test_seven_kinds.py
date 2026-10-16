@@ -84,6 +84,8 @@ KIND_OF = {
     "TD-018": "other",
 }
 FLAG = "TD-018: fits no page kind — check its Owner, Kind and Blocked by"
+# no lane takes an evaluation since the anchor seat is retired (§4.9b *No anchor seat*, TD-757)
+EVAL_FLAG = f"TD-017: {ledger.NO_LANE}"
 
 
 def _entries() -> list[dict]:
@@ -109,7 +111,7 @@ def _reading(root: str) -> dict:
 def test_one_entry_of_each_kind_and_the_residue_flagged():
     got = _entries()
     assert {e["id"]: e["for_page"] for e in got} == KIND_OF
-    assert ledger.flags(got) == [FLAG]
+    assert ledger.flags(got) == [FLAG, EVAL_FLAG]
 
 
 def test_the_kind_bar_draws_the_seven_kinds_in_order_with_a_legend():
@@ -166,6 +168,7 @@ def test_the_repo_page_draws_a_list_per_kind_and_flags_the_other(tmp_path, monke
     )
     row = html[html.index('id="TD-017"') :]
     assert "fits no page kind" not in row[: row.index("</div>")]
+    assert f'<span class="meta flag">· {ledger.NO_LANE}</span>' in row[: row.index("</div>")]
 
 
 def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monkeypatch, capsys):
@@ -187,8 +190,8 @@ def test_ao_repo_reads_the_seven_counts_and_lists_by_the_mapping(tmp_path, monke
     assert lines[0].endswith(
         "9 open entries: 1 pickable, 1 design, 1 for you, 3 live check, 1 blocked, 1 evaluation, 1 other · read ? ago"
     )
-    assert lines[1] == f"  {FLAG}"
-    rows = [ln.split()[:2] for ln in lines[2:]]
+    assert lines[1:3] == [f"  {FLAG}", f"  {EVAL_FLAG}"]
+    rows = [ln.split()[:2] for ln in lines[3:]]
     assert rows == [["pickable", "TD-010"], ["pickable", "TD-013"], ["design", "TD-011"], ["live-check", "TD-014"]]
     assert cli.main(["--json", "repo"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["ledger"]["by_kind"]["design"] == 1
@@ -204,5 +207,6 @@ def test_a_live_check_whose_build_is_live_is_in_a_free_pick_lane():
     designer = ledger.in_lanes(_entries(), [{"id": "d1", "lane": ["design-first"], "state": "idle"}])
     assert designer["design"] == ["TD-011"] and designer["live_check"] == []
     anchor = ledger.in_lanes(_entries(), [{"id": "a1", "lane": ["anchor"], "state": "idle"}])
-    # the anchor seat takes its evaluation and the check on its decision; the team sum keeps to the three kinds
-    assert anchor["members"][0]["ids"] == ["TD-015", "TD-017"] and anchor["live_check"] == ["TD-015"]
+    # `anchor` is no lane word (§4.9b *No anchor seat*, TD-757): the evaluation and the check on a
+    # decision once the anchor's are taken by no lane
+    assert anchor["members"][0]["ids"] == [] and anchor["live_check"] == []

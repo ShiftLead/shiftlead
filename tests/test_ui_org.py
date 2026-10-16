@@ -1575,32 +1575,17 @@ def test_a_delta_carries_the_plus_card_for_a_defined_team_and_none_for_the_rest(
     assert render_heads(None) is None  # the flat page has no groups to carry
 
 
-# ── the anchor seat's words (§4.5a *card: on call — the anchor seat's words*, TD-387) ──
+# ── no anchor seat's words (§4.9b *No anchor seat*, TD-757) ──
 
 
-def test_the_anchor_seats_slot_says_what_brings_it_and_why_a_fill_waits():
-    from shiftlead.org import ANCHOR_WHEN
+def test_a_seats_slot_never_reads_a_held_checkout():
+    """The anchor seat's *the checkout is yours* words are gone with it: a leftover `seat_held` on a
+    record is read by nothing, and the seat's slot says what brings it."""
     from shiftlead.ui.app import view
 
-    seats = {"ao-w": ANCHOR_WHEN}
-    slot = view(_card(state="closed", pane=False), seats=seats)["slot"]
-    assert slot["text"] == "on call — comes when the checkout's lane gains work"
-    assert "in the checkout itself" in slot["full"] and slot["caption"].startswith("last ran")
-    # held off by a session in the checkout: the tick's `seat_held` (§6 rule 3, TD-386) names it
-    held = {"by": "ao-alpha-paul", "why": "held by ao-alpha-paul (working)"}
-    slot = view(_card(state="closed", pane=False, seat_held=held), seats=seats)["slot"]
-    assert slot["text"] == "on call — the checkout is yours · a session holds it: ao-alpha-paul"
-    assert "fills the seat once the checkout is free" in slot["full"]
-    # …or by the tree itself: the tick's own words
     tree = {"by": "checkout", "why": "branch td-x, 2 files uncommitted"}
-    slot = view(_card(state="closed", pane=False, seat_held=tree), seats=seats)["slot"]
-    assert slot["text"] == "on call — the checkout is yours · branch td-x, 2 files uncommitted"
-    # a malformed mark costs the words, never the card; another seat never reads it
-    assert view(_card(state="closed", pane=False, seat_held="junk"), seats=seats)["slot"]["text"].endswith(
-        "lane gains work"
-    )
-    other = view(_card(state="closed", pane=False, seat_held=tree), seats={"ao-w": "comes on the next question"})
-    assert other["slot"]["text"] == "on call — comes on the next question"
+    slot = view(_card(state="closed", pane=False, seat_held=tree), seats={"ao-w": "comes on the next question"})["slot"]
+    assert slot["text"] == "on call — comes on the next question" and "checkout" not in slot["full"]
 
 
 def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
@@ -1608,10 +1593,10 @@ def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
 
     now = datetime(2026, 10, 8, 7, 0, tzinfo=UTC)
     seat = {
-        "id": "ao-alpha-anchor-ao-1",
-        "name": "anchor-ao-1",
+        "id": "ao-alpha-techlead-ao-1",
+        "name": "techlead-ao-1",
         "state": "working",
-        "seat": {"trigger": "work"},
+        "seat": {"trigger": "asks"},
         "progress": [
             {"ref": "TD-200", "status": "claimed", "at": "2026-10-07T01:00:00Z"},  # past its lease
             {"ref": "TD-299", "status": "claimed", "at": "2026-10-08T06:00:00Z"},
@@ -1620,23 +1605,23 @@ def test_the_occupancy_check_names_a_seat_with_its_state_and_claim():
     }
     paul = {"id": "ao-alpha-paul", "name": "paul", "state": "idle"}
     fleet = [seat, paul]
-    assert seat_occupant(["ao-alpha-anchor-ao-1 (working)"], fleet, now) == (
-        "anchor-ao-1 holds it (a seat, working · TD-299)"
+    assert seat_occupant(["ao-alpha-techlead-ao-1 (working)"], fleet, now) == (
+        "techlead-ao-1 holds it (a seat, working · TD-299)"
     )
-    assert seat_occupant(["ao-alpha-anchor-ao-1@node1 (idle)"], fleet, now) == (
-        "anchor-ao-1 holds it (a seat, idle · TD-299)"
+    assert seat_occupant(["ao-alpha-techlead-ao-1@node1 (idle)"], fleet, now) == (
+        "techlead-ao-1 holds it (a seat, idle · TD-299)"
     )
-    assert seat_occupant(["ao-alpha-anchor-ao-1 (idle)"], [{**seat, "progress": []}], now) == (
-        "anchor-ao-1 holds it (a seat, idle)"
+    assert seat_occupant(["ao-alpha-techlead-ao-1 (idle)"], [{**seat, "progress": []}], now) == (
+        "techlead-ao-1 holds it (a seat, idle)"
     )
     # not a seat, outside shiftlead, or nothing: the plain *in use by* words stand
     assert seat_occupant(["ao-alpha-paul (idle)"], fleet, now) == ""
     assert seat_occupant(["claude-1 (claude-code, outside shiftlead)"], fleet, now) == ""
     assert seat_occupant([], fleet, now) == ""
     # a seat listed after another holder is still named (review of #1253)
-    assert seat_occupant(["claude-1 (claude-code, outside shiftlead)", "ao-alpha-anchor-ao-1 (idle)"], fleet, now) == (
-        "anchor-ao-1 holds it (a seat, idle · TD-299)"
-    )
+    assert seat_occupant(
+        ["claude-1 (claude-code, outside shiftlead)", "ao-alpha-techlead-ao-1 (idle)"], fleet, now
+    ) == ("techlead-ao-1 holds it (a seat, idle · TD-299)")
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "(o.seat || `in use by ${o.occupants.join" in js
 

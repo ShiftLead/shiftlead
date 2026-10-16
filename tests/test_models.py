@@ -147,18 +147,20 @@ def test_report_line_shows_the_reference_the_pr_and_the_lane_count():
     assert report_line(pr.to_dict()) == "#360 · 2/2 done"
 
 
-def test_the_anchor_lane_word_is_no_reference_like_free_pick():
-    """§4.9b, TD-381, TD-392: the anchor seat's lane `anchor` is a lane word, as `free-pick` is: no
-    reference, so nothing held, counted or offered to `ao progress` — never a claim named `anchor`."""
-    from sessionorc.models import lane_refs
+def test_a_lane_word_is_no_reference_and_anchor_is_no_lane_word():
+    """§4.8, TD-392: `free-pick` and `design-first` are lane words, no reference, so nothing held,
+    counted or offered to `ao progress`; `anchor` is no lane word since the seat is retired (§4.9b
+    *No anchor seat*, TD-757)."""
+    from sessionorc.models import LANE_WORDS, lane_refs
 
-    for words in (["free-pick"], ["anchor"], ["anchor", "owner:anchor"]):
+    for words in (["free-pick"], ["design-first"], ["free-pick", "owner:grinder"]):
         assert lane_refs(words) == []
         s = Session(id="a", name="a", kind="interactive", adapter="shell", dir="/", lane=words)
         assert report_line(s.to_dict()) == ""
         s.report_progress(ProgressEntry(ref="TD-025", status="done", pr=59))
         assert report_line(s.to_dict()) == "TD-025 → #59 · 1/1 done"
-    assert lane_refs(["anchor", "TD-027"]) == ["TD-027"]
+    assert lane_refs(["free-pick", "TD-027"]) == ["TD-027"]
+    assert "anchor" not in LANE_WORDS
 
 
 def test_every_record_field_has_exactly_one_owner():

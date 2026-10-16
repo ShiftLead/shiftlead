@@ -14,7 +14,8 @@ commands: {test: pdm run test, lint: pdm run lint}   # `test` and `lint` fill th
 
 `unattended` and `ready_when` are accepted and read by nothing yet: each waits on the feature that reads
 it (§5); `commands:`' `test` and `lint` fill the built-in briefs' layout slots (`layout`, TD-588).
-`adapter`, `worktrees` and `anchor` are refused, naming where each is decided instead (`RETIRED`, TD-149).
+`adapter`, `worktrees` and `anchor` are refused, naming where each is decided instead (`RETIRED`, TD-149);
+`anchor: false`, which says what is now true, is passed over (§5, TD-757).
 
 Missing file: the defaults §5 lists. A malformed file: a `ValueError` naming the key. Read on every
 use and cached nowhere (the profiles rule), by the clients only — the host agent never reads it, so
@@ -45,7 +46,8 @@ FILE = paths.REPO_FILE
 RETIRED = {
     "adapter": "the adapter is chosen per session (`ao new --adapter`, the New session form) and per profile",
     "worktrees": "a session's worktree is always `<repo>/.claude/worktrees/<name>` (sessionorc.gitinfo)",
-    "anchor": "one agent session per directory is invariant 2 (design §9), not a per-repo setting",
+    "anchor": "the anchor seat is retired — no seat runs in a main checkout (design §4.9b *No anchor seat*, "
+    "§9 invariant 2); delete the key",
 }
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
@@ -297,17 +299,6 @@ PRESETS: dict[str, dict[str, Any]] = {
         "label": "Auditor",
         "context": WORKER_CONTEXT,
         "message": "what its trigger counts: the last n PRs, the period",
-    },
-    # The anchor seat (design §4.9b *The anchor seat*, TD-381): the checkout's own work, from the lane
-    # word `anchor`, in the home repo's main checkout. No icon: the design names none.
-    "anchor": {
-        "kind": "seat",
-        "brief": "anchor.md",
-        "lane": ["anchor"],
-        "grants": [],
-        "label": "Anchor",
-        "context": WORKER_CONTEXT,
-        "message": "the checkout's own work: an anchor-owned entry, a live check, a decided board line",
     },
     # The design stage's role (design §4.9c *The designer gets a template*, TD-309): no icon and no
     # label, so no designer card's badge changes at the build.
@@ -752,6 +743,8 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         if not held:
             raise ValueError(f"{where} names no path — a review that holds nothing is no key (design §4.9c)")
         cfg.held = held
+    elif key == "anchor" and value is False:
+        pass  # says what is now true, so it is read and passed over (§5, §4.9b *No anchor seat*, TD-757)
     elif key in RETIRED:
         raise ValueError(f"{where} is not a `.shiftlead.yml` key any more (design §5): {RETIRED[key]}")
     else:

@@ -1135,7 +1135,6 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             print(
                 f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}{' (on call)' if r.get('on_call') else ''}  "
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")
-                + (f"anchor: {r['anchor']['name']}  " if r.get("anchor") else "")  # the anchor seat (TD-387)
                 + (f"seats: {', '.join(s['name'] for s in r['seats'])}  " if r.get("seats") else "")
                 + f"members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
@@ -1799,20 +1798,20 @@ def cmd_repo(args: argparse.Namespace) -> int:
             for e in teamrun.pr_orders(r):
                 if e.get("sync"):
                     said = f" · sync since {e.get('sync_since') or '?'}: {e.get('reason') or ''}"
-                    print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'anchor':<11}  {e.get('title') or ''}{said}")
+                    print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
             # then a decided board line (§4.7, TD-384): the person has answered
             for e in teamrun.work_orders(r):
                 d = e.get("decided") or {}
                 said = f" · decided {d.get('text') or '?'} {d.get('date') or ''}".rstrip()
                 print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'board':<11}  {e.get('title') or ''}{said}")
-            # then a red PR nobody holds (§4.7, TD-613): the anchor seat's, a free-pick lane's where the
-            # repo's teams have no anchor seat
+            # then a red PR nobody holds (§4.7, TD-613): every free-pick lane's, so the grinders' (§4.9b
+            # *No anchor seat*, TD-757)
             for e in teamrun.pr_orders(r):
                 if e.get("sync"):
                     continue
                 why = ", ".join(e.get("failing") or []) or ("conflicting" if e.get("conflicting") else "red")
                 said = f" · red since {e.get('red_since') or '?'}: {why}"
-                print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'anchor':<11}  {e.get('title') or ''}{said}")
+                print(f"  {'pickable':<12} {e['id']}  {'High':<6}  {'grinders':<11}  {e.get('title') or ''}{said}")
             for kind in ("pickable", "design", "live-check"):
                 ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if _repo_list(e) == kind]
                 # the pick order is cadence's (design §4.4 *Repo facts*, §4.8 *Choosing in a free-pick
@@ -3866,7 +3865,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument(
         "--anyway",
         action="store_true",
-        help="start it although every lane is empty, the anchor seat's too (the page's Start anyway)",
+        help="start it although every lane is empty (the page's Start anyway)",
     )
     q.set_defaults(fn=cmd_team_start)
 

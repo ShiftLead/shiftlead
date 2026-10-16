@@ -82,13 +82,13 @@ async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent,
         _rec("manager-ao", lane=["TD-900"]),
         _rec("techlead-ao", seat={"trigger": "asks"}, out_of_work=None, controllers=["ao-t-manager-ao"]),
         _rec("paul-ao", unattended=False, out_of_work=None, state="working"),
-        _rec("anchor-ao", seat={"trigger": "work"}, out_of_work=None),
+        _rec("auditor-ao", seat={"trigger": "prs", "after": "10"}, out_of_work=None),
         _rec("watched-ao", seat={"trigger": "asks"}, unattended=False, out_of_work=None),
     )  # fmt: skip
     assert replays.calls == [], "not before the settle"
     await agent._work_marks(later)
     names = [c[0] for c in replays.calls]
-    assert names[0] == "manager-ao" and sorted(names[1:]) == ["anchor-ao", "grinder-ao-1", "techlead-ao"], (
+    assert names[0] == "manager-ao" and sorted(names[1:]) == ["auditor-ao", "grinder-ao-1", "techlead-ao"], (
         "the lead first; no person, and no seat a person watches"
     )
     rec = _team_rec(agent)
@@ -102,7 +102,7 @@ async def test_start_replays_the_team_the_lead_first_and_counts_one_start(agent,
         "manager-ao": False,
         "grinder-ao-1": False,
         "techlead-ao": True,
-        "anchor-ao": True,
+        "auditor-ao": True,
     }
     rec = _team_rec(agent)
     assert "work_waiting" not in rec and len(rec["work_started"]) == 1
@@ -274,7 +274,7 @@ async def test_a_start_by_the_rule_writes_its_seats_held_and_the_first_tick_fill
         for name in ("mgr", "tl"):
             new = agent.sessions[made[name]]
             assert new is not old[made[name]] and new.state == "closed", name
-            assert new.closer == {"by": "start", "why": "held"} and new.seat_held is None
+            assert new.closer == {"by": "start", "why": "held"}
             assert new.restarts[-1] == {
                 **new.restarts[-1],
                 "why": "work",
@@ -465,12 +465,12 @@ async def test_a_member_its_flow_sat_out_is_not_replayed_by_a_start(agent, tmp_p
 
 
 def _running(agent, tmp_path, **grinder):
-    """Team `g` running on its anchor seat; its grinder closed after declaring, its lane gaining TD-002."""
+    """Team `g` running on its auditor seat; its grinder closed after declaring, its lane gaining TD-002."""
     return (
         _rec("grinder-ao-1", controllers=["ao-t-manager-ao"], **grinder),
         _rec("grinder-ao-2", controllers=["ao-t-manager-ao"]),  # finished too, its lane gained nothing new
         _rec("manager-ao", lane=["TD-900"], state="closed"),
-        _rec("anchor-ao", seat={"trigger": "work"}, out_of_work=None, state="working", lane=["TD-900"]),
+        _rec("auditor-ao", seat={"trigger": "prs", "after": "10"}, out_of_work=None, state="working", lane=["TD-900"]),
     )
 
 
@@ -573,7 +573,7 @@ async def test_a_killed_member_and_a_stopped_team_are_not_read_member_by_member(
 @pytest.mark.parametrize(
     ("guard", "odd"),
     [
-        ("a seat", {"seat": {"trigger": "work"}}),
+        ("a seat", {"seat": {"trigger": "asks"}}),
         ("the manager", None),
         ("one its flow sat out", {"closed_for": {"why": "sit_out", "at": "x"}}),
         ("a record a successor took over", {"superseded_by": "ao-t-successor"}),

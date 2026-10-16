@@ -76,9 +76,10 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "added": "",
         "detail": [],
     }
-    # an anchor's `Kind: decision` is no longer *for you* (TD-367): it waits on no person, and is the
-    # anchor's *evaluation*; a design-first waiting on an open entry is *blocked* (TD-418)
-    assert [got[t]["for_page"] for t in got] == ["pickable", "blocked", "for-you", "evaluation", "live-check"]
+    # a `Kind: decision` not the person's is no longer *for you* (TD-367), and with the anchor seat
+    # retired no lane takes it: *other*, flagged (TD-757); a design-first waiting on an open entry is
+    # *blocked* (TD-418)
+    assert [got[t]["for_page"] for t in got] == ["pickable", "blocked", "for-you", "other", "live-check"]
     # derived (TD-228): no Blocked by is pickable, and an open blocker is not
     assert got["TD-014"]["pickable"] == "yes" and got["TD-011"]["pickable"] == "no"
     assert got["TD-011"]["blocked_by"] == ["TD-014"]
@@ -534,7 +535,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert "g2 is out of work with" in (out := capsys.readouterr().out) and "board:0123abcd" in out.split("g2 is")[1]
     assert cli.main(["--json", "repo"]) == 0
     assert json.loads(capsys.readouterr().out)[0]["work_orders"]["orders"][0]["id"] == "board:0123abcd"
-    # a red PR nobody holds is a work order after the board's, the anchor's, counted (§4.7, TD-613)
+    # a red PR nobody holds is a work order after the board's, the grinders', counted (§4.7, TD-613, TD-757)
     red = {"id": "pr:1573", "title": "Sync dev-cadence", "for_page": "pickable", "pickable": "yes", "work_order": True,
            "pr_order": True, "priority": "High", "pr": 1573, "failing": ["test (3.12)"],
            "red_since": "2026-10-12T09:00:00Z"}  # fmt: skip
@@ -542,9 +543,9 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert "6 open entries, 1 decided board line, 1 red PR nobody holds: 3 pickable (t 2 · " in out
-    row = "pickable     pr:1573  High    anchor       Sync dev-cadence · red since 2026-10-12T09:00:00Z: test (3.12)"
+    row = "pickable     pr:1573  High    grinders     Sync dev-cadence · red since 2026-10-12T09:00:00Z: test (3.12)"
     assert row in out and out.index("board:0123abcd") < out.index("pr:1573") < out.index("pickable     TD-012")
-    # g2's lane is free-pick and no team here has an anchor seat: the order is in its lane too
+    # g2's lane is free-pick: the order is in its lane (§4.9b *No anchor seat*)
     assert "pr:1573" in out.split("g2 is")[1]
     # a sync PR's order is first of all, before the board's line, counted apart (§4.4, TD-684)
     sync = {"id": "pr:1728", "title": "sync dev-cadence 517a2b5", "for_page": "pickable", "pickable": "yes",
@@ -554,7 +555,7 @@ def test_ao_repo_prints_the_numbers_and_says_could_not_look(repo, monkeypatch, c
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
     assert "1 decided board line, 1 sync PR to land, 1 red PR nobody holds: 4 pickable" in out
-    row = "pickable     pr:1728  High    anchor       sync dev-cadence 517a2b5 · sync since 2026-10-14T09:00:00Z: green"
+    row = "pickable     pr:1728  High    grinders     sync dev-cadence 517a2b5 · sync since 2026-10-14T09:00:00Z: green"
     assert row in out and out.index("pr:1728") < out.index("board:0123abcd") < out.index("pickable     pr:1573")
     assert out.count("pr:1728  High") == 1
 
@@ -944,30 +945,25 @@ def test_repo_lanes_reads_the_repos_own_records_and_a_claim_only_while_its_holde
     assert teamrun.repo_lanes(entries, repo, sessions)["ao-grind"]["out_of_work"] == []  # a live holder holds it
 
 
-def test_a_red_prs_order_is_the_anchors_and_free_picks_only_where_no_team_has_an_anchor_seat(repo):
-    """§4.4 *A red PR nobody holds is a work order* (TD-613): `pr:<n>` is in the anchor seat's lane;
-    a `free-pick` lane takes it only where no team servicing the repo has an anchor seat — one of its
-    records here carrying the `anchor` lane word, live or ended. A decided board line is every
-    `free-pick` lane's either way."""
+def test_a_red_prs_order_is_every_free_pick_lanes_as_a_board_line_is(repo):
+    """§4.4 *A red PR nobody holds is a work order* (TD-613), §4.9b *No anchor seat* (TD-757): `pr:<n>`
+    is on the grinders' pick list — every `free-pick` lane takes it, as it takes a decided board line —
+    and a record still carrying the retired `anchor` word takes nothing."""
     from shiftlead import teamrun
 
     red = {"id": "pr:7", "title": "t", "for_page": "pickable", "pickable": "yes", "work_order": True, "pr_order": True}
     board = {"id": "board:00aa11bb", "title": "b", "for_page": "pickable", "pickable": "yes", "work_order": True}
     r = {"ledger": {"entries": []}, "work_orders": {"orders": [board]}, "pr_orders": {"orders": [red], "told": {}}}
     entries = teamrun.lane_entries(r)
-    assert [e["id"] for e in entries] == ["board:00aa11bb", "pr:7"] and teamrun.pr_orders(r) == [
-        {**red, "owner": "anchor"}
-    ]
+    assert [e["id"] for e in entries] == ["board:00aa11bb", "pr:7"]
     assert teamrun.lane_kinds({**r, "ledger": {"by_kind": {"pickable": 2}}})["pickable"] == 4  # both orders counted
     g = {"id": "g1", "name": "grinder", "team": "t", "repo": str(repo), "lane": ["free-pick"], "state": "idle"}
     assert teamrun.repo_lanes(entries, repo, [g])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
     anchor = {"id": "a1", "name": "anchor", "team": "u", "repo": str(repo), "lane": ["anchor"], "state": "closed"}
     got = teamrun.repo_lanes(entries, repo, [g, anchor])
-    assert got["t"]["pickable"] == ["board:00aa11bb"] and got["u"]["pickable"] == ["board:00aa11bb", "pr:7"]
-    assert got["t"]["rest"] == [{"owner": "anchor", "n": 1, "ids": ["pr:7"]}]  # the anchor's, never unowned
-    both = {**g, "lane": ["free-pick", "anchor"]}  # one team holding both words takes it
-    assert teamrun.repo_lanes(entries, repo, [both])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
-    assert "free_pick" not in red  # the reading's own entry is never written to
+    assert got["t"]["pickable"] == ["board:00aa11bb", "pr:7"] and got["u"]["pickable"] == []
+    narrowed = {**g, "lane": ["free-pick", "owner:grinder"]}  # no owner word narrows an order out
+    assert teamrun.repo_lanes(entries, repo, [narrowed])["t"]["pickable"] == ["board:00aa11bb", "pr:7"]
     # a sync PR's order comes before every entry and every other order (TD-684)
     sync = {**red, "id": "pr:8", "sync": True}
     td = {"id": "TD-001", "title": "e", "for_page": "pickable", "pickable": "yes", "priority": "High"}
@@ -1014,14 +1010,14 @@ def test_ao_repo_splits_its_first_line_by_the_teams_lanes_and_names_who_is_out_o
 
 def _own_counts():
     """A ledger and a team for each member's own count (TD-418, built by TD-428): grinder builds, one
-    held; a live check whose build is live and one whose build is not; an anchor evaluation; a
-    designer's design-first entry."""
+    held; a live check whose build is live and one whose build is not; a checker's build; a designer's
+    design-first entry."""
 
     def e(i, owner, kind="build", **kw):
         return {"id": i, "title": i, "for_page": "pickable", "owner": owner, "kind": kind, "pickable": "yes", **kw}
 
     entries = [e("TD-355", "grinder"), e("TD-358", "grinder"), e("TD-360", "grinder", "live-check", live="yes")]
-    entries += [e("TD-361", "grinder", "live-check", live="no"), e("TD-370", "anchor", "evaluation")]
+    entries += [e("TD-361", "grinder", "live-check", live="no"), e("TD-370", "checker")]
     entries += [{**e("TD-300", "designer", "design-first"), "for_page": "design"}]
     grind = ["free-pick", "owner:grinder"]
     out = {"at": "2026-10-09T09:00:00Z", "why": "nothing pickable"}
@@ -1029,8 +1025,8 @@ def _own_counts():
         {"id": "g1", "name": "grinder-ao-1", "team": "ao-grind", "lane": grind, "state": "idle"},
         {"id": "g2", "name": "grinder-ao-2", "team": "ao-grind", "lane": list(reversed(grind)), "state": "working"},
         {"id": "d1", "name": "designer-ao-1", "team": "ao-grind", "lane": ["design-first"], "state": "idle"},
-        {"id": "a1", "name": "anchor-ao-1", "team": "ao-grind", "lane": ["anchor"], "state": "closed",
-         "out_of_work": out},
+        {"id": "a1", "name": "checker-ao-1", "team": "ao-grind", "lane": ["free-pick", "owner:checker"],
+         "state": "closed", "out_of_work": out},
         {"id": "m", "name": "manager-ao-1", "team": "ao-grind", "state": "idle"},
     ]  # fmt: skip
     return entries, records
@@ -1039,10 +1035,10 @@ def _own_counts():
 def test_in_lanes_gives_each_member_its_own_count_and_reads_out_of_work_from_it():
     """§4.4 *A member's own count* (TD-418, built by TD-428): each record with a lane gets what
     `lane_matches` takes for its own lane that `held` does not hold — a held entry left out, a live
-    check whose build is live counted by a `free-pick` lane and one not live by none, an `anchor` lane
-    counting its pickable `Owner: anchor` evaluation, whatever the page kind — and `k`, the live records
-    carrying the identical lane, word order aside; `out_of_work` is a declared member whose count is
-    above 0, an ended anchor seat among them; no lane, no row."""
+    check whose build is live counted by a `free-pick` lane and one not live by none, an `owner:` word
+    narrowing each lane to its own — and `k`, the live records carrying the identical lane, word order
+    aside; `out_of_work` is a declared member whose count is above 0, an ended one among them; no lane,
+    no row."""
     from sessionorc import ledger
 
     entries, records = _own_counts()
@@ -1054,16 +1050,16 @@ def test_in_lanes_gives_each_member_its_own_count_and_reads_out_of_work_from_it(
         "d1": (["TD-300"], 1),  # a lone lane
         "a1": (["TD-370"], 0),  # ended: counted for its declaration, never for `k`
     }
-    assert [(m["name"], m["ids"]) for m in got["out_of_work"]] == [("anchor-ao-1", ["TD-370"])]
+    assert [(m["name"], m["ids"]) for m in got["out_of_work"]] == [("checker-ao-1", ["TD-370"])]
     records[0]["out_of_work"] = {"at": "2026-10-09T09:00:00Z", "why": "x"}
     got = ledger.in_lanes(entries, records, held={"TD-355", "TD-358", "TD-360"})
-    assert [m["name"] for m in got["out_of_work"]] == ["anchor-ao-1"]  # its own count is 0 once all are held
+    assert [m["name"] for m in got["out_of_work"]] == ["checker-ao-1"]  # its own count is 0 once all are held
 
 
 def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch, capsys):
     """§4.7 `ao repo` (TD-428): the *is out of work with n* line reads the per-member count — an
-    out-of-work anchor seat with an unheld evaluation, which the pickable and design-first kinds alone
-    never named, and a member that declared and is waiting on you, whatever its pill reads."""
+    out-of-work member that has ended, with an unheld entry in its lane, and a member that declared
+    and is waiting on you, whatever its pill reads."""
     from shiftlead import cli
 
     entries, records = _own_counts()
@@ -1079,7 +1075,7 @@ def test_ao_repo_names_an_out_of_work_member_by_its_own_count(repo, monkeypatch,
     monkeypatch.chdir(repo)
     assert cli.main(["repo"]) == 0
     out = capsys.readouterr().out
-    assert "  anchor-ao-1 is out of work with 1 in its lane: TD-370" in out
+    assert "  checker-ao-1 is out of work with 1 in its lane: TD-370" in out
     assert "  grinder-ao-2 is out of work with 3 in its lane: TD-355, TD-358, TD-360" in out
 
 

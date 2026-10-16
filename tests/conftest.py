@@ -66,17 +66,6 @@ def _identity_off(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def _anchor_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Design §4.9b *The anchor seat*: a team that writes no `anchor:` has one, in its home repo's
-    main checkout. A test of something else starts the team it writes and counts what it created,
-    so the suite reads the default as off; the anchor's own tests (tests/test_anchor_seat.py) turn it
-    back on, and one of them holds the shipped value."""
-    from shiftlead import org
-
-    monkeypatch.setattr(org, "ANCHOR_DEFAULT", False)
-
-
-@pytest.fixture(autouse=True)
 def _no_real_repos_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A host with no `repos_registry:` of its own imports dev-cadence's machine roster in the
     person's home only on the default home (TD-298, TD-590: every home reads its own `repos.txt`, which

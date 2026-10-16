@@ -24,8 +24,8 @@ from shiftlead import org as orgmod
 
 from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
-from .common import _age, _instant, host_name
-from .inbox import held_for, seat_held_mark, work_note, work_started
+from .common import _age, host_name
+from .inbox import work_note, work_started
 from .org import (
     WINDOWS,
     _https,
@@ -117,7 +117,10 @@ LEDGER_LISTS = (
     ("evaluation", "evaluation"),
     ("other", "other"),
 )
-LEDGER_FLAG = ledger.NO_KIND  # an *other* row's flag (§4.4 *Repo facts*), the words `ledger.flags` uses
+# each kind's row flag (§4.4 *Repo facts*), the words `ledger.flags` uses: an *other* row fits no page
+# kind, and an *evaluation* row is in no lane since the anchor seat retired (§4.9b *No anchor seat*, TD-757)
+LEDGER_FLAG = ledger.NO_KIND
+LEDGER_FLAGS = {"other": ledger.NO_KIND, "evaluation": ledger.NO_LANE}
 LEDGER_FOLD = 4  # a list folds past this many rows, with *+n more*
 PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
 LOCAL_ID = re.compile(r"TD-(\d+)")  # a `blocked_by` item that is a local id, not a decision or `<repo>#` item
@@ -335,7 +338,7 @@ def ledger_lists(
                     # what it waits for (§4.5a *Repo page: waits mark*, TD-716): the line whole on hover
                     "wait": teamrun.wait_words(e, short=True),
                     "wait_line": teamrun.wait_line(e),
-                    **({"flag": LEDGER_FLAG} if key == "other" else {}),
+                    **({"flag": LEDGER_FLAGS[key]} if key in LEDGER_FLAGS else {}),
                     "builds": builds.get(e["id"]),
                     "builds_of": builds_of.get(e["id"], []),
                 }
@@ -544,14 +547,6 @@ def team_groups(
         dead = [m for m in crew if not m.get("seat") and m.get("state") in DEAD] if team != NO_TEAM and not live else []
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
-        # §4.5a *team header: seat held* (TD-559): the team's anchor seat held off its work past the
-        # grace, the row's own reading — the oldest hold where a team ever had two
-        now = datetime.now(UTC)
-        held = [(_instant(mark[0]), mark[1]) for m in members if (mark := seat_held_mark(m, now))]
-        held_mark = None
-        if team != NO_TEAM and held:
-            since, text = min(held, key=lambda h: h[0] or now)
-            held_mark = {"age": held_for((now - (since or now)).total_seconds()), "title": text}
         # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are its *asked you* line (TD-354)
         summary = (
             team_summary(team, members, repos, doing, waiting, needs=needs, fleet=views) if team != NO_TEAM else None
@@ -577,7 +572,6 @@ def team_groups(
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "prs_waiting": waiting,
-                "seat_held": held_mark,
                 "summary": summary,
                 "live": live,
                 # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the

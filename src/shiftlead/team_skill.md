@@ -136,8 +136,7 @@ teams:
 - **A repo with little or no work** (`ao doctor repos` reads its ledger's count): a start whose every
   member's lane holds nothing to pick is refused (step 5), so a `free-pick` team on an empty ledger
   does not start. Run an on-call manager alone (leave `members:` out) or one member, and start it with
-  `ao team start <name> --anyway`: the team's anchor seat has a lane too, so an empty ledger refuses
-  either shape without it.
+  `ao team start <name> --anyway` where a lane it starts is empty.
 
 A team whose only project is one repo can live in **that repo's** `.shiftlead.yml` under `teams:`
 instead, and travels with the checkout. The org file wins a name collision. **Which file:** the

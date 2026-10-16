@@ -153,7 +153,7 @@ async def test_each_reading_of_a_member_fills_the_manager_once(agent, tmp_path):
 
 async def test_a_held_manager_has_no_pane_and_its_first_reading_fills_it(agent, tmp_path):
     """TD-413 slice 1 (§6 rule 3 *A Start writes the seat and never fills it*, TD-410): the Start's
-    `create` with `held` writes the manager on call closed with no pane and no `seat_held`, its launch
+    `create` with `held` writes the manager on call closed with no pane, its launch
     record beside it; its members name its id; nothing due, the tick neither fills nor closes it; a
     member's permission fills it — a pane, from the launch record, never another held record."""
     await park_ticks(agent)
@@ -162,7 +162,7 @@ async def test_a_held_manager_has_no_pane_and_its_first_reading_fills_it(agent, 
         mgr = await _manager(person, tmp_path, held=True)
         first = agent.sessions[mgr]
         assert first.state == "closed" and first.closer == {"by": "start", "why": "held"}
-        assert first.seat == {"trigger": "team"} and first.seat_held is None
+        assert first.seat == {"trigger": "team"} and not hasattr(first, "seat_held")
         assert not await asyncio.to_thread(agent.tmux.has_session, mgr), "no pane"
         assert agent._read_launch(mgr).get("seat") == {"trigger": "team"} and "held" not in agent._read_launch(mgr)
         a = await _member(person, tmp_path, "a", mgr)
