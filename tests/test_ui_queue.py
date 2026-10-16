@@ -168,6 +168,8 @@ def client(monkeypatch, tmp_path, Fake):
     from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
+    # the page reads the wall clock; the fixtures sit at NOW, so its windows are read at NOW too
+    monkeypatch.setattr(ui, "queue_view", lambda got, _now: queue_view(got, NOW))
     return TestClient(ui.create_app())
 
 
