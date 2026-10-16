@@ -14395,3 +14395,39 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** TD-787, TD-790, TD-684 (the per-head sync read), TD-613 (`pr_orders`).
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1956) — `held.repo_key` (the `held:` list or named sets, else the live records' `review` globs), `held.match`, `HELD_READS`; `reports._held_flags` reads each open non-sync PR's files once per head and key under the cap, carried from `old`, a failed read keeping the last word; the tick's `_held_keys` unions the keys per remote into `_read_repos`; `held.asks`/`unasked`/`has_reader` give `_red_prs` its `pr_orders.asked` and `unasked`, both in its save comparison. `tests/test_held_reading.py` holds the Done-when list.
+
+## TD-791: Nothing asserts the remedy line of `ao org check`'s two-team lack: the left-out names can be dropped from `orgcheck.team_lacks`' `Team = …` suggestion and every test passes
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1943)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/orgcheck.py` `team_lacks` (`names = [*declared, *…left-out…]`); `tests/test_cli_org.py` `test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `names = [*declared, *(s["team"] for s in stale if s["kind"] == "left-out")]` to `names = [*declared]` in `orgcheck.team_lacks` (the lines #1943 rewrote onto `teams.stale_teams`) leaves `pdm run pytest -q tests/test_cli_org.py tests/test_cli_teams.py` green. The lack's remedy, `add `Team = ao-grind | ops``, then names only the declared teams, so a person who follows it declares nothing new and the lack stays. `test_cli_org.py` asserts only the message's prefix (`startswith("alpha: has 2 teams and its ledger's Fields: line does not declare alpha-grind")`); the `add `Team = …`` assertion in `tests/test_cli_teams.py` reads `teamrun`'s own start-refusal message, a different function.
+
+**Fix:** extend the two-team lack test to assert the whole remedy: with `declared = []` the lack says `Team = alpha-grind | span`; with `["span"]`, `Team = span | alpha-grind`.
+
+**Done when** the mutation above fails a test.
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #1962) — `test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking` asserts each lack's whole remedy, `Team = span | alpha-grind` (declared first, then the left-out teams in `teams.stale_teams`' order — with nothing declared that is span first, not the order the Fix guessed); `names = [*declared]` now fails both cases.
+
+## TD-792: No test holds Claude Code's `permission_channel = True`: the conformance suite checks only that the value is a bool, so flipping it to False passes
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, auditing #1949)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/adapters/claude_code/__init__.py` (`permission_channel`); `tests/conformance/_harness.py` line 62, `tests/conformance/test_conformance.py` `test_shell_declares_no_permission_channel`
+
+**Why:** `test-audit-ao-1`, 2026-10-16. Changing `permission_channel = True` to `False` on `ClaudeCodeAdapter` leaves `tests/conformance` at 17 passed, 3 skipped (run with the main checkout's venv and `PYTHONPATH=$PWD/src`: a scratch worktree's venv has no `shiftlead.adapters` entry point, so there the suite's first test fails at baseline). `_harness.py` asserts `permission_channel` is a `bool` (`getattr(ad, "permission_channel", True)`) and nothing else; the only assertion on a value is the shell's and the command's `False`. The contract's comment says a pending permission is answered through the hook channel (Allow / Deny) where it is True: that is Claude Code's claim, and no test holds it.
+
+**Fix:** a conformance test that Claude Code declares `permission_channel` True, beside the shell's `False`; and, once TD-784's hook-payload fixtures land, one that a declared channel's pending permission reads as answerable.
+
+**Done when** the mutation above fails a test.
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #1962) — `test_claude_code_declares_its_permission_channel` holds `permission_channel is True` beside the shell's False; flipping it fails the test. The second half (a declared channel's pending permission reads as answerable) needs TD-784's hook-payload fixtures and is written on TD-784's Status.
