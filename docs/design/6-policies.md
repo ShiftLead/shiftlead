@@ -232,8 +232,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      brief* (TD-717), not filled here. A supervised seat that is `exited` or `closed` with `seat_due`
      set, not suspended, on a profile that is not gated, is filled: `create` with `keep_mail`
      (§4.9b), the launch record, and `seat_due` cleared; a seat that is `idle` with no `seat_due` —
-     or with a `prs` or `every` one, met while it ran and so the next fill's cause, as the anchor's
-     `work` is (the count starts again at the fill, from the new record's creation) —
+     or with a `prs` or `every` one, met while it ran and so the next fill's cause (the count starts again at the fill, from the new record's creation) —
      hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a fill is not closed before its prompt
      lands), with nothing dirty or unpushed and **no live subagent** (§4.2 *Working on its own*,
      TD-734: a seat that ended its turn on an Agent-tool reviewer is working, as its card says; its
@@ -251,29 +250,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      refused fills until the hour rolls; fills are not crash restarts and do not count toward
      `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from `seat_count` (*on
      call — runs after 10 PRs · 4 of 10*).
-     **The anchor seat is a seat of this rule, with the trigger `work`** (§4.9b *The anchor
-     seat*): `seat_due` is set with `by: work` and the `ids` when the seat's lane reading — the
-     lane word `anchor` (rule 6), kept on the seat's record as `lane_seen` as a finished member's
-     is, and pruned as rule 6 prunes it (an id the lane no longer matches leaves it, so a live
-     check that goes live after the seat saw it as a build is due again) — holds an id it did not
-     when the seat last declared or was created, and a cause fills once per stretch as the
-     manager's do: the same ids raise no second `seat_due` after a `none`. **Its fill is gated by
-     the checkout**: the `create` is in its repo's main checkout, refused by occupancy (§9
-     invariant 2) while any session holds it and refused while the checkout is dirty or off its
-     default branch, each leaving `seat_due` standing with the reason on the record — **`seat_held:
-     {by, why, since}`** (home-owned; `since` the first tick that read this `by`, kept while the holder is the same and reset by another, so the Inbox row and the header mark of §4.5a *Inbox row: seat held* age from it, past `SEAT_HELD_GRACE`) — for the card's slot (*on call — the checkout is yours · branch
-     td-x, 2 files uncommitted*); the next tick tries again. **`ao team start` is gated by the
-     same reading**: a Start whose checkout is not free writes the seat's record held — `closed`,
-     no pane, `seat_held` with the reason, which stands while its lane holds work due and is
-     cleared as any `seat_held` is when nothing is — in place of a pane there, and this rule fills
-     it once the checkout is free; the gate is one reading, never two that can disagree (a node's
-     checkout: occupancy alone, from its records, on both roads). **A `none` that consumes no
-     stretch**: a `work` seat's `none` declared while its checkout is not its own — dirty or off
-     its default branch at the declaration, the holder being itself — writes `lane_seen` with no
-     ids (`ids: []`, as a held Start's record is written; never `None`, which the next tick fills
-     from the reading), so the ids it could not work stand due and fill it again once the checkout
-     is clean; the fill ceiling bounds a checkout that keeps turning dirty between the gate and
-     the first prompt. Its idle close and its fill ceiling are this rule's as for every seat.
+     **No seat is filled in a main checkout** (§4.9b *No anchor seat*, retired 2026-10-15): no seat
+     carries the trigger `work` or a lane, so no fill is gated by a checkout and no record carries
+     `seat_held`.
      **A manager on call is a seat of this rule.** `ao team start` writes `seat: {trigger: team}`
      on a manager whose definition does not say `on_call: false` — the `manager` role's default
      alone, another role's manager being a seat only where its definition says `on_call: true`
@@ -313,9 +292,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      launch record, `restarts: [{why: fill}]`; closed once idle with no `seat_due` for
      `SEAT_IDLE_GRACE` with nothing dirty or unpushed. **A Start writes the seat and never fills
      it**: `ao team start`, and a Start's or an Apply's create of a manager the run lacks (§4.9c),
-     writes a manager on call's record as the anchor's is written when its checkout is not free
-     (§4.9b: `create` with `held`) — `closed`, no pane, the launch record written, `seat:
-     {trigger: team}`, no `seat_held`, since nothing holds it: it is simply not due — and the
+     writes a manager on call's record by `create` with `held` (§4.9b) — `closed`, no pane, the launch record written, `seat:
+     {trigger: team}`: it is simply not due — and the
      Start's line for it reads *on call — comes when a member needs a reading*, the card's words.
      The team's other records list its id in `controllers` as before: the id is the name's (§4.1)
      and the fill keeps it, so the members' briefs name it before it has ever run, as they name
@@ -324,8 +302,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the held create moves the mail as a fill does), a member `needs-you` from the first minute —
      by this rule and no Start-time case: the Start itself is never a cause.
      **A replay of the team writes its seats the same way**: rule 8's start and §6 *Schedule*'s
-     replay at a reset hand every seat record they replay — the manager on call, the techlead, the
-     anchor seat, any seat with a trigger — to `create` with `held` and `keep_mail`: `closed`, no
+     replay at a reset hand every seat record they replay — the manager on call, the techlead, any seat with a trigger — to `create` with `held` and `keep_mail`: `closed`, no
      pane, the launch record, the mail moved, `closer: {by: start, why: held}`, its `restarts` entry
      the replay's (`why: work` or `schedule`, the start's `ids`, `start` and `of`) with **`held:
      true`**. A replayed seat is on call again with its trigger standing, and the first tick fills it
@@ -465,7 +442,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      holds and that ref's tip does not (a branch checked out at the home) is written into it
      untold, so neither that tick nor a later one tells as new an entry the checkout held at the
      first write and `origin/<default>` does not. That is the first write's alone: an entry that
-     appears in the checkout's reading only after it (the anchor checking out a ledger branch) is
+     appears in the checkout's reading only after it (a person's session checking out a ledger branch) is
      told once, as any new id is, though its note's *read the ledger on `origin/main`* will not
      find it there — the ledger read is the checkout's file; where the history cannot be read, the
      reading at that tick. **A lane word matches by the entry's header, never its prose**: with
@@ -476,23 +453,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      reading finds the entry pickable and tells the grinder lane as it tells any lane news; for
      that match the decision's holder stands as the entry's owner, so `[design-first,
      owner:designer]` takes an entry whose `Owner:` is `grinder`, and a decision named for anyone
-     else — `decision (paul)`, `decision (anchor)` — matches no lane: the person's is *for you*
-     (§4.4 *Repo facts*), and the anchor's is the lane word `anchor`, below —, and `free-pick` a
+     else — `decision (paul)` — matches no lane: the person's is *for you* (§4.4 *Repo facts*) —, and `free-pick` a
      pickable entry whose kind is `build` or unwritten — or `live-check`, **once its build is
      live** (§4.9b *A live check is a grinder's once its build is live*) — and **every open
      decided line of the repo's board**, a work order `board:<key>` (§4.4 *Board write-back*),
-     which `owner:<word>` never narrows out, since a line has no owner — and **`anchor`** every
-     pickable entry whose `Owner:` is `anchor`, of any kind, and every work order — a decided board line
-     or a red PR nobody holds, `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), which a
-     `free-pick` lane takes too where the repo has no anchor seat (§4.9b *The
-     anchor seat*: the seat's lane, and a person's own anchor session reads the same) — so an
+     which `owner:<word>` never narrows out, since a line has no owner, and **every red PR nobody holds**, a work order `pr:<n>` (§4.4 *A red PR nobody holds is a work order*, TD-613), the same: the grinders' pick list takes both first (§4.9b *No anchor seat*) — so an
      evaluation, a decision and a live check whose build is not live match no lane, and a ledger
      with no header lines at all gives a `free-pick` lane everything it has unblocked; a lane of
      references gains nothing, and any other lane word matches nothing until a role gives it a
      meaning here. **An `owner:<word>` in a lane narrows it**: with one or more, an entry matches
      when it matches one of the lane's other words and its `Owner:` is one of the owners named or
-     is absent, so `[free-pick, owner:grinder]` leaves an entry that is the anchor's or Paul's
-     out. The word is the lane's, written where the lane is (`org.yml`, a role's preset), and is
+     is absent, so `[free-pick, owner:grinder]` leaves an entry that is the designer's or Paul's out. The word is the lane's, written where the lane is (`org.yml`, a role's preset), and is
      compared with the ledger's line alone: a session's role badge is not read (§9 invariant 9). A
      lane with no owner word matches as it did. An owner word is **not a reference and not a lane
      of its own**: it is set aside before a lane is checked as `free-pick` or a list of references
@@ -514,8 +485,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      live, a `Blocked by` that reopened and cleared, an `Owner:` that moved away and back; an id
      the reading does not hold is kept, since an entry absent from the checkout's file is archived
      or the checkout's moment, not the lane's. The reading is one function (`sessionorc.work`),
-     the memory pruned and the news read in one pass, so rule 6, rule 8 and the anchor seat's
-     `work` trigger (rule 3) never disagree on what is new; it keys on the id alone, since
+     the memory pruned and the news read in one pass, so rule 6 and rule 8 never disagree on what is new; it keys on the id alone, since
      *matches the lane now and did not when last seen* is what being news means, and no kind or
      workability is written beside the id. The promote tells nobody itself: it is one of the ways
      an entry comes back, and the reading sees them all. **Unknown is not *not live***: until the
@@ -611,13 +581,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      definition — having declared `out_of_work`; a member killed or closed by a person makes it
      *stopped*, which this rule leaves alone, and a person's own session in the team changes
      nothing. The reading is written once (`sessionorc.work`), and the card's is the same function
-     given the definition's seat names. **The repo's anchor seat is a seat of every team whose
-     manager its `controllers` name** (§4.9b *The anchor seat*; it carries no `team` badge): its
-     lane's news goes into the `work_waiting` of each wound-down team whose records' `repo` is the
-     seat's — by the repo, since rule 9 has taken those teams' managers out of its `controllers` —
-     and
-     a replay of a team that finds the seat ended replays it with that team's manager as its
-     controller, each other team's manager added again as its team comes back. When a wound-down team's member's lane holds a matching id
+     given the definition's seat names. When a wound-down team's member's lane holds a matching id
      its `lane_seen` does not — the memory pruned as rule 6 prunes it for a member that is gone, so
      an entry that left the lane before the wind-down and came back after it is this rule's news —
      and `WORK_SETTLE` (ten minutes) has passed since the home first read the newest of them — a
@@ -705,9 +669,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      person's own RPC and the home's alone (`modes.HOME_EDITS`), the same replay under the same
      bounds, refused in the row's words when one holds; `off` writes nothing. The member started
      again reads the ledger at its start and finds the entry, as any start does: nothing is typed at
-     it, and rule 6 tells it nothing it has not read. **A seat still holds a wind-down**: a team
-     whose anchor seat is at work — the repo's, its `controllers` naming the team's manager (§4.9b)
-     — is running; what changed is that a member's lane no longer waits for
+     it, and rule 6 tells it nothing it has not read. **A seat still holds a wind-down**: a team whose seat is at work is running; what changed is that a member's lane no longer waits for
      that reading. **Rule 9's race** — a member closed as finished on the tick before the checkout's
      reading held the entry merged into its lane — needs no hold on the finished pass: the closed
      member is this reading's on the next tick, and the miss costs one restart rather than a day.
@@ -741,8 +703,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      unattended live session carrying its badge that is not a seat and not the manager is finished
      as §4.9a defines it — `out_of_work` on the record and `idle`, `exited` or `closed` — none of
      them carries `restart_wanted` (that one is rule 2's, and a team with a restart wanted is not
-     finished), its seats are `idle` or gone — the repo's anchor seat among them while its `controllers` name
-     the team's manager (§4.9b) — and its manager, when live, is `idle`, declared or
+     finished), its seats are `idle` or gone, and its manager, when live, is `idle`, declared or
      not — where `idle` in this rule is an idle record with no live subagent (§4.2 *Working on its
      own*, TD-734). A team whose only unattended live sessions are its seats and its manager is finished too:
      nobody is working and nobody has anything to take. An interactive session in the team is a
@@ -784,10 +745,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      team finds it by rule 8; a hold would make this rule a second reader of the lane —: the
      members' half is `ao team stop --close`'s (§4.9a) — each finished member is closed under the
      wrap-up's own safety check, one with uncommitted or unpushed work left open and the Inbox row
-     it is after any wrap-up — and the manager's half is this rule's own; and the home takes the team's manager out of the
-     repo's anchor seat's `controllers`, and on any tick on which none is left and no live record with
-     a `team` badge has the seat's `repo`, the home winds the seat down (§4.9b), a person-led team's
-     sessions keeping it running. The manager, if live and
+     it is after any wrap-up — and the manager's half is this rule's own. The manager, if live and
      on the home, gets **one** send of fixed text, *[shiftlead] your team is finished: every member
      has declared. Make your last acts — `ao progress none`, the note to the person — then `ao
      close` yourself*, typed only into an idle composer as rule 4's line is, and
@@ -935,7 +893,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      counted, each `#<n>` a link, Open the member, Dismiss marking the entries `dismissed`
      (`clear_mark`; they stay, so no PR is a crossing twice). The home undoes nothing: a revert is
      a person's word, or the reader's finding on a later thread. **Not a crossing**: a PR the
-     reader merged itself, which replied; a PR whose record carries no `review` (the anchor's); a
+     reader merged itself, which replied; a PR whose record carries no `review` (a person's own session's); a
      PR merged before the record carried `review`; a files read that failed — no reading, read
      again next cadence, never a crossing by default. A node's member is read as rule 10 reads
      one.
@@ -1279,10 +1237,7 @@ teams:
 - **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7): the
   team-wide form of a session's `run_until`. On every tick, each live session carrying the team's
   badge — members and seats — whose `run_until` is unset or later than the team's takes the team's
-  instant (the repo's anchor seat, which carries no badge, only once every team its `controllers`
-  name has an instant, and then the latest, or with empty `controllers` the latest among the
-  repo's teams; a move or a Clear re-derives the seat's instant from its teams' as they stand,
-  §4.9b), exactly as `set_stop` would give it (`wrapup_sent_at` reset, the wrap-up then the kill
+  instant, exactly as `set_stop` would give it (`wrapup_sent_at` reset, the wrap-up then the kill
   as the stop time's own rule says), and a start the team makes after the instant is set stamps it
   on what it creates — while the instant is still ahead: a session created after it has passed is
   not given it, since starting the team again after its stop time is the person's word. It runs at

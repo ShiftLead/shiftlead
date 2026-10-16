@@ -169,6 +169,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — *Repo facts*' *evaluation* and an unblocked non-person `Kind: decision` match no lane, named by `ao repo` for their owner to rewrite; an `Owner:` no lane takes shows in *the rest* by owner; a red PR's and a sync's order are the grinders' pick list; the repo's lanes are its teams'. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): the boards reading is the repo's, none split per team (TD-741).
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): *In a team's lanes* — the repo's lanes are its teams' and its anchor seat's, the seat's line drawn first; a red PR's work order falls to `free-pick` lanes *where the repo has no anchor seat*. Built by TD-724 slice 6, TD-725.
 - 2026-10-15 (TD-745, the designer; the anchor, reading its lane: #1840 and #1850, drafts Paul had paused during a design round, were listed first as High `pr:` orders and passed over on every run): *A red PR nobody holds is a work order* — **a draft is no work order**, no note to its holder, no Inbox row; ready again, it is under the rule at once with its `red_since`; `ao repo`, the Repo page's tag and the facet's hover say *no order while a draft*; a draft `is_sync_order` orders is still an order. Rejected: a `Paused:` line or label (a step per pause, when the draft flag says it) and a longer bound (the paused ones listed again a day later). A steer to the techlead (m-0aca91d3a677) answered: go with it, the cost recorded. Fable round 1 (nothing blocking, adopted): the Repo page's tag and the facet's hover say *no order while a draft*; the told memory survives a draft spell; a seat's drafted-entry PR is covered too. Sonnet round 1 (adopted): one test (`teamrun.red_prs`'s `whose`) for `ao repo`'s line and the pages, one wording, the sync draft by `is_sync_order`, `red_since` kept while red, the readers of `pr_orders` named with tests. Fable round 2 (adopted, and it closed the loop): a held draft's no-note test, §4.10's leftover as the one draft with no tracker, one phrase (*no order while a draft*). Sonnet round 2 READY, its one wording fix (a sync draft in §4.5a and §4.7) adopted. Built by TD-750.
@@ -325,6 +326,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the on-call slot's checkout words, the anchor's card on the repo line and the Repo page, and the *seat held* Inbox row go; *nobody's — the grinders' order*. Built by TD-757, TD-725, TD-740.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): screen 1's + card and full-card text name a repo's no-team strip and *No repo* for *No team*. Built by TD-725.
 - 2026-10-15 (TD-722 amended, an interactive session with Paul, after Fable's review round 1): screen 1 — a repo's line carries its Repo facet once and its anchor seat's card, a team card the other two facets, *No team* becomes a repo's no-team strip and *No repo*; screen 6 — a board row carries its repo and no team badge, `next:<n>` is per repo; screen 11 — the page is the repo's group expanded: every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, *Waiting on you* linking `?repo=`. Built by TD-725, TD-740, TD-741.
 - 2026-10-15 (TD-745, the designer): screen 11's Open PRs tag says *no order while a draft* for a red draft nobody holds. Built by TD-750.
@@ -448,6 +450,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the rows *Inbox row: seat held*, *team header: seat held*, *repo line: seat held*, *card: on call — the anchor seat's words* and *New session: occupancy: a seat* are removed; the Start's lane line, the ring, the repo line, the Repo facet and *flow changed — Apply* lose the seat. Built by TD-757, TD-725.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): *team card: Repo facet* in the present tense; *decided lines* links `?repo=`; *card: on call* — Members… lists the repo's seat on every team of the repo, `ao org` names it; *card: compact* and *Members…* lose *No team*.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): *board items shown* is *the next n per repo*; the rail counts the repo's anchor seat's asks and attention rows under its repo.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): a new row *repo line* (the anchor's compact card and marks on the repo's line, a heading hidden with what is under it, the strip's heading *n sessions, no team*) and *repo line: seat held*, the *team header: seat held* row keeping a team's own seats; *team card: summary* rewritten to two facets; the ring's order under a repo; *flow changed — Apply* offers *<repo>-anchor: starts* to every team of the repo; the rail's team count includes the team's repo's board rows; the New session form's Order and Repo lose Project; *No team* becomes the strip or *No repo*. Built by TD-724, TD-725, TD-741.
@@ -791,6 +794,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — `ao org` lists no anchor seat and `ao org check` no `anchors:` warning; `ao repo`'s `pr:` orders are on the grinders' pick list; `anchor:` other than `false` is an old key refused. Built by TD-724, TD-757.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): a team's manager starts in a worktree of its repo, not its home repo.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): `ao org` lists each anchor seat with its host; an anchor written in both `.shiftlead.yml` and `anchors:` is a warning of `ao org check`, not a lack. Built by TD-724.
 - 2026-10-15 (TD-722 amended, an interactive session with Paul, after Fable's review round 1): `ao org` says each team's project and each repo's anchor seat; `ao org check` refuses a session name two teams on one repo give, a repo in two projects and the old keys; `ao new --project` goes. Built by TD-724.
@@ -888,6 +892,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the roles table's `anchor` row is removed. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): the roles table's `anchor` row — the repo's seat, in its repo's main checkout, its `controllers` every manager of the repo's teams.
 - 2026-10-15 (TD-715, the designer): a claim on a waiting entry is refused, and `--force` passes it, since the session may know the event has come. Built by TD-716.
 - 2026-10-14 (TD-707, the designer): a claim on a settling or held entry is refused, `--force` or not. Built by TD-710.
@@ -983,6 +988,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the `anchor` key (team or repo) is retired — `anchor: false` read and passed over, any other value refused; `anchors:` goes; names unique per repo, *live* and the Org page lose the seat; the changeover becomes *the retired seats' records*: a leftover `<team>-anchor` retired by the build's migration once each repo's `Owner: anchor` entries have moved. Built by TD-724, TD-757, TD-760.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): *The changeover* — the first Start or Apply after the promote marks each old `<team>-anchor` removed (TD-703) so rule 3 never refills it; the dated reason leaves *`anchor`*.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): `anchors:` covers any repo whose own `.shiftlead.yml` has no `anchor:`, the repo's winning with a warning; *The changeover* — the teams stop and the old `<team>-anchor` records wind down before the build is promoted; the anchor seat is drawn on its repo's line and never pulled into a team's group by its `controllers`. Built by TD-724, TD-725.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): a team is live while the repo's anchor seat is live with its manager in the seat's `controllers`; the Org page's anchor card is the compact card with its marks on the repo line, a heading hides with what is under it, the ring's order, the strip's heading. Built by TD-724 slice 6, TD-725.
@@ -1050,6 +1056,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9a Winding down: a team that runs out of work
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the finished reading counts no anchor seat. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): the finished reading counts the repo's anchor seat among a team's seats while the team's manager is in its `controllers`. Built by TD-724 slice 6.
 - 2026-10-12 (TD-584, the designer; [ADR 2026-10-12](decisions/2026-10-12-ledgerboard-dev-cadence-shiftlead.md), decided by Paul the same day): *What a session does with a decided line* closes it with `ao board edit done`, `scripts/board_edit.py` the same edit without ShiftLead. Built by TD-587.
 - 2026-10-09 (TD-468, grinder-ao-1): *The home's note says more* built — `_finished_tell` adds, after a blank line, *Claims left*, *Restarts*, *Alarms*, *Open to you* and *Usage* lines, each only when it has something to say (members' restarts and claims; alarms over every record of the team). A `wanted` restart's entry keeps the member's own why as `said`, so the line reads *2 context bound*; a person's Restart and a team's `start`/`work` replays are not counted. `usage_at_start` is written by `_mark_team_start` when nothing of the team runs: at the dispatcher for a create carrying `team_start` (which `ao team start` sets, before the create is routed, so a node's start is kept at the home), and at the tick's `start` and `work` replays; a restart never writes it.
@@ -1080,6 +1087,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — *The anchor seat* is replaced by *No anchor seat*: no seat runs in a main checkout; work orders go to the grinders' pick list, builds and live checks to `Owner: grinder`, an evaluation to a build or the designer, a decision to `decision (designer)`, host chores to the person; a waiting live check gains a `Waits:` line. Everything per-repo-anchor of rounds 1–3 (the `<repo>-anchor` seat, its controllers, review chain, wind-down, changeover) is gone, and **Sonnet round 2's findings, all on that seat's lifecycle, are superseded by the retirement**. Built by TD-757, TD-759, TD-760.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): *The anchor seat* — its review is the chain of the repo's first team in definition order, computed by every start, replay and Apply, nothing per team, and taken by the next Start or Apply when another team becomes first; while the first team is stopped its reviewer may not run and the ask waits or goes to the person; rule 8's news by the records' `repo`; a *live record of the repo's teams* is one with a `team` badge and the seat's `repo`, and rule 9 winds the seat down on any tick with none; `_work_start` adds a manager to a live seat with empty `controllers`; `anchor: false` drops the seat. Built by TD-724.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): *The anchor seat* — rule 9 winds it down on empty `controllers` only when no live record of the repo's teams is left (a person-led team keeps it, reporting to the person); its stop time with empty controllers is the latest among the repo's teams, and a move or Clear re-derives it; it is in no team's reserve priority, balance or start mark, its mail carries its project and no team, its asks shown under its repo. Built by TD-724 slices 4 and 6, TD-741.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): *The anchor seat* — the home ties it to its teams by `controllers`, never a badge (it holds each team's wind-down, rule 9's wind-down takes the team's manager out and winds it down when none is left, rule 8 replays it with the replaying team's manager, its news in each wound-down team's `work_waiting`, a team stop time only once every team over it has one); one per repo per host; a repo whose teams are all the person's leaves its `controllers` empty and reports to the person. Built by TD-724 slices 4 and 6.
@@ -1135,6 +1143,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9c Flows: the path an entry takes through a team
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — *Switching* compares no anchor seat. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): *Switching* — only the repo's first team compares the anchor seat's review against its own chain and reads *flow changed* over it; another team's Apply leaves the seat's review alone. Built by TD-724.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): *Switching* — the repo's anchor seat is the repo's, not a definition's: every team of the repo reads *<repo>-anchor: starts* when its run finds no record, and the first to press Apply creates it; *its repo's main checkout*. Built by TD-724.
 - 2026-10-15 (TD-722 amended, an interactive session with Paul, after Fable's review round 1): a review link's paths are the team's repo's `held:` — one list, not a union. Built by TD-724.
@@ -1198,6 +1207,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the *seat held* row's example and the anchor's *No team* exception go. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): an entry from the repo's anchor seat, which carries no team, shows under its repo, not *No team*. Built by TD-741.
 - 2026-10-15 (TD-722, the designer): *across teams, by project* — the `project` badge is the team's repo's project, the repo's own name where no project lists it, so two teams on one repo always share one. Built by TD-724.
 - 2026-10-13 (TD-665, the designer): mail to a record with no agent is refused. Built by TD-666.
@@ -1319,6 +1329,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 5. Configuration
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — a repo's `anchor:` is retired (`false` passed over) and the org file's `anchors:` is removed. Built by TD-724.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): `next:<n>` is per repo; `anchors:` applies to any repo whose `.shiftlead.yml` has no `anchor:`.
 - 2026-10-15 (TD-722 amended, an interactive session with Paul, after Fable's review round 1): a repo's `.shiftlead.yml` takes `anchor:` (no longer a refused key); the org file takes `anchors:`. Built by TD-724.
 - 2026-10-15 (TD-722, the designer): `org.yml`'s example — `projects:` headings with a `title`, `teams.<name>.repo`. Built by TD-724.
@@ -1368,6 +1379,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — rule 3 fills no seat in a main checkout (no `work` trigger, no `seat_held`); rule 6's lane word `anchor` goes, every red PR's order on the grinders' pick list; rules 8 and 9, *A seat still holds a wind-down* and *Team stop time* lose the seat. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): rule 8 reads the anchor seat's news into wound-down teams by the records' `repo`; rule 9 winds the seat down on any tick on which its `controllers` are empty and no live record of the repo's teams is left. Built by TD-724 slice 6.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): rule 9 winds the anchor seat down only when no live record of the repo's teams is left; *Team stop time* re-derives the seat's instant on a move or Clear, and an empty-controllers seat takes the latest among the repo's teams. Built by TD-724 slice 6.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): rules 8 and 9, *A seat still holds a wind-down* and *Team stop time* read the repo's anchor seat as a seat of every team whose manager its `controllers` name; rule 3's fill is *in its repo's main checkout*; rule 6's work orders fall to `free-pick` *where the repo has no anchor seat*. Built by TD-724 slice 6.
@@ -1574,6 +1586,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 9. Invariants
 
+- 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — invariant 2's second sentence: no seat runs in a main checkout; the one agent there is the person's own session, the anchor session. Built by TD-757.
 - 2026-10-13 (TD-641, grinder-ao-1): invariant 9's list names the person's `permissions:` rules per role beside `teams.<team>` — the role badge says which members' prompts a rule is about and grants nothing (TD-636 keyed the rules on the role).
 - 2026-10-12 (TD-619, the designer): invariant 10's `relaunch` mark carries `profile`. Built by TD-620.
 - 2026-10-12 (TD-582, the designer): invariant 9's named exception covers the `project` badge's cross-team mail edge beside the `team` badge's. Built by TD-601.

@@ -160,7 +160,7 @@ board: docs/user_attention.md         # the person's board, optional (*The seams
 gate: python3 scripts/check_cadence.py --pr {pr} --json   # the merge gate, a command judged by its exit code (*The seams*)
 worktree_setup: scripts/hydrate_worktree.sh   # run in every new worktree (*The seams*)
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
-anchor: {profile: grind}              # §4.9b: the repo's anchor seat, shared by its teams (TD-722); default present as <repo>-anchor; false for none
+
 settle: {design-first: 10m}           # §4.4 *A new entry settles*: wins over settings.yml's settle:, key by key
                                       # this repo's own flows and roles are directories in .shiftlead/, not keys (§4.9c)
 teams:                                # §4.9: the repo's own teams, aggregated into the org; org.yml wins a name
@@ -183,9 +183,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   is built. **Not keys**: `adapter:` and
   `worktrees:` are refused, the error naming where each is decided — the adapter per session and per
   profile, and a session's worktree always `<repo>/.claude/worktrees/<name>` (the host agent never
-  reads this file, so it could not move it). **`anchor:`** is a key (TD-722): the repo's anchor seat,
-  `{name, profile, brief}` or `false` (§4.9 *Teams*, §4.9b *The anchor seat*) — one seat in the main
-  checkout, shared by the repo's teams, which keeps §9 invariant 2 rather than choosing it.
+  reads this file, so it could not move it). **`anchor:`** is retired (§4.9b *No anchor seat*): `anchor: false` is read and passed over, any other value refused as retired, since no seat runs in a main checkout (§9 invariant 2).
 
   **`promote:`** (`run` and `check`, both required; `auto` refused as `settings.yml`'s) is the repo's own
   answer to *how does `main` become what is running*, and nothing in shiftlead names pip, a venv,
@@ -283,8 +281,6 @@ teams:
     manager: {role: manager, name: manager-ao-1}
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
-anchors:                                     # §4.9b: the anchor seat of any repo whose .shiftlead.yml has no anchor: (TD-722); where both set one, the repo's wins and ao org check warns
-  guardians-api: false
 roles:
   grinder: {profile: grind}
 director: {profile: grind, brief: docs/briefs/director.md}   # TD-636, §4.9b *The director seat*: the org's one seat of no team, trigger `prompt` (with `asks` and `groom`, TD-657); absent, none

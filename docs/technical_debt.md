@@ -60,10 +60,10 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-740 builds it |
-| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 — TD-724, TD-725, TD-741 build it |
+| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 (the anchor seat retired) — TD-724, TD-725, TD-741, TD-757, TD-759, TD-760 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
-| TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the repo's anchor seat, names unique per repo, the old keys refused | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
-| TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet and the anchor seat on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
+| TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, names unique per repo, the old keys refused | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
+| TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
@@ -71,6 +71,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
 | TD-755 | Two behaviours of TD-736 (#1873) are held by no test: a held entry a decided line names stays a held row, not a *for you* one, and the held row's footer reads *held in … ledger* | Low | Open |
+| TD-757 | Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired | Medium | Open |
+| TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
+| TD-760 | Re-own the other repos' `Owner: anchor` entries (dev-cadence, contractmatch), and delete shiftlead's `roles: anchor:` block | Low | Open |
 
 ---
 
@@ -1141,13 +1144,13 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-15 in TD-722's amendment (an interactive round with Paul, PR #1850) — §4.5 screen 11: the page is the repo's group of the Org expanded: the repo's line with its Repo facet once, the anchor seat's card, every servicing team's whole card by the Org's own partials and kept by `/events`, the no-team strip, then the lists; Doing with team chips; *Waiting on you* linking `?repo=`; Add entry's optional **Team** pick. Built by TD-740. Was: Open, blocked by TD-722.
+**Status:** Designed 2026-10-15 in TD-722's amendment (an interactive round with Paul, PR #1850) — §4.5 screen 11: the page is the repo's group of the Org expanded: the repo's line with its Repo facet once, every servicing team's whole card by the Org's own partials and kept by `/events`, the no-team strip, then the lists; Doing with team chips; *Waiting on you* linking `?repo=`; Add entry's optional **Team** pick. Built by TD-740. Was: Open, blocked by TD-722.
 **Blocked by:** TD-740
 **Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
 
 **Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
 
-1. **The header** (`group_head.html`, §4.5a *team groups*): the flow chip and *flow changed* / *definition changed* with **Apply**, ✉ *n* unread, *anchor held*, the *answered for you* mark, *n PRs waiting*, *n ready to close*, the *needs you* pill, the run's state (*concluded*, *wound down … by …*, *stopped*, *work waiting*), and the notes under it (*over its line*, *stops*, *started … for*).
+1. **The header** (`group_head.html`, §4.5a *team groups*): the flow chip and *flow changed* / *definition changed* with **Apply**, ✉ *n* unread, the *answered for you* mark, *n PRs waiting*, *n ready to close*, the *needs you* pill, the run's state (*concluded*, *wound down … by …*, *stopped*, *work waiting*), and the notes under it (*over its line*, *stops*, *started … for*).
 2. **The controls**: Start, Wind down, Stop now, Forget all, and the ***i*** panel (Definition, Members…, Open file, Flow on Settings →, who for what, *not concluded:*).
 3. **The member cards** (`card.html` compact, with their state pills and the lane's count) and the **+** card.
 4. **A repo two teams service** names both in its *serviced by* line but draws only the first team's facets (`serving[0]`); the second team's card on the Org has nothing on the page that is meant to expand it.
@@ -1167,8 +1170,8 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed, amended 2026-10-15 (an interactive round with Paul after Fable's review, PR #1850): the anchor seat is the repo's, shared by its teams (`anchor:` in the repo's `.shiftlead.yml`, the org file's `anchors:`), its controllers the repo's managers; an agent's name is unique across a repo's teams; the old keys and a team's `anchor:` are refused, not read with a warning; the director carries an Org block from the registry and a directory of its own; the Org page's headings follow the org file's order with liveness inside a repo, the Repo facet and the anchor's card on the repo's line, a no-team strip per repo and *No repo*; a board row carries its repo; `--project` and the Project picker go. Round 2 (Fable's eleven findings, adopted by Paul): the home ties the anchor seat to its teams by `controllers`; one seat per repo per host; its review the first controller team's chain; the repo's lanes include the seat's; the Org page's repo line, ring, hiding and strip heading. Round 3 (Sonnet's twelve findings, adopted by Paul): the seat winds down only when no live record of the repo's teams is left; its stop time re-derived on a move or Clear; the anchor's review chain settled; the seat in no team's reserve, balance or start mark, its asks under its repo; `anchors:` for any repo whose file has no `anchor:`; the changeover before the promote; TD-724 split into an unheld slice 4 and a held slice 6. Fable round 3 (adopted by Paul): the seat's review is the repo's first team's chain, nothing per team, only that team reading *flow changed* over it; rule 8 reads the seat's news by the records' `repo`; a live record of the repo's teams defined, the seat wound down on any tick with none; `anchor: false` drops the seat; the changeover marks the old `<team>-anchor` records removed. Built by TD-724, TD-725 and TD-741; the Repo page is TD-721's, built by TD-740. Was: designed by the designer in #1832 — Designed 2026-10-15 (the designer; no mockup: the Org page keeps every card as it is and adds a heading per project and a line per repo above them) — §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The Org page*. A team declares one `repo:` (required in the org file, unsaid in a repo's own), and every `home:` and `projects:` on a team goes. A project is a heading on repos with an optional `title`, a repo in at most one, and a repo in none is its own heading. The `project` badge is the repo's project, so two teams on one repo always share one, and mail is unchanged. The director is the org's, with the org-wide block (a step added to TD-642). The Org page groups project → repo → team, cards whole and never combined. The old keys are read for one release where they name one repo, and refused where a team spans. §4.9's guardians example is two teams under one heading, and the ADR is amended. Built by TD-724 and TD-725. Was: Open.
-**Blocked by:** TD-724, TD-725, TD-741
+**Status:** Designed, amended 2026-10-15 (an interactive round with Paul after Fable's review, PR #1850): the anchor seat (first made the repo's, shared by its teams; then retired in round 4, §4.9b *No anchor seat*), its controllers the repo's managers; an agent's name is unique across a repo's teams; the old keys and a team's `anchor:` are refused, not read with a warning; the director carries an Org block from the registry and a directory of its own; the Org page's headings follow the org file's order with liveness inside a repo, the Repo facet and the anchor's card on the repo's line, a no-team strip per repo and *No repo*; a board row carries its repo; `--project` and the Project picker go. Round 2 (Fable's eleven findings, adopted by Paul): the home ties the anchor seat to its teams by `controllers`; one seat per repo per host; its review the first controller team's chain; the repo's lanes include the seat's; the Org page's repo line, ring, hiding and strip heading. Round 3 (Sonnet's twelve findings, adopted by Paul): the seat winds down only when no live record of the repo's teams is left; its stop time re-derived on a move or Clear; the anchor's review chain settled; the seat in no team's reserve, balance or start mark, its asks under its repo; `anchors:` for any repo whose file has no `anchor:`; the changeover before the promote; TD-724 split into an unheld slice 4 and a held slice 6. Fable round 3 (adopted by Paul): the seat's review is the repo's first team's chain, nothing per team, only that team reading *flow changed* over it; rule 8 reads the seat's news by the records' `repo`; a live record of the repo's teams defined, the seat wound down on any tick with none; `anchor: false` drops the seat; the changeover marks the old `<team>-anchor` records removed. Built by TD-724, TD-725 and TD-741; the Repo page is TD-721's, built by TD-740. Was: designed by the designer in #1832 — Designed 2026-10-15 (the designer; no mockup: the Org page keeps every card as it is and adds a heading per project and a line per repo above them) — §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The Org page*. A team declares one `repo:` (required in the org file, unsaid in a repo's own), and every `home:` and `projects:` on a team goes. A project is a heading on repos with an optional `title`, a repo in at most one, and a repo in none is its own heading. The `project` badge is the repo's project, so two teams on one repo always share one, and mail is unchanged. The director is the org's, with the org-wide block (a step added to TD-642). The Org page groups project → repo → team, cards whole and never combined. The old keys are read for one release where they name one repo, and refused where a team spans. §4.9's guardians example is two teams under one heading, and the ADR is amended. Built by TD-724 and TD-725. Was: Open. **Round 4** (Fable, adopted by Paul, 2026-10-15): **the anchor seat is retired**, reversing TD-381 — its jobs go to the grinders' pick list, the designer and the person (§4.9b *No anchor seat*); everything per-repo-anchor of rounds 1–3 is gone, and Sonnet round 2's seat-lifecycle findings are superseded; the removal is TD-757, TD-758, TD-759 and TD-760.
+**Blocked by:** TD-724, TD-725, TD-741, TD-757, TD-759, TD-760
 **Location:** `docs/design/4.9-org-team-project.md` (*Projects*, *Teams*: `projects: [...]`, `manager.home`, a member's `home`, the guardians example with a nested team; *Home and reach*); `docs/design/4.10-messages.md` (*across teams, by project*: the `project` badge, *the first of its team's projects that lists its home repo*); `docs/design/4.5-ui.md` (screen 1 *The Org, team-first*, screen 6 `repo_teams`, screen 11); `docs/design/4.5a-controls.md` (*team groups*: the header's place, *mixed*); `docs/design/4.9b-techlead.md` (*The director seat*); `docs/design/5-configuration.md` (`org.yml`, a repo's `.shiftlead.yml`); [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md) (*a team may span projects*)
 
 **Why:** Paul, 2026-10-15, in the conversation TD-721 waited on: *one repo per team, declared. We still want to be able to have multiple teams per repo (e.g. db team, compliance team) and those can be listed together (per repo) but not auto-combined* — and of a grouping such as Guardians, *a project heading*, placed **on the repo** (*project on the repo*). The design today lets a team span projects and a project hold several repos, and infers a team's repo from where its live members sit (`team_repo`); every project in the org file holds one repo, and no team spans two. The inference is what leaves the header's *mixed* place, `repo_teams`' first-team-in-definition-order rule, and a Repo page that can expand only one team's card (TD-721). The cases for a team over several repos each split by repo: a function across repos (docs, audits, dependency bumps) is a role or flow stage in each repo's team; a product over several repos is one team per repo, sequenced by cross-repo `Blocked by: <repo>#TD-NNN`; the cost a team per repo adds is its seats, which an on-call seat and a team managed by the person already keep small.
@@ -1193,7 +1196,7 @@ The other cases:
 **Priority:** Low
 **Type:** feature
 **Added:** 2026-10-15 (Paul, in an interactive session)
-**Owner:** anchor
+**Owner:** paul
 **Kind:** build
 **Status:** Open
 **Blocked by:** TD-722, TD-724
@@ -1201,7 +1204,7 @@ The other cases:
 
 **Why:** Paul, 2026-10-15: *file a backfill to have samscrape and contractmatch both be on the ContractMatch project.* The two repos are one product; once a project is a heading on repos (TD-722), they share one, which draws them together on the Org page, lets their teams settle things by mail (§4.10 *across teams, by project*) and gives each session the other repo in its Project block.
 
-**Fix:** once TD-722's build is live, one project, `contractmatch` (drawn *ContractMatch* if the design gives a heading a display name), listing both repos with their checkouts per host, in place of the two one-repo projects; the teams in each repo's `.shiftlead.yml` changed only as TD-722's migration says. A session live at the change keeps its old `project` badge (`samscrape`) until its next start, since the badge is written at create, so the two repos' teams mail each other only once each has restarted: make the change between runs, or accept the lag. **The changeover** comes first: a live `<team>-anchor` record holds the checkout and would refuse the new `<repo>-anchor`, so the teams stop between runs, the old `<team>-anchor` records are wound down, and only then is TD-724's build promoted; the first Start or Apply after it marks each old `<team>-anchor` removed (TD-703), so rule 3 never refills it. Paul decided the change on 2026-10-15; the anchor makes it once TD-722's build is live, with a backup of the org file first (`org.yml.bak-<date>-<what>`), as earlier org-file edits had.
+**Fix:** once TD-722's build is live, one project, `contractmatch` (drawn *ContractMatch* if the design gives a heading a display name), listing both repos with their checkouts per host, in place of the two one-repo projects; the teams in each repo's `.shiftlead.yml` changed only as TD-722's migration says. A session live at the change keeps its old `project` badge (`samscrape`) until its next start, since the badge is written at create, so the two repos' teams mail each other only once each has restarted: make the change between runs, or accept the lag. Paul decided the change on 2026-10-15; Paul makes it once TD-722's build is live, with a backup of the org file first (`org.yml.bak-<date>-<what>`), as earlier org-file edits had.
 
 **Done when** the Org page draws samscrape and contractmatch under one ContractMatch heading, and a samscrape session's brief names contractmatch's checkout in its Project block.
 
@@ -1209,91 +1212,72 @@ The other cases:
 
 ---
 
-## TD-724: Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, the repo's anchor seat, names unique per repo, the old keys refused
+## TD-724: Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, names unique per repo, the old keys refused
 
 **Priority:** Medium
 **Type:** feature
 **Added:** 2026-10-15 (the designer, building TD-722's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul): the anchor seat is the repo's, agent names are unique per repo, the old keys are refused, and `--project` goes. grinder-ao-2's draft #1840 holds slices 1–3 as first designed; whoever takes this next starts from that branch (`td724-team-repo`) or replaces it
+**Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul): agent names are unique per repo, the old keys are refused, `--project` goes, and the anchor seat is retired (§4.9b *No anchor seat*), its definition code removed here and its seat code by TD-757 and TD-758. grinder-ao-2's draft #1840 holds slices 1–3 as first designed; whoever takes this next starts from that branch (`td724-team-repo`) or replaces it
 **Blocked by:** decision (paul) — the TD-722 amendment's review round (Fable and Sonnet), 2026-10-15
-**Location:** design §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The org is an aggregate*, §4.10 *across teams, by project*, §4.5a *Add entry form: Hand to the techlead*, §5 `org.yml`; `src/shiftlead/org.py` (`TeamDef.projects` ~L184, `ManagerDef`/`TechleadDef`/`AnchorDef`/`SeatDef`/`MemberDef.home`, `MANAGER_KEYS` ~L628, `MEMBER_KEYS`, `TEAM_KEYS` ~L631, `TECHLEAD_KEYS`, `ANCHOR_KEYS`, `SEAT_KEYS`, `_project` ~L580, `_team` ~L675, `_validate` ~L858, `_home` ~L903, `team_repos` ~L273, `anchor_first` ~L282, `merge_repo_teams` ~L338, `_land` ~L415), `src/shiftlead/teams.py` (`project_of` ~L214, `project_block` ~L222, `reach_block` ~L244, `entry_teams` ~L481, `_launch` ~L784, `plan` ~L971), `src/shiftlead/teams.py` (the other readers of `team.projects` and `.home`, ~L330, ~L344, ~L352, ~L492, ~L541, ~L868, and the anchor message at ~L1041 that names `anchor.home`), `src/shiftlead/ui/common.py` (~L757, ~L775, which read `t.projects`), `src/shiftlead/ui/templates/group_head.html` (~L20, `g.projects`), `src/shiftlead/ui/app.py` (`repo_teams` ~L383), `src/shiftlead/teamrun.py` (`rows` ~L457), `src/shiftlead/orgcheck.py` (`view` ~L100), `src/shiftlead/cli.py` (`cmd_team_list` ~L1072), `src/shiftlead/ui/settings_page.py` (`org_cards` ~L481); held, slice 6: `src/sessionorc/work.py` (`wound_down`, `finished`, `crew`), `src/sessionorc/agent_tick.py` (`_finished_pass`, `_work_marks` and `by_team` ~L1671, `_replay`, `_work_start`, `_team_stop_times`, `_restamp_team` ~L327, `team_extra` use ~L436, `_mark_team_start` ~L2320), `src/sessionorc/agent_inbox.py` (`rpc_clear_work` ~L1038, `rpc_work_start` ~L1079), `src/sessionorc/agent_notify.py` (~L125), `src/sessionorc/workorders.py` (~L457), `src/sessionorc/ledger.py` (~L249, ~L260)
+**Location:** design §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The org is an aggregate*, §4.10 *across teams, by project*, §4.5a *Add entry form: Hand to the techlead*, §5 `org.yml`; `src/shiftlead/org.py` (`TeamDef.projects` ~L184, `ManagerDef`/`TechleadDef`/`AnchorDef`/`SeatDef`/`MemberDef.home`, `MANAGER_KEYS` ~L628, `MEMBER_KEYS`, `TEAM_KEYS` ~L631, `TECHLEAD_KEYS`, `ANCHOR_KEYS`, `SEAT_KEYS`, `_project` ~L580, `_team` ~L675, `_validate` ~L858, `_home` ~L903, `team_repos` ~L273, `anchor_first` ~L282, `merge_repo_teams` ~L338, `_land` ~L415), `src/shiftlead/teams.py` (`project_of` ~L214, `project_block` ~L222, `reach_block` ~L244, `entry_teams` ~L481, `_launch` ~L784, `plan` ~L971), `src/shiftlead/teams.py` (the other readers of `team.projects` and `.home`, ~L330, ~L344, ~L352, ~L492, ~L541, ~L868, and the anchor message at ~L1041 that names `anchor.home`), `src/shiftlead/ui/common.py` (~L757, ~L775, which read `t.projects`), `src/shiftlead/ui/templates/group_head.html` (~L20, `g.projects`), `src/shiftlead/ui/app.py` (`repo_teams` ~L383), `src/shiftlead/teamrun.py` (`rows` ~L457), `src/shiftlead/orgcheck.py` (`view` ~L100), `src/shiftlead/cli.py` (`cmd_team_list` ~L1072), `src/shiftlead/ui/settings_page.py` (`org_cards` ~L481)
 
-**Why:** TD-722's design, as amended 2026-10-15 (§4.9 *Teams* `anchor`, *Names are the org's*, *A definition written before TD-722*, *Home and reach*; §4.9b *The anchor seat*). A team that may span projects leaves its repo to be read from where its members sit, and that inference is what leaves the Org header's *mixed* place, `repo_teams`' first-team rule and a Repo page that can expand only one team (TD-721).
+**Why:** TD-722's design, as amended 2026-10-15 (§4.9 *Teams*, *Names are the org's*, *A definition written before TD-722*, *Home and reach*; §4.9b *No anchor seat*). A team that may span projects leaves its repo to be read from where its members sit, and that inference is what leaves the Org header's *mixed* place, `repo_teams`' first-team rule and a Repo page that can expand only one team (TD-721).
 
-**Fix:** slices 1–5 touch no `src/sessionorc/**` (the badge stays a plain string there, and `mail.message_edge` is unchanged); slice 6 is held (`src/sessionorc/**`, reviewed by the techlead seat). Slices, each its own PR:
-**The changeover**: a live `<team>-anchor` record holds the repo's main checkout and would refuse the new `<repo>-anchor`, so the teams stop between runs, the old `<team>-anchor` records are wound down, and only then is the build promoted; the first Start or Apply after the promote marks each old `<team>-anchor` removed from the definition, sat out as a dropped seat is (TD-703), so rule 3 never refills it (§4.9 *A definition written before TD-722*).
+**Fix:** this touches no `src/sessionorc/**` (the badge stays a plain string there, and `mail.message_edge` is unchanged). Slices, each its own PR:
 1. **The definition** (`org.py`).
    - `TeamDef.repo` (one name) replaces `TeamDef.projects`. `home` leaves every `*_KEYS` set and dataclass, `TEAM_KEYS` gains `repo`, and `_home` goes. In the org file `repo:` is required and resolves through a project's repos or the registry's directory names. In a repo's `.shiftlead.yml` it is that repo: `merge_repo_teams` writes it in place of `raw["projects"] = [rname]`, and a written `repo:` there is refused outright, as `host:` is. `repo:` resolves to a path in §4.9's order: the listing project's path for the host, else the host registry's one entry of that name (`_land`), else refused in `_land`'s words.
    - `Project` gains an optional `title`. A repo listed by two projects is an error naming both, at load.
    - **No synthetic project.** `merge_repo_teams` stops creating `Project(rname, …)` for a repo-defined team (~L382), since under the new check a repo-defined team's repo listed by a heading (TD-723's samscrape under `contractmatch`) would be in two projects. A repo in no project is its own heading with no `Project` object.
    - **One store of checkouts.** `Org.checkouts: {repo: {host: path}}` is filled from every project's `repos:` and from each repo-defined team's registered checkout, and is carried by every `Org(...)` copy (`merge_repo_teams` ~L354, `with_repos` ~L508) as `projects` is. A project's `repos:` stays its list of names for the heading and the block. `Org.checkout(repo, host)` (today `checkout(project, repo, host)`, ~L267) reads it, and so do `teams.py`'s launch and start checks (~L330, ~L541, and the *declared on* words of its no-checkout error ~L544), `entry_teams` (~L492), `reach_block` (~L255), `project_block` (~L229) and `_land` (~L430–L461). `_land` keeps its rule: a path the org file already gives for the landing host is used as it stands. It writes the landed path into `Org.checkouts`. Its *not landed* words become *add `{host}: <path>` under `projects.<project>.repos.<repo>`* where a heading lists the repo, and *register the checkout on `{host}`* (§5 *Repos*) where none does.
    - `Org.project_of(repo)` returns the listing project's name, else the repo's own name. `team_repos` becomes `[team.repo]` (§4.9c's `held:` is that one repo's). `_land` reads `team.repo`.
-   - **The anchor seat is the repo's.** `AnchorDef` leaves `TeamDef` and `TEAM_KEYS`; it is read from a repo file's top-level `anchor:` (no longer refused by `repoconfig`) or the org file's `anchors: {<repo>: …}`, the repo's file winning, default present as `<repo>-anchor`. `anchor_first` goes: there is no second anchor to refuse. `ao org` reports each repo's anchor.
-   - **Names are unique per repo.** At load, every session name the teams on one repo start (managers, techleads, seats, members with their count suffixes, and the repo's anchor) is collected, and a name two teams give is an error naming both teams and the name, in `org.load`, `ao org check` and every start.
-2. **The old keys** (`org.py`, `orgcheck.py`). A team carrying `projects:`, any `home:`, or an `anchor:` is **refused by name**, the message saying the fix in §4.9's words (*write `repo: shiftlead`*; *`anchor:` is the repo's — write it in shiftlead's `.shiftlead.yml`*; *guardians spans … — split it*). No release of warnings. `ao org check` lists each one.
+   - **Names are unique per repo.** At load, every session name the teams on one repo start (managers, techleads, seats, members with their count suffixes) is collected, and a name two teams give is an error naming both teams and the name, in `org.load`, `ao org check` and every start.
+   - **The anchor definition goes** (§4.9b *No anchor seat*): `AnchorDef`, `ANCHOR_KEYS`, `anchor_first` and `ANCHOR_DEFAULT` (~L722, which recreates `<team>-anchor` at every Start through `teamrun.py` ~L765–L776) are removed. **It lands no earlier than TD-757 and TD-758**: until `pr:` orders are free-pick, the live seats take them (the interim: each repo's `Owner: anchor` entries move to their takers first, TD-760 for the repos other than shiftlead), so this step waits for that release or ships in it.
+2. **The old keys** (`org.py`, `orgcheck.py`, `repoconfig.py`). A team carrying `projects:` or any `home:` is **refused by name**, the message saying the fix in §4.9's words (*write `repo: shiftlead`*; *guardians spans … — split it*). An `anchor:` on a team or at a repo file's top level is refused as **retired** (*the anchor seat is gone — delete the key*), except `anchor: false`, which is read and passed over silently. No release of warnings. `ao org check` lists each one.
 3. **What reads a team's repo** (`teams.py`, `ui/app.py`, `teamrun.py`, `cli.py`, `settings_page.py`).
    - `project_of` is the repo's project. `project_block` lists the project's repos and marks the team's.
    - `repo_teams` and `entry_teams` map a checkout to the teams whose `repo:` is it, in definition order. The hand-to target is the first of them with a techlead seat.
-   - `ao team list --json` carries `repo` and `project` (dropping `projects` and `anchor.home`), and `ao org` likewise. The Settings org card's row reads *repo*.
+   - `ao team list --json` carries `repo` and `project` (dropping `projects` and `anchor`), and `ao org` likewise. The Settings org card's row reads *repo*.
    - `team_repo` (`ui/org.py`, the inference) stays only for a badge no definition holds; TD-725 removes its other callers.
-   - `teamrun.members_view` (~L1716, `"anchor": held(team.anchor.name)`): the Members… dialog lists the repo's anchor seat on every team of the repo, not removable, read from the repo, not `team.anchor`.
-4. **The anchor seat's start and stop, its host, its review and the repo's lanes** (unheld: `teams.py`, `teamrun.py`).
-   - A team's start writes the repo's anchor record when none holds `<repo>-anchor` **on the host the team lands on**, after its techlead seat, with no `team` badge, the repo's `project` badge and `controllers` that team's manager; a later team's start on that host adds its manager (`control`), and a team's stop or wind-down by the client removes it. The seat is **one per repo per host**: a repo whose teams land on two hosts has a seat on each, its `controllers` the managers landing there (`id@host` keeps the two apart, §9 invariant 12). Its occupancy and clean-tree gate is as today. A client stop that empties `controllers` winds the seat down only when no live record of any team names the repo (a person-led team's sessions keep it, §4.9b).
-   - **The review chain**: the seat's `review` is the chain of the repo's first team in definition order that names the repo, computed by every start, replay and Apply the same way, so nothing is recorded per team. Only that team's Switching (`teams.py`'s flow comparison) compares the seat against its own chain and may read *flow changed*; another team's never does, and its Apply leaves the seat's `review` alone. A definition change that makes another team first is taken by the next Start or Apply. `anchor: false` drops the seat: the next Start or Apply marks a live one removed (TD-703).
-   - **The repo's lanes** (§4.4 *In a team's lanes*): in `teamrun.repo_lanes` (~L1265–L1269), drop the `if s.get("team")` filter from the anchor-owner check — a seat with no `team` would otherwise make it false and send every red PR's order to every `free-pick` lane — and return the seat's lanes apart from the teams' (a distinct value beside the per-team map, never a team-name key a team called `anchor` could clash with), so the Repo facet draws them first (TD-725).
-   - **Tests**: two teams on one host share one seat, both managers its controllers; two hosts give two seats, each with its host's managers; the second team's start adds its manager; two teams on one repo: the second team's Apply leaves the seat's `review` as the first team's chain and shows no *flow changed*; `anchor: false` on a repo with a live seat marks it removed at the next Start; the seat with no `team` still counts as the repo's anchor in `repo_lanes` (a red PR's order goes to the anchor, not the free-pick lanes); `repo_lanes` returns the seat's lanes apart and a team named `anchor` does not clash.
-5. **No `--project`** (`cli.py`, `ui/app.py`, the New session form). `ao new --project` and the form's **Project** picker go; a hand-started session in a registered repo gets its repo's badge and Project block from its directory (`project_of`, `reach_block`), as a team session does. The tests that pin the flag and the picker (`grep -ln -- "--project\|Project picker\|project=" tests/`: `test_cli.py`, `test_ui_teams.py`, `test_cli_teams.py`, `test_prompt_from.py`, `test_notify.py`, `test_watch.py` — the last three may only pass `project` through a record) are rewritten or removed.
-6. **The home ties the anchor seat to its teams by `controllers`** (held: `src/sessionorc/**`, reviewed by the techlead seat; design §4.9b *The anchor seat*, §6 rules 8 and 9, *Team stop time*, §4.9a). Where a reading asks which records are a team's, a seat whose `controllers` name the team's manager is the team's seat, keyed on the edge (§9 invariant 9):
-   - `sessionorc/work.py`: `wound_down`, `finished` and `crew` count the repo's anchor seat as a seat of every team whose manager its `controllers` name.
-   - `sessionorc/agent_tick.py` `_finished_pass` (rule 9): the home's wind-down takes the wound-down team's manager out of the seat's `controllers`; on any tick on which they are empty and **no live record of the repo's teams** is left — a live record with a `team` badge whose `repo` is the seat's, read from the records, no definition — it winds the seat down (rule 3's close). A seat over a person-led team's live sessions keeps running and reports to the person.
-   - `_work_marks` and its `by_team` grouping (~L1671), and the `by_team` of `_finished_pass`: the seat's lane news goes into the `work_waiting` of each wound-down team whose records' `repo` is the seat's — by the repo, not `controllers`, which rule 9 has already emptied of those teams' managers. `_replay` / `_work_start` replay the seat for the team whose replay finds it ended, with that team's manager as its controller, and a `_work_start` that finds the seat live with empty `controllers` adds the team's manager; `rpc_clear_work` (`agent_inbox.py` ~L1038) and `rpc_work_start` (~L1079) read the seat as each such team's.
-   - `agent_notify.py` (~L125, the crew by team for the *work* row): the seat is in each team's crew whose manager its `controllers` name.
-   - `_team_stop_times`: the seat takes a team's instant only when every team its `controllers` name has one, the latest of them; with empty `controllers`, the latest `until` among the repo's teams. `_restamp_team` (~L327, which picks records by `s.team`): a moved or cleared team stop time re-derives the seat's instant from its teams' instants as they stand.
-   - The seat in no team's other readings: `team_extra` (the usage gate's reserve priority) and the balance pass skip it; `_mark_team_start` passes it by.
-   - Docstrings: `workorders.py` (~L457) and `ledger.py` (~L249, and `lane_matches` ~L260, whose code is unchanged) say *where the repo has no anchor seat*.
-   - **Unchanged**: §6 rule 8's `work_waiting` for one root and *Balance*'s reading over the roots a team's records name (`_work_marks`, the balance pass) already handle what one repo gives, and are left as they are.
-   - **Tests**: `tests/test_finished.py`, `test_finished_tick.py`, `test_work_waiting.py`, `test_work_start.py`, `test_anchor_tick.py`, `test_seat_policy.py`, `test_usage_gate.py` (`_team_stop_times`) and the team stop time's tests (`grep -ln "_team_stop_times\|_restamp_team" tests/`), each gaining a two-team case: the seat holds both teams' wind-down; the first wind-down removes one manager and the second winds the seat down; **a repo with a person-led team and a managed team**: the managed team's wind-down empties `controllers` and the seat keeps running while the person-led team's sessions are live, and is wound down on the first tick none is left; a `_work_start` that finds the seat live with empty `controllers` adds its manager; one team's replay brings the seat back with its manager; news lands in the `work_waiting` of each wound-down team whose records name the repo, after rule 9 has emptied `controllers`; the stop time applies only once both teams have one; **Clear** of one team's stop time re-derives the seat's instant from the other's.
-- **Tests:** in `tests/test_org.py`, `test_cli_teams.py`, `test_cli_org.py`, `test_anchor_seat.py`, `test_ui_board.py` and `test_ui_teams.py`, rewrite the tests that pin `projects`, `home` and the first-team rule (`test_projects_and_checkout_expand_home`, `test_home_is_required_above_one_repo`, `test_merge_repo_teams`, `test_the_project_block_names_every_repo_on_this_host_and_which_is_home`, `test_a_repo_maps_to_the_first_team_whose_projects_hold_it`, `test_home_is_the_managers_and_required_only_where_written`, and the `MEMBER_KEYS` assertion). New tests:
+4. **No `--project`** (`cli.py`, `ui/app.py`, the New session form). `ao new --project` and the form's **Project** picker go; a hand-started session in a registered repo gets its repo's badge and Project block from its directory (`project_of`, `reach_block`), as a team session does. The tests that pin the flag and the picker (`grep -ln -- "--project\|Project picker\|project=" tests/`: `test_cli.py`, `test_ui_teams.py`, `test_cli_teams.py`, `test_prompt_from.py`, `test_notify.py`, `test_watch.py` — the last three may only pass `project` through a record) are rewritten or removed.
+- **Tests:** in `tests/test_org.py`, `test_cli_teams.py`, `test_cli_org.py`, `test_ui_board.py` and `test_ui_teams.py`, rewrite the tests that pin `projects`, `home` and the first-team rule (`test_projects_and_checkout_expand_home`, `test_home_is_required_above_one_repo`, `test_merge_repo_teams`, `test_the_project_block_names_every_repo_on_this_host_and_which_is_home`, `test_a_repo_maps_to_the_first_team_whose_projects_hold_it`, `test_home_is_the_managers_and_required_only_where_written`, and the `MEMBER_KEYS` assertion). New tests:
   - `repo:` is required in the org file and implied in a repo's.
   - A repo in two projects is an error.
   - A repo in no project badges its sessions with the repo's name.
   - Two teams on one repo share the badge, and mail passes between them (`tests/test_mail.py`'s edge test, unchanged).
-  - The old keys, and a team's `anchor:`, are refused with their fix.
-  - Two teams on one repo share one anchor seat: one record, both managers its controllers; the second team's start adds its manager and its stop removes it; the last stop winds it down.
+  - The old keys are refused with their fix; an `anchor:` is refused as retired, and `anchor: false` is read silently.
   - A session name two teams on one repo give is refused, naming both.
   - `ao new --project` is an unknown flag; a hand-started session in a project's repo carries the project badge.
   - `title` is read.
   - The director's Org block lists every registered checkout on its host, from the registry (with TD-642).
 
-**Done when** every team in this install reads its repo from its definition, `ao team list` and `ao org` say each team's repo and project and each repo's anchor seat, two teams on one repo badge alike and share one anchor seat, a name two of a repo's teams give is refused, the old keys are refused with their fix, `--project` is gone, and every listed test passes.
+**Done when** every team in this install reads its repo from its definition, `ao team list` and `ao org` say each team's repo and project, two teams on one repo badge alike, a name two of a repo's teams give is refused, the old keys are refused with their fix and an `anchor:` as retired, no `AnchorDef` is left, `--project` is gone, and every listed test passes.
 
-**Related:** TD-722 (the design), TD-725 (the page), TD-723 (the org file's backfill, after this is live), TD-721, TD-582, TD-642.
+**Related:** TD-722 (the design), TD-725 (the page), TD-723 (the org file's backfill, after this is live), TD-757, TD-758 (the seat's removal), TD-721, TD-582, TD-642.
 
 ---
 
-## TD-725: Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet and the anchor seat on the repo's line, a no-team strip per repo, *No repo*
+## TD-725: Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet on the repo's line, a no-team strip per repo, *No repo*
 
 **Priority:** Medium
 **Type:** feature
 **Added:** 2026-10-15 (the designer, building TD-722's design)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul)
+**Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul); the anchor seat's card and marks went with the seat (round 4)
 **Blocked by:** TD-724, decision (paul) — the TD-722 amendment's review round (Fable and Sonnet), 2026-10-15
 **Location:** design §4.9 *The Org page*, §4.5 screen 1 (the team's header), §4.5a *Org: team groups*; `src/shiftlead/ui/repo.py` (`team_groups` ~L450, its `projects` from badges ~L522 and ~L567, `group_place` use ~L576), `src/shiftlead/ui/cards.py` (`group_place` ~L1150), `src/shiftlead/ui/org.py` (`team_repo` ~L60, `team_summary` ~L452), `src/shiftlead/ui/repo.py` (`compact_in` ~L366), `src/shiftlead/ui/templates/group_head.html` (~L15), the Org page's template and its ordering
 
 **Why:** TD-722's design. With a team's repo declared, the Org page can say what it groups: project headings over repos over teams, two teams on one repo two whole cards, and no *mixed* place.
 
-**Fix:** design §4.9 *The Org page* as amended 2026-10-15, §4.5 screen 1, §4.5a *team groups*, *team card: summary*, *team card: Repo facet*, *team header: seat held*.
+**Fix:** design §4.9 *The Org page* as amended 2026-10-15, §4.5 screen 1, §4.5a *team groups*, *team card: summary*, *team card: Repo facet*.
 - **Headings** in the org file's order: each project (its `title`, else its name) with its repos in its list's order, then the repos no project lists, in the registry's order. A project of one repo draws one heading, the repo's. Headings do not fold.
 - **Under each repo**, in order:
-  - **the repo's line**: its name linked to `/repo/<name>`, and the **Repo facet**, moved off the team card (`team_summary`'s `repo` facet becomes the repo line's, drawn once; `drawn_facets` and the stopped-team rule keep two facets on a team card). Its lanes *i* carries the repo's lanes: the anchor seat's line first, then one per servicing team (`teamrun.repo_lanes` over the teams and the seat, `ledger.in_lanes` for each, TD-724 slice 6); a team card's own lanes line is the *i* beside its TDs in motion heading. The Repo facet's entries selector is remembered per repo.
-  - **the repo's anchor seat's card** (TD-724's seat), with the *anchor held* mark moved here from the team header (`group_head.html`'s `g.seat_held` for the anchor).
+  - **the repo's line**: its name linked to `/repo/<name>`, and the **Repo facet**, moved off the team card (`team_summary`'s `repo` facet becomes the repo line's, drawn once; `drawn_facets` and the stopped-team rule keep two facets on a team card). Its lanes *i* carries the repo's lanes, one line per servicing team (`teamrun.repo_lanes` over the teams, `ledger.in_lanes` for each); a team card's own lanes line is the *i* beside its TDs in motion heading. The Repo facet's entries selector is remembered per repo.
   - **its teams' cards**: the live and concluded first, then those with nothing live, each in definition order within its kind; two teams on one repo two whole cards.
   - **a no-team strip**, headed *n sessions, no team*: the full cards of the repo's sessions with no team badge.
-- **The anchor seat's card** is the compact card with the seat's slot, and its marks (✉ n, *ready to close*, needs you, *anchor held*) sit on the repo's line after the Repo facet's name (§4.5a *repo line*, *repo line: seat held*). **A heading or repo line hides** when the filter hides everything under it. **The ring** runs repo line → anchor card → team cards → no-team strip.
+- **A heading or repo line hides** when the filter hides everything under it. **The ring** runs repo line → team cards → no-team strip.
 - **A registered repo with no team** is drawn as its line and Repo facet.
 - **Top and bottom**: the person's row and, only where `director:` is defined, the director's card in a row of its own (TD-642 writes the seat), no Start or Wind down on it; at the end **No repo**, the sessions in no registered repo (the old *No team*, renamed in the template and the filter's words).
 - **A team's repo is its `repo:`** (TD-724). A `team` badge no definition holds is drawn under the repo its records sit in, which is `team_repo`'s one remaining use. `team_summary` and `compact_in` read the definition's repo.
@@ -1304,16 +1288,15 @@ The other cases:
   - Two repos of one project are under one heading with its `title`; a project of one repo draws one heading.
   - Headings follow the org file's order; within a repo the live team precedes the stopped one.
   - A repo in no project is its own heading, after the projects; a registered repo with no team draws its line and facet.
-  - The anchor seat's card and *anchor held* sit on the repo's line, not a team header.
   - A session in a repo with no team badge is in that repo's no-team strip; one in no registered repo is under *No repo*.
   - The header's place has no repo (`tests/test_ui_org.py`'s `test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count`, rewritten).
   - An undefined badge's group is under its records' repo.
   - A heading, and a repo line, hide when the filter hides everything under them, and show again with the first match.
-  - The ring runs repo line → anchor card → team cards → no-team strip.
+  - The ring runs repo line → team cards → no-team strip.
   - The director's card is drawn only where `director:` is defined.
   - `g` then a digit counts *No repo* where it sits.
 
-**Done when** the Org page draws every team under its repo and every repo under its heading in the org file's order, the Repo facet once per repo on its line with the anchor seat's card, two teams on one repo stand side by side as whole cards, a repo's teamless sessions sit in its strip and the rest under *No repo*, no header says *mixed* for a repo, and every listed test passes.
+**Done when** the Org page draws every team under its repo and every repo under its heading in the org file's order, the Repo facet once per repo on its line, two teams on one repo stand side by side as whole cards, a repo's teamless sessions sit in its strip and the rest under *No repo*, no header says *mixed* for a repo, and every listed test passes.
 
 **Related:** TD-722 (the design), TD-724 (the definition), TD-721 (the Repo page as the repo group expanded), TD-642 (the director's card).
 
@@ -1327,14 +1310,14 @@ The other cases:
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Blocked by:** decision (paul) — the amendment to TD-722's design (a per-repo anchor, names unique per repo), from the 2026-10-15 interactive round, lands first; this entry's teams are the teams of one repo it defines
+**Blocked by:** decision (paul) — the amendment to TD-722's design (names unique per repo, the anchor seat retired), from the 2026-10-15 interactive round, lands first; this entry's teams are the teams of one repo it defines
 **Location:** `docs/design/4.4-host-agent.md` (*Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
 
 **Why:** Paul, 2026-10-15: *when a TD is added to the ledger in shiftlead we can require that a team is selected (by the techlead if not beforehand by the user) … If TDs are added outside shiftlead, the host agent can identify them and send them to a techlead to have them resolved … We should also have a check for stale entries, e.g. team1 is assigned entries but is no longer defined.* Under TD-722 a repo has any number of teams (a db team and a compliance team), each with its own lanes, but an entry names only an `Owner:` role word. So two teams' grinders both take every pickable `Owner: grinder` entry. A claim keeps them off the same entry at once, but nothing keeps compliance work with the compliance team.
 
 **Fix:** a design round. What Paul and the session proposed (2026-10-15), for the designer to check against the design:
 1. **A `Team:` header field, not `Owner: <team>:<role>`.** `Owner:` is read by dev-cadence's synced `scripts/ledger.py` against a fixed word list in every cadence repo, ShiftLead or not. A field declared on the ledger's `Fields:` line is how `Waits` joined (TD-715), and dev-cadence reads past it. Its values are the repo's team names.
-2. **Required only where the repo has two or more teams**; one team is implied, so no existing entry is edited. `Owner: paul` and `Owner: anchor` entries carry none, since the anchor is the repo's (TD-722's amendment).
+2. **Required only where the repo has two or more teams**; one team is implied, so no existing entry is edited. `Owner: paul` entries carry none.
 3. **Set at Add entry**: the form's team pick, optional. Left blank, the techlead that drafts the entry writes it.
 4. **An entry with no `Team:` on a repo of several teams, or one naming a team no definition holds any more (stale)**, is withheld from every lane, as a waiting entry is (TD-715). The home hands it to a techlead of the repo's teams to tag. The Repo page lists it as *needs a team*, and `ao org check` names the stale ones.
 5. The lanes reader (`lane_matches` over `repo_lanes`) takes an entry only into its `Team:`'s lanes.
@@ -1383,7 +1366,7 @@ The other cases:
 **Why:** TD-721 (Paul, 2026-10-15: *the repo page should essentially be an expansion of the info shown on the org page*), designed in TD-722's amendment. The page draws only the first servicing team's three facets: no header, marks, controls, *i* panel or member cards, and nothing of a second team.
 
 **Fix:**
-- **The page is the repo's group** as TD-725 draws it on the Org, by the same partials: the repo's line with its Repo facet, the anchor seat's card, every servicing team's whole card (header, marks, controls, *i* panel, TDs in motion, Answer needed / Doing, member cards, + card) in the Org's order within a repo, then the no-team strip; the lists below unchanged. `serving[0]` goes.
+- **The page is the repo's group** as TD-725 draws it on the Org, by the same partials: the repo's line with its Repo facet, every servicing team's whole card (header, marks, controls, *i* panel, TDs in motion, Answer needed / Doing, member cards, + card) in the Org's order within a repo, then the no-team strip; the lists below unchanged. `serving[0]` goes.
 - **Kept by `/events`**: the cards and headers take the Org's deltas through the Org's own client code; the lists keep the `?part=1` poll and the `repos` / `doing` events. A team card folds by the same per-team choice as on the Org.
 - **Doing** is every servicing team's kept calls, newest first; where two or more teams service the repo a team chip per team comes first (*db (12)*), then *all (n)* and the agent chips; a team pick and an agent pick AND.
 - **Waiting on you**'s heading links `/inbox?repo=<repo>&kind=board` (TD-741's filter).
@@ -1420,8 +1403,7 @@ The other cases:
 - `next:<n>` is per repo: each board's n soonest open items, the board counted once whichever teams work its repo. The setting keeps its word.
 - `repo_teams` keeps its other callers (Add entry's hand-to default, the start-on-work row), and stops badging board rows.
 - A team's rail count includes the board rows of the team's repo, so the count and the narrowed page agree.
-- **The repo's anchor seat's asks and attention rows** carry its repo too: the seat has no `team` (§4.9b), so §4.10's envelope stamp (`4.10-messages.md` ~L1011: *an entry from a session with no team … shows under No team*) and the attention row's empty `team` would put them under *No team*; the Inbox derives the repo from the row's session record (its `repo`, which every mail and attention row's `sid` names), in the client, so no held file changes — they show under the seat's repo in the Repos group and under `?repo=`.
-- **Tests** (in `tests/test_ui_board.py` and the Inbox tests, `tests/test_ui_inbox*.py`): a team's rail count includes its repo's board rows; the anchor seat's ask and its attention row show under its repo, not *No team*; a board row of a repo two teams service carries the repo and no team; `?repo=` narrows to it; a team pick shows its repo's board rows; `next:3` draws three per repo; a repo in a multi-repo project reads *Project · repo*.
+- **Tests** (in `tests/test_ui_board.py` and the Inbox tests, `tests/test_ui_inbox*.py`): a team's rail count includes its repo's board rows; a board row of a repo two teams service carries the repo and no team; `?repo=` narrows to it; a team pick shows its repo's board rows; `next:3` draws three per repo; a repo in a multi-repo project reads *Project · repo*.
 
 **Done when** board rows carry their repo, the rail filters by repo, the horizon counts per repo, and every listed test passes.
 
@@ -1488,3 +1470,106 @@ The other cases:
 **Done when** the two assertions exist and fail under those mutations.
 
 **Related:** TD-736, #1873.
+
+---
+
+## TD-757: Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** decision (paul) — TD-722's amendment under review
+**Location:** design §4.9b *No anchor seat*, §6 rules 3, 6, 8 and 9, §4.4 *Repo facts* and *A red PR nobody holds is a work order*, §4.5 and §4.5a (the rows the retirement removed), §4.7, §9 invariant 2. Unheld: `src/shiftlead/repoconfig.py` (the `anchor` preset ~L301–L310, `RETIRED`'s `anchor` ~L48), `src/shiftlead/repoinit.py` (~L18, the ledger template's `Fields:` Owner words), `src/shiftlead/teamrun.py` (`repo_lanes`' `free_pick` branch ~L1316, `ANCHOR_OWNER` ~L1214 and ~L1355, the Start words ~L554, the anchor create ~L765–L776), `src/shiftlead/org.py` (`ANCHOR_WHEN`), `src/shiftlead/cli.py` (`ao repo`'s `anchor` column ~L1802–L1815, `ao team list`'s `anchor:` ~L1138, `--anyway`'s help ~L3869), `src/shiftlead/ui/cards.py` (the on-call pill ~L957–L967, `seat_held_words` ~L878), `src/shiftlead/ui/inbox.py` (`seat_held_mark` ~L197–L225 and its row ~L417), `src/shiftlead/ui/templates/inbox_row.html` (~L548), `group_head.html` (~L35–L38, ~L86), `src/shiftlead/ui/repo.py` (~L547–L580), `src/shiftlead/ui/static/app.js` (~L2085–L2105, ~L2943), `src/shiftlead/ui/templates/base.html` (~L99), `src/shiftlead/ui/app.py` (~L89, ~L288), `src/shiftlead/skill.md`, `team_skill.md`, `briefs/techlead.md`. Held (`src/sessionorc/**`, read by the techlead seat): `src/sessionorc/models.py` (`LANE_WORDS` ~L678, `seat_held` ~L130 and ~L1189), `ledger.py` (`ANCHOR_OWNER` ~L201, `_kind` ~L232, `lane_matches` ~L261–L294, `_word_matches` ~L382–L391), `workorders.py` (~L456), `agent_tick.py` (the `work` trigger and the checkout gate ~L2512–L2807: the seat's lane, its reading, the held reading and the Start's), `agent.py` (`create` with `held`'s `seat_held` ~L990–L1046, ~L1321–L1369), `agent_common.py` (`SEAT_HELD_GRACE` ~L115), `agent_inbox.py` (the `seat_held` attention kind ~L241–L264), `work.py` (~L264, the docstring)
+
+**Why:** Paul, 2026-10-15, retired the anchor seat (design §4.9b *No anchor seat*, reversing TD-381). Its jobs all have other takers, and a per-repo seat's lifecycle kept opening gaps (TD-722's amendment, rounds 1–3, and Sonnet round 2). Two readings keep it alive in code (Fable round 4). First, `teamrun.repo_lanes` sets `free_pick` on a `pr:` order only when no team record of the repo carries the lane `anchor` (finding 1.1). Second, the tick's `lane_matches` gives a `pr:` order to `anchor` alone unless `free_pick` is set, and the tick never sets it. Separately, `org.ANCHOR_DEFAULT = True` recreates `<team>-anchor` at every Start (finding 1.2); TD-724 slice 1 removes it.
+
+**Fix:** one release, unheld and held together, so a `pr:` order is never left with no taker. The techlead seat reads it, since it touches `src/sessionorc/**`. TD-724 slice 1's anchor step lands in it or after it. (TD-758 is unused: the held and unheld halves cannot go live apart, since only `repo_lanes` sets `free_pick` today, and the tick's matching does not.)
+1. **`pr:` orders on the grinders' pick list.**
+   - `lane_matches` gives a `pr:` order to `free-pick` always, and the `free_pick` flag and the `repo_lanes` branch that sets it go.
+   - `LANE_WORDS` loses `anchor`, and `_word_matches`' and `_kind`'s `anchor` cases go.
+   - `Kind: evaluation`, and an unblocked `Kind: decision` that is not the person's, then match no lane. They read as the page kind *evaluation*, which `ao repo` names for its owner to rewrite (§4.4 *Repo facts*).
+   - The docstrings in `workorders.py` and `ledger.py` follow.
+2. **The preset and its words.**
+   - The `anchor` preset leaves `repoconfig`, and `RETIRED`'s `anchor` text says the seat is retired.
+   - The ledger template's `Fields:` line (`repoinit.py`) drops `anchor` from its Owner words.
+   - `ANCHOR_OWNER`'s readers go.
+   - `ao repo`'s *anchor* column for orders goes, with *grinders* in its place, and so does `ao team list`'s `anchor:`.
+   - The Start's *the anchor seat's too* goes from `teamrun.py`, `app.js`, `base.html` and `cli.py`.
+   - The on-call pill's anchor words and `ANCHOR_WHEN` go.
+   - The mentions in `skill.md`, `team_skill.md` and `briefs/techlead.md` go.
+3. **`seat_held` and its marks.**
+   - These go: the tick's `work` trigger, the checkout gate (the held reading and the Start's), `create` with `held`'s `seat_held`, `SEAT_HELD_GRACE`, the `seat_held` attention kind, the Inbox row, and the team header's mark (`inbox.py`, `inbox_row.html`, `group_head.html`, `repo.py`, `cards.py`).
+   - `create` with `held` stays, for a manager on call and a replay (§6 rule 3).
+4. **The leftover records** (the migration). On the home's first tick after the promote, each record whose role is `anchor` is retired:
+   - a closed one is forgotten;
+   - a live one is closed first, under the wrap-up's safety check; one with work left is left open and named on the Inbox, as rule 9's members are.
+
+   Each repo's `Owner: anchor` entries have already moved before this release (TD-760, and shiftlead's own backfill), so nothing waits on a seat that is gone.
+5. **Tests:**
+   - a red PR nobody holds is matched by a `free-pick` lane with no `anchor` record anywhere, by the tick's rule 6 and by `repo_lanes`;
+   - `[anchor]` is no lane word;
+   - a Start writes no `<team>-anchor`;
+   - `ao repo` lists a `pr:` order without an *anchor* owner;
+   - no `seat_held` row or mark is drawn;
+   - the migration forgets a closed `anchor` record and closes a live one;
+   - the tests that pin the seat (`tests/test_anchor_seat.py`, `test_anchor_tick.py`, and `grep -ln "anchor\|seat_held" tests/`) are rewritten or removed.
+
+**Done when** no code reads a lane word `anchor`, a `pr:` order is on every `free-pick` lane, no seat is created in a main checkout, `seat_held` is gone, the leftover `anchor` records are retired, and every listed test passes.
+
+**Related:** TD-722, TD-724, TD-759, TD-760, TD-381, TD-613, TD-748.
+
+---
+
+## TD-759: Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-757, decision (paul) — TD-722's amendment under review
+**Location:** design §4.9b *No anchor seat*, *A live check is a grinder's once its build is live*; held (`docs/briefs/**`): `docs/briefs/anchor.md`, `docs/briefs/techlead-context.md` (~L103); `src/shiftlead/briefs/anchor.md`, `src/shiftlead/briefs/grinder.md`
+
+**Why:** once TD-757 removes the preset, nothing reads `anchor.md`. One rule in it still matters to the grinders who now take live checks: *read the live copy, never press*.
+
+**Fix:**
+- Delete `docs/briefs/anchor.md` and the package's `src/shiftlead/briefs/anchor.md`.
+- Move the live-copy rule into the live-check paragraph of `src/shiftlead/briefs/grinder.md`, in §4.9b's words: read `ao status -v`, a record's fields, `ao promote status`, a headless GET; a press only on a scratch home.
+- Fix `techlead-context.md`'s pointer (~L103) to say the seat is retired.
+- `docs/briefs/**` is a held path, so the techlead seat reads the PR.
+- The tests that read the briefs pass (`grep -ln "briefs/" tests/`).
+
+**Done when** no `anchor.md` is left, the grinder brief carries the live-copy rule, and the primer names no anchor seat.
+
+**Related:** TD-757, TD-722.
+
+---
+
+## TD-760: Re-own the other repos' `Owner: anchor` entries (dev-cadence, contractmatch), and delete shiftlead's `roles: anchor:` block
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** decision (paul) — TD-722's amendment under review
+**Location:** dev-cadence's `docs/technical_debt.md` (TD-092, TD-102); contractmatch's `docs/technical_debt.md` (TD-008, TD-054, TD-055, TD-057); shiftlead's `.shiftlead.yml` (`roles: anchor:`)
+
+**Why:** the anchor seat is retired (design §4.9b *No anchor seat*). Until TD-757 lands, the live seats keep taking `pr:` orders, so the interim is the ledger backfill alone: every registered repo's `Owner: anchor` entries move to their takers. shiftlead's own backfill is a separate PR. Fable round 4 (§3) found the entries below in the other repos.
+
+**Fix:**
+1. **The other repos' ledgers**, each by a PR in that repo under its own cadence:
+   - dev-cadence: TD-092 and TD-102 → `Owner: grinder`;
+   - contractmatch: TD-008, TD-054 and TD-055 → `Owner: grinder`, and TD-057 → `Owner: designer` (`Kind: design-first`), since its result is a design.
+
+   Each entry's Status says why: *the anchor seat is retired*. A registered repo this list misses is checked the same way: `grep -n "Owner:\*\* anchor"` over each registered ledger.
+2. **shiftlead's `roles: anchor:` block** in `.shiftlead.yml` is deleted once TD-757 is live, since no `.shiftlead.yml` edit is made before the build (the interim).
+
+**Done when** no registered repo's ledger has an `Owner: anchor` entry, and shiftlead's `.shiftlead.yml` has no `roles: anchor:` block.
+
+**Related:** TD-757, TD-722, TD-723.
