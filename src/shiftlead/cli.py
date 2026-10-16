@@ -2908,6 +2908,103 @@ def cmd_td_hold(args: argparse.Namespace) -> int:
     return emit(args, got, lambda: print("\n".join(lines)))
 
 
+def _ordinal(n: int) -> str:
+    return f"{n}{'th' if 10 <= n % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')}"
+
+
+def cmd_rank(args: argparse.Namespace) -> int:
+    """`ao rank <TD-n> (--above <TD-m> | --below <TD-m> | --top) [--repo <name>]` and `ao rank --list [--repo
+    <name>]` (design §4.7, §4.4 *A move lands*; TD-769): move the card holding `TD-n` just above or below the
+    card holding `TD-m`, or to the top of Up next — the home's `rank_move {ids, prev, next}`, landed by its
+    next flush — or print the cards in rank order. An id takes `<repo>#TD-n` for another repo's entry; the
+    repo defaults as `ao td add`'s does. The person's and an interactive session's: the home refuses an
+    unattended one."""
+    cards: list[dict[str, Any]] = (call_sync("queue", omit=["completed", "other_work"]) or {}).get("cards") or []
+    if args.list:
+        want = pathlib.Path(_td_repo(args.repo)[0]).expanduser().name if args.repo else None
+        shown = [c for c in cards if not want or want in (c.get("repos") or ())]
+
+        def prose() -> None:
+            for c in shown:
+                top = c.get("top") or {}
+                n = len(c.get("order") or ())
+                num = f"{c['place']:>3}" if c.get("place") else "  ·"
+                pr = f"{top.get('priority') or '-':<6}"
+                print(
+                    f"{num}  {_short(c['id'], want):<18} {pr} {(top.get('title') or '')[:70]} · "
+                    f"{n} entr{'y' if n == 1 else 'ies'} · {c.get('status') or ''}"
+                    + (" · not landed — retrying" if c.get("not_landed") else "")
+                )
+            if not shown:
+                print("no open cards")
+
+        return emit(args, {"cards": shown}, prose)
+    if not args.entry or not (args.top or args.above or args.below):
+        raise AgentError("ao rank <TD-n> --above <TD-m> | --below <TD-m> | --top, or ao rank --list")
+    try:
+        home = pathlib.Path(_td_repo(args.repo)[0]).expanduser().name
+    except AgentError:
+        if args.repo:
+            raise
+        home = ""  # outside a registered repo: every id names its repo
+    q = _qid(args.entry, home)
+    card = next((c for c in cards if q in (c.get("order") or ())), None)
+    if card is None:
+        raise AgentError(f"{args.entry} is on no open card of the Queue")
+    if card.get("group") != "up_next":
+        raise AgentError(f"{args.entry}'s card is In progress, which does not move (design §4.4 *A move lands*)")
+    rest = [c for c in cards if c.get("group") == "up_next" and c is not card]
+    prev = nxt = None
+    if args.top:
+        nxt = rest[0]["id"] if rest else None
+    else:
+        m = _qid(args.above or args.below, home)
+        mc = next((c for c in cards if m in (c.get("order") or ())), None)
+        if mc is card:
+            raise AgentError(f"{args.above or args.below} is on {args.entry}'s own card")
+        if mc is None or mc.get("group") != "up_next":
+            raise AgentError(f"{args.above or args.below}'s card is not in Up next: a card moves only among them")
+        i = rest.index(mc)
+        if args.above:
+            prev, nxt = (rest[i - 1]["id"] if i > 0 else None), mc["id"]
+        else:
+            prev, nxt = mc["id"], (rest[i + 1]["id"] if i + 1 < len(rest) else None)
+    got = call_sync("rank_move", ids=[q], prev=prev, next=nxt)
+
+    def said() -> None:
+        n = got.get("entries") or 1
+        who = f"{_short(str(got.get('card') or q), home)}'s card ({n} entr{'y' if n == 1 else 'ies'})"
+        if not got.get("moved"):
+            print(f"{who} is already there: nothing lands")
+            return
+        where = (
+            f"between {_short(prev, home)} and {_short(nxt, home)}" if prev and nxt
+            else f"above {_short(nxt, home)}" if nxt else f"below {_short(prev, home)}" if prev else "alone"
+        )  # fmt: skip
+        place = f"now {_ordinal(got['place'])}, " if got.get("place") else ""
+        print(f"{who} {place}{where} — lands within a minute")
+
+    return emit(args, got, said)
+
+
+def _qid(item: str, repo: str) -> str:
+    """`TD-12` → `<repo>#TD-012`, `<repo>#TD-12` → itself with the id written as the ledger writes it."""
+    raw = str(item).strip()
+    r, _, tid = raw.rpartition("#")
+    m = re.fullmatch(r"(?i)TD-(\d+)", tid)
+    if not m:
+        raise AgentError(f"{raw!r} is not an entry id: TD-NNN, or <repo>#TD-NNN")
+    if not (r or repo):
+        raise AgentError(f"{raw} names no repo, and this directory is not in a registered one: <repo>#{tid}, or --repo")
+    return f"{r or repo}#TD-{int(m.group(1)):03d}"
+
+
+def _short(q: str | None, repo: str | None) -> str:
+    """A qid as `ao rank` prints it: the id alone in `repo`, `<repo>#TD-n` elsewhere."""
+    r, _, tid = str(q or "").partition("#")
+    return tid if r == repo else str(q or "")
+
+
 def _settle_mark(e: dict[str, Any], now: datetime | None = None) -> str:
     """`ao repo`'s words after an entry's owner while the home's settle clock withholds it (design §4.7,
     §4.4 *A new entry settles before it is pickable*, TD-710): *settles in 7m*, *held 2h*, else ''."""
@@ -4040,6 +4137,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--all", action="store_true", help="every registered repo, one line each")
     p.add_argument("--repo", help="after `init`: the registered repo to write an empty ledger in (design §4.7)")
     p.set_defaults(fn=cmd_repo)
+
+    p = add("rank", help="move a card of the Queue above or below another, or to the top; --list (design §4.7)")
+    p.add_argument("entry", nargs="?", metavar="TD-n", help="an entry of the card to move: TD-n or <repo>#TD-n")
+    g = p.add_mutually_exclusive_group()
+    g.add_argument("--above", metavar="TD-m", help="just above the card holding TD-m")
+    g.add_argument("--below", metavar="TD-m", help="just below the card holding TD-m")
+    g.add_argument("--top", action="store_true", help="first in Up next")
+    g.add_argument("--list", action="store_true", help="the cards in rank order, In progress first")
+    p.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
+    p.set_defaults(fn=cmd_rank)
 
     p = add("promote", help="make a repo's main live, a person's press; `ao promote status` reads (design §6)")
     p.add_argument(

@@ -174,6 +174,9 @@ BOUND = 40.0  # seconds from the fetch to the merge (§4.4)
 MOVED = "that line of the board no longer holds this item: reload the Inbox and try again"
 NOT_ON_ORIGIN = "this line is not on origin yet: push the checkout first"
 PR_BODY = "shiftlead's board write-back: one line of the board, at the person's press (cadence §4.5)."
+RANK_BODY = (
+    "shiftlead's rank flush: the rank file's lines of the person's moves on the Queue (design §4.4 *A move lands*)."
+)
 
 
 def unreachable(why: str) -> Refused:
@@ -326,13 +329,24 @@ def _gh(t: Path, clock: _Clock, step: str, *args: str) -> subprocess.CompletedPr
         raise unreachable(f"gh could not be run: {e}") from None
 
 
-def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -> dict[str, Any]:
-    """Commit the tree's board and land it on `origin/<want>` by the one road the forge's rule
-    allows (§4.4): a branch of the host agent's own, a PR it opens and squash-merges at once. A
+def _land(
+    root: Path,
+    t: Path,
+    want: str,
+    msg: str,
+    clock: _Clock,
+    still: Any,
+    *,
+    rel: str | None = None,
+    body: str = PR_BODY,
+    prefix: str = "board",
+) -> dict[str, Any]:
+    """Commit the tree's board (or the file at `rel`: a rank file, §4.4 *A move lands*) and land it on
+    `origin/<want>` by the one road the forge's rule allows (§4.4): a branch of the host agent's own, a PR it opens and squash-merges at once. A
     refused merge closes the PR and deletes the branch, and refuses the press as a moved line when
     `still()` — origin's board read again — no longer holds the item, else as unreachable."""
     base = _git(t, "rev-parse", "HEAD").stdout.strip()
-    rel = str(workorders.board_rel(root))
+    rel = rel or str(workorders.board_rel(root))
     cp = _git(
         t,
         *_identity(root),
@@ -349,7 +363,7 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
         _reset(t, want)
         raise Refused(f"the commit failed, and the board is as it was: {_why(cp, 'git commit')}")
     sha = _git(t, "rev-parse", "HEAD").stdout.strip()
-    branch = f"board/{Path(root).name}/{datetime.now(UTC):%Y%m%d%H%M%S}-{sha[:7]}"
+    branch = f"{prefix}/{Path(root).name}/{datetime.now(UTC):%Y%m%d%H%M%S}-{sha[:7]}"
     pushed = False
     try:
         cp = _git(t, "push", "-q", "origin", f"HEAD:refs/heads/{branch}", timeout=clock.left("git push"))
@@ -369,7 +383,7 @@ def _land(root: Path, t: Path, want: str, msg: str, clock: _Clock, still: Any) -
             "--title",
             msg,
             "--body",
-            PR_BODY,
+            body,
         )
         if cp.returncode != 0:
             raise unreachable(_why(cp, "gh pr create"))
@@ -780,3 +794,36 @@ def branch_edit(
         "message": msg,
         "branch": branch,
     }
+
+
+def land_rank(root: str | Path, rel: str, lines: dict[str, str | None], msg: str) -> dict[str, Any] | None:
+    """Write `lines` (`{TD-n: key}`, None removing one) on origin's rank file at `rel` in the host agent's own
+    tree for the checkout `root`, and land it by the board's road (§4.4 *A move lands*): a branch, a PR titled
+    `msg` (ledgerboard's `queue_subject`), squash-merged at once. Two flushes conflict only on one line, and
+    the later is made once more on origin's new head. Returns `{commit, message, pr}`, or None when origin's
+    file already says every line; raises `Refused` with nothing changed on origin."""
+    root = Path(root)
+    with _EDIT:
+        clock = _Clock()
+        return _twice(lambda: _land_rank(root, rel, lines, msg, clock))
+
+
+def _land_rank(root: Path, rel: str, lines: dict[str, str | None], msg: str, clock: _Clock) -> dict[str, Any] | None:
+    if shutil.which("gh") is None:
+        raise unreachable("gh is not installed")
+    t, want = _tree(root, clock)
+    path = t / rel
+    try:
+        text = path.read_text(encoding="utf-8") if path.exists() else ""
+    except OSError as e:
+        raise Refused(f"{rel} on origin cannot be read: {e}") from None
+    try:
+        new = ledgerboard.set_rank(text, lines)
+    except ledgerboard.Refused as e:
+        raise Refused(f"{rel}: {e}") from None
+    if new == text:
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(new, encoding="utf-8")
+    _git(t, "add", "--", rel, timeout=clock.left("git add"))  # a first rank file is new to the tree
+    return _land(root, t, want, msg, clock, lambda: True, rel=rel, body=RANK_BODY, prefix="queue")

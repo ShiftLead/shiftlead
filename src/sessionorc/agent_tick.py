@@ -214,6 +214,7 @@ class TickMixin:
             await self._balance_marks(snapshot_at)
             await self._red_prs(snapshot_at)
             await self._queue_pass(snapshot_at)
+            await self._rank_pass(snapshot_at)
         if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
             # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
             self._promote_task = asyncio.create_task(self._refresh_promotes())
@@ -2957,7 +2958,7 @@ class TickMixin:
         old = self._queue or {}
         self._queue = got
         if {k: v for k, v in got.items() if k != "at"} != {k: v for k, v in old.items() if k != "at"}:
-            await self._broadcast({"event": "queue", "queue": got})
+            await self._broadcast({"event": "queue", "queue": self._queue_ranked(got)})
 
     def _repo_view(self, root: str) -> dict[str, Any] | None:
         """A checkout's reading as the `repos` RPC and event serve it: the reading, and under

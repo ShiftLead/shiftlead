@@ -302,6 +302,7 @@ def reading(
                 "pr": (prs.get(q) or {}).get("number"),
                 "holder": _holder(claim[0][0]) if claim else None,
                 "key": e.get("key") or "",
+                "lined": bool(e.get("lined")),
                 "archived": False,
             }
         a = archived[q]
@@ -317,6 +318,7 @@ def reading(
             "pr": pr,
             "holder": None,
             "key": "",
+            "lined": False,
             "archived": True,
         }
 
@@ -506,6 +508,7 @@ def _passed_over(
         for rec, p in claims:
             if not rec.lane or not rec.unattended:
                 continue
+            home = rs.of_record(rec)  # once per claim, not per member: it resolves a path per repo
             for c in rank[: at[mine["id"]]]:
                 if c is mine or c["group"] != "up_next":
                     continue
@@ -514,7 +517,7 @@ def _passed_over(
                     for m in c["members"]
                     if open_[m].get("pickable") == "yes"
                     and not (open_[m].get("settling") or open_[m].get("held") or open_[m].get("waiting"))
-                    and rs.of_record(rec) == open_[m]["repo"]
+                    and home == open_[m]["repo"]
                     and ledger_mod.lane_matches(list(rec.lane), dict(open_[m]), rec.team or None)
                 ]
                 if not takes:
@@ -577,7 +580,7 @@ def _completed(
             continue  # with an open card: its archived rows
         dated = [(_resolved_date(archived[q]["fields"]), q) for q in members]
         day, last = max(dated)
-        when = (closed_at.get(last) or {}).get("closed") or day
+        when = day or (closed_at.get(last) or {}).get("closed")  # the Resolved: date; the close's where none
         try:
             if not when or date.fromisoformat(str(when)[:10]) < since:
                 continue
