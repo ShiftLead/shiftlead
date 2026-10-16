@@ -313,6 +313,9 @@ def test_entry_rules_are_written_once_and_read_both_ways():
     assert "ledger of shiftlead: docs/technical_debt.md, with Type feature" in filled
     assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" in filled
     assert not any(slot in filled for slot in repoconfig.ENTRY_SLOTS)
+    # the Team rule (§4.4 *An entry names its team*, TD-763): who writes it, and a `tag` fill's one PR
+    assert "`**Team:** <team>`" in filled and "two or more teams" in filled
+    assert "Filled `by: tag`" in filled and "one ledger PR" in filled
     tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
     text, made = tl.compose([])
     assert "{entry}" not in text and "## An entry handed to you" in text

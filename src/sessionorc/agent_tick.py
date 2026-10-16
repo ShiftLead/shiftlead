@@ -119,10 +119,16 @@ NOT_RESTARTS = ("person", "start", "work")
 def filled_for(cause: dict[str, Any] | None) -> str | None:
     """The closing line of a manager on call's fill prompt (§6 rule 3 *A fill says why it came*,
     TD-410), in fixed words from its `seat_due`: *[shiftlead] you are filled for: <by> — <member>*, the
-    question's id for `asks`. None for any other fill, which says nothing more."""
+    question's id for `asks`, and for a tagging seat's `tag` the ids it tags, *tag — TD-801, TD-802*
+    (§4.4 *An entry names its team*, TD-730). None for any other fill, which says nothing more."""
     if not cause or not cause.get("by"):
         return None
-    what = cause.get("ask") if cause["by"] == "asks" else cause.get("member")
+    if cause["by"] == "asks":
+        what = cause.get("ask")
+    elif cause["by"] == "tag":
+        what = ", ".join(str(i) for i in cause.get("ids") or [])
+    else:
+        what = cause.get("member")
     return f"{FILLED_FOR}{cause['by']}" + (f" — {what}" if what else "")
 
 
@@ -2598,6 +2604,8 @@ class TickMixin:
         waiting is the idle seat's own to read, as the techlead's is."""
         if not s.seat_due:
             return True
+        if s.seat_due.get("by") == "tag":
+            return True  # a tagging seat's `tag` due is the next fill's (§4.4 *An entry names its team*, TD-730)
         # a `prs` or `every` due met while the seat ran is the next run's cause (TD-700)
         if (s.seat or {}).get("trigger") in ("prs", "every"):
             return True
@@ -2656,6 +2664,12 @@ class TickMixin:
             if s.seat_due and any(same(s.seat_due, c) for c in fresh):
                 return s.seat_due
             return {"at": now_iso(), **fresh[0]} if fresh else None
+        if seat.get("tags"):
+            # a tagging seat (§4.4 *An entry names its team*, TD-730): `asks` while a question waits —
+            # a standing `tag` due handed back would hide it — else `tag` while uncovered ids stand
+            if s.asks_waiting(home=self.host):
+                return s.seat_due if (s.seat_due or {}).get("by") == "asks" else {"at": now_iso(), "by": "asks"}
+            return self._tag_cause(s, records)
         if trigger == "asks":
             return (s.seat_due or {"at": now_iso(), "by": "asks"}) if s.asks_waiting(home=self.host) else None
         if s.seat_due:
@@ -2669,6 +2683,61 @@ class TickMixin:
             every = _duration(str(seat.get("after") or ""))
             met = every is not None and now - _parse(s.created) >= every
         return {"at": now_iso(), "by": trigger} if met else None
+
+    def _tagging_seat(self, root: str, records: list[Session]) -> Session | None:
+        """The repo's tagging seat (§4.4 *An entry names its team*, TD-730): among the repo's records
+        carrying `seat.tags` whose team is live — an unattended session carrying its badge is live
+        (§4.9 *Starting and stopping*), so a stopped team's seat is never filled for this — the one
+        whose team comes first in the ledger's `declared_teams`, a team it leaves out after, by name."""
+        led = (self._repos.get(root) or {}).get("ledger") or {}
+        declared = [str(t).casefold() for t in led.get("declared_teams") or []]
+        live = {
+            r.team for r in records if r.team and r.unattended and not r.superseded_by and r.state not in work_mod.DEAD
+        }
+        seats = [
+            r
+            for r in records
+            if r.repo == root
+            and (r.seat or {}).get("tags")
+            and r.team in live
+            and r.supervised
+            and r.unattended
+            and not r.superseded_by
+            and not r.suspended
+        ]
+
+        def order(r: Session) -> tuple[int, int, str]:
+            team = str(r.team).casefold()
+            return (0, declared.index(team), "") if team in declared else (1, 0, team)
+
+        return min(seats, key=order, default=None)
+
+    def _tag_cause(self, s: Session, records: list[Session]) -> dict[str, Any] | None:
+        """A tagging seat's `tag` cause (§4.4 *An entry names its team*, §6 rule 3, TD-730):
+        `{at, by: tag, ids}`, `ids` the repo's `needs_team` that no `seat_filled` tag entry covers —
+        coverage by set, so {A, B} filled, A tagged and C joined is a due for {C} alone — and only on
+        the repo's tagging seat. A tag entry of `seat_filled` is kept while any of its ids is in
+        `needs_team`. A repo with no reading yet changes nothing."""
+        led = (self._repos.get(s.repo or "") or {}).get("ledger") or {}
+        if "needs_team" not in led:
+            return s.seat_due if (s.seat_due or {}).get("by") == "tag" else None
+        need = [str(i) for i in led.get("needs_team") or []]
+
+        def tag(e: Any) -> bool:
+            return isinstance(e, dict) and e.get("by") == "tag"
+
+        kept = [e for e in s.seat_filled if not tag(e) or set(map(str, e.get("ids") or [])) & set(need)]
+        if kept != s.seat_filled:
+            s.seat_filled = kept
+        if self._tagging_seat(str(s.repo or ""), records) is not s:
+            return None
+        covered = {str(i) for e in kept if tag(e) for i in e.get("ids") or []}
+        ids = [i for i in need if i not in covered]
+        if not ids:
+            return None
+        if (s.seat_due or {}).get("by") == "tag" and s.seat_due.get("ids") == ids:
+            return s.seat_due
+        return {"at": now_iso(), "by": "tag", "ids": ids}
 
     async def _fill(self, s: Session, now: datetime, records: list[Session]) -> None:
         """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at
@@ -2704,7 +2773,10 @@ class TickMixin:
                 await self._push_changes()
             return
         log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
-        cause = s.seat_due if (s.seat or {}).get("trigger") == "team" else None
+        seat = s.seat or {}
+        tagged = bool(seat.get("tags")) and (s.seat_due or {}).get("by") == "tag"
+        # a manager on call's cause, or a tagging seat's `tag` (TD-730); a techlead's `asks` fill has none
+        cause = s.seat_due if seat.get("trigger") == "team" or tagged else None
         # a manager on call says why it came (§6 rule 3 *A fill says why it came*, TD-410): its first
         # act is the reading `seat_due` names, read back from the record, never `ao status` first
         said = filled_for(cause)

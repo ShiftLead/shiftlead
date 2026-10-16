@@ -154,6 +154,54 @@ def checkout_warnings(root: Path) -> list[str]:
     return out
 
 
+def team_lacks(org: orgmod.Org, here: str, readings: dict[str, Any]) -> list[str]:
+    """Where a repo's definitions on this host and its ledger's `Team` declaration disagree (§4.4 *A
+    stale team*, *An untagged or unknown entry is handed to a techlead*, TD-730), each a lack: a
+    declared name no definition of the repo holds, naming the entries that carry it; where the repo's
+    definitions hold two or more teams, each the declaration leaves out, whatever its size; and the
+    `needs_team` ids of a repo none of whose teams has a techlead seat. A repo with no reading, or a
+    ledger that did not parse, says nothing."""
+    out: list[str] = []
+    for root, r in sorted(readings.items()):
+        led = (r or {}).get("ledger") if isinstance(r, dict) else None
+        if not isinstance(led, dict) or "declared_teams" not in led or "error" in led:
+            continue
+        name = r.get("name") or root
+        defs = [t["team"] for t in teams.entry_teams(org, str(Path(root).resolve()), here)]
+        held = {t.casefold() for t in defs}
+        declared = [str(t) for t in led.get("declared_teams") or []]
+        said = {t.casefold() for t in declared}
+        for d in declared:
+            if d.casefold() in held:
+                continue
+            carry = [
+                str(e.get("id"))
+                for e in led.get("entries") or []
+                if isinstance(e, dict) and str(e.get("team") or "").casefold() == d.casefold()
+            ]
+            on = f" ({', '.join(carry)} carry it)" if carry else ""
+            out.append(
+                f"{name}: its ledger declares team {d}, which no definition of the repo holds{on} — drop it from "
+                "the Fields: line's Team, or add it back, by PR (design §4.4 A stale team)"
+            )
+        if len(defs) >= 2:
+            names = [*declared, *(t for t in defs if t.casefold() not in said)]
+            for t in defs:
+                if t.casefold() not in said:
+                    out.append(
+                        f"{name}: has {len(defs)} teams and its ledger's Fields: line does not declare {t} — add "
+                        f"`Team = {' | '.join(names)}`, and a Team: line on each open entry a lane takes, by PR "
+                        "(design §4.4 The move from one team to two)"
+                    )
+        need = [str(i) for i in led.get("needs_team") or []]
+        if need and not any(org.teams[t].techlead is not None for t in defs if t in org.teams):
+            out.append(
+                f"{name}: {', '.join(need)} need a team, and no team of the repo has a techlead seat to tag them — "
+                "tag them by PR, or give a team a techlead (design §4.4 An entry names its team)"
+            )
+    return out
+
+
 def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     org: orgmod.Org,
     notes: Collection[str],
@@ -164,6 +212,7 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     files: teams.Files | None = None,
     settings: dict[str, Any] | None = None,
     repos_of: orgmod.ReposOf | None = None,
+    readings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """`ao org check`: the aggregate as a verdict — `{ok, lacks, warnings}`, `ok` false when
     anything is lacking. `notes` are `with_repos`' own (a repo file that cannot be read, a name
@@ -175,7 +224,10 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     refuse — its role's profile not in `profiles.yml`, a brief not in the checkout, a checkout
     missing, each in the start's own words (`teams.plan`, which creates nothing); a name defined
     twice; a team whose definition names one session twice (TD-268); a `place:` naming no linked
-    host; a team in `settings.yml` no definition names. A
+    host; a team in `settings.yml` no definition names; and, against `readings` (the home's `repos`
+    reading, §4.4 *A stale team*, TD-730), a name a repo's ledger declares that no definition of the
+    repo holds, a team of a repo with two or more that its ledger does not declare, and entries that
+    need a team where no team of the repo has a techlead seat (`team_lacks`). A
     warning, which does not fail it: a registered checkout off its default branch or holding
     changes, a `place:` naming a team no registered repo defines, a repo a linked host's registry
     holds that this one's does not (or a linked registry that could not be read; `repos_of` asks),
@@ -241,6 +293,8 @@ def check(  # noqa: PLR0913 — each argument is one thing the verdict reads
     for r in repoconfig.visible(roots):  # a role directory that is not whole, or takes a preset's name
         if not r["usable"] and not r.get("shadowed"):
             lack(f"role {r['name']} ({r['source']}) is not usable — {'; '.join(r['problems'])}")
+    for line in team_lacks(org, here, readings or {}):
+        lack(line)
     for name in sorted(settings_mod.teams(settings or {})):
         if name not in org.teams and name not in org.refused:
             lack(

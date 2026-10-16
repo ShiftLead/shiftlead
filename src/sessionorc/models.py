@@ -1175,14 +1175,17 @@ class Session:
     # wrap-up to a member the team's flow no longer uses; the tick closes it once settled and writes
     # `closed_for: {why: sit_out}`. Gone at the next create. The home's.
     sit_out: dict[str, Any] | None = None
-    # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
-    # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
-    # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.
+    # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it — the techlead's
+    # `{trigger: asks, tags: true}`, a candidate for its repo's tagging seat (§4.4 *An entry names its
+    # team*, TD-730) — written by `ao team start` at create: a seat's ending is its own, so the crash
+    # restart never acts on one (§6 rule 1, and rule 3 — the seat policy, TD-103 slice 3 — is what
+    # fills one). The home's.
     seat: dict[str, Any] | None = None
     # What the tick makes of a seat's trigger (§6 rule 3, TD-103 slice 3). `seat_due` is `{at, by}`,
     # set only once the trigger is met — `by` is what met it: `asks` (a question waiting, cleared
     # again if none is by the fill), `prs` (n merged to the seat's repo since this record was
-    # created) or `every` (that long since it was created) — and it is what fills the seat; the
+    # created), `every` (that long since it was created) or, on the repo's tagging seat, `tag`
+    # (`{at, by: tag, ids}`, the `needs_team` ids no fill covers, TD-730) — and it is what fills the seat; the
     # fill's new record starts without it. `seat_count` is the count toward a `prs:` trigger as last
     # read, `{prs, at}`, so a card can say how far along it is; a `gh` outage leaves the last
     # reading and never reads as zero. Both the home's, computed at the home.
@@ -1190,7 +1193,8 @@ class Session:
     seat_count: dict[str, Any] | None = None
     # A manager on call's memory of what it was filled for (§6 rule 3 *A manager on call is a seat
     # of this rule*, TD-259): `[{by, member, at}]`, `member` the address of the member the reading
-    # was of and, for `asks`, `ask` the question's id in its place — one entry per cause a fill was
+    # was of and, for `asks`, `ask` the question's id in its place; a tagging seat's `{by: tag, ids, at}`,
+    # kept while any of its ids still needs a team (TD-730) — one entry per cause a fill was
     # made for, carried across the fill and dropped when the cause has gone, so a cause still
     # standing fills once. The home's.
     seat_filled: list[dict[str, Any]] = field(default_factory=list)
