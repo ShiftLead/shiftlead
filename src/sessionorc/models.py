@@ -81,6 +81,8 @@ NODE_OWNED = frozenset(
         "context",
         "subagents",
         "subagent_at",
+        "shells",
+        "shells_at",
         "files",
         "links",
         "wrapup_sent_at",
@@ -706,8 +708,9 @@ def normalize_ref(ref: str) -> str:
 
 # What counts as something worth waking a manager for (design §4.8 "Waking a manager", TD-049). The
 # vocabulary is deliberately short, and the exclusions are the point: `last_output`, `tail`,
-# `since`, `seen_at`, `git`, `subagents`, `subagent_at`, `model` and `context` move on almost every tick of a healthy
-# session, so a digest over the whole record would wake a lead continuously and be worth less
+# `since`, `seen_at`, `git`, `subagents`, `subagent_at`, `shells`, `shells_at` (TD-766), `model` and
+# `context` move on almost every tick of a healthy session, so a digest over the whole record would
+# wake a lead continuously and be worth less
 # than the poll it replaces. What is left is what a lead acts on: the state it may have to answer
 # or restart, the pending thing it would answer, what the session has claimed or finished, what it
 # has filed, and whether it is still this lead's to act on.
@@ -955,6 +958,12 @@ class Session:
     # event the adapter marked `subagent_seen`, never moved back, so a replay never revives a stale
     # pill. `subagents_live` reads it with `subagents`; both are reset on a fresh conversation and on exit.
     subagent_at: str | None = None
+    # The tool's background shell tasks (design §4.2 *A background shell task*, TD-766): `{pid, start, cmd,
+    # since}`, read from the process tree by the tick while the record is idle with no live subagent
+    # (the adapter's `background`), `since` this host's first sight of the task. `shells_at` is the last
+    # tick that read one within `SHELL_WAIT`, never moved back. Both are cleared on exit.
+    shells: list[dict[str, Any]] = field(default_factory=list)
+    shells_at: str | None = None
     # The files the session's work changed (design §4.2 *The record's `files`*, TD-538): `{path, at, sha}`
     # read from git with the status — the porcelain's paths and the branch's commits since its base —
     # newest first, a path once, at most `RECENT_FILES`, `sha` absent on a dirty path. The Focus Session
@@ -1435,6 +1444,7 @@ class Session:
             self.ended = None  # a run that came back has not ended
         else:
             self.subagents, self.subagent_at = 0, None  # no subagent outlives its process (§4.2, TD-734)
+            self.shells, self.shells_at = [], None  # nor a shell task (§4.2 *A background shell task*, TD-766)
 
     def report_progress(self, entry: ProgressEntry) -> bool:
         """Upsert a `progress` entry by reference, in place so the lane order the session declared

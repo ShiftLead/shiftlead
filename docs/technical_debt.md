@@ -74,7 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
-| TD-766 | Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9 | Medium | Open |
+| TD-766 | Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9 | Medium | Built — live check #1905 |
 | TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
 
 ---
@@ -1551,8 +1551,8 @@ The other cases:
 **Type:** feature
 **Added:** 2026-10-15 (TD-761's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #1905
+**Status:** Built (#1905, 2026-10-16). `Monitor`'s task was checked: it is wrapped as a background shell is — a `bash -c source …/shell-snapshots/…` child of `claude`, its first child the script's command — so it is read and counted (§4.2). **What to read once #1905 is live** (`ao promote status`): an idle session of this host that ended its turn on a `run_in_background` command carries that task on its record (`ao --json status -v`, its `shells`, `cmd` the command) and reads `shells_live` true, and the list empties on the tick after the command ends. A read, no press; TD-767 draws it.
 **Location:** design §4.2 *Working on its own* (*A background shell task*), §4.3 `background`, §6 rules 3, 4 and 9; `src/sessionorc/identity.py` (`ProcReader` ~L76, `LinuxProc` ~L84, and §4.8a's bounded walk); `src/shiftlead/adapters/claude_code/__init__.py` (`ClaudeCodeAdapter` ~L502, beside `context` ~L652); `src/sessionorc/agent_tick.py` (a new `_refresh_shells` beside `_refresh_context` ~L173/~L3563; `_subagent_flips` ~L604; the rule sites reading `subagents_live` ~L1147, ~L1201, ~L2581, ~L2850; the *finished* dict ~L2031); `src/sessionorc/tmux.py` (`#{pane_pid}` in the pane list ~L21); `src/sessionorc/agent_common.py` (`subagents_live` ~L1048, `idle_from` ~L1059, `SEAT_PR_WAIT` ~L138); `src/sessionorc/agent_serve.py` (`_view` ~L71); `src/sessionorc/work.py` (~L197, ~L224); `src/sessionorc/models.py` (`NODE_OWNED` ~L66, the wake exclusions ~L708, the record's fields ~L957, the exit reset ~L1445)
 
 **Why:** TD-761. A session idle on a background shell reads *ready to close ✓*; one Close kills the shell.

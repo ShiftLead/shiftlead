@@ -69,6 +69,8 @@ class ServeMixin:
         # §4.2 *Working on its own* (TD-734): a live subagent, the one reading every page and RPC
         # reader takes and the tick's rules call at their own `now`; derived, never stored
         v["subagents_live"] = agent_common.subagents_live(s, now)
+        # §4.2 *A background shell task* (TD-766): a live shell is working on its own too
+        v["shells_live"] = agent_common.shells_live(s, now)
         down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
         rings = getattr(adapters.get(s.adapter), "composer", None) is not None
         cache = s.host == self.host and agent_common.cache_restarts(s, now)  # a lapsed cache (TD-467)

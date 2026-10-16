@@ -23,8 +23,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sessionorc import paths
+from sessionorc import identity, paths
 from sessionorc.adapters import ExternalSession, LaunchSpec, Link, Transcript
+from sessionorc.identity import ProcReader
 from sessionorc.models import Confidence, State
 from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
@@ -65,6 +66,10 @@ CONTEXT_WINDOWS = (
     ("claude-sonnet-4-6", 200_000),
     ("claude-haiku-4-5", 200_000),
 )
+# The background-shell read (design §4.2 *A background shell task*, TD-766): how many processes the walk
+# down from the pane reads before it gives up, and how much of a task's command its `cmd` keeps.
+SHELL_WALK_NODES = 256
+SHELL_CMD_LEN = 120
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 SKIP_FLAG = "--dangerously-skip-permissions"  # added to an unattended launch under `permission_prompts: skip`
 CACHE_TTL_ENV = "CLAUDE_CODE_PROMPT_CACHE_TTL"  # the main conversation's cache lifetime (§4.2a, TD-458)
@@ -673,6 +678,36 @@ class ClaudeCodeAdapter:
             window = next((w for prefix, w in CONTEXT_WINDOWS if model.startswith(prefix)), None)
             return self._reported({"tokens": tokens, "at": d.get("timestamp"), "window": window}, session_id)
         return self._reported(None, session_id)
+
+    def background(self, pid: int, proc: ProcReader) -> list[dict] | None:
+        """The tool's live background shell tasks under the pane's process `pid` (design §4.3 `background`,
+        §4.2 *A background shell task*, TD-766): `[{pid, start, cmd}]`. From `pid`, its own included, down
+        to the first process whose `comm` is the binary's name (`comm` keeps 15 characters) — the pane's
+        own for an ao launch, a descendant under a hand-started shell — bounded by `identity.WALK_LIMIT`
+        levels and `SHELL_WALK_NODES` processes; then its direct children that are the tool's command
+        wrapper (`<shell> -c` with a `/shell-snapshots/` script), `cmd` the argv of the wrapper's first
+        child, joined and cut to `SHELL_CMD_LEN`. An MCP server is a child too, never a wrapper. None
+        when no such process is found, which is never an error."""
+        name = os.path.basename(self.binary)[:15]
+        level, seen, tool = [int(pid)], 0, None
+        for _ in range(identity.WALK_LIMIT):
+            tool = next((p for p in level if proc.comm(p) == name), None)
+            if tool is not None or not level or seen > SHELL_WALK_NODES:
+                break
+            seen += len(level)
+            level = [c for p in level for c in proc.children(p) or ()]
+        if tool is None:
+            return None
+        out = []
+        for child in proc.children(tool) or ():
+            argv = proc.cmdline(child) or []
+            st = proc.stat(child)
+            if st is None or len(argv) < 3 or argv[1] != "-c" or "/shell-snapshots/" not in argv[2]:
+                continue
+            kids = [(k.start, k.pid) for c in proc.children(child) or () if (k := proc.stat(c)) is not None]
+            first = proc.cmdline(min(kids)[1]) if kids else None
+            out.append({"pid": child, "start": st.start, "cmd": " ".join(first or [])[:SHELL_CMD_LEN]})
+        return out
 
     @staticmethod
     def _reported(reading: dict | None, session_id: str) -> dict | None:

@@ -195,7 +195,8 @@ def finished(
     - a **seat** or the **manager**, when live, must be `idle` — declared or not; a seat never
       declares and the manager's word is a judgement about these same records;
     - an `idle` record carrying `subagents_live` (the view's reading, §4.2 *Working on its own*,
-      TD-734) is working on its own, not idle: *grinder-dc-1 idle, subagent live*;
+      TD-734) is working on its own, not idle: *grinder-dc-1 idle, subagent live*; so is one carrying
+      `shells_live` (§4.2 *A background shell task*, TD-766): *grinder-dc-1 idle, shell live*;
     - a live **member** must be `idle` with `out_of_work` or `restart_wanted` on its record: one
       that declared and then took a turn is `working` with the word still there;
     - a dead member with `out_of_work` is counted; one `exited` with its pane and no declaration
@@ -222,11 +223,14 @@ def finished(
         live = state not in DEAD
         # an idle record whose own subagent runs is working on its own, not idle (§4.2, TD-734)
         alive = live and state == "idle" and bool(_f(r, "subagents_live"))
+        shell = live and state == "idle" and not alive and bool(_f(r, "shells_live"))  # a shell's (TD-766)
         if r is manager or _f(r, "seat") is not None or _f(r, "name") in seats:
             if live and state != "idle":
                 why.append(f"{name} {state}")
             elif alive:
                 why.append(f"{name} idle, subagent live")
+            elif shell:
+                why.append(f"{name} idle, shell live")
             continue
         wants, out = _said(r, "restart_wanted"), _said(r, "out_of_work")
         asked = (waiting or {}).get(str(_f(r, "id"))) if live else None
@@ -238,6 +242,8 @@ def finished(
                 why.append(f"{name} {state}")
             elif alive:
                 why.append(f"{name} idle, subagent live")
+            elif shell:
+                why.append(f"{name} idle, shell live")
             elif wants is None and out is None:
                 why.append(f"{name} idle, not declared")
             else:
