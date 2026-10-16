@@ -64,7 +64,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-724 | Build TD-722 (1): one repo per team — `repo:` on a team, a project a heading on repos, the badge, the Project block, names unique per repo, the old keys refused | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
-| TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
+| TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Designed — built by TD-762, TD-763, TD-764 |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
@@ -73,6 +73,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-757 | Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired | Medium | Open |
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Open |
+| TD-762 | Build TD-730 (1): an entry's `Team:` read, `needs_team` marked and withheld, `lane_matches` by the record's team, the claim refusals, `ao repo`'s lines | Medium | Open |
+| TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
+| TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 
 ---
 
@@ -1305,8 +1308,9 @@ The other cases:
 **Added:** 2026-10-15 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
-**Location:** `docs/design/4.4-host-agent.md` (*Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
+**Status:** Designed (2026-10-15, the designer): §4.4 *An entry names its team* — a `**Team:**` line whose vocabulary is the ledger's own `Fields:` line (`Team = db | compliance`), required only where it names two or more teams; the reader marks `needs_team` (untagged or unknown) and withholds it; `lane_matches` takes the lane's record's team; a claim on another team's entry is refused (`--force` passes); the techlead seat carries `seat.tags`, and the tagging seat (first in the vocabulary's order) is due `by: tag` to tag them in one PR; a stale or missing declaration is `ao org check`'s. The home reads the declaration, never the definitions. Built by TD-762 (reader, lanes, claim, `ao repo`), TD-763 (the tagging seat, `entry.md`, `ao org check`) and TD-764 (the pages, `entry.team`).
+**Blocked by:** TD-762, TD-763, TD-764
+**Location:** `docs/design/4.4-host-agent.md` (*An entry names its team*, *Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
 
 **Why:** Paul, 2026-10-15: *when a TD is added to the ledger in shiftlead we can require that a team is selected (by the techlead if not beforehand by the user) … If TDs are added outside shiftlead, the host agent can identify them and send them to a techlead to have them resolved … We should also have a check for stale entries, e.g. team1 is assigned entries but is no longer defined.* Under TD-722 a repo has any number of teams (a db team and a compliance team), each with its own lanes, but an entry names only an `Owner:` role word. So two teams' grinders both take every pickable `Owner: grinder` entry. A claim keeps them off the same entry at once, but nothing keeps compliance work with the compliance team.
 
@@ -1547,3 +1551,79 @@ The other cases:
 **Done when** the design says how a background shell task is read and what Ready to close and the card do with it, its build entries are filed, and this entry's `Blocked by:` names them; a session idle on a background shell no longer reads *ready to close ✓*.
 
 **Related:** TD-734, TD-743 (subagents read, background shells left to `ao doing`), TD-079 (the checklist's outcome row).
+
+---
+
+## TD-762: Build TD-730 (1): an entry's `Team:` read, `needs_team` marked and withheld, `lane_matches` by the record's team, the claim refusals, `ao repo`'s lines
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-730's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *An entry names its team* (*The `Team:` line*, *When it is required*, *What the reader marks*, *What the lanes read*, *Shown where it is read*), §4.8 (the claim refusals), §4.7 `ao repo`; `src/sessionorc/ledger.py` (`entries` ~L399, after `for_page`; `lane_matches` ~L261, `in_lanes` ~L305); `src/sessionorc/ledgerboard.py` (`declared` ~L96); `src/sessionorc/work.py` ~L283; `src/sessionorc/agent_tick.py` (rule 6's news ~L1532, the anchor seat's `_seat_lane` ~L2638 until TD-757 removes it); `src/shiftlead/teamrun.py` (~L617, `repo_lanes` ~L1296); `src/shiftlead/ui/inbox.py` ~L1390; `src/sessionorc/settle.py` (a new `team_refusal` beside `wait_refusal` ~L107); `src/sessionorc/agent.py` (the claim, ~L2794); `src/shiftlead/cli.py` (`ao repo`)
+
+**Why:** TD-730. A repo may have several teams, and an entry names only a role word, so every team's lanes take every entry of their owner words.
+
+**Fix:**
+- **The reader** (`ledger.entries`, after each entry's page kind is known) reads `**Team:**` as the entry's `team`, and the `Fields:` line's `Team` vocabulary, in its order, as `declared_teams` on the repo's reading (through ledgerboard's `declared()`, never a second parser).
+- It marks `needs_team: {why}`: `untagged` where the vocabulary names two or more, on an open entry whose page kind a lane takes (*pickable*, *design*, *live check*) and that has no `Team:`; `unknown <name>` wherever a vocabulary is declared, on an entry whose `Team:` it does not hold. Names compare case-folded. The repo's reading carries the ids as `needs_team`.
+- **`lane_matches(lane, entry, team=None)`**: a `needs_team` entry matches nothing; an entry's `team` matches only a lane whose `team` is it; `team=None` narrows nothing; a work order (`work_order`, `pr_order`) carries no team, is never marked, and matches as it does now. Every caller listed in *Location* passes the lane's record's `team` (the anchor seat's `_seat_lane` its own record's); `in_lanes` pairs each lane with its record's `team` rather than keeping the lanes alone. Names compare case-folded on both sides. `in_lanes` counts a `needs_team` entry in no kind of the team's lanes and no rest.
+- **The claim**: `settle.team_refusal(entry, team)` beside `wait_refusal`, called in the claim under `not force` with the claimer's `s.team` (`""` is no team): refused on another team's entry (*TD-801 is db's: compliance-grinder-1 is compliance's*), never for a claimer with no team; refused on a `needs_team` one for every claimer (*TD-801 needs a team (untagged)*).
+- **`ao repo`**: *needs a team* after the owner; a line under the first, *needs a team: TD-801, TD-802* (TD-763 adds the seat it is handed to); `--json` carries `needs_team`, `declared_teams` and each entry's `team`.
+- **Tests** (in `tests/test_ledger.py`, `tests/test_lane_news.py`, `tests/test_live_check_lane.py`, and the claim's own): a ledger declaring `Team = db | ops` marks an untagged pickable entry `untagged`, one naming `qa` `unknown qa`, and no blocked, evaluation or person's entry; a vocabulary of one name marks no untagged entry and does mark `Team: qa`; `Team: DB` reads as `db`; a work order is in both teams' lanes; db's lane takes `Team: db` and not `Team: ops`; a teamless lane takes both; `in_lanes` leaves a marked entry out of every count; a vocabulary of one name with a lane of another team takes nothing tagged otherwise; `Team: DB` against a lane of team `db`; a settling, held or waiting entry that also needs a team reads as settling, held or waiting first; the two claim refusals, a teamless claimer on another team's entry and on a marked one, and `--force`; `ao repo --json` carries the three fields.
+
+**Done when** an entry's `Team:` keeps it in its team's lanes, an untagged or unknown one on a multi-team ledger is in no lane and listed, the claim refuses across teams, and every listed test passes.
+
+**Related:** TD-730 (the design), TD-763, TD-764, TD-724.
+
+---
+
+## TD-763: Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-730's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-762
+**Location:** design §4.4 *An entry names its team* (*Who writes it*, *An untagged or unknown entry is handed to a techlead*, *A stale team*), §4.9b *Seats with a trigger*, §6 rule 3 (`tag`), §4.7 `ao org check`, §4.9 *Add an entry to the ledger*; `src/shiftlead/teams.py` (`Launch.trigger` ~L124, the record's `seat` ~L162, `_trigger` ~L957); `src/sessionorc/agent_tick.py` (`_seat_due` ~L2586, its `team` branch's cause model and `seat_filled`, the fill's cause line); `src/shiftlead/briefs/entry.md` and the `techlead` preset's brief; `src/shiftlead/orgcheck.py` (`check` ~L157); the Start's checks in `src/shiftlead/teams.py` and the Start dialog's plan
+
+**Why:** TD-730. An entry filed outside a team, or by hand, lands with no team; somebody has to tag it, and a team removed leaves entries naming it.
+
+**Fix:**
+- **`ao team start`** (with a repo whose reading has no `declared_teams` passing) writes the techlead seat's mark as `seat: {trigger: asks, tags: true}` — `tags` a boolean beside the string-valued trigger, so `Launch` gains a `tags: bool` written into the record's `seat` (not into `trigger`'s `dict[str, str]`); `ao team list --json` carries it. It refuses a team whose repo's definitions hold two or more teams and whose ledger's `Team` vocabulary does not name it, in the words of §4.4 *The move from one team to two*, reading `declared_teams` from the home's repo reading; the Start dialog shows the same refusal.
+- **The tick**: for each repo whose reading has `needs_team`, the tagging seat is the repo's record carrying `seat.tags` of a **live** team (§4.9), whose `team` is first in `declared_teams`' order (an undeclared team after, by name). `_seat_due` tests `seat.tags` before its `asks` branch: while `asks_waiting`, `by: asks` — the standing `seat_due` kept only when its `by` is `asks`, else a fresh `{at, by: asks}` (today's `s.seat_due or …` would hand back a standing tag due) — else a `_tag_cause(s, records)` — `{by: tag, ids}` only where `s` is the repo's tagging seat (reading the repo's `needs_team` and `declared_teams` and the live-team test), `ids` the set difference from every `seat_filled` tag entry's ids. Neither clears the other's due. The tag entries of `seat_filled` are kept while any of their ids is in `needs_team` (coverage, not `same()`'s equality, which compares `by/member/ask` and would match every tag cause); `_tag_cause` prunes the tag entries of `seat_filled` as the `team` branch prunes its own. **The fill** (agent_tick ~L2791): `cause` is taken for `trigger == "team"` or for a `tags` seat whose `seat_due.by == "tag"`, and for nothing else, so a techlead's `asks` fill gains no cause line, no `seat_filled` entry and no `for:` mark, as today (the handed-entry check that reads `cause.get("ask")` passes a tag cause harmlessly); `filled_for` (~L118) gains an `ids` branch, printing a tag cause from `cause["ids"]` joined by ", ": *you are filled for: tag — TD-801, TD-802*. `_tag_cause` is not reached while a question waits, so its pruning pauses then; coverage is recomputed once the question clears, which is enough. **The idle close**: `_seat_done` (~L2541) is True for trigger `asks` when `seat_due.by == "tag"` (the due is the next fill's, §4.4), and False for an `asks` due, as today. It sets `seat_due: {at, by: tag, ids}` on it while uncovered ids stand. The fill's cause line names them. `ao repo`'s *needs a team* line gains *— handed to <seat>*, or *no techlead seat to tag them*, *<seat>'s team is stopped*, or *no techlead seat carries tags yet — the next Start of <team> writes it*. Rule 3's ceiling and the wait on its own PR apply unchanged.
+- **`entry.md`** (and, through it, the techlead preset) says: where the ledger's `Team` vocabulary names two or more teams, write `**Team:**` (and never where it does not: an undeclared field fails `ledger.py --check --since`) — your own team unless the work is plainly another's, a designer's builds the designed entry's, a handed entry the `entry.team` it carries, else the team the words point to. Filled `by: tag`: tag every listed id in one ledger PR; where two readings stand, open the PR with your choice and `steer` the person with it as `--default`.
+- **`ao org check`**: a lack for a declared name that no definition of the repo holds (naming its entries); where the repo's definitions hold two or more teams, for each the vocabulary does not name, whatever its size (none included); and for `needs_team` ids where no team of the repo has a techlead seat.
+- **Tests** (in `tests/test_cli_teams.py`, `tests/test_seat_policy.py`, `tests/test_cli_org.py`, beside each module's own): the start writes `tags`, refuses an undeclared team of a two-team repo, and passes a one-team repo, a declared team and a repo with no reading; a stopped team's seat is never the tagging seat; an `ask` and a tag set both standing: the due is `asks` while the question waits (a question left standing still holds it), then `tag`; a tag due standing when an ask arrives becomes `asks`; an idle seat with a `tag` due is closed and filled on the next tick, one with an `asks` due is held; an `asks` fill writes no `seat_filled` entry; `filled_for` prints *tag — TD-801, TD-802*; {A, B} filled, A tagged, C joined: the new due carries {C} alone; `ao repo`'s *handed to*, *no techlead seat*, *team is stopped* and *no techlead seat carries tags yet* lines; the tick picks the first declared team's seat, fills it once per id set and again when an id joins, the new due carrying only the new id; no `seat.tags` record means no due; `entry.md` carries the rule (a doc-bound test); `ao org check`'s three lacks.
+
+**Done when** an untagged entry on a multi-team repo fills the first declared team's techlead seat once, `entry.md` tells every filer to write the team, `ao org check` names a stale or missing declaration, and every listed test passes.
+
+**Related:** TD-730, TD-762, TD-764.
+
+---
+
+## TD-764: Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-730's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-762, TD-740
+**Location:** design §4.5 screen 11 (*Technical debt*), §4.5a *Add entry form: Hand to the techlead*, §4.10 *An entry handed to a seat*, §4.7 `ao td add`; `src/shiftlead/ui/repo.py`, `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/plan`), the Repo page's templates; `src/sessionorc/agent_inbox.py` (`rpc_entry_add` ~L371); `src/shiftlead/cli.py` (`cmd_td_add` ~L2889, its `teams` list ~L2929 from `teams.entry_teams`)
+
+**Why:** TD-730. The person sees which entries need a team and which declared team is stale, and the form's Team pick reaches the ledger.
+
+**Fix:**
+- **Repo page**: a Technical debt row of a `needs_team` entry says *needs a team* after its owner; under the heading's lanes lines, the repo's *needs a team* line as `ao repo` prints it, and each stale-team note, read by the page from the definitions it already reads (*the ledger declares db, which no definition holds: TD-801*; *the ledger leaves out ops, which this repo defines*).
+- **The hand**: `entry_add` takes `team` and carries `entry: {repo, type, team}`; `/api/entry/hand` sends the form's Team pick (TD-740's field), empty when blank; blank hands to the first team with a techlead seat in `declared_teams`' order where the ledger declares one, else definition order (`repo_teams`), `declared_teams` read from the home's repo reading, as the page and `ao td add` already read the repo; `ao td add --team` naming no team of the repo is refused with the repo's team names; `ao td add --team <team>` hands to that team's seat and carries it.
+- **Tests** (in `tests/test_ui_repo*.py`, `tests/test_handed_entry.py` and `tests/test_ui_entry.py`): the row mark and the heading line; a stale note for a declared name no definition holds; the hand carries `entry.team` from the form and from `--team`, and blank carries it empty; a blank pick hands in the vocabulary's order; `--team` with an unknown name is refused.
+
+**Done when** the Repo page shows what needs a team and what is stale, Add entry's and `ao td add`'s team reaches the seat as `entry.team`, and every listed test passes.
+
+**Related:** TD-730, TD-762, TD-763, TD-740.

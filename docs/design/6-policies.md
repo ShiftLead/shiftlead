@@ -215,7 +215,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
      by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
-     `every`, `work`, and `prompt`, the org's director seat's alone: due while a prompt no rule of the
+     `every`, `work`, **`tag`** — the repo's tagging seat while the reading's `needs_team` holds
+     ids not yet filled for, `seat_due: {at, by: tag, ids}` and `seat_filled` keeping `{by: tag,
+     ids}`, so a fill is once per set of ids (§4.4 *An entry names its team*, TD-730) — and `prompt`, the org's director seat's alone: due while a prompt no rule of the
      person's answered is pending on an unattended record of the org, cleared when none is, §4.9b
      *The director seat*, TD-636; the director's seat is also due by `asks` while a question passed
      up to it is open in its inbox, and by **`groom`** once `director.groom` has passed since its last
@@ -269,7 +271,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      cleared when its state changes, the work closes or the member declares), the one reading the
      card's slot, this trigger and the person-led team's Inbox row (§4.5a *Inbox row: idle · open
      work*) draw; the page reads it from the record and derives nothing from `nudged_at`.
-     `seat_due` carries the cause — `{at, by, member}` — and **a cause fills once per stretch**:
+     `seat_due` carries the cause — `{at, by, member}`, with `ask` in `member`'s place for `asks` and `ids`, the uncovered entries, for a techlead seat's `tag` (§4.4 *An entry names its team*) — and **a cause fills once per stretch**:
      the home keeps **`seat_filled: [{member, by, at}]`** on the seat's record, an entry dropped
      when its cause has gone (the state changed, the question closed), and a cause still standing
      after a fill raises no second `seat_due` until then, so a manager that chose to leave a
