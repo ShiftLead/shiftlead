@@ -271,7 +271,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      cleared when its state changes, the work closes or the member declares), the one reading the
      card's slot, this trigger and the person-led team's Inbox row (§4.5a *Inbox row: idle · open
      work*) draw; the page reads it from the record and derives nothing from `nudged_at`.
-     `seat_due` carries the cause — `{at, by, member}` — and **a cause fills once per stretch**:
+     `seat_due` carries the cause — `{at, by, member}`, with `ask` in `member`'s place for `asks` and `ids`, the uncovered entries, for a techlead seat's `tag` (§4.4 *An entry names its team*) — and **a cause fills once per stretch**:
      the home keeps **`seat_filled: [{member, by, at}]`** on the seat's record, an entry dropped
      when its cause has gone (the state changed, the question closed), and a cause still standing
      after a fill raises no second `seat_due` until then, so a manager that chose to leave a
