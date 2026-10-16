@@ -14153,3 +14153,65 @@ Each reproduction passed with its fix.
 **Related:** TD-721, TD-723, TD-582, TD-636, TD-642, TD-657, TD-040.
 
 **Resolved:** 2026-10-16 — archived with its last builds (TD-724 by #1840, #1910; TD-725 by #1929; TD-741 by #1931; TD-757 by #1900; TD-759 by #1924; TD-760 by dev-cadence#276 and contractmatch#179; see their **Resolved:**).
+
+---
+
+## TD-721: The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Resolved
+**Blocked by:** TD-740
+**Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
+
+**Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
+
+1. **The header** (`group_head.html`, §4.5a *team groups*): the flow chip and *flow changed* / *definition changed* with **Apply**, ✉ *n* unread, the *answered for you* mark, *n PRs waiting*, *n ready to close*, the *needs you* pill, the run's state (*concluded*, *wound down … by …*, *stopped*, *work waiting*), and the notes under it (*over its line*, *stops*, *started … for*).
+2. **The controls**: Start, Wind down, Stop now, Forget all, and the ***i*** panel (Definition, Members…, Open file, Flow on Settings →, who for what, *not concluded:*).
+3. **The member cards** (`card.html` compact, with their state pills and the lane's count) and the **+** card.
+4. **A repo two teams service** names both in its *serviced by* line but draws only the first team's facets (`serving[0]`); the second team's card on the Org has nothing on the page that is meant to expand it.
+
+**Fix:** a design round on screen 11: the page opens with the servicing team's whole Org card — header, controls, facets, member cards — drawn by the same templates, so the page cannot drift from the card, and the lists below expand it. Two teams on one repo are two cards, listed together and never combined (Paul, 2026-10-15, TD-722). It decides whether the member cards fold as on the Org; and how the page keeps the header and cards current, since the Org takes them from `/events` deltas and the Repo page re-reads `?part=1` on a 30 s poll. Then one or more build entries.
+
+**Done when** screen 11 says the page carries everything the team's Org card shows, its build entries are filed, and this entry's `Blocked by:` names them.
+
+**Related:** TD-722, TD-176 (slice 5 built the page), TD-418, TD-604, TD-693.
+
+**Resolved:** 2026-10-16 (grinder-ao-2) — designed in TD-722's amendment (#1850); its one build, TD-740, merged in #1936, so it archives with it (§4.9c *A design entry archives with its last build*).
+
+---
+
+## TD-740: Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, an interactive round with Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Blocked by:** TD-725, TD-741
+**Location:** design §4.5 screen 11 (*The page is the repo's group of the Org, expanded*, *Waiting on you*, *Doing*), §4.5a *Repo page: the team's facets*, *Repo page: doing filters*, *Add entry form: Hand to the techlead*, §4.9 *Add an entry to the ledger* (*Where there is no seat*); `src/shiftlead/ui/app.py` (`repo_page` ~L1302: `serving[0]`, `"g": {"team": ..., "summary": ...}`), `src/shiftlead/ui/templates/repo_part.html`, `repo.html`, `group_head.html`, `card.html`, `plus_card.html`, the Org page's group template TD-725 leaves; `src/shiftlead/ui/repo.py` (`doing_chips` ~L355); `src/shiftlead/ui/static/` (`AO.repo` ~L3205, the Org's delta handler); the Add entry form and `/api/entry/plan`, `/api/entry/hand`
+
+**Why:** TD-721 (Paul, 2026-10-15: *the repo page should essentially be an expansion of the info shown on the org page*), designed in TD-722's amendment. The page draws only the first servicing team's three facets: no header, marks, controls, *i* panel or member cards, and nothing of a second team.
+
+**Fix:**
+- **The page is the repo's group** as TD-725 draws it on the Org, by the same partials: the repo's line with its Repo facet, every servicing team's whole card (header, marks, controls, *i* panel, TDs in motion, Answer needed / Doing, member cards, + card) in the Org's order within a repo, then the no-team strip; the lists below unchanged. `serving[0]` goes.
+- **Kept by `/events`**: the cards and headers take the Org's deltas through the Org's own client code; the lists keep the `?part=1` poll and the `repos` / `doing` events. A team card folds by the same per-team choice as on the Org.
+- **Doing** is every servicing team's kept calls, newest first; where two or more teams service the repo a team chip per team comes first (*db (12)*), then *all (n)* and the agent chips; a team pick and an agent pick AND.
+- **Waiting on you**'s heading links `/inbox?repo=<repo>&kind=board` (TD-741's filter).
+- **Add entry**'s form gains an optional **Team** pick where two or more teams service the repo: blank hands to the first in definition order with a techlead seat, a pick to that team's seat, and the form names the seat. TD-730 later says how the entry names its team.
+- **Tests** (in `tests/test_ui_repo*.py`, beside the Repo page's own):
+  - A repo two teams service draws both teams' whole cards, each with its header controls and member cards, and the Repo facet once.
+  - A repo no team services draws its line and facet alone, with the lists.
+  - A delta on a member re-renders its card on the Repo page as on the Org.
+  - The Doing chips carry a team chip per team where two serve the repo, and none where one does.
+  - The Team pick hands to the picked team's techlead seat, and blank to the first.
+
+**Done when** the Repo page shows everything the Org shows for the repo's group, for every servicing team, kept live by the Org's deltas, and every listed test passes.
+
+**Related:** TD-721 (the design), TD-722, TD-725, TD-741, TD-730, TD-176.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1936) — the Repo page is the repo's items of the Org's own layout (`repo_items` over `team_groups` and `org_layout`), drawn by one partial, `org_item.html`, which the Org draws with too: the repo's line with its Repo facet once, every servicing team's whole card and the no-team strip. The cards take the Org's `/events` deltas through the shared `groupsEvent(ev, repo)` (`AO.repoItems`, `syncGroups(gs, drop)`), and fold by the Org's per-team choice. The lists, title line and seams keep the `?part=1` poll, re-read on this repo's events. Doing is every servicing team's calls, with team chips where two or more serve the repo (`repo_doing`, `doing_chips`). *Waiting on you* links `/inbox?repo=…&kind=board`. Add entry has an optional **Team** pick (`entry_plan(…, pick)`, `/api/entry/hand` `team`). Tests in `tests/test_ui_repo_org.py`; UI check on a scratch home (`docs/mockups/reviews/2026-10-16-td740-*.png`).

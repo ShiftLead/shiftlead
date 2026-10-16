@@ -81,7 +81,7 @@ def test_the_facets_closed_block_links_to_recently_completed_with_the_titles_on_
     r["completed"] = [closed(600 + n, 1 + n) for n in range(12)]
     fleet = [rec("tdgrind-1", root)]
     html = client(monkeypatch, tmp_path, fake({root: r}, fleet)).get("/repo/samscrape").text
-    tsum = html[html.index('class="tsum"') : html.index('id="prs"')]
+    tsum = html[html.index('class="rline') : html.index('id="prs"')]  # the facet is on the repo's line (TD-740)
     a = tsum[tsum.index('href="/repo/samscrape?win=week#completed"') :].split(">")[0]
     title = htmllib.unescape(a.split('title="')[1].split('"')[0]).split("\n")
     assert title[0] == "TD-600 closed 600" and len(title) == 11 and title[-1] == "… and 2 more"

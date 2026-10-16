@@ -75,7 +75,7 @@ def test_a_node_already_in_place_is_not_moved():
 @pytest.mark.unit
 def test_the_swap_reads_first_and_moves_only_what_is_out_of_order():
     js = JS.read_text()
-    start = js.index("function syncGroups(gs)")
+    start = js.index("function syncGroups(gs")
     body = js[start : js.index("\n  }\n", start)]
     # every summary's scroll positions are read before the first node is replaced or moved
     read = body.index("scrollKept[sum.dataset.team] = AO.scrolls(sum)")

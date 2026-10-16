@@ -338,7 +338,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     repo_facet,  # noqa: F401
     repo_named,  # noqa: F401
     rollup,  # noqa: F401
-    team_lanes,
+    team_lanes,  # noqa: F401
     team_repo,  # noqa: F401
     team_summary,  # noqa: F401
 )
@@ -368,7 +368,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     compact_in,  # noqa: F401
     completed_rows,
     design_builds,  # noqa: F401
-    doing_chips,  # noqa: F401
+    doing_chips,
     entry_branch_exists,
     entry_hand,
     entry_line,
@@ -377,13 +377,15 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     flow_head,  # noqa: F401
     ledger_lists,  # noqa: F401
     missing_seams,
-    org_layout,  # noqa: F401
+    org_layout,
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
+    repo_doing,
+    repo_items,
     repo_line,  # noqa: F401
     settle_mark,  # noqa: F401
     strip_group,  # noqa: F401
-    team_groups,  # noqa: F401
+    team_groups,
     who_for_what,  # noqa: F401
 )
 from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
@@ -1404,10 +1406,12 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/repo/{name}", response_class=HTMLResponse)
     async def repo_page(request: Request, name: str, part: str = ""):
-        """The **Repo** page (design §4.5 screen 11, TD-176 slice 5): the servicing team's three
-        facets, then the lists behind the numbers — Open PRs, Technical debt, Waiting on you, Doing.
-        A registered repo no team services has a page too, its Repo facet alone. `part=1` is the
-        page's own refresh: the content without the chrome."""
+        """The **Repo** page (design §4.5 screen 11, TD-176 slice 5, TD-740): the repo's group of the Org,
+        expanded — its line with the Repo facet, every servicing team's whole card and its no-team
+        strip, by the Org's own layout and partials (`repo_items`) — then the lists behind the
+        numbers: Open PRs, Technical debt, Recently completed, Waiting on you, Doing. A registered repo
+        no team services has a page too, its line alone above the lists. `part=1` is the page's own
+        refresh: the lists without the chrome or the cards, which the Org's deltas keep."""
         repos_omit(REPOS_OMIT_PAGE)
         now = datetime.now(UTC)
         repos, doing = await repo_facts()
@@ -1419,39 +1423,31 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         seats = await seats_of(sessions)
         waits = await h.person_waits()  # *waiting* (§4.2, TD-428)
         vs = [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
-        groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing, needs=h.needs_cache["rows"]) or []
-        serving = [g for g in groups if g.get("summary") and (g["summary"].get("repo") or {}).get("name") == name]
+        info: dict[str, Any] = {}
+        with contextlib.suppress(Exception):  # an older agent or a node's link down: the headers lose their notes
+            info = dict(await call("host"))
+        strip = teams_view(sessions, info.get("waiting") or {})
+        # the Org's own groups and layout (§4.9 *The Org page*), cut to this repo's items (TD-740)
+        groups = team_groups(
+            vs,
+            strip["teams"],
+            repos,
+            doing,
+            info.get("work") or {},
+            await flow_views(sessions),
+            info.get("balance"),
+            h.needs_cache["rows"],
+        )
+        # no team anywhere (the Org's flat page): the repo's sessions still stand under its line, as a strip
+        groups = groups if groups is not None else [{"team": NO_TEAM, "members": vs}]
+        items = repo_items(org_layout(groups, repos, (await h.defs()).projects.values(), vs, now), name)
+        serving = [g for g in items if g["kind"] == "team"]
         org, _ = await asyncio.to_thread(org_here)
         named = repo_teams(org, host_name()).get(str(Path(str(r.get("root") or "")).resolve()), "")
         teams = list(dict.fromkeys([*(g["team"] for g in serving), *([named] if named else [])]))
-        first = serving[0] if serving else None
-        if first:
-            # the Repo page draws all three facets, whatever a stopped team's card leaves out (TD-418)
-            summary = {**first["summary"], "drawn": list(FACETS)}
-            members = first["members"]
-        elif named:
-            # a team the definitions give this repo, with nothing live now (between runs, stopped):
-            # its facets still stand — its members' claims, its doing log — with the repo's own
-            # numbers, since no live member points the summary at the repo (review of slice 5)
-            members = [v for v in vs if v.get("team") == named]
-            summary = team_summary(named, members, {}, doing, prs_waiting(members), now, needs=h.needs_cache["rows"])
-            summary["repo"] = repo_facet(r, now, prs_waiting(members), team_lanes(named, vs, r), vs)
-            summary["motion"] = motion_rows(members, r)
-            summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
-        else:
-            summary = {
-                "team": "",
-                "repo": repo_facet(r, now, fleet=vs),
-                "motion": [],
-                "phases": {},
-                "answers": [],
-                "doing": [],
-                "doer_w": 1,
-                "face": "doing",
-                "answer_key": "",
-                "noteam": True,
-            }
-            members = []
+        members = [m for g in serving for m in g["members"]]
+        motion = [x for g in serving for x in (g.get("summary") or {}).get("motion") or []]
+        facet = next((g.get("facet") for g in items if g["kind"] == "repo"), None)
         # every seat's inbox and sent mail, read as a person's read (§4.9c *What is shown*): a seat by
         # the definitions or its record, running or not — a view's `seat` is only an empty one's
         seat_ids = {*seats, *(str(s.get("id")) for s in sessions if s.get("seat"))}
@@ -1476,10 +1472,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         ctx = {
             "r": r,
             "name": name,
-            "g": {"team": summary["team"], "summary": summary},
+            "groups": items,  # the Org's items, drawn by its partials (TD-740)
+            "facet": facet,
             "teams": teams,
             "prs": pr_rows(r, members, standing, now, sessions),
-            "lists": ledger_lists(r, summary["motion"], lanes, now),
+            "lists": ledger_lists(r, motion, lanes, now),
             # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
             "completed": completed_rows(r, sessions, now),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
@@ -1490,15 +1487,16 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ],
             "boards": boards,
             "horizon": hz,
-            "doing": summary["doing"],
-            "chips": doing_chips(summary["doing"]),
-            "doer_w": summary.get("doer_w") or 1,
+            "doing": (drows := repo_doing(serving))[0],
+            "chips": doing_chips(drows[0], [g["team"] for g in serving]),
+            "doer_w": drows[1],
             # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first
             "ledger_editor": editor_file_link(ledger_file) if ledger_file else None,
             # the seams the repo leaves unset, and a ledger that is not there (§4.5a, TD-591)
             "seams": missing_seams(r),
             "host": host_name(),
             "active": "",
+            "part": bool(part),  # the re-read carries the title line and the seams, swapped in place
         }
         if not part:  # the page's top bar; the part is the page's body alone
             ctx["usage"] = await chip_usage(call)
@@ -2255,12 +2253,14 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return f"a branch named {name} exists — the session would start on it; pick another name"
         return ""
 
-    async def entry_plan(repo: str, type_: str, name: str = "") -> dict[str, Any]:
+    async def entry_plan(repo: str, type_: str, name: str = "", pick: str = "") -> dict[str, Any]:
         """What **Open a session** would start for `repo` (a registered checkout's name) and `type_`:
         the team whose `repo:` is the checkout, the role its `entries:` names (§4.9), the first
         `entry-<n>` free in the repo (`default`), the name the press takes — `name` as typed in the
         **Name** box, else the default — and `name_why`, why that name is not free (TD-677), the
-        team's live manager, and the line under the button."""
+        team's live manager, and the line under the button. `pick` is the form's **Team** pick
+        (TD-740): a servicing team's name puts it first among the teams **Hand to the techlead**
+        hands to; blank, or no team of the repo, leaves the first with a techlead seat."""
         if type_ not in orgmod.ENTRY_TYPES:
             raise HTTPException(400, f"type is {' or '.join(orgmod.ENTRY_TYPES)}, not {type_!r}")
         root = next((p for p in hosts.local_host().repos() if Path(p).expanduser().name == repo), None)
@@ -2294,6 +2294,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if (t.host or here) != here:  # **Attach** in the composer's words for a node's session (§4.5a, TD-630)
                 attach = f"{team} runs on {t.host}: this call does not cross the link"
         servicing = entry_teams(org, root, host_name())
+        picked = next((t for t in servicing if t["team"] == pick), None)
+        servicing = [picked, *(t for t in servicing if t is not picked)] if picked else servicing
         return {
             "repo": repo,
             "root": root,
@@ -2306,16 +2308,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "name_why": name_why,  # stands in place of the line, and disables **Open a session**
             "manager": manager,
             "line": entry_line(role, name, team),
-            "teams": servicing,  # what `entry_add` is handed (TD-218), in definition order
+            "teams": servicing,  # what `entry_add` is handed (TD-218), the picked team first (TD-740)
+            "picked": picked["team"] if picked else "",
             "hand": entry_hand(servicing, records, datetime.now(UTC)),  # **Hand to the techlead** (TD-219 slice 4)
             "attach": attach,  # why **Attach** refuses, or "" (§4.5a *Add entry form: Attach / drop / paste*)
         }
 
     @app.get("/api/entry/plan")
-    async def api_entry_plan(repo: str = "", type: str = "debt", name: str = ""):
-        """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes, and the
-        **Name** box's verdict as the person types (`name=`, TD-677)."""
-        return await entry_plan(repo, type, name)
+    async def api_entry_plan(repo: str = "", type: str = "debt", name: str = "", team: str = ""):
+        """The Add entry form's line under **Open a session** (§4.5a), read as the Type changes, the
+        **Name** box's verdict as the person types (`name=`, TD-677), and **Hand to the techlead**'s seat
+        for the **Team** pick (`team=`, TD-740)."""
+        return await entry_plan(repo, type, name, team)
 
     @app.post("/api/entry/attach")
     async def api_entry_attach(
@@ -2334,15 +2338,18 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/entry/hand")
     async def api_entry_hand(request: Request):
-        """§4.5a Add entry form → **Hand to the techlead** (TD-219 slice 4): `{repo, type, words}` goes
-        to `entry_add` (TD-218) as the person's `ask` to the techlead seat of the repo's first
-        servicing team, marked `handed`, with no bound; the host agent refuses in words what the page
-        disables (no team, no seat, no words). Answers `{id, to, name, text, href}`: the toast's words,
-        *handed to techlead-ao-1 · m-…*, and the message's page in the Inbox."""
+        """§4.5a Add entry form → **Hand to the techlead** (TD-219 slice 4): `{repo, type, words, team}`
+        goes to `entry_add` (TD-218) as the person's `ask` to the techlead seat of the team the **Team**
+        pick names (TD-740), else the repo's first servicing team with a seat, marked `handed`, with no
+        bound; the host agent refuses in words what the page disables (no team, no seat, no words).
+        Answers `{id, to, name, text, href}`: the toast's words, *handed to techlead-ao-1 · m-…*, and the
+        message's page in the Inbox."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, type, words}")
-        plan = await entry_plan(str(body.get("repo") or ""), str(body.get("type") or "debt"))
+        plan = await entry_plan(
+            str(body.get("repo") or ""), str(body.get("type") or "debt"), pick=str(body.get("team") or "")
+        )
         got = await call(
             "entry_add",
             repo=plan["root"],

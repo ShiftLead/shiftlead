@@ -156,6 +156,9 @@
       <label><input type="radio" name="entrytype" value="debt" checked> debt <span class="meta">something wrong now</span></label>
       <label><input type="radio" name="entrytype" value="feature"> feature <span class="meta">something new</span></label>
     </div>
+    {#- §4.5a *Add entry form: Hand to the techlead* (TD-740): where two or more teams service the repo, the
+        optional **Team** pick — blank hands to the first with a techlead seat, a pick to that team's -#}
+    <label class="row gap" id="entryteamrow" hidden><span class="field">Team</span><select class="input" id="entryteam" aria-label="Team" style="width: auto; flex: none;"></select><span class="meta">its techlead takes the entry</span></label>
     <div class="col gap"><div class="row gap wrap"><button class="btn primary" type="button" id="entryhand" disabled>Hand to the techlead</button>
         <span class="mono" id="entryseat"></span><span class="meta" id="entryhandwhat">drafts the entry and lands it by PR. Its questions come to your Inbox; the entry's id and PR come back as the outcome.</span></div>
       <span class="meta" id="entrywhen"></span></div>
