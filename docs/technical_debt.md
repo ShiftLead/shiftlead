@@ -67,7 +67,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-781 | A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start` | Medium | Open |
-| TD-783 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Open |
+| TD-787 | A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask | Medium | Open |
 
 ---
 
@@ -1319,7 +1319,7 @@ The other cases:
 
 ---
 
-## TD-783: A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask
+## TD-787: A green PR that touches a held path and was never asked of its reader reads the same as one outside `held:`: nothing shows that its author still owes the review and the ask
 
 **Priority:** Medium
 **Type:** debt
