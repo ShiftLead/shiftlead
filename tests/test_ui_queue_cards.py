@@ -214,9 +214,10 @@ def test_the_page_puts_a_refused_card_back_and_says_why():
     assert body.index("placeCards(m.order)") < body.index('fetch("/api/rank/move"') < body.index("placeCards(before)")
     assert "why.textContent" in body and "why.hidden = false" in body
     # a link to an entry opens the card that holds it before it scrolls there
-    show = js[js.index("function showHash()") :]
+    show = js[js.index("function reveal(") :]
     show = show[: show.index("\n    }\n")]
-    assert show.index("toggleFold(card)") < show.index("row.scrollIntoView(")
+    assert show.index("toggleFold(card)") < show.index("el.scrollIntoView(")
+    assert "reveal(el, false)" in js[js.index("function showHash()") :][:200]
 
 
 PROBE = """

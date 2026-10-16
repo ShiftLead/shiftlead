@@ -8,6 +8,11 @@
 {% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
 {% else %}
 
+{# the filter row's numbers, which the page copies into the row it keeps outside these lists (TD-771) #}
+<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}" data-ininbox="{{ in_inbox or 0 }}"></span>
+{% if q.find_miss %}<div class="qnote qfindmiss" id="qfindmiss">{{ q.find_miss.id }} is on no open card{% if q.find_miss.repos %} — in the archive: {% for r in q.find_miss.repos %}{% if not loop.first %} · {% endif %}<a href="{{ r.url }}">{{ q.find_miss.id }} on {{ r.name }}'s Repo page</a>{% endfor %}{% endif %}</div>{% endif %}
+{% if q.filtered and not q.shown %}<div class="qnote" id="qnone">no open card fits these picks</div>{% endif %}
+
 {# Recently completed — the completed cards and the open cards' archived rows in the window, newest first #}
 <section class="rsec" id="qcompleted">
   <div class="row gap rsh"><span class="h2">Recently completed</span>
@@ -17,7 +22,7 @@
   </div>
   <div class="rlist qdone">
   {% for ln in q.completed.lines %}
-    <div class="qdline{% if ln.entries %} opens{% endif %}" data-key="{{ ln.kind }}:{{ ln.show }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
+    <div class="qdline{% if ln.entries %} opens{% endif %}{% if ln.off %} qoff{% endif %}" data-key="{{ ln.kind }}:{{ ln.show }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
       <div class="qdhead"{% if ln.entries %} role="button" tabindex="0" aria-expanded="false" title="what was done"{% endif %}>
         <span class="qsub qage">{{ ln.age }}</span><span class="qid mono strong">{{ ln.show }}</span>{{ pbadge(ln.priority) }}<span class="qtitle">{{ ln.title }}</span>
         <span class="qright">{% if ln.kind == 'row' %}<a class="qsub" href="#{{ ln.on }}">on {{ ln.on }}'s card</a>{% elif ln.n > 1 %}<span class="qsub">{{ ln.n }} entries</span>{% endif %}</span>
@@ -35,7 +40,7 @@
   {% if q.in_progress or q.other %}
   <div class="qcards">
   {% for c in q.in_progress %}{{ qc.card(c) }}{% endfor %}
-  {% for o in q.other %}<div class="qother"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
+  {% for o in q.other %}<div class="qother{% if o.off %} qoff{% endif %}"><span class="qsub">other work</span>{{ holder(o.holder) }}<span class="mono">{{ o.ref }}</span>{% if o.pr %}<span class="qsub">#{{ o.pr }}</span>{% endif %}</div>{% endfor %}
   </div>
   {% else %}<div class="rlist"><div class="rrow qsub">nobody holds an entry</div></div>{% endif %}
 </section>

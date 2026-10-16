@@ -867,6 +867,17 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qdline.opens > .qdhead:hover { background: var(--hover); }
 .qage { flex: none; min-width: 3.5em; text-align: right; }
 .qdbody { padding: 0 14px 10px calc(3.5em + 22px); display: grid; gap: 6px; font-size: var(--t-small); }
+/* the filter row (§4.5a *Queue page: filters, find*, TD-771): toggles carried in the URL; what they hide is `qoff` */
+.qoff { display: none !important; }
+.qfilters { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 10px; }
+.qf { border: 1px solid var(--border); border-radius: 5px; padding: 2px 9px; font-size: var(--t-small); color: var(--fg); text-decoration: none; }
+.qf:hover { background: var(--hover); }
+.qf[aria-pressed="true"] { background: var(--hover); color: var(--strong); font-weight: 600; }
+.qkinds { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.qfind { margin-left: auto; }
+.qfind input { font: inherit; font-size: var(--t-small); padding: 3px 8px; min-width: 16em; }
+.qfilters + .qnote, .qfindmiss { padding-left: 0; margin-top: 6px; }
+.qring { outline: 2px solid var(--needs-fg); outline-offset: 2px; border-radius: 4px; }
 .qother { display: flex; gap: 10px; align-items: baseline; padding: 8px 14px 8px 17px; border-top: 1px solid var(--line); font-size: var(--t-small); }
 @media (max-width: 720px) {
   .qhead { grid-template-columns: 1em 1.6em 1fr; column-gap: 6px; }
@@ -874,5 +885,7 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
   .qtitle { flex: 1 1 0; min-width: 8em; }
   .qright { margin-left: 0; justify-content: flex-start; flex-basis: 100%; }
   .qbuilds, .qnote { padding-left: 0; }
+  .qfind { margin-left: 0; flex-basis: 100%; }
+  .qfind input { width: 100%; min-width: 0; }
   .qrow { padding-left: calc(2.6em + var(--qd, 1) * 1ch); }
 }

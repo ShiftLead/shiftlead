@@ -227,7 +227,7 @@ TAIL = "</x-dc>\n</body>\n</html>\n"
 def topbar(active="Org", narrow=False):
     # a tab exists only for a built page (TD-123); an unbuilt screen's own mockup draws its tab, active
     inbox = active if active.startswith("Inbox") else "Inbox 4 · 2"
-    live = ["Org", inbox] + ([] if active in ("Org", inbox) else [active])
+    live = ["Org", inbox, "Queue"] + ([] if active in ("Org", inbox, "Queue") else [active])
     tabs = "".join(f'<span class="tab{" on" if t == active or (t == inbox and active.startswith("Inbox")) else ""}">{t}</span>' for t in live)
     return f'''<div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
@@ -1954,6 +1954,110 @@ DARK = [
  ("background: #0f1419;", "background: #05070a;"), ("background: #f3f4f6;", "background: #1f242c;"),
  ("background: #e5e7eb; color: #f1f3f6;", "background: #3a424d; color: #f1f3f6;"),
 ]
+def queue_page():
+    """Screen 12, the **Queue** (TD-748, built by TD-771; §4.5a *Queue page*), from the mockup Paul reviewed over
+    seven rounds (`reviews/2026-10-16-td748-queue-*.png`): the filter row, Recently completed one line a card under
+    the window picker, In progress with its green stripe and *d/m done* and an other-work line, and Up next numbered
+    with the grip and ⤒ ↑ ↓ — amber spent on what needs the person alone, the mail and the ledger's needs drawn on
+    the row they name by the Inbox's own renderers."""
+    P = {"H": ("#1e3a8a", "#fff"), "M": ("#2563eb", "#fff"), "L": ("#bfdbfe", "#1e3a8a")}
+    def badge(p):
+        bg, fg = P[p]
+        return (f'<span class="mono" style="display: inline-flex; width: 15px; height: 15px; align-items: center; justify-content: center; '
+                f'border-radius: 3px; font-size: 10px; font-weight: 600; background: {bg}; color: {fg};">{p}</span>')
+    def tid(t, strong=True):
+        return f'<span class="mono" style="font-size: 12.5px;{" font-weight: 600;" if strong else ""}">{t}</span>'
+    def chip(t, on=False):
+        return (f'<span style="border: 1px solid #d0d5dc; border-radius: 5px; padding: 2px 9px; font-size: 12px;'
+                f'{" background: #e9edf2; font-weight: 600;" if on else ""}">{t}</span>')
+    def word(t, mark="#16a34a"):
+        return f'<span class="meta" style="font-size: 12px;"><i style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: {mark}; margin-right: 4px;"></i>{t}</span>'
+    needs_badge = '<span style="background: #d97706; color: #fff; border-radius: 10px; padding: 1px 9px; font-size: 12px; font-weight: 600;">Needs you</span>'
+    moves = '<span class="meta" style="font-size: 13px; letter-spacing: 6px;">⤒↑↓</span>'
+    def card(n, t, p, title, right, needs=False, body="", stripe=""):
+        bg = "#fffaf0" if needs else "#fff"
+        edge = "#d97706" if needs else (stripe or "transparent")
+        place = (f'<span style="font-size: 30px; font-weight: 600; color: rgba(28,33,40,.25); width: 1.6em; text-align: right; line-height: 1;">{n}</span>'
+                 if n else '<span style="width: 1.6em;"></span>')
+        grip = '<span class="meta" style="width: 1em;">⋮⋮</span>' if n else '<span style="width: 1em;"></span>'
+        return (f'<div style="border-top: 1px solid #e3e7ec; border-left: 3px solid {edge}; background: {bg}; padding: 10px 14px 10px 8px;">'
+                f'<div style="display: flex; gap: 10px; align-items: flex-start;">{grip}{place}'
+                f'<div style="flex: 1; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;">{tid(t)}{badge(p)}'
+                f'<span style="flex: 1; min-width: 20em; font-weight: 500;">{title}</span>'
+                f'<span style="display: flex; gap: 10px; align-items: center;">{right}</span></div></div>{body}</div>')
+    def need(kind, text, buttons):
+        btns = "".join(f'<span class="btn sm">{b}</span>' for b in buttons)
+        return (f'<div style="margin: 10px 0 2px calc(2.6em + 18px); border-left: 3px solid #d97706; background: #fff; padding: 8px 12px; '
+                f'display: flex; gap: 12px; align-items: flex-start;"><b style="font-size: 12px; color: #92400e; white-space: nowrap;">{kind}</b>'
+                f'<span style="flex: 1; font-size: 13px;">{text}</span><span style="display: flex; gap: 6px;">{btns}</span></div>')
+    def done_line(age, t, p, title, right=""):
+        return (f'<div style="display: flex; gap: 8px; align-items: baseline; padding: 8px 14px; border-top: 1px solid #eef1f4;">'
+                f'<span class="meta" style="width: 3.5em; text-align: right; font-size: 12px;">{age}</span>{tid(t)}{badge(p)}'
+                f'<span style="flex: 1;">{title}</span><span class="meta" style="font-size: 12px;">{right}</span></div>')
+    def panel(title, sub, body, right=""):
+        return (f'<div style="margin-top: 18px;"><div style="display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px;">'
+                f'<span style="font-size: 17px; font-weight: 600;">{title}</span><span class="meta" style="font-size: 12px;">{sub}</span>'
+                f'<span style="flex: 1;"></span>{right}</div>'
+                f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{body}</div></div>')
+    wins = ('<span style="display: inline-flex; border: 1px solid #d0d5dc; border-radius: 5px; overflow: hidden; font-size: 12px;">'
+            + "".join(f'<span style="padding: 2px 10px; border-left: 1px solid #d0d5dc;{" background: #e9edf2; font-weight: 600;" if w.startswith("Day") else ""}">{w}</span>'
+                      for w in ("4 h (3)", "Day (31)", "Week (261)", "Month (609)")) + "</span>")
+    completed = "".join([
+        done_line("3h", "TD-749", "M", "The grinders' file split idles one grinder while the other's package has work"),
+        done_line("3h", "TD-752", "M", "<span class=\"mono\">test_dismiss_marks_the_entries…</span> is flaky on CI"),
+        done_line("4h", "TD-736", "M", "Build TD-731 (2): <b>Hold</b> on every settled row a lane takes", "2 entries"),
+        done_line("5h", "TD-744", "M", "TD-731's <span class=\"mono\">_hold_tell</span> reading a PR only from a declared claim", "on TD-731's card"),
+    ])
+    in_progress = (
+        card("", "TD-771", "M", "Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards",
+             '<span class="mono" style="font-size: 12px; border: 1px solid #c7d2fe; border-radius: 10px; padding: 0 8px;">grinder-ao-2</span>'
+             + word("in review #1962") + '<span class="meta" style="font-size: 12px; font-weight: 600; color: #15803d;">3/4 done</span>',
+             stripe="#16a34a")
+        + '<div style="display: flex; gap: 10px; padding: 8px 14px 8px 17px; border-top: 1px solid #e3e7ec; font-size: 12px;"><span class="meta">other work</span>'
+          '<span class="mono" style="border: 1px solid #c7d2fe; border-radius: 10px; padding: 0 8px;">grinder-ao-1</span><span class="mono">board:cadence-sync</span></div>'
+    )
+    up_next = "".join([
+        card(1, "TD-784", "M", "Build TD-112 (1): the adapter conformance suite — offline fixtures in CI, live by hand",
+             moves + '<span class="meta" style="font-size: 12px;">2 entries</span>' + word("ready", "#2563eb"),
+             body='<div class="meta" style="font-size: 12px; margin: 6px 0 0 calc(2.6em + 18px);">passed over by grinder-ao-1: TD-789 holds the review seat\'s reading it needs first</div>'),
+        card(2, "TD-156", "M", "UI review of the end of a session: Focus offers Kill in the header and Close only in the side panel",
+             moves + needs_badge, needs=True,
+             body=need("Yours to do", "<b>Why:</b> the end of a session is the one moment the person must act…", ["Reply", "Open", "Start session", "Done"])),
+        card(3, "TD-460", "M", "Read back the one-week trial of a 200k context bound on ao-grind's grinders",
+             moves + '<span class="meta" style="font-size: 12px;">waits until 2026-10-23</span>' + word("steer", "#7c3aed"),
+             body=need("Steer", "take the 200k line out; the 300k default returns — lapses to <i>run another week</i> in 3h", ["Reply", "Pause"]).replace("#d97706", "#a78bfa").replace("#92400e", "#5b21b6")),
+        card(4, "TD-623", "M", "No document says how a repo gets its first ShiftLead team",
+             moves + needs_badge, needs=True,
+             body=need("Held until", "when guardians-devenv TD-028's <i>doc gaps</i> list is enough to write from", ["Lift the hold", "Reply", "Open"])),
+        card(5, "TD-553", "L", "Drop the <span class=\"mono\">.agentorc.yml</span> fallback once samscrape, contractmatch and dev-cadence have renamed theirs",
+             moves + '<span class="meta" style="font-size: 12px;">after contractmatch#TD-055</span>' + word("blocked", "#9ca3af")),
+    ])
+    filters = ('<div style="display: flex; gap: 6px 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;">'
+               + chip("All", True) + chip("Needs you (2)")
+               + '<span class="meta" style="font-size: 12px;"><a href="#">+ 1 in the Inbox</a></span>'
+               + chip("Steering") + chip("ao-grind") + '<span class="meta" style="font-size: 12px; margin-left: 6px;">kind</span>'
+               + "".join(chip(k) for k in ("questions", "steering", "board lines", "yours to do", "held until", "held (person)"))
+               + '<span style="flex: 1;"></span><span style="border: 1px solid #d0d5dc; border-radius: 4px; padding: 3px 8px; min-width: 16em; '
+                 'font-size: 12px; color: #8a94a3; background: #fff;">find an id or a title</span></div>')
+    note = ('<div class="note" style="margin-top: 18px;">Design notes, not page text. The top bar\'s one number stays the Inbox\'s (it counts the '
+            'questions drawn on cards, and opens the needs-you filter while any is here); the Queue tab carries none. A move\'s neighbours are '
+            'the whole Up next order, whatever a filter hides; the filters are carried in the URL. No Snooze here: the rank orders the Queue, '
+            'not a date. Built by TD-769–TD-771.</div>')
+    return head("Queue") + f'''<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Queue")}
+<div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
+  <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Queue</span>
+    <span class="meta" style="font-size: 12px;">31 cards: 3 in progress, 28 up next. <b style="color: #b45309;">2 need you.</b></span></div>
+  {filters}
+  {panel("Recently completed", "26 in the last day", completed, wins)}
+  {panel("In progress", "1 · someone holds an entry, or its PR is open", in_progress)}
+  {panel("Up next", "28 · worked from the top: drag a card by its grip, or use its arrows, to change the order", up_next)}
+  {note}
+</div>
+</div>
+''' + TAIL
+
+
 def darken(html):
     for a, b in DARK:
         html = html.replace(a, b)
@@ -1985,6 +2089,7 @@ files = {
     "TypeDark.dc.html": darken(type_scale()),
     "Settings.dc.html": settings_page(),
     "RepoFacet.dc.html": repo_facet_board(),
+    "Queue.dc.html": queue_page(),
     "SettingsDark.dc.html": darken(settings_page()),
 }
 for n, s in files.items():
@@ -2016,6 +2121,7 @@ LAYOUT = [
     ("InboxPress.dc.html", "Inbox — a control answers the press (TD-338)", 1),
     ("NewSession.dc.html", "New session", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
+    ("Queue.dc.html", "Queue — the cards in rank order (TD-748, built by TD-771)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
