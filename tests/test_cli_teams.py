@@ -2374,6 +2374,34 @@ def test_the_lanes_line_counts_only_the_teams_own_entries(world, capsys):
     assert json.loads(capsys.readouterr().out)["lanes"]["roles"]["grinder"]["n"] == 2
 
 
+def _tag_seat(name, team, root, **kw):
+    """A techlead seat carrying `tags`, live in a live team unless told otherwise (TD-777)."""
+    return {"id": name, "name": name, "state": "idle", "repo": str(root), "team": team, "unattended": True,
+            "seat": {"trigger": "asks", "tags": True}, **kw}  # fmt: skip
+
+
+def test_the_tagging_seat_is_the_first_live_one_in_declared_order(tmp_path):
+    """§4.4 *An untagged or unknown entry is handed to a techlead* (TD-730, TD-777): among live tagging
+    seats, `ao repo` names the one the tick picks — the first in `declared`'s order (case-folded), never
+    the first by name — and one in no declared team after them all."""
+    root = tmp_path.resolve()
+    fleet = [_tag_seat("tl-alpha", "alpha", root), _tag_seat("tl-zulu", "zulu", root)]
+    assert teamrun.tagging_seat(fleet, root, ["ZULU", "alpha"]) == ("tl-zulu", "")
+    assert teamrun.tagging_seat(fleet, root, ["alpha", "zulu"]) == ("tl-alpha", "")
+    assert teamrun.tagging_seat(fleet, root, ["alpha"]) == ("tl-alpha", ""), "an undeclared team's seat comes after"
+    assert teamrun.tagging_seat(fleet, root, ["zulu"]) == ("tl-zulu", "")
+
+
+@pytest.mark.parametrize("bad", [{"unattended": False}, {"suspended": True}])
+def test_an_attended_or_suspended_tagging_seat_is_passed_over_for_a_good_one(tmp_path, bad):
+    """TD-777: a seat a person took over, or one suspended, is not handed the tagging, though its team is
+    live and it is declared first; the good seat of the next team is."""
+    root = tmp_path.resolve()
+    worker = {"id": "g", "name": "g", "state": "idle", "repo": str(root), "team": "alpha", "unattended": True}
+    fleet = [_tag_seat("tl-alpha", "alpha", root, **bad), worker, _tag_seat("tl-zulu", "zulu", root)]
+    assert teamrun.tagging_seat(fleet, root, ["alpha", "zulu"]) == ("tl-zulu", "")
+
+
 # ── a team its repo's ledger does not declare (§4.4 *The move from one team to two*, TD-763) ─────
 
 
