@@ -46,11 +46,12 @@ def test_two_teams_mark_an_untagged_lane_entry_and_an_unknown_one_and_nothing_el
         _entry(5, kind="evaluation"),
         _entry(6, owner="paul"),  # for you
         _entry(7, kind="design-first"),  # design: a lane takes it
+        _entry(8, kind="live-check #1"),  # live check: a lane takes it
     )
     assert got["TD-001"]["needs_team"] == {"why": "untagged"}
     assert got["TD-002"]["needs_team"] == {"why": "unknown qa"}
     assert got["TD-007"]["needs_team"] == {"why": "untagged"}
-    assert {i for i, e in got.items() if e.get("needs_team")} == {"TD-001", "TD-002", "TD-007"}
+    assert {i for i, e in got.items() if e.get("needs_team")} == {"TD-001", "TD-002", "TD-007", "TD-008"}
     assert got["TD-003"]["team"] == "db" and got["TD-001"]["team"] == ""
     assert got["TD-001"]["for_page"] == "pickable", "its page kind is unchanged"
 
@@ -102,6 +103,8 @@ def test_in_lanes_reads_each_lane_with_its_records_team_and_counts_a_marked_entr
     assert db["pickable"] == ["TD-001"] and db["rest"] == [], "another team's entry is no rest; a marked one none"
     assert db["members"][0]["ids"] == ["TD-001"]
     assert db["out_of_work"] == [{"id": "d1", "name": "db-grinder", "ids": ["TD-001"]}]
+    teamless = ledger.in_lanes(entries, [{**records[0], "team": ""}])
+    assert teamless["pickable"] == ["TD-001", "TD-002"], "a teamless lane narrows nothing; a marked entry stays out"
     both = ledger.in_lanes(entries, records)
     assert both["pickable"] == ["TD-001", "TD-002"]
     assert [m["ids"] for m in both["members"]] == [["TD-001"], ["TD-002"]]

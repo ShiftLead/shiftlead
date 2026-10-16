@@ -171,6 +171,28 @@ async def test_an_entry_filed_after_the_declaration_is_told_once(agent, tmp_path
         await person.call("kill", id=sid)
 
 
+async def test_rule_six_tells_a_member_only_its_own_teams_entries(agent, tmp_path):
+    """Rule 6 reads the lane with the record's `team` (§4.4 *An entry names its team*, TD-762): an entry
+    tagged for another team, and one that needs a team, are no news to db's member."""
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _finished(
+            agent, person, tmp_path, "w", ["free-pick"], [_e("TD-001"), {**_e("TD-005"), "team": "ops"}]
+        )
+        rec = agent.sessions[sid]
+        rec.team = "db"
+        await agent._keep_running(now)
+        assert rec.lane_seen and rec.lane_seen["ids"] == ["TD-001"], "the tick reads the member's team"
+        agent._repos[str(tmp_path)]["ledger"]["entries"] = [
+            _e("TD-001"), {**_e("TD-002"), "team": "db"}, {**_e("TD-003"), "team": "ops"},
+            {**_e("TD-004"), "needs_team": {"why": "untagged"}},
+        ]  # fmt: skip
+        await agent._lane_news(rec, now)
+        assert len(notes := _notes(agent, sid)) == 1 and "1 entry since you declared out of work: TD-002" in notes[0]
+        await person.call("kill", id=sid)
+
+
 async def test_an_entry_on_the_designers_decision_is_told_to_the_designer_and_once_decided_to_the_grinder(
     agent, tmp_path
 ):
