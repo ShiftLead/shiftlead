@@ -886,14 +886,14 @@
 {%- endmacro %}
 
 {# ── design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3) ─────────────────────────
-   One row per wound-down team whose lanes gained work, every part a structured reading of the
+   One row per wound-down or stopped team whose lanes gained work, every part a structured reading of the
    home's (`work_waiting`, `work` on `host`): the team, when it wound down, the ids — each a link
    to the Repo page's entry — and, under `on_work: start`, the bound that held the start back.
    **Start** is the team card's Start (`/api/teams/<team>/start`, every check the client makes,
    refused in its words); **Snooze ▾** by time alone; **Dismiss** is `clear_work`. #}
 {% macro work_row(e, section) -%}
 <div class="row gap wrap mhead">
-  <span class="ref" title="{{ e.team }}: {{ 'running, and a member that finished has new work in its lane' if e.running else 'wound down, and its lanes gained work since' }} (design §6 rule 8)">{{ e.team }}</span>
+  <span class="ref" title="{{ e.team }}: {{ 'running, and a member that finished has new work in its lane' if e.running else ('stopped, and its lanes gained work since — the rule never starts a stopped team' if e.stopped else 'wound down, and its lanes gained work since') }} (design §6 rule 8)">{{ e.team }}</span>
   <span class="badge kindmark k-promote">team start</span>
   <span class="grow"></span>
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}" title="since the entries were read as waiting">{{ e.age or '' }}</span>{% endif %}
@@ -901,7 +901,7 @@
 {{ subj(e) }}
 <div class="body">{{ e.team }} ·
   {%- if e.running %}{% for f in e.finished %} {{ f.name }} finished{% if f.at %} <span class="localtime" data-at="{{ f.at }}" title="{{ f.at }}">{{ f.at }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}
-  {%- else %} wound down{% if e.wound_down %} <span class="localtime" data-at="{{ e.wound_down }}" title="{{ e.wound_down }}">{{ e.wound_down }}</span>{% endif %}{% endif %} ·
+  {%- else %} {% if e.stopped %}stopped{{ e.stopped_words }}{% else %}wound down{% endif %}{% if e.wound_down %} <span class="localtime" data-at="{{ e.wound_down }}" title="{{ e.wound_down }}">{{ e.wound_down }}</span>{% endif %}{% endif %} ·
   {%- for q in e.questions %} {{ q.name }}'s {{ q.kind }} about {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ q.ref }}">{{ q.ref }}</a>{% else %}<span class="mono">{{ q.ref }}</span>{% endif %} {{ 'lapsed to its default' if q.how == 'lapsed' else 'was answered' }}{{ ';' if not loop.last or e.n }}{% endfor %}
   {%- if e.n %} {{ e.lanes or 'its lanes' }} gained {{ e.n }} entr{{ 'y' if e.n == 1 else 'ies' }}:
   {%- for i in e.ids %} {% if e.repo %}<a class="mono" href="/repo/{{ e.repo }}#{{ i }}">{{ i }}</a>{% else %}<span class="mono">{{ i }}</span>{% endif %}{{ ',' if not loop.last }}{% endfor %}{% if e.more %} and {{ e.more }} more{% endif %}{% endif %}</div>

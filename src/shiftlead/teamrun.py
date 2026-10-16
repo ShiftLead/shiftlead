@@ -522,6 +522,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | Non
                 # *who for what* lines (design §4.5a ***i*** mark, TD-171)
                 "roles": role_holders(t),
                 "live": n_live,
+                # how many crew records carry its badge: none is *a team with no record* (§6 rule 8, TD-781)
+                "records": len(mine),
                 # only when nothing is live: a team still running is described by what it is doing
                 "wound_down": down,
                 # …who closed it, how soon and why (§4.5a *wound down* note, TD-265): only when it did
@@ -609,7 +611,9 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
     — each read against its checkout's ledger as rules 6 and 8 read it (`ledger.lane_matches` over the
     home's `repos` reading, whatever the entry's page kind) and said by the page's kinds: *grinder: 3
     pickable, 1 live check · designer: 0*. Returns `{line, empty, roles}`, `roles` as `{role: {n,
-    by_kind}}` — `n` None for a ledger that cannot be read, which is *unknown*, never empty. `empty`
+    by_kind}}` — `n` None for a ledger that cannot be read, which is *unknown*, never empty — and `ids`,
+    the distinct ids every lane read matched, each once (a team with no record says *its lanes hold n
+    entries* from it, §6 rule 8 *A team with no record*, TD-781). `empty`
     only when every lane was read and none matched. None when there is nothing to
     say: no launch has a lane, or the plan itself fails, which the start reports in its own words."""
     try:
@@ -625,6 +629,7 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
     except Exception:  # noqa: BLE001 — no reading is every lane unknown, never a refused start
         readings = {}
     roles: dict[str, dict[str, Any]] = {}
+    ids: dict[str, None] = {}  # every lane's matches, each id once, in the ledger's order per lane
     for x in holders:
         if x.role in roles:
             continue  # a role once: its members share a lane (§4.9)
@@ -634,10 +639,11 @@ def lanes(call: Call, org: orgmod.Org, name: str, host: str) -> dict[str, Any] |
             mine = [e for e in entries if isinstance(e, dict) and ledger_mod.lane_matches(x.lane, e, name)]
             by_kind = {k: sum(1 for e in mine if (e.get("for_page") or "other") == k) for k, _ in LANE_WORDS}
             roles[x.role] = {"n": len(mine), "by_kind": by_kind}
+            ids.update((str(e.get("id")), None) for e in mine if e.get("id"))
         else:
             roles[x.role] = {"n": None, "by_kind": {}}
     line = " · ".join(_lane_count(role, got) for role, got in roles.items())
-    return {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles}
+    return {"line": line, "empty": all(r["n"] == 0 for r in roles.values()), "roles": roles, "ids": list(ids)}
 
 
 def keep_mail_for(

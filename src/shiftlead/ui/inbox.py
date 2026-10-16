@@ -10,7 +10,7 @@ from __future__ import annotations
 import functools
 import subprocess
 import time
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -34,11 +34,12 @@ from sessionorc.client import call_sync
 from sessionorc.models import (
     normalize_ref,
 )
-from sessionorc.work import manager_of
+from sessionorc.work import manager_of, wound_down
 from shiftlead import review as review_mod
 from shiftlead import teamrun
 
 from . import render as rendermod
+from . import uiconf
 from .cards import _clock, _first_line, alarm_note, alarm_to_view
 from .common import _age, _countdown, _instant, _iso, _left, editor_file_link, host_name, templates
 
@@ -831,6 +832,8 @@ def ci_not_run_kinds(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 WORK_IDS = 5  # §4.5a *Inbox row: team start*: five ids at most, then *and n more*
+# §4.5a *Inbox row: team start*, a stopped team's: the words after *stopped*, by `stopped.by` (TD-781)
+STOPPED_BY = {"person": " by you", "until": " at its stop time"}
 
 
 def work_ids(mark: Mapping[str, Any]) -> list[str]:
@@ -893,6 +896,7 @@ def work_rows(
     wound: Mapping[str, Any] | None = None,
     now: datetime | None = None,
     records: Iterable[Mapping[str, Any]] = (),
+    on_work: Callable[[str], str] | None = None,
 ) -> list[dict[str, Any]]:
     """design §4.5a **Inbox row: team start** (§6 rule 8, TD-227 slice 3): one row per wound-down
     team whose lanes gained work, from the home's `work_waiting` (`work` on the `host` read) —
@@ -907,8 +911,16 @@ def work_rows(
     **A team that runs on** (§6 rule 8 *A member that finished while its team runs on*, TD-466): a
     team `wound` does not name, whose mark names members, reads *`<team>` · grinder-ao-1 finished <t>
     · its lane gained …* — each named member by its record's name and the instant it closed, from
-    `records` (the page's own list) — and is `running`, so its **Start** posts `work_start`."""
+    `records` (the page's own list) — and is `running`, so its **Start** posts `work_start`.
+
+    **A team that stopped** (§6 rule 8 *A team that stopped*, TD-781: the mark carries `stopped: {by,
+    at}`) is never read as one that runs on: *`<team>` · stopped by you <t> · its lanes gained …*, *by
+    you* for `person`, *at its stop time* for `until`, nothing for `other`, `<t>` its `stopped.at`
+    (`wound_down`, as the wound-down row's), and under `on_work: start` (`on_work`, the team's setting
+    as `uiconf` last read it) *· not started: a stopped team is started by Start*. Its **Start** is the
+    card's. `stopped` is its `by`; one the person stopped is `later`, which **Needs you** never takes."""
     at = now or datetime.now(UTC)
+    on_work = on_work or uiconf.team_on_work
     out: list[dict[str, Any]] = []
     for team, mark in sorted((work or {}).items()):
         if not isinstance(mark, Mapping):
@@ -919,17 +931,24 @@ def work_rows(
         ids = [i for i in work_ids(mark) if i not in refs]
         if not ids and not asked:
             continue
-        down = (wound or {}).get(team)
+        stopped = mark.get("stopped") if isinstance(mark.get("stopped"), Mapping) else None
+        by = str(stopped.get("by") or "other") if stopped else ""
+        # a stopped team's instant is its stop's, never the card's *wound down* (TD-781)
+        down = (str(stopped.get("at") or "") or None) if stopped else (wound or {}).get(team)
         repo = Path(str(mark.get("repo") or "")).name
         held = work_held(mark.get("held"), at)
+        if stopped and not held and on_work(str(team)) == "start":
+            held = "a stopped team is started by Start"  # rule 8 never starts it (§6, TD-781)
         n = len(ids)
-        finished = work_finished(str(team), mark, records) if wound is not None and not down else []
+        finished = work_finished(str(team), mark, records) if wound is not None and not down and not stopped else []
         lanes = ("its lane" if len(finished) == 1 else "their lanes") if finished else "its lanes"
         said = f"{lanes} gained {n} entr{'y' if n == 1 else 'ies'}: {', '.join(ids[:WORK_IDS])}" if ids else ""
         if n > WORK_IDS:
             said += f" and {n - WORK_IDS} more"
         said = "; ".join([*(q["words"] for q in asked), *([said] if said else [])])
-        who = ", ".join(f"{f['name']} finished" + (f" {f['at']}" if f["at"] else "") for f in finished) or "wound down"
+        who = ", ".join(f"{f['name']} finished" + (f" {f['at']}" if f["at"] else "") for f in finished) or (
+            "stopped" + STOPPED_BY.get(by, "") if stopped else "wound down"
+        )
         out.append(
             {
                 "row": "work",
@@ -953,6 +972,9 @@ def work_rows(
                 "held": held,
                 "running": bool(finished),
                 "finished": finished,
+                "stopped": by,
+                "stopped_words": STOPPED_BY.get(by, ""),
+                "later": by == "person",  # under Later, uncounted and never told (§6 rule 8, TD-781)
                 "lanes": lanes,
                 "text": f"{team} · {who} · {said}" + (f" · not started: {held}" if held else ""),
                 "find": " ".join(x for x in (str(team), "team start", who, said, held) if x),
@@ -1298,8 +1320,10 @@ def board_waiting_on(
     repo's lanes (§4.4 *Board write-back*, TD-384) — *pickable by <team>* naming the teams whose
     `free-pick` lanes take it, with each one's wound-down state when none of them is live (*· the
     start row is in Needs you* for a team in `starting`, the teams a *team start* row names, else
-    *· <team> wound down — starts on `on_work`*), else the next session to read the repo's board.
-    Read from the fleet the page already holds, as `orphan_standing` reads it for mail; display only."""
+    *· <team> wound down — starts on `on_work`*, or *· <team> stopped — Start it* for a team that
+    stopped rather than wound down, which rule 8 never starts, §6 *A team that stopped*, TD-781), else
+    the next session to read the repo's board. Read from the fleet the page already holds, as
+    `orphan_standing` reads it for mail; display only."""
     order = _board_order(r)
     holder, ref = _board_holder(r, records, now, order)
     if holder:
@@ -1313,11 +1337,12 @@ def board_waiting_on(
             words = f"pickable by {', '.join(teams)}"
             if not any(teams.values()):
                 for t in teams:
-                    words += (
-                        " · the start row is in Needs you"
-                        if t in starting
-                        else f" · {t} wound down — starts on `on_work`"
-                    )
+                    if t in starting:
+                        words += " · the start row is in Needs you"
+                    elif _team_wound(t, records):
+                        words += f" · {t} wound down — starts on `on_work`"
+                    else:
+                        words += f" · {t} stopped — Start it"
             return words
     return f"waiting on the next session to read {r.get('repo') or 'its repo'}'s board"
 
@@ -1328,6 +1353,13 @@ def _board_order(r: Mapping[str, Any]) -> str:
     if not r.get("decided") or r.get("kind") == "fyi" or not r.get("root"):
         return ""
     return str(r.get("key") or "") or workorders_mod.ref(str(r["root"]), str(r.get("text") or ""))
+
+
+def _team_wound(team: str, records: Collection[Mapping[str, Any]]) -> bool:
+    """Whether a team with nothing live reads *wound down* (`work.wound_down` over its crew's records, its
+    seats left out), as the card reads it — else it *stopped* (§6 rule 8 *A team that stopped*, TD-781)."""
+    mine = [dict(r) for r in records if isinstance(r, Mapping) and r.get("team") == team and not teamrun.persons(r)]
+    return wound_down(mine, {str(r.get("name") or "") for r in mine if r.get("seat")}) is not None
 
 
 def _order_teams(r: Mapping[str, Any], order: str, records: Collection[Mapping[str, Any]]) -> dict[str, bool]:
@@ -1860,6 +1892,9 @@ def inbox_sections(
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
+    # a stopped team's row the person stopped is *Later*'s, never counted (§6 rule 8 *A team that
+    # stopped*, TD-781); the Later section draws it from TD-782's next slice, so until then no section does
+    states = [r for r in states if not r.get("later")]
     for r in states:
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
         if r.get("fyi") and not (r.get("auto_row") and _iso(raw) and _iso(raw) > at):

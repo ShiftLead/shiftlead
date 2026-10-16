@@ -28,6 +28,8 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+
+from sessionorc import settings as settings_mod
 from urllib.parse import quote
 
 from sessionorc.settings import BOARD_SHOW_DEFAULT, parse_board_show, parse_file_link
@@ -112,6 +114,14 @@ def team_until(team: str) -> str:
         return ""
     at = at if at.tzinfo else at.replace(tzinfo=UTC)
     return until if at > datetime.now(UTC) else ""
+
+
+def team_on_work(team: str) -> str:
+    """A team's `teams.<team>.on_work` (design §5, §6 rule 8) as last read: `ask`, `start` or `off`, and
+    `start` (`ON_WORK_DEFAULT`) where the key is absent or not one of the three — the *team start* row's
+    *not started* clause for a stopped team reads it (§4.5a *Inbox row: team start*, TD-781)."""
+    got = (_read["teams"].get(team) or {}).get("on_work")
+    return got if got in settings_mod.ON_WORK else settings_mod.ON_WORK_DEFAULT
 
 
 def open_in() -> OpenIn:

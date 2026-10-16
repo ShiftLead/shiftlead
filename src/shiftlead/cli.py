@@ -1097,8 +1097,13 @@ def cmd_team_list(args: argparse.Namespace) -> int:
         for team, mark in (home.get("work") or {}).items():
             members = mark.get("members") if isinstance(mark, dict) and isinstance(mark.get("members"), dict) else {}
             waiting[team] = len({str(i) for ids in members.values() if isinstance(ids, list) for i in ids})
+    here = hosts.local_host().name
     for r in rows:
-        r["work_waiting"] = waiting.get(r["name"], 0) if not r["live"] and r["wound_down"] else 0
+        # beside *wound down*, or a stopped team's *stopped* (§6 rule 8 *A team that stopped*, TD-781)
+        r["work_waiting"] = waiting.get(r["name"], 0) if not r["live"] else 0
+        # a team with no record: what its lanes hold, each id once (*A team with no record*, TD-781); None unread
+        got = teamrun.lanes(call_sync, org, r["name"], here) if not r["records"] else None
+        r["lanes_hold"] = len(got["ids"]) if got and not any(x["n"] is None for x in got["roles"].values()) else None
     # the home's `balance` marks (§6 *Balance*), from the `repos` reading and the `host` read, which alone
     # carries a mark with no repo (TD-330); an agent without either has none
     marks: dict[str, dict[str, Any]] = {}
@@ -1108,7 +1113,6 @@ def cmd_team_list(args: argparse.Namespace) -> int:
         r["balance"] = marks.get(r["name"]) if r["live"] else None
     # the team's flows (§4.9c *What is shown*, TD-309 slice 6): each listed flow, the current one, its
     # strip and why the team cannot follow it, and `entries.feature` as the current flow fills it
-    here = hosts.local_host().name
     for r in rows:
         t = org.teams.get(r["name"])
         # …and, live, its records against its current flow — *flow changed — Apply* (§4.9c *Switching*)
@@ -1130,9 +1134,12 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
             if not r["live"] and r["wound_down"] and (ago := _age(str(r["wound_down"]))) != "?":
                 live += f" {ago} ago"  # *wound down 9h 13m ago*, as the card says it (TD-296 #7)
-            # *work waiting: n entries* beside *wound down* (§4.7, §6 rule 8), from the home's `work_waiting`
-            if not r["live"] and r["wound_down"] and (n := r.get("work_waiting")):
+            # *work waiting: n entries* beside *wound down* or *stopped* (§4.7, §6 rule 8), from the home's
+            # `work_waiting`; a team with no record, *lanes hold n entries* (TD-781)
+            if not r["live"] and (n := r.get("work_waiting")):
                 live += f", work waiting: {n} entr{'y' if n == 1 else 'ies'}"
+            elif not r["live"] and (n := r.get("lanes_hold")):
+                live += f", lanes hold {n} entr{'y' if n == 1 else 'ies'}"
             if r.get("concluded"):
                 live += ", concluded"
             if r.get("balance"):  # the team card's note, in its words (§4.5a, §4.7)

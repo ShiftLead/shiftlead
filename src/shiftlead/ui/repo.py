@@ -585,6 +585,11 @@ def flow_head(fv: Mapping[str, Any] | None, *, live: bool) -> dict[str, Any]:
     }
 
 
+def _stopped(mark: Any) -> bool:
+    """Whether a `work_waiting` mark is a stopped team's (§6 rule 8 *A team that stopped*, TD-781)."""
+    return isinstance(mark, Mapping) and isinstance(mark.get("stopped"), Mapping)
+
+
 def team_groups(
     views: list[dict[str, Any]],
     rows: Collection[dict[str, Any]] = (),
@@ -662,6 +667,7 @@ def team_groups(
                     manager_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
         row = defs.get(team) or {}
+        mark = (work or {}).get(team)  # the home's `work_waiting` mark (§6 rule 8), if any
         # live, concluded, wound down and Forget all read the team's unattended sessions: a person's
         # session in it keeps nothing live (design §4.9 *A person in the team*, TD-173)
         crew = [m for m in members if not teamrun.persons(m)] if team != NO_TEAM else members
@@ -738,8 +744,9 @@ def team_groups(
                 "wound_after": row.get("after") or "",
                 "closed_by": row.get("closed_by") or "",
                 "manager_why": row.get("manager_why") or "",
-                # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only
-                "work_note": work_note((work or {}).get(team)) if not live and row.get("wound_down") else None,
+                # §4.5a team card **work waiting** note (§6 rule 8, TD-227): display only, beside *wound
+                # down* or a stopped team's *stopped* (TD-781)
+                "work_note": work_note(mark) if not live and (row.get("wound_down") or _stopped(mark)) else None,
                 "work_started": work_started(crew) if live and team != NO_TEAM else None,
                 # §4.5a team card **over its line** note (§6 *Balance*, TD-239): the home's mark, display only
                 "balance_note": teamrun.balance_note(marks[team]) if live and team in marks else "",

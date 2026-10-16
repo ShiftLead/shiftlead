@@ -317,3 +317,54 @@ def test_the_team_headers_times_stay_fuzzy():
     note = {"at": AT, "age": "5m", "n": 2, "title": "g: TD-213, TD-214"}
     head = render(g={**g, "live": False, "wound_down": True, "work_note": note})
     assert f'2 entries waiting since <span title="{AT}">5m ago</span>' in head and "localtime" not in head
+
+
+def test_a_stopped_teams_row_says_how_it_stopped_and_is_never_a_running_teams():
+    """§6 rule 8 *A team that stopped* (TD-781, TD-782 slice 2): a mark carrying `stopped` reads *ao-grind ·
+    stopped at its stop time <t> · its lanes gained …*, *by you* for `person`, nothing more for `other`;
+    `<t>` is `stopped.at`, never the card's *wound down*; it is never *finished*, so its Start is the
+    card's; under `on_work: start` it ends *not started: a stopped team is started by Start*; one the
+    person stopped is `later`, out of Needs you and its count, and `until` and `other` are counted."""
+    recs = [{"id": "ao-g1", "name": "grinder-ao-1", "team": "ao-grind", "closed_at": "2026-09-30T00:56:00Z"}]
+    stop = "2026-09-30T02:00:00+00:00"
+    words = {"until": "stopped at its stop time", "person": "stopped by you", "other": "stopped"}
+    rows = {}
+    for by, said in words.items():
+        m = mark(members={"grinder-ao-1": ["TD-428"]}, stopped={"by": by, "at": stop})
+        # `wound` naming no team and a member's closed record: a running team's row but for `stopped`
+        (r,) = work_rows({"ao-grind": m}, {}, NOW, records=recs, on_work=lambda t: "ask")
+        assert r["text"] == f"ao-grind · {said} · its lanes gained 1 entry: TD-428", by
+        assert not r["running"] and r["finished"] == [] and r["wound_down"] == stop and r["held"] == ""
+        assert r["stopped"] == by and r["later"] is (by == "person")
+        rows[by] = r
+    (started,) = work_rows(
+        {"ao-grind": mark(stopped={"by": "until", "at": stop})}, {"ao-grind": AT}, NOW, on_work=lambda t: "start"
+    )
+    assert started["held"] == "a stopped team is started by Start" and started["wound_down"] == stop
+    assert started["text"].endswith("· not started: a stopped team is started by Start")
+    # a hold the home wrote is its own words; a mark with no `stopped` is the wound-down row as it was
+    (held,) = work_rows({"t": mark(stopped={"by": "other", "at": stop}, held={"why": "day", "count": 3})}, {})
+    assert held["held"] == "started 3 times today"
+    (down,) = work_rows({"t": mark()}, {"t": AT}, NOW, on_work=lambda t: "start")
+    assert down["held"] == "" and down["stopped"] == "" and not down["later"]
+    s = inbox_sections([], states=list(rows.values()))
+    assert s["count"] == 2 and sorted(e["stopped"] for e in s["needs"]) == ["other", "until"]
+    assert all(e.get("stopped") != "person" for k in s if isinstance(s[k], list) for e in s[k])
+
+
+def test_a_stopped_teams_row_and_card_on_the_pages(page):
+    """The Inbox draws a stopped team's row with the card's Start (no `data-running`), and the Org card
+    says *stopped* with its *work waiting* note (§4.5a *team card: work waiting note*, TD-781)."""
+    c, _calls, work = page
+    answers = c.app.state.answers
+    answers["list"] = [_session("m"), _session("g", closed_at="2026-09-30T00:56:00+00:00")]  # nobody declared
+    work["wt"] = mark(members={"g": ["TD-213"]}, stopped={"by": "other", "at": "2026-09-30T01:00:00+00:00"})
+    html = c.get("/inbox").text
+    assert re.search(r"wt · stopped <span class=\"localtime\" data-at=\"2026-09-30T01:00:00\+00:00\"", html)
+    assert 'data-act="work_start" data-id="person" data-team="wt" title=' in html and "finished" not in html
+    assert c.get("/api/person/inbox").json()["needs"] == 1
+    org = c.get("/").text
+    assert '<span class="meta">stopped</span>' in org and "1 entry waiting since" in org
+    work["wt"]["stopped"]["by"] = "person"
+    assert c.get("/api/person/inbox").json()["needs"] == 0
+    assert "wt · stopped" not in c.get("/inbox").text
