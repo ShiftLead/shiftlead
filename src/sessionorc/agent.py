@@ -2001,7 +2001,7 @@ class HostAgent(
         s = self._find(id)
         rule = "(design §4.9c *Switching*)"
         if sit_out:
-            return await self._sit_out(s, launch, rule, dropped=bool(dropped))
+            return await self._sit_out(s, launch, rule, dropped=bool(dropped), caller=caller)
         if dropped:
             raise RpcError(f"dropped is the sit-out form's: a removal from the definition {rule}")
         if not isinstance(launch, dict):
@@ -2078,7 +2078,9 @@ class HostAgent(
             names = ", ".join(known) or "none"
             raise RpcError(f"no profile {profile!r} in profiles.yml (known: {names}): nothing relaunched {rule}")
 
-    async def _sit_out(self, s: Session, launch: Any, rule: str, dropped: bool = False) -> dict[str, Any]:
+    async def _sit_out(
+        self, s: Session, launch: Any, rule: str, dropped: bool = False, caller: Any = None
+    ) -> dict[str, Any]:
         """`relaunch`'s sit-out form: refused, touching nothing, on a launch handed with it, an interactive
         record, a superseded one, a seat or a scheduled one, and when the wrap-up cannot be sent (a
         pending prompt, a link down); said again of a record already sitting out, it does nothing more.
@@ -2098,9 +2100,9 @@ class HostAgent(
         if s.state not in ("exited", "closed") and adapters.has_agent(s.adapter):
             try:  # a record with no agent is typed nothing: the sit-out's close stops it (§4.3)
                 if s.host == self.host:
-                    await self.rpc_send(s.id, WRAPUP_PROMPT, wrapup=True)
-                else:
-                    await self._route_act("send", {"id": s.id, "text": WRAPUP_PROMPT, "wrapup": True}, None, s.host)
+                    await self.rpc_send(s.id, WRAPUP_PROMPT, wrapup=True, caller=caller)
+                else:  # the caller carried, so the wrap-up's `wrapup_by` is whoever pressed (TD-781)
+                    await self._route_act("send", {"id": s.id, "text": WRAPUP_PROMPT, "wrapup": True}, caller, s.host)
             except Exception as e:  # noqa: BLE001 — said to the person who pressed, nothing marked
                 raise RpcError(
                     f"{s.name}: the wrap-up could not be sent ({str(e) or type(e).__name__}), "
@@ -2225,6 +2227,7 @@ class HostAgent(
         if wrapup and not adapters.has_agent(s.adapter):
             raise RpcError(f"{s.name}: a shell runs no turns: there is nothing to wrap up — Close it (design §4.3)")
         s.wrapup_at = now_iso() if wrapup else None
+        s.wrapup_by = closer_of(caller, None, "")["by"] if wrapup else None  # who stopped it (§6 rule 8, TD-781)
         entry = self._record_send(s, caller, text)
         if mail.is_person(caller):
             self._refill(s)

@@ -88,6 +88,7 @@ NODE_OWNED = frozenset(
         "wrapup_sent_at",
         "gated",
         "wrapup_at",
+        "wrapup_by",
         "doorbell_failed",
         "first_prompt",
         "first_prompt_sent_at",
@@ -1231,6 +1232,10 @@ class Session:
     # text. The doorbell never rings while it is set; the next plain send clears it, since a new
     # instruction is a run carrying on.
     wrapup_at: str | None = None
+    # Who sent that wrap-up (design §6 rule 8 *A team that stopped*, TD-781): `person`, or the session's id,
+    # read from the caller as `closer` is; set and cleared with `wrapup_at`. A record that leaves on its own
+    # after the person's Wind down names nobody at its end, and this is what says the person stopped it.
+    wrapup_by: str | None = None
     # A doorbell that failed to submit twice (design §4.10): `{at, error}`, so the sender and the
     # page can see that the ring did not land; cleared by the next ring that does.
     doorbell_failed: dict[str, str] | None = None
