@@ -123,7 +123,7 @@ concurrent session in this repo works in a worktree (`claude --worktree <name>` 
 `scripts/open_worktree.sh <topic>`); the first session in the checkout is the anchor.
 Self-authored PRs get an independent cheaper-model review before merge; doc-only PRs get a
 fact-check against the repo. A PR that `ao pr held <n>` says is held waits for its reader only once
-the author asks: when it is green and the gate passes, send `ao msg --kind ask --pr <n> <reader> "…"`
+the author asks: when it is green, post its review, then send `ao msg --kind ask --pr <n> <reader> "…"`
 (design §4.9b *How the reader hears of a PR*) — nothing else sends it.
 
 ## If you are a cloud session (claude.ai/code)
