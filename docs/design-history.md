@@ -1005,6 +1005,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-16 (TD-775, grinder-ao-2): a `{team: …}` member now fails the org file's load as well as a repo's, naming the key, so *Add or remove a member* no longer lists it among the edits it refuses — such a file never loads.
 - 2026-10-15 (TD-730, the designer): *Add an entry to the ledger* — the entry names its team in its `Team:` line (the pick, else the words, else the seat's own), and `entry.md` tells every filing session to write its own.
 - 2026-10-15 (TD-722 amendment, Fable round 5 and Sonnet round 3, adopted): `anchor: false` is passed over only because no definition writes it today. Built by TD-724.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — the `anchor` key (team or repo) is retired — `anchor: false` read and passed over, any other value refused; `anchors:` goes; names unique per repo, *live* and the Org page lose the seat; the changeover becomes *the retired seats' records*: a leftover `<team>-anchor` retired by the build's migration once each repo's `Owner: anchor` entries have moved. Built by TD-724, TD-757, TD-760.

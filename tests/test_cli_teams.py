@@ -330,7 +330,7 @@ def test_a_team_member_is_refused_when_the_file_is_read_and_nothing_starts(world
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1
     err = capsys.readouterr().err
-    assert "members[1].team: no team holds another" in err and not creates(state)
+    assert "members[2].team: no team holds another" in err and not creates(state)
 
 
 def test_an_unknown_team_names_the_defined_ones(world, capsys):
