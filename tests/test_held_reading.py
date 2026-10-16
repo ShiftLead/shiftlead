@@ -189,6 +189,24 @@ def test_asked_reads_the_seats_and_the_persons_mail_by_the_senders_repo():
 
 
 @pytest.mark.unit
+def test_asked_is_the_earliest_ask_by_at_whatever_the_order_the_mail_lists_it_in():
+    """TD-793: the first ask by `at`, not by the graph's or an inbox's order — a later ask of the same
+    PR listed first, to another seat, never wins."""
+    repos = _repos("/a")
+    lead = _rec("ao-tl", role="techlead", team="t")  # read first: the graph lists it first
+    auditor = _rec("ao-au", seat={"name": "audit"}, team="t")
+    author = _rec("ao-ga", repo="/a", team="t")
+    later, earlier = T0 + timedelta(hours=2), T0 + timedelta(minutes=30)
+    lead.inbox = [_ask(12, "ao-ga", at=later, mid="m-late"), _ask(12, "ao-ga", at=T0 + timedelta(hours=1))]
+    auditor.inbox = [_ask(12, "ao-ga", at=earlier, mid="m-early")]
+    graph = {s.id: s for s in (lead, auditor, author)}
+    assert held.asks(graph, [], repos) == {"/a": {"12": {"at": earlier.isoformat(), "to": "ao-au"}}}
+    # the person's inbox, read last, still wins with the earliest
+    person = _ask(12, "ao-ga", at=T0, mid="m-person")
+    assert held.asks(graph, [person], repos) == {"/a": {"12": {"at": T0.isoformat(), "to": PERSON}}}
+
+
+@pytest.mark.unit
 def test_unasked_needs_held_no_ask_a_green_or_unchecked_ready_pr_and_a_reader():
     base = {"held": ["src/core/a.py"], "checks": "green"}
     prs = [
@@ -244,6 +262,28 @@ async def test_the_home_keeps_asked_past_the_mails_prune_and_a_reload_and_lists_
     author.state = "exited"
     await agent._red_prs(T0 + timedelta(hours=15))
     assert agent._repos[root]["pr_orders"]["unasked"] == [] and agent._repos[root]["prs"]["open"][0]["held"]
+
+
+async def test_a_later_ask_on_a_later_pass_never_moves_the_kept_first_one(agent, tmp_path):
+    """TD-793: the first ask, kept, wins over a fresh ask of the same PR to another seat once the first
+    is pruned from the mail — `at` and `to` never drift pass to pass."""
+    from conftest import park_ticks
+
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    author = _rec("ao-g", repo=root, review=CORE, team="t", host=agent.host)
+    lead = _rec("ao-tl", role="techlead", team="t", host=agent.host)
+    auditor = _rec("ao-au", seat={"name": "audit"}, team="t", host=agent.host)
+    lead.inbox = [_ask(12, "ao-g")]
+    agent.sessions.update({s.id: s for s in (author, lead, auditor)})
+    row = {"held": ["src/core/a.py"], "held_head": "h", "held_key": ["src/core/**"], "checks": "green"}
+    agent._repos[root] = {"name": "repo", "root": root, "remote": "", "prs": {"open": [{"number": 12, **row}]}}
+    await agent._red_prs(T0)
+    first = {"12": {"at": T0.isoformat(), "to": "ao-tl"}}
+    assert agent._repos[root]["pr_orders"]["asked"] == first
+    lead.inbox, auditor.inbox = [], [_ask(12, "ao-g", at=T0 + timedelta(hours=3), mid="m-again")]
+    await agent._red_prs(T0 + timedelta(hours=3))
+    assert agent._repos[root]["pr_orders"]["asked"] == first
 
 
 async def test_the_tick_passes_each_remotes_union_of_keys_to_the_read(agent, tmp_path, monkeypatch):

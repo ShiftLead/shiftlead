@@ -64,7 +64,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-784 | Build TD-112 (1): the adapter conformance suite — `tests/conformance/`, offline fixtures in CI, `pdm run conformance <adapter>` live by hand; Claude Code passes it | Medium | Open |
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
-| TD-793 | No test holds that `asked` is the *first* ask: the sort by `at` in `held.asks` and the earlier-wins merge in `_red_prs` can be reversed and every test passes | Low | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-795 | The Queue's two `src/sessionorc/` leftovers from TD-771 — *held until <the words after the dash>* and Telegram's card link for an item drawn on the Queue | Low | Open |
 
@@ -1251,24 +1250,6 @@ The other cases:
 **Done when** a Gemini session's transcript page, context bound (rule 5), start context, mail and the cadence start hook work as a Claude Code session's do, and the full conformance suite passes for `gemini` offline and live.
 
 **Related:** TD-112, TD-784, TD-785.
-
----
-
-## TD-793: No test holds that `asked` is the *first* ask: the sort by `at` in `held.asks` and the earlier-wins merge in `_red_prs` can be reversed and every test passes
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1956)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/held.py` (`asks`); `src/sessionorc/agent_tick.py` (`_red_prs`, the `asked = {…}` merge); `tests/test_held_reading.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16. TD-789's Fix says `asked` is "the first `ask` carrying `pr`" and kept past the mail's prune. Two mutations leave `tests/test_held_reading.py`, `tests/test_held_missed.py` and `tests/test_pr_held.py` at 21 passed: (1) `key=lambda x: str(x[0].at or "")` → `key=lambda x: 0` in `held.asks` (a later ask of the same PR then wins over the earlier by mail order); (2) `asked = {**(found.get(root) or {}), **(old.get("asked") or {})}` → `{**(old.get("asked") or {}), **(found.get(root) or {})}` in `_red_prs` (a fresh ask then overwrites the kept first one, so `at`/`to` drift on each pass). Run as `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_held_reading.py tests/test_held_missed.py tests/test_pr_held.py`. TD-789's Done-when names "kept past the mail's prune" only; the one test with two asks on a PR (`test_held_reading.py`, #12) lists them earliest first and from the same seat, so a stable sort that ignores `at` keeps the right answer; none lists the later ask first or has different seats.
-
-**Fix:** a test with two asks of one PR (different `at`, listed latest first in the inbox, to different seats) whose `asked[n]` is the earlier's `{at, to}`; and one where a second ask arrives on a later pass, `asked[n]` still the first's.
-
-**Done when** both mutations above fail a test.
 
 ---
 
