@@ -70,6 +70,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-781 | A stopped team's lanes gain work and nothing says so: rule 8 reads only a team that wound down, so a team renamed, forgotten or never started under its names waits silently under `on_work: start` | Medium | Open |
+| TD-783 | A green PR that touches a held path and was never asked of its reader waits silently: the home watches red PRs, asked PRs and merged held PRs, never a held one nobody handed over | Medium | Open |
 
 ---
 
@@ -1404,3 +1405,34 @@ The other cases:
 **Done when** the design says what a stopped team with waiting work shows and does under each `on_work`, and its build entry is filed and named in this entry's `Blocked by:`.
 
 **Related:** TD-214, TD-227, TD-457, TD-748, TD-769.
+
+---
+
+## TD-783: A green PR that touches a held path and was never asked of its reader waits silently: the home watches red PRs, asked PRs and merged held PRs, never a held one nobody handed over
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open — filed in an interactive round with Paul; its Fix is reviewed by Fable and Sonnet before the designer picks it
+**Blocked by:** decision (paul) — the proposal's Fable and Sonnet round
+**Location:** design §4.9b *How the reader hears of a PR*, §6 rule 11 *Merged without its read* (6-policies.md ~L853), §4.4 *A red PR nobody holds is a work order* (4.4-host-agent.md ~L702–L776); `src/sessionorc/held.py` (`review_links`, `addressed`), `src/sessionorc/workorders.py` (`holds_pr` ~L385, `red_prs` ~L491), `src/sessionorc/agent_tick.py` (`_held_pass`, `_held_line`), `src/sessionorc/agent_common.py` (`ORPHAN_AFTER` ~L143); `src/shiftlead/briefs/grinder.stage.md:1` (the ask step, the only place it is written)
+
+**Why:** #1842 (the designer brief's Fable and Sonnet rounds, opened 2026-10-15 20:42 by the interactive session ao-paul) touches `docs/briefs/**`, so `ao pr held 1842` said *held for the techlead*. The author recorded it as waiting for the techlead, sent no `ask` and posted no fact-check. It sat green for 17 hours until Paul asked whether it was stranded. Three things let it:
+1. **The ask is the author's, and only the grinder brief says so.** §4.9b: once a held PR is green with its `cadence-review:` comment, its author sends `ao msg --kind ask --pr <n> {techlead} "…"`. That step is written in `grinder.stage.md` alone; an interactive session gets no brief, and AGENTS.md and `docs/cadence.md` do not name it.
+2. **The home never reads an open held PR.** It watches a red or conflicting PR past `ORPHAN_AFTER` (`red_prs`: a `pr:<n>` order, or a note to its idle holder), an ask past its bound (the PR becomes the person's), and a held PR that **merged** without its read (rule 11). A green, held, unasked PR is in none of them.
+3. **Its holder was invisible.** `holds_pr` matches a `progress` entry naming the PR or the record's checkout branch; #1842's branch lived in a scratch worktree of the session's, so no record held it.
+
+The session-start hook names a PR only past two days.
+
+**Fix (proposal, under review):** the home reads each open, green, non-draft PR of a registered repo against the `held:` globs of the review the repo's teams carry (`sessionorc.held`, as rule 11 and `ao pr held` read them). One that touches a held path, has been green for `ORPHAN_AFTER`, and has no `ask` carrying `pr: <n>` addressed to its first link's reader in the mail the home holds (`review_links`, `addressed`) is **unasked**:
+- **held by an idle record** (`holds_pr`): one `system` note, as a red PR's — *PR #<n> touches held paths (`<path>`) and no reader was asked: `ao msg --kind ask --pr <n> <reader> "…"`* — and, still unasked and the holder still idle `ORPHAN_AFTER` later, it no longer counts;
+- **held by nobody**: a `pr:<n>` order on the grinders' pick list, as a red PR nobody holds; the grinder who takes it (`ao progress claim pr:<n>`) posts the review if it has none and sends the ask as the PR's new author;
+- **a repo no team services**: the Inbox row a red PR gets there, worded *unasked*.
+
+The ask stays the author's; the home only notices its absence. `ao repo` and the Repo page's Open PRs tag it *unasked*. Also: AGENTS.md says a held PR's author sends the ask once it is green, for an interactive session, which has no brief.
+
+**Done when** the design says how the home finds a green held PR that no reader was asked about, who is told, and what it shows, and its build entries are filed and named in this entry's `Blocked by:`.
+
+**Related:** TD-652 (a red PR's holders), TD-658 (an ask refused until the PR is green), TD-745 (a draft is no order), #1842.
