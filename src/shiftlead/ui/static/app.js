@@ -2011,7 +2011,8 @@
         const d = menu && $("details.more", fresh); if (d) d.open = true;
       }
       else if (!repo || (cut(ev.groups) || []).some((g) => (g.ids || []).includes(ev.id))) {
-        const grid = $("#groups .tgroup .grid");  // syncGroups below moves it into its own group
+        // syncGroups below moves it into its own group; with no grid yet (a repo's first strip), the box holds it
+        const grid = $("#groups .tgroup .grid") || $("#groups");
         if (grid) grid.appendChild(fresh);
       }
       // TD-156 (g): Paul saw two cards named designer-ao-1 after a resume superseded the exited
@@ -3164,12 +3165,13 @@
       nameBox.placeholder = v.default || "";
       if (!named) nameBox.value = v.default || "";
       $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
-      const ts = (v.teams || []).map((t) => t.team).sort();
-      if (teamSel && ts.join(" ") !== (teamSel.dataset.teams || "")) {
-        // the options once per set of teams, the first of them the blank: *first with a seat*; a pick stays picked
-        const was = picked(), first = (v.teams || []).find((t) => t.seat) || {};
-        teamSel.innerHTML = [`<option value="">${esc(first.team ? `first with a seat (${first.team})` : "first")}</option>`, ...ts.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`)].join("");
-        teamSel.dataset.teams = ts.join(" ");
+      const ts = (v.teams || []).map((t) => t.team), set = [...ts].sort().join(" ");
+      if (teamSel && set !== (teamSel.dataset.teams || "")) {
+        // the options once per set of teams, in the plan's order — the blank first, *first with a seat* — read
+        // with no pick, so the blank names the first; a pick stays picked
+        const was = picked(), first = v.picked ? {} : (v.teams || []).find((t) => t.seat) || {};
+        teamSel.innerHTML = [`<option value="">${esc(first.team ? `first with a seat (${first.team})` : "first with a seat")}</option>`, ...ts.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`)].join("");
+        teamSel.dataset.teams = set;
         teamSel.value = ts.includes(was) ? was : "";
       }
       if ($("#entryteamrow")) $("#entryteamrow").hidden = ts.length < 2;
@@ -3316,7 +3318,8 @@
       const win = store.get("win", "day");
       $$("#completed .wv", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
       // a team pick and a doer pick AND (§4.5a *Repo page: doing filters*, TD-740); *all* is neither
-      const who = store.get(whoKey, ""), team = store.get(teamKey, "");
+      const who = store.get(whoKey, "");
+      const picked = store.get(teamKey, ""), team = $$(".dchips .chip[data-team]", box).some((c) => c.dataset.team === picked) ? picked : "";
       $$(".dchips .chip", box).forEach((c) => {
         const on = c.dataset.team !== undefined ? c.dataset.team === team : c.dataset.who === who && (!!who || !team);
         c.setAttribute("aria-pressed", on ? "true" : "false");
@@ -3332,6 +3335,9 @@
           const kept = AO.denyWhys(lists), open = $$(".secinfo:not([hidden])", lists).map((el) => el.id);
           const unfolded = $$("[data-unfolded]", lists).map((el) => el.dataset.unfolded);
           lists.innerHTML = await res.text();
+          // the title line and the seams come with the lists (`part=1`): swapped in place, above the cards
+          const head = $("#repohead", lists), was = $("#repohead", box);
+          if (head && was && was !== head) was.replaceWith(head);
           AO.restoreDenyWhys(lists, kept);
           AO.reopenFolds(lists);  // the board's *not shown* fold, opened for this page view (TD-220)
           open.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = false; });
@@ -3399,11 +3405,20 @@
     setInterval(reread, 30000);  // the Inbox's poll; the events below are the fast path
     // the Org's stream, whole: the cards and headers take its deltas (TD-740), and a burst of
     // deltas is one re-read of the lists, a second and a half after the last
-    let soon = null;
+    // Only this repo's news re-reads the lists: its `repos` push, a doing call or a delta of a card on the
+    // page — the full stream carries every repo's — and a burst waits at most five seconds (`first`)
+    let soon = null, first = 0;
+    const root = box.dataset.root || "";
+    const mine = (ev) => (ev.event === "repos" ? String(ev.root || "") === root
+      : ev.event === "doing" ? true
+      : (ev.event === "session" || ev.event === "gone") && !!$(`#card-${CSS.escape(String(ev.id || ""))}`));
     connectEvents((ev) => {
+      const ours = mine(ev);  // before the delta: a card that leaves is still on the page
       groupsEvent(ev, repo);
-      if (!["repos", "doing", "session", "gone"].includes(ev.event)) return;
-      clearTimeout(soon); soon = setTimeout(reread, 1500);
+      if (!ours && !((ev.event === "session") && $(`#card-${CSS.escape(String(ev.id || ""))}`))) return;
+      if (!soon) first = Date.now();
+      clearTimeout(soon);
+      soon = setTimeout(() => { soon = null; reread(); }, Math.max(0, Math.min(1500, first + 5000 - Date.now())));
     });
   };
 

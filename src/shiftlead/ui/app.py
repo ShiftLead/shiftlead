@@ -1496,6 +1496,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "seams": missing_seams(r),
             "host": host_name(),
             "active": "",
+            "part": bool(part),  # the re-read carries the title line and the seams, swapped in place
         }
         if not part:  # the page's top bar; the part is the page's body alone
             ctx["usage"] = await chip_usage(call)

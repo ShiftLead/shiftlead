@@ -1,4 +1,5 @@
 {% import "inbox_row.html" as ir with context %}
+{% if part %}{% include "repo_head.html" %}{% endif %}
 {# (1) Open PRs — every open PR on the remote, newest last; a PR is GitHub's: no control #}
 <section class="rsec" id="prs">
   <div class="row gap rsh"><span class="h2">Open PRs</span> <span class="meta">{{ prs | length }} · newest last</span>

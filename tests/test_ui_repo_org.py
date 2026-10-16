@@ -174,6 +174,12 @@ AO.orgGroupsEvent({ event: "groups", groups: gs(["b"]) }, "r");
 out.left = groups.querySelectorAll(".sc").map((c) => c.dataset.id);
 AO.orgGroupsEvent({ event: "groups", groups: null }, "r");
 out.flat = groups.querySelectorAll(".sc").map((c) => c.dataset.id);
+// the repo's line alone, then a first session of the repo with no team: its strip is made and the card put in it
+AO.orgGroupsEvent({ event: "groups", groups: gs([]).slice(0, 1) }, "r");
+out.line_alone = [groups.querySelectorAll(".tgroup").length, groups.querySelectorAll(".sc").length];
+const strip = { kind: "strip", key: "strip:r", team: "", repo: "r", manager: "", live: 1, ids: ["s"], html: "", summary: "", plus: "", lanes: {} };
+AO.orgGroupsEvent({ event: "session", id: "s", html: card("s", "idle"), groups: [...gs([]).slice(0, 1), strip] }, "r");
+out.strip = groups.querySelectorAll(".tgroup").map((x) => [x.dataset.key, x.querySelector(".grid").children.map((c) => c.dataset.id)]);
 console.log(JSON.stringify(out));
 """
 )
@@ -194,4 +200,17 @@ def test_a_delta_on_a_member_redraws_its_card_on_the_repo_page_as_on_the_org(tmp
         "added": ["a", "b"],  # a new member of the repo's team is placed, sorted as on the Org
         "left": ["b"],  # a card no item lists now is another repo's: it leaves
         "flat": ["b"],  # the flat page's `null` names no repo: what was drawn stays
+        "line_alone": [0, 0],
+        "strip": [["strip:r", ["s"]]],  # with no grid on the page, the new card still lands in its strip
     }
+
+
+def test_the_re_read_carries_the_title_line_and_the_seams_and_never_the_cards(tmp_path, monkeypatch):
+    """Review of TD-740: *serviced by* and the missing seams are re-read with the lists, as before."""
+    root = str(tmp_path / "samscrape")
+    part = (
+        client(monkeypatch, tmp_path, fake({root: reading(root)}, two_teams(root))).get("/repo/samscrape?part=1").text
+    )
+    assert part.count('id="repohead"') == 1 and "serviced by" in part and 'id="groups"' not in part
+    page = client(monkeypatch, tmp_path, fake({root: reading(root)}, two_teams(root))).get("/repo/samscrape").text
+    assert page.count('id="repohead"') == 1 and page.index('id="repohead"') < page.index('id="groups"')

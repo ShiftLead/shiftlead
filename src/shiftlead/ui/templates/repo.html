@@ -6,17 +6,8 @@
    Org's own partial (`org_item.html`) and kept by the Org's deltas — then the lists behind the
    numbers, `repo_part.html`, which the page re-reads on its poll and on the repos and doing events.
    Reached from a repo's line and its Repo facet on the Org; no tab. #}
-<div class="page repopage" id="repopage" data-repo="{{ name }}">
-<div class="row gap wrap rhead">
-  <a class="meta" href="/">← Org</a>
-  <span class="h1 mono">{{ name }}</span>
-  <span class="meta mono">{{ host }} · {{ r.root }}</span>
-  <span class="grow"></span>
-  {% if teams %}<span class="meta">serviced by {% for t in teams %}<a href="/?team={{ t }}" data-team-link="{{ t }}">{{ t }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>
-  {% else %}<span class="meta">no team services this repo</span>{% endif %}
-</div>
-{# missing seams (§4.5a, TD-591): one line per seam the repo leaves unset with no default file, display only #}
-{% if seams and seams.lines %}<div class="seams meta" id="seams">{% for ln in seams.lines %}<div class="seamline">{{ ln }}</div>{% endfor %}</div>{% endif %}
+<div class="page repopage" id="repopage" data-repo="{{ name }}" data-root="{{ r.root }}">
+{% include "repo_head.html" %}
 <div id="groups">{% for g in groups %}{% include "org_item.html" %}{% endfor %}</div>
 <div id="repolists">{% include "repo_part.html" %}</div>
 </div>
