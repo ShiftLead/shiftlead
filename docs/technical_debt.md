@@ -77,7 +77,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
 | TD-766 | Build TD-761 (1): background shells read from the process tree — `ProcReader.children`/`cmdline`, the adapter's `background`, the record's `shells`/`shells_at`, `shells_live` in rules 3, 4 and 9 | Medium | Open |
 | TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
-| TD-768 | Two CI flakes with no entry: `test_attachment_life`'s tick test (three times) and `test_promote`'s press under auto (once, on main) | Medium | Open |
 
 ---
 
@@ -1651,27 +1650,3 @@ The other cases:
 **Done when** a session idle on a background shell reads *working · 1 shell*, Ready to close names the shell and fails, and every listed test passes.
 
 **Related:** TD-761, TD-766, TD-734.
-
----
-
-## TD-768: Two CI flakes with no entry: `test_attachment_life`'s tick test (three times) and `test_promote`'s press under auto (once, on main)
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-16 (grinder-ao-2, TD-463's week of CI)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_attachment_life.py` (`test_the_tick_reads_a_record_as_live_until_it_ends`, ~L54); `tests/test_promote.py` (`test_the_press_under_auto_promotes_at_once_skipping_the_settle`, ~L811); `tests/conftest.py` (`park_ticks`); `src/sessionorc/agent_tick.py` (the first tick's detached `_promote_task`, the run-log sweep's `_pruned_at`)
-
-**Why:** a red run on main stops the promote policy, and a red PR costs a re-run. TD-463's read of every CI run from 2026-10-09 to 2026-10-16 found two flaking tests that no entry names:
-- `tests/test_attachment_life.py::test_the_tick_reads_a_record_as_live_until_it_ends` failed **three times** on 3.12: run 38027920135 (2026-10-10, `td504-service-install-tests`), 38177136833 attempt 1 (2026-10-11, `td060-ledger-split`, passed on the re-run) and 38338872935 (2026-10-13, **main**). Each time `assert f["ao-run-5/old.png"].exists() and not f["ao-end-6/old.png"].exists()` failed: the tick had passed the right live ids (the assertion before held), yet the ended session's old file was still there. The test never parks the fixture's tick loop, so a concurrent tick can take the sweep (and its `_pruned_at`) around the test's own.
-- `tests/test_promote.py::test_the_press_under_auto_promotes_at_once_skipping_the_settle` failed **once**, on 3.12, run 38336561646 (2026-10-13, **main**): `assert agent._promotes["repo"]["auto"] is True` read `False` at L822 after the press. This is TD-753's shape: `park_ticks` cancels the loop, but the first tick's detached promote pass can still write `_promotes` after the test has set it.
-
-Neither test has changed since it failed (`git log` on both files: the last change to either test is 2026-10-12 or earlier).
-
-**Fix:** for each, reproduce first (slow the racing pass, as TD-695 slowed `promote.survey`, or loop the file beside a full suite), then own the clock. `test_promote`'s test awaits the first tick's `_promote_task` (and `_repos_task`) after `park_ticks`, before it sets `_promotes`, as TD-753 did. `test_attachment_life`'s test calls `park_ticks` first, and awaits any first-tick task that sweeps, then takes its one tick by hand.
-
-**Done when** each test passes under a reproduction that fails without its fix.
-
-**Related:** TD-463 (archived; the read that found them), TD-753, TD-752, TD-695 (the same family: a first tick racing a test).
