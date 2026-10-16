@@ -69,7 +69,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15), amended from the mockup (#1887); Paul lifted the hold — the design next |
-| TD-757 | Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired | Medium | Built — live check #1900 |
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
 | TD-763 | Build TD-730 (2): the tagging seat — `seat.tags` on the techlead, the tick's `by: tag`, `entry.md`'s Team rule, `ao org check`'s stale and missing declarations | Medium | Open |
@@ -1426,61 +1425,6 @@ The other cases:
 **Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
 
 **Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
-
----
-
-## TD-757: Retire the anchor seat in code: `pr:` orders on every `free-pick` lane, the preset and lane word `anchor` gone, the seat's tick code, `seat_held` and its marks removed, leftover `<team>-anchor` records retired
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
-**Owner:** grinder
-**Kind:** live-check #1900
-**Status:** Built — live check (PR #1900, 2026-10-16, grinder-ao-1): every step of the Fix, tests listed in the PR. **What only the running system can show:** once #1900 is live (`ao promote status`), the home's first tick retires the leftover `anchor` records — read `ao status --json` and see no record whose role is `anchor` (the closed `ao-shiftlead-ao-grind-anchor` was the one left on 2026-10-16) other than one left open with work in its tree, and no `seat_held` field on any record; and `ao repo` names a red PR nobody holds with *grinders* in its owner column, if one stands.
-**Location:** design §4.9b *No anchor seat*, §6 rules 3, 6, 8 and 9, §4.4 *Repo facts* and *A red PR nobody holds is a work order*, §4.5 and §4.5a (the rows the retirement removed), §4.7, §9 invariant 2. Unheld: `src/shiftlead/repoconfig.py` (the `anchor` preset ~L301–L310, `RETIRED`'s `anchor` ~L48), `src/shiftlead/repoinit.py` (~L18, the ledger template's `Fields:` Owner words), `src/shiftlead/teamrun.py` (`repo_lanes`' `free_pick` branch ~L1316, `ANCHOR_OWNER` ~L1214 (and the `repo_lanes` condition ~L1316, named above), `red_prs` ~L1350–L1359 (its `whose` string *nobody's — the anchor's order*), the anchor readers ~L323–L347, ~L397–L398, ~L489–L490, ~L570–L624 (the lanes line and `checkout_held`), ~L1035–L1080, ~L1485–L1488, ~L1722–L1723, the Start words ~L554, the anchor create ~L765–L776), `src/shiftlead/org.py` (`ANCHOR_DEFAULT` ~L112, used at ~L724; `AnchorDef` ~L118; `ANCHOR_KEYS`, `ANCHOR_ROLE`, `anchor_first`, `_anchor`, the validate block ~L817–L879; `ANCHOR_WHEN`), `src/shiftlead/teams.py` (`Plan.anchor`, `plan()` ~L961–L964 and ~L1035–L1066, `Launch.in_checkout` and its use ~L146, `Spec`), shiftlead's `.shiftlead.yml` (`roles: anchor:`, ~L59–L63, the block and its comments), `src/shiftlead/cli.py` (`ao repo`'s `anchor` column ~L1802–L1815, `ao team list`'s `anchor:` ~L1138, `--anyway`'s help ~L3869), `src/shiftlead/ui/cards.py` (~L35, the on-call pill ~L956–L978, `seat_held_words` ~L878), `src/shiftlead/ui/inbox.py` (~L32, `seat_held_mark` ~L197–L225 and its row ~L417), `src/shiftlead/ui/templates/inbox_row.html` (~L548), `group_head.html` (~L35–L38, ~L86), `src/shiftlead/ui/repo.py` (~L547–L580), `src/shiftlead/ui/static/app.js` (~L2085–L2105, ~L2943), `src/shiftlead/ui/templates/base.html` (~L99), `src/shiftlead/ui/app.py` (~L89, ~L288). Held (`src/sessionorc/**`, read by the techlead seat): `src/sessionorc/modes.py` (`HOME_ONLY` ~L138, `checkout_held`), `src/sessionorc/models.py` (`LANE_WORDS` ~L678, `seat_held` ~L130 and ~L1195), `ledger.py` (`ANCHOR_OWNER` ~L201, `kind_of` ~L213–L237, its anchor branches ~L232–L236, `lane_matches` ~L261–L294, `_word_matches` ~L382–L391), `workorders.py` (~L456), `agent_tick.py` (~L856, ~L1894, the `work` trigger and the checkout gate ~L2512–L2807: the seat's lane, its reading, the held reading and the Start's; the `checkout_held` RPC's handler), `agent.py` (`create` with `held`'s `seat_held` ~L990–L1046, ~L1321–L1369; the `checkout_held` RPC), `agent_common.py` (`SEAT_HELD_GRACE` ~L115), `agent_inbox.py` (the `seat_held` attention kind ~L241–L264), `work.py` (~L264, the docstring)
-
-**Why:** Paul, 2026-10-15, retired the anchor seat (design §4.9b *No anchor seat*, reversing TD-381). Its jobs all have other takers, and a per-repo seat's lifecycle kept opening gaps (TD-722's amendment, rounds 1–3, and Sonnet round 2). Two readings keep it alive in code (Fable round 4). First, `teamrun.repo_lanes` sets `free_pick` on a `pr:` order only when no team record of the repo carries the lane `anchor` (finding 1.1). Second, the tick's `lane_matches` gives a `pr:` order to `anchor` alone unless `free_pick` is set, and the tick never sets it. Separately, `org.ANCHOR_DEFAULT = True` recreates `<team>-anchor` at every Start (finding 1.2); step 0 below removes it.
-
-**Fix:** one release, unheld and held together, so a `pr:` order is never left with no taker. The techlead seat reads it, since it touches `src/sessionorc/**`. It also takes **all of the anchor's definition code** (step 0), so the definitions, a Start and the tick change in one release; TD-724 waits on it. (TD-758 is unused: the held and unheld halves cannot go live apart, since only `repo_lanes` sets `free_pick` today, and the tick's matching does not.)
-0. **The anchor's definition code** (from TD-724 slice 1, Sonnet round 3 finding 1: removing it there before this release would break a Start). `AnchorDef`, `ANCHOR_DEFAULT`, `ANCHOR_KEYS`, `ANCHOR_ROLE`, `anchor_first`, `_anchor` and the validate block (`org.py`); `teams.py`'s plan block (`Plan.anchor`, `plan()`'s anchor parts, `Launch.in_checkout` and its use, `Spec`'s anchor); every reader of them (`teamrun.py`, `cards.py`, `inbox.py`, `agent_tick.py` ~L856 and ~L1894, `app.js` ~L2943 and `app.py`'s exports, every `seat_when`/`ANCHOR_WHEN` comparison); and the `checkout_held` RPC (its handler, `modes.HOME_ONLY`, its `teamrun` callers), which has no other use. Slice 2 of TD-724 keeps only the old-key refusal (`anchor:` retired, `anchor: false` passed over).
-1. **`pr:` orders on the grinders' pick list.**
-   - `lane_matches` gives a `pr:` order to `free-pick` always, and the `free_pick` flag and the `repo_lanes` branch that sets it go.
-   - `LANE_WORDS` loses `anchor`, and `_word_matches`' and `kind_of`'s `anchor` cases go.
-   - With `kind_of`'s anchor branches gone, `Kind: evaluation` stays the page kind *evaluation* and an unblocked non-person `Kind: decision` becomes *other*. Neither matches a lane. **`flags()` gains an evaluation flag**, *TD-NNN: no lane takes an evaluation — write it as a build whose Fix is the write-up, or as design-first*, beside *other*'s (`ledger.flags` today flags only `for_page == "other"`, and `ao repo` shows *evaluation* as a count alone), so `ao repo` and the Repo page name each evaluation (§4.4 *Repo facts*, §4.7).
-   - The docstrings in `workorders.py` and `ledger.py` follow.
-2. **The preset and its words.**
-   - The `anchor` preset leaves `repoconfig`, and `RETIRED`'s `anchor` text says the seat is retired. **shiftlead's `.shiftlead.yml` `roles: anchor:` block goes in the same PR**: `repoconfig.load` (~L650–L653) raises on a `roles:` key with no preset.
-   - The ledger template's `Fields:` line (`repoinit.py`) drops `anchor` from its Owner words.
-   - `ANCHOR_OWNER`'s readers go.
-   - `ao repo`'s *anchor* column for orders goes, with *grinders* in its place, and so does `ao team list`'s `anchor:`.
-   - `red_prs`' `whose` reads *nobody's — the grinders' order* (§4.5 screen 11), and `tests/test_ui_red_prs.py` (~L63, ~L87, ~L171 escaped, and the ~L76 comment), which pins the string, follows.
-   - The Start's *the anchor seat's too* goes from `teamrun.py`, `app.js`, `base.html` and `cli.py`.
-   - The on-call pill's anchor words and `ANCHOR_WHEN` go.
-3. **`seat_held` and its marks.**
-   - These go: the tick's `work` trigger, the checkout gate (the held reading and the Start's), `create` with `held`'s `seat_held`, `SEAT_HELD_GRACE`, the `seat_held` attention kind, the Inbox row, and the team header's mark (`inbox.py`, `inbox_row.html`, `group_head.html`, `repo.py`, `cards.py`).
-   - `create` with `held` stays, for a manager on call and a replay (§6 rule 3).
-4. **The leftover records** (the migration). On the home's first tick after the promote, each record whose role is `anchor` is retired:
-   - a closed one is forgotten;
-   - a live one is closed first, under the wrap-up's safety check; one with work left is left open and named on the Inbox, as rule 9's members are.
-
-   Each repo's `Owner: anchor` entries have already moved before this release (TD-760, and shiftlead's own backfill, #1890), so nothing waits on a seat that is gone. **The migration runs before anything resolves the role `anchor`** — a replay (rule 8, *Schedule*) or a relaunch — so no replay tries to start a role the presets no longer hold.
-5. **What stays** (do not delete): the **anchor session** and the **anchor rule** — `adapters.py` ~L257, `agent.py` ~L1132, `agent_remote.py`, `reports.py` ~L50, `client.py` ~L171, `teams.py` ~L56, `app.js` ~L3324, `agent_tick.py` ~L4102 — and `containers.py`'s *re-anchor* (paths, unrelated); `repoconfig.RETIRED["anchor"]`, reworded; TD-724's *`anchor:` retired* refusal; `create` with `held` for a manager on call and a replay.
-6. **Tests:**
-   - a red PR nobody holds is matched by a `free-pick` lane with no `anchor` record anywhere, by the tick's rule 6 and by `repo_lanes`;
-   - `[anchor]` is no lane word;
-   - a Start writes no `<team>-anchor`;
-   - `ao repo` lists a `pr:` order without an *anchor* owner;
-   - no `seat_held` row or mark is drawn;
-   - the migration forgets a closed `anchor` record and closes a live one;
-   - an evaluation no lane takes is flagged by `flags()` and named by `ao repo`;
-   - shiftlead's `.shiftlead.yml` loads with no `roles: anchor:`;
-   - `tests/test_briefs_layout.py` ~L30 (the `anchor` preset's slot set) and ~L86 (`test_the_anchors_repo_part_names_the_scratch_home`) fail once the preset and the `roles: anchor:` block are gone: rewritten or removed in this PR, so it lands green (TD-759 keeps the brief files);
-   - the `checkout_held` tests go with the RPC: `tests/test_anchor_tick.py` ~L295 and ~L440, `tests/test_cli_teams.py` ~L2308–L2354, and `tests/test_ui_teams.py` ~L36 and ~L48 (the fake's `checkout_held` branch);
-   - the tests that pin the seat are rewritten or removed: `tests/test_anchor_seat.py` (incl. ~L383), `test_anchor_tick.py`, `test_ui.py` ~L1479, `test_ui_inbox.py` ~L3409, `test_ui_org.py` ~L1578, and the files that lean on it most — `test_repo_facts.py`, `test_cli_teams.py`, `test_agent.py`, `test_ledger_derived.py`, `test_lane_news.py`, `test_live_check_lane.py`, `test_work_start.py`, `test_seven_kinds.py`, `test_repoconfig.py`, `test_models.py` and `conftest.py` (`grep -ln "anchor\|seat_held\|checkout_held" tests/` for the rest; a test of the anchor *session* or rule stays).
-
-**Done when** no code reads a lane word `anchor`, no `AnchorDef` is left, a `pr:` order is on every `free-pick` lane, no seat is created in a main checkout, `seat_held` and `checkout_held` are gone, an evaluation is flagged, shiftlead's `.shiftlead.yml` has no `roles: anchor:`, the leftover `anchor` records are retired, and every listed test passes.
-
-**Related:** TD-722, TD-724, TD-759, TD-760, TD-381, TD-613, TD-748.
 
 ---
 
