@@ -1217,7 +1217,7 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul): agent names are unique per repo, the old keys are refused, `--project` goes, and the anchor seat is retired (§4.9b *No anchor seat*), all of its code — the definition, the plan and every reader — removed by TD-757, which this waits on. grinder-ao-2's draft #1840 holds slices 1–3 as first designed; whoever takes this next starts from that branch (`td724-team-repo`) or replaces it
-**Blocked by:** TD-757, decision (paul) — the TD-722 amendment's review round (Fable and Sonnet), 2026-10-15
+**Blocked by:** TD-757
 **Location:** design §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The org is an aggregate*, §4.10 *across teams, by project*, §4.5a *Add entry form: Hand to the techlead*, §5 `org.yml`; `src/shiftlead/org.py` (`TeamDef.projects` ~L184, `ManagerDef`/`TechleadDef`/`SeatDef`/`MemberDef.home`, `MANAGER_KEYS` ~L628, `MEMBER_KEYS`, `TEAM_KEYS` ~L631, `TECHLEAD_KEYS`, `SEAT_KEYS`, `_project` ~L580, `_team` ~L675, `_validate` ~L858, `_home` ~L903, `team_repos` ~L273, `merge_repo_teams` ~L338, `_land` ~L415), `src/shiftlead/teams.py` (`project_of` ~L214, `project_block` ~L222, `reach_block` ~L244, `entry_teams` ~L481, `_launch` ~L784, `plan` ~L971), `src/shiftlead/teams.py` (the other readers of `team.projects` and `.home`, ~L330, ~L344, ~L352, ~L492, ~L541, ~L868), `src/shiftlead/ui/common.py` (~L757, ~L775, which read `t.projects`), `src/shiftlead/ui/templates/group_head.html` (~L20, `g.projects`), `src/shiftlead/ui/app.py` (`repo_teams` ~L383), `src/shiftlead/teamrun.py` (`rows` ~L457), `src/shiftlead/orgcheck.py` (`view` ~L100), `src/shiftlead/cli.py` (`cmd_team_list` ~L1072), `src/shiftlead/ui/settings_page.py` (`org_cards` ~L481)
 
 **Why:** TD-722's design, as amended 2026-10-15 (§4.9 *Teams*, *Names are the org's*, *A definition written before TD-722*, *Home and reach*; §4.9b *No anchor seat*). A team that may span projects leaves its repo to be read from where its members sit, and that inference is what leaves the Org header's *mixed* place, `repo_teams`' first-team rule and a Repo page that can expand only one team (TD-721).
@@ -1262,7 +1262,7 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul); the anchor seat's card and marks went with the seat (round 4)
-**Blocked by:** TD-724, decision (paul) — the TD-722 amendment's review round (Fable and Sonnet), 2026-10-15
+**Blocked by:** TD-724
 **Location:** design §4.9 *The Org page*, §4.5 screen 1 (the team's header), §4.5a *Org: team groups*; `src/shiftlead/ui/repo.py` (`team_groups` ~L450, its `projects` from badges ~L522 and ~L567, `group_place` use ~L576), `src/shiftlead/ui/cards.py` (`group_place` ~L1150), `src/shiftlead/ui/org.py` (`team_repo` ~L60, `team_summary` ~L452), `src/shiftlead/ui/repo.py` (`compact_in` ~L366), `src/shiftlead/ui/templates/group_head.html` (~L15), the Org page's template and its ordering
 
 **Why:** TD-722's design. With a team's repo declared, the Org page can say what it groups: project headings over repos over teams, two teams on one repo two whole cards, and no *mixed* place.
@@ -1306,7 +1306,6 @@ The other cases:
 **Owner:** designer
 **Kind:** design-first
 **Status:** Open
-**Blocked by:** decision (paul) — the amendment to TD-722's design (names unique per repo, the anchor seat retired), from the 2026-10-15 interactive round, lands first; this entry's teams are the teams of one repo it defines
 **Location:** `docs/design/4.4-host-agent.md` (*Repo facts*, *In a team's lanes*, *An entry says what it waits for*, *A new entry settles before it is pickable*); `docs/design/4.9-org-team-project.md` (*Teams*); `docs/design/4.5a-controls.md` (*Add entry form*, *Hand to the techlead*, the Repo page's lists); `docs/technical_debt.md` (the `Fields:` line); `src/sessionorc/ledger.py` (`lane_matches`, `in_lanes`); `src/shiftlead/teamrun.py` (`repo_lanes`)
 
 **Why:** Paul, 2026-10-15: *when a TD is added to the ledger in shiftlead we can require that a team is selected (by the techlead if not beforehand by the user) … If TDs are added outside shiftlead, the host agent can identify them and send them to a techlead to have them resolved … We should also have a check for stale entries, e.g. team1 is assigned entries but is no longer defined.* Under TD-722 a repo has any number of teams (a db team and a compliance team), each with its own lanes, but an entry names only an `Owner:` role word. So two teams' grinders both take every pickable `Owner: grinder` entry. A claim keeps them off the same entry at once, but nothing keeps compliance work with the compliance team.
@@ -1356,7 +1355,7 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-725, TD-741, decision (paul) — the TD-722 amendment's review round (Fable and Sonnet), 2026-10-15
+**Blocked by:** TD-725, TD-741
 **Location:** design §4.5 screen 11 (*The page is the repo's group of the Org, expanded*, *Waiting on you*, *Doing*), §4.5a *Repo page: the team's facets*, *Repo page: doing filters*, *Add entry form: Hand to the techlead*, §4.9 *Add an entry to the ledger* (*Where there is no seat*); `src/shiftlead/ui/app.py` (`repo_page` ~L1302: `serving[0]`, `"g": {"team": ..., "summary": ...}`), `src/shiftlead/ui/templates/repo_part.html`, `repo.html`, `group_head.html`, `card.html`, `plus_card.html`, the Org page's group template TD-725 leaves; `src/shiftlead/ui/repo.py` (`doing_chips` ~L355); `src/shiftlead/ui/static/` (`AO.repo` ~L3205, the Org's delta handler); the Add entry form and `/api/entry/plan`, `/api/entry/hand`
 
 **Why:** TD-721 (Paul, 2026-10-15: *the repo page should essentially be an expansion of the info shown on the org page*), designed in TD-722's amendment. The page draws only the first servicing team's three facets: no header, marks, controls, *i* panel or member cards, and nothing of a second team.
@@ -1388,7 +1387,7 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-724, decision (paul) — the TD-722 amendment's review round (Fable and Sonnet), 2026-10-15
+**Blocked by:** TD-724
 **Location:** design §4.5 screen 6 (board items, *The board's horizon* `next:<n>`, *the rail*), §4.5a *Inbox page: the rail*; `src/shiftlead/ui/inbox.py` (the horizon ~L1571, `next:` ~L1605, its `repo_teams` badge ~L1582), `src/shiftlead/ui/app.py` (`repo_teams` ~L383 and its callers ~L758, ~L2171, ~L2397, ~L3241), the Inbox templates and rail
 
 **Why:** the board is the repo's, but the Inbox badges a board row with the first team whose repo it is (`repo_teams`) and counts the horizon per team. With two teams on one repo (TD-722) the badge is arbitrary and the second team's rail pick shows none of the repo's board. Paul, 2026-10-15, asked whether a board row should carry the project or *project.repo*: the row carries its repo, and the project heading is read from it, since a repo is in one project.
@@ -1457,7 +1456,6 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** decision (paul) — TD-722's amendment under review
 **Location:** design §4.9b *No anchor seat*, §6 rules 3, 6, 8 and 9, §4.4 *Repo facts* and *A red PR nobody holds is a work order*, §4.5 and §4.5a (the rows the retirement removed), §4.7, §9 invariant 2. Unheld: `src/shiftlead/repoconfig.py` (the `anchor` preset ~L301–L310, `RETIRED`'s `anchor` ~L48), `src/shiftlead/repoinit.py` (~L18, the ledger template's `Fields:` Owner words), `src/shiftlead/teamrun.py` (`repo_lanes`' `free_pick` branch ~L1316, `ANCHOR_OWNER` ~L1214 (and the `repo_lanes` condition ~L1316, named above), `red_prs` ~L1350–L1359 (its `whose` string *nobody's — the anchor's order*), the anchor readers ~L323–L347, ~L397–L398, ~L489–L490, ~L570–L624 (the lanes line and `checkout_held`), ~L1035–L1080, ~L1485–L1488, ~L1722–L1723, the Start words ~L554, the anchor create ~L765–L776), `src/shiftlead/org.py` (`ANCHOR_DEFAULT` ~L112, used at ~L724; `AnchorDef` ~L118; `ANCHOR_KEYS`, `ANCHOR_ROLE`, `anchor_first`, `_anchor`, the validate block ~L817–L879; `ANCHOR_WHEN`), `src/shiftlead/teams.py` (`Plan.anchor`, `plan()` ~L961–L964 and ~L1035–L1066, `Launch.in_checkout` and its use ~L146, `Spec`), shiftlead's `.shiftlead.yml` (`roles: anchor:`, ~L59–L63, the block and its comments), `src/shiftlead/cli.py` (`ao repo`'s `anchor` column ~L1802–L1815, `ao team list`'s `anchor:` ~L1138, `--anyway`'s help ~L3869), `src/shiftlead/ui/cards.py` (~L35, the on-call pill ~L956–L978, `seat_held_words` ~L878), `src/shiftlead/ui/inbox.py` (~L32, `seat_held_mark` ~L197–L225 and its row ~L417), `src/shiftlead/ui/templates/inbox_row.html` (~L548), `group_head.html` (~L35–L38, ~L86), `src/shiftlead/ui/repo.py` (~L547–L580), `src/shiftlead/ui/static/app.js` (~L2085–L2105, ~L2943), `src/shiftlead/ui/templates/base.html` (~L99), `src/shiftlead/ui/app.py` (~L89, ~L288). Held (`src/sessionorc/**`, read by the techlead seat): `src/sessionorc/modes.py` (`HOME_ONLY` ~L138, `checkout_held`), `src/sessionorc/models.py` (`LANE_WORDS` ~L678, `seat_held` ~L130 and ~L1195), `ledger.py` (`ANCHOR_OWNER` ~L201, `kind_of` ~L213–L237, its anchor branches ~L232–L236, `lane_matches` ~L261–L294, `_word_matches` ~L382–L391), `workorders.py` (~L456), `agent_tick.py` (~L856, ~L1894, the `work` trigger and the checkout gate ~L2512–L2807: the seat's lane, its reading, the held reading and the Start's; the `checkout_held` RPC's handler), `agent.py` (`create` with `held`'s `seat_held` ~L990–L1046, ~L1321–L1369; the `checkout_held` RPC), `agent_common.py` (`SEAT_HELD_GRACE` ~L115), `agent_inbox.py` (the `seat_held` attention kind ~L241–L264), `work.py` (~L264, the docstring)
 
 **Why:** Paul, 2026-10-15, retired the anchor seat (design §4.9b *No anchor seat*, reversing TD-381). Its jobs all have other takers, and a per-repo seat's lifecycle kept opening gaps (TD-722's amendment, rounds 1–3, and Sonnet round 2). Two readings keep it alive in code (Fable round 4). First, `teamrun.repo_lanes` sets `free_pick` on a `pr:` order only when no team record of the repo carries the lane `anchor` (finding 1.1). Second, the tick's `lane_matches` gives a `pr:` order to `anchor` alone unless `free_pick` is set, and the tick never sets it. Separately, `org.ANCHOR_DEFAULT = True` recreates `<team>-anchor` at every Start (finding 1.2); step 0 below removes it.
@@ -1513,7 +1511,7 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-757, decision (paul) — TD-722's amendment under review
+**Blocked by:** TD-757
 **Location:** design §4.9b *No anchor seat*, *A live check is a grinder's once its build is live*; held (`docs/briefs/**`): `docs/briefs/anchor.md`, `docs/briefs/docs-audit.md` (~L14), `docs/briefs/test-audit.md` (~L16); `src/shiftlead/briefs/anchor.md`, `src/shiftlead/briefs/grinder.md` (~L12, ~L14, ~L26), `src/shiftlead/team_skill.md` (~L139, ~L255)
 
 **Why:** once TD-757 removes the preset, nothing reads `anchor.md`. One rule in it still matters to the grinders who now take live checks: *read the live copy, never press*.
@@ -1539,7 +1537,6 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** decision (paul) — TD-722's amendment under review
 **Location:** dev-cadence's `docs/technical_debt.md` (TD-092, TD-102); contractmatch's `docs/technical_debt.md` (TD-008, TD-054, TD-055, TD-057)
 
 **Why:** the anchor seat is retired (design §4.9b *No anchor seat*). Until TD-757 lands, the live seats keep taking `pr:` orders, so the interim is the ledger backfill alone: every registered repo's `Owner: anchor` entries move to their takers. shiftlead's own backfill is a separate PR. Fable round 4 (§3) found the entries below in the other repos.
