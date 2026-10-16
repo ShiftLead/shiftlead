@@ -198,7 +198,7 @@ def page(tmp_path, monkeypatch):
     (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     (home / "org.yml").write_text(
         f"projects:\n  p:\n    repos:\n      r: {{kmaster: {tmp_path}}}\n"
-        "teams:\n  wt:\n    projects: [p]\n    manager: {role: manager, name: m}\n"
+        "teams:\n  wt:\n    repo: r\n    manager: {role: manager, name: m}\n"
         "    members: [{role: grinder, name: g}]\n"
     )
     calls: list[tuple[str, dict]] = []

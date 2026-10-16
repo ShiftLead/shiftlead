@@ -2122,7 +2122,7 @@ def test_ao_team_until_and_reserve_and_ao_settings(subprocess_agent, tmp_path, c
     monkeypatch.chdir(tmp_path)
     (paths.home() / "org.yml").write_text(
         f"projects:\n  ao: {{repos: {{ao: {{kmaster: {tmp_path}}}}}}}\n"
-        "teams:\n  ao-grind:\n    projects: [ao]\n    manager: {role: manager, name: m}\n"
+        "teams:\n  ao-grind:\n    repo: ao\n    manager: {role: manager, name: m}\n"
         "    members: [{role: grinder, name: g}]\n"
     )
     assert cli.main(["team", "until", "nope", "+2h"]) != 0

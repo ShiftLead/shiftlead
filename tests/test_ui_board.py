@@ -123,20 +123,19 @@ def test_a_board_row_carries_its_repo_team_due_words_text_and_the_board_at_its_l
 
 
 @pytest.mark.unit
-def test_a_repo_maps_to_the_first_team_whose_projects_hold_it(tmp_path):
+def test_a_repo_maps_to_the_first_team_whose_repo_it_is(tmp_path):
+    """§4.9 *Teams* (TD-722): a repo has any number of teams; a board row carries one badge, the first
+    team whose `repo:` is that checkout, in definition order."""
     from shiftlead import org as orgmod
     from shiftlead.ui.app import repo_teams
 
     here = tmp_path / "ao"
     org = orgmod.Org(
-        projects={
-            "shiftlead": orgmod.Project("shiftlead", {"shiftlead": {"kmaster": here, "other": tmp_path / "x"}}),
-            "cm": orgmod.Project("cm", {"cm": {"other": tmp_path / "cm"}}),
-        },
+        checkouts={"shiftlead": {"kmaster": here, "other": tmp_path / "x"}, "cm": {"other": tmp_path / "cm"}},
         teams={
-            "ao-grind": orgmod.TeamDef("ao-grind", projects=["shiftlead"]),
-            "ao-audit": orgmod.TeamDef("ao-audit", projects=["shiftlead"]),
-            "cm-grind": orgmod.TeamDef("cm-grind", projects=["cm", "gone"]),
+            "ao-grind": orgmod.TeamDef("ao-grind", repo="shiftlead"),
+            "ao-audit": orgmod.TeamDef("ao-audit", repo="shiftlead"),
+            "cm-grind": orgmod.TeamDef("cm-grind", repo="cm"),
         },
     )
     assert repo_teams(org, "kmaster") == {str(here.resolve()): "ao-grind"}
@@ -299,7 +298,7 @@ def test_the_rows_of_a_real_board_read_by_the_host_agents_reader(tmp_path, monke
     host(tmp_path, monkeypatch, [root])
     (tmp_path / "home" / "org.yml").write_text(
         f"projects:\n  proj:\n    repos:\n      proj: {{kmaster: {root}}}\n"
-        "teams:\n  proj-grind:\n    projects: [proj]\n    manager: {role: manager}\n"
+        "teams:\n  proj-grind:\n    repo: proj\n    manager: {role: manager}\n"
     )
     from sessionorc import workorders
     from shiftlead.ui import app as uiapp

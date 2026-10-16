@@ -385,17 +385,13 @@ from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, t
 
 
 def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
-    """Each checkout on `host` → the team whose projects hold it (§4.5 screen 6: *a board item
-    carries its repo, which `org.yml`'s projects map to teams*). A repo two teams share is the
-    first's, in definition order: a row carries one team badge, as a message does."""
+    """Each checkout on `host` → the first team whose `repo:` is it, in definition order (§4.5 screen
+    6: *a board item carries its repo*, design §4.9 *Teams*): a repo has any number of teams, and a
+    row carries one team badge, as a message does."""
     out: dict[str, str] = {}
     for tname, t in org.teams.items():
-        for pname in t.projects:
-            p = org.projects.get(pname)
-            for by in p.repos.values() if p else ():
-                path = by.get(host)
-                if path:
-                    out.setdefault(str(Path(path).expanduser().resolve()), tname)
+        if path := org.checkout(t.repo, host):
+            out.setdefault(str(Path(path).expanduser().resolve()), tname)
     return out
 
 
@@ -2226,7 +2222,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     async def entry_plan(repo: str, type_: str, name: str = "") -> dict[str, Any]:
         """What **Open a session** would start for `repo` (a registered checkout's name) and `type_`:
-        the team whose projects hold the checkout, the role its `entries:` names (§4.9), the first
+        the team whose `repo:` is the checkout, the role its `entries:` names (§4.9), the first
         `entry-<n>` free in the repo (`default`), the name the press takes — `name` as typed in the
         **Name** box, else the default — and `name_why`, why that name is not free (TD-677), the
         team's live manager, and the line under the button."""

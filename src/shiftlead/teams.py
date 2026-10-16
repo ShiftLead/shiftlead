@@ -107,7 +107,7 @@ class Launch:
 
     name: str
     role: str
-    home: str  # the repo name in the team's projects
+    home: str  # the team's repo (design §4.9 *Teams*)
     dir: Path  # its checkout on this host; the session runs in a worktree of it
     team: str
     project: str  # the badge: the project the home repo came from
@@ -209,41 +209,35 @@ def find(org: orgmod.Org, name: str) -> orgmod.TeamDef:
         raise TeamError(f"unknown team {name!r}; defined: {known}") from None
 
 
-def project_of(org: orgmod.Org, projects: list[str], repo: str) -> str:
-    """The badge a session whose home is `repo` carries: the first project that lists that repo."""
-    for pname in projects:
-        if repo in (org.projects.get(pname) or orgmod.Project(pname)).repos:
-            return pname
-    return ""
-
-
-def project_block(org: orgmod.Org, projects: list[str], host: str, home: str = "") -> str:
+def project_block(org: orgmod.Org, repo: str, host: str) -> str:
     """The **Project** block that prefixes a brief when the reach is more than one repo (§4.9 "Home
-    and reach"): each repo's checkout on this host and which one is home. Reach is that and nothing
-    else. Empty when one repo (or none) is in reach, which is why a one-repo team's brief is
-    untouched."""
-    repos: dict[str, dict[str, Path]] = {}
-    for pname in projects:
-        for rname, by_host in (org.projects.get(pname) or orgmod.Project(pname)).repos.items():
-            repos.setdefault(rname, by_host)
-    if len(repos) < 2:
+    and reach"): each repo of `repo`'s project, its checkout on this host, and which one is the
+    team's. Reach is that and nothing else. Empty when the project has one repo, or no project
+    lists `repo`, which is why a one-repo team's brief is untouched."""
+    heading = org.heading(repo)
+    if heading is None or len(heading.repos) < 2:
         return ""
-    lines = [f"## Project: {', '.join(projects)}", ""]
-    for rname, by_host in repos.items():
+    return _block(org, heading, host, repo)
+
+
+def _block(org: orgmod.Org, heading: orgmod.Project, host: str, mine: str) -> str:
+    lines = [f"## Project: {heading.title or heading.name}", ""]
+    for rname in heading.repos:
+        by_host = org.checkouts.get(rname) or {}
         path = by_host.get(host)
         if path is None:
             # §4.9: an entry for another host is noted, not an error — phase 2's transport reaches it
             elsewhere = ", ".join(sorted(by_host)) or "nowhere"
             lines.append(f"- {rname}: not checked out on {host} (declared on {elsewhere}) — out of reach")
         else:
-            lines.append(f"- {rname}: {path}" + ("  — your home" if rname == home else ""))
+            lines.append(f"- {rname}: {path}" + ("  — your repo" if rname == mine else ""))
     return "\n".join([*lines, "", REACH_NOTE, "", ""])
 
 
 def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> tuple[str, str]:
     """The Project block a *hand-started* session gets from `ao new --project` and the New session
     form's **Project** picker (design §4.9 "Home and reach"): the same block a team member gets,
-    with home taken to be whichever of the project's repos `here` is. Returns `(block, note)`.
+    with its repo taken to be whichever of the project's repos `here` is. Returns `(block, note)`.
 
     An undefined project name is not a refusal: the badge is a plain string and nothing that acts keys
     on it but the mail gate (§9 invariant 9), so the session is still badged and the note says there is no reach to
@@ -253,16 +247,15 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
     if project not in org.projects:
         known = ", ".join(sorted(org.projects)) or "none"
         return "", f"project: {project!r} is not defined in {org.path} ({known}) — badge only, no reach block"
+    heading = org.projects[project]
+    if len(heading.repos) < 2:
+        return "", ""
     where = Path(here).expanduser().resolve()
-    home = next(
-        (
-            r
-            for r, by_host in org.projects[project].repos.items()
-            if (p := by_host.get(host)) and Path(p).expanduser().resolve() == where
-        ),
-        "",  # started outside the project's repos: the block still names them, nothing is home
+    mine = next(
+        (r for r in heading.repos if (p := org.checkout(r, host)) and Path(p).expanduser().resolve() == where),
+        "",  # started outside the project's repos: the block still names them, nothing is the session's
     )
-    return project_block(org, [project], host, home), ""
+    return _block(org, heading, host, mine), ""
 
 
 # A lead, a member and the techlead seat are shaped alike where a launch is concerned (§4.9): each
@@ -320,12 +313,12 @@ def _brief(
     )
 
 
-def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, home: str, host: str, here: str) -> str:
+def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, host: str, here: str) -> str:
     """The id a team's session will take, known before anything is created: §4.1's
     `ao-<scope>-<name>` from its checkout, qualified `@<host>` when the team lands on another
     host, as the home addresses that host's records. "" without a checkout (the session's own
     launch then refuses the start, naming it)."""
-    checkout = org.checkout(project_of(org, team.projects, home), home, host)
+    checkout = org.checkout(team.repo, host)
     if checkout is None:
         return ""
     checkout = Path(checkout).expanduser()
@@ -339,7 +332,7 @@ def seat_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
     a seat, or without a checkout."""
     if team.techlead is None:
         return ""
-    return _session_id(org, team, team.techlead.name, team.techlead.home, host, here)
+    return _session_id(org, team, team.techlead.name, host, here)
 
 
 def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
@@ -347,7 +340,7 @@ def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> s
     names as the one its `done` lines go to. "" when a person leads the team."""
     if team.manager.role == orgmod.PERSON:
         return ""
-    return _session_id(org, team, team.manager.name, team.manager.home, host, here)
+    return _session_id(org, team, team.manager.name, host, here)
 
 
 def current_flow(team: orgmod.TeamDef) -> str | None:
@@ -383,7 +376,7 @@ def flow_rows(
     now = current_flow(team)
     techlead = seat_id(org, team, team.host or here, here) if team.techlead is not None else ""
     try:
-        checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
+        checkout, read = _checkout(org, team, team.repo, host, here, files, f"team {team.name}")
         cfg = repoconfig.load(checkout, read=read)
     except (TeamError, ValueError, OSError) as e:
         why = str(e).strip(chr(34))
@@ -411,7 +404,7 @@ def flow_rows(
                 node=host if host != here else "",
                 seats=[(x.role, x.trigger) for x in team.seats],
                 held_sets=cfg.held_sets,
-                repo=org.team_repos(team)[0],
+                repo=team.repo,
             ):
                 row["cannot"] = flowdefs.cannot_follow(name, team.name, reasons)
         out.append(row)
@@ -477,33 +470,29 @@ def brief_ids(
 
 
 def entry_teams(org: orgmod.Org, root: str, host: str) -> list[dict[str, str]]:
-    """The teams that service the checkout `root` on `host`, in definition order, each `{team,
+    """The teams whose `repo:` is the checkout `root` on `host`, in definition order, each `{team,
     seat, name}` — `seat` the id its techlead takes (`teams.seat_id`), empty where it defines none,
     and `name` that seat's name — which is what `entry_add` is handed by the
     Add entry form and `ao td add` (TD-218: the host agent does
-    not read `org.yml`). The first is the one **Hand to the techlead** hands to, as `repo_teams`
-    gives a repo its first team's badge."""
+    not read `org.yml`). Those that define a techlead seat come first, so the first is the one
+    **Hand to the techlead** hands to (design §4.9 *Teams*: a repo has any number of teams)."""
     out = []
     for tname, t in org.teams.items():
-        paths = {
-            str(Path(path).expanduser().resolve())
-            for pname in t.projects
-            for by in (org.projects[pname].repos.values() if pname in org.projects else ())
-            if (path := by.get(host))
-        }
-        if root in paths:
+        path = org.checkout(t.repo, host)
+        if path is not None and str(Path(path).expanduser().resolve()) == root:
             seat = seat_id(org, t, t.host or host, host)
             out.append(
                 {
                     "team": tname,
                     "seat": seat,
                     "name": t.techlead.name if seat and t.techlead else "",
-                    # a seat the team defines whose home has no checkout on its host: `seat_id` is ""
+                    # a seat the team defines whose repo has no checkout on its host: `seat_id` is ""
                     # for it as for no seat at all, and the reason under the button tells them apart
                     "techlead": t.techlead.name if t.techlead else "",
                 }
             )
-    return out
+    # a repo has any number of teams (§4.9 *Teams*): the hand-to is the first that defines a techlead seat
+    return sorted(out, key=lambda x: not x["techlead"])
 
 
 def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: str, files: Files | None) -> str:
@@ -536,13 +525,18 @@ def _checkout(
 ) -> tuple[Path, repoconfig.Reader | None]:
     """Where repo `home` is checked out on `host`, and how to read it: this host's disk (None), or
     the node's files across the link for a checkout that is not a directory here (step 4b.3)."""
-    project = project_of(org, team.projects, home)
-    checkout = org.checkout(project, home, host)
+    checkout = org.checkout(home, host)
     if checkout is None:
-        declared = ", ".join(sorted((org.projects[project].repos.get(home) or {}) if project in org.projects else []))
+        declared = ", ".join(sorted(org.checkouts.get(home) or {}))
+        heading = org.heading(home)
+        fix = (
+            f"add `{host}: <path>` under `projects.{heading.name}.repos.{home}` in org.yml"
+            if heading is not None
+            else f"register the checkout on {host} (design §5 *Repos*)"
+        )
         raise TeamError(
             f"{where}: repo {home!r} has no checkout on {host} (declared on {declared or 'no host'}) — "
-            f"add `{host}: <path>` under it in org.yml, or set the team's `host:`"
+            f"{fix}, or set the team's `host:`"
         )
     checkout = Path(checkout).expanduser()
     read: repoconfig.Reader | None = None  # this host's disk
@@ -567,8 +561,7 @@ def _check_flows(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, fi
     `plan`). A team with neither key is not read here at all."""
     if not team.flows and not team.entries:
         return
-    repos = org.team_repos(team)
-    home = repos[0]  # every team today is one repo (§4.9c item 2: the repos' `held:` is their union)
+    home = team.repo  # a team works one repo (§4.9 *Teams*; §4.9c item 2: the repos' `held:` is their union)
     where = f"team {team.name}"
     checkout, read = _checkout(org, team, home, host, here, files, where)
     try:
@@ -662,7 +655,7 @@ def compiled(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str, files:
     if name is None:
         return None
     try:
-        checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
+        checkout, read = _checkout(org, team, team.repo, host, here, files, f"team {team.name}")
         cfg = repoconfig.load(checkout, read=read)
         # a listed flow that does not load counts for no sit-out: `_check_flows` refuses the start anyway
         listed = [f for n in team.flows if (f := flowdefs.load(n, cfg, org.roles, read=read)) is not None]
@@ -708,7 +701,7 @@ def flow_needs(org: orgmod.Org, team: orgmod.TeamDef, role: str, host: str, here
     if not team.flows:
         return ""
     try:
-        checkout, read = _checkout(org, team, org.team_repos(team)[0], host, here, files, f"team {team.name}")
+        checkout, read = _checkout(org, team, team.repo, host, here, files, f"team {team.name}")
         cfg = repoconfig.load(checkout, read=read)
         for name in team.flows:
             flow = flowdefs.load(name, cfg, org.roles, read=read)
@@ -863,7 +856,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         home=home,
         dir=checkout,
         team=team.name,
-        project=project_of(org, team.projects, home),
+        project=org.project_of(home),
         profile=profile,
         adapter=adapter,
         prompt=prompt,
@@ -974,7 +967,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
         raise TeamError(org.unlanded[name])
     here, host = host, team.host or host  # the team lands on its `host:`, else where the start runs (§4.4a)
     p = Plan(team=team.name, source=team.source, host=host if host != here else "")
-    reach = bool(project_block(org, team.projects, host))
+    block = project_block(org, team.repo, host)  # the same for every session: they share the team's repo
     p.techlead_id = tid = seat_id(org, team, host, here)
     p.manager_id = mid = manager_id(org, team, host, here)
     ctx = (team.techlead.context or "") if team.techlead is not None else ""  # the primer (§4.9b)
@@ -986,13 +979,13 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             team=team,
             name=team.manager.name,
             role_name=team.manager.role,
-            home=team.manager.home,
+            home=team.repo,
             host=host,
             here=here,
             profile_override=profile or team.manager.profile,
             member=team.manager,  # its lane, brief, grants and unattended read like a member's
             lead=True,
-            block=project_block(org, team.projects, host, team.manager.home) if reach else "",
+            block=block,
             files=files,
             techlead=tid,
             context=ctx,
@@ -1010,13 +1003,13 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             team=team,
             name=seat.name,
             role_name=orgmod.TECHLEAD_ROLE,
-            home=seat.home,
+            home=team.repo,
             host=host,
             here=here,
             profile_override=profile or seat.profile,
             member=seat,
             lead=False,
-            block=project_block(org, team.projects, host, seat.home) if reach else "",
+            block=block,
             files=files,
             techlead=tid,
             context=ctx,
@@ -1041,13 +1034,13 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                 team=team,
                 name=trig.name,
                 role_name=trig.role,
-                home=trig.home,
+                home=team.repo,
                 host=host,
                 here=here,
                 profile_override=profile or trig.profile,
                 member=trig,
                 lead=False,
-                block=project_block(org, team.projects, host, trig.home) if reach else "",
+                block=block,
                 files=files,
                 techlead=tid,
                 context=ctx,
@@ -1062,7 +1055,6 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                 f"team {team.name}: member {{team: {member.team}}} is a nested team, which is not built yet "
                 f"(design §4.9: the flat case ships first) — start it on its own with `ao team start {member.team}`"
             )
-        block = project_block(org, team.projects, host, member.home) if reach else ""
         if under is not None and under.sits_out(member.role):
             # §4.9c: not started at a Start, interactive or not — a definition's member is the team's
             # to start; what an interactive member is spared is the switch's wind-down (slice 5)
@@ -1078,7 +1070,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                     team=team,
                     name=mname,
                     role_name=member.role,
-                    home=member.home,
+                    home=team.repo,
                     host=host,
                     here=here,
                     profile_override=profile,

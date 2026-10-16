@@ -771,7 +771,10 @@ def projects_view() -> list[dict[str, Any]]:
     return [
         {
             "name": name,
-            "repos": [{"repo": r, "path": str(by.get(host) or ""), "hosts": sorted(by)} for r, by in p.repos.items()],
+            "repos": [
+                {"repo": r, "path": str((by := org.checkouts.get(r) or {}).get(host) or ""), "hosts": sorted(by)}
+                for r in p.repos
+            ],
         }
         for name, p in org.projects.items()
     ]
@@ -780,7 +783,7 @@ def projects_view() -> list[dict[str, Any]]:
 def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The teams for New session's **Team** picker (design §4.5a, §4.9 *A person in the team*,
     TD-173): every definition `org_here` reads — `ao team list`'s set — with the host it runs on,
-    its projects' checkouts there (the Directory list it narrows to), its member roles (Role is
+    its repo's checkout there (the Directory list it narrows to), its member roles (Role is
     filtered to them plus `plain`) and its manager's id when that session is live or a seat on call
     (the Controllers tick, TD-269). A definition that cannot be read leaves the picker at *none*, as
     the strip notes it."""
@@ -789,13 +792,7 @@ def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for t in org.teams.values():
         host = t.host or here
-        dirs = [
-            str(by[host])
-            for p in t.projects
-            if p in org.projects
-            for by in org.projects[p].repos.values()
-            if by.get(host)
-        ]
+        dirs = [str(path)] if (path := org.checkout(t.repo, host)) else []
         mid = teams.manager_id(org, t, host, here)
         out.append(
             {
@@ -872,7 +869,7 @@ def _aged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def teams_view(sessions: list[dict[str, Any]], waiting: teamrun.Waiting | None = None) -> dict[str, Any]:
-    """The **Teams** strip's contents (design §4.5a): every definition with its source, projects,
+    """The **Teams** strip's contents (design §4.5a): every definition with its source, repo, project,
     member count and live count — `teamrun.rows`, the very rows `ao team list` prints. `waiting` is
     the `host` reading's (TD-274), without which no member reads as waiting on the person."""
     org, notes = org_here()

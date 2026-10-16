@@ -2,12 +2,13 @@
 `~/.shiftlead/org.yml` (design §4.9, §5).
 
 ```yaml
-projects:
-  shiftlead: {repos: {shiftlead: {kmaster: ~/shiftlead}}}
-  guardians: {repos: {guardians: {devenv: /workspaces/guardians}, guardians-api: {devenv: /workspaces/guardians/api}}}
+projects:                             # headings on repos (§4.9 *Projects*): a repo in at most one
+  guardians:
+    title: Guardians
+    repos: {guardians: {devenv: /workspaces/guardians}, guardians-api: {devenv: /workspaces/guardians/api}}
 teams:
   ao-grind:
-    projects: [shiftlead]
+    repo: shiftlead                     # one repo per team (§4.9 *Teams*): a project's, or a registered checkout
     manager: {role: manager, name: manager-ao-1}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # optional: the go-between (§4.9b)
     seats: [{name: docs-audit-ao-1, role: auditor, trigger: {prs: 10}}]   # optional: seats with a trigger (§4.9b)
@@ -16,7 +17,7 @@ teams:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
   cm-grind:
-    projects: [contractmatch]
+    repo: contractmatch
     host: contractmatch               # every session lands on that node (§4.4a "Teams across hosts")
     manager: {role: manager}
     members: [{role: grinder}]
@@ -26,7 +27,7 @@ place:
   sam-grind: devenv                   # a repo-defined team that lands on a node (§4.9 *Where a repo's team lands*)
 ```
 
-A repo's `.shiftlead.yml` may carry `teams:` of its own (teams whose only project is that repo), and
+A repo's `.shiftlead.yml` may carry `teams:` of its own (teams on that repo, `repo:` unsaid), and
 the org a client sees is the aggregate (§4.9 *The org is an aggregate*, TD-229): `with_repos` folds
 in the teams of every checkout in the host's registry, the org file winning a name collision (the
 repo's reads *shadowed*) and a name two repos define refused in both, and says where each of a
@@ -63,8 +64,12 @@ ReposOf = Callable[[str], list[str]]
 
 @dataclass
 class Project:
+    """A heading on repos (design §4.9 *Projects*, TD-722): its repos' names, each with its checkout
+    per host as the org file writes it, and the words the Org page draws (`title`, else the name)."""
+
     name: str
     repos: dict[str, dict[str, Path]] = field(default_factory=dict)  # repo name → host name → checkout
+    title: str = ""
 
 
 # What a `manager:` with no `on_call` means (design §4.9): a seat on call, since the tick reads the
@@ -79,7 +84,6 @@ MANAGER_WHEN = "comes when a member needs a reading"
 class ManagerDef:
     role: str = DEFAULT_MANAGER_ROLE
     name: str = ""  # default `<team>-lead`, filled by the loader
-    home: str = ""  # a repo name from the team's projects
     profile: str | None = None  # overrides the role's
     lane: list[str] = field(default_factory=list)
     brief: str | None = None  # overrides the role's template — the manager brief a repo keeps
@@ -96,10 +100,9 @@ class TechleadDef:
     are fixed, so a launch reads the seat as it reads a member: no lane, the role's grants (none)."""
 
     name: str = ""  # default `<team>-techlead`, filled by the loader
-    home: str = ""
     profile: str | None = None
     brief: str | None = None  # overrides the preset's `techlead.md`
-    context: str | None = None  # the primer, a path in its home checkout: the brief's `{context}`
+    context: str | None = None  # the primer, a path in the team's checkout: the brief's `{context}`
     lane: list[str] = field(default_factory=list)
     grants: list[str] | None = None
     unattended: bool = True
@@ -117,7 +120,6 @@ class SeatDef:
     role: str = ""
     trigger: str = "asks"  # `asks` | `prs` | `every`
     after: str = ""  # the trigger's value: `prs`' count, `every`'s duration as written; "" for `asks`
-    home: str = ""
     profile: str | None = None
     brief: str | None = None  # overrides the role's template
     lane: list[str] = field(default_factory=list)
@@ -138,7 +140,6 @@ class MemberDef:
     role: str = ""
     count: int = 1
     name: str = ""  # the prefix; default the role
-    home: str = ""
     lane: list[str] = field(default_factory=list)
     brief: str | None = None  # overrides the role's template
     profile: str | None = None
@@ -156,7 +157,7 @@ class MemberDef:
 @dataclass
 class TeamDef:
     name: str
-    projects: list[str] = field(default_factory=list)
+    repo: str = ""  # the one repo every session of the team works in (design §4.9 *Teams*, TD-722)
     manager: ManagerDef = field(default_factory=ManagerDef)
     members: list[MemberDef] = field(default_factory=list)
     techlead: TechleadDef | None = None  # the seat (§4.9b), when the definition has one
@@ -172,6 +173,9 @@ class TeamDef:
     # `teams.<team>.flow` in `settings.yml` (§4.9c, §5): the flow a person picked — the setting, not
     # the definition, so no file sets it; `with_settings` does, on the client's own copy. "" is none
     flow: str = ""
+    # a definition written before TD-722 (§4.9): each old key as written, `projects` or `<who>.home`
+    # → its value, which `_validate` refuses by name, saying the fix
+    old: dict[str, Any] = field(default_factory=dict)
 
     def entry_role(self, type_: str) -> str:
         """The role **Open a session** on the Add entry form starts for `type_` (`debt` | `feature`)."""
@@ -185,6 +189,11 @@ class TeamDef:
         if self.techlead is not None:
             out.append(self.techlead.name)
         return out + [n for m in self.members if m.team is None for n in m.names()]
+
+    def started_names(self) -> list[str]:
+        """Every session name a start of the team gives — its manager, techlead, seats and members —
+        which no other team on its repo may give (design §4.9 *Names are the org's*)."""
+        return self.session_names() + [s.name for s in self.seats]
 
     def twice_named(self) -> list[str]:
         """The names the definition holds more than once, in order — what `ao org check` and the
@@ -234,22 +243,42 @@ class Org:
     landed: dict[str, tuple[str, str]] = field(default_factory=dict)
     # a repo-defined team whose landing cannot be told, which no start goes past: team → why
     unlanded: dict[str, str] = field(default_factory=dict)
+    # where each repo is checked out, per host (design §4.9 *Projects*, TD-722): every project's `repos:`
+    # and each registered checkout — the one store `checkout` reads, a project keeping only the names
+    checkouts: dict[str, dict[str, Path]] = field(default_factory=dict)
 
-    def checkout(self, project: str, repo: str, host: str) -> Path | None:
-        """Where `repo` of `project` is checked out on `host`; None when any of the three is unknown."""
-        p = self.projects.get(project)
-        if p is None:
-            return None
-        return (p.repos.get(repo) or {}).get(host)
+    def copy(self) -> Org:
+        """A copy whose maps can be written without touching this one's (`with_repos` lands teams on it)."""
+        return dataclasses.replace(
+            self,
+            projects=dict(self.projects),
+            teams=dict(self.teams),
+            roles=dict(self.roles),
+            shadowed={k: list(v) for k, v in self.shadowed.items()},
+            refused=dict(self.refused),
+            place=dict(self.place),
+            landed=dict(self.landed),
+            unlanded=dict(self.unlanded),
+            checkouts={k: dict(v) for k, v in self.checkouts.items()},
+        )
+
+    def checkout(self, repo: str, host: str) -> Path | None:
+        """Where `repo` is checked out on `host`; None when either is unknown."""
+        return (self.checkouts.get(repo) or {}).get(host)
+
+    def heading(self, repo: str) -> Project | None:
+        """The project that lists `repo` — a repo sits in at most one (§4.9 *Projects*) — else None."""
+        return next((p for p in self.projects.values() if repo in p.repos), None)
+
+    def project_of(self, repo: str) -> str:
+        """The badge a session of `repo` carries (§4.9 *Home and reach*): the project that lists it,
+        else the repo's own name — so two teams on one repo always share one."""
+        p = self.heading(repo)
+        return p.name if p is not None else repo
 
     def team_repos(self, team: TeamDef) -> list[str]:
-        """Every repo name across the team's projects, in definition order, deduped."""
-        out: list[str] = []
-        for pname in team.projects:
-            for rname in (self.projects.get(pname) or Project(pname)).repos:
-                if rname not in out:
-                    out.append(rname)
-        return out
+        """The team's repo as a list — kept for §4.9c's `held:` union, which reads a team's repos."""
+        return [team.repo] if team.repo else []
 
 
 def org_file() -> Path:
@@ -268,6 +297,15 @@ def load(path: Path | None = None) -> Org:
     org = Org(path=path)
     for pname, raw in _mapping(data.get("projects"), f"{label}: projects").items():
         org.projects[str(pname)] = _project(str(pname), raw, f"{label}: projects.{pname}")
+    for p in org.projects.values():
+        for rname, by_host in p.repos.items():
+            if rname in org.checkouts:  # a repo sits in at most one project (§4.9 *Projects*, TD-722)
+                first = next(q.name for q in org.projects.values() if rname in q.repos)
+                raise ValueError(
+                    f"{label}: projects: repo {rname!r} is listed by {first} and by {p.name} — a repo sits in at "
+                    "most one project; keep it under one heading"
+                )
+            org.checkouts[rname] = dict(by_host)
     for tname, raw in _mapping(data.get("teams"), f"{label}: teams").items():
         org.teams[str(tname)] = _team(str(tname), raw, f"{label}: teams.{tname}", source=path)
     for rname, raw in _mapping(data.get("roles"), f"{label}: roles").items():
@@ -293,57 +331,59 @@ def load(path: Path | None = None) -> Org:
 def merge_repo_teams(
     org: Org, repo_root: Path, repo_teams: dict[str, Any] | None, repo_roles: Collection[str] = ()
 ) -> Org:
-    """Fold a repo's `.shiftlead.yml` `teams:` into the org (design §4.9): each is a team whose only
-    project is that repo, so a repo can ship its own grind team beside its code. The org file wins
+    """Fold a repo's `.shiftlead.yml` `teams:` into the org (design §4.9): each is a team on that
+    repo, so a repo can ship its own grind team beside its code. The org file wins
     a name collision, and the repo's is recorded in `shadowed`; each definition keeps its `source`.
     Returns a new Org; `org` is untouched. `repo_roles` names the roles the repo's own file defines,
     which its teams' `entries:` may name.
 
-    The repo is the team's project, unsaid: the checkout's directory name, on this host at
-    `repo_root`; an org project of that name is used as it stands. Spanning, placing and nesting
-    are the org file's, so a `projects:` key, a `host:` and a nested `{team: …}` member are each
-    refused naming the key (§4.9 *The org is an aggregate*)."""
+    The repo is the team's repo, unsaid (TD-722): the checkout's directory name, on this host at
+    `repo_root` — a path the org file's project already gives for this host is used as it stands —
+    and its project the heading that lists it, else none. A `repo:` naming another repo is refused;
+    so are placing and nesting, which are the org file's: a `projects:` key, a `host:` and a nested
+    `{team: …}` member are each refused naming the key (§4.9 *The org is an aggregate*)."""
     repo_root = Path(repo_root).expanduser().resolve()
     rname = repo_root.name
-    merged = Org(
-        projects=dict(org.projects),
-        teams=dict(org.teams),
-        roles=dict(org.roles),
-        path=org.path,
-        shadowed={k: list(v) for k, v in org.shadowed.items()},
-        refused=dict(org.refused),
-        place=dict(org.place),
-        landed=dict(org.landed),
-        unlanded=dict(org.unlanded),
-    )
+    merged = org.copy()
     source = paths.repo_file(repo_root)
     label = f"{source}"
     teams = _mapping(repo_teams, f"{label}: teams")
     for tname, raw in teams.items():
         key = f"{label}: teams.{tname}"
         raw = _mapping(raw, key)
-        for k in ("projects", "host"):
+        for k in ("repo", "projects"):
             if k in raw:
                 raise ValueError(
-                    f"{key}.{k}: a repo's team is on its own repo and lands where the org places it — "
-                    f"`{k}:` is the org file's (design §4.9 *The org is an aggregate*)"
+                    f"{key}.{k}: a repo's team works its own repo, {rname}, unsaid — delete the key "
+                    "(design §4.9 *The org is an aggregate*)"
                 )
+        if "host" in raw:
+            raise ValueError(
+                f"{key}.host: a repo's team lands where the org places it — `host:` is the org file's "
+                "(`place:`, design §4.9 *The org is an aggregate*)"
+            )
         for i, m in enumerate(raw.get("members") or []):
             if isinstance(m, dict) and "team" in m:
                 raise ValueError(
                     f"{key}.members[{i}].team: a nested team is the org file's, not a repo's "
                     "(design §4.9 *The org is an aggregate*)"
                 )
-    if teams and rname not in merged.projects:
-        merged.projects[rname] = Project(rname, {rname: {hosts.local_host().name: repo_root}})
+    if teams:  # no project is made for it: a repo in no project is a heading of its own (§4.9 *Projects*)
+        merged.checkouts.setdefault(rname, {}).setdefault(hosts.local_host().name, repo_root)
     for tname, raw in teams.items():
         tname = str(tname)
         if tname in org.teams:
             merged.shadowed.setdefault(tname, []).append(source)  # the org file wins
             continue
         raw = dict(_mapping(raw, f"{label}: teams.{tname}"))
-        raw["projects"] = [rname]
-        merged.teams[tname] = _team(tname, raw, f"{label}: teams.{tname}", source=source)
+        raw["repo"] = rname
+        team = _team(tname, raw, f"{label}: teams.{tname}", source=source)
+        if team.old:  # a `home:` on one of its sessions (TD-722): the repo is the file's own
+            raise ValueError(
+                f"{label}: teams.{tname}: `home:` is gone — a repo's team works its own repo, {rname}; delete "
+                "the key (design §4.9 *A definition written before TD-722*)"
+            )
+        merged.teams[tname] = team
     _validate(merged, label)
     for tname in teams:  # only the teams this repo adds: each is checked once, against its own repo's roles
         team = merged.teams.get(str(tname))
@@ -367,29 +407,31 @@ def _named(repos: Collection[str], repo: str) -> list[str]:
     return [str(r) for r in repos if Path(str(r)).name == repo]
 
 
-def _land(org: Org, base: Collection[str], here: str, repos_of: ReposOf | None) -> None:
+def _land(org: Org, here: str, repos_of: ReposOf | None) -> None:
     """Give each repo-defined team of `org` its landing, in place (`org` is `with_repos`' own copy):
     `landed`, and for one that lands on another host its `host` and the repo's path there — that
-    host's registry entry (§4.9 *The repo is the team's project*), asked through `repos_of`. A
-    project the org file defines (`base`) is used as it stands and nothing is asked. A landing that
-    cannot be told is `unlanded`, with the reason a start gives."""
+    host's registry entry (§4.9 *The repo is the team's repo*), asked through `repos_of`, written
+    into `Org.checkouts`. A path the org file already gives for the landing host is used as it
+    stands and nothing is asked. A landing that cannot be told is `unlanded`, with the reason a
+    start gives: where a heading lists the repo, its fix is a path under that heading; where none
+    does, a checkout registered on that host."""
     for team in org.teams.values():
-        if team.source is None or team.source == org.path or len(team.projects) != 1:
+        if team.source is None or team.source == org.path or not team.repo:
             continue  # the org file's own: its `host:` places it
-        repo = team.projects[0]
+        repo = team.repo
         host, why = landing(team.name, org.place, here)
         org.landed[team.name] = (host, why)
         if host == here:
             continue
         team.host = host
-        if host in org.projects[repo].repos.get(repo, {}):
+        if org.checkout(repo, host) is not None:
             continue
-        if repo in base:  # the org file's project, as it stands: it says no path there, and nothing is asked
-            org.unlanded[team.name] = (
-                f"team {team.name}: `place:` puts it on {host}, and org.yml's project {repo} names no checkout "
-                f"there — add `{host}: <path>` under `projects.{repo}.repos.{repo}`"
-            )
-            continue
+        p = org.heading(repo)
+        fix = (
+            f"add `{host}: <path>` under `projects.{p.name}.repos.{repo}` in org.yml"
+            if p is not None
+            else f"register the one checkout of {repo} on {host} (design §5 *Repos*)"
+        )
         try:
             if repos_of is None:
                 raise OSError("nothing here asks a host for its registry")
@@ -408,12 +450,10 @@ def _land(org: Org, base: Collection[str], here: str, repos_of: ReposOf | None) 
                     if found
                     else f"holds no checkout named {repo}"
                 )
-                + f" — register the one checkout there, or name its path under `projects.{repo}` in org.yml"
+                + f" — {fix}"
             )
             continue
-        by_host = dict(org.projects[repo].repos.get(repo, {}))
-        by_host[host] = Path(found[0])
-        org.projects[repo] = Project(repo, {**org.projects[repo].repos, repo: by_host})
+        org.checkouts.setdefault(repo, {})[host] = Path(found[0])
 
 
 def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | None = None) -> tuple[Org, list[str]]:
@@ -432,14 +472,14 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
     registry — the path of a placed team's checkout there — and is only called for a team that
     `place:` puts on another host. One that cannot be landed stays listed, `unlanded` saying why."""
     notes: list[str] = []
-    base, file_org = set(org.projects), org
+    file_org = org
     found: list[tuple[repoconfig.RepoConfig, dict[str, Any]]] = []
-    seen: set[Path] = set()
+    seen: dict[Path, None] = {}  # the registry's order: the first of two checkouts of one name is the one read
     for root in roots:
         where = Path(root).expanduser().resolve()
         if where in seen:  # one checkout written twice (a trailing slash, a symlink) is one repo, not two
             continue
-        seen.add(where)
+        seen[where] = None
         try:
             cfg = repoconfig.load(Path(root).expanduser())
         except (OSError, ValueError) as e:
@@ -458,18 +498,12 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
             org = merge_repo_teams(org, Path(cfg.root), mine, repoconfig.role_names(cfg)) if mine else org
         except (OSError, ValueError) as e:
             notes.append(f"{cfg.root}: {str(e).strip(chr(34))}")
-    if twice or org is file_org:  # a copy of our own before anything is written on it
-        org = Org(
-            projects=dict(org.projects),
-            teams=dict(org.teams),
-            roles=org.roles,
-            path=org.path,
-            shadowed=org.shadowed,
-            refused=dict(org.refused),
-            place=dict(org.place),
-            landed=dict(org.landed),
-            unlanded=dict(org.unlanded),
-        )
+    if org is file_org:  # a copy of our own before anything is written on it
+        org = org.copy()
+    here = hosts.local_host().name
+    for where in seen:  # a repo no heading lists is its registered checkout's directory name (§4.9 *Teams*)
+        if org.heading(where.name) is None:
+            org.checkouts.setdefault(where.name, {}).setdefault(here, where)
     if twice:
         for n, files in twice.items():
             org.refused[n] = (
@@ -477,8 +511,9 @@ def with_repos(org: Org, roots: Collection[Path | str], *, repos_of: ReposOf | N
                 "a team's name is the org's; rename one (design §4.9 *Names are the org's*)"
             )
             notes.append(org.refused[n])
-    _land(org, base, hosts.local_host().name, repos_of)
+    _land(org, here, repos_of)
     notes.extend(org.unlanded.values())
+    notes.extend(v for v in org.refused.values() if v not in notes)
     for tname, host in org.place.items():  # a mistyped name would otherwise place nothing, silently
         if tname not in org.teams and tname not in org.refused:
             notes.append(f"place.{tname}: no registered repo defines a team {tname!r} — nothing is placed on {host}")
@@ -534,13 +569,14 @@ def _opt_str(raw: Any, key: str) -> str | None:
 
 def _project(name: str, raw: Any, key: str) -> Project:
     raw = _mapping(raw, key)
+    _no_stray(raw, PROJECT_KEYS, key)
     repos: dict[str, dict[str, Path]] = {}
     for rname, by_host in _mapping(raw.get("repos"), f"{key}.repos").items():
         hosts_map = _mapping(by_host, f"{key}.repos.{rname}")
         repos[str(rname)] = {
             str(h): Path(_str(p, f"{key}.repos.{rname}.{h}")).expanduser() for h, p in hosts_map.items()
         }
-    return Project(name, repos)
+    return Project(name, repos, title=_str(raw.get("title"), f"{key}.title"))
 
 
 def _lane(raw: Any, key: str) -> list[str]:
@@ -580,39 +616,52 @@ def _grants(raw: Any, key: str) -> list[str] | None:
     return grants
 
 
-MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended", "on_call")
+PROJECT_KEYS = ("repos", "title")
+MANAGER_KEYS = ("role", "name", "profile", "lane", "brief", "grants", "unattended", "on_call")
 # a member is never on call (§4.9): the key is the manager's alone, so on a member it is a stray one
 MEMBER_KEYS = (*(k for k in MANAGER_KEYS if k != "on_call"), "count", "team")
-TEAM_KEYS = ("projects", "manager", "techlead", "anchor", "seats", "members", "host", "entries", "flows")
+TEAM_KEYS = ("repo", "manager", "techlead", "anchor", "seats", "members", "host", "entries", "flows")
 # the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
 ENTRY_TYPES = ("debt", "feature")
-TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
+TECHLEAD_KEYS = ("name", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
 # `anchor:` on a team is retired (design §4.9b *No anchor seat*, §4.9 *A definition written before
 # TD-722*, TD-757): kept among the keys so `anchor: false`, which says what is now true, is passed over;
 # any other value is refused by `_team` in these words
 ANCHOR_RETIRED = "`anchor:` is retired — the anchor seat is gone (§4.9b *No anchor seat*); delete the key"
-SEAT_KEYS = ("name", "role", "trigger", "brief", "profile", "home")
+SEAT_KEYS = ("name", "role", "trigger", "brief", "profile")
+# A definition written before TD-722 (design §4.9): `projects:` on a team and `home:` on any of its
+# sessions pass `_no_stray` so `_validate` can refuse them by name, saying the fix (`_refuse_old`)
+OLD_TEAM_KEYS = ("projects",)
+OLD_KEYS = ("home",)
 TRIGGERS = ("asks", "prs", "every")
 _DURATION = re.compile(r"[1-9]\d*[mhd]")
 
 
-def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str) -> None:
+def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str, old: tuple[str, ...] = ()) -> None:
     """A key nobody reads is a typo, and silence about it is how a manager's `brief:` disappears into
-    a file that looks right (found while writing the first real org.yml, 2026-09-13)."""
-    stray = sorted(k for k in raw if k not in known)
+    a file that looks right (found while writing the first real org.yml, 2026-09-13). `old` keys pass
+    here, and are refused by name, with their fix, where the definition is validated (TD-722)."""
+    stray = sorted(k for k in raw if k not in known and k not in old)
     if stray:
         raise ValueError(f"{key}: unknown key(s) {stray}; known: {list(known)}")
 
 
-def _member(raw: Any, key: str) -> MemberDef:
+def _old(raw: dict[str, Any], who: str, key: str, into: dict[str, Any]) -> None:
+    """Keep `who`'s old `home:` (TD-722) in `into` for `_validate` to refuse, under `<who>.home`."""
+    if "home" in raw:
+        into[f"{who}.home"] = _str(raw["home"], f"{key}.home")
+
+
+def _member(raw: Any, key: str, old: dict[str, Any], who: str) -> MemberDef:
     raw = _mapping(raw, key)
     if "team" in raw:
         extra = sorted(k for k in raw if k != "team")
         if extra:
             raise ValueError(f"{key}: a nested team member is `{{team: <name>}}` alone; unexpected {extra}")
         return MemberDef(team=_str(raw["team"], f"{key}.team"))
-    _no_stray(raw, MEMBER_KEYS, key)
+    _no_stray(raw, MEMBER_KEYS, key, OLD_KEYS)
+    _old(raw, who, key, old)
     role = _str(raw.get("role"), f"{key}.role")
     if not role:
         raise ValueError(f"{key}.role is required (or `team:` for a nested team)")
@@ -620,7 +669,6 @@ def _member(raw: Any, key: str) -> MemberDef:
         role=role,
         count=_count(raw.get("count"), f"{key}.count"),
         name=_str(raw.get("name"), f"{key}.name", default=role),
-        home=_str(raw.get("home"), f"{key}.home"),
         lane=_lane(raw.get("lane"), f"{key}.lane"),
         brief=_opt_str(raw.get("brief"), f"{key}.brief"),
         profile=_opt_str(raw.get("profile"), f"{key}.profile"),
@@ -631,25 +679,26 @@ def _member(raw: Any, key: str) -> MemberDef:
 
 def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     raw = _mapping(raw, key)
-    _no_stray(raw, TEAM_KEYS, key)
+    _no_stray(raw, TEAM_KEYS, key, OLD_TEAM_KEYS)
     if "anchor" in raw and raw["anchor"] is not False:
         raise ValueError(f"{key}: {ANCHOR_RETIRED}")
-    projects = raw.get("projects")
-    if projects is None:
-        projects = []
-    if isinstance(projects, str):
-        projects = [projects]
-    if not isinstance(projects, list):
-        raise ValueError(f"{key}.projects must be a list of project names")
+    old: dict[str, Any] = {}
+    if "projects" in raw:  # a definition written before TD-722: read by `_validate`, with a warning
+        projects = raw["projects"]
+        if isinstance(projects, str):
+            projects = [projects]
+        if not isinstance(projects, list):
+            raise ValueError(f"{key}.projects must be a list of project names")
+        old["projects"] = [_str(p, f"{key}.projects") for p in projects]
     manager_raw = _mapping(raw.get("manager"), f"{key}.manager")
-    _no_stray(manager_raw, MANAGER_KEYS, f"{key}.manager")
+    _no_stray(manager_raw, MANAGER_KEYS, f"{key}.manager", OLD_KEYS)
+    _old(manager_raw, "manager", f"{key}.manager", old)
     manager_role = _str(manager_raw.get("role"), f"{key}.manager.role", default=DEFAULT_MANAGER_ROLE)
     if manager_role == PERSON and "on_call" in manager_raw:
         raise ValueError(f"{key}.manager.on_call: a person manages this team, so no session is started to fill")
     manager = ManagerDef(
         role=manager_role,
         name=_str(manager_raw.get("name"), f"{key}.manager.name", default=f"{name}-lead"),
-        home=_str(manager_raw.get("home"), f"{key}.manager.home"),
         profile=_opt_str(manager_raw.get("profile"), f"{key}.manager.profile"),
         lane=_lane(manager_raw.get("lane"), f"{key}.manager.lane"),
         brief=_opt_str(manager_raw.get("brief"), f"{key}.manager.brief"),
@@ -670,19 +719,19 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         members_raw = []
     if not isinstance(members_raw, list):
         raise ValueError(f"{key}.members must be a list")
-    members = [_member(m, f"{key}.members[{i}]") for i, m in enumerate(members_raw)]
-    projects = [_str(p, f"{key}.projects") for p in projects]
+    members = [_member(m, f"{key}.members[{i}]", old, f"members[{i}]") for i, m in enumerate(members_raw)]
     return TeamDef(
         name,
-        projects,
+        _str(raw.get("repo"), f"{key}.repo").strip(),
         manager,
         members,
-        techlead=_techlead(name, raw.get("techlead"), f"{key}.techlead") if "techlead" in raw else None,
-        seats=_seats(name, raw.get("seats"), f"{key}.seats"),
+        techlead=_techlead(name, raw.get("techlead"), f"{key}.techlead", old) if "techlead" in raw else None,
+        seats=_seats(name, raw.get("seats"), f"{key}.seats", old),
         source=source,
         host=_str(raw.get("host"), f"{key}.host"),
         entries=_entries(raw.get("entries"), f"{key}.entries"),
         flows=_flows(raw.get("flows"), f"{key}.flows"),
+        old=old,
     )
 
 
@@ -719,23 +768,23 @@ def _entries(raw: Any, key: str) -> dict[str, str]:
     return out
 
 
-def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
-    """`techlead: {name, home, profile, brief, context}` (design §4.9b). No `role:` — the seat is the role —
+def _techlead(team: str, raw: Any, key: str, old: dict[str, Any]) -> TechleadDef:
+    """`techlead: {name, profile, brief, context}` (design §4.9b). No `role:` — the seat is the role —
     and no `grants:`: the preset holds none (identity alarms go to the person, §4.8a).
     `techlead: person` is refused as any non-mapping is."""
     raw = _mapping(raw, key)
-    _no_stray(raw, TECHLEAD_KEYS, key)
+    _no_stray(raw, TECHLEAD_KEYS, key, OLD_KEYS)
+    _old(raw, "techlead", key, old)
     return TechleadDef(
         name=_str(raw.get("name"), f"{key}.name", default=f"{team}-techlead"),
-        home=_str(raw.get("home"), f"{key}.home"),
         profile=_opt_str(raw.get("profile"), f"{key}.profile"),
         brief=_opt_str(raw.get("brief"), f"{key}.brief"),
         context=_opt_str(raw.get("context"), f"{key}.context"),
     )
 
 
-def _seats(team: str, raw: Any, key: str) -> list[SeatDef]:
-    """`seats: [{name, role, trigger, brief, profile, home}]` (design §4.9b *Seats with a trigger*).
+def _seats(team: str, raw: Any, key: str, old: dict[str, Any]) -> list[SeatDef]:
+    """`seats: [{name, role, trigger, brief, profile}]` (design §4.9b *Seats with a trigger*).
     `trigger` is `asks`, `{prs: <n>}` or `{every: <n>m|h|d}`, and is required: a seat nobody says
     when to fill is a member that never runs. A seat is a session and never `person`, and holds no
     `grants:` and no `lane:` — the design gives it none, so a key for them is refused as a typo is."""
@@ -747,7 +796,8 @@ def _seats(team: str, raw: Any, key: str) -> list[SeatDef]:
     for i, item in enumerate(raw):
         skey = f"{key}[{i}]"
         item = _mapping(item, skey)
-        _no_stray(item, SEAT_KEYS, skey)
+        _no_stray(item, SEAT_KEYS, skey, OLD_KEYS)
+        _old(item, f"seats[{i}]", skey, old)
         role = _str(item.get("role"), f"{skey}.role")
         if not role:
             raise ValueError(f"{skey}.role is required")
@@ -763,7 +813,6 @@ def _seats(team: str, raw: Any, key: str) -> list[SeatDef]:
                 role=role,
                 trigger=trigger,
                 after=after,
-                home=_str(item.get("home"), f"{skey}.home"),
                 profile=_opt_str(item.get("profile"), f"{skey}.profile"),
                 brief=_opt_str(item.get("brief"), f"{skey}.brief"),
             )
@@ -793,31 +842,66 @@ def _trigger(raw: Any, key: str) -> tuple[str, str]:
 
 
 def _validate(org: Org, label: str) -> None:
-    """The cross-references and the `home` rule (§4.9), reported one at a time, first error first."""
-    for team in org.teams.values():
+    """The cross-references and the one-repo rule (§4.9 *Teams*), reported one at a time, first
+    error first. A team written before TD-722 is refused here by name (`_refuse_old`)."""
+    for team in list(org.teams.values()):
         key = f"{label}: teams.{team.name}"
-        if not team.projects:
-            raise ValueError(f"{key}.projects: a team is on one or more projects")
-        for pname in team.projects:
-            if pname not in org.projects:
-                raise ValueError(f"{key}.projects: {pname!r} is not a defined project ({sorted(org.projects)})")
-        repos = org.team_repos(team)
-        if not repos:
-            raise ValueError(f"{key}: its projects {team.projects} list no repos")
-        if team.manager.role != PERSON:  # a person manages from nowhere: no session, so no home
-            team.manager.home = _home(team.manager.home, repos, f"{key}.manager.home")
-        if team.techlead is not None:
-            team.techlead.home = _home(team.techlead.home, repos, f"{key}.techlead.home")
-        for i, seat in enumerate(team.seats):
-            seat.home = _home(seat.home, repos, f"{key}.seats[{i}].home")
+        if team.old:
+            _refuse_old(org, team, key)
+        if not team.repo:
+            raise ValueError(
+                f"{key}.repo: a team works one repo — name it, `repo: <repo>`: a repo a project lists, "
+                "or a registered checkout's directory name (design §4.9 *Teams*)"
+            )
         for i, m in enumerate(team.members):
-            mkey = f"{key}.members[{i}]"
-            if m.team is not None:
-                if m.team not in org.teams:
-                    raise ValueError(f"{mkey}.team: {m.team!r} is not a defined team ({sorted(org.teams)})")
-                continue
-            m.home = _home(m.home, repos, f"{mkey}.home")
+            # a team two repos define is refused, not unknown: its own refusal says why (§4.9)
+            if m.team is not None and m.team not in org.teams and m.team not in org.refused:
+                raise ValueError(f"{key}.members[{i}].team: {m.team!r} is not a defined team ({sorted(org.teams)})")
+    _names_per_repo(org, label)
     _no_cycles(org, label)
+
+
+def _refuse_old(org: Org, team: TeamDef, key: str) -> None:
+    """Refuse a definition written before TD-722 by name, saying the fix (design §4.9 *A definition
+    written before TD-722*): its `projects:` and every `home:` name the repos it meant — the homes
+    where any is written, else the projects' repos. One: *write `repo: <it>`*. More: the team spans
+    them, and is to be split into a team per repo under their heading. There is no release of warnings."""
+    projects = team.old.get("projects", [])
+    for pname in projects:
+        if pname not in org.projects:
+            raise ValueError(f"{key}.projects: {pname!r} is not a defined project ({sorted(org.projects)})")
+    homes = [v for k, v in team.old.items() if k.endswith(".home") and v]
+    named = list(dict.fromkeys([*([team.repo] if team.repo else []), *homes]))
+    if not homes:
+        named = list(dict.fromkeys([*named, *(r for p in projects for r in org.projects[p].repos)]))
+    if len(named) > 1:
+        heading = org.heading(named[0])
+        where = heading.name if heading is not None else (projects[0] if projects else named[0])
+        raise ValueError(
+            f"{key}: {team.name} spans {', '.join(named[:-1])} and {named[-1]}: a team works one repo — split it "
+            f"into a team per repo under the {where} heading (design §4.9 *Teams*)"
+        )
+    gone = list(dict.fromkeys(["projects" if k == "projects" else "home" for k in team.old]))
+    words = " and ".join(f"`{k}:`" for k in gone)
+    fix = f"write `repo: {named[0]}`" if named else "write `repo: <repo>`"
+    raise ValueError(
+        f"{key}: {words} {'is' if len(gone) == 1 else 'are'} gone — {fix} (design §4.9 "
+        "*A definition written before TD-722*)"
+    )
+
+
+def _names_per_repo(org: Org, label: str) -> None:
+    """An agent's name is its repo's (design §4.9 *Names are the org's*): a session's id is
+    `ao-<repo>-<name>`, so a name two teams on one repo both start is refused, naming both."""
+    held: dict[tuple[str, str], str] = {}
+    for team in org.teams.values():
+        for n in dict.fromkeys(team.started_names()):
+            other = held.setdefault((team.repo, n), team.name)
+            if other != team.name:
+                raise ValueError(
+                    f"{label}: teams {other} and {team.name} both start a session called {n!r} on {team.repo} — "
+                    f"an agent's name is its repo's; rename one (design §4.9 *Names are the org's*)"
+                )
 
 
 def _entries_resolve(org: Org, team: TeamDef, key: str, repo_roles: Collection[str]) -> None:
@@ -829,17 +913,6 @@ def _entries_resolve(org: Org, team: TeamDef, key: str, repo_roles: Collection[s
     for t, role in team.entries.items():
         if role not in known:
             raise ValueError(f"{key}.{t}: unknown role {role!r}; known: {', '.join(dict.fromkeys(known))}")
-
-
-def _home(home: str, repos: list[str], key: str) -> str:
-    """`home` names a repo of the team's projects; required above one repo, defaulted to the only one."""
-    if not home:
-        if len(repos) == 1:
-            return repos[0]
-        raise ValueError(f"{key} is required when the team's projects span more than one repo ({repos})")
-    if home not in repos:
-        raise ValueError(f"{key}: {home!r} is not a repo of the team's projects ({repos})")
-    return home
 
 
 def _no_cycles(org: Org, label: str) -> None:

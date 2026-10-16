@@ -31,11 +31,11 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
         "projects": {"ao": {"repos": repos}},
         "teams": {
             "ao-grind": {
-                "projects": ["ao"],
-                "manager": {"role": "manager", "name": "orc-ao", "home": "shiftlead"},
+                "repo": "shiftlead",
+                "manager": {"role": "manager", "name": "orc-ao"},
                 "members": [
-                    {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "shiftlead"},
-                    {"role": "hunter", "name": "hunt", "lane": "ui", "home": "shiftlead"},
+                    {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick"},
+                    {"role": "hunter", "name": "hunt", "lane": "ui"},
                 ],
             }
         },
@@ -324,7 +324,7 @@ def test_a_planned_member_carries_its_profiles_adapter(world):
 def test_a_nested_team_member_says_it_is_not_built_rather_than_pretending(world, capsys):
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["inner"] = {"projects": ["ao"], "manager": {"role": "person"}, "members": []}
+    doc["teams"]["inner"] = {"repo": "shiftlead", "manager": {"role": "person"}, "members": []}
     doc["teams"]["ao-grind"]["members"].append({"team": "inner"})
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1
@@ -402,20 +402,24 @@ def test_a_person_lead_starts_no_lead_session_and_members_are_controlled_by_nobo
     assert all(p["controllers"] == [] for p in made)
 
 
-def test_the_project_block_names_every_repo_on_this_host_and_which_is_home(world):
+def test_the_project_block_names_every_repo_of_the_heading_on_this_host_and_which_is_the_teams(world):
+    """§4.9 *Home and reach* (TD-722): every session of a team works its one repo; the Project block
+    lists each repo of that repo's heading and marks the team's, the same in every brief."""
     tmp_path, state = world
     doc = org_doc(tmp_path, two_repos=True)
-    doc["teams"]["ao-grind"]["members"][0]["home"] = "ao-api"
+    doc["projects"]["ao"]["title"] = "AO"
+    doc["teams"]["ao-grind"]["repo"] = "ao-api"
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     made = {p["name"]: p for p in creates(state)}
     block = made["grind-1"]["prompt"]
-    assert block.startswith("## Project: ao")
-    assert f"- ao-api: {tmp_path / 'ao-api'}  — your home" in block
+    assert block.startswith("## Project: AO")  # the heading's title, where it has one
+    assert f"- ao-api: {tmp_path / 'ao-api'}  — your repo" in block
     assert f"- shiftlead: {tmp_path / 'shiftlead'}\n" in block
     assert "no credential and no permission" in block and "## Lane: free-pick" in block
-    assert made["grind-1"]["dir"] == str(tmp_path / "ao-api")  # its home is where it runs
-    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your home" in made["hunt"]["prompt"]
+    assert {p["dir"] for p in made.values()} == {str(tmp_path / "ao-api")}  # the team's repo is where each runs
+    assert all(p["project"] == "ao" for p in made.values())
+    assert f"- ao-api: {tmp_path / 'ao-api'}  — your repo" in made["hunt"]["prompt"]
 
 
 def test_a_repo_on_another_host_is_a_note_not_a_failure(world):
@@ -594,7 +598,7 @@ def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     assert cli.main(["team", "start", "repo-team"]) == 0
     made = creates(state)
     assert [p["name"] for p in made] == ["hunter"] and made[0]["team"] == "repo-team"
-    assert made[0]["project"] == "shiftlead"  # the repo's own project, named for the checkout
+    assert made[0]["project"] == "ao"  # its repo's project: the org file's heading that lists it (TD-722)
 
 
 def test_the_org_is_one_aggregate_of_the_registered_checkouts(world, capsys, monkeypatch):
@@ -1073,7 +1077,7 @@ def test_ao_new_project_adds_the_reach_block_and_the_badge(world, capsys):
     assert cli.main(["new", "solo", "--project", "ao", "--role", "hunter"]) == 0
     p = creates(state)[0]
     assert p["project"] == "ao" and p["prompt"].startswith("## Project: ao")
-    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your home" in p["prompt"]  # started in that checkout
+    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your repo" in p["prompt"]  # started in that checkout
     assert "## Area: free" in p["prompt"]
     state["calls"].clear()
     # an undefined project is still a badge (step b landed it as a plain string): one line, no block
@@ -1313,7 +1317,7 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
         "projects": {"contractmatch": {"repos": {"contractmatch": {"kmaster": "~/contractmatch"}}}},
         "teams": {
             "cm-grind": {
-                "projects": ["contractmatch"],
+                "repo": "contractmatch",
                 "host": "contractmatch",
                 "manager": {"role": "manager", "name": "manager-cm"},
                 "members": [{"role": "grinder", "count": 2, "name": "grinder-cm", "lane": "free-pick"}],
@@ -1325,7 +1329,7 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
     team = org.teams["cm-grind"]
     assert team.host == "contractmatch" and team.manager.name == "manager-cm"
     assert team.members[0].names() == ["grinder-cm-1", "grinder-cm-2"]  # the prefix rule the recipe states
-    assert org.checkout("contractmatch", "contractmatch", "kmaster") is not None
+    assert org.checkout("contractmatch", "kmaster") is not None
 
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -1369,8 +1373,8 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
         yaml.safe_dump({
             "projects": {"p": {"repos": {"r": {"h": str(tmp_path)}}}},
             "teams": {
-                "outer": {"projects": ["p"], "manager": {"role": "manager"}, "members": [{"team": "inner"}]},
-                "inner": {"projects": ["p"], "manager": {"role": "manager"}, "members": [{"role": "grinder"}]},
+                "outer": {"repo": "r", "manager": {"role": "manager"}, "members": [{"team": "inner"}]},
+                "inner": {"repo": "r", "manager": {"role": "manager"}, "members": [{"role": "grinder"}]},
             },
         })
     )  # fmt: skip
@@ -1605,7 +1609,7 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     # whose definition name only looks like one is never taken for it (review of PR #350)
     sessions[1]["name"] = "techlead-ao-2"
     assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
-    doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3", "home": "shiftlead"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     org = cli._org_here()
     assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}
@@ -1717,8 +1721,8 @@ def test_a_live_add_of_a_role_the_current_flow_does_not_use_is_written_and_sits_
     `build-review` is current, and says it sits out rather than starting it."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    doc["teams"]["ao-grind"].update(flows=["build-review", "td"], techlead={"name": "techlead-ao"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     started(state)
@@ -1732,8 +1736,8 @@ def test_a_live_add_reads_the_flow_the_person_picked(world):
     `settings.yml`, Add sits a designer out as it does where `build-review` is first (review of #1066)."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"].update(flows=["td", "build-review"], techlead={"name": "techlead-ao", "home": "shiftlead"})
-    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao", "home": "shiftlead"})
+    doc["teams"]["ao-grind"].update(flows=["td", "build-review"], techlead={"name": "techlead-ao"})
+    doc["teams"]["ao-grind"]["members"].append({"role": "designer", "name": "designer-ao"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc, default_flow_style=None))
     (tmp_path / "shiftlead" / ".shiftlead.yml").write_text("held: [src/sessionorc/**]\n")
     (tmp_path / "home" / "settings.yml").write_text("teams: {ao-grind: {flow: build-review}}\n")
@@ -1981,7 +1985,7 @@ def _td_world(world, monkeypatch, *, seat=True):
     tmp_path, state = world
     doc = org_doc(tmp_path)
     if seat:
-        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "shiftlead"}
+        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
     write_org(tmp_path, doc)
     handed = []
 
@@ -2097,11 +2101,11 @@ def test_td_add_is_refused_in_words_where_the_forms_button_is_disabled(world, ca
     assert "no team services" in capsys.readouterr().err
     assert cli.main(["td", "add", "--repo", "nowhere", "words"]) == 1
     assert "no registered repo is named 'nowhere'" in capsys.readouterr().err and len(handed) == 2
-    # a seat the team defines whose home has no checkout on its host: the form's own reason
+    # a seat the team defines whose repo has no checkout on its host: the form's own reason
     tmp_path, handed = _td_world(world, monkeypatch)
     doc = org_doc(tmp_path)
-    doc["projects"]["ao"]["repos"]["far"] = {"devenv": "/workspaces/far"}
-    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "home": "far"}
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
+    doc["teams"]["ao-grind"]["host"] = "devenv"  # it lands where shiftlead is not checked out
     write_org(tmp_path, doc)
     assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 1
     assert "techlead-ao: the techlead seat has no checkout on its host" in capsys.readouterr().err and not handed
@@ -2298,7 +2302,7 @@ def test_a_start_counts_every_lane_it_creates_by_kind_the_managers_too(world, ca
     team = doc["teams"]["ao-grind"]
     team["manager"]["lane"] = "design-first"  # a manager whose role carries a lane: counted, once
     team["members"][0]["lane"] = ["free-pick", "owner:grinder"]  # as a grinder's is
-    team["members"].append({"role": "grinder", "name": "grind-x", "lane": "free-pick", "home": "shiftlead"})
+    team["members"].append({"role": "grinder", "name": "grind-x", "lane": "free-pick"})
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     real = cli.call_sync
 
@@ -2341,9 +2345,9 @@ def test_a_start_counts_every_lane_it_creates_by_kind_the_managers_too(world, ca
 def _two_teams(tmp_path, state, declared):
     doc = org_doc(tmp_path)
     doc["teams"]["ops"] = {
-        "projects": ["ao"],
+        "repo": "shiftlead",
         "manager": {"role": "person"},
-        "members": [{"role": "grinder", "name": "ops-grind", "lane": "free-pick", "home": "shiftlead"}],
+        "members": [{"role": "grinder", "name": "ops-grind", "lane": "free-pick"}],
     }
     write_org(tmp_path, doc)
     if declared is not None:

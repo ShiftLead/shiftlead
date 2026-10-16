@@ -97,16 +97,11 @@ def org_doc(root: Path) -> dict:
     return {
         "projects": {
             "ao": {"repos": {"shiftlead": {HOST: str(root / "shiftlead")}}},
-            "wide": {
-                "repos": {
-                    "shiftlead": {HOST: str(root / "shiftlead")},
-                    "ao-api": {HOST: str(root / "ao-api"), "devenv": "/workspaces/api"},
-                }
-            },
+            "wide": {"repos": {"ao-api": {HOST: str(root / "ao-api"), "devenv": "/workspaces/api"}}},
         },
         "teams": {
             "ao-grind": {
-                "projects": ["ao"],
+                "repo": "shiftlead",
                 "manager": {"role": "manager", "name": "orc-ao"},
                 "members": [{"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick"}],
             }
@@ -167,12 +162,25 @@ def badged(name, team, project="ao", state="working", unattended=True):
 # ── the strip's contents (design §4.5a Org **Teams** strip) ───────────────────────────────────
 
 
+def test_an_old_key_is_refused_by_name_with_its_fix(world):
+    """§4.9 *A definition written before TD-722*: `projects:` is refused by name, as any key nobody
+    reads is, and the strip's note says the fix — there is no release of warnings."""
+    tmp_path, fleet = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"] = {**doc["teams"]["ao-grind"], "projects": ["ao"]}
+    del doc["teams"]["ao-grind"]["repo"]
+    write_org(tmp_path, doc)
+    v = uiapp.teams_view([])
+    assert v["teams"] == [] and "`projects:` is gone — write `repo: shiftlead`" in v["notes"][0]
+
+
 def test_the_strip_lists_every_definition_with_its_source_projects_members_and_live_count(world):
     tmp_path, fleet = world
     v = uiapp.teams_view([])
     (row,) = v["teams"]
     assert row["name"] == "ao-grind" and row["manager"] == "orc-ao"
-    assert row["projects"] == ["ao"] and row["members"] == 2 and row["live"] == 0  # stopped
+    assert row["repo"] == "shiftlead" and row["project"] == "ao"  # its one repo and that repo's heading (TD-722)
+    assert row["members"] == 2 and row["live"] == 0  # stopped
     assert row["source"] == str(tmp_path / "home" / "org.yml") and v["source"] == row["source"]
     # a team is live when a session carrying its badge is; a dead one does not count
     live = uiapp.teams_view([badged("orc-ao", "ao-grind"), badged("grind-1", "ao-grind", state="exited")])
@@ -578,7 +586,7 @@ def test_the_picker_offers_each_project_with_its_repos_checkouts_on_this_host(wo
     assert f'"path": "{tmp_path / "shiftlead"}"' in html  # the narrowing data rides with the option
     assert '"repo": "ao-api"' in html and '"hosts": ["devenv", "kmaster"]' in html
     projects = {p["name"]: p for p in uiapp.projects_view()}
-    assert [r["repo"] for r in projects["wide"]["repos"]] == ["ao-api", "shiftlead"]
+    assert [r["repo"] for r in projects["wide"]["repos"]] == ["ao-api"]  # a repo sits in one project (TD-722)
     assert projects["ao"]["repos"][0]["path"] == str(tmp_path / "shiftlead")
 
 
@@ -594,6 +602,9 @@ def test_no_project_is_the_default_and_changes_nothing(world, client):
 
 def test_choosing_a_project_badges_the_session_and_puts_the_project_block_in_front(world, client):
     tmp_path, fleet = world
+    doc = org_doc(tmp_path)  # shiftlead moves under the wide heading: a project of two repos
+    doc["projects"]["wide"]["repos"]["shiftlead"] = doc["projects"].pop("ao")["repos"]["shiftlead"]
+    write_org(tmp_path, doc)
     r = client.post(
         "/new",
         data={"name": "x", "dir": str(tmp_path / "shiftlead"), "prompt": "go", "project": "wide"},
@@ -603,7 +614,7 @@ def test_choosing_a_project_badges_the_session_and_puts_the_project_block_in_fro
     (made,) = fleet.creates()
     assert made["project"] == "wide"
     assert made["prompt"].startswith("## Project: wide")
-    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your home" in made["prompt"]
+    assert f"- shiftlead: {tmp_path / 'shiftlead'}  — your repo" in made["prompt"]
     assert "ao-api: not checked out on kmaster" not in made["prompt"]  # it is checked out here
     assert made["prompt"].endswith("go")
 
