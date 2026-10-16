@@ -67,8 +67,9 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Open |
 | TD-731 | The person cannot hold a settled entry: a hold is only a settling entry's, so an entry that settled before the person looked is in a lane with no press to stop it | Medium | Designed — built by TD-735, TD-736 |
 | TD-736 | Build TD-731 (2): **Hold** on every settled row a lane takes, and a held entry is an Inbox row with **Release** | Medium | Open |
-| TD-739 | The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes | Medium | Open |
 | TD-744 | Two behaviours of TD-731 (#1861) are held by no test: `_hold_tell` reads a PR only from a *declared* claim, and `prehold` keeps an id's existing hold | Low | Open |
+| TD-746 | The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it | Medium | Open |
+| TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 
 ---
 
@@ -1366,26 +1367,6 @@ The other cases:
 
 ---
 
-## TD-739: The Org, Inbox and Repo pages take 0.35–0.86 s before their first byte, and nothing says where the time goes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, measuring render times for TD-737)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (the `/`, `/inbox` and `/repo/{name}` routes and what each reads from the host agent before rendering); `src/shiftlead/ui/org.py`, `inbox.py`, `repo.py`
-
-**Why:** TD-737's measurement, 2026-10-15, read-only GETs of the live UI, three passes each: time to first byte was 0.45–0.57 s for `/` (280 KB), 0.39–0.86 s for `/inbox` (1.46 MB), 0.31–0.79 s for `/repo/shiftlead` (636 KB), and 0.14–0.40 s for `/settings` (83 KB). In headless Chromium, parsing then added 0.1–0.35 s before the DOM was ready. The server's half is the larger, and it is paid on every page change, since each page is a full server-rendered navigation (§4.5 *Browser mechanics*).
-
-**Fix:** profile each route's render on a scratch home loaded to the live home's size (`scripts/look_home.py`, with the fixture's sessions, mail and board raised to the counts the live Inbox shows: ~320 mail rows, ~60 board items). Split the time into the host agent's RPCs, the view's computation and the template, say in the PR where it goes, and fix the largest share, or file each part as its own entry where its fix is in `src/sessionorc/`.
-
-**Done when** the PR names each route's split, and the largest share is fixed or filed.
-
-**Related:** TD-737, TD-738.
-
----
-
 ## TD-744: TD-731's `_hold_tell` reading a PR only from a declared claim, and `prehold` keeping an id's existing hold, are held by no test (#1861)
 
 **Priority:** Low
@@ -1405,5 +1386,47 @@ The other cases:
 **Done when** the two tests exist and fail under those mutations.
 
 **Related:** TD-731, #1861.
+
+---
+
+## TD-746: The `repos` reading a page asks for is 1.3 MB on the live home: every PR of the week, every completed entry and every ledger entry's text, ~40 ms a read, for a page that draws a fraction of it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/` — the host agent's `repos` RPC and the repo facts it hands whole (`prs`, `completed`, `ledger`, `boards` per checkout); its readers in `src/shiftlead/ui/app.py` (`Readings.repos`), `inbox.py` (`board_reading`, `ledger_for_you`), `repo.py`, and the cards' `view()`
+
+**Why:** TD-739's measurement, 2026-10-15, read-only calls to the live host agent: `repos` answered 1,325,334 bytes in 34–55 ms, against 22–26 ms for `list` (248 KB) and 1–9 ms for `host`, `usage`, `gate` and `doing_log`. Of it, shiftlead's checkout alone is 796 KB: `prs` 407 KB, `ledger` 201 KB, `completed` 185 KB; samscrape's is 249 KB. Every page reads it once since TD-739 (it was two or three times), and the client parses all of it on each page change, though the Org, the Inbox and the Repo page each draw a small part: the board rows, the ledger rows for the person, one repo's facts.
+
+**Fix:** measure which fields each reader uses, then either give the RPC a `fields`/`root` filter the pages pass (the Repo page one root, the Inbox `boards` and the ledger's person rows, the Org the lanes and counts), or split the heavy parts (`prs`, `completed`) into their own reads. A reading the cards' `view()` takes stays whole where it needs it.
+- **Tests:** each page's request asks only for what it draws (a fake agent records the params), and a filtered reading equals the whole one restricted to those fields.
+
+**Done when** no page reads the whole `repos` reading to draw a part of it, and the PR gives the bytes and the time per page before and after.
+
+**Related:** TD-739 (the measurement), TD-747.
+
+---
+
+## TD-747: The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/inbox_row.html` (the `row` macro and the macros under it), `inbox_rows.html`; `src/shiftlead/ui/render.py` (`inline`, `render`, the closed markdown subset each row's text goes through); `src/shiftlead/ui/inbox.py` (`row_find`, `row_subject`)
+
+**Why:** TD-739's profile, 2026-10-15: on a scratch home with 320 mail entries, 60 board lines, this repo's ledger and 12 sessions, `/inbox` took ~230 ms, of which the template was ~135 ms (it was ~186 ms before TD-739's `subject_of` fix). What is left is spread across ~1,200 macro calls: Jinja's own call overhead, ~56,000 `markupsafe.escape` calls, `render.inline` on every row's text (~3,900 calls) and `row_find`'s lowercased copy of each row. No one function is above ~10% of it.
+
+**Fix:** profile again (the harness in TD-739's PR body), then take the cheapest of: render each mail row's `md()` once per entry revision and keep it (the person inbox's `rev`, TD-616); move the per-row constant `title` strings out of the loop; or draw *FYI* folded with its rows fetched on open. Say in the PR which, and the time before and after.
+- **Tests:** the page's HTML is byte-identical before and after for a fixture inbox (or differs only where the PR says).
+
+**Done when** `/inbox` at the live size renders its template in under ~70 ms on a scratch home, and the PR gives the split.
+
+**Related:** TD-739, TD-738, TD-746.
 
 ---

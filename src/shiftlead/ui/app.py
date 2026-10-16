@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import contextvars
 import gzip
 import html
 import json
@@ -677,6 +678,15 @@ async def agent_call(method: str, **params: Any) -> Any:
         raise HTTPException(400, str(e)) from e
 
 
+# One `repos` reading per page request (TD-739): the reading is the repos' whole facts — 1.3 MB on
+# the live home, ~40 ms a read — and a page asked for it two or three times (the board, the state
+# rows, the ledger's rows). The http middleware gives each request its own memo; a reader with none
+# (`ao inbox --counts`) reads each time, and a memo older than `REPOS_MEMO_TTL` is read again, so a
+# long-lived request never holds a stale one.
+_REPOS_MEMO: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("repos_memo", default=None)
+REPOS_MEMO_TTL = 2.0
+
+
 class Readings:
     """The readings the Inbox is counted from (design §4.4 *Each reading has one owner*, *The Inbox's
     counts*; TD-616): the person inbox, the state rows, the board's horizon and the build chip, each
@@ -705,6 +715,16 @@ class Readings:
         while nobody is in one (TD-097). Every page that draws a pill asks, so they agree."""
         return teamrun.seat_ids(await self.defs(), fleet)
 
+    async def repos(self) -> Any:
+        """The `repos` reading, once per request (`_REPOS_MEMO`, TD-739)."""
+        memo = _REPOS_MEMO.get()
+        if memo is not None and "got" in memo and time.monotonic() - memo["at"] <= REPOS_MEMO_TTL:
+            return memo["got"]
+        got = await self.call("repos")
+        if memo is not None:
+            memo.update(got=got, at=time.monotonic())
+        return got
+
     async def repo_facts(self) -> tuple[dict[str, Any], dict[str, Any]]:
         """The home's repo facts and doing log (§4.4 *Repo facts*, TD-176), each `{}` when the agent
         cannot give it — an older agent, a node whose link is down: the facets then read *no repo
@@ -712,7 +732,7 @@ class Readings:
         repos: dict[str, Any] = {}
         doing: dict[str, Any] = {}
         with contextlib.suppress(Exception):
-            repos = await self.call("repos")
+            repos = await self.repos()
         with contextlib.suppress(Exception):
             doing = await self.call("doing_log")
         return repos, doing
@@ -753,7 +773,7 @@ class Readings:
             return [], ""
         await self.pull_marks()
         try:
-            repos = await self.call("repos")
+            repos = await self.repos()
         except Exception as e:  # noqa: BLE001 — said in words, never an empty board
             return [], f"board items are not shown: the host agent's repo reading could not be read ({e})"
         teams_of = repo_teams(await self.defs(), host_name())
@@ -975,7 +995,9 @@ def create_app() -> FastAPI:
     async def person_settings(request: Request, call_next: Any) -> Any:
         """The person's own (`person:` in the home's `settings.yml`, design §5, TD-146) read through
         the agent's `settings` read at most once in `DEFS_TTL` seconds, before a page is drawn — the
-        editor button every card and Focus header draws comes from it. A failed read keeps the last."""
+        editor button every card and Focus header draws comes from it. A failed read keeps the last.
+        Each request gets its own `repos` memo here (TD-739)."""
+        _REPOS_MEMO.set({})
         now = time.monotonic()
         if now - settings_at["at"] > DEFS_TTL and not request.url.path.startswith("/static"):
             settings_at["at"] = now
@@ -1132,6 +1154,7 @@ def create_app() -> FastAPI:
         heads=heads,
         flow_views=flow_views,
         repo_facts=repo_facts,
+        repos=rd.repos,  # the `repos` reading, once per request (TD-739)
         identity_info=identity_info,
         person_states=person_states,
         person_view=person_view,
@@ -3241,7 +3264,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         repos: dict[str, Any] = {}
         named: dict[str, str] = {}
         with contextlib.suppress(Exception):
-            repos = await call("repos")
+            repos = await h.repos()
         with contextlib.suppress(Exception):
             named = repo_teams(await h.defs(), host_name())
         return ledger_for_you(repos, fleet, named)

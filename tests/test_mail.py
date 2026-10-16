@@ -2776,6 +2776,7 @@ def test_a_subject_is_the_first_sentence_else_the_text_clipped_at_a_word():
     assert len(got) <= mail.SUBJECT_CHARS and got.endswith("word…") and "wor…" not in got
     assert mail.clip_subject("a" * 100) == "a" * (mail.SUBJECT_CHARS - 1) + "…"  # one word: clipped where it must be
     assert mail.clip_subject("  short \x1b one ") == "short one"
+    assert mail.subject_of("a\x00b\x07c\x7fd. e") == "a b c\x7fd."  # every control character a space (TD-739)
 
 
 async def test_mail_the_person_reads_carries_a_subject_given_derived_or_its_questions(agent, tmp_path):
