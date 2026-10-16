@@ -211,12 +211,15 @@ def pr_rows(
     standing: Mapping[int, dict[str, Any]],
     now: datetime,
     fleet: Collection[dict[str, Any]] = (),
+    teams: list[list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """**Open PRs** (§4.5 screen 11): every open PR, newest last, with its author — the member whose
     branch it is, else the GitHub login — its age, *draft*, its standing with the techlead
     (`standing`, by number; nothing when no entry names it), and `red` for one that reads red or
     conflicting — its word, how long, and past `ORPHAN_AFTER` whose it is among `fleet`'s records
-    (`teamrun.red_prs`, TD-613); `not_run` for one whose CI never started (TD-686), drawn *CI never ran*."""
+    (`teamrun.red_prs`, TD-613); `not_run` for one whose CI never started (TD-686), drawn *CI never ran*;
+    `unasked` for a held PR nobody asked, in the standing's place (§4.4, TD-790): `teams` the servicing
+    teams' members in the Org's order, whose reader the tag names (`review.unasked`)."""
     by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
     reds = {x["number"]: {**x, "age": _age(x["red_since"], now)} for x in teamrun.red_prs(r, fleet, now)}
     rows = []
@@ -224,6 +227,8 @@ def pr_rows(
         if not isinstance(p, dict) or not isinstance(p.get("number"), int):
             continue
         who = by_branch.get(str(p.get("branch") or ""))
+        st = standing.get(p["number"])
+        tag = None if st else review.unasked(dict(r), p["number"], teams or [])
         rows.append(
             {
                 "number": p["number"],
@@ -233,7 +238,14 @@ def pr_rows(
                 "login": str(p.get("author") or ""),
                 "age": _age(p.get("created"), now),
                 "draft": bool(p.get("draft")),
-                "standing": standing.get(p["number"]),
+                "standing": st,
+                "unasked": {
+                    "word": f"unasked · {_age(tag['created'], now)}",
+                    "title": f"touches held paths ({', '.join(tag['paths'])}): {review.unasked_hint(p['number'], tag)}"
+                    " — where your own ao pr held says held",
+                }
+                if tag
+                else None,
                 "red": reds.get(p["number"]),
                 # CI that never started is the person's, drawn apart from red (§4.4, TD-686)
                 "not_run": p.get("not_run") if p.get("checks") == "not_run" else None,
