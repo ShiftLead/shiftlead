@@ -13504,3 +13504,28 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-736, #1873.
 
 **Resolved:** 2026-10-16 — `tests/test_ui_inbox_ledger.py`: `test_a_held_for_you_entry_an_open_decided_line_names_is_its_held_row` holds a held *for you* entry that an open decided line names as one *ledger · held* row, no answers, **Release**; the held-row test asserts the footer *held in agentorc's ledger — no lane takes it until you release it*. Each fails under its mutation (the `not in decided` dropped; the footer replaced by `x`).
+
+## TD-760: Re-own the other repos' `Owner: anchor` entries (dev-cadence, contractmatch)
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** dev-cadence's `docs/technical_debt.md` (TD-092, TD-102); contractmatch's `docs/technical_debt.md` (TD-008, TD-054, TD-055, TD-057)
+
+**Why:** the anchor seat is retired (design §4.9b *No anchor seat*). Until TD-757 lands, the live seats keep taking `pr:` orders, so the interim is the ledger backfill alone: every registered repo's `Owner: anchor` entries move to their takers. shiftlead's own backfill is a separate PR. Fable round 4 (§3) found the entries below in the other repos.
+
+**Fix:**
+1. **The other repos' ledgers**, each by a PR in that repo under its own cadence:
+   - dev-cadence: TD-092 and TD-102 → `Owner: grinder`;
+   - contractmatch: TD-008, TD-054 and TD-055 → `Owner: grinder`, and TD-057 → `Owner: designer` (`Kind: design-first`), since its result is a design.
+
+   Each entry's Status says why: *the anchor seat is retired*. A registered repo this list misses is checked the same way: `grep -n "Owner:\*\* anchor"` over each registered ledger.
+
+**Done when** no registered repo's ledger has an `Owner: anchor` entry. (shiftlead's `roles: anchor:` block goes in TD-757's own PR.)
+
+**Related:** TD-757, TD-722, TD-723.
+
+**Resolved:** 2026-10-15 — dev-cadence#276 (TD-092, TD-102 → `Owner: grinder`) and contractmatch#179 (TD-008, TD-054, TD-055 → `Owner: grinder`; TD-057 → `Owner: designer`), each Status saying the anchor seat is retired. Read on each registered repo's `origin` after the merges: `grep -c '^\*\*Owner:\*\* anchor'` is 0 in contractmatch, dev-cadence, guardians-devenv, ledgerboard, pneuma-ops, samscrape, shiftlead and work_history.
