@@ -13347,3 +13347,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-739 (the measurement), TD-747.
 
 **Resolved:** 2026-10-15 — the `repos` RPC takes `omit`, dotted paths each reading is served without (`reports.omitted`); the Org, the Repo page, Focus and `/api/sessions` leave out `ledger.recent`, the month's PRs' head, base, branch, author, dates and draft flag, and the entries' detail blocks; the Inbox (its page, its poll, a message page and the keeper's recount) the same less the detail and plus `completed`; Settings both. On the live reading of 2026-10-15: 1,449,490 B whole (~31 ms at the agent, 19 ms to encode and parse) → 750,556 B for a page (9 ms), 639,477 B for the Inbox (7 ms), 492,494 B for Settings (6 ms). An omit, not a keep-list, so a key the agent grows reaches every page. The events stream's `repos` events still carry whole readings: TD-754.
+
+## TD-749: The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-15 (Paul, in an interactive session; TD-748's review)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `docs/briefs/grinder-ao-1.md:15` (*Your half of the team*); `docs/briefs/grinder-ao-2.md` (its *Lane* heading and the split rule)
+
+**Why:** the doing log (`~/.shiftlead/doing.jsonl`) since 2026-10-10 has two lines where a grinder declared out of work because the open builds were the sibling's package (2026-10-15 00:07Z *the open grinder builds are all sessionorc (the sibling's)*, 00:24Z *TD-687 and TD-690 are sessionorc-led (the sibling's)*), and five where a grinder picked an entry over a higher one in the other half (TD-428, TD-593, TD-616, TD-689, TD-691) — the pass-over §4.8 *Choosing in a free-pick lane* says needs a reason, manufactured by the brief. Merge safety is `held:` review, not the split; a conflict between two grinders costs a rebase.
+
+**Fix:** remove the split from both briefs: each grinder picks the highest pickable unclaimed entry in its lane (priority, then the ledger's order) whatever package it touches; a claim names files a live sibling's claim also touches. Lanes by role and stage are unchanged.
+
+**Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
+
+**Related:** TD-108, TD-748.
+
+**Resolved:** 2026-10-15 — `docs/briefs/grinder-ao-1.md` (*One lane for both grinders* replaces *Your half of the team*) and `docs/briefs/grinder-ao-2.md` (*One lane, both packages* replaces the package lane): each grinder picks the highest pickable entry nobody holds whatever package it touches, and a claim names the files a live sibling's claim also touches; `grep -n "Your half" docs/briefs` finds nothing.
