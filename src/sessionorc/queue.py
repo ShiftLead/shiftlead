@@ -170,6 +170,12 @@ def _closed(fields: Mapping[str, str], close: Mapping[str, Any] | None) -> str:
     return str((close or {}).get("closed") or "") or _resolved_date(fields)
 
 
+def _closed_order(closed: str) -> datetime:
+    """A close as an instant to order by: a commit's time, else a `Resolved:` date as the end of its day."""
+    when = _when(closed if not DATE.fullmatch(closed) else f"{closed}T23:59:59+00:00")
+    return when or datetime.min.replace(tzinfo=UTC)
+
+
 def _key_sort(key: str, q: str) -> tuple[tuple[int, ...], int, str]:
     repo, _, tid = q.partition("#")
     return lb.key_order(key), int(tid[3:]), repo
@@ -633,7 +639,7 @@ def _completed(
                     "resolved": _resolved_text(a["fields"]),
                 }
             )
-        ents.sort(key=lambda e: e["closed"], reverse=True)
+        ents.sort(key=lambda e: _closed_order(e["closed"]), reverse=True)
         out.append(
             {
                 "id": min(members, key=lambda q: (int(q.partition("#")[2][3:]), q)),

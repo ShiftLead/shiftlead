@@ -328,3 +328,12 @@ def test_an_archived_entrys_close_is_the_commits_time_where_the_reading_holds_it
     r["completed"] = [{"id": "TD-001", "closed": f"{TODAY}T09:30:00+00:00", "pr": 5}]
     (done,) = _cards({root: r})["completed"]
     assert done["at"] == f"{TODAY}T09:30:00+00:00" and done["entries"][0]["closed"] == done["at"]
+
+
+def test_a_completed_cards_entries_are_ordered_by_instant_a_bare_date_its_days_end(tmp_path):
+    root, r = _repo(tmp_path, "r", [_entry(9, "open", Priority="Low")],
+                    archive=[_entry(1, "a commit's time", Resolved=f"{TODAY} — (PR #5)."),
+                             _entry(2, "a bare date", Blocked_by="TD-001", Resolved=f"{TODAY} (PR #6).")])  # fmt: skip
+    r["completed"] = [{"id": "TD-001", "closed": f"{TODAY}T09:30:00-06:00", "pr": 5}]
+    (done,) = _cards({root: r})["completed"]
+    assert [e["id"] for e in done["entries"]] == ["TD-002", "TD-001"] and done["at"] == TODAY
