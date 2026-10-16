@@ -78,7 +78,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-771 | Build TD-748 (3): the Queue page — groups, completed cards, the mail on its cards, `home: inbox\|queue`, the Inbox's ledger rows moved, the Queue tab, filters and find, Lift the hold, passed over | Medium | Open |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-773 | The pre-start lane count reads an entry's team through no test: `teamrun.lanes` passes the team name to `lane_matches` and nothing fails without it (#1902) | Low | Open |
-| TD-774 | The anchor-record retirement's three branches — a suspended record skipped, a node's record removed over its link, a scheduled start cancelled — are held by no test (#1900) | Low | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
 
 ---
@@ -1649,24 +1648,6 @@ The other cases:
 **Related:** TD-762, TD-730, #1902.
 
 ---
-
-## TD-774: The anchor-record retirement's three branches — a suspended record skipped, a node's record removed over its link, a scheduled start cancelled — are held by no test (#1900)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1900)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (`_retire_anchors`); `tests/test_anchor_retired.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1900's (TD-757) `_retire_anchors` one line at a time and running `tests/test_anchor_retired.py tests/test_no_anchor_seat.py tests/test_agent.py tests/test_link.py tests/test_models.py tests/test_manager_on_call.py` (6 `test_link.py` tests fail in this worktree unmutated, for a reason outside the PR; the count is 6 before and after each mutation below, so each of these passes every test that passes unmutated). Mutations that fail a test: `clean = True`, and the `exited and not clean` skip. Three that do not: (1) `and not r.suspended` removed from the selection — the docstring says *a suspended one is the person's (§4.8a) and never forgotten here*, and no test suspends an anchor record; (2) `await self._route_act("remove", {"id": s.id}, None, s.host)` replaced by `pass` — a node's anchor record is never removed, and no test has one (the docstring promises *a node's removed*); (3) `if s.state == "scheduled" and s.host == self.host:` replaced by `if False:` — `await self._cancel_start(s)` is never called, and the existing scheduled case (`test_the_tick_forgets_a_closed_anchor_record...`, `e-anchor`) still passes because the fall-through forgets the record anyway, so it does not say the start was cancelled (a pending timer could still fire into a forgotten record).
-
-**Fix:** in `tests/test_anchor_retired.py`: (1) a suspended anchor record, idle and clean, is still in `agent.sessions` after `_retire_anchors`; (2) a node's anchor record in `agent.remote` with its link present: the `remove` act is routed to that host, and with the link down the record stays; (3) the scheduled case asserts the start's timer is cancelled (`_cancel_start` called, or no start task remains). Each fails under its mutation above.
-
-**Done when** the tests exist and fail under those three mutations.
-
-**Related:** TD-757, #1900.
 
 ## TD-775: A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722
 
