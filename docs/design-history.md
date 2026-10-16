@@ -798,7 +798,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
-- 2026-10-15 (TD-730, the designer): `ao repo` says *needs a team* and names the tagging seat; `ao org check` lacks a stale or missing `Team` declaration, and needs-a-team entries with no techlead seat to tag them.
+- 2026-10-15 (TD-730, the designer): `ao repo` says *needs a team* and names the tagging seat; `ao td add --team`; `ao org check` lacks a stale or missing `Team` declaration, and needs-a-team entries with no techlead seat to tag them.
 - 2026-10-15 (TD-722 amendment, Fable round 5 and Sonnet round 3, adopted): `ao repo` lists the evaluation flag beside *other*'s, matching §4.4. Built by TD-757.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — `ao org` lists no anchor seat and `ao org check` no `anchors:` warning; `ao repo`'s `pr:` orders are on the grinders' pick list; `anchor:` other than `false` is an old key refused. Built by TD-724, TD-757.
 - 2026-10-15 (TD-722 amended, Sonnet round 1, adopted by Paul): a team's manager starts in a worktree of its repo, not its home repo.
