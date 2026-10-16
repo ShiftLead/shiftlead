@@ -13,7 +13,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from sessionorc.client import AgentError
-from shiftlead.ui.queue import queue_view
+from shiftlead.ui.inbox import inbox_sections, rail_rows
+from shiftlead.ui.queue import attach, card_index, item_home, queue_view
 
 pytestmark = pytest.mark.unit
 
@@ -142,7 +143,7 @@ def test_a_resolved_date_with_no_time_is_in_the_day_it_names():
     assert ln["wins"] == ["day", "week", "month"]  # no time of day: never in *4 h*
 
 
-def fake(q: dict | None):
+def fake(q: dict | None, entries: list | None = None):
     class Fake:
         def __init__(self, *a, **k):
             pass
@@ -158,6 +159,8 @@ def fake(q: dict | None):
                 if q is None:
                     raise AgentError("unknown method: queue")
                 return q
+            if method == "inbox":
+                return {"entries": [dict(e) for e in entries or ()]}
             return {"list": [], "usage": {}, "host": {"name": "kmaster"}}.get(method, {})
 
     return Fake
@@ -168,8 +171,13 @@ def client(monkeypatch, tmp_path, Fake):
     from shiftlead.ui import app as ui
 
     monkeypatch.setattr(ui, "LocalClient", Fake)
-    # the page reads the wall clock; the fixtures sit at NOW, so its windows are read at NOW too
-    monkeypatch.setattr(ui, "queue_view", lambda got, _now: queue_view(got, NOW))
+
+    class Frozen(datetime):  # the page's clock is the fixture's, so its windows hold whenever the suite runs
+        @classmethod
+        def now(cls, tz=None):
+            return NOW if tz else NOW.replace(tzinfo=None)
+
+    monkeypatch.setattr(ui, "datetime", Frozen)
     return TestClient(ui.create_app())
 
 
@@ -222,3 +230,83 @@ def test_a_resolved_line_is_drawn_without_its_marks():
     assert queue_view(q, NOW)["completed"]["lines"][1]["entries"][0]["resolved"] == (
         "2026-10-16 — Hold on every held row; rpc_td_hold and 2*3."
     )
+
+
+# -- slice 2: the mail on its card (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a row*)
+
+
+def mail(mid: str, text: str, kind: str = "ask", **kw) -> dict:
+    return {"id": mid, "from": "g1", "to": ["person"], "kind": kind, "text": text, "at": at(1), "state": "open", **kw}
+
+
+def test_an_item_is_drawn_where_its_entry_is():
+    idx = card_index(queue())
+    assert idx["TD-021"] == ("s#TD-20", "s#TD-21") and idx["s#TD-009"] == ("s#TD-10", "s#TD-9")
+    assert item_home(mail("m1", "x", about="TD-21"), idx)["on_row"] == "s#TD-21"  # `about` first
+    got = item_home(mail("m2", "TD-20: shall I split it? TD-30 waits on it"), idx)
+    assert got == {"home": "queue", "on_card": "s#TD-20", "on_row": "s#TD-20", "mentions": ["s#TD-30"]}
+    # an entry on a completed card, or on none, a state row and mail about nothing: the Inbox's
+    for e in (mail("m3", "TD-1 is done"), mail("m4", "TD-99?"), mail("m5", "no id"), {"row": "state", "id": "x"}):
+        assert item_home(e, idx)["home"] == "inbox"
+    board = {"row": "board", "id": "b", "text": "**Pick** one. Context: TD-30 · the design. Due: 2026-10-17"}
+    assert item_home(board, idx)["on_row"] == "s#TD-30"
+    secs = inbox_sections([], now=NOW, boards=[{**board, "due": "2026-10-16"}], cards=idx)
+    assert secs["needs"][0]["row"] == "board" and secs["needs"][0]["on_row"] == "s#TD-30"  # its kind kept
+    red = {"row": "red_pr", "id": "red_pr:s:5", "title": "TD-10 slice 2: the thing"}
+    assert item_home(red, idx)["on_row"] == "s#TD-10"
+    # a bare id two repos hold resolves to neither; the repo's form still does
+    two = card_index(queue(repo2=True) | {"cards": [*queue()["cards"], card(row("db", "TD-20", "same id"))]})
+    assert "TD-020" not in two and two["db#TD-020"][0] == "db#TD-20"
+
+
+def test_a_question_about_a_td_is_on_its_card_and_still_counted():
+    entries = [
+        mail("m1", "TD-21: which?"),
+        mail("m2", "about nothing"),
+        mail("m3", "TD-20 steer", kind="steer", bound=at(-1)),
+    ]
+    plain = inbox_sections(entries, now=NOW)
+    secs = inbox_sections(entries, now=NOW, cards=card_index(queue()))
+    assert secs["count"] == plain["count"] == 2 and secs["queue_n"] == 1 and plain["queue_n"] == 0
+    assert {e["id"]: e["home"] for e in secs["needs"]} == {"m1": "queue", "m2": "inbox"}
+    assert [e["home"] for e in plain["needs"]] == ["inbox", "inbox"]
+    # the rail counts what the Inbox draws
+    assert len([r for r in rail_rows(secs) if r["section"] == "needs"]) == 1
+    got = attach(secs, lambda e, sec: f"<{e['id']}>")
+    assert got["s#TD-21"]["items"] == [{"section": "needs", "id": "m1", "html": "<m1>"}]
+    assert got["s#TD-20"]["items"][0]["section"] == "steering"
+    view = queue_view(queue(), NOW, got)
+    status = {c["id"]: c["status"] for c in view["up_next"]}
+    assert status["s#TD-20"] == "needs you" and view["n"]["needs_you"] == 2
+
+
+def test_a_steer_alone_raises_the_card_to_steer():
+    secs = inbox_sections([mail("m3", "TD-20 steer", kind="steer", bound=at(-1))], now=NOW, cards=card_index(queue()))
+    view = queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))
+    assert {c["id"]: c["status"] for c in view["up_next"]}["s#TD-20"] == "steer"
+
+
+def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path, monkeypatch):
+    entries = [mail("m1", "TD-21: which one?"), mail("m9", "TD-20 is the parent, also TD-30")]
+    c = client(monkeypatch, tmp_path, fake(queue(), entries))
+    html = c.get("/queue").text
+    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
+    assert 'class="qmail inboxrows"' in card20 and "which one?" in card20  # on its row
+    assert "also mentioned in TD-20 is the parent" in html[html.index('data-card="s#TD-30"') :]
+    assert "Needs you</span>" in card20
+    css = c.get("/static/app.css").text
+    assert ".qmail details.more { display: none; }" in css  # no Snooze on the Queue
+    inbox = c.get("/inbox").text
+    rows = inbox[inbox.index('id="rows-needs"') : inbox.index('id="sec-fyi"')]
+    assert "which one?" not in rows and "TD-20 is the parent" not in rows
+    assert 'id="railqueue"' in inbox and '<span id="railqueuen">2</span> on the Queue' in inbox
+    # the number is unchanged and links to the Queue's needs-you filter
+    assert 'data-href="/queue?filter=needs-you"' in inbox and 'class="badge needs" id="personneeds">2</span>' in inbox
+    assert c.get("/api/person/inbox?counts=1").json()["queue_n"] == 2
+
+
+def test_with_nothing_on_the_queue_the_number_links_to_the_inbox(tmp_path, monkeypatch):
+    c = client(monkeypatch, tmp_path, fake(queue(), [mail("m2", "about nothing")]))
+    inbox = c.get("/inbox").text
+    assert "data-href" not in inbox[inbox.index('id="personinbox"') : inbox.index('id="queuetab"')]
+    assert 'id="railqueue"' in inbox and "about nothing" in inbox

@@ -1310,6 +1310,14 @@
     // lie in the one place a person looks to see whether anything is waiting (TD-069).
     const chip = $("#personneeds"), n = got.needs || 0;
     if (chip && got.needs !== null) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
+    // the number alone opens the Queue's needs-you filter while a counted row is drawn on a card (TD-771)
+    if (chip && typeof got.queue_n === "number") {
+      if (got.queue_n) { chip.dataset.href = "/queue?filter=needs-you"; chip.title = "some of these are drawn on their Queue cards: open the Queue's needs-you filter"; }
+      else { delete chip.dataset.href; chip.removeAttribute("title"); }
+      const rq = $("#railqueue"), rn = $("#railqueuen");
+      if (rq && rn) { rn.textContent = String(got.queue_n); rq.hidden = !got.queue_n; }
+    }
+    if (typeof document.dispatchEvent === "function" && typeof CustomEvent === "function") document.dispatchEvent(new CustomEvent("ao:counts", { detail: got }));
     // §4.10 *The Inbox is a queue* (TD-079 step 2): FYI's own quiet number, *Inbox 1 · 5*, never
     // added to the first. `null` is *not known* here too — a chip reading 0 with the host agent
     // down would be the same lie the first one refuses to tell.
@@ -1357,6 +1365,10 @@
   }
   drawBuildChip(null);
   if ($("#personneeds")) {
+    $("#personneeds").addEventListener("click", (e) => {
+      const to = e.currentTarget.dataset.href;
+      if (to) { e.preventDefault(); e.stopPropagation(); location.href = to; }
+    });
     // the Org page and the Inbox page render the count server-side; every other page reads it at
     // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.
     // The Org reads it at load too: its number is server-rendered, but the team headers' *answered
@@ -3395,9 +3407,9 @@
     box.addEventListener("click", (e) => {
       const mv = e.target.closest(".qmove[data-move]");
       if (mv) return moveCard(mv.closest(".qcard"), mv.dataset.move);
-      // a card's header folds it; a link, a button or the grip in it keeps its own press
+      // a card's header folds it; a link, a button, the grip or an Inbox item in it keeps its own press
       const head = e.target.closest(".qcard.hasrows > .qhead");
-      if (head && !e.target.closest("a, button, .qgrip")) toggleFold(head.closest(".qcard"));
+      if (head && !e.target.closest("a, button, .qgrip, .qmail")) toggleFold(head.closest(".qcard"));
     });
     box.addEventListener("keydown", (e) => {  // a card's header is a button: Enter or Space folds it
       const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qcard.hasrows > .qhead");
@@ -3464,9 +3476,17 @@
     setInterval(reread, 30000);
     let soon = null;
     connectEvents((ev) => {
-      if (ev.event !== "queue") return;  // the mail a card carries re-reads it too once it is drawn there (slice 2)
+      if (ev.event !== "queue") return;
       clearTimeout(soon);
       soon = setTimeout(() => { soon = null; reread(); }, 1500);
+    });
+    // …and on the mail a card carries (§4.5 screen 12, TD-771): the Inbox's counts moved, so a question
+    // was asked or answered — read again, as the Inbox does
+    let rev = null;
+    document.addEventListener("ao:counts", (e) => {
+      const r = e.detail && e.detail.rev;
+      if (rev !== null && r !== rev) { clearTimeout(soon); soon = setTimeout(() => { soon = null; reread(); }, 1500); }
+      rev = r === undefined ? rev : r;
     });
   };
 

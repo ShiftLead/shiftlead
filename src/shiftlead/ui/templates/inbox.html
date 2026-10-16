@@ -51,7 +51,7 @@
     <div id="railsheetbody"></div>
   </dialog>
   <div class="inboxwrap">
-  {{ rl.rail_html(rail, picks, "what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you, steering you paused and board items due today or overdue, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference. The top bar's number is this line's whole, never filtered.") }}
+  {{ rl.rail_html(rail, picks, "what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you, steering you paused and board items due today or overdue, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference. The top bar's number is this line's whole with the + n on the Queue under it, never filtered.", on_queue) }}
   <div class="inboxcol">
   {# Always drawn, hidden until it is true: the page's poll turns it on when the host agent goes
      away under it, so the rows on screen are not silently frozen (design §4.5 *no silent failure

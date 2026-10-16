@@ -32,6 +32,72 @@ WINDOW_WORD = {
     "month": "in the last month",
 }
 DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
+# an entry named in a mail item, a board line's `Context:` or a PR's title: `TD-n`, or `<repo>#TD-n`
+TD_REF = re.compile(r"(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b")
+CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)", re.S)
+
+
+def card_index(queue: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
+    """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
+    its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
+    the bare `TD-n` too where one repo alone holds it. An entry on a completed card, or on none, is in
+    no card: the item that names it stays in the Inbox."""
+    out: dict[str, tuple[str, str]] = {}
+    bare: dict[str, set[str]] = {}
+    for c in (queue or {}).get("cards") or []:
+        if not isinstance(c, Mapping) or not c.get("top"):
+            continue
+        for r in [c["top"], *(c.get("rows") or [])]:
+            q = str(r.get("qid") or "")
+            refs = _refs(q)
+            if "#" not in q or not refs:
+                continue
+            out.setdefault(refs[0], (str(c["id"]), q))
+            bare.setdefault(refs[0].partition("#")[2], set()).add(refs[0])
+    for tid, qs in bare.items():
+        if len(qs) == 1:
+            out[tid] = out[next(iter(qs))]
+    return out
+
+
+def _refs(text: Any) -> list[str]:
+    """The entries a text names, in order, each once: `TD-n` with its number as the ledger writes it."""
+    seen: list[str] = []
+    for repo, n in TD_REF.findall(str(text or "")):
+        ref = f"{repo}#TD-{int(n):03d}" if repo else f"TD-{int(n):03d}"
+        if ref not in seen:
+            seen.append(ref)
+    return seen
+
+
+def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
+    """Where an Inbox item is drawn (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a
+    row*): `{home, on_card, on_row, mentions}` — `queue` with the card and row its entry is on, for a question,
+    steer or note whose `about` names an entry an open card holds (else the first `TD-n` of its subject
+    and text, the others its mentions), a board line whose `Context:` names one, and a red PR whose title
+    or branch names one; `inbox` for the rest — a state row, a promote or team-start row, mail about no
+    entry, an entry on a completed card or found nowhere."""
+    inbox = {"home": "inbox", "on_card": "", "on_row": "", "mentions": []}
+    if not index:
+        return inbox
+    kind = e.get("row")
+    if kind == "board":
+        m = CONTEXT.search(str(e.get("text") or ""))
+        refs = _refs(m.group(1)) if m else []
+    elif kind == "red_pr":
+        refs = _refs(f"{e.get('branch') or ''} {e.get('title') or ''}")
+    elif kind and not e.get("handed_row"):
+        return inbox  # a state row, an alarm, a promote, a team start, the trail: no entry's
+    else:
+        about = _refs(e.get("about"))
+        refs = about or _refs(f"{e.get('subject') or ''} {e.get('text') or ''}")
+        if about:
+            refs += [r for r in _refs(f"{e.get('subject') or ''} {e.get('text') or ''}") if r not in about]
+    if not refs or refs[0] not in index:
+        return inbox
+    card, row = index[refs[0]]
+    mentions = [index[r][1] for r in refs[1:] if r in index and index[r][1] != row]
+    return {"home": "queue", "on_card": card, "on_row": row, "mentions": list(dict.fromkeys(mentions))}
 
 
 def _plain(text: Any) -> str:
@@ -73,11 +139,16 @@ def _show(q: str, one_repo: bool) -> str:
     return q.rpartition("#")[2] if one_repo else q
 
 
-def _row(r: Mapping[str, Any], one_repo: bool) -> dict[str, Any]:
+def _row(r: Mapping[str, Any], one_repo: bool, mail: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """A card's row (or its top entry) as the partials take it: `show`, `also`, `anchor` (the id a
-    `/queue#TD-n` finds, its open rows alone) and no `ext` — the Repo page's extras are not the Queue's."""
+    `/queue#TD-n` finds, its open rows alone), no `ext` — the Repo page's extras are not the Queue's — and
+    what is attached to it (`attach`): `mail`, the Inbox items drawn under it, and `mentioned`, the first
+    words of each item that names it beside another row."""
     q = str(r.get("qid") or "")
+    got = (mail or {}).get(q) or {}
     return {
+        "mail": list(got.get("items") or ()),
+        "mentioned": list(got.get("mentioned") or ()),
         **r,
         "priority": str(r.get("priority") or "").lower(),
         "show": _show(q, one_repo),
@@ -87,7 +158,36 @@ def _row(r: Mapping[str, Any], one_repo: bool) -> dict[str, Any]:
     }
 
 
-def queue_view(queue: Mapping[str, Any] | None, now: datetime) -> dict[str, Any]:
+def attach(sections: Mapping[str, Any], drawn: Any) -> dict[str, dict[str, list[Any]]]:
+    """The Inbox's rows the Queue draws (`home: queue`, §4.5 screen 6 *Where a row is drawn*), by the row
+    each is attached to (§4.5 screen 12 *What is attached to a row*): `items`, each `{section, id, html}`
+    with the row drawn by the Inbox's own renderer (`drawn(e, section)`), in the Inbox's order — what
+    needs the person first — and `mentioned`, a quiet line's words on each row an item names beside its own.
+    The snoozed list is the Inbox's alone: no Snooze on the Queue."""
+    out: dict[str, dict[str, list[Any]]] = {}
+    for sec in ("needs", "steering", "waiting", "answered", "fyi"):
+        for e in sections.get(sec) or ():
+            if e.get("home") != "queue":
+                continue
+            out.setdefault(e["on_row"], {"items": [], "mentioned": []})["items"].append(
+                {"section": sec, "id": str(e.get("id") or ""), "html": drawn(e, sec)}
+            )
+            words = " ".join(str(e.get("subject") or e.get("text") or "").split()[:8])
+            for m in e.get("mentions") or ():
+                out.setdefault(m, {"items": [], "mentioned": []})["mentioned"].append(words)
+    return out
+
+
+def _mail_status(status: str, rows: list[Mapping[str, Any]]) -> str:
+    """The mail's part of a card's status (§4.4 *The card's status*: *needs you* > *steer* > the ledger's):
+    an attached item that needs the person, else an attached running `steer`."""
+    secs = {m["section"] for r in rows for m in r.get("mail") or ()}
+    if status == "needs you" or "needs" in secs:
+        return "needs you"
+    return "steer" if "steering" in secs else status
+
+
+def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """The page's groups from the `queue` reading (§4.5 screen 12 *Groups*):
 
     - `completed`: `{lines, counts}` — one line per completed card (its age, the top entry's id, Priority
@@ -97,7 +197,10 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime) -> dict[str, Any]
     - `in_progress` and `up_next`: the cards in the reading's order, each row shaped for the partials;
     - `other`: the *other work* lines, each hold that names no open entry, with its holder;
     - `upnext`: the whole Up next order, each card's id (a move's neighbours, §4.4 *A move lands*);
-    - `n`: the header's counts — cards, in progress, up next, and those whose status is *needs you*."""
+    - `n`: the header's counts — cards, in progress, up next, and those whose status is *needs you*.
+
+    `mail` is what is attached to each row (`attach`): drawn under it, the top entry's in the header, and
+    raising the card's status to *needs you* or *steer*."""
     q = queue or {}
     cards = [c for c in q.get("cards") or [] if isinstance(c, Mapping) and c.get("top")]
     repos = {str(r) for c in cards for r in c.get("repos") or ()}
@@ -108,9 +211,10 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime) -> dict[str, Any]
 
     shaped: list[dict[str, Any]] = []
     for c in cards:
-        top = _row(c["top"], one_repo)
-        rows = [_row(r, one_repo) for r in c.get("rows") or []]
-        shaped.append({**c, "top": top, "rows": rows, "ids": list(c.get("order") or [c["id"]])})
+        top = _row(c["top"], one_repo, mail)
+        rows = [_row(r, one_repo, mail) for r in c.get("rows") or []]
+        status = _mail_status(str(c.get("status") or ""), [top, *rows])
+        shaped.append({**c, "status": status, "top": top, "rows": rows, "ids": list(c.get("order") or [c["id"]])})
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]
     up_next = [c for c in shaped if c.get("group") == "up_next"]
 
