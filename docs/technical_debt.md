@@ -67,7 +67,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
-| TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-769 | Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs | Medium | Open |
 | TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
@@ -1382,32 +1381,6 @@ The other cases:
 **Done when** the design says all of the ADR, its build entries are filed with the dev-cadence entry in their `Blocked by:`, and this entry's `Blocked by:` names them.
 
 **Related:** TD-604, TD-693, TD-715, TD-716, TD-734, TD-749.
-
----
-
-## TD-759: Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-757
-**Location:** design §4.9b *No anchor seat*, *A live check is a grinder's once its build is live*; held (`docs/briefs/**`): `docs/briefs/anchor.md`, `docs/briefs/docs-audit.md` (~L14), `docs/briefs/test-audit.md` (~L16); `src/shiftlead/briefs/anchor.md`, `src/shiftlead/briefs/grinder.md` (~L12, ~L14, ~L26), `src/shiftlead/team_skill.md` (~L139, ~L255)
-
-**Why:** once TD-757 removes the preset, nothing reads `anchor.md`. One rule in it still matters to the grinders who now take live checks: *read the live copy, never press*.
-
-**Fix:** a held path (`docs/briefs/**`), so the techlead seat reads the PR.
-- Delete `docs/briefs/anchor.md` and the package's `src/shiftlead/briefs/anchor.md`.
-- Add the live-copy rule as **a new paragraph** in `src/shiftlead/briefs/grinder.md` beside its rules (~L26; there is no live-check paragraph today), in §4.9b's words: read `ao status -v`, a record's fields, `ao promote status`, a headless GET; a press only on a scratch home.
-- The briefs stop telling agents to file `Owner: anchor`, each naming its replacement: `src/shiftlead/briefs/grinder.md` ~L12 (→ `Owner: grinder`, with a `Waits:` line where the entry waits on an event, or `Owner: paul` where it is the person's) and ~L14 (the excluded *anchor* count goes); `docs/briefs/docs-audit.md` ~L14 and `docs/briefs/test-audit.md` ~L16 (the same); `src/shiftlead/team_skill.md` ~L139 (*the team's anchor seat has a lane too* goes) and ~L255 (*waits for the anchor* → *waits for the techlead*).
-- **Left as they are**: `techlead-context.md` ~L103, `briefs/techlead.md`, `skill.md` ~L107 and `docs/briefs/grinder-ao-1.md` ~L9 (*only the anchor promotes*) name the anchor **session**, which stays.
-- `tests/test_briefs_layout.py`'s anchor tests are TD-757's (they fail with the preset); here the rest of `grep -ln "briefs/" tests/` passes with the brief files gone.
-
-**Done when** no `anchor.md` is left, the grinder brief carries the live-copy rule, no brief tells an agent to file `Owner: anchor`, and the brief tests pass.
-
-**Related:** TD-757, TD-722.
 
 ---
 
