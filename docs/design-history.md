@@ -174,6 +174,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4 Host agent
 
+- 2026-10-16 (TD-787, the designer; the fix agreed with Paul over Fable rounds 1–4 and Sonnet rounds 1–3 when it was filed): *A held PR nobody asked is marked, never ordered* — the tick's held key (`held.repo_key`: the repo's `held:`, else its live records' `review`), `pr_reading`'s per-head `held` read capped by `HELD_READS`, `pr_orders.asked` from the review seats' mail and the person's (by the sender's repo), and the *unasked* rule, owned by `_red_prs` as `pr_orders.unasked`, `asked` read from the standing's seats and counted by the sender's remote, listed only in a repo with a live reader (Fable rounds 1–2 and Sonnet round 2 adopted): visible only, keyed on the PR's files whoever wrote it. Built by TD-789 and TD-790.
 - 2026-10-16 (TD-769, grinder-ao-1): *A move lands* built — `rank_move`, the intents in `ranks.json`, the flush (`sessionorc.rank`, `agent_rank`, `board.land_rank`) and `ao rank`; the bullet's *As built* says that the neighbours are read with the unlanded intents applied, the `pending` and `not_landed` marks, the five remembered cards beyond each neighbour, a dropped intent, the flush's order, and why `ranks.json` keeps what the last flush found.
 - 2026-10-16 (TD-769, grinder-ao-1): *The Queue*'s reading built — `sessionorc.queue`, the `queue` RPC and event; the bullet says its shape, that it is derived each tick at the home, the month of completed cards it serves, *other work*, and how `sessionorc` reads a holder idle or stuck.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): *The Queue: cards, and the rank that orders them* — a card is one connected component of the open ledgers' `Blocked by:` ids across repos, with no exception, headed by its top entry; completed cards from the archive's components; the rank one key space (lined keys in `<ledger stem>_rank.yml`, implicit keys from Priority, Type and id), the card's key its best lined key, a move one line per open member landed by the board's road as a `queue: rank` PR; *stalled* at `QUEUE_STALL_AFTER` (24 h); the rank is the pick order by convention. Built by TD-769, TD-770, TD-771 on dev-cadence#TD-119.
@@ -337,6 +338,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-16 (TD-787, the designer; the fix agreed with Paul over Fable rounds 1–4 and Sonnet rounds 1–3 when it was filed): screen 11's Open PRs reads *unasked · 17h* (amber) for a green held PR nobody has asked, naming the reader to ask; the blank no longer stands for both. Built by TD-790.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): screen 12, the **Queue**, added; screen 6's ledger rows and held rows move to their cards, and *Where a row is drawn* tags each row `home: inbox|queue` while the numbers stay the Inbox's; *It is a queue* reads *Nothing leaves it without an answer*; screen 11's Technical debt becomes the repo's cards in Queue order. Built by TD-769–TD-771.
 - 2026-10-15 (TD-761, the designer): an idle session with a background shell reads *working · 1 shell*.
 - 2026-10-15 (TD-730, the designer): screen 11's Technical debt rows say *needs a team*, and the heading carries the repo's *needs a team* line and any stale-team note.
@@ -811,6 +813,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-16 (TD-787, the designer; the fix agreed with Paul over Fable rounds 1–4 and Sonnet rounds 1–3 when it was filed): `ao repo` prints *unasked* on the PR's line for every caller and carries `held`, `asked`, `unasked`; `ao pr held`'s *not held* names a path the repo holds. Built by TD-790.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): `ao rank` (and `--list`); `ao repo` lists in rank order. Built by TD-769.
 - 2026-10-15 (TD-730, the designer): `ao repo` says *needs a team* and names the tagging seat; `ao td add --team`; `ao org check` lacks a stale or missing `Team` declaration, and needs-a-team entries with no techlead seat to tag them.
 - 2026-10-15 (TD-722 amendment, Fable round 5 and Sonnet round 3, adopted): `ao repo` lists the evaluation flag beside *other*'s, matching §4.4. Built by TD-757.
@@ -1113,6 +1116,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
+- 2026-10-16 (TD-787, the designer; the fix agreed with Paul over Fable rounds 1–4 and Sonnet rounds 1–3 when it was filed): *The repo's mark beside it*: the reading's tag keys on the repo's `held:`, the author's `ao pr held` on its record's `review`; an author with a `review` asks the reader the tag names, one with none lets it stand.
 - 2026-10-15 (TD-730, the designer): the techlead seat's mark is `seat: {trigger: asks, tags: true}`, a candidate for its repo's tagging seat.
 - 2026-10-15 (TD-722 amendment, Fable round 6 and Sonnet round 4, both converged): no design change — TD-757's pointers corrected (`sessionorc/modes.py` held, `kind_of`, `red_prs`' *nobody's — the grinders' order*), its PR named the tests it would turn red (`test_briefs_layout.py`, the `checkout_held` tests) so it lands green, and its Done when says no `AnchorDef` is left.
 - 2026-10-15 (TD-722 amendment, Fable round 5 and Sonnet round 3, adopted): *No anchor seat*: a repo whose teams have no member for its work shows it as *the rest*, by owner, for the pickable kind, and an evaluation no lane takes is flagged — not *rest · owner n* alone. Built by TD-757.
@@ -1172,6 +1176,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9c Flows: the path an entry takes through a team
 
+- 2026-10-16 (TD-787, the designer; the fix agreed with Paul over Fable rounds 1–4 and Sonnet rounds 1–3 when it was filed): *What is shown*: a held PR no seat has been asked reads *unasked*; `held:` is read by the home's reading too. Built by TD-790.
 - 2026-10-15 (TD-722 amendment, Fable round 4, adopted by Paul): the anchor seat retired, reversing TD-381 — *Switching* compares no anchor seat. Built by TD-757.
 - 2026-10-15 (TD-722 amended, Fable round 3, adopted by Paul; review_by dropped for the repo's first team's chain): *Switching* — only the repo's first team compares the anchor seat's review against its own chain and reads *flow changed* over it; another team's Apply leaves the seat's review alone. Built by TD-724.
 - 2026-10-15 (TD-722 amended, Fable round 2, adopted by Paul): *Switching* — the repo's anchor seat is the repo's, not a definition's: every team of the repo reads *<repo>-anchor: starts* when its run finds no record, and the first to press Apply creates it; *its repo's main checkout*. Built by TD-724.
