@@ -284,6 +284,14 @@ def _find_text(rows: list[Mapping[str, Any]]) -> str:
     return " ".join(bits).lower()
 
 
+def _finds(w: str, text: str) -> bool:
+    """A find word in a card's or line's find text: an id whole — `TD-7` never finds TD-70 or TD-77 — and a
+    title's words as written, anywhere."""
+    if re.fullmatch(r"(?:[\w.-]+#)?td-\d+", w):
+        return any(t == w or t.endswith("#" + w) for t in text.split())
+    return w in text
+
+
 def _find_word(w: str) -> str:
     """A find word as `_find_text` writes it: lower-cased, an id with its number as the ledger writes it."""
     w = re.sub(r"(?i)\btd-(?=\d)", "TD-", w)
@@ -495,7 +503,7 @@ def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[s
     def by_repo_find(card_repos: Any, text: str) -> bool:
         if repos and not repos & set(card_repos or ()):
             return False
-        return all(w in text for w in words)
+        return all(_finds(w, text) for w in words)
 
     cards = [*(view.get("in_progress") or ()), *(view.get("up_next") or ())]
     for c in cards:

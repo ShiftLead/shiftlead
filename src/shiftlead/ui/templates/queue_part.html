@@ -8,23 +8,8 @@
 {% elif not q.served %}<div class="warn" id="noqueue">{{ why or 'the home serves no Queue yet: a node, or a home before its first tick' }}</div>
 {% else %}
 
-{# The filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): each a toggle carried in the
-   URL; what it hides is marked `qoff`, never dropped, so a move's neighbours stay the whole Up next order #}
-{% set fp = picks.filter %}
-<div class="qfilters" id="qfilters" role="group" aria-label="filters">
-  <a class="qf" href="/queue" aria-pressed="{{ 'false' if q.filtered else 'true' }}">All</a>
-  <a class="qf" id="qfneeds" href="{{ pq(picks, filter='needs-you') }}" aria-pressed="{{ 'true' if fp == 'needs-you' else 'false' }}" title="cards whose status is needs you, in rank order">Needs you ({{ q.n.needs_you }})</a>
-  {% if in_inbox %}<a class="qsub qininbox" id="qininbox" href="/inbox" title="what needs you that names no entry on a card: drawn in the Inbox, and counted in the top bar's number">+ {{ in_inbox }} in the Inbox</a>{% endif %}
-  <a class="qf" href="{{ pq(picks, filter='steering') }}" aria-pressed="{{ 'true' if fp == 'steering' else 'false' }}" title="cards with a steer running">Steering</a>
-  {% for t in teams %}<a class="qf qfteam" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
-  {% if q.repos | length > 1 %}{% for r in q.repos %}<a class="qf" href="{{ pq(picks, repo=r) }}" aria-pressed="{{ 'true' if r in picks.repo else 'false' }}" title="the cards of {{ r }}">{{ r }}</a>{% endfor %}{% endif %}
-  <span class="qkinds"><span class="qsub">kind</span>{% for k, label in kinds.items() %}<a class="qf" href="{{ pq(picks, kind=k) }}" aria-pressed="{{ 'true' if k in picks.kind else 'false' }}">{{ label }}</a>{% endfor %}</span>
-  <form class="qfind" method="get" action="/queue" role="search">
-    {% if fp %}<input type="hidden" name="filter" value="{{ fp }}">{% endif %}
-    {% for k in ('team', 'repo', 'kind') %}{% if picks[k] %}<input type="hidden" name="{{ k }}" value="{{ picks[k] | join(',') }}">{% endif %}{% endfor %}
-    <input type="search" name="find" id="qfindbox" value="{{ picks.find }}" placeholder="find an id or a title" aria-label="find an id or words of a title">
-  </form>
-</div>
+{# the filter row's numbers, which the page copies into the row it keeps outside these lists (TD-771) #}
+<span id="qcounts" hidden data-needs="{{ q.n.needs_you }}" data-ininbox="{{ in_inbox or 0 }}"></span>
 {% if q.find_miss %}<div class="qnote qfindmiss" id="qfindmiss">{{ q.find_miss.id }} is on no open card{% if q.find_miss.repos %} — in the archive: {% for r in q.find_miss.repos %}{% if not loop.first %} · {% endif %}<a href="{{ r.url }}">{{ q.find_miss.id }} on {{ r.name }}'s Repo page</a>{% endfor %}{% endif %}</div>{% endif %}
 {% if q.filtered and not q.shown %}<div class="qnote" id="qnone">no open card fits these picks</div>{% endif %}
 

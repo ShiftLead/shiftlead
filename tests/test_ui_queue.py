@@ -463,10 +463,8 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     c = client(monkeypatch, tmp_path, fake(queue(), [mail("m2", "about nothing")]))
     html = c.get("/queue").text
     row = html[html.index('id="qfilters"') : html.index('id="qcompleted"')]
-    assert 'aria-pressed="true">All</a>' in row and "Needs you (1)" in row and "Steering" in row
-    assert (
-        '<span id="railqueuen">' not in row and "+ 1 in the Inbox" in row
-    )  # the question about nothing is the Inbox's
+    assert 'aria-pressed="true">All</a>' in row and 'Needs you (<span id="qfneedsn">1</span>)' in row
+    assert "Steering" in row and '+ <span id="qininboxn">1</span> in the Inbox' in row  # the question about nothing
     assert 'name="find"' in row and "held (person)</a>" in row
     html = c.get("/queue?filter=needs-you").text
     assert re.search(r'id="qfneeds" href="/queue" aria-pressed="true"', html)  # pressed again: All
@@ -476,7 +474,11 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     assert 'data-card="s#TD-30"' in upnext and "s#TD-20" in upnext[upnext.index("data-upnext") :]
     part = c.get("/queue?part=1&find=TD-3").text
     assert 'id="qfindmiss"' in part and 'href="/repo/s#TD-003"' in part and 'id="qnone"' in part
-    assert c.get("/queue?part=1").text.count("+ 1 in the Inbox") == 1  # the re-read lists carry it too
+    # the row stands outside the lists the page re-reads (typed find words survive); the lists carry its numbers
+    html = c.get("/queue").text
+    assert html.index('id="qfilters"') < html.index('id="queuelists"')
+    part = c.get("/queue?part=1").text
+    assert 'id="qfilters"' not in part and 'id="qcounts" hidden data-needs="1" data-ininbox="1"' in part
 
 
 def test_a_passed_over_flag_is_drawn_on_its_card(tmp_path, monkeypatch):
@@ -497,3 +499,26 @@ def test_the_message_page_returns_to_the_queue_for_an_item_drawn_there(tmp_path,
     assert 'id="msgback" href="/queue?filter=needs-you#m1"' in page
     assert 'id="msgback" href="/inbox#m1"' in c.get("/inbox/m1?back=//evil.example").text  # nothing else is a list
     assert 'id="msgback" href="/inbox?sec=needs#m1"' in c.get("/inbox/m1?back=" + quote("?sec=needs")).text
+
+
+def test_an_id_in_find_matches_that_id_whole():
+    q = queue()
+    q["cards"].append(card(row("s", "TD-200", "a later one"), place=3))
+    q["cards"].append(card(row("s", "TD-2000", "much later, after TD-20"), place=4))
+    assert shown(apply_picks(queue_view(q, NOW), queue_picks({"find": "TD-20"}), {})) == ["s#TD-20"]  # not TD-200
+    assert shown(apply_picks(queue_view(q, NOW), queue_picks({"find": "s#TD-200"}), {})) == ["s#TD-200"]
+    assert shown(apply_picks(queue_view(q, NOW), queue_picks({"find": "later"}), {})) == ["s#TD-200", "s#TD-2000"]
+
+
+def test_the_rows_on_cards_and_in_the_inbox_add_up_to_the_top_bars_number(tmp_path, monkeypatch):
+    """The top bar counts both homes (§4.5 screen 6 *Where a row is drawn*): the counted rows drawn on cards and
+    the filter row's *+ m in the Inbox* make its number. *Needs you (n)* counts cards whose status is *needs you*
+    (the held TD-30 among them, which no number counts), so it is the cards, not a part of this sum."""
+    entries = [mail("m1", "TD-21: which one?"), mail("m2", "TD-20: and this?"), mail("m3", "about nothing"),
+               mail("m4", "nor this")]  # fmt: skip
+    c = client(monkeypatch, tmp_path, fake(queue(), entries))
+    top = c.get("/api/person/inbox?counts=1").json()
+    html = c.get("/queue").text
+    m = int(re.search(r'id="qininboxn">(\d+)<', html)[1])
+    assert top["needs"] == 4 and top["queue_n"] == 2 and m == 2 and top["queue_n"] + m == top["needs"]
+    assert 'Needs you (<span id="qfneedsn">2</span>)' in html  # TD-20's card and the held TD-30's

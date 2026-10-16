@@ -3453,6 +3453,12 @@
         || $(`.mailrow[data-msg="${CSS.escape(id)}"]`, box) || $(`[data-card="${CSS.escape(id)}"]`, box);
       return el && box.contains(el) ? el : null;
     }
+    // a target a pick hides (`qoff`) is shown by the page without the picks, at the same address
+    function hidden(el, keep) {
+      if (!el.closest(".qoff")) return false;
+      location.href = `/queue${keep}${location.hash}`;
+      return true;
+    }
     function reveal(el, ring) {
       const card = el.closest(".qcard");
       if (card && card.classList.contains("folded")) qc.toggleFold(card);
@@ -3460,7 +3466,7 @@
       if (ring) { $$(".qring", box).forEach((x) => x.classList.remove("qring")); el.classList.add("qring"); }
     }
     function showHash() {
-      const el = onCard(AO.hashId(location.hash)); if (el) reveal(el, false);
+      const el = onCard(AO.hashId(location.hash)); if (el && !hidden(el, "")) reveal(el, false);
     }
     // a TD item's address (§4.5 screen 12 *Addresses*, TD-771): `?card=<top id>&row=<TD-n>&item=<entry id>`
     // opens the card, scrolls to the row (the header for the top entry) and rings the item
@@ -3469,6 +3475,8 @@
       const card = p.get("card"), row = p.get("row"), item = p.get("item");
       if (!card && !row && !item) return;
       const it = item && onCard(item), at = onCard(row) || onCard(card);
+      const keep = new URLSearchParams(); [["card", card], ["row", row], ["item", item]].forEach(([k, v]) => { if (v) keep.set(k, v); });
+      if ((it && hidden(it, `?${keep}`)) || (at && hidden(at, `?${keep}`))) return;
       if (at) reveal(at, !it);
       if (it) reveal(it, true);
     }
@@ -3492,6 +3500,14 @@
         if (res.ok) {
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
           lists.innerHTML = await res.text();
+          // the filter row stands outside the lists, so typed find words and its focus survive: its numbers follow
+          const n = $("#qcounts", lists);
+          if (n) {
+            const a = $("#qfneedsn", box), b = $("#qininboxn", box), link = $("#qininbox", box);
+            if (a) a.textContent = n.dataset.needs || "0";
+            if (b) b.textContent = n.dataset.ininbox || "0";
+            if (link) link.hidden = !Number(n.dataset.ininbox);
+          }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           apply();
         }
