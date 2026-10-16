@@ -13464,3 +13464,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-746, TD-739.
 
 **Resolved:** 2026-10-15 — `subscribe` takes `omit` (`agent_serve._handle_conn` keeps it per subscriber, `_broadcast` and the subscribe's seed send each `repos` event through `reports.omitted`, one line per distinct omit); the UI's `Fanout` and `CountsKeeper` subscribe with `REPOS_OMIT_PAGE` and `fan_seed` reads the reading with it; design §4.4 *Repo facts*. Tests: `tests/test_ui_repos_omit.py` (a subscriber with an omit and one without; the UI's subscription, seed and keeper ask with the page's omit).
+
+## TD-756: `repos_omit` on the Focus page and the inbox entry page (TD-746) is held by no test (#1880)
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1880)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (`focus`, `repos_omit(REPOS_OMIT_PAGE)`; `inbox_entry_page`, `repos_omit(REPOS_OMIT_INBOX)`); `tests/test_ui_repos_omit.py`
+
+**Why:** `test-audit-ao-1`, 2026-10-15, deleting each `repos_omit(…)` call of #1880 in turn and running `tests/test_ui*.py` (812 passed each time, main's venv). The calls in `org`, `repo_page`, `api_sessions`, `inbox_page` and `api_person_inbox` each fail `tests/test_ui_repos_omit.py`; the two in `focus` and `inbox_entry_page` do not. Both routes read `repos` (`repo_facts()`), so either page reads the whole 1.3 MB reading again unnoticed; the test's parametrised routes are `/`, `/repo/samscrape`, `/inbox`, `/api/person/inbox` and `/api/sessions` only.
+
+**Fix:** add `/focus/<sid>` and `/inbox/<mid>` to the omit test's routes, each asserting the `repos` call carries the page's `omit`. Each fails with its call deleted.
+
+**Done when** the two routes are in the test and fail with their `repos_omit` call deleted.
+
+**Related:** TD-746, #1880.
+
+**Resolved:** 2026-10-15 — `tests/test_ui_repos_omit.py`'s `PAGES` holds `/focus/<sid>` (`REPOS_OMIT_PAGE`) and `/inbox/<mid>` (`REPOS_OMIT_INBOX`), the fake answering `seen` with a whole record; each fails with its route's `repos_omit` call deleted (checked by hand, the rest passing).
