@@ -132,6 +132,9 @@ SEAT_IDLE_GRACE = timedelta(minutes=2)
 # how long rule 3 leaves an idle seat open on a PR of its own that no reader holds (§6 rule 3, TD-366):
 # its fact-check or CI runs in the background and wakes it; past this the seat is closed as before
 SEAT_PR_WAIT = timedelta(hours=2)
+# how long a background shell task reads as the session working on its own (§4.2 *A background shell
+# task*, TD-766): a shell sends no heartbeat, and the waits it holds — CI, a deploy — run long
+SHELL_WAIT = timedelta(hours=2)
 # §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
 # the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
 IDLE_NUDGE = timedelta(minutes=20)
@@ -1053,11 +1056,31 @@ def subagents_live(s: Session, now: datetime) -> bool:
         return False
 
 
+def shells_live(s: Session, now: datetime) -> bool:
+    """A **live background shell** (design §4.2 *A background shell task*, TD-766): a task on the record's
+    `shells` whose `since` is within `SHELL_WAIT` of `now`, so a server left running holds no rule for
+    good. The view's `shells_live` and §6 rules 3, 4 and 9 read it beside `subagents_live`."""
+    for sh in s.shells or ():
+        try:
+            if now - _parse(str(sh.get("since"))) <= SHELL_WAIT:
+                return True
+        except (ValueError, AttributeError):
+            continue
+    return False
+
+
+def on_its_own(s: Session, now: datetime) -> bool:
+    """Working on its own (§4.2): a live subagent or a live background shell — what rules 3, 4 and 9
+    read as not idle, and what the tick's flips push."""
+    return subagents_live(s, now) or shells_live(s, now)
+
+
 def idle_from(s: Session) -> datetime | None:
-    """When an idle stretch counts from (§6 rules 3 and 4, TD-734): the later of `since` and
-    `subagent_at`, so a session whose last subagent has just ended is not read idle at once."""
+    """When an idle stretch counts from (§6 rules 3 and 4, TD-734, TD-766): the later of `since`,
+    `subagent_at` and `shells_at`, so a session whose last subagent or shell has just ended is not read
+    idle at once."""
     times = []
-    for iso in (s.since, s.subagent_at):
+    for iso in (s.since, s.subagent_at, s.shells_at):
         with contextlib.suppress(ValueError, TypeError):
             if iso:
                 times.append(_parse(iso))

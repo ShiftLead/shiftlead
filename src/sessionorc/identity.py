@@ -80,6 +80,10 @@ class ProcReader(Protocol):
 
     def comm(self, pid: int) -> str | None: ...
 
+    def children(self, pid: int) -> list[int] | None: ...
+
+    def cmdline(self, pid: int) -> list[str] | None: ...
+
 
 class LinuxProc:
     """`/proc` as it is. A process that is gone, or one we may not read, is `None` — never an error."""
@@ -113,6 +117,45 @@ class LinuxProc:
         except (OSError, ValueError):
             return None
         return cgroup_path(lines)
+
+    def children(self, pid: int) -> list[int] | None:
+        """The process's direct children (design §4.2 *A background shell task*, TD-766): every thread's
+        `/proc/<pid>/task/<tid>/children`, a child forked by any thread among them; on a kernel without
+        the file, every process whose `stat` names `pid` as its `ppid`. None for a process gone."""
+        try:
+            tids = os.listdir(f"/proc/{int(pid)}/task")
+        except (OSError, ValueError):
+            return None
+        found: set[int] = set()
+        try:
+            for tid in tids:
+                with open(f"/proc/{int(pid)}/task/{tid}/children", encoding="ascii") as f:
+                    found.update(int(x) for x in f.read().split())
+        except FileNotFoundError:
+            return self._children_by_ppid(int(pid))
+        except (OSError, ValueError):
+            pass  # a thread that ended under the read: what the others named stands
+        return sorted(found)
+
+    def _children_by_ppid(self, pid: int) -> list[int]:
+        out = []
+        for name in os.listdir("/proc"):
+            if name.isdigit() and (st := self.stat(int(name))) is not None and st.ppid == pid:
+                out.append(st.pid)
+        return sorted(out)
+
+    def cmdline(self, pid: int) -> list[str] | None:
+        """The process's argv, from `/proc/<pid>/cmdline`; None for a process gone or unreadable, and
+        `[]` for a kernel thread or a zombie, which has none."""
+        try:
+            with open(f"/proc/{int(pid)}/cmdline", "rb") as f:
+                raw = f.read()
+        except (OSError, ValueError):
+            return None
+        parts = raw.split(b"\0")
+        if parts and parts[-1] == b"":
+            parts.pop()  # argv ends in a NUL; one rewritten by the process may not
+        return [a.decode("utf-8", "replace") for a in parts]
 
 
 def cgroup_path(lines: Iterable[str]) -> str | None:

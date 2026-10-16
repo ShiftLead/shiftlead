@@ -11,6 +11,7 @@ import json
 import os
 import shutil
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -171,6 +172,7 @@ class TickMixin:
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
         await self._refresh_context(snapshot_at)
+        await self._refresh_shells(snapshot_at, panes)
         await self._refresh_links(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
@@ -605,13 +607,14 @@ class TickMixin:
     async def _subagent_flips(self, now: datetime) -> None:
         """A live subagent goes stale at `STALL_AFTER` with no event to say so (design §4.2 *Working
         on its own*, TD-734): each record's last `subagents_live` is kept, and a record whose reading
-        flipped since the last tick is pushed, so the card leaves *working* without waiting for a change."""
+        flipped since the last tick is pushed, so the card leaves *working* without waiting for a change.
+        A background shell's reading is one with it (`on_its_own`, TD-766): it goes stale at `SHELL_WAIT`."""
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         flipped = False
         seen: dict[str, bool] = {}
         for r in records:
             key = self._address(r)
-            seen[key] = live = agent_common.subagents_live(r, now)
+            seen[key] = live = agent_common.on_its_own(r, now)
             flipped = flipped or self._subagents_were.get(key, live) != live
         self._subagents_were = seen
         if flipped:
@@ -1186,11 +1189,11 @@ class TickMixin:
             return
         if s.state != "idle" or s.confidence != "hook" or s.pending or s.out_of_work or s.restart_wanted:
             return
-        if agent_common.subagents_live(s, now):
-            return  # its own work is running, and its card says *working* (§4.2 *Working on its own*, TD-734)
+        if agent_common.on_its_own(s, now):
+            return  # its own work runs — a subagent or a shell — and its card says *working* (§4.2, TD-766)
         idle = agent_common.idle_from(s)
         if idle is None or now - idle < IDLE_NUDGE:
-            return  # counted from the later of `since` and `subagent_at`, so a subagent just ended is not idling
+            return  # counted from the later of `since`, `subagent_at` and `shells_at` (TD-734, TD-766)
         if s.nudged_at and _parse(s.nudged_at) >= _parse(s.since):
             return  # this stretch was nudged already: never a second before the first is answered
         if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
@@ -1240,8 +1243,8 @@ class TickMixin:
             return
         if s.confidence != "hook" or s.pending or now - _parse(str(s.nudged_at)) < IDLE_NUDGE:
             return
-        if agent_common.subagents_live(s, now):
-            return  # not marked while its own work runs (§6 rule 4, TD-734)
+        if agent_common.on_its_own(s, now):
+            return  # not marked while its own work runs (§6 rule 4, TD-734, TD-766)
         s.idle_open = {"at": now_iso(), "ref": ref}
         log.info("%s: still idle %s after the nudge with %s open — idle · open work", s.id, IDLE_NUDGE, ref or "a debt")
         self._save(s)
@@ -2073,6 +2076,7 @@ class TickMixin:
             "out_of_work": r.out_of_work,
             "restart_wanted": r.restart_wanted,
             "subagents_live": agent_common.subagents_live(r, now),
+            "shells_live": agent_common.shells_live(r, now),
         }
 
     async def _finished_team(self, team: str, records: list[Session], now: datetime) -> datetime | None:
@@ -2619,8 +2623,8 @@ class TickMixin:
                 elif by == "stalled":
                     met = r.state == "stalled?"
                 else:
-                    # a standing mark is no cause while a subagent of the member's runs (§6 rule 4, TD-734)
-                    met = r.state == "idle" and bool(r.idle_open) and not agent_common.subagents_live(r, now)
+                    # a standing mark is no cause while a subagent or a shell of the member's runs (§6 rule 4)
+                    met = r.state == "idle" and bool(r.idle_open) and not agent_common.on_its_own(r, now)
                 if met:
                     causes.append({"by": by, "member": self._address(r)})
         return causes
@@ -2742,13 +2746,13 @@ class TickMixin:
         reviewer subagent is working) — with its git known and nothing uncommitted or unpushed — a seat
         that left work is the board's, as today."""
         git = s.git or {}
-        idle = agent_common.idle_from(s)  # from the later of `since` and `subagent_at` (TD-734)
+        idle = agent_common.idle_from(s)  # from the later of `since`, `subagent_at` and `shells_at` (TD-734, TD-766)
         return bool(
             s.state == "idle"
             and s.confidence == "hook"
             and idle is not None
             and now - idle >= SEAT_IDLE_GRACE
-            and not agent_common.subagents_live(s, now)
+            and not agent_common.on_its_own(s, now)
             and git
             and not git.get("dirty")
             and not git.get("unpushed")
@@ -3494,6 +3498,59 @@ class TickMixin:
             if live.context != reading:
                 live.context = reading
                 self.store.save(live)
+
+    async def _refresh_shells(self, now: datetime, panes: Mapping[str, Any]) -> None:
+        """Each idle record's background shell tasks (design §4.2 *A background shell task*, §4.3
+        `background`, TD-766): every tick, for each record of this host that is `idle`, attended or
+        not, with no live subagent and a pane in `panes` (the tick's list, keyed by the record's id),
+        whose adapter has `background` — read off the loop with the pane's pid. `shells` is written
+        with `since` kept for a task (`pid`, `start`) seen before, and `shells_at` moves to `now` while
+        one is within `SHELL_WAIT`, never back. Any other record, and a read that cannot tell (None),
+        keeps its last reading. The record is pushed when its list changes."""
+        due = []
+        for s in self.sessions.values():
+            pane = panes.get(s.id)
+            if s.state != "idle" or s.host != self.host or pane is None or agent_common.subagents_live(s, now):
+                continue
+            try:
+                fn = getattr(adapters.get(s.adapter), "background", None)
+            except KeyError:
+                fn = None
+            if fn and getattr(pane, "pane_pid", 0) > 1:
+                due.append((s, fn, int(pane.pane_pid)))
+        if not due:
+            return
+        results = await asyncio.gather(
+            *(asyncio.to_thread(fn, pid, self.proc) for _, fn, pid in due), return_exceptions=True
+        )
+        changed = False
+        at = now.isoformat()
+        for (s, _, _), result in zip(due, results, strict=True):
+            live = self.sessions.get(s.id)
+            if live is None or live.state != "idle" or not isinstance(result, list):
+                continue
+            was = {(sh.get("pid"), sh.get("start")): sh.get("since") for sh in live.shells if isinstance(sh, dict)}
+            shells = [
+                {
+                    "pid": t.get("pid"),
+                    "start": t.get("start"),
+                    "cmd": str(t.get("cmd") or ""),
+                    "since": was.get((t.get("pid"), t.get("start"))) or at,
+                }
+                for t in result
+                if isinstance(t, dict)
+            ]
+            moved = shells != live.shells
+            live.shells = shells
+            if agent_common.shells_live(live, now) and (not live.shells_at or _parse(live.shells_at) < now):
+                live.shells_at, moved_at = at, True
+            else:
+                moved_at = False
+            if moved or moved_at:
+                self.store.save(live)
+            changed = changed or moved
+        if changed:
+            await self._push_changes()
 
     async def _refresh_links(self, now: datetime) -> None:
         """Each live record's printed URLs (design §4.2 *The record's `links`*, §4.3 `links`, TD-543): the
