@@ -136,7 +136,7 @@ async def test_hand_to_the_techlead_claims_the_draft_for_the_ask(agent, tmp_path
         claim = json.loads((paths.attachments_dir() / token / paths.DRAFT_CLAIM).read_text())
         assert claim["by"] == f"hand:{got['id']}"
         e = next(e for e in agent.sessions[got["to"]].inbox if e.id == got["id"])
-        assert e.draft == token and e.entry == {"repo": "shiftlead", "type": "debt"}
+        assert e.draft == token and e.entry == {"repo": "shiftlead", "type": "debt", "team": ""}
         before = len(agent.sessions[got["to"]].inbox)
         with pytest.raises(AgentError, match="already claimed"):
             await c.call("entry_add", repo="shiftlead", type="debt", text="again", teams=teams, draft=token)
