@@ -1,5 +1,0 @@
-This is the shiftlead repo's part of the anchor's brief (design §4.8, the repo's part; TD-588): what the package's template leaves to the repo, since the built-ins name no repo's layout. The test command (`.shiftlead.yml`'s `commands:`, `pdm run test`) and the design (`docs/design/`, its dated history in `docs/design-history.md`) are filled into the template already; the gate is `python3 scripts/check_cadence.py --pr <n>` and the ledger check `python3 scripts/ledger.py --check`.
-
-**The scratch home.** `scripts/look_home.py` is the one way to run the host agent or `ao ui` here (design §4.9b): `pdm run python scripts/look_home.py` stands up both on a home under `/tmp`, a tmux server and a port of their own, with fixture sessions and a board, and SIGTERM or Ctrl+C tears it all down. A live check that needs a press is made there. `pdm run test` (private tmux sockets, a temp `SHIFTLEAD_HOME`) is how the host agent is exercised otherwise.
-
-**The ledger's own list.** `python3 scripts/ledger.py --list --pickable yes --owner anchor` lists what is yours by its header lines; `ao repo` alone tells a live check whose build is live.

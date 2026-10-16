@@ -13904,3 +13904,29 @@ Each reproduction passed with its fix.
 **Related:** TD-613 (the rule), TD-722, TD-724.
 
 **Resolved:** 2026-10-16 — archived with its build, TD-750 (#1883; see its **Resolved:**).
+
+## TD-759: Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-15 (TD-722's amendment, Fable round 4, adopted by Paul)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Blocked by:** TD-757
+**Location:** design §4.9b *No anchor seat*, *A live check is a grinder's once its build is live*; held (`docs/briefs/**`): `docs/briefs/anchor.md`, `docs/briefs/docs-audit.md` (~L14), `docs/briefs/test-audit.md` (~L16); `src/shiftlead/briefs/anchor.md`, `src/shiftlead/briefs/grinder.md` (~L12, ~L14, ~L26), `src/shiftlead/team_skill.md` (~L139, ~L255)
+
+**Why:** once TD-757 removes the preset, nothing reads `anchor.md`. One rule in it still matters to the grinders who now take live checks: *read the live copy, never press*.
+
+**Fix:** a held path (`docs/briefs/**`), so the techlead seat reads the PR.
+- Delete `docs/briefs/anchor.md` and the package's `src/shiftlead/briefs/anchor.md`.
+- Add the live-copy rule as **a new paragraph** in `src/shiftlead/briefs/grinder.md` beside its rules (~L26; there is no live-check paragraph today), in §4.9b's words: read `ao status -v`, a record's fields, `ao promote status`, a headless GET; a press only on a scratch home.
+- The briefs stop telling agents to file `Owner: anchor`, each naming its replacement: `src/shiftlead/briefs/grinder.md` ~L12 (→ `Owner: grinder`, with a `Waits:` line where the entry waits on an event, or `Owner: paul` where it is the person's) and ~L14 (the excluded *anchor* count goes); `docs/briefs/docs-audit.md` ~L14 and `docs/briefs/test-audit.md` ~L16 (the same); `src/shiftlead/team_skill.md` ~L139 (*the team's anchor seat has a lane too* goes) and ~L255 (*waits for the anchor* → *waits for the techlead*).
+- **Left as they are**: `techlead-context.md` ~L103, `briefs/techlead.md`, `skill.md` ~L107 and `docs/briefs/grinder-ao-1.md` ~L9 (*only the anchor promotes*) name the anchor **session**, which stays.
+- `tests/test_briefs_layout.py`'s anchor tests are TD-757's (they fail with the preset); here the rest of `grep -ln "briefs/" tests/` passes with the brief files gone.
+
+**Done when** no `anchor.md` is left, the grinder brief carries the live-copy rule, no brief tells an agent to file `Owner: anchor`, and the brief tests pass.
+
+**Related:** TD-757, TD-722.
+
+**Resolved:** 2026-10-16 (grinder-ao-2) — `docs/briefs/anchor.md` and `src/shiftlead/briefs/anchor.md` deleted. The grinder brief already carried the live-copy rule: its lane paragraph's *A live check* (design §4.9b) says the live copy is **read, never pressed** — `ao status -v`, a record's fields, `ao promote status`, a transcript, a headless GET — and a press only on a scratch home, so no paragraph was added; its ~L12 and ~L14 no longer named `Owner: anchor` (TD-757). `docs/briefs/docs-audit.md` and `docs/briefs/test-audit.md` file `paul` or `grinder` with a `**Waits:**` line where they said `anchor`; `src/shiftlead/team_skill.md`'s gate example waits for the techlead (its *anchor seat has a lane too* line was already gone).

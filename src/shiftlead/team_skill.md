@@ -259,7 +259,7 @@ A skeleton — one short section each, and nothing the template already says:
 - **Where it works** — the branch naming, the default branch, anything about worktrees the repo
   does differently.
 - **The gate** — what a PR needs beyond `commands:` and `gate:`: who reviews and who merges which
-  PRs (e.g. *anything under `src/core/` waits for the anchor*).
+  PRs (e.g. *anything under `src/core/` waits for the techlead*).
 - **Standing rules** — what is never done here: deploys, destructive data operations, files with
   their own line endings, what waits on the person, whole areas the team leaves alone.
 - **The lane** — what a `free-pick` excludes in this repo, or the context a named list needs.
