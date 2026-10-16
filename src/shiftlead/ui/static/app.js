@@ -1823,10 +1823,11 @@
     });
     applyFilter();
     const shown = $$("#groups .sc:not(.plus)").filter((c) => !c.hidden);
-    $("#count").textContent = `${shown.length} session${shown.length === 1 ? "" : "s"}`;
-    $("#empty").hidden = shown.length > 0;
+    // the Org's title line; the Repo page draws the cards without it (TD-740)
+    if ($("#count")) $("#count").textContent = `${shown.length} session${shown.length === 1 ? "" : "s"}`;
+    if ($("#empty")) $("#empty").hidden = shown.length > 0;
     const counts = {}; shown.forEach((c) => (counts[c.dataset.state] = (counts[c.dataset.state] || 0) + 1));
-    $("#badges").innerHTML = [["needs-you", "needs", "needs you"], ["limited", "limited", "limited"], ["stalled?", "stalled", "stalled"]]
+    if ($("#badges")) $("#badges").innerHTML = [["needs-you", "needs", "needs you"], ["limited", "limited", "limited"], ["stalled?", "stalled", "stalled"]]
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
     syncTeams();
   }
@@ -1895,7 +1896,7 @@
   // The server derives the groups on every render and every delta (only it sees the whole fleet),
   // so a badge or `controllers` change moves cards between groups here without a page reload.
   // `groups` null means the flat grid: one unnamed section, no header anywhere.
-  function syncGroups(gs) {
+  function syncGroups(gs, drop = false) {
     const box = $("#groups"); if (!box) return;
     box.classList.toggle("flat", !gs);
     const wanted = gs || [{ team: "", key: "", manager: "", ids: $$("#groups .sc:not(.plus)").map((c) => c.dataset.id), html: "" }];
@@ -1974,12 +1975,91 @@
       // first group may now be a stopped team, folded (review of PR #226), so *No team* or a live
       // team is preferred.
       const dest = keep.find((k) => !k.dataset.team) || keep.find((k) => +k.dataset.live) || keep[0];
-      const home = $(".grid", dest);
-      $$(".sc:not(.plus)", sec).forEach((c) => home.appendChild(c));
+      const home = !drop && dest && $(".grid", dest);
+      $$(".sc:not(.plus)", sec).forEach((c) => { if (home) home.appendChild(c); else { AO.handRing(c); c.remove(); } });
       sec.remove();
     });
+    // the Repo page (`drop`, TD-740) is one repo's items: a card no item lists now is another repo's
+    if (drop) {
+      const ids = new Set(wanted.flatMap((g) => g.ids || []));
+      $$("#groups .sc:not(.plus)").forEach((c) => { if (!ids.has(c.dataset.id)) { AO.handRing(c); c.remove(); } });
+    }
   }
-  Object.assign(AO, { orgLayout: layout, orgSyncGroups: syncGroups });  // run under node by tests/test_ui_org_plus.py (TD-390)
+  // The Repo page's items among a delta's groups (§4.5 screen 11, TD-740): the repo's line, its teams'
+  // cards and its no-team strip — `repo_items`' test, on what the stream sends. `undefined` for the
+  // flat page's `null`, which names no repo: the page keeps what it drew.
+  AO.repoItems = function (gs, repo) {
+    if (!gs) return undefined;
+    return gs.filter((g) => g.key === "repo:" + repo || ((g.kind === "team" || g.kind === "strip") && g.repo === repo));
+  };
+  // A delta on the Org's stream, applied to the page's `#groups` (§4.5a *team groups*): a card swapped
+  // or placed, the groups and the rollup re-sent. `repo` is the Repo page's (TD-740): only its items
+  // are kept, and a new card of another repo is never put in.
+  function groupsEvent(ev, repo) {
+    const cut = (gs) => (repo ? AO.repoItems(gs, repo) : gs);
+    const sync = (gs) => { const got = cut(gs); if (got !== undefined) syncGroups(got, !!repo); };
+    if (ev.event === "session") {
+      const old = $(`#card-${CSS.escape(ev.id)}`);
+      const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
+      const fresh = tpl.content.firstElementChild;
+      if (old) {
+        // a delta redraws the card; a menu the person has open stays open (TD-121), as a Deny reason stays typed
+        // and a ringed card stays ringed (TD-124)
+        const kept = AO.denyWhys(old), menu = !!$("details.more[open]", old), ring = document.activeElement === old;
+        old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
+        if (ring) fresh.focus({ preventScroll: true });
+        const d = menu && $("details.more", fresh); if (d) d.open = true;
+      }
+      else if (!repo || (cut(ev.groups) || []).some((g) => (g.ids || []).includes(ev.id))) {
+        const grid = $("#groups .tgroup .grid");  // syncGroups below moves it into its own group
+        if (grid) grid.appendChild(fresh);
+      }
+      // TD-156 (g): Paul saw two cards named designer-ao-1 after a resume superseded the exited
+      // record of that name. The swap above is by id, so a second element needs a second insert
+      // of one id, and the cause is not reproduced yet; until it is, a delta leaves one card per id.
+      $$(`[id="card-${CSS.escape(ev.id)}"]`).slice(1).forEach((dup) => dup.remove());
+      if (ev.groups !== undefined) sync(ev.groups);
+      if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
+      AO.markPopped(fresh);
+      layout();
+    } else if (ev.event === "gone") {
+      const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
+      if (ev.groups !== undefined) sync(ev.groups);
+      if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
+      layout();
+    } else if (ev.event === "groups") {
+      // the repo facts or a doing call moved (TD-176): the summaries are in the groups
+      sync(ev.groups);
+      if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
+      layout();
+    }
+  }
+  // The presses on a team's card — Start, Wind down, Stop now, Forget all, Apply, the fold, a facet's
+  // selector — the same on the Org and on the Repo page (TD-740), which draws the cards by the same partials
+  function wireGroups(box) {
+    box.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-team-act]");
+      // a concluded team's Start closes its sessions first, and its confirm names them (TD-099); a
+      // Start reads the lanes first (TD-265)
+      if (b && b.dataset.teamAct === "start") return startPress(b);
+      if (b) return b.dataset.confirm && !confirm(b.dataset.confirm) ? undefined : teamAct(b.dataset.team, b.dataset.teamAct, b);
+      const fa = e.target.closest("[data-forget-all]");
+      if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
+      const ap = e.target.closest("[data-flow-apply]");
+      if (ap) return confirm(ap.dataset.confirm) ? flowApply(ap) : undefined;
+      const f = e.target.closest("[data-fold]");
+      if (f) return toggleFold(f.closest(".tgroup"));
+      // the header's row is the fold's mouse target (TD-194): not a press on its controls, links,
+      // inputs or marks, nor one that ends a text selection, so a name can still be copied
+      const head = e.target.closest(".tgroup > .ghead");
+      if (head && $(".fold", head) && !e.target.closest(FOLD_SKIP) && !String(window.getSelection ? window.getSelection() : "")) {
+        return toggleFold(head.parentElement);
+      }
+      const p = e.target.closest(".tsum .seg[data-pick] button");
+      if (p && !p.disabled) pickSummary(p);
+    });
+  }
+  Object.assign(AO, { orgLayout: layout, orgSyncGroups: syncGroups, orgGroupsEvent: groupsEvent });  // run under node by tests/test_ui_org_plus.py (TD-390)
   // ---- a team's card: the fold, and a request in flight (design §4.5a *team card: fold*) ----
   // Any team with sessions folds to its header, by the header's row or its *n sessions* button. A
   // team opens as it did before anyone chose — open while something is live (a concluded team is
@@ -3054,6 +3134,9 @@
     const nameBox = $("#entryname");
     let named = false;
     const typed = () => (named && nameBox.value.trim() ? nameBox.value : "");
+    // the **Team** pick (TD-740): drawn where two or more teams service the repo; blank is the first with a seat
+    const teamSel = $("#entryteam"), picked = () => (teamSel ? teamSel.value : "");
+    if (teamSel) { teamSel.innerHTML = ""; teamSel.dataset.teams = ""; teamSel.onchange = plan; }
     let handWhy = "…";  // **Hand to the techlead**'s reason to be disabled, from the plan (TD-219 slice 4)
     let busy = false;  // a hand in flight: nothing re-enables the button under it, so one press hands once
     const hand = $("#entryhand");
@@ -3071,7 +3154,7 @@
       $("#entryseat").textContent = ""; $("#entrywhen").textContent = "";  // the last Type's, until this answer
       let r, v;
       try {
-        const q = typed() ? `&name=${encodeURIComponent(typed())}` : "";
+        const q = (typed() ? `&name=${encodeURIComponent(typed())}` : "") + (picked() ? `&team=${encodeURIComponent(picked())}` : "");
         r = await fetch(`/api/entry/plan?repo=${encodeURIComponent(repo)}&type=${encodeURIComponent(type())}${q}`);
         v = await r.json();
       } catch (e) { if (mine === asked) { say(`the page could not ask: ${e.message}`); $("#entrygo").disabled = true; } return; }
@@ -3081,6 +3164,15 @@
       nameBox.placeholder = v.default || "";
       if (!named) nameBox.value = v.default || "";
       $("#entrywhere").textContent = `${v.repo} · ${v.ledger}`;
+      const ts = (v.teams || []).map((t) => t.team).sort();
+      if (teamSel && ts.join(" ") !== (teamSel.dataset.teams || "")) {
+        // the options once per set of teams, the first of them the blank: *first with a seat*; a pick stays picked
+        const was = picked(), first = (v.teams || []).find((t) => t.seat) || {};
+        teamSel.innerHTML = [`<option value="">${esc(first.team ? `first with a seat (${first.team})` : "first")}</option>`, ...ts.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`)].join("");
+        teamSel.dataset.teams = ts.join(" ");
+        teamSel.value = ts.includes(was) ? was : "";
+      }
+      if ($("#entryteamrow")) $("#entryteamrow").hidden = ts.length < 2;
       // a name that is not free: its reason stands in place of the line, and the button is disabled
       $("#entryline").textContent = v.name_why || `Starts ${v.line}, and opens its Focus with these words in the composer, not sent. You talk the entry through; what the session is told besides is on its Focus, under Told at start.`;
       const h = v.hand || { why: "the host agent did not say who takes it" };
@@ -3096,7 +3188,7 @@
       busy = true; handState();
       let r, got;
       try {
-        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft() }) });
+        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft(), team: picked() }) });
         got = await r.json();
       } catch (e) { busy = false; handState(); return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { busy = false; handState(); return say(got.detail || "refused"); }
@@ -3149,27 +3241,7 @@
       layout();
     });
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
-    box.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-team-act]");
-      // a concluded team's Start closes its sessions first, and its confirm names them (TD-099); a
-      // Start reads the lanes first (TD-265)
-      if (b && b.dataset.teamAct === "start") return startPress(b);
-      if (b) return b.dataset.confirm && !confirm(b.dataset.confirm) ? undefined : teamAct(b.dataset.team, b.dataset.teamAct, b);
-      const fa = e.target.closest("[data-forget-all]");
-      if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
-      const ap = e.target.closest("[data-flow-apply]");
-      if (ap) return confirm(ap.dataset.confirm) ? flowApply(ap) : undefined;
-      const f = e.target.closest("[data-fold]");
-      if (f) return toggleFold(f.closest(".tgroup"));
-      // the header's row is the fold's mouse target (TD-194): not a press on its controls, links,
-      // inputs or marks, nor one that ends a text selection, so a name can still be copied
-      const head = e.target.closest(".tgroup > .ghead");
-      if (head && $(".fold", head) && !e.target.closest(FOLD_SKIP) && !String(window.getSelection ? window.getSelection() : "")) {
-        return toggleFold(head.parentElement);
-      }
-      const p = e.target.closest(".tsum .seg[data-pick] button");
-      if (p && !p.disabled) pickSummary(p);
-    });
+    wireGroups(box);
     // the rollup (TD-176 slice 4): its window picker is the page's one value, and an Agents pill
     // types `state:<word>` into the filter box — pressed again, it takes the word out
     const rollupBox = $("#rollup");
@@ -3183,50 +3255,15 @@
     });
     layout();
     if (popChan()) popChan().postMessage({ who: true });  // the popped windows answer with their ids
-    connectEvents((ev) => {
-      if (ev.event === "session") {
-        const old = $(`#card-${CSS.escape(ev.id)}`);
-        const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
-        const fresh = tpl.content.firstElementChild;
-        if (old) {
-          // a delta redraws the card; a menu the person has open stays open (TD-121), as a Deny reason stays typed
-          // and a ringed card stays ringed (TD-124)
-          const kept = AO.denyWhys(old), menu = !!$("details.more[open]", old), ring = document.activeElement === old;
-          old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
-          if (ring) fresh.focus({ preventScroll: true });
-          const d = menu && $("details.more", fresh); if (d) d.open = true;
-        }
-        else {
-          const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
-          grid.appendChild(fresh);
-        }
-        // TD-156 (g): Paul saw two cards named designer-ao-1 after a resume superseded the exited
-        // record of that name. The swap above is by id, so a second element needs a second insert
-        // of one id, and the cause is not reproduced yet; until it is, a delta leaves one card per id.
-        $$(`[id="card-${CSS.escape(ev.id)}"]`).slice(1).forEach((dup) => dup.remove());
-        if (ev.groups !== undefined) syncGroups(ev.groups);
-        if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
-        AO.markPopped(fresh);
-        layout();
-      } else if (ev.event === "gone") {
-        const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
-        if (ev.groups !== undefined) syncGroups(ev.groups);
-        if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
-        layout();
-      } else if (ev.event === "groups") {
-        // the repo facts or a doing call moved (TD-176): the summaries are in the groups
-        syncGroups(ev.groups);
-        if (ev.rollup !== undefined && $("#rollup")) $("#rollup").innerHTML = ev.rollup;
-        layout();
-      }
-    });
+    connectEvents((ev) => groupsEvent(ev, ""));
   };
 
 
-  // ---- the Repo page (design §4.5 screen 11, TD-176 slice 5) ----
-  // The page is `repo_part.html`, re-read on a poll and on every `repos` or `doing` event; the
-  // facets' selectors are the team card's (`syncSummaries`), the doing chips are remembered per
-  // browser, and a typed Deny reason survives a re-read.
+  // ---- the Repo page (design §4.5 screen 11, TD-176 slice 5, TD-740) ----
+  // The page's top is the repo's items of the Org — its line, its teams' whole cards, its no-team
+  // strip — kept by the Org's own deltas (`groupsEvent` with the repo); its lists are `repo_part.html`,
+  // re-read on a poll and on every `repos` or `doing` event. The facets' selectors and the folds are
+  // the team card's, the doing chips are remembered per browser, and a typed Deny reason survives a re-read.
   // design §4.5 screen 9 **Transcript** (TD-166): the page is a snapshot drawn by the server; the one
   // script is *earlier turns*, which fetches the twenty before the first shown and puts them in the
   // button's place — above the turns already there. Folds are plain <details>, remembered nowhere.
@@ -3268,7 +3305,8 @@
 
   AO.repo = function () {
     const box = $("#repopage"); if (!box) return;
-    const repo = box.dataset.repo, whoKey = "doingwho:" + repo;
+    const repo = box.dataset.repo, whoKey = "doingwho:" + repo, teamKey = "doingteam:" + repo;
+    const lists = $("#repolists"), groups = $("#groups");
     // the facet's *closed* block carries its window (`?win=week#completed`, TD-604): the page's one picker takes it
     const carried = new URLSearchParams(location.search).get("win");
     if (["day", "week", "month"].includes(carried)) store.set("win", carried);
@@ -3277,9 +3315,13 @@
       // Recently completed follows the page's one window picker (§4.5 screen 11 item 3, TD-604)
       const win = store.get("win", "day");
       $$("#completed .wv", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
-      const who = store.get(whoKey, "");
-      $$(".dchips .chip", box).forEach((c) => c.setAttribute("aria-pressed", c.dataset.who === who ? "true" : "false"));
-      $$("#doing .drow", box).forEach((r) => (r.hidden = !!who && r.dataset.who !== who));
+      // a team pick and a doer pick AND (§4.5a *Repo page: doing filters*, TD-740); *all* is neither
+      const who = store.get(whoKey, ""), team = store.get(teamKey, "");
+      $$(".dchips .chip", box).forEach((c) => {
+        const on = c.dataset.team !== undefined ? c.dataset.team === team : c.dataset.who === who && (!!who || !team);
+        c.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+      $$("#doing .drow", box).forEach((r) => (r.hidden = (!!who && r.dataset.who !== who) || (!!team && r.dataset.team !== team)));
     }
     let busy = false;
     async function reread() {
@@ -3287,15 +3329,14 @@
       try {
         const res = await fetch(`/repo/${encodeURIComponent(repo)}?part=1`);
         if (res.ok) {
-          const kept = AO.denyWhys(box), open = $$(".secinfo:not([hidden])", box).map((el) => el.id);
-          const unfolded = $$("[data-unfolded]", box).map((el) => el.dataset.unfolded), scrolled = AO.scrolls(box);
-          box.innerHTML = await res.text();
-          AO.restoreDenyWhys(box, kept);
-          AO.reopenFolds(box);  // the board's *not shown* fold, opened for this page view (TD-220)
+          const kept = AO.denyWhys(lists), open = $$(".secinfo:not([hidden])", lists).map((el) => el.id);
+          const unfolded = $$("[data-unfolded]", lists).map((el) => el.dataset.unfolded);
+          lists.innerHTML = await res.text();
+          AO.restoreDenyWhys(lists, kept);
+          AO.reopenFolds(lists);  // the board's *not shown* fold, opened for this page view (TD-220)
           open.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = false; });
           unfolded.forEach((k) => unfold(k));
           apply();
-          AO.restoreScrolls(box, scrolled);  // the summary's Doing feed, as on the Org (TD-205)
         }
       } finally { busy = false; }
     }
@@ -3328,11 +3369,18 @@
       if (row.classList.contains("folded")) unfold(row.dataset.list);
       row.scrollIntoView({ block: "center" });
     }
+    // the cards' own presses, as on the Org (TD-740); a card's team badge opens the Org filtered to that team
+    wireGroups(groups);
+    groups.addEventListener("click", (e) => {
+      const b = e.target.closest(".badge.team[data-team]");
+      if (b && b.dataset.team) { e.preventDefault(); location.href = "/?team=" + encodeURIComponent(b.dataset.team); }
+    });
     box.addEventListener("click", (e) => {
-      const p = e.target.closest(".tsum .seg[data-pick] button");
-      if (p && !p.disabled) { pickSummary(p); return apply(); }
+      // a facet's selector: `wireGroups` picked it; the window picker moves Recently completed too
+      if (e.target.closest(".tsum .seg[data-pick] button")) return apply();
       const chip = e.target.closest(".dchips .chip");
-      if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
+      if (chip && chip.dataset.team !== undefined) { store.set(teamKey, store.get(teamKey, "") === chip.dataset.team ? "" : chip.dataset.team); return apply(); }
+      if (chip) { store.set(whoKey, chip.dataset.who); if (!chip.dataset.who) store.set(teamKey, ""); return apply(); }
       const more = e.target.closest("[data-unfold]");
       if (more) return unfold(more.dataset.unfold);
       // **Hold** / **Release** on an entry (§4.5a, TD-710, TD-736): the home's clock, no ledger edit
@@ -3341,19 +3389,22 @@
       // a board row's team badge: here it opens the Org filtered to that team (in the Inbox it picks the rail)
       const badge = e.target.closest(".mailrow .badge.team[data-team]");
       if (badge && badge.dataset.team) { location.href = "/?team=" + encodeURIComponent(badge.dataset.team); return; }
-      const i = e.target.closest(".imark");
+      const i = e.target.closest(".rsec .imark");
       if (i) { const panel = document.getElementById(i.getAttribute("aria-controls")); if (panel) { panel.hidden = !panel.hidden; i.setAttribute("aria-expanded", panel.hidden ? "false" : "true"); } }
     });
+    layout();  // the cards' order, the folds and the facets' faces, as the Org draws them
     apply();
     showHash();
     window.addEventListener("hashchange", showHash);
     setInterval(reread, 30000);  // the Inbox's poll; the events below are the fast path
-    // a burst of deltas is one re-read, a second and a half after the last
+    // the Org's stream, whole: the cards and headers take its deltas (TD-740), and a burst of
+    // deltas is one re-read of the lists, a second and a half after the last
     let soon = null;
     connectEvents((ev) => {
+      groupsEvent(ev, repo);
       if (!["repos", "doing", "session", "gone"].includes(ev.event)) return;
       clearTimeout(soon); soon = setTimeout(reread, 1500);
-    }, "light=1");
+    });
   };
 
   // The toast of a **Hold** (§4.5a *Repo page: Hold / Release on an entry*, TD-736): what the hold did,

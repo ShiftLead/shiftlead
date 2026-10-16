@@ -1,21 +1,9 @@
 {% import "inbox_row.html" as ir with context %}
-<div class="row gap wrap rhead">
-  <a class="meta" href="/">← Org</a>
-  <span class="h1 mono">{{ name }}</span>
-  <span class="meta mono">{{ host }} · {{ r.root }}</span>
-  <span class="grow"></span>
-  {% if teams %}<span class="meta">serviced by {% for t in teams %}<a href="/?team={{ t }}" data-team-link="{{ t }}">{{ t }}</a>{{ ', ' if not loop.last }}{% endfor %}</span>
-  {% else %}<span class="meta">no team services this repo</span>{% endif %}
-</div>
-{# missing seams (§4.5a, TD-591): one line per seam the repo leaves unset with no default file, display only #}
-{% if seams and seams.lines %}<div class="seams meta" id="seams">{% for ln in seams.lines %}<div class="seamline">{{ ln }}</div>{% endfor %}</div>{% endif %}
-{% include "team_summary.html" %}
-
 {# (1) Open PRs — every open PR on the remote, newest last; a PR is GitHub's: no control #}
 <section class="rsec" id="prs">
   <div class="row gap rsh"><span class="h2">Open PRs</span> <span class="meta">{{ prs | length }} · newest last</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-prs" title="About this list">i</button></div>
-  <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ g.summary.repo.read ~ ' ago' if g.summary.repo else '' }}); the standing is each review seat's mail — <i>waiting on</i> the seat while its ask is open, then <i>passed by</i>, <i>findings from</i> or <i>merged by</i> it, as its answer's verdict says</div>
+  <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ facet.read ~ ' ago' if facet else '' }}); the standing is each review seat's mail — <i>waiting on</i> the seat while its ask is open, then <i>passed by</i>, <i>findings from</i> or <i>merged by</i> it, as its answer's verdict says</div>
   <div class="rlist">
   {% for p in prs %}
     <div class="rrow"><a class="mono strong" href="{{ p.url }}" target="_blank" rel="noopener">#{{ p.number }}</a><span class="rtitle">{{ p.title }}</span><span class="grow"></span>
@@ -48,7 +36,7 @@
     {% for e in l.rows %}
     {% if e.work_order %}{# a decided board line, a work order of the lanes (§4.5a *Repo page: decided lines*, TD-384) #}
     <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}" data-order><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
-      <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?{% if teams %}team={{ teams[0] }}&{% endif %}kind=board" title="the line on the board, in the Inbox">board →</a></div>
+      <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?repo={{ name }}&kind=board" title="the line on the board, in the Inbox">board →</a></div>
     {% else %}
     <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
       {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.settle %}<span class="meta settle">· {{ e.settle }}</span>{% endif %}{% if e.wait %}<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>{% endif %}{% if e.settle_mark %}{# the home's settle clock (§4.5a *Repo page: Hold / Release on an entry*, TD-710, TD-736) #}<button class="btn sm ghost" type="button" data-tdhold="{{ e.id }}" data-repo="{{ name }}"{% if e.settle_mark == 'held' %} data-release="1" title="make it pickable now: a lane may take it at once (design §4.4)">Release{% else %} title="keep every lane off it until you release it (design §4.4)">Hold{% endif %}</button>{% endif %}{% for d in e.builds_of %}<span class="meta">· builds <a href="#{{ d }}">{{ d }}</a></span>{% endfor %}{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}</div>
@@ -86,9 +74,9 @@
 
 {# (4) Waiting on you — the Inbox's own board rows, filtered to the repo: acting here is acting on the board #}
 <section class="rsec" id="waiting">
-  <div class="row gap rsh"><span class="h2">Waiting on you</span> <span class="meta">{{ boards | length }} due</span>
+  <div class="row gap rsh"><a class="h2" href="/inbox?repo={{ name }}&kind=board" title="the Inbox, filtered to this repo’s board items">Waiting on you</a> <span class="meta">{{ boards | length }} due</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-wait" title="About this list">i</button>
-    <span class="grow"></span>{% if teams %}<a class="meta" href="/inbox?team={{ teams[0] }}&kind=board">open in the Inbox →</a>{% endif %}</div>
+    <span class="grow"></span><a class="meta" href="/inbox?repo={{ name }}&kind=board">open in the Inbox →</a></div>
   <div class="secinfo meta" id="info-wait" hidden>the repo's board items due today or overdue, as the Inbox shows them — Reply, Snooze and Done write the board; under them, what your board items shown setting draws before it is due, not counted</div>
   <div class="inboxpage"><div class="inboxrows">
   {% set firsts = origin_firsts(boards) %}{% for e in boards %}{{ ir.row(e, 'needs', e.id in firsts) }}{% else %}<div class="rrow meta">nothing on the board is due</div>{% endfor %}
@@ -96,14 +84,15 @@
   {% with hz = horizon %}{% include "board_horizon.html" %}{% endwith %}</div>
 </section>
 
-{# (5) Doing — the team's ao doing calls, newest first, with a chip per doer #}
+{# (5) Doing — every servicing team's ao doing calls, newest first, with a chip per team where two or
+   more service the repo, then a chip per doer; a team pick and a doer pick AND (§4.5a *Repo page: doing filters*) #}
 <section class="rsec" id="doing">
-  <div class="row gap rsh"><span class="h2">Doing</span> <span class="meta">the team's ao doing calls · newest first</span>
+  <div class="row gap rsh"><span class="h2">Doing</span> <span class="meta">{{ 'the teams’' if teams | length > 1 else 'the team’s' }} ao doing calls · newest first</span>
     <button class="imark" type="button" aria-expanded="false" aria-controls="info-doing" title="About this list">i</button></div>
-  <div class="secinfo meta" id="info-doing" hidden>every <code>ao doing</code> call of the servicing team's members, the last fifty and each doer's newest five (design §4.8)</div>
-  {% if doing %}<div class="row gap wrap dchips"><span class="meta">show</span>{% for c in chips %}<button type="button" class="chip" data-who="{{ c.who }}" aria-pressed="{{ 'true' if not c.who else 'false' }}">{{ c.label }} ({{ c.n }})</button>{% endfor %}</div>{% endif %}
+  <div class="secinfo meta" id="info-doing" hidden>every <code>ao doing</code> call of the servicing teams' members, the last fifty and each doer's newest five (design §4.8)</div>
+  {% if doing %}<div class="row gap wrap dchips"><span class="meta">show</span>{% for c in chips %}{% if c.team is defined %}<button type="button" class="chip" data-team="{{ c.team }}" aria-pressed="false">{{ c.label }} ({{ c.n }})</button>{% else %}<button type="button" class="chip" data-who="{{ c.who }}" aria-pressed="{{ 'true' if not c.who else 'false' }}">{{ c.label }} ({{ c.n }})</button>{% endif %}{% endfor %}</div>{% endif %}
   <div class="rlist">
-  {% for d in doing %}<div class="rrow drow" data-who="{{ d.name }}" style="--doer-n: {{ doer_w or 1 }}"><span class="dage meta mono" data-doing-at="{{ d.at }}" title="{{ d.at }}">{{ d.age }}</span><a class="name mono" href="/focus/{{ d.id }}" title="{{ d.name }}">{{ d.name }}</a><span class="dtext">{{ d.text }}</span></div>
+  {% for d in doing %}<div class="rrow drow" data-who="{{ d.name }}" data-team="{{ d.team }}" style="--doer-n: {{ doer_w or 1 }}"><span class="dage meta mono" data-doing-at="{{ d.at }}" title="{{ d.at }}">{{ d.age }}</span><a class="name mono" href="/focus/{{ d.id }}" title="{{ d.name }}">{{ d.name }}</a><span class="dtext">{{ d.text }}</span></div>
   {% else %}<div class="rrow meta">{{ 'no team services this repo' if not teams else 'no ao doing calls yet' }}</div>{% endfor %}
   </div>
 </section>
