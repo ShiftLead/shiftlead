@@ -79,7 +79,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
 | TD-775 | A nested `{team: …}` member is still read from the org file, though §4.9 *Teams* refuses it by name since TD-722 | Low | Open |
 | TD-776 | The tagging seat's tag cause and its seat choice (#1908) are held by no test in four lines: the unchanged-ids due kept, a repo with no reading keeping its due, and the seat's supervised, unattended, superseded and suspended filters | Low | Open |
-| TD-777 | `teamrun.tagging_seat` (`ao repo`'s *handed to* line) and `orgcheck.team_lacks` (#1908) are held by no test in four lines: the declared-team order, the live-seat filters, the case-folded declared name, and the unparsed ledger's silence | Low | Open |
 
 ---
 
@@ -1664,19 +1663,3 @@ The other cases:
 **Why:** `test-audit-ao-1`, 2026-10-16, mutating #1908's (TD-763) lines one at a time and running `tests/test_entry_team.py tests/test_seat_policy.py tests/test_cli_org.py tests/test_cli_teams.py tests/test_repoconfig.py` (main's venv, `PYTHONPATH=$PWD/src`). Of 26 mutations 19 fail a test; these leave every test green: (1) `_tag_cause`'s `return s.seat_due if (s.seat_due or {}).get("by") == "tag" else None` for a repo with no `needs_team` reading, changed to `return None` — the docstring says *a repo with no reading yet changes nothing*, so a standing `tag` due must survive a tick before the reading; (2) the `if (s.seat_due or {}).get("by") == "tag" and s.seat_due.get("ids") == ids: return s.seat_due` branch deleted — the due then takes a new `at` every tick for the same ids, which is what the branch exists to stop; (3) `_tagging_seat`'s `r.supervised`, `r.unattended` and `not r.superseded_by` conditions, each deleted alone (three runs) and (4) `not r.suspended`: all four survive. The docstring says an unattended session carrying its badge is live and a stopped team's seat is never filled for this.
 
 **Fix:** in `tests/test_entry_team.py` (or `tests/test_seat_policy.py`, beside the existing `_tag_cause` tests): (1) a standing `tag` due and a repo reading with no `needs_team` key: the due is kept; (2) two ticks over the same uncovered ids: the second returns the first's `at`; (3) one tagging-seat candidate each that is unsupervised, attended, superseded and suspended, beside a good one: the good one is chosen and the others get no `tag` due. Each fails under its mutation above.
-
----
-
-## TD-777: `teamrun.tagging_seat` and `orgcheck.team_lacks` (#1908) are held by no test in four lines: the declared-team order, the live-seat filters, the case-folded declared name, and the unparsed ledger's silence
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1908)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/teamrun.py` (`tagging_seat`, `first`'s key and the `live` list); `src/shiftlead/orgcheck.py` (`team_lacks`: `if d.casefold() in held`, `"error" in led`); `tests/test_cli_org.py`, `tests/test_cli_teams.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16, same run as TD-776. Four mutations pass all 5 test files: (1) `tagging_seat`'s key `(0, order.index(team), "")` changed to `(0, 0, team)` — its docstring says *the first in `declared`'s order*, and `ao repo` would name a different seat from the one the tick picks (`agent_tick._tagging_seat`, whose own order line is held); (2) the `live` list's `s.get("unattended") and not s.get("suspended")` dropped; (3) `team_lacks`'s `d.casefold() in held` changed to `d in held` — a ledger declaring `Backend` against a definition `backend` is then a false *no definition holds it* lack; (4) `"error" in led` removed from the first guard — the docstring says a ledger that did not parse says nothing.
-
-**Fix:** in `tests/test_cli_teams.py` and `tests/test_cli_org.py`: (1) `tagging_seat` over a fleet of two live tagging seats with `declared` listing the later one first; (2) one unattended-false and one suspended seat beside a good one; (3) `team_lacks` with a declared team differing from a definition's by case: no lack; (4) a reading whose `ledger` carries `error`: no lack. Each fails under its mutation above.

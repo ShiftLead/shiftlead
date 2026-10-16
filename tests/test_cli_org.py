@@ -357,6 +357,21 @@ def test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking(world,
     )
 
 
+def test_a_declared_name_differing_from_its_definition_by_case_is_no_lack(world, monkeypatch, capsys):
+    """§4.4 *A stale team* (TD-777): a declared name is held by a definition case-folded — `ALPHA-GRIND`
+    and `Span` against alpha-grind and span are both declared and both held."""
+    _reading(world, monkeypatch, {"declared_teams": ["ALPHA-GRIND", "Span"], "entries": []})
+    code, got = check(capsys)
+    assert (code, got["lacks"]) == (0, [])
+
+
+def test_a_ledger_that_did_not_parse_says_no_lack(world, monkeypatch, capsys):
+    """§4.4 (TD-777): a reading whose ledger carries `error` says nothing, though what it holds would lack."""
+    _reading(world, monkeypatch, {"declared_teams": ["gone"], "entries": [], "error": "no Fields: line"})
+    code, got = check(capsys)
+    assert (code, got["lacks"]) == (0, [])
+
+
 def test_entries_that_need_a_team_where_no_team_has_a_techlead_seat_are_lacking(world, monkeypatch, capsys):
     led = {"declared_teams": ["alpha-grind", "span"], "entries": [], "needs_team": ["TD-003"]}
     _reading(world, monkeypatch, led)
