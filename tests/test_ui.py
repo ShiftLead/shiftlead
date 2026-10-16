@@ -1470,7 +1470,8 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     # only for its fold (TD-176, TD-194): unfolded, CSS hides them, since the compact cards say it
     assert g["counts"] == ["1 working", "1 unseen"] and "▾ 2 sessions" in head  # the count once, on the fold (TD-418)
     assert 'class="meta counts foldonly">· 1 working · 1 unseen<' in head
-    assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
+    # the host alone: the repo, or the directory, is not the header's (§4.9 *The Org page*, TD-725)
+    assert g["place"] and " / " not in g["place"] and f'<span class="meta">{g["place"]}</span>' in head
     card = templates.get_template("card.html").render(s=g["members"][0])
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
 

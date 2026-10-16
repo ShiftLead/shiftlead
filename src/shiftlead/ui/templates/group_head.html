@@ -1,23 +1,26 @@
 {# One team group's header (design §4.5a Org **team groups**, §4.9; §4.5 *The card's anatomy*,
-   TD-095), **one row** (TD-418, built by TD-428): the team, the host / repo its sessions share
-   (*mixed* where they do not), the flow chip, the team's marks, its controls, the fold with the
+   TD-095), **one row** (TD-418, built by TD-428): the team, the host its sessions share (*mixed*
+   where they do not; the repo is its heading's, TD-725), the flow chip, the team's marks, its controls, the fold with the
    session count, the *i* mark, and the counts by state only while folded — and **not** its manager's name, state or line, which
    are on the manager's card, the first in the group (Paul, 2026-09-21, reversing TD-074's header
-   line). *No team* is headed by its count and nothing else. Rendered on page load and re-rendered
+   line). *No repo* is headed by its count and nothing else, a repo's no-team strip by *n sessions, no
+   team* (TD-725). Rendered on page load and re-rendered
    per delta on /events — the client swaps the header's contents, never composes them. A team with
    nothing live keeps its card (2026-09-18): the header then reads *stopped* / *wound down*, carries
    Start, and folds the cards. A **concluded** team — live, every live session idle and declared
    (TD-099) — is drawn the same way (`g.stopped`), reading *concluded <t> ago*, and its Start's
    confirm names the sessions it closes first. #}
-<span class="h2"{% if g.source %} title="defined in {{ g.source }}"{% endif %}>{{ g.label }}</span>
-{% if not g.team %}<span class="meta">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</span>
+{#- a repo's no-team strip is headed *n sessions, no team* and nothing else (§4.9 *The Org page*, TD-725) #}
+{% if g.kind == 'strip' %}<span class="meta">{{ g.label }}</span>
+{% else %}<span class="h2"{% if g.source %} title="defined in {{ g.source }}"{% endif %}>{{ g.label }}</span>{% endif %}
+{% if not g.team %}{% if g.kind != 'strip' %}<span class="meta">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</span>{% endif %}
 {% else %}
 {% if g.place %}<span class="meta">{{ g.place }}</span>{% endif %}
 {# a manager whose own badge puts its card in another group is named here, since no card below is it #}
 {% if g.manager and g.manager_elsewhere %}<span class="meta" title="the manager carries a different team badge, so its card is in that group (design §4.9)">{{ g.manager.role_label or 'Manager' }} <a class="name" href="/focus/{{ g.manager.id }}">{{ g.manager.name }}</a> elsewhere</span>
 {% elif not g.manager and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
 {% elif not g.members and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech Lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
-{% if not g.members and g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
+{#- no project on the header: the team sits under its repo's heading (§4.9 *The Org page*, TD-725) #}
 {% endif %}
 {#- design §4.5a *team groups* (§4.9c, TD-309; TD-418): the **flow chip** — the flow the team runs, its
     strip (its stages in order and the person last, as the brief's `{flow}` lines read) the chip's

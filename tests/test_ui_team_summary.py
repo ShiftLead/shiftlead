@@ -339,7 +339,8 @@ def test_a_wound_down_team_shows_what_it_left():
     assert none["summary"] is None and not any(m.get("compact") for m in none["members"])
     # nothing live: nothing summed, whatever the summaries hold — Needs you alone (TD-406)
     assert ui.rollup(groups) == {"live": False}
-    assert s["drawn"] == ["repo", "motion", "face"]  # each of the three holds something
+    # the two that hold something; the Repo facet is the repo line's, never a team card's (TD-725)
+    assert s["drawn"] == ["motion", "face"] and s["repo"]
     # nothing here, nothing claimed, no doing row: no facet, and no summary drawn (TD-418)
     (quiet,) = ui.team_groups([member("q", state="exited", rank=1, slot={}, place="x")], (), {}, {})
     assert quiet["summary"]["motion"] == [] and quiet["summary"]["drawn"] == []
@@ -462,9 +463,9 @@ def test_a_stopped_team_draws_only_the_facets_that_hold_something():
 
     # two: a repo here and a claim, no doing row
     g = stopped(member("a", progress=[claim("TD-301")]))
-    assert g["summary"]["drawn"] == ["repo", "motion"]
+    assert g["summary"]["drawn"] == ["motion"]  # the repo here is its line's facet (TD-725)
     html = render(g=g)
-    assert 'class="facet frepo"' in html and 'class="facet fmotion"' in html and "fface" not in html
+    assert 'class="facet frepo"' not in html and 'class="facet fmotion"' in html and "fface" not in html
     # one: the doing log alone, no repo here and nothing claimed
     g = stopped(member("b", repo="/elsewhere"), doing={"grind": [{"id": "b", "text": "x", "at": _iso(NOW)}]})
     assert g["summary"]["drawn"] == ["face"]
@@ -481,7 +482,7 @@ def test_a_stopped_team_draws_only_the_facets_that_hold_something():
     assert 'class="tsum"' not in page
     # a live team draws all three, however empty
     (live,) = [x for x in ui.team_groups(_live("grind", member("d", repo="/elsewhere")), (), repos, {}) if x["team"]]
-    assert live["summary"]["drawn"] == ["repo", "motion", "face"] and "no repo here" in render(g=live)
+    assert live["summary"]["drawn"] == ["motion", "face"] and "no repo here" not in render(g=live)
 
 
 def test_an_answer_or_an_ask_alone_draws_the_face_facet():

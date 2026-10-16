@@ -1883,6 +1883,14 @@
       sec.hidden = !$$(".sc", sec).some((c) => !c.hidden) && (filtering || !sec.dataset.team);
       sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
     });
+    // a repo's line, and a project's heading, hide when the filter hides everything under them
+    // (§4.9 *The Org page*, TD-725), and show again with the first match
+    $$("#groups .rline").forEach((line) => {
+      line.hidden = filtering && !sections().some((s) => s.dataset.repo === line.dataset.repo && !s.hidden);
+    });
+    $$("#groups .phead").forEach((head) => {
+      head.hidden = filtering && !$$("#groups .rline").some((l) => l.dataset.project === head.dataset.project && !l.hidden);
+    });
   }
   // The server derives the groups on every render and every delta (only it sees the whole fleet),
   // so a badge or `controllers` change moves cards between groups here without a page reload.
@@ -1890,7 +1898,7 @@
   function syncGroups(gs) {
     const box = $("#groups"); if (!box) return;
     box.classList.toggle("flat", !gs);
-    const wanted = gs || [{ team: "", manager: "", ids: $$("#groups .sc:not(.plus)").map((c) => c.dataset.id), html: "" }];
+    const wanted = gs || [{ team: "", key: "", manager: "", ids: $$("#groups .sc:not(.plus)").map((c) => c.dataset.id), html: "" }];
     // a scrolled list keeps where the person left it (TD-205): every summary's boxes are read here,
     // before anything moves — the read forces a layout, and one taken halfway through the swap let
     // the page's scroll anchoring chase a section being moved, throwing the page to the top (TD-224).
@@ -1899,13 +1907,29 @@
     Object.keys(scrollKept).forEach((k) => delete scrollKept[k]);
     $$(".tsum", box).forEach((sum) => (scrollKept[sum.dataset.team] = AO.scrolls(sum)));
     const keep = [];
+    let at = 0;  // where the next element goes among `#groups`' children: headings and lines count too
+    const lines = $$("#groups .phead, #groups .rline"), kept = [];
     wanted.forEach((g) => {
-      let sec = sections().find((s) => s.dataset.team === g.team);
+      // a project heading or a repo's line (§4.9 *The Org page*, TD-725): swapped whole, in the server's order
+      if (g.kind === "heading" || g.kind === "repo") {
+        const tpl = document.createElement("template"); tpl.innerHTML = g.html.trim();
+        const fresh = tpl.content.firstElementChild, old = lines.find((l) => l.dataset.key === g.key);
+        const ringBack = !!old && old.contains(document.activeElement);  // a ringed line keeps the ring
+        if (old) old.remove();
+        const fsum = $(".tsum", fresh); if (fsum) showSummary(fsum);
+        AO.placeAt(box, fresh, at++); kept.push(fresh);
+        if (ringBack) fresh.focus({ preventScroll: true });
+        return;
+      }
+      const key = g.key !== undefined ? g.key : g.team;
+      let sec = sections().find((s) => (s.dataset.key !== undefined ? s.dataset.key : s.dataset.team) === key);
       if (!sec) {
         sec = document.createElement("section");
         sec.className = "tgroup"; sec.dataset.team = g.team;
         sec.innerHTML = '<div class="grid"></div>';
       }
+      sec.dataset.key = key;
+      sec.dataset.repo = g.repo || ""; sec.dataset.project = g.project || "";
       sec.dataset.manager = g.manager || "";
       sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
@@ -1940,9 +1964,10 @@
       const plus = $(".sc.plus", grid);
       if (g.plus && !plus) { const tpl = document.createElement("template"); tpl.innerHTML = g.plus.trim(); grid.appendChild(tpl.content.firstElementChild); }
       else if (!g.plus && plus) { AO.handRing(plus); plus.remove(); }
-      AO.placeAt(box, sec, keep.length);  // in the server's order
+      AO.placeAt(box, sec, at++);  // in the server's order
       keep.push(sec);
     });
+    lines.forEach((l) => { if (!kept.includes(l)) { AO.handRing(l); l.remove(); } });
     sections().forEach((sec) => {
       if (keep.includes(sec)) return;
       // A card the server did not list keeps its place on the page — somewhere it can be seen: the
@@ -4818,7 +4843,7 @@
   // the message page's one row is its entry: its keys press that row's controls, never a thread's
   // A folded team's header takes its cards' place in the Org's ring (TD-194): the cards are hidden,
   // so `shown` skips them, and the header is found in the page's order where they were.
-  const RINGS = { org: "#groups .sc, #groups .tgroup.folded:not(.filtering) > .ghead", inbox: ".inboxpage .mailrow", msg: ".msgentry" };
+  const RINGS = { org: "#groups .rline, #groups .sc, #groups .tgroup.folded:not(.filtering) > .ghead", inbox: ".inboxpage .mailrow", msg: ".msgentry" };
   // The event's name in the table, or null when the page must not take it: focus in anything
   // editable (a composer, the filter, a reply box, the *why?* box, the terminal's own textarea), or
   // a modifier other than Shift held — those keys are the browser's and the terminal's.
