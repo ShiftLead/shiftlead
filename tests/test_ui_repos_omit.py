@@ -7,6 +7,7 @@ import copy
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from conftest import park_ticks
 from test_ui_entry import client, fake, world
 
 from sessionorc import reports
@@ -301,3 +302,56 @@ def test_the_pages_one_subscriber_asks_for_its_events_and_its_seed_without_what_
     assert subs and all(o == list(ui.REPOS_OMIT_PAGE) for o in subs)
     assert ("repos", list(ui.REPOS_OMIT_PAGE)) in asked  # the run's seed
     assert ("repos", None) not in asked  # nothing in the stream reads the reading whole
+
+
+async def test_a_subscribe_again_on_one_connection_without_an_omit_is_sent_repos_whole(agent, tmp_path):
+    """A subscribe again says its omit again (TD-765): one connection that subscribed with an `omit`
+    and then subscribes with none is sent the second seed and the next `repos` event whole."""
+    import asyncio
+    import json
+
+    await park_ticks(agent)  # the tick would drop a root the registry does not list, mid-test
+    root = str(tmp_path)
+    agent._repos[root] = _reading(root)
+    omit = ["ledger.recent", "completed"]
+
+    async def next_repos(reader: asyncio.StreamReader) -> dict:
+        while True:
+            ev = json.loads(await asyncio.wait_for(reader.readline(), 5))
+            if ev.get("event") == "repos":
+                return ev
+
+    async with LocalClient() as c:
+        r, w = c._reader, c._writer
+        assert r and w
+        w.write((json.dumps({"id": 1, "method": "subscribe", "params": {"omit": omit}}) + "\n").encode())
+        await w.drain()
+        first = await next_repos(r)
+        assert first["repo"] == reports.omitted(agent._repo_view(root), omit)
+        w.write((json.dumps({"id": 2, "method": "subscribe", "params": {}}) + "\n").encode())
+        await w.drain()
+        seed = await next_repos(r)
+        await agent._broadcast({"event": "repos", "root": root, "repo": agent._repo_view(root)})
+        after = await next_repos(r)
+    whole = agent._repo_view(root)
+    assert "completed" in whole and whole["ledger"]["recent"]
+    assert seed["repo"] == whole
+    assert after["repo"] == whole
+
+
+async def test_a_send_that_fails_drops_the_subscriber_and_its_omit(agent):
+    """A send that fails drops the subscriber, and its omit goes with it (TD-765)."""
+
+    class Broken:
+        def write(self, data: bytes) -> None:
+            raise ConnectionError("gone")
+
+        async def drain(self) -> None:  # pragma: no cover - write raises first
+            pass
+
+    w = Broken()
+    agent._subscribers[w] = {}
+    agent._sub_omit[w] = ("completed",)
+    await agent._broadcast({"event": "repos", "root": "/r", "repo": None})
+    assert w not in agent._subscribers
+    assert not agent._sub_omit

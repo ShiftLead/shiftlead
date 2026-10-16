@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-759 | Retire the anchor seat's briefs: the package's and the repo's `anchor.md` go; *read the live copy, never press* moves into the grinder brief | Low | Open |
 | TD-761 | Ready to close passes while a background shell task still runs: goal 11 lists *no background tasks running*, and nothing reads them | Medium | Designed — built by TD-766, TD-767 |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
-| TD-765 | A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886) | Low | Open |
 | TD-767 | Build TD-761 (2): the pages — Ready to close's *no background shells running*, *working · 1 shell* on the pill and the slot | Medium | Open |
 | TD-769 | Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs | Medium | Open |
 | TD-770 | Build TD-748 (2): the Repo page's Technical debt drawn as the repo's cards in rank order, with the grip and the move buttons | Medium | Open |
@@ -1501,26 +1500,6 @@ The other cases:
 **Done when** the Repo page shows what needs a team and what is stale, Add entry's and `ao td add`'s team reaches the seat as `entry.team`, and every listed test passes.
 
 **Related:** TD-730, TD-762, TD-763, TD-740.
-
----
-
-## TD-765: A subscribe's omit is held by no test when it is said again, or when a send to it fails (#1886)
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1, auditing #1886)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_serve.py` (`_handle_conn`: `self._sub_omit.pop(writer, None)  # a subscribe again says its omit again`; `_send`: `self._sub_omit.pop(w, None)`); `tests/test_ui_repos_omit.py`
-
-**Why:** `test-audit-ao-1`, 2026-10-16, mutating #1886's (TD-754) lines one at a time and running `tests/test_ui_repos_omit.py tests/test_ui_counts.py tests/test_ui_fanout.py tests/test_ui_events_light.py tests/test_ui_events_paths.py` (47 pass unmutated; main's venv, `PYTHONPATH=$PWD/src`). Four mutations fail a test (the `_handle_conn` cleanup pop, `CountsKeeper`'s `omit=`, `fan_seed`'s memo omit, the client's `omit or None`). Two pass all 47: (1) the `_handle_conn` pop on a subscribe again deleted — the comment says *a subscribe again says its omit again*, so a connection that subscribes a second time with no `omit` must be sent `repos` events whole, and with the line gone it keeps the first subscribe's omit; no test subscribes twice on one connection. (2) the `_send` failure path's `self._sub_omit.pop(w, None)` deleted — a send that fails drops the subscriber, and its omit must go with it; no test fails a send.
-
-**Fix:** in `tests/test_ui_repos_omit.py`, (1) one connection that sends `subscribe` with an `omit` and then `subscribe` without: the second seed and the next `repos` event after it are whole; (2) a subscriber whose writer raises `ConnectionError` on `_send`: `agent._sub_omit` is empty after. Each fails under its mutation above.
-
-**Done when** the two tests exist and fail under those mutations.
-
-**Related:** TD-754, #1886.
 
 ---
 
