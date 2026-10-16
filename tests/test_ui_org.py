@@ -169,7 +169,8 @@ def test_a_team_with_no_lead_and_the_needs_you_count():
 def test_unbadged_sessions_form_the_no_team_group_last():
     views = [sess("ao-x", "x"), sess("ao-orc", "orc", team="t", caps=["control"])]
     groups = team_groups(views)
-    assert [g["label"] for g in groups] == ["t", "No team"]
+    # in no registered repo here, so *No repo* (§4.9 *The Org page*, TD-725): `org_layout` splits it by repo
+    assert [g["label"] for g in groups] == ["t", "No repo"]
     assert groups[-1]["team"] == "" and groups[-1]["manager"] is None
 
 
@@ -230,11 +231,11 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
     # the top bar's tabs are the pages that exist: no dead placeholder tabs (design §4.5 screens 4, 5, 7; TD-123)
     assert 'class="tab off"' not in html
     assert not any(f">{dead}<" in html for dead in ("Resumable", "Commands", "Attention"))
-    assert 'data-team="ao-grind"' in html and "No team" in html
+    assert 'data-team="ao-grind"' in html and "No repo" in html
     # a live team's members are compact cards, which carry no team badge (TD-176, §4.5a *card: compact*)
     assert ' compact"' in html and 'class="badge team ingroup"' not in html
     assert "orchestrator-ao-1" in html and 'id="card-ao-g1"' in html
-    assert html.index('data-team="ao-grind"') < html.index('id="card-ao-sh"')  # No team last
+    assert html.index('data-team="ao-grind"') < html.index('id="card-ao-sh"')  # No repo last
 
 
 def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
@@ -1151,17 +1152,21 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
 
 
 def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count():
-    """Design §4.5 *The card's anatomy* (TD-095): the header carries the host / repo its sessions
-    share — *mixed* where they do not — and the counts by state in the grid's order, *needs you*
-    being its ringed mark instead; *No team* is headed by its count and nothing else."""
+    """Design §4.5 *The card's anatomy* (TD-095): the header carries the host its sessions share —
+    *mixed* where they do not; the repo is its heading's (§4.9 *The Org page*, TD-725) — and the
+    counts by state in the grid's order, *needs you* being its ringed mark instead; *No repo* is
+    headed by its count and nothing else."""
     from shiftlead.ui.app import group_place, state_counts, team_groups, templates
 
     def v(sid, state, place, unseen=False, **kw):
-        return {**sess(sid, sid, state=state, **kw), "place": place, "unseen": unseen}
+        host = place.split(" / ")[0]
+        return {**sess(sid, sid, state=state, **kw), "place": place, "host": host, "unseen": unseen}
 
     same = [v("a", "working", "kmaster / shiftlead", team="t"), v("b", "idle", "kmaster / shiftlead", team="t")]
-    assert group_place(same) == "kmaster / shiftlead" and group_place([]) == ""
+    assert group_place(same) == "kmaster" and group_place([]) == ""
     assert group_place([*same, v("c", "idle", "vps / shiftlead", team="t")]) == "mixed"
+    # two repos on one host: still one place, the host (the repos are their headings')
+    assert group_place([*same, v("d", "idle", "kmaster / wg", team="t")]) == "kmaster"
     many = [*same, v("c", "needs-you", "x"), v("d", "idle", "x", unseen=True), v("e", "limited", "x")]
     assert state_counts(many) == ["1 limited", "1 working", "1 unseen", "1 idle"]  # urgency order
     groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
@@ -1169,10 +1174,11 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     head = templates.get_template("group_head.html").render(g=team)
     # a live team's header carries no state chips since TD-176: its compact cards say it — but
     # folded it does, so they are drawn for the fold alone and CSS shows them only then (TD-194)
-    assert "kmaster / shiftlead" in head and "▾ 2 sessions" in head and " live<" not in head
+    assert '<span class="meta">kmaster</span>' in head and "▾ 2 sessions" in head and " live<" not in head
+    assert "kmaster / shiftlead" not in head
     assert head.count("1 working") == 1 and 'class="meta counts foldonly">· 1 working · 1 idle<' in head
     nohead = templates.get_template("group_head.html").render(g=none)
-    assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
+    assert ">No repo</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
 
 
 def test_within_one_urgency_the_persons_own_sort_first_and_the_card_says_it_is_mine(tmp_path, monkeypatch):

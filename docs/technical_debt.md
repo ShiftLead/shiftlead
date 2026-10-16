@@ -61,7 +61,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-740 builds it |
 | TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 (the anchor seat retired) — TD-724, TD-725, TD-741, TD-757, TD-759, TD-760 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
-| TD-725 | Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet on the repo's line, a no-team strip per repo, *No repo* | Medium | Open — rescoped by TD-722's amendment; waits on its review round |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Designed — built by TD-762, TD-763, TD-764 |
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
@@ -1183,49 +1182,6 @@ The other cases:
 **Done when** the Org page draws samscrape and contractmatch under one ContractMatch heading, and a samscrape session's brief names contractmatch's checkout in its Project block.
 
 **Related:** TD-722.
-
----
-
-## TD-725: Build TD-722 (2): the Org page grouped project → repo → team — headings in file order, the Repo facet on the repo's line, a no-team strip per repo, *No repo*
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (the designer, building TD-722's design)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — rescoped 2026-10-15 by TD-722's amendment (an interactive round with Paul); the anchor seat's card and marks went with the seat (round 4)
-**Location:** design §4.9 *The Org page*, §4.5 screen 1 (the team's header), §4.5a *Org: team groups*; `src/shiftlead/ui/repo.py` (`team_groups` ~L450, its `projects` from badges ~L522 and ~L567, `group_place` use ~L576), `src/shiftlead/ui/cards.py` (`group_place` ~L1150), `src/shiftlead/ui/org.py` (`team_repo` ~L60, `team_summary` ~L452), `src/shiftlead/ui/repo.py` (`compact_in` ~L366), `src/shiftlead/ui/templates/group_head.html` (~L15), the Org page's template and its ordering
-
-**Why:** TD-722's design. With a team's repo declared, the Org page can say what it groups: project headings over repos over teams, two teams on one repo two whole cards, and no *mixed* place.
-
-**Fix:** design §4.9 *The Org page* as amended 2026-10-15, §4.5 screen 1, §4.5a *team groups*, *team card: summary*, *team card: Repo facet*.
-- **Headings** in the org file's order: each project (its `title`, else its name) with its repos in its list's order, then the repos no project lists, in the registry's order. A project of one repo draws one heading, the repo's. Headings do not fold.
-- **Under each repo**, in order:
-  - **the repo's line**: its name linked to `/repo/<name>`, and the **Repo facet**, moved off the team card (`team_summary`'s `repo` facet becomes the repo line's, drawn once; `drawn_facets` and the stopped-team rule keep two facets on a team card). Its lanes *i* carries the repo's lanes, one line per servicing team (`teamrun.repo_lanes` over the teams, `ledger.in_lanes` for each); a team card's own lanes line is the *i* beside its TDs in motion heading. The Repo facet's entries selector is remembered per repo.
-  - **its teams' cards**: the live and concluded first, then those with nothing live, each in definition order within its kind; two teams on one repo two whole cards.
-  - **a no-team strip**, headed *n sessions, no team*: the full cards of the repo's sessions with no team badge.
-- **A heading or repo line hides** when the filter hides everything under it. **The ring** runs repo line → team cards → no-team strip.
-- **A registered repo with no team** is drawn as its line and Repo facet.
-- **Top and bottom**: the person's row and, only where `director:` is defined, the director's card in a row of its own (TD-642 writes the seat), no Start or Wind down on it; at the end **No repo**, the sessions in no registered repo (the old *No team*, renamed in the template and the filter's words).
-- **A team's repo is its `repo:`** (TD-724). A `team` badge no definition holds is drawn under the repo its records sit in, which is `team_repo`'s one remaining use. `team_summary` and `compact_in` read the definition's repo.
-- **The team header's place** is the host alone: `group_place` returns the host, *mixed* where members' hosts differ, and the repo goes from it.
-- **Unchanged:** the fold, the counts, every other mark and control, the cards, and the rollup.
-- **Tests:**
-  - Two teams on one repo are two groups under one repo line, and the Repo facet is drawn once, on the line.
-  - Two repos of one project are under one heading with its `title`; a project of one repo draws one heading.
-  - Headings follow the org file's order; within a repo the live team precedes the stopped one.
-  - A repo in no project is its own heading, after the projects; a registered repo with no team draws its line and facet.
-  - A session in a repo with no team badge is in that repo's no-team strip; one in no registered repo is under *No repo*.
-  - The header's place has no repo (`tests/test_ui_org.py`'s `test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count`, rewritten).
-  - An undefined badge's group is under its records' repo.
-  - A heading, and a repo line, hide when the filter hides everything under them, and show again with the first match.
-  - The ring runs repo line → team cards → no-team strip.
-  - The director's card is drawn only where `director:` is defined.
-  - `g` then a digit counts *No repo* where it sits.
-
-**Done when** the Org page draws every team under its repo and every repo under its heading in the org file's order, the Repo facet once per repo on its line, two teams on one repo stand side by side as whole cards, a repo's teamless sessions sit in its strip and the rest under *No repo*, no header says *mixed* for a repo, and every listed test passes.
-
-**Related:** TD-722 (the design), TD-724 (the definition), TD-721 (the Repo page as the repo group expanded), TD-642 (the director's card).
 
 ---
 

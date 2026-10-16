@@ -27,12 +27,15 @@ from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_co
 from .common import _age, host_name
 from .inbox import work_note, work_started
 from .org import (
+    FACETS,
     WINDOWS,
     _https,
     compact_line,
     completed_in,
     drawn_facets,
     lane_count,
+    repo_facet,
+    repo_named,
     team_lanes,
     team_repo,
     team_summary,
@@ -377,17 +380,20 @@ def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def compact_in(
-    v: dict[str, Any], fleet: Collection[dict[str, Any]], repos: Mapping[str, Any] | None = None
+    v: dict[str, Any], fleet: Collection[dict[str, Any]], repos: Mapping[str, Any] | None = None, repo: str = ""
 ) -> dict[str, Any]:
     """Mark `v` compact when it is a member of a team (§4.5a *card: compact*): a `team` badge, live
     or not — a team with nothing live draws its summary and compact cards too, once unfolded
-    (TD-192). The full card stays on *No team*. With `repos`, the home's repo facts, it carries **the
-    lane's count** (TD-428) as `team_groups` gives it, read from the same lanes reading over `fleet`."""
+    (TD-192). The full card stays in its repo's no-team strip or *No repo*. With `repos`, the home's
+    repo facts, it carries **the lane's count** (TD-428) as `team_groups` gives it, read from the same
+    lanes reading over `fleet` — of `repo`, the team's definition's (TD-725), else the repo its
+    members sit in."""
     if v.get("team"):
         v["compact"], v["compact_line"] = True, compact_line(v, repos)
         if repos is not None and v.get("lane"):
             fleet = list(fleet)
-            r = team_repo([s for s in fleet if s.get("team") == v["team"]], repos)
+            r = repo_named(repo, repos) if repo else None
+            r = r or team_repo([s for s in fleet if s.get("team") == v["team"]], repos)
             v["lane_count"] = lane_count(v, team_lanes(str(v["team"]), fleet, r))
     return v
 
@@ -481,8 +487,10 @@ def team_groups(
     `control` that other members of the same group list as a controller. A group without one
     has no manager card and its header says so. Within a group the manager comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
-    per group in Pinned mode. Down the page: the teams with something live, the sessions with no
-    badge as *No team*, then the teams with nothing live.
+    per group in Pinned mode. In this list: the teams with something live, the sessions with no
+    badge (*No repo*'s label: `org_layout` splits them by repo for the Org page, TD-725), then the
+    teams with nothing live. Each team group carries its `repo` (the definition's) and its `order`
+    (the definition's place), which `org_layout` orders a repo's teams by.
 
     A manager carrying a different badge from its members — which `ao team start` never produces, but a
     hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
@@ -505,6 +513,7 @@ def team_groups(
     `balance` is the home's balance marks by team (`host`'s `balance`, §6 *Balance*, TD-330): every
     mark, one with no `repo` too, which no checkout's reading in `repos` carries."""
     defs = {str(r["name"]): r for r in rows}
+    order = {name: i for i, name in enumerate(defs)}  # definition order, within a repo (§4.9 *The Org page*)
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
         by_team.setdefault(str(v.get("team") or NO_TEAM), []).append(v)
@@ -548,20 +557,30 @@ def team_groups(
         ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         waiting = prs_waiting(members) if team != NO_TEAM else None
         # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are its *asked you* line (TD-354)
+        # the team's repo is its definition's `repo:`; a badge no definition holds, where its records sit
+        # (§4.9 *The Org page*, TD-725) — the heading `org_layout` draws it under
+        repo_name = str(row.get("repo") or "") if team != NO_TEAM else ""
+        if team != NO_TEAM and not repo_name:
+            repo_name = str((team_repo(members, repos or {}) or {}).get("name") or "")
         summary = (
-            team_summary(team, members, repos, doing, waiting, needs=needs, fleet=views) if team != NO_TEAM else None
+            team_summary(team, members, repos, doing, waiting, needs=needs, fleet=views, repo=repo_name)
+            if team != NO_TEAM
+            else None
         )
         if summary:
             lanes = ((summary.get("repo") or {}).get("ledger") or {}).get("lanes")
             for m in members:
                 m["compact"], m["compact_line"] = True, compact_line(m, repos)
                 m["lane_count"] = lane_count(m, lanes)  # the member's own count, in its pill (TD-428)
-            if not live:  # a team with nothing live draws only the facets that hold something (TD-418)
-                summary["drawn"] = drawn_facets(summary)
+            # a team with nothing live draws only the facets that hold something (TD-418), and no team
+            # card draws the Repo facet: it is the repo's, drawn once on its line (§4.9, TD-725)
+            summary["drawn"] = [f for f in (drawn_facets(summary) if not live else FACETS) if f != "repo"]
         groups.append(
             {
                 "team": team,
-                "label": team or "No team",
+                "label": team or "No repo",
+                "repo": repo_name,
+                "order": (0, order[team], "") if team in order else (1, 0, team),
                 # the header names its manager only when that card is in another group (TD-095: its
                 # name, state and line are on its own card, the first here); `role_label` is what it
                 # is called there (§4.8 *The names*, TD-076): *Manager*, or its role's own label.
@@ -637,9 +656,132 @@ def team_groups(
                 **flow_head((flows or {}).get(team), live=bool(live) and team in defs),
             }
         )
-    # what is running is read first; *No team* is never "stopped" — nothing there starts as one
+    # what is running is read first; the no-team group is never "stopped" — nothing there starts as one
     # …and among the live teams, one with a session that needs a person comes first (2026-09-18)
     groups.sort(
         key=lambda g: (2 if g["team"] and g["stopped"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
     )
     return groups
+
+
+# the keys the client keys the page's elements on, each kind its own prefix, so no name meets another's
+TEAM_KEY, STRIP, REPO_LINE, HEADING, NO_REPO = "team:", "strip:", "repo:", "head:", "norepo"
+
+
+def strip_group(key: str, label: str, members: list[dict[str, Any]], repo: str, project: str) -> dict[str, Any]:
+    """A section of sessions with no team: a repo's no-team strip, or *No repo* (§4.9 *The Org page*).
+    Not a card: no header but its words, no summary, no controls, never folded."""
+    members = sorted(members, key=card_order)
+    return {
+        "kind": "strip" if repo else "norepo",
+        "key": key,
+        "team": NO_TEAM,
+        "label": label,
+        "repo": repo,
+        "project": project,
+        "manager": None,
+        "members": members,
+        "ids": [m["id"] for m in members],
+        "live": sum(1 for m in members if m.get("state") not in DEAD),
+        "summary": None,
+        "defined": False,
+    }
+
+
+def repo_line(
+    name: str,
+    r: Mapping[str, Any] | None,
+    teams: list[dict[str, Any]],
+    fleet: list[dict[str, Any]],
+    now: datetime,
+) -> dict[str, Any] | None:
+    """The **Repo facet** a repo's line draws (§4.5a *team card: Repo facet*, §4.9 *The Org page*,
+    TD-725): the repo's numbers, once, whatever teams service it. Its lanes *i* carries one line per
+    team on the repo; its bars' hovers are the first such team's. None where this host reads no repo of
+    that name: the line is then its name alone."""
+    if r is None:
+        return None
+    lines = [got for g in teams if (got := team_lanes(str(g["team"]), fleet, r))]
+    lanes = {**lines[0], "text": "\n".join(x["text"] for x in lines)} if lines else None
+    waiting = prs_waiting([m for g in teams for m in g.get("members") or []])
+    return repo_facet(r, now, waiting, lanes, fleet)
+
+
+def org_layout(
+    groups: list[dict[str, Any]] | None,
+    repos: Mapping[str, Any] | None,
+    projects: Collection[orgmod.Project] = (),
+    fleet: Collection[dict[str, Any]] = (),
+    now: datetime | None = None,
+) -> list[dict[str, Any]] | None:
+    """The Org page down from the rollup (§4.9 *The Org page*, §4.5a *team groups*, TD-725), from
+    `team_groups`' groups: **project → repo → team**. The headings are in the org file's order — each
+    project, its `title` else its name, with its repos in its list's order — then the repos no project
+    lists, in the registry's order (`repos`, the home's readings), then any team's repo neither names.
+    **A project of one repo draws one heading**, the repo's: its line is the heading. Under each repo,
+    its **line** (its name and the Repo facet, drawn here once and on no team card), its **teams** —
+    the live and concluded first, then those with nothing live, each in definition order — and a
+    **no-team strip** of the repo's sessions with no team badge. Then a team whose repo is not told,
+    and last **No repo**, the sessions in no registered repo. A registered repo with no team is its
+    line alone; a project's repo this host neither reads nor has a team on is not drawn.
+
+    Each item carries `kind` (`heading`, `repo`, `team`, `strip`, `norepo`) and `key`, which the
+    client keys its elements on. None for the flat page."""
+    if groups is None:
+        return None
+    now = now or datetime.now(UTC)
+    fleet = list(fleet)
+    readings = {str(r["name"]): r for r in (repos or {}).values() if isinstance(r, dict) and r.get("name")}
+    by_root = {
+        str(Path(root).resolve()): str(r["name"])
+        for root, r in (repos or {}).items()
+        if isinstance(r, dict) and r.get("name")
+    }
+    teams = [g for g in groups if g["team"] != NO_TEAM]
+    loose = next((g["members"] for g in groups if g["team"] == NO_TEAM), [])
+    by_repo: dict[str, list[dict[str, Any]]] = {}
+    for g in teams:
+        by_repo.setdefault(str(g.get("repo") or ""), []).append(g)
+    strays: dict[str, list[dict[str, Any]]] = {}
+    for m in loose:
+        name = by_root.get(str(Path(str(m["repo"])).resolve()), "") if m.get("repo") else ""
+        strays.setdefault(name, []).append(m)
+    heads: list[tuple[str, str, list[str]]] = []
+    listed: set[str] = set()
+    for p in projects:
+        heads.append((p.name, p.title or p.name, list(p.repos)))
+        listed.update(p.repos)
+    rest = [n for n in readings if n not in listed]
+    rest += [n for n in by_repo if n and n not in listed and n not in readings]
+    # a repo in no project is its own heading, under no project's key: a project named like it is another's
+    heads += [("", n, [n]) for n in rest]
+    out: list[dict[str, Any]] = []
+    for key, label, names in heads:
+        names = [n for n in names if n in readings or n in by_repo or n in strays]
+        if not names:
+            continue
+        if len(names) > 1:
+            out.append({"kind": "heading", "key": HEADING + key, "label": label, "project": key, "repos": names})
+        for n in names:
+            here = sorted(by_repo.pop(n, []), key=lambda g: (not g["live"], g["order"]))
+            out.append(
+                {
+                    "kind": "repo",
+                    "key": REPO_LINE + n,
+                    "repo": n,
+                    "project": key,
+                    "heading": len(names) == 1,  # the repo's line is the heading (§4.9)
+                    "url": f"/repo/{n}",
+                    "facet": repo_line(n, readings.get(n), here, fleet, now),
+                }
+            )
+            out += [{**g, "kind": "team", "key": TEAM_KEY + g["team"], "project": key} for g in here]
+            if mine := strays.pop(n, []):
+                said = f"{len(mine)} session{'' if len(mine) == 1 else 's'}, no team"
+                out.append(strip_group(STRIP + n, said, mine, n, key))
+    # a team whose repo is told nowhere (a badge whose records sit in no registered repo), then *No repo*
+    left = sorted((g for gs in by_repo.values() for g in gs), key=lambda g: (not g["live"], g["order"]))
+    out += [{**g, "kind": "team", "key": TEAM_KEY + g["team"], "project": ""} for g in left]
+    if nowhere := [m for ms in strays.values() for m in ms]:
+        out.append(strip_group(NO_REPO, "No repo", nowhere, "", ""))
+    return out

@@ -1182,7 +1182,7 @@ def ready_to_close(
 
 
 DEFS_TTL = 5.0  # seconds the events stream keeps the team definitions it read (design §4.5a)
-NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as *No team*, last
+NO_TEAM = ""  # the group key for sessions carrying no `team` badge: `org_layout` splits it by repo, *No repo* last
 DEAD = ("exited", "closed")
 
 
@@ -1224,9 +1224,10 @@ def state_counts(members: list[dict[str, Any]]) -> list[str]:
 
 
 def group_place(members: list[dict[str, Any]]) -> str:
-    """Where a team's sessions are, said once in its header so no card has to (TD-095): the
-    `host / repo` they share, or *mixed* when they do not. Empty for a group with no sessions."""
-    places = {str(m.get("place") or "") for m in members}
+    """Where a team's sessions are, said once in its header so no card has to (TD-095): the host
+    they share, or *mixed* when they do not — the repo is the heading's (§4.9 *The Org page*,
+    TD-725). Empty for a group with no sessions."""
+    places = {str(m.get("host") or "") for m in members}
     return "" if not places else places.pop() if len(places) == 1 else "mixed"
 
 

@@ -73,6 +73,11 @@ def team_repo(members: Collection[dict[str, Any]], repos: Mapping[str, Any]) -> 
     return by_root[max(sorted(tally), key=lambda k: tally[k])]
 
 
+def repo_named(name: str, repos: Mapping[str, Any]) -> dict[str, Any] | None:
+    """The home's reading of the registered checkout named `name` (§4.4 *Repo facts*), or None."""
+    return next((r for r in (repos or {}).values() if isinstance(r, dict) and r.get("name") == name), None)
+
+
 def _bars(counts: Mapping[str, Any], labels: tuple[tuple[str, str], ...]) -> list[dict[str, Any]]:
     """A stacked bar's segments, zeros left out: `{key, label, n, pct}` with the widths summing to 100."""
     total = sum(int(counts.get(k) or 0) for k, _ in labels)
@@ -503,13 +508,17 @@ def team_summary(
     now: datetime | None = None,
     needs: Collection[dict[str, Any]] = (),
     fleet: list[dict[str, Any]] | None = None,
+    repo: str = "",
 ) -> dict[str, Any]:
     """A team's **summary** (§4.5a *team card: summary*): the Repo facet, TDs in motion, and Answer
     needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
     live has one too (TD-192): its claims as the members' last records hold them, and Doing, since
-    nobody can be waiting."""
+    nobody can be waiting. `repo` is the definition's (§4.9 *Teams*, TD-725): its reading is the
+    team's, else the one its members sit in (`team_repo`, a badge no definition holds). The Org page
+    draws the Repo facet on the repo's line (`org_layout`); the Repo page and the rollup read it here."""
     now = now or datetime.now(UTC)
-    r = team_repo(members, repos or {})
+    r = repo_named(repo, repos or {}) if repo else None
+    r = r or team_repo(members, repos or {})
     motion = motion_rows(members, r)
     answers = answer_blocks(members)
     return {

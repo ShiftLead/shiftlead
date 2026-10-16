@@ -335,6 +335,7 @@ from .org import (  # re-exported: routes, templates and tests read these from t
     motion_rows,  # noqa: F401
     pr_ref,  # noqa: F401
     repo_facet,  # noqa: F401
+    repo_named,  # noqa: F401
     rollup,  # noqa: F401
     team_lanes,
     team_repo,  # noqa: F401
@@ -375,9 +376,12 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     flow_head,  # noqa: F401
     ledger_lists,  # noqa: F401
     missing_seams,
+    org_layout,  # noqa: F401
     pr_rows,  # noqa: F401
     pr_standing,  # noqa: F401
+    repo_line,  # noqa: F401
     settle_mark,  # noqa: F401
+    strip_group,  # noqa: F401
     team_groups,  # noqa: F401
     who_for_what,  # noqa: F401
 )
@@ -639,8 +643,16 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
     summary = templates.get_template("team_summary.html")
     plus = templates.get_template("plus_card.html")
     lanecount = templates.get_template("lanecount.html").module.span
+    # a project heading and a repo's line (§4.9 *The Org page*, TD-725): no cards, their markup whole
+    lines = {"heading": templates.get_template("project_head.html"), "repo": templates.get_template("repo_line.html")}
     return [
-        {
+        {"kind": g["kind"], "key": g["key"], "team": "", "html": lines[g["kind"]].render(g=g)}
+        if g.get("kind") in lines
+        else {
+            "kind": g.get("kind", "team"),
+            "key": g.get("key", g["team"]),
+            "repo": g.get("repo", ""),
+            "project": g.get("project", ""),
             "team": g["team"],
             "manager": (g["manager"] or {}).get("id", ""),
             "live": g["live"],  # what the fold's default keys on: nothing live opens folded (TD-194)
@@ -1110,10 +1122,12 @@ def create_app() -> FastAPI:
         seats, waits = await seats_of(fleet), await person_waits()  # *waiting* (§4.2, TD-428)
         rows, marks = await team_rows(fleet), await work_marks()
         flows, balance, needs = flow_cache["flows"], work_cache["balance"], needs_cache["rows"]
+        projects = list((await defs()).projects.values())
 
         def build() -> dict[str, Any]:
+            vs = [view(s, fleet, seats=seats, repos=repos, waits=waits) for s in fleet]
             groups = team_groups(
-                [view(s, fleet, seats=seats, repos=repos, waits=waits) for s in fleet],
+                vs,
                 rows,
                 repos,
                 doing,
@@ -1123,7 +1137,7 @@ def create_app() -> FastAPI:
                 needs,  # a member's open ask to the person: its team's *asked you* line (TD-354)
             )
             ro = templates.get_template("rollup.html").render(ro=rollup(groups))
-            return {"groups": render_heads(groups), "rollup": ro}
+            return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
 
         # off the loop (TD-670): a view of every record and every header rendered held the loop up to
         # ~300 ms a regroup on the live home with an Org page open; the events run calls this under
@@ -1306,7 +1320,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                "groups": (
+                # project → repo → team (§4.9 *The Org page*, TD-725), from the team groups
+                "groups": org_layout(
                     groups := team_groups(
                         vs,
                         strip["teams"],
@@ -1316,7 +1331,10 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         flows,
                         {} if agent_down else (info or {}).get("balance"),
                         h.needs_cache["rows"],
-                    )
+                    ),
+                    repos,
+                    (await h.defs()).projects.values(),
+                    vs,
                 ),
                 "rollup": rollup(groups),
                 "strip": strip,
@@ -3855,7 +3873,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             repos=st.repos,
             waits=await h.person_waits(),
         )
-        compact_in(v, st.known.values(), st.repos)
+        team_def = (await h.defs()).teams.get(str(v.get("team") or ""))  # its repo is the definition's (TD-725)
+        compact_in(v, st.known.values(), st.repos, team_def.repo if team_def else "")
         # the view's rank: unseen idle sorts above idle
         return {"event": "session", "id": s["id"], "state": s["state"], "rank": v["rank"], "session": v}
 

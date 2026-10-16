@@ -362,7 +362,9 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     assert "teammail" not in head  # nothing unread
     assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
     assert "It first closes grind-1, orc-ao" in head  # the confirm names what the Start closes
-    assert html.index('data-team="adhoc"') < html.index('data-team="ao-grind"')  # sorted with the stopped
+    # a concluded team is live: it keeps its place among the live ones, in definition order — before
+    # a badge no definition holds (§4.9 *The Org page*, TD-725)
+    assert html.index('data-team="ao-grind"') < html.index('data-team="adhoc"')
     # every declaration out of work: the header says so
     fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "out_of_work": out}
     assert "ago · out of work" in client.get("/").text

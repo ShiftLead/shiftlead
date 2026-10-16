@@ -9,48 +9,7 @@
 {%- set drawn = m.drawn if m.drawn is defined else ('repo', 'motion', 'face') %}
 <div class="tsum" id="tsum-{{ g.team }}" data-team="{{ g.team }}" data-face-default="{{ m.face }}" data-answer-key="{{ m.answer_key }}">
   {# -- Repo (§4.5a *team card: Repo facet*) -- #}
-  {% if 'repo' in drawn %}
-  <div class="facet frepo">
-    {% if not m.repo %}
-    <div class="fhead"><span class="kind">Repo</span></div>
-    <div class="meta" title="no member of this team works in a checkout this host's repos registry lists (design §4.4 Repo facts)">no repo here</div>
-    {% else %}{% set r = m.repo %}
-    <div class="fhead"><span class="kind">Repo</span> <a class="strong" href="{{ r.url }}">{{ r.name }}</a><span class="grow"></span><a class="meta" href="{{ r.url }}">open →</a></div>
-    {% set led = r.ledger %}
-    <div class="fhead"><span class="kind">Technical debt{% if led.n is not none %} ({{ led.n }} open){% endif %}</span>{% if led.lanes %}<span class="tipmark" tabindex="0" role="img" aria-label="{{ led.lanes.text }}" title="{{ led.lanes.text }}">i</span>{% endif %}
-      <button class="btn sm ghost" type="button" data-addentry="{{ r.name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button><span class="grow"></span>
-      <span class="seg" data-pick="led">{% for w in ('open', 'day', 'week', 'month') %}<button type="button" data-v="{{ w }}"{% if w != 'open' and not led.windows %} disabled title="the ledger's history could not be read{% if led.history_error %}: {{ led.history_error }}{% endif %}"{% endif %}>{{ w }}</button>{% endfor %}</span></div>
-    {% if led.n is none %}
-    <div class="meta dim" title="{{ led.error or 'not read yet' }}">could not look</div>
-    {% else %}
-    <div class="lv" data-lv="open">
-      <div class="bar" role="img" aria-label="open entries by priority">{% for b in led.priority %}<a class="bseg p-{{ b.key }}" href="{{ r.url }}#debt" style="flex-basis: {{ b.pct }}%;" title="{{ b.n }} {{ b.label }}">{{ b.n }}<span class="bw"> {{ b.label }}</span></a>{% else %}<span class="meta">no open entries</span>{% endfor %}</div>
-      <div class="bar" role="img" aria-label="open entries by kind">{% for b in led.kind %}<a class="bseg k-{{ b.key }}" href="{{ r.url }}#debt-{{ b.key }}" style="flex-basis: {{ b.pct }}%;" title="{{ (led.lanes.titles[b.key] if led.lanes and b.key in led.lanes.titles) or (b.n ~ ' ' ~ b.label) }}">{{ b.n }}</a>{% endfor %}</div>
-      <div class="legend">{% for k, label in kind_bars %}<span><i class="k-{{ k }}"></i>{{ label }}</span>{% endfor %}</div>
-    </div>
-    {% if led.windows %}{% for w in ('day', 'week', 'month') %}{% set b = led.windows[w] %}
-    <div class="lv" data-lv="{{ w }}" hidden>
-      <div class="blocks"><a class="blk opened" href="{{ r.url }}#debt-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}?win={{ w }}#completed" style="flex-basis: {{ 100 - b.opct }}%;"{% if led.closed_titles and led.closed_titles[w] %} title="{{ led.closed_titles[w] }}"{% endif %}><b>{{ b.closed }}</b> closed</a></div>
-    </div>
-    {% endfor %}{% endif %}
-    {% if led.error %}<div class="meta dim" title="{{ led.error }}">the last read failed — these are the numbers before it</div>{% endif %}
-    {% endif %}
-    {% set p = r.prs %}
-    <div class="fhead"><span class="kind">Pull requests{% if p.n is not none %} ({{ p.n }} open){% endif %}</span>{% if p.red %}<span class="prred" title="{{ p.red_title }}">· {{ p.red | length }} red</span>{% endif %}{% if p.not_run %}<span class="prnotrun" title="{{ p.not_run_title }}">· {{ p.not_run }} CI never ran</span>{% endif %}<span class="grow"></span>
-      <span class="seg" data-pick="win">{% for w in ('day', 'week', 'month') %}<button type="button" data-v="{{ w }}">{{ w }}</button>{% endfor %}</span></div>
-    {% if p.n is none %}
-    <div class="meta dim" title="{{ p.error or 'not read yet' }}">could not look</div>
-    {% else %}
-    {% if p.windows %}{% for w in ('day', 'week', 'month') %}{% set b = p.windows[w] %}
-    <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
-      <div class="blocks"><a class="blk opened" href="{{ r.url }}#prs-opened" style="flex-basis: {{ b.opct }}%;"><b>{{ b.opened }}</b> opened</a><a class="blk closed" href="{{ r.url }}#prs-closed" style="flex-basis: {{ 100 - b.opct }}%;"><b>{{ b.closed }}</b> closed</a></div>
-    </div>
-    {% endfor %}{% endif %}
-    <div class="meta{% if p.error %} dim{% endif %}"{% if p.error %} title="the last read failed: {{ p.error }}"{% endif %}>{% if p.oldest %}oldest {{ p.oldest }} · {% endif %}{% if p.waiting %}{{ p.waiting.n }} waiting on review · {% endif %}{% if p.error %}could not look — {% endif %}read {{ r.read }} ago</div>
-    {% endif %}
-    {% endif %}
-  </div>
-  {% endif %}
+  {% if 'repo' in drawn %}{% include "repo_facet.html" %}{% endif %}
   {# -- TDs in motion (§4.5a *team card: TDs in motion*) -- #}
   {# **Columns** (§4.5a, TD-252): phase · priority · reference · title · holders · PR on one grid, every
      track but the title's a fixed width — the reference's, the holders' and the PR's the server's (`ref_w`,
