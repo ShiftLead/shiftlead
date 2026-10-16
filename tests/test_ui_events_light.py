@@ -48,7 +48,7 @@ def client(monkeypatch, tmp_path, hold=0.0):
                 return {"entries": []}
             return replies.get(method, {})
 
-        async def subscribe(self):
+        async def subscribe(self, omit=None):
             await asyncio.sleep(hold)  # for the pages that join the one subscription before it pushes
             for s in pushed:
                 yield {"event": "session", "session": s}
@@ -114,9 +114,9 @@ def test_three_pages_share_one_subscription_and_each_delta_is_computed_once(tmp_
     Fake = ui.LocalClient
     real_sub = Fake.subscribe
 
-    def counting(self):
+    def counting(self, omit=None):
         subscribed.append(1)
-        return real_sub(self)
+        return real_sub(self, omit)
 
     monkeypatch.setattr(Fake, "subscribe", counting)
     got: dict[str, list] = {}
@@ -190,7 +190,7 @@ def test_a_focus_page_takes_its_members_and_controllers_from_its_own_stream(tmp_
         async def call(self, method, **kw):
             return {"entries": []} if method == "inbox" else replies.get(method, {})
 
-        async def subscribe(self):
+        async def subscribe(self, omit=None):
             for ev in pushed:
                 yield ev
 

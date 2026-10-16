@@ -557,6 +557,9 @@ class HostAgent(
         # subscriber → what it was last sent, per session (TD-009: a new tab gets its own snapshot
         # without every other tab being re-sent everything)
         self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
+        # subscriber → the dotted paths its `repos` events are sent without (the subscribe's `omit`,
+        # TD-754): a page's stream is not sent the parts of a reading its pages never draw
+        self._sub_omit: dict[asyncio.StreamWriter, tuple[str, ...]] = {}
         self._gone: list[str] = []  # forgotten ids not yet announced (`_forget` → `_push_changes`)
         self._waits: set[_Wait] = set()  # every `wait` blocked right now, each on its own connection
         # The doorbell (design §4.10, TD-052 step 7): per session, the idle stretch it last rang in —

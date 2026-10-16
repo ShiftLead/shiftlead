@@ -36,7 +36,7 @@ class Client:
     async def __aexit__(self, *a: Any) -> bool:
         return False
 
-    async def subscribe(self):
+    async def subscribe(self, omit=None):
         while (ev := await self.events.get()) is not None:
             if isinstance(ev, BaseException):
                 raise ev

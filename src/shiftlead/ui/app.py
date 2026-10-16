@@ -1205,7 +1205,7 @@ def create_app() -> FastAPI:
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
         needs_cache=needs_cache,  # the Inbox's needs rows for the Org's *asked you* lines (TD-354)
         # the Inbox's counts, kept once and pushed (§4.4, TD-616); `LocalClient` read when it connects
-        counts=CountsKeeper(counts_now, client=lambda: LocalClient()),
+        counts=CountsKeeper(counts_now, client=lambda: LocalClient(), omit=REPOS_OMIT_PAGE),
     )
     for register in (
         _pages_routes,
@@ -3840,8 +3840,13 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         with contextlib.suppress(Exception):
             known = {o["id"]: o for o in await call("list")}
         # the repo facts and the doing log (TD-176): seeded once, then kept by their own events, so
-        # a session delta redraws the summaries without asking the agent again
-        repos, doing = await repo_facts()
+        # a session delta redraws the summaries without asking the agent again; read without what the
+        # pages it feeds omit, as its `repos` events are sent (TD-754)
+        token = _REPOS_MEMO.set({"omit": REPOS_OMIT_PAGE})
+        try:
+            repos, doing = await repo_facts()
+        finally:
+            _REPOS_MEMO.reset(token)
         acct_of: dict[str, str] = {}  # profile → the account chip it is drawn on (TD-122)
         with contextlib.suppress(Exception):
             for name, acc in usage_accounts(await call("usage")).items():
@@ -3993,7 +3998,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             for name in {was_on, now_on} - {None}:
                 run.to_all(run.live, {"event": "usage", "account": name, "usage": grouped.get(name)})
 
-    fan = Fanout(lambda: LocalClient(), fan_seed, fan_step, fan_regroup)
+    # the run keeps the reading the Org, the Repo page and a card draw, so it is sent what they read (TD-754)
+    fan = Fanout(lambda: LocalClient(), fan_seed, fan_step, fan_regroup, omit=REPOS_OMIT_PAGE)
     # §4.5 *A reconnect reloads once, never in a loop* (TD-694): a page opening `/events` in a loop is
     # one warning line, and the handler's own failure is logged, at most once a minute
     opens, events_failed = OpenRate(), Every(60.0)
