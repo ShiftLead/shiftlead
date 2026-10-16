@@ -156,7 +156,9 @@ def test_the_focus_and_inbox_pages_ask_for_the_light_stream():
     import pathlib
 
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
-    assert '}, "light=1");' in js  # the Inbox
+    # the Repo page took the light stream until TD-740: its cards are the Org's now, kept by the full one
+    repo = js[js.index("AO.repo = function") :]
+    assert "groupsEvent(ev, repo);" in repo and '"light=1"' not in repo[: repo.index("AO.heldWords = function")]
     assert "}, `light=1&focus=${encodeURIComponent(id)}`);" in js  # Focus
 
 

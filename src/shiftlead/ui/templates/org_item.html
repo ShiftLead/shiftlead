@@ -1,0 +1,12 @@
+{# One item of the Org's layout (§4.9 *The Org page*, TD-725): a project heading, a repo's line, a
+   team's whole card, or a strip of sessions with no team — `org_layout`'s items in page order. The
+   Org draws every item and the Repo page its repo's (§4.5 screen 11, TD-740), by this one partial. #}
+{% if g.kind == 'heading' %}{% include "project_head.html" %}
+{% elif g.kind == 'repo' %}{% include "repo_line.html" %}
+{% else %}
+<section class="tgroup" data-team="{{ g.team }}" data-key="{{ g.key }}" data-repo="{{ g.repo }}" data-project="{{ g.project }}" data-manager="{{ g.manager.id if g.manager else '' }}" data-live="{{ g.live }}">
+  <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
+  {% if g.summary and g.summary.drawn %}{% include "team_summary.html" %}{% endif %}
+  <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}{% if g.team and g.defined %}{% include "plus_card.html" %}{% endif %}</div>
+</section>
+{% endif %}

@@ -107,12 +107,15 @@ REPORTS = frozenset({"progress", "finding", "doing"})
 # The readings the home takes (§4.4 *Repo facts*, TD-176): a node holds none of them, so while the
 # link is down a read of one is refused rather than answered with nothing — an empty answer would
 # say *no PRs*, and the truth is *not known from here*.
-HOME_READS = frozenset({"repos", "doing_log"})
+HOME_READS = frozenset({"repos", "doing_log", "queue"})  # `queue`: the Queue's reading (§4.4, TD-769)
 # The ledger ids the home gives (§4.4 *A ledger entry's id is handed out by the home*, TD-696): `ids.json` is the
 # home's alone, so `td_next` is forwarded while the link is up and refused offline — a person's call too, checked
 # before the person-is-served return, or a node would give its own ids and the counter would split per host. It is
 # in neither `HOME_EDITS` (whose `PERSON_NODE_BOUND` would refuse a person's call from a node) nor `identity.READS`.
 IDS = frozenset({"td_next"})
+# The rank's intents (§4.4 *A move lands*, TD-769): `ranks.json` is the home's, and a move is a person's or an
+# interactive session's wherever it sits, so `rank_move` is forwarded while the link is up and refused offline.
+RANKS = frozenset({"rank_move"})
 # What a session may do to itself offline, and a person to any session on this host: the node is
 # the single tmux writer for its host, whether or not home can be reached.
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
@@ -156,6 +159,8 @@ def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host
         return f"{method} edits what the home owns, so it waits for the link: {tail}"
     if method in IDS:
         return f"ids.json is the home's: the ledger ids are handed out there alone: {tail}"
+    if method in RANKS:
+        return f"ranks.json is the home's: a move on the rank is kept and landed there alone: {tail}"
     if caller is None or method not in NODE_ACTS:
         return None  # a person at this host acts on its sessions; a read is a read
     if method == "create":

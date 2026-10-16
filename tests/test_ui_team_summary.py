@@ -293,8 +293,9 @@ def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
     sync = js.index("function syncSummaries()")
     restore = js.index("AO.restoreScrolls(sum, scrollKept[sum.dataset.team])")
     assert restore > js.index("showSummary(sum);", sync) > sync  # the face is shown, then the box scrolled
-    # …and the Repo page, which includes the same summary and re-reads its part whole
-    assert "scrolled = AO.scrolls(box);" in js and "AO.restoreScrolls(box, scrolled);" in js
+    # …and the Repo page draws the same cards, swapped by the same deltas (TD-740): its re-read is the lists alone
+    repo = js[js.index("AO.repo = function") : js.index("AO.heldWords = function")]
+    assert 'lists.innerHTML = await res.text();' in repo and "groupsEvent(ev, repo);" in repo
 
 
 def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
@@ -845,7 +846,7 @@ def test_sync_groups_patches_every_members_lane_count_from_the_groups_payload():
     its card's pill — the old one taken away, the new one put in, an unchanged one left — so a sibling's
     claim moves this card's count with no delta of its own (TD-513)."""
     js = (ui.Path(ui.__file__).parent / "static" / "app.js").read_text()
-    body = js[js.index("function syncGroups(gs) {") :]
+    body = js[js.index("function syncGroups(gs, drop = false) {") :]
     body = body[: body.index("\n  }\n")]
     block = body[body.index("Object.entries(g.lanes || {}).forEach(([id, html]) => {") :]
     block = block[: block.index("});")]

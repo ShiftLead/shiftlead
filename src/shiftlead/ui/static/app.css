@@ -695,7 +695,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .bseg.phase { border-radius: 2px; } .legend .ph-add { background: var(--ph-add); } .legend .ph-design { background: var(--ph-design); }
 .legend .ph-grind { background: var(--ph-grind); } .legend .ph-review { background: var(--ph-review); }
 /* the Repo page (design §4.5 screen 11, TD-176 slice 5) */
-.repopage .rhead { margin-bottom: 14px; align-items: baseline; }
+.repopage #repohead > .rhead { margin-bottom: 14px; align-items: baseline; }
 .repopage .seams { margin: -8px 0 12px; display: grid; gap: 2px; }  /* missing seams (§4.5a, TD-591) */
 .repopage .rsec { margin-top: 22px; }
 .repopage .rsh { align-items: center; margin-bottom: 8px; }
@@ -716,8 +716,8 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .rrow.buildsline { border-top: 0; padding: 0 14px 8px 76px; margin-top: -6px; font-size: var(--t-small); }  /* a design's builds line, under its row (TD-693) */
 .repopage .rrow.buildsline > .meta { white-space: normal; flex: 1 1 auto; min-width: 0; }
 .repopage .rrow.buildsline .bstate { color: var(--muted); }
-.repopage .imark { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; }
-.repopage .secinfo { margin: -4px 0 8px; }
+.repopage .rsec .imark { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; }
+.repopage .rsec .secinfo { margin: -4px 0 8px; }
 .repopage .dchips { margin-bottom: 8px; }
 .repopage .dchips .chip { border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
 .repopage .dchips .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }

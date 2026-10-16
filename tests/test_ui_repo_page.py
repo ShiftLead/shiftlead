@@ -328,10 +328,10 @@ def test_a_claimed_work_order_is_in_motion_with_the_lines_head_text():
     )
 
 
-def test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_nothing(tmp_path, monkeypatch):
-    """TD-476 (TD-418, §4.5 screen 11): a stopped team's card draws only the facets that hold something,
-    but the Repo page draws all three — a team that works here, nothing claimed and no Doing row still
-    shows *TDs in motion (0)*, *nothing claimed* and the Doing head."""
+def test_the_repo_page_draws_a_stopped_teams_card_as_the_org_draws_it(tmp_path, monkeypatch):
+    """TD-740 (§4.5 screen 11, in place of TD-476): the page draws the team's whole card by the Org's
+    partials, so a stopped team's card draws only the facets that hold something, as on the Org (TD-418)
+    — its header still there — and the repo's facet once, on its line."""
     root = str(tmp_path / "samscrape")
     fleet = [rec("g1", root, state="exited")]
     from shiftlead.ui import org as uiorg
@@ -343,8 +343,10 @@ def test_the_repo_page_draws_all_three_facets_for_a_stopped_team_that_holds_noth
     assert uiorg.drawn_facets(g["summary"]) == ["repo"]  # the card's: the repo alone holds something
     html = c.get("/repo/samscrape").text
     assert "serviced by" in html
-    assert "TDs in motion (0)" in html and "nothing claimed" in html
-    assert '<span class="kind">Doing</span>' in html
+    top = html[html.index('id="groups"') : html.index('id="repolists"')]
+    assert 'class="rline' in top and top.count('class="facet frepo"') == 1  # the Repo facet, on the line
+    assert 'data-key="team:grind"' in top and 'class="row gap wrap ghead"' in top  # the team's card, its header
+    assert "TDs in motion (0)" not in top and '<span class="kind">Doing</span>' not in top
 
 
 def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of_technical_debt(tmp_path, monkeypatch):
@@ -360,7 +362,7 @@ def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of
         "worktree_setup": absent,
     }  # fmt: skip
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
-    seams = html[html.index('id="seams"') : html.index('class="tsum"')]
+    seams = html[html.index('id="seams"') : html.index('id="groups"')]
     assert re.findall(r'class="seamline">([^<]*)<', seams) == ["no gate: a person merges", "no worktree setup"]
     debt = html[html.index('id="debt"') : html.index('id="completed"')]
     assert 'id="noledger"' in debt and "no ledger at docs/technical_debt.md — <code>ao repo init</code>" in debt

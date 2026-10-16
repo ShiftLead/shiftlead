@@ -23,7 +23,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done — steps 1–8 done (5 was a measurement); the second-adapter step and the live check remain |
 | TD-060 | The rename to ShiftLead's loose ends: TD-552's text sweep and TD-553's fallback; archives when both are done | Medium | Step 2 live 2026-10-11 (#1505, cutover done); repo renamed and moved to the ShiftLead org; the live briefs swept; the dev venvs rebuilt; what is left is split out (TD-552, TD-553, and each repo's own entry) |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 built 2026-09-23 (PR #499); 8 is Paul's canvas |
-| TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
+| TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open — design-first (Paul, 2026-10-16) |
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
@@ -58,11 +58,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-706 | Build TD-703: a member renamed or removed in the definition is paired, applied and started without leaving two records | Medium | Built (#1802, #1807, #1818); live check |
 | TD-717 | A seat whose first hook is lost sits with its brief unsent for hours: the scraped send never fires for Claude Code, and nothing acts on the *brief not sent* mark | High | Designed — TD-720 builds it |
 | TD-720 | Build TD-717: a launch whose first hook is lost gets its brief from the composer, keeps *no hook* across a restart, and is replayed once | High | Built by #1834, #1837, #1838; live check read 2026-10-15, the replay waits for a lost first hook (anchor) |
-| TD-721 | The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams | Medium | Designed — TD-740 builds it |
-| TD-722 | One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards | Medium | Designed, amended 2026-10-15 (the anchor seat retired) — TD-724, TD-725, TD-741, TD-757, TD-759, TD-760 build it |
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-730 | A ledger entry on a repo two teams service says which team's lanes take it: a `Team:` field, set at Add entry or by the techlead, and an untagged or stale one withheld and handed to a techlead | Medium | Designed — built by TD-762, TD-763, TD-764 |
-| TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
 | TD-764 | Build TD-730 (3): the pages and the hand — *needs a team* on the Repo page, the stale-team note, `entry.team` from Add entry's Team pick and `ao td add --team` | Medium | Open |
 | TD-769 | Build TD-748 (1): the rank — the cards and keys of the `queue` reading, the intents and their flush, `rank_move` and `ao rank`, rank order in `pickable()`, `ao repo` and the briefs | Medium | Open |
@@ -250,9 +247,9 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-22 (the anchor session; the design review)
-**Owner:** paul
-**Kind:** evaluation
-**Status:** **Paul, 2026-10-10 (with ao-paul): agreed, a spike, and integration tests with it.** Run as an interactive session, not a member's lane: a second tool must be installed and signed in (neither `codex` nor `gemini` is on kmaster on 2026-10-10; the sign-in is Paul's account or key), the work is judgement (which of the contract's methods are neutral), and its result is an ADR, not a merge. **Paul, 2026-10-13 (the lessons ADR, `docs/decisions/2026-10-13-agent-product-lessons.md` lesson 10):** Gemini CLI is *"a definite fit"*, so it is the spike's tool; Hermes Agent, Muse Code and Grok Bot are not wanted as tools for now. The lasting product is an **adapter conformance suite**: one set of tests every adapter passes against its real tool (launch, the state it reports, `send`, `composer()`, the doorbell and mail, `title()`), so neutrality is checked on every change and not once by the spike. The spike says which of those a scraped adapter can pass and which belong to Claude Code alone. **2026-10-15 (grinder-ao-2, answering Paul's board question *does the recently added Gemini CLI fit the bill?*):** in part. What was added is dev-cadence's TD-109 (dev-cadence #259, 2026-10-14): Gemini CLI installed on kmaster (`~/.npm-global/bin/gemini`, 0.64.0) and signed in with Paul's Google account, and a Gemini backend for dev-cadence's session *introspection* (`agent_sessions.py`: lists Gemini sessions, their cwd and `gemini --resume <uuid>`). That removes the spike's blocker (a second tool installed and signed in) and gives facts read off a real install (`docs/plans/2026-10-12-session-introspection-adapter.md` in dev-cadence: chats under `~/.gemini/tmp/<slug>/chats/`, a `sessionId` in the first record, no live registry). It is not a ShiftLead adapter: `src/shiftlead/adapters/` still holds only `claude_code/`, and the spike, its ADR and the conformance suite are all unbuilt. Who runs the spike, and when, is put back to Paul on the board. Open — for evaluation. The design's stated moat is one neutral view across tools, and only one agent adapter exists. Since phase 1 the contract (§4.3) gained `composer()`, `title()`, `mail()`, a session id chosen at launch, the doorbell, the trust pre-seed and screen rules, each shaped by Claude Code. Phase 5 puts the second adapter last. Recommendation: a scraped spike now — Codex CLI or Gemini CLI, `state_source: scraped`, no hooks — to see which of the contract's methods are really neutral, what `send` and the doorbell do without a readable composer, and whether the record's fields assume a tool session id. The spike is a branch and an ADR, not a shipped adapter. **Next:** for evaluation, not scheduled.
+**Owner:** designer
+**Kind:** design-first
+**Status:** **Paul, 2026-10-16 (the board, line `board:fbc6ebd9`): file it design-first for the designer.** Of the three answers put to him — he runs the spike now with ao-paul, file it design-first for the designer, or leave it for evaluation — Paul chose the designer: the design decides the scraped Gemini adapter's shape (which §4.3 contract methods it implements and which are Claude Code's alone, `state_source: scraped`, what `send` and the doorbell do without a readable composer, whether the record assumes a tool session id) and the adapter conformance suite, and lands them as build entries naming this one in `**Blocked by:**`; the 2026-10-10 note that the spike is an interactive session's is superseded by this decision. Was: **Paul, 2026-10-10 (with ao-paul): agreed, a spike, and integration tests with it.** Run as an interactive session, not a member's lane: a second tool must be installed and signed in (neither `codex` nor `gemini` is on kmaster on 2026-10-10; the sign-in is Paul's account or key), the work is judgement (which of the contract's methods are neutral), and its result is an ADR, not a merge. **Paul, 2026-10-13 (the lessons ADR, `docs/decisions/2026-10-13-agent-product-lessons.md` lesson 10):** Gemini CLI is *"a definite fit"*, so it is the spike's tool; Hermes Agent, Muse Code and Grok Bot are not wanted as tools for now. The lasting product is an **adapter conformance suite**: one set of tests every adapter passes against its real tool (launch, the state it reports, `send`, `composer()`, the doorbell and mail, `title()`), so neutrality is checked on every change and not once by the spike. The spike says which of those a scraped adapter can pass and which belong to Claude Code alone. **2026-10-15 (grinder-ao-2, answering Paul's board question *does the recently added Gemini CLI fit the bill?*):** in part. What was added is dev-cadence's TD-109 (dev-cadence #259, 2026-10-14): Gemini CLI installed on kmaster (`~/.npm-global/bin/gemini`, 0.64.0) and signed in with Paul's Google account, and a Gemini backend for dev-cadence's session *introspection* (`agent_sessions.py`: lists Gemini sessions, their cwd and `gemini --resume <uuid>`). That removes the spike's blocker (a second tool installed and signed in) and gives facts read off a real install (`docs/plans/2026-10-12-session-introspection-adapter.md` in dev-cadence: chats under `~/.gemini/tmp/<slug>/chats/`, a `sessionId` in the first record, no live registry). It is not a ShiftLead adapter: `src/shiftlead/adapters/` still holds only `claude_code/`, and the spike, its ADR and the conformance suite are all unbuilt. Who runs the spike, and when, is put back to Paul on the board. Open — for evaluation. The design's stated moat is one neutral view across tools, and only one agent adapter exists. Since phase 1 the contract (§4.3) gained `composer()`, `title()`, `mail()`, a session id chosen at launch, the doorbell, the trust pre-seed and screen rules, each shaped by Claude Code. Phase 5 puts the second adapter last. Recommendation: a scraped spike now — Codex CLI or Gemini CLI, `state_source: scraped`, no hooks — to see which of the contract's methods are really neutral, what `send` and the doorbell do without a readable composer, and whether the record's fields assume a tool session id. The spike is a branch and an ADR, not a shipped adapter. **Next:** the designer's round.
 **Location:** design §4.3, §7 phase 5, `src/shiftlead/adapters/`
 
 **Why:** every Claude-shaped feature built before a second adapter exists is a feature that may have to be unbuilt, and the claim the product is sold on has not been tested.
@@ -1109,60 +1106,6 @@ The other cases:
 
 ---
 
-## TD-721: The Repo page is not an expansion of the team's Org card: it draws the card's three facets but not its header, its controls or its member cards, and only the first of two servicing teams
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (Paul, in an interactive session)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-15 in TD-722's amendment (an interactive round with Paul, PR #1850) — §4.5 screen 11: the page is the repo's group of the Org expanded: the repo's line with its Repo facet once, every servicing team's whole card by the Org's own partials and kept by `/events`, the no-team strip, then the lists; Doing with team chips; *Waiting on you* linking `?repo=`; Add entry's optional **Team** pick. Built by TD-740. Was: Open, blocked by TD-722.
-**Blocked by:** TD-740
-**Location:** `docs/design/4.5-ui.md` (screen 11 *Repo*: *The page opens with the team's three facets*); `src/shiftlead/ui/templates/repo_part.html` (includes `team_summary.html` alone), `src/shiftlead/ui/templates/group_head.html`, `card.html`, `plus_card.html`; `src/shiftlead/ui/app.py` (`repo_page`: `first = serving[0]`, `"g": {"team": ..., "summary": ...}`)
-
-**Why:** Paul, 2026-10-15: *everything that is shown on the org page card for a team/repo also shown on the repo page — the repo page should essentially be an expansion of the info shown on the org page.* Today the Repo page draws the team card's three facets (Repo, TDs in motion, Answer needed / Doing, all three even where the card leaves one out, TD-418) and nothing else of the card:
-
-1. **The header** (`group_head.html`, §4.5a *team groups*): the flow chip and *flow changed* / *definition changed* with **Apply**, ✉ *n* unread, the *answered for you* mark, *n PRs waiting*, *n ready to close*, the *needs you* pill, the run's state (*concluded*, *wound down … by …*, *stopped*, *work waiting*), and the notes under it (*over its line*, *stops*, *started … for*).
-2. **The controls**: Start, Wind down, Stop now, Forget all, and the ***i*** panel (Definition, Members…, Open file, Flow on Settings →, who for what, *not concluded:*).
-3. **The member cards** (`card.html` compact, with their state pills and the lane's count) and the **+** card.
-4. **A repo two teams service** names both in its *serviced by* line but draws only the first team's facets (`serving[0]`); the second team's card on the Org has nothing on the page that is meant to expand it.
-
-**Fix:** a design round on screen 11: the page opens with the servicing team's whole Org card — header, controls, facets, member cards — drawn by the same templates, so the page cannot drift from the card, and the lists below expand it. Two teams on one repo are two cards, listed together and never combined (Paul, 2026-10-15, TD-722). It decides whether the member cards fold as on the Org; and how the page keeps the header and cards current, since the Org takes them from `/events` deltas and the Repo page re-reads `?part=1` on a 30 s poll. Then one or more build entries.
-
-**Done when** screen 11 says the page carries everything the team's Org card shows, its build entries are filed, and this entry's `Blocked by:` names them.
-
-**Related:** TD-722, TD-176 (slice 5 built the page), TD-418, TD-604, TD-693.
-
----
-
-## TD-722: One repo per team, declared, and a project a heading on repos: a team names its repo, a repo has many teams listed together, the org page groups project → repo → team cards
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (Paul, in an interactive session)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed, amended 2026-10-15 (an interactive round with Paul after Fable's review, PR #1850): the anchor seat (first made the repo's, shared by its teams; then retired in round 4, §4.9b *No anchor seat*), its controllers the repo's managers; an agent's name is unique across a repo's teams; the old keys and a team's `anchor:` are refused, not read with a warning; the director carries an Org block from the registry and a directory of its own; the Org page's headings follow the org file's order with liveness inside a repo, the Repo facet and the anchor's card on the repo's line, a no-team strip per repo and *No repo*; a board row carries its repo; `--project` and the Project picker go. Round 2 (Fable's eleven findings, adopted by Paul): the home ties the anchor seat to its teams by `controllers`; one seat per repo per host; its review the first controller team's chain; the repo's lanes include the seat's; the Org page's repo line, ring, hiding and strip heading. Round 3 (Sonnet's twelve findings, adopted by Paul): the seat winds down only when no live record of the repo's teams is left; its stop time re-derived on a move or Clear; the anchor's review chain settled; the seat in no team's reserve, balance or start mark, its asks under its repo; `anchors:` for any repo whose file has no `anchor:`; the changeover before the promote; TD-724 split into an unheld slice 4 and a held slice 6. Fable round 3 (adopted by Paul): the seat's review is the repo's first team's chain, nothing per team, only that team reading *flow changed* over it; rule 8 reads the seat's news by the records' `repo`; a live record of the repo's teams defined, the seat wound down on any tick with none; `anchor: false` drops the seat; the changeover marks the old `<team>-anchor` records removed. Built by TD-724, TD-725 and TD-741; the Repo page is TD-721's, built by TD-740. Was: designed by the designer in #1832 — Designed 2026-10-15 (the designer; no mockup: the Org page keeps every card as it is and adds a heading per project and a line per repo above them) — §4.9 *Projects*, *Teams*, *A definition written before TD-722*, *Home and reach*, *The Org page*. A team declares one `repo:` (required in the org file, unsaid in a repo's own), and every `home:` and `projects:` on a team goes. A project is a heading on repos with an optional `title`, a repo in at most one, and a repo in none is its own heading. The `project` badge is the repo's project, so two teams on one repo always share one, and mail is unchanged. The director is the org's, with the org-wide block (a step added to TD-642). The Org page groups project → repo → team, cards whole and never combined. The old keys are read for one release where they name one repo, and refused where a team spans. §4.9's guardians example is two teams under one heading, and the ADR is amended. Built by TD-724 and TD-725. Was: Open. **Round 4** (Fable, adopted by Paul, 2026-10-15): **the anchor seat is retired**, reversing TD-381 — its jobs go to the grinders' pick list, the designer and the person (§4.9b *No anchor seat*); everything per-repo-anchor of rounds 1–3 is gone, and Sonnet round 2's seat-lifecycle findings are superseded; the removal is TD-757, TD-759 and TD-760.
-**Blocked by:** TD-725, TD-741, TD-757, TD-759, TD-760
-**Location:** `docs/design/4.9-org-team-project.md` (*Projects*, *Teams*: `projects: [...]`, `manager.home`, a member's `home`, the guardians example with a nested team; *Home and reach*); `docs/design/4.10-messages.md` (*across teams, by project*: the `project` badge, *the first of its team's projects that lists its home repo*); `docs/design/4.5-ui.md` (screen 1 *The Org, team-first*, screen 6 `repo_teams`, screen 11); `docs/design/4.5a-controls.md` (*team groups*: the header's place, *mixed*); `docs/design/4.9b-techlead.md` (*The director seat*); `docs/design/5-configuration.md` (`org.yml`, a repo's `.shiftlead.yml`); [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md) (*a team may span projects*)
-
-**Why:** Paul, 2026-10-15, in the conversation TD-721 waited on: *one repo per team, declared. We still want to be able to have multiple teams per repo (e.g. db team, compliance team) and those can be listed together (per repo) but not auto-combined* — and of a grouping such as Guardians, *a project heading*, placed **on the repo** (*project on the repo*). The design today lets a team span projects and a project hold several repos, and infers a team's repo from where its live members sit (`team_repo`); every project in the org file holds one repo, and no team spans two. The inference is what leaves the header's *mixed* place, `repo_teams`' first-team-in-definition-order rule, and a Repo page that can expand only one team's card (TD-721). The cases for a team over several repos each split by repo: a function across repos (docs, audits, dependency bumps) is a role or flow stage in each repo's team; a product over several repos is one team per repo, sequenced by cross-repo `Blocked by: <repo>#TD-NNN`; the cost a team per repo adds is its seats, which an on-call seat and a team managed by the person already keep small.
-
-**Fix:** a design round:
-1. **A team declares one repo** — `repo:` in its definition, replacing `projects: [...]`, `manager.home` and a member's `home`; a repo's `.shiftlead.yml` team's repo is that repo. A repo has any number of teams.
-2. **A project is a heading on repos** — `projects:` in the org file keeps listing repos, and a repo sits in at most one project; a team's project is its repo's. A repo in no project is its own heading. Nothing acts on a project but the mail gate and the brief's Project block.
-3. **Mail and reach stay as they are**, read off the repo: *across teams, by project* (TD-582) keys on the repo's project, so two teams on one repo always share one; the Project block names the project's other repos.
-4. **The director** (TD-636, TD-642, TD-657) is the org's, above every heading: what it reads of the org's repos (an org-wide Project block: every registered repo's checkout) and where it is drawn (with the person, at the top of the Org page).
-5. **The Org page groups project → repo → team cards**: a repo's teams listed together, each its own whole card, never combined; the *mixed* place and `repo_teams`' first-team rule go. The Repo page is one repo group expanded (TD-721).
-6. **What goes**: §4.9's guardians example (one team over several repos, a nested team) becomes several teams under a Guardians heading; the ADR's *a team may span projects* is superseded, with a dated line in the history.
-7. **Migration**: a definition carrying `projects:` or `home:` on a team — refused by name — and the backfill (TD-723). Then build entries.
-
-**Done when** the design says the above, its build entries are filed, and this entry's `Blocked by:` names them.
-
-**Related:** TD-721, TD-723, TD-582, TD-636, TD-642, TD-657, TD-040.
-
----
-
 ## TD-723: Backfill TD-722: samscrape and contractmatch under one ContractMatch project
 
 **Priority:** Low
@@ -1207,38 +1150,6 @@ The other cases:
 **Done when** the design says how an entry names its team, how an untagged or stale one is found and resolved, and how the lanes read it, its build entries are filed, and this entry's `Blocked by:` names them.
 
 **Related:** TD-722, TD-721, TD-715, TD-707, TD-731.
-
----
-
-## TD-740: Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-15 (TD-722's amendment, an interactive round with Paul)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-725, TD-741
-**Location:** design §4.5 screen 11 (*The page is the repo's group of the Org, expanded*, *Waiting on you*, *Doing*), §4.5a *Repo page: the team's facets*, *Repo page: doing filters*, *Add entry form: Hand to the techlead*, §4.9 *Add an entry to the ledger* (*Where there is no seat*); `src/shiftlead/ui/app.py` (`repo_page` ~L1302: `serving[0]`, `"g": {"team": ..., "summary": ...}`), `src/shiftlead/ui/templates/repo_part.html`, `repo.html`, `group_head.html`, `card.html`, `plus_card.html`, the Org page's group template TD-725 leaves; `src/shiftlead/ui/repo.py` (`doing_chips` ~L355); `src/shiftlead/ui/static/` (`AO.repo` ~L3205, the Org's delta handler); the Add entry form and `/api/entry/plan`, `/api/entry/hand`
-
-**Why:** TD-721 (Paul, 2026-10-15: *the repo page should essentially be an expansion of the info shown on the org page*), designed in TD-722's amendment. The page draws only the first servicing team's three facets: no header, marks, controls, *i* panel or member cards, and nothing of a second team.
-
-**Fix:**
-- **The page is the repo's group** as TD-725 draws it on the Org, by the same partials: the repo's line with its Repo facet, every servicing team's whole card (header, marks, controls, *i* panel, TDs in motion, Answer needed / Doing, member cards, + card) in the Org's order within a repo, then the no-team strip; the lists below unchanged. `serving[0]` goes.
-- **Kept by `/events`**: the cards and headers take the Org's deltas through the Org's own client code; the lists keep the `?part=1` poll and the `repos` / `doing` events. A team card folds by the same per-team choice as on the Org.
-- **Doing** is every servicing team's kept calls, newest first; where two or more teams service the repo a team chip per team comes first (*db (12)*), then *all (n)* and the agent chips; a team pick and an agent pick AND.
-- **Waiting on you**'s heading links `/inbox?repo=<repo>&kind=board` (TD-741's filter).
-- **Add entry**'s form gains an optional **Team** pick where two or more teams service the repo: blank hands to the first in definition order with a techlead seat, a pick to that team's seat, and the form names the seat. TD-730 later says how the entry names its team.
-- **Tests** (in `tests/test_ui_repo*.py`, beside the Repo page's own):
-  - A repo two teams service draws both teams' whole cards, each with its header controls and member cards, and the Repo facet once.
-  - A repo no team services draws its line and facet alone, with the lists.
-  - A delta on a member re-renders its card on the Repo page as on the Org.
-  - The Doing chips carry a team chip per team where two serve the repo, and none where one does.
-  - The Team pick hands to the picked team's techlead seat, and blank to the first.
-
-**Done when** the Repo page shows everything the Org shows for the repo's group, for every servicing team, kept live by the Org's deltas, and every listed test passes.
-
-**Related:** TD-721 (the design), TD-722, TD-725, TD-741, TD-730, TD-176.
 
 ---
 
@@ -1294,7 +1205,7 @@ The other cases:
 **Added:** 2026-10-16 (TD-748's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Building — slice 1 (ledgerboard v1.2 synced and vendored; the ledger reading's `key`, `lined`, `card_key` and `order`; `ao repo` in rank order) by #1930. Next: `sessionorc.queue` and the `queue` reading, then `rank_move`, its flush and `ao rank`, then the briefs.
+**Status:** Building — slice 1 (ledgerboard v1.2 synced and vendored; the ledger reading's `key`, `lined`, `card_key` and `order`; `ao repo` in rank order) by #1930; slice 2 (`sessionorc.queue`: the `queue` reading, RPC and event — cards across repos, the top entry, rows, row states, the ledger's part of the status, keys, completed cards, passed-over flags, other work) by #1933; slice 3 (`rank_move`, the intents in `ranks.json`, the flush with its joins and prunes by `board.land_rank`, `ao rank` and `--list`; #1933's review notes: a completed card dated by its `Resolved:` date first, `of_record` once per claim) by its PR. Next: the briefs (`grinder.md`, `designer.md`, `work.md`, `docs/briefs/techlead-context.md`).
 **Blocked by:** dev-cadence#TD-119
 **Location:** design §4.4 *The Queue: cards, and the rank that orders them*, §4.7 `ao rank`, `ao repo`, §4.8 *Choosing in a free-pick lane*; `scripts/ledgerboard.py` and `src/sessionorc/ledgerboard.py` (the vendored release); `src/sessionorc/ledger.py` (`reading` ~L672, the `lb.pickable` call ~L406, `blocked_ids` ~L140); a new `src/sessionorc/queue.py`; `src/sessionorc/board.py` (`_land` ~L329, its tree and `still()` ~L517); `src/sessionorc/agent.py` (`rpc_repos` ~L863, beside it `rpc_queue` and `rpc_rank_move`); `src/sessionorc/agent_ids.py` (`rpc_td_hold` ~L100, the person-or-interactive check `rpc_td_next(held)` ~L206 makes); `src/shiftlead/cli.py` (`cmd_repo` ~L1724, a new `cmd_rank`); `src/shiftlead/briefs/grinder.md`, `designer.md`, `work.md`; `docs/briefs/` (held: the techlead reads it)
 

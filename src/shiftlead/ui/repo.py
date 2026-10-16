@@ -368,15 +368,50 @@ def settle_mark(e: Mapping[str, Any], now: datetime, lane: bool = False) -> str:
     return "settled" if lane else ""
 
 
-def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The Doing section's filter chips (§4.5a *Repo page: doing filters*): *all (n)* and one per
-    doer in the feed, the busiest first."""
+def doing_chips(rows: Collection[dict[str, Any]], teams: Collection[str] = ()) -> list[dict[str, Any]]:
+    """The Doing section's filter chips (§4.5a *Repo page: doing filters*): where two or more teams
+    service the repo a chip per team first, in `teams`' order (`team`, *db (12)*), then *all (n)* and
+    one per doer in the feed, the busiest first (`who`). A team pick and a doer pick AND."""
     tally: dict[str, int] = {}
     for d in rows:
         tally[d["name"]] = tally.get(d["name"], 0) + 1
-    return [{"who": "", "label": "all", "n": len(rows)}] + [
-        {"who": w, "label": w, "n": n} for w, n in sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))
+    per_team = (
+        [{"team": t, "label": t, "n": sum(1 for d in rows if d.get("team") == t)} for t in teams]
+        if len(teams) > 1
+        else []
+    )
+    return (
+        per_team
+        + [{"who": "", "label": "all", "n": len(rows)}]
+        + [{"who": w, "label": w, "n": n} for w, n in sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))]
+    )
+
+
+def repo_items(layout: list[dict[str, Any]] | None, name: str) -> list[dict[str, Any]]:
+    """The Repo page's top (§4.5 screen 11 *The page is the repo's group of the Org, expanded*,
+    TD-740): the Org's layout items of the repo `name` — its line with the Repo facet, every
+    servicing team's whole card in the Org's order, then its no-team strip — never a copy of them.
+    The client keeps them from the Org's deltas by the same test (`AO.repoItems`)."""
+    return [
+        g
+        for g in layout or []
+        if (g.get("kind") == "repo" and g.get("repo") == name)
+        or (g.get("kind") in ("team", "strip") and g.get("repo") == name)
     ]
+
+
+def repo_doing(items: Collection[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """The Repo page's **Doing** (§4.5 screen 11 item 5): every servicing team's kept calls, each
+    row carrying its `team`, newest first, and the doer column's width across them."""
+    rows = [
+        {**d, "team": g["team"]}
+        for g in items
+        if g.get("kind") == "team" and g.get("summary")
+        for d in g["summary"].get("doing") or []
+    ]
+    rows.sort(key=lambda d: d.get("at") or "", reverse=True)  # ISO instants: the text sorts as the time
+    width = max((int(g["summary"].get("doer_w") or 1) for g in items if g.get("summary")), default=1)
+    return rows, width
 
 
 def compact_in(

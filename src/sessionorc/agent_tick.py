@@ -33,6 +33,7 @@ from sessionorc import conventions as conventions_mod
 from sessionorc import held as held_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import promote as promote_mod
+from sessionorc import queue as queue_mod
 from sessionorc import seams as seams_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
@@ -212,6 +213,8 @@ class TickMixin:
         if self.mode == "home":
             await self._balance_marks(snapshot_at)
             await self._red_prs(snapshot_at)
+            await self._queue_pass(snapshot_at)
+            await self._rank_pass(snapshot_at)
         if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
             # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
             self._promote_task = asyncio.create_task(self._refresh_promotes())
@@ -2933,6 +2936,29 @@ class TickMixin:
                 await self._broadcast({"event": "repos", "root": root, "repo": self._repo_view(root)})
             except Exception:  # noqa: BLE001 — one repo's surprise is a log line; the next tick reads again
                 log.exception("reading the red PRs of %s failed", root)
+
+    async def _queue_pass(self, now: datetime) -> None:
+        """The Queue's reading (§4.4 *The Queue*, TD-769), at the home on every tick: derived from the
+        repo readings, the live graph's claims, who waits on a question (the person's, or a reader
+        holding a PR's ask) and the doing log, and pushed as a `queue` event when it changed — its `at`
+        aside. A surprise is a log line, and the last reading stands."""
+        try:
+            graph = list(self._graph().values())
+            # by record id: an inbox names a node's sender `id@host`, as the readers' asks do
+            waiting = {naming.split_address(k)[0] for k in work_mod.waiting_of(self.person_inbox)}
+            for r in graph:
+                for a in (r.prs_waiting(home=self.host) or {}).get("asks") or ():
+                    if isinstance(a, dict) and a.get("from"):
+                        waiting.add(naming.split_address(str(a["from"]))[0])
+            doing = {t: list(r) for t, r in self.doing_log.rings.items()}
+            got = queue_mod.reading(self._repos, graph, now, waiting=waiting, doing=doing)
+        except Exception:  # noqa: BLE001 — the Queue is a reading: the last one stands, the next tick tries again
+            log.exception("reading the queue failed")
+            return
+        old = self._queue or {}
+        self._queue = got
+        if {k: v for k, v in got.items() if k != "at"} != {k: v for k, v in old.items() if k != "at"}:
+            await self._broadcast({"event": "queue", "queue": self._queue_ranked(got)})
 
     def _repo_view(self, root: str) -> dict[str, Any] | None:
         """A checkout's reading as the `repos` RPC and event serve it: the reading, and under
