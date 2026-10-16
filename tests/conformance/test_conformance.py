@@ -62,6 +62,11 @@ def test_shell_declares_no_permission_channel():
     assert adapters.implements(adapters.get("shell")) == frozenset()
 
 
+def test_claude_code_declares_its_permission_channel():
+    """Design §4.3 (TD-792): Claude Code answers a pending permission through its hook channel (Allow / Deny)."""
+    assert adapters.get("claude-code").permission_channel is True
+
+
 @pytest.mark.parametrize("name", AGENTS)
 def test_every_pane_reads_as_a_state(name):
     """A pane fixture reads as a state or as no opinion, and as what the adapter read at capture.

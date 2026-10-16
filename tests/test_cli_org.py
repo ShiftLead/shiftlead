@@ -348,6 +348,8 @@ def test_a_declared_name_no_definition_holds_is_lacking_and_names_its_entries(wo
 
 @pytest.mark.parametrize("declared", [[], ["span"]])
 def test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking(world, monkeypatch, capsys, declared):
+    """§4.4 *The move from one team to two* (TD-791): the remedy names the declared teams and every left-out one,
+    so following it declares what was missing."""
     _reading(world, monkeypatch, {"declared_teams": declared, "entries": []})
     code, got = check(capsys)
     assert code == 1 and len(got["lacks"]) == 2 - len(declared)
@@ -355,6 +357,7 @@ def test_a_team_of_a_two_team_repo_its_ledger_does_not_declare_is_lacking(world,
         x.startswith("alpha: has 2 teams and its ledger's Fields: line does not declare alpha-grind")
         for x in got["lacks"]
     )
+    assert all("add `Team = span | alpha-grind`, and a Team: line" in x for x in got["lacks"])
 
 
 def test_a_declared_name_differing_from_its_definition_by_case_is_no_lack(world, monkeypatch, capsys):
