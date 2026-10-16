@@ -1762,6 +1762,32 @@ def test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_
     assert v_old["not_ready"] == ["1 background shell running — python -m http.server 8000"]
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
     assert "cm.disabled = !(ready || v.shell_close)" in js
+    # after a live refresh the confirm is this line's alone: the template draws `data-confirm` once (TD-779)
+    assert "cm.dataset.confirm = v.shell_close || v.close_confirm" in js
+
+
+def test_a_shells_cmd_cut_at_a_words_end_keeps_the_word():
+    """§4.2 *What it draws* (TD-778): a `cmd` whose word ends exactly at `SHELL_CMD_CUT` keeps it; a cut
+    inside a word drops that word, and a short one is drawn whole."""
+    from shiftlead.ui.cards import SHELL_CMD_CUT, shell_cmd
+
+    assert len("python3 scripts/check_cadence.py") == SHELL_CMD_CUT
+    assert shell_cmd({"cmd": "python3 scripts/check_cadence.py --pr 1917"}) == "python3 scripts/check_cadence.py …"
+    assert shell_cmd({"cmd": "timeout 1500 gh pr checks 1893 --watch"}) == "timeout 1500 gh pr checks 1893 …"
+    assert shell_cmd({"cmd": "x" * 40}) == "x" * SHELL_CMD_CUT + " …"
+    assert shell_cmd({"cmd": "sleep 9"}) == "sleep 9"
+
+
+def test_a_live_shell_flag_with_no_shell_to_name_stays_idle(tmp_path, monkeypatch):
+    """§4.2 *Working on its own* (TD-780): `shells_live` true over no shell the view can name (`shells`
+    empty, or only malformed entries `shells_of` drops) is not *working*: nothing to name, and no raise."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    from shiftlead.ui.app import view
+
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0}
+    for shells in ([], ["x"]):
+        v = view(_card(git=clean, shells=shells, shells_live=True))
+        assert (v["pill_word"], v["own_work"]) == ("idle", ""), shells
 
 
 def test_an_idle_session_that_waits_on_someone_reads_waiting(tmp_path, monkeypatch):

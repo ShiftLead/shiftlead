@@ -1112,7 +1112,9 @@ def shell_cmd(sh: Mapping[str, Any]) -> str:
     if len(cmd) <= SHELL_CMD_CUT:
         return cmd
     head = cmd[:SHELL_CMD_CUT]
-    return (head.rsplit(" ", 1)[0] if " " in head else head) + " …"
+    if cmd[SHELL_CMD_CUT] != " " and " " in head:  # the cut lands inside a word: drop it
+        head = head.rsplit(" ", 1)[0]
+    return head + " …"
 
 
 def ready_to_close(
