@@ -132,6 +132,10 @@ def recording(log: list[dict], whole: dict, honour: bool = True, fleet: list | N
             if method == "repos":
                 log.append(kw)
                 return reports.omitted(whole, kw.get("omit") or []) if honour else whole
+            if method == "seen":  # Focus opens on a record (TD-756), drawn whole
+                at = datetime.now(UTC).isoformat()
+                rec = {"since": at, "created": at, "confidence": "hook", "kind": "agent", "adapter": "shell"}
+                return {**rec, **member(next(iter(whole)))}
             return await super().call(method, **kw)
 
     return Fake
@@ -143,6 +147,8 @@ PAGES = [
     ("/api/sessions", "REPOS_OMIT_PAGE"),
     ("/inbox", "REPOS_OMIT_INBOX"),
     ("/api/person/inbox", "REPOS_OMIT_INBOX"),
+    ("/focus/ao-samscrape-grinder-1", "REPOS_OMIT_PAGE"),  # TD-756: the report line's PR mark
+    ("/inbox/m-1", "REPOS_OMIT_INBOX"),  # TD-756: the message page's row, drawn as the list draws it
 ]
 
 
@@ -207,3 +213,91 @@ def test_the_counts_outside_a_request_read_the_reading_once_without_the_inbox_om
 
     asyncio.run(ui.Readings(call).counts_now(False))
     assert log == [{"omit": list(ui.REPOS_OMIT_INBOX)}]
+
+
+# -- the events stream (TD-754) ---------------------------------------------------------------------
+
+
+async def test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole(agent, tmp_path):
+    """The seed a subscribe is sent and each `repos` event after it: a subscription that names an
+    `omit` gets the reading without those paths, one that names none gets it whole, and a dropped
+    checkout's `repo: null` reaches both as it is."""
+    import asyncio
+
+    root = str(tmp_path)
+    agent._repos[root] = _reading(root)
+    omit = ["ledger.recent", "ledger.entries.detail", "completed"]
+    got: dict[str, list[dict]] = {"some": [], "whole": []}
+
+    async def listen(key: str, o: list[str] | None) -> None:
+        async with LocalClient() as sub:
+            async for ev in sub.subscribe(o):
+                if ev.get("event") == "repos":
+                    got[key].append(ev)
+
+    tasks = [asyncio.create_task(listen("some", omit)), asyncio.create_task(listen("whole", None))]
+    try:
+        for _ in range(50):
+            if all(got.values()):
+                break
+            await asyncio.sleep(0.05)
+        await agent._broadcast({"event": "repos", "root": root, "repo": agent._repo_view(root)})
+        await agent._broadcast({"event": "repos", "root": "/gone", "repo": None})
+        for _ in range(50):
+            if all(len(v) == 3 for v in got.values()):
+                break
+            await asyncio.sleep(0.05)
+    finally:
+        for t in tasks:
+            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    want = reports.omitted(agent._repo_view(root), omit)
+    assert "completed" not in want and "recent" not in want["ledger"]
+    assert [e["repo"] for e in got["some"]] == [want, want, None]
+    assert [e["repo"] for e in got["whole"]] == [agent._repo_view(root), agent._repo_view(root), None]
+    assert not agent._sub_omit  # a subscription gone takes its omit with it
+
+
+def test_the_pages_one_subscriber_asks_for_its_events_and_its_seed_without_what_the_pages_omit(tmp_path, monkeypatch):
+    """The UI's fan-out keeps the reading the Org, the Repo page and a card draw, so its subscription,
+    its seed and the Inbox's counts keeper all ask for it with the page's omit (TD-754)."""
+    import asyncio
+
+    from test_ui_events_light import received
+
+    from shiftlead.ui import app as ui
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    root = str(tmp_path / "samscrape")
+    asked: list[tuple[str, object]] = []
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "repos":
+                asked.append(("repos", kw.get("omit")))
+                return {root: _reading(root)}
+            return {"entries": []} if method == "inbox" else ([] if method == "list" else {})
+
+        async def subscribe(self, omit=None):
+            asked.append(("subscribe", omit))
+            await asyncio.sleep(0.3)
+            return
+            yield
+
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(ui, "LocalClient", Fake)
+    received(TestClient(ui.create_app()), "/events")
+    subs = [o for m, o in asked if m == "subscribe"]
+    assert subs and all(o == list(ui.REPOS_OMIT_PAGE) for o in subs)
+    assert ("repos", list(ui.REPOS_OMIT_PAGE)) in asked  # the run's seed
+    assert ("repos", None) not in asked  # nothing in the stream reads the reading whole

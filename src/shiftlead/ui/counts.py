@@ -43,9 +43,10 @@ def _shape(s: dict[str, Any]) -> tuple[Any, ...]:
 
 
 class CountsKeeper:
-    def __init__(self, count: Count, client: Callable[[], LocalClient] = LocalClient):
+    def __init__(self, count: Count, client: Callable[[], LocalClient] = LocalClient, omit: tuple[str, ...] = ()):
         self._count = count  # `watching` → the numbers, or the agent-down shape (`agent_down: True`)
         self._client = client
+        self._omit = omit  # a `repos` event is only a recount here: sent without what no page draws (TD-754)
         self.streams: dict[Any, bool] = {}  # each page's socket → its document is visible
         self.reading: dict[str, Any] | None = None  # the last numbers sent, `rev` among them
         self.rev = 0
@@ -172,7 +173,7 @@ class CountsKeeper:
             with contextlib.suppress(Exception):
                 known = {s["id"]: _shape(s) for s in await c.call("list")}
             self._dirty.set()  # a (re)subscribed keeper counts at once
-            async for ev in c.subscribe():
+            async for ev in c.subscribe(list(self._omit) or None):
                 kind = ev.get("event")
                 if kind == "session":
                     s = ev.get("session") or {}

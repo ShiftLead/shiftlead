@@ -1338,6 +1338,9 @@ def serviced(root: str | Path, sessions: Collection[Mapping[str, Any]]) -> bool:
     return any(s.get("team") for s in in_repo(sessions, root))
 
 
+DRAFT_WHOSE = "no order while a draft"  # §4.4 *A draft is no work order*, TD-745
+
+
 def red_prs(
     r: Mapping[str, Any] | None, sessions: Collection[Mapping[str, Any]], now: datetime
 ) -> list[dict[str, Any]]:
@@ -1346,7 +1349,8 @@ def red_prs(
     `title`, `url`, `author`, `word` (*red*, else *conflicting*), `failing`, `red_since`, and `whose`
     — past `ORPHAN_AFTER`, *nobody's — the anchor's order* for one the reading lists as an order
     (*nobody's* where no team services the repo: its row is the Inbox's), *held by <names>* for one a
-    live record of the repo holds, as the reading names them (`pr_orders.held`, TD-652); before it, ''.
+    live record of the repo holds, as the reading names them (`pr_orders.held`, TD-652), *no order while
+    a draft* for a draft (not a sync PR) nobody holds (TD-745); before it, ''.
     `sessions` the records, or the pages' views."""
     r = r or {}
     mine = in_repo(sessions, str(r.get("root") or "")) if r.get("root") else []
@@ -1367,6 +1371,8 @@ def red_prs(
         if now - since >= ORPHAN_AFTER:
             held = [str(x) for x in holders.get(str(p["number"])) or []]
             whose = nobody if p["number"] in orders else f"held by {', '.join(held)}" if held else ""
+            if not whose and p.get("draft") and not p.get("sync"):
+                whose = DRAFT_WHOSE  # a draft is no order (TD-745); a sync draft waits as any sync PR does
         out.append(
             {
                 "number": p["number"],

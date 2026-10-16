@@ -69,11 +69,8 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-740 | Build TD-721: the Repo page as the repo's group of the Org expanded — every servicing team's whole card by the Org's partials, kept by `/events`, Doing with team chips, Add entry's Team pick | Medium | Open |
 | TD-741 | Build TD-722 (3): a board row carries its repo, not a team — the Inbox rail's Repos group and `?repo=`, `next:<n>` per repo | Medium | Open |
 | TD-745 | A draft PR paused on the person's word reads as *a red PR nobody holds*, a High work order in the anchor's lane | Low | Designed — built by TD-750 |
-| TD-747 | The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739 | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
-| TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
-| TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
-| TD-754 | The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change | Low | Open |
+| TD-755 | Two behaviours of TD-736 (#1873) are held by no test: a held entry a decided line names stays a held row, not a *for you* one, and the held row's footer reads *held in … ledger* | Low | Open |
 
 ---
 
@@ -1453,27 +1450,6 @@ The other cases:
 
 ---
 
-## TD-747: The Inbox renders every row server-side on every page change: ~135 ms of Jinja for ~380 rows on a scratch home at the live size, after TD-739
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, profiling the pages for TD-739)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/templates/inbox_row.html` (the `row` macro and the macros under it), `inbox_rows.html`; `src/shiftlead/ui/render.py` (`inline`, `render`, the closed markdown subset each row's text goes through); `src/shiftlead/ui/inbox.py` (`row_find`, `row_subject`)
-
-**Why:** TD-739's profile, 2026-10-15: on a scratch home with 320 mail entries, 60 board lines, this repo's ledger and 12 sessions, `/inbox` took ~230 ms, of which the template was ~135 ms (it was ~186 ms before TD-739's `subject_of` fix). What is left is spread across ~1,200 macro calls: Jinja's own call overhead, ~56,000 `markupsafe.escape` calls, `render.inline` on every row's text (~3,900 calls) and `row_find`'s lowercased copy of each row. No one function is above ~10% of it.
-
-**Fix:** profile again (the harness in TD-739's PR body), then take the cheapest of: render each mail row's `md()` once per entry revision and keep it (the person inbox's `rev`, TD-616); move the per-row constant `title` strings out of the loop; or draw *FYI* folded with its rows fetched on open. Say in the PR which, and the time before and after.
-- **Tests:** the page's HTML is byte-identical before and after for a fixture inbox (or differs only where the PR says).
-
-**Done when** `/inbox` at the live size renders its template in under ~70 ms on a scratch home, and the PR gives the split.
-
-**Related:** TD-739, TD-738, TD-746.
-
----
-
 ## TD-748: The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD
 
 **Priority:** Medium
@@ -1495,76 +1471,20 @@ The other cases:
 
 ---
 
-## TD-749: The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-15 (Paul, in an interactive session; TD-748's review)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — Paul decided 2026-10-15 to drop the split now, ahead of TD-748.
-**Location:** `docs/briefs/grinder-ao-1.md:15` (*Your half of the team*); `docs/briefs/grinder-ao-2.md` (its *Lane* heading and the split rule)
-
-**Why:** the doing log (`~/.shiftlead/doing.jsonl`) since 2026-10-10 has two lines where a grinder declared out of work because the open builds were the sibling's package (2026-10-15 00:07Z *the open grinder builds are all sessionorc (the sibling's)*, 00:24Z *TD-687 and TD-690 are sessionorc-led (the sibling's)*), and five where a grinder picked an entry over a higher one in the other half (TD-428, TD-593, TD-616, TD-689, TD-691) — the pass-over §4.8 *Choosing in a free-pick lane* says needs a reason, manufactured by the brief. Merge safety is `held:` review, not the split; a conflict between two grinders costs a rebase.
-
-**Fix:** remove the split from both briefs: each grinder picks the highest pickable unclaimed entry in its lane (priority, then the ledger's order) whatever package it touches; a claim names files a live sibling's claim also touches. Lanes by role and stage are unchanged.
-
-**Done when** neither brief divides the code between the grinders, and `grep -n "Your half" docs/briefs` finds nothing.
-
-**Related:** TD-108, TD-748.
-
----
-
-## TD-750: Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so
+## TD-755: TD-736's held row for an entry a decided line names, and its footer text, are held by no test (#1873)
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-15 (the designer, building TD-745's design)
+**Added:** 2026-10-15 (test-audit-ao-1, auditing #1873)
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** design §4.4 *A red PR nobody holds is a work order* (*A draft is no work order*), §4.7 `ao repo`, §4.5a *Inbox row: red PR*; `src/sessionorc/workorders.py` (`red_prs` ~L492), `src/shiftlead/teamrun.py` (`red_prs` ~L1341, its `whose`), `src/shiftlead/cli.py` (`ao repo`'s open-PR line, ~L1786); `src/shiftlead/ui/templates/repo_part.html` (the Open PRs tag, which already draws *draft*), `src/shiftlead/ui/org.py` (`red` ~L245, `red_title` ~L276, the facet's hover) and `ui/repo.py`, the `whose` readers; `tests/test_workorders.py`, `tests/test_ui_red_prs.py`
+**Location:** `src/shiftlead/ui/inbox.py` (`ledger_for_you`, `for_you = … and e.get("id") not in decided`; the `held in {{ e.name }}'s ledger` footer in `src/shiftlead/ui/templates/inbox_row.html`); `tests/test_ui_inbox_ledger.py`
 
-**Why:** TD-745's design. On 2026-10-15 #1840 and #1850, drafts Paul had paused during a design round, were listed first in the anchor's lane as High `pr:` orders, and every anchor run passed over them.
+**Why:** `test-audit-ao-1`, 2026-10-15, mutating #1873's lines one at a time and running `tests/test_ui_inbox_ledger.py tests/test_settle_pages.py tests/test_ledger_derived.py tests/test_repo_facts.py` (main's venv, `PYTHONPATH=$PWD/src`). Eleven mutations fail a test. Two pass all of them: (1) `for_you = e.get("for_page") == "for-you" and e.get("id") not in decided` reduced to `e.get("for_page") == "for-you"`: the docstring says a held entry is a row "here for its hold" when it is not *for you*, so a held *for you* entry that an open decided line names must draw as a *ledger · held* row without answers, and with the mutation it draws the answers row; no test holds a decided entry. (2) the held row's footer `held in {{ e.name }}'s ledger — no lane takes it until you release it` replaced by `x`: the test asserts the badge, *claimed by*, **Release** and **Open**, never the footer.
 
-**Fix:** this touches `src/sessionorc/**`, so the techlead reads it (§4.9b).
-- `workorders.red_prs`: a PR whose reading carries `draft` and is not a sync order (`is_sync_order`) is skipped right after the told memory is carried (`kept[key] = was`, ~L527), so no order and no note, and the memory of an earlier non-draft spell survives the draft. A sync PR is skipped only where `is_sync_order` would not order it, so a pending or `not_run` sync draft waits as any sync PR does. Its `red_since` is the reading's own, so it is kept, and the PR is an order on the first reading after it is marked ready, if red past `ORPHAN_AFTER` and unheld.
-- Every other reader takes `pr_orders`, so it drops a draft with no change of its own: the Inbox's red-PR row (`ui/inbox.py`), `ao repo`'s first-line count of *red PRs nobody holds* (`cli.py` ~L1518), rule 6's news and rule 8's lane counts. Tests hold the count and the Inbox row.
-- `teamrun.red_prs`: an unheld draft past `ORPHAN_AFTER` has `whose` *no order while a draft*, where today it is ''. A held one stays *held by …*. The Repo page's Open PRs tag and the facet's hover draw it.
-- `ao repo`: a draft's open-PR line reads *(draft · red since <t>: no order while a draft)* where `teamrun.red_prs` gives it that `whose` (the one test, `ORPHAN_AFTER` included), `red_since` printed as the order line prints it, and *(draft)* otherwise, as today.
-- Tests, each failing with its line reverted:
-  - a red draft unheld past `ORPHAN_AFTER` is no order;
-  - a red draft held by idle holders past `ORPHAN_AFTER`, and again a second `after` later, is no order, sends no note and writes no told entry;
-  - the same PR, no longer a draft, is an order on the next reading;
-  - a draft sync PR is still an order;
-  - a held PR told once, then drafted and readied within `after` of the tell, is not told again; readied past `after`, it is an order at once, with no second tell;
-  - a held draft keeps *held by …* in `whose` and gets no note;
-  - a pending sync draft is no order and no *no order while a draft* either;
-  - `ao repo`'s count and the Inbox's red-PR row omit a draft;
-  - `teamrun.red_prs`'s `whose` for an unheld draft;
-  - `ao repo`'s draft line.
+**Fix:** in `tests/test_ui_inbox_ledger.py`, (1) an entry with `for_page` *for-you*, `held` set and its id in the repo's decided refs: one row, `kind` *ledger · held*, `answers` `[]`, `release` true; (2) assert the footer's words in the existing held-row test. Each fails under its mutation above.
 
-**Done when** the tests above pass, `ao repo` on a repo with a red, unheld draft lists no `pr:` order and says why on the PR's line, and the Repo page's tag and the facet's hover read *no order while a draft* while the facet's *· n red* still counts it.
+**Done when** the two assertions exist and fail under those mutations.
 
-**Related:** TD-613, TD-684, TD-745.
-
----
-
-## TD-754: The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, building TD-746)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py`, `agent_inbox.py`, `agent_sync.py` (each `_broadcast({"event": "repos", …, "repo": self._repo_view(root)})`), `agent_serve.py:193` (the subscriber's seed); `src/shiftlead/ui/app.py` (`fan_seed`, which reads the reading whole: a websocket has no request memo)
-
-**Why:** TD-746 gave the `repos` RPC an `omit` and every page's read one, halving what a page is sent (1.45 MB → 0.75 MB on the live home, 2026-10-15). The pushed stream was left as it was: each `repos` event is `_repo_view(root)` whole — `ledger.recent`, the month's PRs with every field, every entry's detail — and the UI's fan-out keeps it in the events run's `repos`, which draws the same facets and cards a page draws from the omitted reading. The reading changes at least every five minutes per repo, and on every ledger edit, settle mark and PR order.
-
-**Fix:** let a subscription say its `omit` (the `events` subscribe carries it, the agent applies `reports.omitted` per subscriber before the send, or once per distinct omit), the UI's fan-out asking for `REPOS_OMIT_PAGE`; `fan_seed` reads with the same omit.
-- **Tests:** a subscriber with an omit receives `repos` events without those paths; one without receives them whole.
-
-**Done when** no `repos` event the UI receives carries a part its pages omit.
-
-**Related:** TD-746, TD-739.
+**Related:** TD-736, #1873.

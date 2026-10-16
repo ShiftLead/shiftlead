@@ -182,3 +182,60 @@ def test_the_inbox_draws_the_row_with_open_and_snooze_and_counts_it(tmp_path, mo
     assert 'data-sid="red_pr:samscrape:802" data-row="red_pr" data-when="1w"' in html
     assert 'href="https://x/802" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a>' in html
     assert c.get("/api/person/inbox").json()["needs"] == 1
+
+
+# -- a draft is no work order (design §4.4, TD-745) -------------------------------------------------------
+
+
+def drafted(root: str, **kw) -> dict:
+    """The reading with #802 a draft: the home lists no order for it (`workorders.red_prs`)."""
+    r = reading(root, orders=[], **kw)
+    r["prs"]["open"][1]["draft"] = True
+    return r
+
+
+def test_an_unheld_draft_past_the_bound_says_no_order_while_a_draft_and_a_held_one_its_holder():
+    from shiftlead import teamrun
+
+    root = "/r/samscrape"
+    got = {x["number"]: x["whose"] for x in teamrun.red_prs(drafted(root), [], now())}
+    assert got[802] == "no order while a draft" == teamrun.DRAFT_WHOSE
+    held = {x["number"]: x["whose"] for x in teamrun.red_prs(drafted(root, held={"802": ["g1"]}), [], now())}
+    assert held[802] == "held by g1"
+    young = drafted(root)
+    young["prs"]["open"][1]["red_since"] = _iso(now() - timedelta(minutes=20))
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(young, [], now())}[802] == ""
+    sync = drafted(root)  # a pending sync draft waits as any sync PR does: no draft's word either
+    sync["prs"]["open"][1].update(sync=True, checks="pending")
+    assert {x["number"]: x["whose"] for x in teamrun.red_prs(sync, [], now())}[802] == ""
+
+
+def test_a_draft_is_tagged_on_the_repo_page_counted_red_and_no_inbox_row(tmp_path, monkeypatch):
+    root = str(tmp_path / "samscrape")
+    c = client(monkeypatch, tmp_path, fake({root: drafted(root)}, [rec("g1", root, git={"branch": "td9"})]))
+    assert ">red 3h 0m · no order while a draft</span>" in c.get("/repo/samscrape").text
+    org = c.get("/").text
+    assert ">· 3 red</span>" in org, "the facet still counts it"
+    assert "#802 · red 3h 0m · no order while a draft" in org, "and its hover says why"
+    assert "samscrape #802" not in c.get("/inbox").text
+    assert c.get("/api/person/inbox").json()["needs"] == 0
+
+
+def test_ao_repo_lists_no_order_for_a_draft_and_says_why_on_its_line(tmp_path, monkeypatch, capsys):
+    import subprocess
+
+    from shiftlead import cli
+
+    root = tmp_path / "samscrape"
+    root.mkdir()
+    subprocess.run(["git", "-C", str(root), "init", "-q", "-b", "main"], check=True)
+    r = drafted(str(root))
+    r["prs"]["open"][3]["draft"] = True  # #804, red 20m: before the bound, a draft as today
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"repos": {str(root): r}, "list": [], "doing_log": {}, "inbox": {}}[rpc])  # fmt: skip
+    monkeypatch.chdir(root)
+    assert cli.main(["repo"]) == 0
+    out = capsys.readouterr().out
+    since = r["prs"]["open"][1]["red_since"]
+    assert f"red, nobody's (draft · red since {since}: no order while a draft)" in out
+    assert "red, young (draft)" in out
+    assert "pr:802" not in out and "red PR" not in out.splitlines()[0]

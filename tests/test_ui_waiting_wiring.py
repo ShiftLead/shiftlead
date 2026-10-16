@@ -97,7 +97,7 @@ def client(monkeypatch, tmp_path):
                 return {"entries": [] if kw.get("id") not in (None, "person") else [ask]}
             return replies.get(method, {})
 
-        async def subscribe(self):
+        async def subscribe(self, omit=None):
             yield {"event": "session", "session": waiting}
 
     from shiftlead.ui import app as ui

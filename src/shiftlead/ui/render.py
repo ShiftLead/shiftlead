@@ -20,6 +20,7 @@ page's controls. Any other link is its characters.
 
 from __future__ import annotations
 
+import functools
 import re
 from html import escape
 from urllib.parse import urlsplit
@@ -146,10 +147,12 @@ def _block(lines: list[str], origin: str | None, links: bool = True) -> list[str
     return out
 
 
+@functools.lru_cache(maxsize=4096)
 def render(text: str, origin: str | None = None, links: bool = True) -> str:
     """The whole text as HTML from the closed subset (§4.10). `origin` is the UI's own
     `scheme://host:port`, so a link back to the page itself is drawn as characters; without `links`
-    every link is."""
+    every link is. Kept per argument triple: a function of its arguments alone, so a text drawn on
+    every Inbox request — a mail entry's never changes — is rendered once (TD-747)."""
     out: list[str] = []
     block: list[str] = []
     fence: list[str] | None = None
