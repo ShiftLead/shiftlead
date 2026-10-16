@@ -365,8 +365,8 @@ def view(
     d["brief_changed"] = brief_changed_view(s.get("brief_changed"))
     d["flow_mark"] = flow_mark(s, hosts.local_host().name) if s.get("team") else None
     d["waiting"] = waiting_view((waits or {}).get(s.get("id")))
-    # **waiting** (§4.2 *Waiting*, §4.5 *The card's anatomy*, TD-418, built by TD-428): an `idle` session
-    # that waits on someone — a claim whose PR the repo reading holds open, or the mark above — is drawn
+    # **waiting** (§4.2 *Waiting*, §4.5 *The card's anatomy*, TD-734): an `idle` session that waits on a
+    # person or another session — a reader holding its ask for a claim's PR, or the mark above — is drawn
     # *waiting*, teal, in the order after `working`; it stays `idle` in every payload. *idle · unseen*
     # wins over it: the person's cue to go and look, and the slot still says the wait.
     d["review_wait"] = review_wait(s, fleet, repos) if state == "idle" else ""
@@ -374,6 +374,15 @@ def view(
     if state == "idle" and not d["unseen"] and d["wait_reason"]:
         d["state_class"] = d["state_label"] = d["pill_word"] = "waiting"
         d["rank"] = STATE_RANK["working"] + 0.25  # after `working`, before an unseen `idle` (idle - 0.5)
+    # **working on its own** (§4.2 *Working on its own*, TD-734): an `idle` session with a live subagent
+    # (the view's `subagents_live`) and nothing waiting is drawn *working*, ranked and filtered with it,
+    # over *idle · unseen*, whose cue shows again once the subagent ends; idle in every payload.
+    n = s.get("subagents") if isinstance(s.get("subagents"), int) else 0
+    d["own_work"] = ""
+    if state == "idle" and s.get("subagents_live") is True and not d["wait_reason"]:
+        d["own_work"] = f"working · {n} subagent{'' if n == 1 else 's'}"
+        d["state_class"] = d["state_label"] = d["pill_word"] = "working"
+        d["rank"], d["unseen"] = STATE_RANK["working"], False
     # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
     # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
     # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
@@ -553,6 +562,8 @@ def pill_title(d: Mapping[str, Any], ending: str = "") -> str:
         return str(d["host_note"])
     if d.get("state_class") == "waiting":
         return f"{d.get('wait_reason') or ''} — idle in every payload, on someone else’s move"
+    if d.get("own_work"):
+        return f"{d['own_work']} — idle in every payload, its own subagents running"
     if d.get("seat"):
         return "a seat on call: read from its record, not from a screen"
     if ending:
@@ -767,12 +778,12 @@ def waits_of(entries: Any) -> dict[str, list[dict[str, Any]]]:
 def review_wait(
     s: Mapping[str, Any], fleet: Collection[Mapping[str, Any]] | None, repos: Mapping[str, Any] | None
 ) -> str:
-    """What a claim of the record waits on in review (§4.2 *Waiting*, TD-428): *review #1302* when a
-    `claimed` entry's PR — its own `pr`, the tick's `review_pr`, or else an open PR whose head branch
-    names the reference, the *review* phase's reading (`org.motion_rows`) — is one the repo reading
-    holds open; *review #1302 with the techlead* while a seat's `prs_waiting.asks` holds this
-    record's ask for that PR, the seat named by its role. "" when it waits on no review, and with no
-    reading: never guessed."""
+    """What a claim of the record waits on in review (§4.2 *Waiting*, TD-734): *review #1302 with the
+    techlead* while a seat's `prs_waiting.asks` holds this record's ask for a `claimed` entry's PR —
+    its own `pr`, the tick's `review_pr`, or else an open PR whose head branch names the reference,
+    the *review* phase's reading (`org.motion_rows`) — that the repo reading holds open, the seat
+    named by its role. A bare open PR no reader holds is no wait: the author's next move is its own,
+    so "" — as with no reading: never guessed."""
     want = str(Path(str(s.get("repo") or "")).resolve()) if s.get("repo") else None
     # the record's repo's reading, `pr_marks`' lookup
     r = next((r for root, r in (repos or {}).items() if want and str(Path(str(root)).resolve()) == want), None)
@@ -799,7 +810,7 @@ def review_wait(
         for a in (w.get("asks") or ()) if isinstance(w, Mapping) else ():
             if isinstance(a, Mapping) and a.get("pr") == pr and naming.split_address(str(a.get("from")))[0] == me:
                 return f"review #{pr} with the {o.get('role') or o.get('name') or 'reader'}"
-    return f"review #{pr}"
+    return ""
 
 
 def waiting_view(questions: Any) -> dict[str, str] | None:
@@ -1003,9 +1014,15 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # alone, on a session that declared nothing: still an ending's place, row 5 (b)
         text, full = d["waiting"]["text"], d["waiting"]["full"]
     elif d.get("review_wait"):
-        # the *waiting* pill's reason (§4.2 *Waiting*, TD-428): its claim's PR is open, in review
+        # the *waiting* pill's reason (§4.2 *Waiting*, TD-734): a reader holds its ask for its claim's PR
         text = f"waiting · {d['review_wait']}"
-        full = f"{text}: it holds a claim whose pull request is open — idle on someone else's move (design §4.2)"
+        full = (
+            f"{text}: the reader holds its ask for its claim's pull request — idle on someone else's move (design §4.2)"
+        )
+    elif d.get("own_work"):
+        # §4.2 *Working on its own* (TD-734): its turn ended, its own subagents still run
+        text = d["own_work"]
+        full = f"{text}: its turn ended and its own subagents are running — idle in every payload (design §4.2)"
     elif d.get("open_work"):
         kind, text = "lim", "idle · open work"
         full = (
@@ -1090,7 +1107,9 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
     # this row is the one test every surface reads (Close, *ready to close ✓*, the side panel)
     state = str(s.get("state") or "")
     if state in ("idle", "exited"):
-        checks = [("agent not working", True)]
+        # *(turn ended)*: beside a *working · 2 subagents* pill the row says what it read (TD-734), and
+        # *no subagents running* below still refuses Close
+        checks = [("agent not working (turn ended)", True)]
     elif state == "working":
         checks = [("agent working — wait or Wrap up", False)]
     else:
@@ -1163,6 +1182,7 @@ def state_counts(members: list[dict[str, Any]]) -> list[str]:
     for m in members:
         key = "unseen" if m.get("unseen") else "oncall" if m.get("seat") else str(m.get("state") or "")
         key = "waiting" if m.get("pill_word") == "waiting" else key
+        key = "working" if m.get("pill_word") == "working" else key  # an idle record working on its own (TD-734)
         tally[key] = tally.get(key, 0) + 1
     return [f"{tally[k]} {label}" for k, label in COUNT_ORDER if tally.get(k)]
 
