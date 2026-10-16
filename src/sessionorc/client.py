@@ -136,9 +136,10 @@ class LocalClient:
             raise AgentError(resp["error"], resp.get("error_data"))
         return resp.get("result")
 
-    async def subscribe(self) -> AsyncIterator[dict[str, Any]]:
-        """Yield session/gone events until the connection drops."""
-        await self.call("subscribe")
+    async def subscribe(self, omit: list[str] | None = None) -> AsyncIterator[dict[str, Any]]:
+        """Yield session/gone events until the connection drops; each `repos` event without the
+        dotted paths `omit` names (TD-754), as the `repos` RPC's `omit` serves a reading."""
+        await self.call("subscribe", omit=omit or None)
         assert self._reader
         while line := await self._reader.readline():
             yield json.loads(line)

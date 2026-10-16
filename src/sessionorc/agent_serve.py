@@ -22,6 +22,7 @@ from sessionorc import (
     modes,
     naming,
     paths,
+    reports,
 )
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
@@ -149,9 +150,20 @@ class ServeMixin:
                 await self._send(w, json.dumps({"event": "gone", "id": sid}))
 
     async def _broadcast(self, msg: dict[str, Any]) -> None:
-        line = json.dumps(msg)
+        # a `repos` event is sent each subscriber without what its subscribe omits (TD-754), the
+        # line made once per distinct omit
+        lines: dict[tuple[str, ...], str] = {}
         for w in list(self._subscribers):
-            await self._send(w, line)
+            omit = self._sub_omit.get(w, ()) if msg.get("event") == "repos" else ()
+            if omit not in lines:
+                lines[omit] = json.dumps(self._omitted(msg, omit))
+            await self._send(w, lines[omit])
+
+    @staticmethod
+    def _omitted(msg: dict[str, Any], omit: tuple[str, ...]) -> dict[str, Any]:
+        if not omit or not isinstance(msg.get("repo"), dict):
+            return msg
+        return {**msg, "repo": reports.omitted(msg["repo"], omit)}
 
     async def _send(self, w: asyncio.StreamWriter, line: str) -> None:
         try:
@@ -159,6 +171,7 @@ class ServeMixin:
             await w.drain()
         except (ConnectionError, OSError):
             self._subscribers.pop(w, None)
+            self._sub_omit.pop(w, None)
 
     # -- connection handling ---------------------------------------------------------------------
 
@@ -184,13 +197,17 @@ class ServeMixin:
                     continue
                 if req.get("method") == "subscribe":
                     self._subscribers[writer] = {}  # empty: the first push is this tab's full snapshot
+                    omit = (req.get("params") or {}).get("omit")
+                    self._sub_omit.pop(writer, None)  # a subscribe again says its omit again
+                    if isinstance(omit, list) and omit:
+                        self._sub_omit[writer] = tuple(str(x) for x in omit)
                     writer.write((json.dumps({"id": req.get("id"), "result": "subscribed"}) + "\n").encode())
                     await writer.drain()
                     for prof, u in self._usage.items():  # the top bar's figure, before the cards
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
                     for root in list(self._repos):  # the repo facts, as a change would push them, marks and all
-                        view = self._repo_view(root)
-                        await self._send(writer, json.dumps({"event": "repos", "root": root, "repo": view}))
+                        ev = {"event": "repos", "root": root, "repo": self._repo_view(root)}
+                        await self._send(writer, json.dumps(self._omitted(ev, self._sub_omit.get(writer, ()))))
                     await self._push_changes()
                     continue
                 writer.write(_reply_line(req, await self._dispatch(req, peer=_peer_pid(writer), conn=writer)))
@@ -201,6 +218,7 @@ class ServeMixin:
             self._conns.discard(writer)
             self._id_conns.pop(writer, None)
             self._subscribers.pop(writer, None)
+            self._sub_omit.pop(writer, None)
             writer.close()
 
     async def _serve_wait(

@@ -13443,3 +13443,24 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-613, TD-684, TD-745.
 
 **Resolved:** 2026-10-15 — `workorders.red_prs` skips a draft that `is_sync_order` does not order, right after the spell's told memory is carried, so a draft gets no order, no note and no told entry. `teamrun.red_prs` gives an unheld non-sync draft past `ORPHAN_AFTER` the `whose` *no order while a draft* (`teamrun.DRAFT_WHOSE`), which the Repo page's tag and the facet's hover draw. `ao repo`'s PR line reads *(draft · red since <t>: no order while a draft)* there, and *(draft)* otherwise. Tests in `tests/test_workorders.py` and `tests/test_ui_red_prs.py`: each fails with its line reverted, and the memory test fails with the skip moved before the memory is carried. TD-745 (the design) is the designer's to archive.
+
+## TD-754: The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, building TD-746)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/sessionorc/agent_tick.py`, `agent_inbox.py`, `agent_sync.py` (each `_broadcast({"event": "repos", …, "repo": self._repo_view(root)})`), `agent_serve.py:193` (the subscriber's seed); `src/shiftlead/ui/app.py` (`fan_seed`, which reads the reading whole: a websocket has no request memo)
+
+**Why:** TD-746 gave the `repos` RPC an `omit` and every page's read one, halving what a page is sent (1.45 MB → 0.75 MB on the live home, 2026-10-15). The pushed stream was left as it was: each `repos` event is `_repo_view(root)` whole — `ledger.recent`, the month's PRs with every field, every entry's detail — and the UI's fan-out keeps it in the events run's `repos`, which draws the same facets and cards a page draws from the omitted reading. The reading changes at least every five minutes per repo, and on every ledger edit, settle mark and PR order.
+
+**Fix:** let a subscription say its `omit` (the `events` subscribe carries it, the agent applies `reports.omitted` per subscriber before the send, or once per distinct omit), the UI's fan-out asking for `REPOS_OMIT_PAGE`; `fan_seed` reads with the same omit.
+- **Tests:** a subscriber with an omit receives `repos` events without those paths; one without receives them whole.
+
+**Done when** no `repos` event the UI receives carries a part its pages omit.
+
+**Related:** TD-746, TD-739.
+
+**Resolved:** 2026-10-15 — `subscribe` takes `omit` (`agent_serve._handle_conn` keeps it per subscriber, `_broadcast` and the subscribe's seed send each `repos` event through `reports.omitted`, one line per distinct omit); the UI's `Fanout` and `CountsKeeper` subscribe with `REPOS_OMIT_PAGE` and `fan_seed` reads the reading with it; design §4.4 *Repo facts*. Tests: `tests/test_ui_repos_omit.py` (a subscriber with an omit and one without; the UI's subscription, seed and keeper ask with the page's omit).

@@ -53,7 +53,7 @@ def client(monkeypatch, tmp_path, pushed, *, wait=1.6, doing_log=None):
                 return {"entries": []}
             return replies.get(method, {})
 
-        async def subscribe(self):
+        async def subscribe(self, omit=None):
             for ev in pushed(g1, g2):
                 yield ev
             await asyncio.sleep(wait)

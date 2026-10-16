@@ -42,7 +42,7 @@ class Client:
     async def call(self, method: str, **kw: Any) -> Any:
         return [{"id": "w", "state": "idle"}] if method == "list" else {}
 
-    async def subscribe(self):
+    async def subscribe(self, omit=None):
         while True:
             yield await self.events.get()
 

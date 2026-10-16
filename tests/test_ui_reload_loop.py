@@ -292,7 +292,7 @@ def _failing_client(monkeypatch, tmp_path):
         async def call(self, method, **kw):
             return {"entries": []} if method == "inbox" else {}
 
-        async def subscribe(self):
+        async def subscribe(self, omit=None):
             if False:
                 yield {}
 

@@ -126,8 +126,10 @@ class Run:
         seed: Callable[[], Awaitable[Any]],
         step: Step,
         regroup: Callable[[Any], Awaitable[dict[str, Any]]],
+        omit: tuple[str, ...] = (),
     ) -> None:
         self._open, self._seed, self._step, self._regroup = open_client, seed, step, regroup
+        self._omit = omit  # what the subscription's `repos` events leave out (TD-754)
         self.streams: list[Stream] = []
         self.state: Any = None
         self.dirty = asyncio.Event()  # a delta moved what the groups read; `flush` re-reads them
@@ -214,7 +216,7 @@ class Run:
                 self.state = await self._seed()
                 flusher = asyncio.ensure_future(self._flush())
                 try:
-                    async for ev in c.subscribe():
+                    async for ev in c.subscribe(list(self._omit) or None):
                         async with self.lock:
                             try:
                                 await self._step(self, ev)
@@ -247,8 +249,9 @@ class Fanout:
         seed: Callable[[], Awaitable[Any]],
         step: Step,
         regroup: Callable[[Any], Awaitable[dict[str, Any]]],
+        omit: tuple[str, ...] = (),
     ) -> None:
-        self._parts = (open_client, seed, step, regroup)
+        self._parts = (open_client, seed, step, regroup, omit)
         self.run: Run | None = None
 
     def join(self, s: Stream) -> None:
