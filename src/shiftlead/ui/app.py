@@ -355,7 +355,18 @@ from .pty_bridge import (
     scroll_argv,
     watch_clients,
 )
-from .queue import WINDOW_LABEL, WINDOW_WORD, attach, card_index, queue_view, split_later
+from .queue import (
+    KINDS,
+    WINDOW_LABEL,
+    WINDOW_WORD,
+    apply_picks,
+    attach,
+    card_index,
+    picks_query,
+    queue_picks,
+    queue_view,
+    split_later,
+)
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     COMPLETED_FOLD,  # noqa: F401
     COMPLETED_WORD,  # noqa: F401
@@ -3121,6 +3132,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 why = f"the home did not serve the Queue: {e.detail}"  # an older home: no `queue` RPC
         fleet: list[dict[str, Any]] = []
         mail: dict[str, Any] = {}
+        in_inbox = None  # the counted rows the Inbox draws: the filter row's *+ n in the Inbox*
         if got is not None:
             # what is attached to a row (§4.5 screen 12, TD-771): the Inbox's own sections over the same
             # reads, each `home: queue` row drawn under its row by the Inbox's own renderer
@@ -3142,6 +3154,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 )
                 # *Later*'s ledger rows and the board's lines not yet due whose entry a card holds (TD-771)
                 later = split_later(await h.ledger_view(fleet), hz["ahead"], index)[2]
+                in_inbox = sections["count"] - sections.get("queue_n", 0)
                 one = templates.get_template("queue_mail.html")
                 origin = page_origin(request)
                 mail = attach(
@@ -3149,8 +3162,20 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=board_choices())),
                     later,
                 )
+        # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
+        # what it hides marked, never dropped — a move's neighbours are the whole Up next order
+        picks = queue_picks(request.query_params)
+        teams: dict[str, str] = {}
+        with contextlib.suppress(Exception):
+            teams = {n: t.repo for n, t in (await h.defs()).teams.items() if t.repo}
+        view = apply_picks(queue_view(got, datetime.now(UTC), mail), picks, teams)
         ctx = {
-            "q": queue_view(got, datetime.now(UTC), mail),
+            "q": view,
+            "picks": picks,
+            "pq": picks_query,
+            "kinds": KINDS,
+            "teams": sorted(n for n, r in teams.items() if r in view["repos"] or n in picks["team"]),
+            "in_inbox": in_inbox,
             "labels": WINDOW_LABEL,
             "words": WINDOW_WORD,
             "why": why,
@@ -3559,7 +3584,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         §4.4a) reads in the host agent's words. Reading marks nothing (§4.10)."""
         repos_omit(REPOS_OMIT_INBOX)
         back = str(request.query_params.get("back") or "")
-        back = back if back.startswith("?") else ""
+        # Back returns to the list the row is drawn in (§4.5 screen 6 *Where a row is drawn*, TD-771): the
+        # Inbox's picks (`?…`), or the Queue's page with its picks (`/queue…`) for a row drawn on a card
+        on_queue = back == "/queue" or back.startswith("/queue?")
+        back = back if back.startswith("?") or on_queue else ""
         ctx: dict[str, Any] = {
             "host": host_name(),
             "active": "Inbox",
@@ -3567,7 +3595,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "build_chip": await chip_build(call),
             "volatile": hosts.local_host().volatile,
             "mid": mid,
-            "back_url": f"/inbox{back}#{mid}",
+            "back_url": f"{back}#{mid}" if on_queue else f"/inbox{back}#{mid}",
             "origin": page_origin(request),
             "fold_open": True,
             "board_choices": board_choices(),

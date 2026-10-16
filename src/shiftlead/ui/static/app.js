@@ -3017,9 +3017,13 @@
   };
   AO.entryUrl = (id, back) => `/inbox/${encodeURIComponent(id)}${back ? `?back=${encodeURIComponent(back)}` : ""}`;
   AO.openEntry = function (id) {
-    const order = $$(".inboxpage .mailrow[data-page]").filter((r) => !r.hidden).map((r) => r.dataset.msg);
-    sess.set(ENTRY_ORDER, { back: location.search, ids: order });
-    location.href = AO.entryUrl(id, location.search);
+    // the list the row is drawn in: the Inbox's as filtered, or the Queue's cards (TD-771), Back to it
+    const queue = !!$(".queuepage");
+    const order = $$(queue ? ".queuepage .qcard:not(.qoff) .mailrow[data-page]" : ".inboxpage .mailrow[data-page]")
+      .filter((r) => !r.hidden).map((r) => r.dataset.msg);
+    const back = queue ? `/queue${location.search}` : location.search;
+    sess.set(ENTRY_ORDER, { back, ids: order });
+    location.href = AO.entryUrl(id, back);
   };
   // `j` / `k` on the page: the next and previous entry of the list as it was filtered
   AO.entryStep = function (step) {
@@ -3441,12 +3445,32 @@
       const body = $(".qdbody", line), head = $(".qdhead", line); if (!body) return;
       body.hidden = !body.hidden; head.setAttribute("aria-expanded", body.hidden ? "false" : "true");
     }
-    function showHash() {
-      const id = AO.hashId(location.hash), row = id && document.getElementById(id);
-      if (!row || !box.contains(row)) return;
-      const card = row.closest(".qcard");
+    // an element on a card, opened and scrolled to: an entry's row or header by its id (`TD-n`, or
+    // `<repo>#TD-n` where the page writes one bare), else an Inbox item drawn on a row by its id
+    function onCard(id) {
+      if (!id) return null;
+      const el = document.getElementById(id) || document.getElementById(id.replace(/^.*#/, ""))
+        || $(`.mailrow[data-msg="${CSS.escape(id)}"]`, box) || $(`[data-card="${CSS.escape(id)}"]`, box);
+      return el && box.contains(el) ? el : null;
+    }
+    function reveal(el, ring) {
+      const card = el.closest(".qcard");
       if (card && card.classList.contains("folded")) qc.toggleFold(card);
-      row.scrollIntoView({ block: "center" });
+      el.scrollIntoView({ block: "center" });
+      if (ring) { $$(".qring", box).forEach((x) => x.classList.remove("qring")); el.classList.add("qring"); }
+    }
+    function showHash() {
+      const el = onCard(AO.hashId(location.hash)); if (el) reveal(el, false);
+    }
+    // a TD item's address (§4.5 screen 12 *Addresses*, TD-771): `?card=<top id>&row=<TD-n>&item=<entry id>`
+    // opens the card, scrolls to the row (the header for the top entry) and rings the item
+    function showAddress() {
+      const p = new URLSearchParams(location.search);
+      const card = p.get("card"), row = p.get("row"), item = p.get("item");
+      if (!card && !row && !item) return;
+      const it = item && onCard(item), at = onCard(row) || onCard(card);
+      if (at) reveal(at, !it);
+      if (it) reveal(it, true);
     }
     box.addEventListener("click", (e) => {
       const w = e.target.closest(".qwin[data-win]");
@@ -3463,7 +3487,8 @@
     async function reread() {
       if (busy || box.querySelector(".qcard.dragging")) return; busy = true;
       try {
-        const res = await fetch("/queue?part=1");
+        const q = new URLSearchParams(location.search); q.set("part", "1");
+        const res = await fetch(`/queue?${q}`);
         if (res.ok) {
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
           lists.innerHTML = await res.text();
@@ -3474,7 +3499,19 @@
     }
     apply();
     showHash();
+    showAddress();
     setInterval(reread, 30000);
+    // an Inbox item drawn on a card opens its message page as the Inbox's does: Back returns here, and j / k
+    // step through the items this page draws (§4.5 screen 6 *Where a row is drawn*)
+    box.addEventListener("click", (e) => {
+      const link = e.target.closest(".mailrow a.pagelink");
+      const body = !link && e.target.closest(".mailrow[data-page] .body, .mailrow[data-page] > .subj");
+      if (!link && !body) return;
+      if (body && (e.target.closest("a, summary, button") || String(window.getSelection ? window.getSelection() : "").trim())) return;
+      if (link && (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) return;
+      e.preventDefault();
+      AO.openEntry(e.target.closest(".mailrow").dataset.msg);
+    });
     // a press on a row drawn here by the Inbox's renderer refreshes this page's lists (TD-771)
     if (typeof AO.refreshInboxPage !== "function") AO.refreshInboxPage = reread;
     let soon = null;

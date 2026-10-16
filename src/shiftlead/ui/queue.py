@@ -13,6 +13,7 @@ import re
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import quote
 
 from .common import _age, _instant
 
@@ -35,6 +36,17 @@ DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
 # an entry named in a mail item, a board line's `Context:` or a PR's title: `TD-n`, or `<repo>#TD-n`
 TD_REF = re.compile(r"(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b")
 CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)", re.S)
+# the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the status toggles, and the
+# kind pick's words in its order — the kinds of what needs the person on a card
+FILTERS = {"needs-you": "Needs you", "steering": "Steering"}
+KINDS = {
+    "questions": "questions",
+    "steering": "steering",
+    "board": "board lines",
+    "yours": "yours to do",
+    "held-until": "held until",
+    "held-person": "held (person)",
+}
 
 
 def card_index(queue: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
@@ -211,26 +223,72 @@ def attach(sections: Mapping[str, Any], drawn: Any, later: Any = ()) -> dict[str
     for e in later or ():
         if e.get("later_section") == "later":
             out.setdefault(e["on_row"], {"items": [], "mentioned": []})["items"].append(
-                {"section": "later", "id": str(e.get("row_id") or ""), "html": drawn(e, "later")}
+                {"section": "later", "id": str(e.get("row_id") or ""), "html": drawn(e, "later"), "kind": ""}
             )
     for sec in ("needs", "steering", "coming", "waiting", "answered", "fyi"):
         if sec == "coming":
             for e in later or ():
                 if e.get("later_section") == "coming":
                     out.setdefault(e["on_row"], {"items": [], "mentioned": []})["items"].append(
-                        {"section": "coming", "id": str(e.get("id") or ""), "html": drawn(e, "coming")}
+                        {"section": "coming", "id": str(e.get("id") or ""), "html": drawn(e, "coming"), "kind": ""}
                     )
             continue
         for e in sections.get(sec) or ():
             if e.get("home") != "queue":
                 continue
             out.setdefault(e["on_row"], {"items": [], "mentioned": []})["items"].append(
-                {"section": sec, "id": str(e.get("id") or ""), "html": drawn(e, sec)}
+                {"section": sec, "id": str(e.get("id") or ""), "html": drawn(e, sec), "kind": _item_kind(e, sec)}
             )
             words = " ".join(str(e.get("subject") or e.get("text") or "").split()[:8])
             for m in e.get("mentions") or ():
                 out.setdefault(m, {"items": [], "mentioned": []})["mentioned"].append(words)
     return out
+
+
+def _item_kind(e: Mapping[str, Any], sec: str) -> str:
+    """The kind pick's word for an attached item that waits on the person (`KINDS`): a question, a running
+    or paused `steer`, a board line; '' for what waits on nobody (FYI, an answered one, a state row)."""
+    if sec not in ("needs", "steering"):
+        return ""
+    if e.get("row") == "board":
+        return "board"
+    if e.get("kind") == "steer":
+        return "steering"
+    return "questions" if not e.get("row") else ""
+
+
+def _card_kinds(rows: list[Mapping[str, Any]]) -> list[str]:
+    """The kinds of what needs the person on a card (the kind pick, §4.5a *Queue page: filters, find*): its
+    rows' own needs — *yours to do*, *held until*, *held (person)* — and its attached items' kinds."""
+    got: set[str] = set()
+    for r in rows:
+        if r.get("archived"):
+            continue
+        if r.get("needs") == "owner":
+            got.add("yours")
+        elif r.get("needs") == "decision":
+            got.add("held-until")
+        if str(r.get("state") or "") == "held (person)":
+            got.add("held-person")
+        got |= {str(m.get("kind")) for m in r.get("mail") or () if m.get("kind")}
+    return [k for k in KINDS if k in got]
+
+
+def _find_text(rows: list[Mapping[str, Any]]) -> str:
+    """What the find box matches on a card or a completed line: each id, written whole and bare, and each
+    title, lower-cased."""
+    bits: list[str] = []
+    for r in rows:
+        q = str(r.get("qid") or r.get("show") or "")
+        bits += [q, *(x for ref in _refs(q) for x in (ref, ref.rpartition("#")[2])), str(r.get("title") or "")]
+    return " ".join(bits).lower()
+
+
+def _find_word(w: str) -> str:
+    """A find word as `_find_text` writes it: lower-cased, an id with its number as the ledger writes it."""
+    w = re.sub(r"(?i)\btd-(?=\d)", "TD-", w)
+    refs = _refs(w) if TD_REF.fullmatch(w) else []
+    return (refs[0] if refs else w).lower()
 
 
 def _mail_status(status: str, rows: list[Mapping[str, Any]]) -> str:
@@ -269,7 +327,17 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
         top = _row(c["top"], one_repo, mail)
         rows = [_row(r, one_repo, mail) for r in c.get("rows") or []]
         status = _mail_status(str(c.get("status") or ""), [top, *rows])
-        shaped.append({**c, "status": status, "top": top, "rows": rows, "ids": list(c.get("order") or [c["id"]])})
+        shaped.append(
+            {
+                **c,
+                "status": status,
+                "top": top,
+                "rows": rows,
+                "ids": list(c.get("order") or [c["id"]]),
+                "kinds": _card_kinds([top, *rows]),
+                "find": _find_text([top, *rows]),
+            }
+        )
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]
     up_next = [c for c in shaped if c.get("group") == "up_next"]
 
@@ -283,6 +351,8 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
         lines.append(
             {
                 "kind": "card",
+                "repo": str(c.get("id") or "").partition("#")[0],
+                "find": _find_text([*ents, {"qid": c.get("id"), "title": top.get("title")}]),
                 "at": at,
                 "age": _aged(c.get("at") or c.get("closed"), at, now),
                 "show": _show(str(c.get("id") or ""), one_repo),
@@ -313,6 +383,8 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
             lines.append(
                 {
                     "kind": "row",
+                    "repo": str(r.get("repo") or str(r.get("qid") or "").partition("#")[0]),
+                    "find": _find_text([r]),
                     "at": at,
                     "age": _aged(r.get("closed"), at, now),
                     "show": r["show"],
@@ -358,5 +430,98 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
             "needs_you": sum(1 for c in shaped if c.get("status") == "needs you"),
         },
         "one_repo": one_repo,
+        "repos": sorted(repos - {""}),
         "served": q.get("at") is not None or bool(cards),
     }
+
+
+def queue_picks(params: Any) -> dict[str, Any]:
+    """The filter row's picks from the URL (§4.5a *Queue page: filters, find*): `filter` (*All* when absent,
+    `needs-you`, `steering`), `team`, `repo` and `kind` each a list, comma-separated or repeated, and
+    `find`. An unknown filter or kind is dropped, so a stale link reads as *All*."""
+
+    def many(key: str) -> list[str]:
+        raw = params.getlist(key) if hasattr(params, "getlist") else [params.get(key) or ""]
+        out: list[str] = []
+        for v in raw:
+            out += [w.strip() for w in str(v or "").split(",") if w.strip() and w.strip() not in out]
+        return out
+
+    f = str(params.get("filter") or "")
+    return {
+        "filter": f if f in FILTERS else "",
+        "team": many("team"),
+        "repo": many("repo"),
+        "kind": [k for k in many("kind") if k in KINDS],
+        "find": " ".join(str(params.get("find") or "").split()),
+    }
+
+
+def picks_query(picks: Mapping[str, Any], **change: Any) -> str:
+    """The page's address with `change` applied to `picks` — a toggle's link: a list value is toggled in its
+    list, `filter` replaced (its own value again is *All*, as is `filter=""`), `find` set."""
+    p = {k: (list(v) if isinstance(v, list) else v) for k, v in picks.items()}
+    for k, v in change.items():
+        if k in ("team", "repo", "kind"):
+            p[k] = [x for x in p.get(k) or [] if x != v] if v in (p.get(k) or []) else [*(p.get(k) or []), v]
+        elif k == "filter":
+            p[k] = "" if p.get(k) == v else v
+        else:
+            p[k] = v
+    parts = [f"filter={p['filter']}"] if p.get("filter") else []
+    parts += [f"{k}={quote(','.join(p[k]))}" for k in ("team", "repo", "kind") if p.get(k)]
+    if p.get("find"):
+        parts.append(f"find={quote(p['find'])}")
+    return "/queue" + ("?" + "&".join(parts) if parts else "")
+
+
+def apply_picks(view: dict[str, Any], picks: Mapping[str, Any], teams: Mapping[str, str]) -> dict[str, Any]:
+    """Mark what the picks hide (`off`), never drop it: a move's neighbours are the whole Up next order,
+    whatever a filter hides (§4.4 *A move lands*). A card passes when its status fits `filter` (*needs you*;
+    *steer*, or a steering item on it), one of its repos is a picked team's (`teams`: name → repo) or a
+    picked repo, one of its kinds is picked, and every word of `find` is in its ids and titles. A completed
+    line passes by the repo and find picks, and by none while a status or kind is picked: nothing on it
+    needs the person. `find_miss` is an id the find names that no open card holds, with the Repo page's
+    address for it in the archive (one per repo where the id names none)."""
+    repos: set[str] = set()
+    if picks.get("team"):
+        repos = {teams.get(t, "") for t in picks["team"]} - {""} or {"\0"}  # a team with no repo holds no card
+    if picks.get("repo"):
+        repos = (repos & set(picks["repo"])) if picks.get("team") else set(picks["repo"])
+        repos = repos or {"\0"}
+    words = [_find_word(w) for w in str(picks.get("find") or "").split()]
+    kinds = set(picks.get("kind") or ())
+
+    def by_repo_find(card_repos: Any, text: str) -> bool:
+        if repos and not repos & set(card_repos or ()):
+            return False
+        return all(w in text for w in words)
+
+    cards = [*(view.get("in_progress") or ()), *(view.get("up_next") or ())]
+    for c in cards:
+        ok = by_repo_find(c.get("repos"), str(c.get("find") or ""))
+        if picks.get("filter") == "needs-you":
+            ok = ok and c.get("status") == "needs you"
+        elif picks.get("filter") == "steering":
+            ok = ok and (c.get("status") == "steer" or "steering" in (c.get("kinds") or ()))
+        if kinds:
+            ok = ok and bool(kinds & set(c.get("kinds") or ()))
+        c["off"] = not ok
+    status_pick = bool(picks.get("filter") or kinds)
+    for ln in (view.get("completed") or {}).get("lines") or ():
+        ln["off"] = status_pick or not by_repo_find([ln.get("repo")], str(ln.get("find") or ""))
+    for o in view.get("other") or ():
+        o["off"] = status_pick or bool(repos) or bool(words)
+    view["find_miss"] = None
+    ref = next(iter(_refs(re.sub(r"(?i)\btd-(?=\d)", "TD-", str(picks.get("find") or "")))), "")
+    if ref:
+        held = {x for c in cards for r in [c.get("top") or {}, *(c.get("rows") or ())] if not r.get("archived")
+                for q in _refs(r.get("qid")) for x in (q, q.rpartition("#")[2])}  # fmt: skip
+        repo, _, tid = ref.rpartition("#")
+        if ref not in held:
+            where = [repo] if repo else list(view.get("repos") or ())
+            view["find_miss"] = {"id": tid, "repos": [{"name": r, "url": f"/repo/{quote(r)}#{tid}"} for r in where]}
+    view["picks"] = dict(picks)
+    view["shown"] = sum(1 for c in cards if not c["off"])
+    view["filtered"] = bool(picks.get("filter") or picks.get("team") or picks.get("repo") or kinds or words)
+    return view

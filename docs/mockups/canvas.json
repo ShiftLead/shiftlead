@@ -161,10 +161,18 @@
       "h": 900
     },
     {
+      "file": "Queue.dc.html",
+      "title": "Queue \u2014 the cards in rank order (TD-748, built by TD-771)",
+      "x": 1540,
+      "y": 6020,
+      "w": 1440,
+      "h": 1180
+    },
+    {
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 6020,
+      "y": 7300,
       "w": 1440,
       "h": 820
     },
@@ -172,7 +180,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 6940,
+      "y": 8220,
       "w": 1440,
       "h": 2320
     },
