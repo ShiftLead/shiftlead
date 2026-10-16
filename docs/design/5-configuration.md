@@ -55,7 +55,7 @@ person:                                       # the person's own — nothing her
   file_link: {folder_first: true, wait: 1}    # what a file link sends (§4.6): the folder first, and how long before the file, 0–4 s; below
   terminal: {size: 13, face: "JetBrains Mono",   # goal 12: ligatures off regardless, monospace always the fallback
              copy_on_select: true}             # a selection in the Focus pane copies itself (§4.5a; default on)
-  inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per team | due | <n>d | all (drawn by the Inbox and the Repo page, picked on the Settings page's You)
+  inbox: {board_show: "next:10"}              # which board items the Inbox lists before they are due: next:<n> per repo | due | <n>d | all (drawn by the Inbox and the Repo page, picked on the Settings page's You)
   composer: folded                            # §4.5a *Focus composer* **the bar**: folded (the default) | open — whether Focus draws the composer as one bar under the terminal or open under it (TD-491)
   attach: {max: "256M"}                       # §4.4 *Attachment drop*: the most a Focus attachment may be, 1M to 4G (TD-473; built by TD-478); read by the attach RPC on each call
 notify:                                       # §4.10 *Told on Telegram when nobody is looking*: read by the home's tick, and by the watch (§4.10 *When the home itself is down*)
@@ -160,6 +160,7 @@ board: docs/user_attention.md         # the person's board, optional (*The seams
 gate: python3 scripts/check_cadence.py --pr {pr} --json   # the merge gate, a command judged by its exit code (*The seams*)
 worktree_setup: scripts/hydrate_worktree.sh   # run in every new worktree (*The seams*)
 held: ["src/sessionorc/**"]           # §4.9c: the paths a review stage holds (the `build` flow holds nothing)
+
 settle: {design-first: 10m}           # §4.4 *A new entry settles*: wins over settings.yml's settle:, key by key
                                       # this repo's own flows and roles are directories in .shiftlead/, not keys (§4.9c)
 teams:                                # §4.9: the repo's own teams, aggregated into the org; org.yml wins a name
@@ -179,11 +180,10 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   checks, which are fixed today and not chosen per repo) and the names of `commands:` other than
   `test` and `lint` (the Commands page, §4.5 screen 5, phase 4) are accepted and checked, so a file
   written ahead of its feature does not break `ao new`, and nothing acts on them until that feature
-  is built. **Not keys**: `adapter:`,
-  `worktrees:` and `anchor:` are refused, the error naming where each is decided — the adapter per
-  session and per profile, a session's worktree always `<repo>/.claude/worktrees/<name>` (the host
-  agent never reads this file, so it could not move it), and one agent session per directory is §9
-  invariant 2, not a per-repo choice.
+  is built. **Not keys**: `adapter:` and
+  `worktrees:` are refused, the error naming where each is decided — the adapter per session and per
+  profile, and a session's worktree always `<repo>/.claude/worktrees/<name>` (the host agent never
+  reads this file, so it could not move it). **`anchor:`** is retired (§4.9b *No anchor seat*): `anchor: false` is read and passed over, any other value refused as retired, since no seat runs in a main checkout (§9 invariant 2).
 
   **`promote:`** (`run` and `check`, both required; `auto` refused as `settings.yml`'s) is the repo's own
   answer to *how does `main` become what is running*, and nothing in shiftlead names pip, a venv,
