@@ -234,28 +234,33 @@ def _block(org: orgmod.Org, heading: orgmod.Project, host: str, mine: str) -> st
     return "\n".join([*lines, "", REACH_NOTE, "", ""])
 
 
-def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> tuple[str, str]:
-    """The Project block a *hand-started* session gets from `ao new --project` and the New session
-    form's **Project** picker (design §4.9 "Home and reach"): the same block a team member gets,
-    with its repo taken to be whichever of the project's repos `here` is. Returns `(block, note)`.
+def repo_here(org: orgmod.Org, here: Path | str, host: str) -> str:
+    """The repo whose checkout on `host` holds `here` — a worktree under it too — or "" (design §4.9
+    *Home and reach*): of two nested checkouts, the inner. The checkouts are `Org.checkouts`, every
+    heading's paths and, in the aggregate (`with_repos`), every registered checkout of this host."""
+    where = Path(here).expanduser()
+    where = where.resolve() if where.exists() else where
+    best, depth = "", -1
+    for rname, by_host in org.checkouts.items():
+        if (path := by_host.get(host)) is None:
+            continue
+        top = Path(path).expanduser()
+        top = top.resolve() if top.exists() else top
+        if (where == top or top in where.parents) and len(top.parts) > depth:
+            best, depth = rname, len(top.parts)
+    return best
 
-    An undefined project name is not a refusal: the badge is a plain string and nothing that acts keys
-    on it but the mail gate (§9 invariant 9), so the session is still badged and the note says there is no reach to
-    describe. A one-repo project has no block either — there is nothing to name."""
-    if not project:
+
+def reach_block(org: orgmod.Org, here: Path | str, host: str) -> tuple[str, str]:
+    """A *hand-started* session's `project` badge and its Project block (design §4.9 *Home and
+    reach*), both read from the repo its directory `here` is in, as a team session's are from its
+    team's repo: there is no `ao new --project` and no Project picker (TD-722). Returns `(project,
+    block)`: the repo's project, else the repo's own name; the block only where the project has more
+    than one repo. A directory in no known checkout carries neither."""
+    repo = repo_here(org, here, host)
+    if not repo:
         return "", ""
-    if project not in org.projects:
-        known = ", ".join(sorted(org.projects)) or "none"
-        return "", f"project: {project!r} is not defined in {org.path} ({known}) — badge only, no reach block"
-    heading = org.projects[project]
-    if len(heading.repos) < 2:
-        return "", ""
-    where = Path(here).expanduser().resolve()
-    mine = next(
-        (r for r in heading.repos if (p := org.checkout(r, host)) and Path(p).expanduser().resolve() == where),
-        "",  # started outside the project's repos: the block still names them, nothing is the session's
-    )
-    return _block(org, heading, host, mine), ""
+    return org.project_of(repo), project_block(org, repo, host)
 
 
 # A lead, a member and the techlead seat are shaped alike where a launch is concerned (§4.9): each

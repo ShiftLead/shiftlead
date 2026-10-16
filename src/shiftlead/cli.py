@@ -462,14 +462,19 @@ def cmd_focus(args: argparse.Namespace) -> int:
     return _attach(args, args.id, s)
 
 
-def _project_block(project: str | None, cfg: repoconfig.RepoConfig, directory: pathlib.Path) -> str:
-    """`ao new --project <name>`: the same reach block a team member gets, composed by
-    `teams.reach_block` — the New session form's **Project** picker calls the very same function.
-    An undefined name is a note on stderr and a badge, not a refusal (design §4.9)."""
-    block, note = teams.reach_block(orgmod.load(), project or "", cfg.root or directory, hosts.local_host().name)
-    if note:
-        print(note, file=sys.stderr)
-    return block
+def _repo_reach(directory: pathlib.Path, host: str | None = None) -> tuple[str, str]:
+    """A hand-started session's `project` badge and Project block (design §4.9 *Home and reach*),
+    read from the repo its directory is in by `teams.reach_block` — the New session form's very
+    function. There is no `--project` (TD-722). `host` is `--host`'s, else this one: another host's
+    checkouts are the ones the org file's headings give for it, as the form's are. An org that cannot be
+    read, or a node, which reads no org, gives neither: the badge grants nothing (§9 invariant 9)."""
+    if hosts.is_node():
+        return "", ""
+    try:  # this host's checkouts alone: a placed team's host is not asked, since nothing here lands one
+        org, _notes = orgmod.with_repos(orgmod.load(), hosts.local_host().repos())
+    except ValueError:
+        return "", ""
+    return teams.reach_block(org, directory, host or hosts.local_host().name)
 
 
 def _team_slots(args: argparse.Namespace, cfg: repoconfig.RepoConfig | None = None) -> dict[str, Any]:
@@ -495,7 +500,8 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     `--grant`), its profile unless `--profile` says otherwise, and — when `--controller` is not
     given — the preset's `controllers:`, else the repo's, resolved from names to session ids here.
     The flags always win; the role's name and the repo's `ledger:` ride along on the record.
-    `--project` adds §4.9's Project block to the brief, as a team start does for its members."""
+    The directory's repo gives the `project` badge and, where its project has more than one repo,
+    §4.9's Project block in front of the brief, as a team start does for its members."""
     directory = pathlib.Path(args.dir or os.getcwd())
     try:
         if args.adapter == "shell":
@@ -532,7 +538,8 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
                 "it disagrees it wins: cut it to the repo's own rules (design §4.8, TD-114)",
                 file=sys.stderr,
             )
-        if block := _project_block(getattr(args, "project", None), cfg, directory):
+        project, block = _repo_reach(directory, getattr(args, "host", None))
+        if block and args.adapter != "shell":  # a shell is handed no brief to put it in front of
             prompt = block + prompt if prompt else block
             prompt_from = repoconfig.prefixed(prompt_from, block)
     except (KeyError, ValueError) as e:
@@ -572,6 +579,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         # (*The bound has two layers*, TD-249) is an unattended session's: a person's own is never told
         # `--supervised` is a member in the making (§6): it takes the default as a team start's does
         "context_bound": role.bound_for(bool(getattr(args, "unattended", False) or getattr(args, "supervised", False))),
+        "project": project,  # a badge (design §4.9 *Home and reach*): the directory's repo's project, or ""
     }
 
 
@@ -698,7 +706,6 @@ def cmd_new(args: argparse.Namespace) -> int:
         **({"supervised": True} if getattr(args, "supervised", False) else {}),
         **defaults,
         team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
-        project=getattr(args, "project", None) or "",
         **_stop(args),
         **teams.gate_prompts(bool(args.unattended)),
         **({"host": args.host} if getattr(args, "host", None) else {}),  # sent only when set (§4.4 skew rule)
@@ -3835,11 +3842,6 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="WHEN",
         help="when this unattended session starts (design §6 Start time): 20:00 (the next one, local), +2h, or an "
         "ISO time. The record, its name and its directory are taken now; the host agent starts it at the time",
-    )
-    p.add_argument(
-        "--project",
-        help="the project it is started under (design §4.9): the badge, and the Project block in front of the brief "
-        "naming each of the project's repos on this host when there is more than one",
     )
     p.add_argument(
         "--host",

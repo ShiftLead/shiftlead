@@ -758,28 +758,6 @@ def org_here() -> tuple[orgmod.Org, list[str]]:
     return orgmod.with_home_settings(org), notes  # the flow each team runs now (§4.9c, `teams.<team>.flow`)
 
 
-def projects_view() -> list[dict[str, Any]]:
-    """The projects defined for this host, for New session's **Project** picker (design §4.5a,
-    §4.9): each with its repos and their checkouts *here*. A repo whose entry names another host
-    is listed with an empty path and the hosts that do have it — phase 2's transport reaches it,
-    and until then the picker says so rather than offering a path that is not there."""
-    try:
-        org = orgmod.load()
-    except ValueError:
-        return []  # a malformed org.yml leaves the form exactly as it was before projects existed
-    host = host_name()
-    return [
-        {
-            "name": name,
-            "repos": [
-                {"repo": r, "path": str((by := org.checkouts.get(r) or {}).get(host) or ""), "hosts": sorted(by)}
-                for r in p.repos
-            ],
-        }
-        for name, p in org.projects.items()
-    ]
-
-
 def teams_for_form(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """The teams for New session's **Team** picker (design §4.5a, §4.9 *A person in the team*,
     TD-173): every definition `org_here` reads — `ao team list`'s set — with the host it runs on,

@@ -78,20 +78,8 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
         </select>
         <span class="note" id="teamnote">optional: its badge and group, its manager as a controller, the team's techlead for its held PRs</span>
       </div>
-      {# design §4.5a New session **Project** picker (§4.9): picking one narrows the Directory list
-         to that project's repos with their checkouts on this host, badges the session, and puts the
-         same **Project** block in front of the brief that `ao new --project` does. "No project" is
-         the default and behaves exactly as the form did before projects existed. #}
-      <div class="field"><label>Project</label>
-        <select class="input" name="project" id="project">
-          <option value="">No project</option>
-          {% for p in projects %}<option value="{{ p.name }}"{% if p.name == prefill.project %} selected{% endif %} data-repos='{{ p.repos | tojson }}'>{{ p.name }} · {{ p.repos | length }} repo{{ '' if p.repos | length == 1 else 's' }}</option>{% endfor %}
-        </select>
-        <span class="note" id="projectnote">{% if projects %}optional: the repos in reach, and a Project block naming them in front of the brief{% else %}no project defined — a session without one is what every session was before{% endif %}</span>
-        <span class="note">{{ fromfile("org.yml", files.org, "projects:") }}</span>
-      </div>
       {#- **Repo** (§4.5a New session **the form**, TD-284 slice 4; TD-294): the registered checkouts on the picked host,
-          narrowed by Team and Project, each *name · path*; the last choice, *another directory…*,
+          narrowed by Team, each *name · path*; the last choice, *another directory…*,
           opens the typed path the Directory field was — for a shell or a directory outside any
           repo — checked as it is typed. The pick fills `dir`, which is what Start posts. -#}
       {%- set form_repos = form_repos | default([]) %}{% set repo_pick = repo_pick | default("") %}
@@ -105,6 +93,8 @@ from <span class="mono">{{ name }}</span>{% if key %} <span class="mono">{{ key 
           <span class="note" id="dircheck"></span>
         </div>
         <span class="note" id="occupancy"></span>
+        {#- §4.9 *Home and reach* (TD-722): no Project pick — the badge is the repo's heading; §4.5a: a project is added in org.yml #}
+        <span class="note">the session's project is its repo's heading — {{ fromfile("org.yml", files.org, "projects:") }}</span>
       </div>
       {#- **Where** is worktree-first (§4.5a New session **the form**, TD-284 slice 4): a new worktree named
           as the session, selected for a git repo, with the repo's worktrees nobody is in as chips

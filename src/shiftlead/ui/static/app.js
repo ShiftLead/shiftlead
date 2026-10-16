@@ -3383,23 +3383,14 @@
       if (!other() && dir.value !== repoSel.value) { dir.value = repoSel.value; if (fire) dir.dispatchEvent(new Event("change")); }
       dirCheck();
     }
-    // Team and Project narrow the list to their checkouts, both at once (either one's change, or the
-    // directory's, re-reads the two); a choice they leave out moves to the first kept
-    // (a Team's checkouts are its host's, which the Team pick sets; a Project's are this host's, so on
-    // another host they narrow by the repo's name — TD-294)
+    // Team narrows the list to its checkouts (its change, or the directory's, re-reads it); a choice
+    // it leaves out moves to the first kept. A Team's checkouts are its host's, which the Team pick sets.
+    // There is no Project picker (§4.9 *Home and reach*, TD-722): the badge is the directory's repo's.
     function kept() {
-      let keep = null, names = null;
-      const t = teamSel && teamSel.selectedOptions[0], p = proj && proj.selectedOptions[0];
+      let keep = null;
+      const t = teamSel && teamSel.selectedOptions[0];
       if (t && t.value) { try { keep = JSON.parse(t.dataset.dirs || "[]"); } catch (e) { keep = []; } }
-      if (p && p.value) {
-        let rs = []; try { rs = JSON.parse(p.dataset.repos || "[]"); } catch (e) { rs = []; }
-        if (away()) names = rs.map((r) => r.repo);
-        else {
-          const ps = rs.filter((r) => r.path).map((r) => r.path);
-          keep = keep ? keep.filter((x) => ps.includes(x)) : ps;
-        }
-      }
-      return { keep, names };
+      return { keep, names: null };
     }
     function narrowRepos() {
       if (!repoSel) return;
@@ -3656,36 +3647,11 @@
       dir.dispatchEvent(new Event("change"));  // the occupancy, the roles, the chips, the name, the team line
     }
     if (hostSel) hostSel.addEventListener("change", () => { gate(); loadRepos(); });
-    // The Project picker (design §4.5a New session **Project**, §4.9): picking one narrows the
-    // Directory list to that project's repos with their checkouts on this host. The paths came
-    // down with the page — a project's repos do not change as you type, so there is nothing to
-    // ask for. "No project" restores the registered repos and recent directories, unchanged.
-    const proj = $("#project"), datalist = $("#recent"), pnote = $("#projectnote");
+    // The Directory list's suggestions: the registered repos and recent directories, which a Team pick
+    // narrows to its checkouts and *none* restores
+    const datalist = $("#recent");
     const allDirs = $$("option", datalist).map((o) => o.value);
     const options = (vals) => (datalist.innerHTML = vals.map((v) => `<option value="${esc(v)}">`).join(""));
-    function applyProject() {
-      if (!proj) return;
-      const o = proj.selectedOptions[0];
-      let repos = [];
-      try { repos = JSON.parse((o && o.dataset.repos) || "[]"); } catch (e) { repos = []; }
-      if (!o || !o.value) { options(allDirs); narrowRepos(); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
-      const here = repos.filter((r) => r.path), elsewhere = repos.filter((r) => !r.path);
-      if (away()) {  // its paths are this host's: on another host it narrows the Repo list by name (TD-294)
-        narrowRepos();
-        pnote.textContent = `narrows Repo to its repos on ${hostSel.value}: ${repos.map((r) => r.repo).join(", ") || "none"}`;
-        return;
-      }
-      options(here.map((r) => r.path)); narrowRepos();
-      if (!dir.value.trim() && here.length) { dir.value = here[0].path; syncRepo(); check(); loadRoles(); nameCheck(); }
-      const mine = here.some((r) => r.path === dir.value.trim());
-      pnote.textContent =
-        `${here.length} repo${here.length === 1 ? "" : "s"} on this host: ${here.map((r) => r.repo).join(", ") || "none"}`
-        + (elsewhere.length ? ` · ${elsewhere.map((r) => `${r.repo} is on ${r.hosts.join(", ")} — out of reach until phase 2`).join("; ")}` : "")
-        + (here.length > 1 ? " · the brief gets the Project block naming them" : "")
-        + (mine || !here.length ? "" : " · this directory is not one of them, so none is home");
-    }
-    if (proj) proj.addEventListener("change", applyProject);
-    dir.addEventListener("change", applyProject);
 
     // The Team picker (design §4.5a New session **Team**, §4.9 *A person in the team*, TD-173):
     // the team's checkouts in the Directory list, Role narrowed to its roles plus `plain`, its live
@@ -3730,7 +3696,7 @@
           if (hostSel.value !== o.dataset.host) { hostSel.value = o.dataset.host; gate(); loadRepos(); }
         }
         underMe = true; applyMode();  // a person's own session in the team (§4.9): a role runs under you
-      } else { underMe = false; applyProject(); applyMode(); }  // *none*: a role is presumed unattended again
+      } else { underMe = false; options(allDirs); narrowRepos(); applyMode(); }  // *none*: a role is presumed unattended again
       teamRoles();
       teamLine();
     }
@@ -3741,7 +3707,6 @@
     loadWorktrees();
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
-    applyProject();
     applyRole();  // the ticks the page rendered are the repo's; a role picked later may narrow them
     if (teamSel && teamSel.value) applyTeam();  // a prefilled team (a Resume of a team's session)
   };
