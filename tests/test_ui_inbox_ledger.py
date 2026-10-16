@@ -195,6 +195,26 @@ def test_an_entry_an_open_decided_line_names_leaves_later(tmp_path):
     assert [r["id"] for r in rows] == ["TD-156", "TD-319"]
 
 
+def test_a_held_for_you_entry_an_open_decided_line_names_is_its_held_row(tmp_path):
+    """§4.5a **Inbox row: held entry** (TD-736, TD-755): a held *for you* entry that an open decided
+    line names is no longer *for you* — that line is its row — so it is here for its hold alone: one
+    row of the kind *ledger · held*, no answers, with **Release**."""
+    from datetime import UTC, datetime, timedelta
+
+    from shiftlead.ui.app import ledger_for_you
+
+    now = datetime(2026, 10, 15, 12, 0, tzinfo=UTC)
+    repos = _repos(tmp_path)
+    a = str(tmp_path / "agentorc")
+    by = {e["id"]: e for e in repos[a]["ledger"]["entries"]}
+    by["TD-133"]["held"] = {"at": (now - timedelta(hours=2)).isoformat()}
+    repos[a]["work_orders"] = {"orders": [{"id": "board:1", "refs": ["TD-133"]}]}
+    rows = [r for r in ledger_for_you(repos, [], {}, now)["groups"][0]["rows"] if r["id"] == "TD-133"]
+    assert len(rows) == 1
+    assert (rows[0]["kind"], rows[0]["answers"], rows[0]["release"]) == ("ledger · held", [], True)
+    assert (rows[0]["added"], rows[0]["claimed"]) == ("held 2h", True)
+
+
 def test_the_route_hands_an_answer_go_with_it_or_words_to_ledger_decide(tmp_path, monkeypatch):
     """`POST /api/person/ledger`: the index, `go` or the Reply's words, with the repo and the id, to
     the home's `ledger_decide`; a press missing any of them is refused before the call."""
@@ -573,6 +593,7 @@ def test_a_held_entry_is_a_row_with_release_and_a_held_for_you_entry_one_row(tmp
     row = _row(html, "ledger:agentorc:TD-010")
     assert ">ledger · held</span>" in row and "claimed by grinder-ao-1" in row and "held by" not in row
     assert ">held 2h · M</span>" in row and "a team started by hand loses the hour." in row
+    assert "held in agentorc's ledger — no lane takes it until you release it" in row
     assert 'data-act="ledger_release" data-id="person" data-repo="agentorc" data-ref="TD-010"' in row
     assert ">Release</button>" in row and ">Open</a>" in row
     for gone in (">Reply</button>", ">Start session</button>", ">Open session</button>", "its answers", "Go with it"):
