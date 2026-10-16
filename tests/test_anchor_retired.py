@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from conftest import park_ticks
@@ -141,3 +142,69 @@ async def test_checkout_held_is_no_rpc(agent):
     async with LocalClient() as person:
         with pytest.raises(AgentError, match="unknown method|checkout_held"):
             await person.call("checkout_held", dir="/tmp")
+
+
+@pytest.mark.integration
+async def test_a_suspended_anchor_record_is_the_persons_and_never_forgotten(agent, tmp_path):
+    """A suspended one is the person's (§4.8a) and never forgotten here (TD-774)."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = (
+            await person.call(
+                "create", **_shell(tmp_path, "s-anchor", role="anchor", seat={"trigger": "asks"}, held=True)
+            )
+        )["id"]
+    rec = agent.sessions[sid]
+    rec.git = {"dirty": 0, "unpushed": 0}
+    rec.suspended = {"at": datetime.now(UTC).isoformat(), "by": "paul", "why": "identity alarm"}
+    await agent._retire_anchors()
+    assert sid in agent.sessions and agent.sessions[sid].state == "closed"
+
+
+@pytest.mark.integration
+async def test_a_nodes_anchor_record_is_removed_over_its_link_and_left_while_the_link_is_down(agent, monkeypatch):
+    """A node's anchor record is removed at its node over the link; with the link down it stays and is
+    looked at again next tick (§4.4a, TD-774)."""
+    await park_ticks(agent)
+    r = models.Session(id="ao-x-anchor", name="a", kind="interactive", adapter="shell", dir="/tmp/x", host="laptop")
+    r.role, r.state = "anchor", "closed"
+    agent.remote["laptop"] = {r.id: r}
+    routed: list[tuple] = []
+
+    async def route(method, params, caller, host):
+        routed.append((method, params, host))
+        return {}
+
+    monkeypatch.setattr(agent, "_route_act", route)
+    try:
+        await agent._retire_anchors()
+        assert routed == [], "the link is down: nothing is routed"
+        assert r.id in agent.remote["laptop"]
+        agent._link_muxes["laptop"] = SimpleNamespace(close=lambda *a, **k: None)  # the home closes it at stop
+        await agent._retire_anchors()
+        assert routed == [("remove", {"id": r.id}, "laptop")]
+    finally:
+        agent.remote.pop("laptop", None)
+        agent._link_muxes.pop("laptop", None)
+
+
+@pytest.mark.integration
+async def test_a_scheduled_anchor_records_start_is_cancelled(agent, tmp_path, monkeypatch):
+    """A scheduled anchor's start not yet made is cancelled through `_cancel_start` (TD-774), not
+    merely forgotten."""
+    await park_ticks(agent)
+    cancelled: list[str] = []
+    cancel = agent._cancel_start
+
+    async def spy(s):
+        cancelled.append(s.id)
+        return await cancel(s)
+
+    monkeypatch.setattr(agent, "_cancel_start", spy)
+    later = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+    async with LocalClient() as person:
+        sid = (await person.call("create", **_shell(tmp_path, "f-anchor", role="anchor", start_at=later)))["id"]
+    assert agent.sessions[sid].state == "scheduled"
+    await agent._retire_anchors()
+    assert cancelled == [sid]
+    assert sid not in agent.sessions
