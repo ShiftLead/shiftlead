@@ -964,7 +964,8 @@ class TickMixin:
         """The retired seats' records (design §4.9 *A definition written before TD-722*, §4.9b *No anchor
         seat*, TD-757): each record whose role is `anchor`, this host's and every node's, is retired at the
         home before rule 3 or rule 8 can resolve a role the presets no longer hold — a closed one, or an
-        exited one with nothing uncommitted or unpushed, is forgotten; a live one is closed first, under
+        exited one with nothing uncommitted or unpushed, is forgotten, and a scheduled one's start
+        cancelled (a node's removed); a live one is closed first, under
         rule 9's close (`_finished_close`), and forgotten on a later tick. One with work left, or a node's
         whose link is down, is left as it stands and looked at again next tick. A suspended one is the
         person's (§4.8a) and never forgotten here."""
@@ -978,7 +979,11 @@ class TickMixin:
                 clean = all(isinstance(git.get(k), int) and git[k] == 0 for k in ("dirty", "unpushed"))
                 if s.state == "exited" and not clean:
                     continue  # its work is the *exited with unpushed work* row's, and the person's
-                if s.state not in ("exited", "closed"):
+                if s.state == "scheduled" and s.host == self.host:
+                    await self._cancel_start(s)  # a start not yet made would be a seat in a checkout
+                    gone = True
+                    continue
+                if s.state not in ("exited", "closed", "scheduled"):
                     if not await self._finished_close(s, "retired"):
                         continue
                     log.info("%s: the anchor seat is retired — closed", self._address(s))

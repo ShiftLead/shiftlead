@@ -6,6 +6,7 @@ record whose role is `anchor` — a closed one forgotten, a live one closed firs
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -83,6 +84,11 @@ async def test_the_tick_forgets_a_closed_anchor_record_and_closes_then_forgets_a
         assert closed not in agent.sessions, "a closed anchor record is forgotten"
         assert live not in agent.sessions, "a live clean one is closed, then forgotten"
         assert agent.sessions[other].state not in ("exited", "closed"), "another role is left alone"
+        later = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
+        sched = (await person.call("create", **_shell(tmp_path, "e-anchor", role="anchor", start_at=later)))["id"]
+        assert agent.sessions[sched].state == "scheduled"
+        await agent._retire_anchors()
+        assert sched not in agent.sessions, "a scheduled anchor's start is cancelled"
         await person.call("kill", id=other)
 
 
