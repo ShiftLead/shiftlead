@@ -478,6 +478,34 @@ def test_a_held_sync_pr_is_no_order_and_its_idle_holder_is_told_then_passed_over
 
 
 @pytest.mark.unit
+def test_a_red_draft_is_no_order_held_or_not_and_an_order_once_ready():
+    """TD-745, design §4.4 *A draft is no work order*: no order, no note and no told entry for a draft,
+    however long it is red; marked ready, it is an order on the next reading."""
+    draft = _red(draft=True)
+    assert workorders.red_prs([draft], [], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+    holder = _rec(git={"branch": "b1573"})  # idle: a ready PR's holder would be told
+    assert workorders.red_prs([draft], [holder], T0 + HOUR, {}, HOUR) == ([], {}, [])
+    assert workorders.red_prs([draft], [holder], T0 + 2 * HOUR, {}, HOUR) == ([], {}, [])
+    assert [o["id"] for o in workorders.red_prs([_red()], [], T0 + 3 * HOUR, {}, HOUR)[0]] == ["pr:1573"]
+    # a sync draft is still the sync rule's: an order at once, but a pending one waits as any sync PR does
+    assert [o["id"] for o in workorders.red_prs([_sync(draft=True)], [], T0, {}, HOUR)[0]] == ["pr:1728"]
+    assert workorders.red_prs([_sync(draft=True, checks="pending")], [], T0 + 3 * HOUR, {}, HOUR) == ([], {}, [])
+
+
+@pytest.mark.unit
+def test_a_holder_told_before_a_draft_is_not_told_again_once_it_is_ready():
+    """The memory of an earlier non-draft spell survives the draft (TD-745): readied within `after` of the
+    tell, no second note and no order yet; readied past it, an order at once and still no second note."""
+    holder = _rec(git={"branch": "b1573"})
+    _, told, notes = workorders.red_prs([_red()], [holder], T0 + HOUR, {}, HOUR)
+    assert len(notes) == 1
+    assert workorders.red_prs([_red(draft=True)], [holder], T0 + HOUR + HOUR / 2, told, HOUR) == ([], told, [])
+    assert workorders.red_prs([_red()], [holder], T0 + 2 * HOUR - timedelta(seconds=1), told, HOUR) == ([], told, [])
+    orders, kept, notes = workorders.red_prs([_red()], [holder], T0 + 3 * HOUR, told, HOUR)
+    assert [o["id"] for o in orders] == ["pr:1573"] and kept == told and notes == []
+
+
+@pytest.mark.unit
 def test_the_holders_of_a_red_pr_are_named_past_the_bound():
     """TD-652: the reading names each red PR's holders, for the pages' *held by <name>*: a live
     record on its head or with a claim on it, never one that ended or is out of work."""

@@ -1782,8 +1782,14 @@ def cmd_repo(args: argparse.Namespace) -> int:
             # an entry no page kind takes, flagged under the first line (§4.7, §4.4 *Repo facts*, TD-418)
             for flag in ledger_mod.flags((r.get("ledger") or {}).get("entries") or []):
                 print(f"  {flag}")
+            # a draft is no order, and its line says so where it would be one (§4.4 *A draft is no work order*, TD-745)
+            waits = {
+                x["number"]: x for x in teamrun.red_prs(r, [], datetime.now(UTC)) if x["whose"] == teamrun.DRAFT_WHOSE
+            }
             for p in (r.get("prs") or {}).get("open") or []:
                 draft = " (draft)" if p.get("draft") else ""
+                if w := waits.get(p["number"]):
+                    draft = f" (draft · red since {w['red_since']}: {teamrun.DRAFT_WHOSE})"
                 age = _age(p.get("created") or "")
                 print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
                 if st := (r.get("standing") or {}).get(str(p["number"])):
