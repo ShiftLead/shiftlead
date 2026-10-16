@@ -71,7 +71,6 @@ Fields: Owner = anchor | designer | grinder | paul | dev-cadence; Kind = build |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Agreed (ADR 2026-10-15) — the real-data mockup next, then the design |
 | TD-749 | The grinders' file split idles one grinder while the other's package has work, and makes each pass over higher entries in the other's half | Medium | Open |
 | TD-750 | Build TD-745: a draft PR is no red-PR work order, and `ao repo` says so | Low | Open |
-| TD-752 | `test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again` failed once on CI (3.12) and passed on a re-run: the third `_held_pass` recorded no crossing for #860 | Low | Open |
 | TD-754 | The events stream's `repos` event carries a checkout's whole reading — 870 KB for shiftlead — to every open page on each change | Low | Open |
 
 ---
@@ -1459,26 +1458,6 @@ The other cases:
 **Done when** the tests above pass, `ao repo` on a repo with a red, unheld draft lists no `pr:` order and says why on the PR's line, and the Repo page's tag and the facet's hover read *no order while a draft* while the facet's *· n red* still counts it.
 
 **Related:** TD-613, TD-684, TD-745.
-
----
-
-## TD-752: `test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again` is flaky on CI: the third `_held_pass` recorded no crossing for #860
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-15 (grinder-ao-2, on #1873's CI)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_held_missed.py` (~L442); `src/sessionorc/agent_*.py` (`_held_pass`, `_held_tried`, `_held_settled`)
-
-**Why:** #1873's CI, run 38830438126 attempt 1 (test (3.12), 2026-10-16T00:44Z UTC; `gh run view 38830438126 --attempt 1 --log-failed`), failed `assert [c["pr"] for c in held.standing(s.held_missed)] == [860]` with `[]`: after a Dismiss and a simulated restart, the pass that should record the next crossing (#860, held and merged) recorded none. The re-run of the same commit passed, and the file passes locally (22 in 1.1 s). #1873 touches nothing under `held`; the test is timing- or state-dependent.
-
-**Fix:** read `_held_pass` for anything throttled by wall time or by `_held_tried` across calls inside one test (the test clears `_held_tried` once, before the second pass, not before the third), reproduce under load (`pytest -p no:randomly --count` or a loop with `taskset`), and pin the pass to what the test means.
-
-**Done when** the test fails with the cause reintroduced and passes 50 runs in a row under load.
-
-**Related:** TD-736 (#1873, where it was seen).
 
 ---
 

@@ -13347,3 +13347,23 @@ Paul considered subtask ids (TD-682a, TD-682b) to fix the first two. They are no
 **Related:** TD-739 (the measurement), TD-747.
 
 **Resolved:** 2026-10-15 — the `repos` RPC takes `omit`, dotted paths each reading is served without (`reports.omitted`); the Org, the Repo page, Focus and `/api/sessions` leave out `ledger.recent`, the month's PRs' head, base, branch, author, dates and draft flag, and the entries' detail blocks; the Inbox (its page, its poll, a message page and the keeper's recount) the same less the detail and plus `completed`; Settings both. On the live reading of 2026-10-15: 1,449,490 B whole (~31 ms at the agent, 19 ms to encode and parse) → 750,556 B for a page (9 ms), 639,477 B for the Inbox (7 ms), 492,494 B for Settings (6 ms). An omit, not a keep-list, so a key the agent grows reaches every page. The events stream's `repos` events still carry whole readings: TD-754.
+
+## TD-752: `test_dismiss_marks_the_entries_and_a_restarted_home_writes_none_again` is flaky on CI: the third `_held_pass` recorded no crossing for #860
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-15 (grinder-ao-2, on #1873's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_held_missed.py` (~L442); `src/sessionorc/agent_*.py` (`_held_pass`, `_held_tried`, `_held_settled`)
+
+**Why:** #1873's CI, run 38830438126 attempt 1 (test (3.12), 2026-10-16T00:44Z UTC; `gh run view 38830438126 --attempt 1 --log-failed`), failed `assert [c["pr"] for c in held.standing(s.held_missed)] == [860]` with `[]`: after a Dismiss and a simulated restart, the pass that should record the next crossing (#860, held and merged) recorded none. The re-run of the same commit passed, and the file passes locally (22 in 1.1 s). #1873 touches nothing under `held`; the test is timing- or state-dependent.
+
+**Fix:** read `_held_pass` for anything throttled by wall time or by `_held_tried` across calls inside one test (the test clears `_held_tried` once, before the second pass, not before the third), reproduce under load (`pytest -p no:randomly --count` or a loop with `taskset`), and pin the pass to what the test means.
+
+**Done when** the test fails with the cause reintroduced and passes 50 runs in a row under load.
+
+**Related:** TD-736 (#1873, where it was seen).
+
+**Resolved:** 2026-10-15 — the cause was the fixture's live tick, not `_held_tried`. Only one test in the file parked the ticks. The first tick runs as the agent starts and launches `_refresh_repos` detached. Under load, that pass can land after `_member` has set `agent._repos["/repo"]`, a root no registry lists, and it drops the root as gone. `_held_pass` skips a member whose root the home holds no reading of. Landing after the second pass, it left the third with nothing to read: CI's `[]` for #860. A scratch test (not committed) reproduced it by running `_refresh_repos` between the passes. This is the same family as TD-695 and TD-753. `tests/test_held_missed.py` now overrides `agent` as `test_sync_pass.py` does: it parks the ticks and awaits the first tick's `_repos_task` and `_held_task`. The held pass reads with the real clock, so it could settle a PR unjudged; it is awaited as well. With the fixture no repos pass runs during a test, and the file passed 50 runs in a row beside a full `pdm run test`.
