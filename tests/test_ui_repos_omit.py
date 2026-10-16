@@ -132,6 +132,10 @@ def recording(log: list[dict], whole: dict, honour: bool = True, fleet: list | N
             if method == "repos":
                 log.append(kw)
                 return reports.omitted(whole, kw.get("omit") or []) if honour else whole
+            if method == "seen":  # Focus opens on a record (TD-756), drawn whole
+                at = datetime.now(UTC).isoformat()
+                rec = {"since": at, "created": at, "confidence": "hook", "kind": "agent", "adapter": "shell"}
+                return {**rec, **member(next(iter(whole)))}
             return await super().call(method, **kw)
 
     return Fake
@@ -143,6 +147,8 @@ PAGES = [
     ("/api/sessions", "REPOS_OMIT_PAGE"),
     ("/inbox", "REPOS_OMIT_INBOX"),
     ("/api/person/inbox", "REPOS_OMIT_INBOX"),
+    ("/focus/ao-samscrape-grinder-1", "REPOS_OMIT_PAGE"),  # TD-756: the report line's PR mark
+    ("/inbox/m-1", "REPOS_OMIT_INBOX"),  # TD-756: the message page's row, drawn as the list draws it
 ]
 
 
