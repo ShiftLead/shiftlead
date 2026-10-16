@@ -210,7 +210,7 @@ async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_pa
         rec = agent.sessions[sid]
         e = next(e for e in rec.inbox if e.id == got["id"])
         assert e.kind == "ask" and e.from_ == PERSON and e.text == "the parser drops a trailing line"
-        assert e.handed and e.entry == {"repo": "shiftlead", "type": "debt"} and e.bound is None
+        assert e.handed and e.entry == {"repo": "shiftlead", "type": "debt", "team": ""} and e.bound is None
         assert e.handed_entry and rec.asks_waiting() == 1
         # three days on, past any `ask`'s default bound, the sweep leaves it standing
         await agent._sweep_mail(datetime.now(UTC) + timedelta(days=3))
@@ -223,6 +223,33 @@ async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_pa
         agent.store.save(rec)
         third = await person.call("entry_add", repo="shiftlead", type="debt", text="a third", teams=teams)
         assert third["read_when"] == "fills this seat: a session starts on the next tick and reads it first"
+        await person.call("kill", id=sid)
+
+
+@pytest.mark.integration
+async def test_entry_add_carries_the_team_pick_and_a_blank_one_takes_the_first_seat(agent, tmp_path):
+    """The form's **Team** pick and `ao td add --team` (§4.10 *An entry handed to a seat*, TD-764): the
+    picked team's seat takes it and `entry.team` names the team; blank, the first team with a seat in
+    the order given takes it and `entry.team` is empty; a team that does not service the repo is refused."""
+    repo = tmp_path / "shiftlead"
+    repo.mkdir()
+    _registry(tmp_path, repo)
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _seat_session(person, tmp_path)
+        teams = [{"team": "db", "seat": ""}, {"team": "ao-grind", "seat": sid}]
+        got = await person.call("entry_add", repo="shiftlead", type="debt", text="picked", teams=teams, team="AO-grind")
+        assert (got["to"], got["team"]) == (sid, "ao-grind")
+        e = next(e for e in agent.sessions[sid].inbox if e.id == got["id"])
+        assert e.entry == {"repo": "shiftlead", "type": "debt", "team": "ao-grind"}  # the definition's spelling
+        # blank: db comes first but has no seat, so the first team with one takes it, and no team is carried
+        blank = await person.call("entry_add", repo="shiftlead", type="debt", text="blank", teams=teams)
+        assert (blank["to"], blank["team"]) == (sid, "ao-grind")
+        assert next(e for e in agent.sessions[sid].inbox if e.id == blank["id"]).entry["team"] == ""
+        with pytest.raises(AgentError, match="ops does not service shiftlead: its teams are db, ao-grind"):
+            await person.call("entry_add", repo="shiftlead", type="debt", text="x", teams=teams, team="ops")
+        with pytest.raises(AgentError, match="db has no techlead seat"):
+            await person.call("entry_add", repo="shiftlead", type="debt", text="x", teams=teams, team="db")
         await person.call("kill", id=sid)
 
 

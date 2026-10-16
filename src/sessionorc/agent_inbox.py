@@ -373,18 +373,23 @@ class InboxMixin:
         text: str = "",
         teams: list[dict[str, str]] | None = None,
         draft: str = "",
+        team: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Hand to the techlead** and `ao td add` (design §4.10 *An entry handed to a seat*, §4.9
         *Add an entry to the ledger*; TD-218 slice 2): the person's words as an `ask` from the
-        person to the techlead seat of the repo's first servicing team, carrying `entry: {repo,
-        type}` and marked `handed`, with **no bound**: it never lapses, and ends by its outcome or
-        the person's Dismiss alone. A person's own, refused to every session as `board_edit` is,
-        and served at the home. The host agent does not read `org.yml`, so the caller hands it the
-        teams that service the repo, in definition order, each `{team, seat}` — `seat` the id the
-        team's techlead takes, or empty where the team defines none — as `board_reply`'s `refs`
-        come from the reader. Refused in words: no such repo, no team services it, the team has no
-        techlead seat, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`.
+        person to a techlead seat of the repo, carrying `entry: {repo, type, team}` and marked
+        `handed`, with **no bound**: it never lapses, and ends by its outcome or the person's
+        Dismiss alone. A person's own, refused to every session as `board_edit` is, and served at
+        the home. The host agent does not read `org.yml`, so the caller hands it the teams that
+        service the repo, in the order a blank pick takes them (the ledger's `Team` vocabulary,
+        else definition order), each `{team, seat}` — `seat` the id the team's techlead takes, or
+        empty where the team defines none — as `board_reply`'s `refs` come from the reader. `team`,
+        the form's **Team** pick or `--team` (TD-730, TD-764), hands to that team's seat and is
+        `entry.team`; blank, the first team with a seat takes it and `entry.team` is empty. Refused
+        in words: no such repo, no team services it, a picked team that does not, no techlead seat
+        to hand to, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`,
+        `team` the team handed to.
         `draft`, where the form attached files (§4.4 *The Add entry form's draft*, TD-630): refused
         before the send unless it is this host's and unclaimed, then claimed for the ask
         (`claimed.json` `{by: hand:<its id>, at}`) and carried in the envelope beside `entry`."""
@@ -410,8 +415,17 @@ class InboxMixin:
         servicing = [t for t in teams or () if isinstance(t, dict) and str(t.get("team") or "").strip()]
         if not servicing:
             raise RpcError(f"no team services {name}: there is no techlead seat to hand it to (design §4.10)")
-        team = str(servicing[0]["team"]).strip()
-        seat = str(servicing[0].get("seat") or "").strip()
+        pick = str(team or "").strip()
+        if pick:
+            to = next((t for t in servicing if str(t["team"]).strip().casefold() == pick.casefold()), None)
+            if to is None:
+                names = ", ".join(str(t["team"]).strip() for t in servicing)
+                raise RpcError(f"{pick} does not service {name}: its teams are {names} (design §4.10)")
+            pick = str(to["team"]).strip()
+        else:  # a blank pick: the first team with a techlead seat, in the order the caller gives them
+            to = next((t for t in servicing if str(t.get("seat") or "").strip()), servicing[0])
+        team = str(to["team"]).strip()
+        seat = str(to.get("seat") or "").strip()
         if not seat:
             raise RpcError(f"{team} has no techlead seat: there is nobody to hand the entry to (design §4.9b)")
         folder = await asyncio.to_thread(agent_common.draft_folder, draft, "entry_add") if draft else None
@@ -422,7 +436,7 @@ class InboxMixin:
         # a seat closed and started again under its name is followed to the record that took it (review of #764)
         seat = next(iter(sent.get("delivered") or ()), seat)
         # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
-        self._mark(mid, handed=True, entry={"repo": name, "type": kind}, bound=None, draft=draft or None)
+        self._mark(mid, handed=True, entry={"repo": name, "type": kind, "team": pick}, bound=None, draft=draft or None)
         if folder is not None:  # the form's files are the ask's, kept `runs_keep_days` from now (§4.4, TD-630)
             try:
                 await asyncio.to_thread(agent_common.claim_draft, folder, f"hand:{mid}", datetime.now(UTC))

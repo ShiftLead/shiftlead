@@ -356,6 +356,32 @@ def ledger_lists(
     return out
 
 
+def team_notes(r: Mapping[str, Any], defs: Collection[str], fleet: list[dict[str, Any]]) -> dict[str, Any]:
+    """The lines under the Technical debt heading's lanes lines (§4.5 screen 11, §4.4 *An entry names its
+    team*, TD-764): `needs`, the repo's *needs a team* line as `ao repo` prints it — `{ids, to}`, `to`
+    *handed to <seat>* or why nobody is (`teamrun.tagging_seat`) — or None where no entry needs one; and
+    `stale`, each `{text, ids}`, *the ledger declares db, which no definition holds* with the entries that
+    carry it, or *the ledger leaves out ops, which this repo defines* (`teams.stale_teams`, over `defs`,
+    the names of the definitions this page reads). A ledger not read says nothing."""
+    led = r.get("ledger") or {}
+    if not isinstance(led, dict) or "error" in led or "declared_teams" not in led:
+        return {"needs": None, "stale": []}
+    declared = [str(t) for t in led.get("declared_teams") or []]
+    entries = [e for e in led.get("entries") or [] if isinstance(e, dict)]
+    need = [str(e["id"]) for e in entries if e.get("needs_team")]
+    needs = None
+    if need:
+        seat, why = teamrun.tagging_seat(fleet, Path(str(r.get("root") or "")).resolve(), declared)
+        needs = {"ids": need, "to": f"handed to {seat}" if seat else why}
+    stale = [
+        {"text": f"the ledger declares {s['team']}, which no definition holds", "ids": s["ids"]}
+        if s["kind"] == "declared"
+        else {"text": f"the ledger leaves out {s['team']}, which this repo defines", "ids": []}
+        for s in teams.stale_teams(declared, defs, entries)
+    ]
+    return {"needs": needs, "stale": stale}
+
+
 def settle_mark(e: Mapping[str, Any], now: datetime, lane: bool = False) -> str:
     """Which press the settle clock's mark on an entry gives its Repo page row (§4.5a *Repo page: Hold /
     Release on an entry*, TD-710, TD-736): `held` (**Release**), `settling` (**Hold**) while its window

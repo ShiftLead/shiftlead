@@ -169,31 +169,22 @@ def team_lacks(org: orgmod.Org, here: str, readings: dict[str, Any]) -> list[str
             continue
         name = r.get("name") or root
         defs = [t["team"] for t in teams.entry_teams(org, str(Path(root).resolve()), here)]
-        held = {t.casefold() for t in defs}
         declared = [str(t) for t in led.get("declared_teams") or []]
-        said = {t.casefold() for t in declared}
-        for d in declared:
-            if d.casefold() in held:
-                continue
-            carry = [
-                str(e.get("id"))
-                for e in led.get("entries") or []
-                if isinstance(e, dict) and str(e.get("team") or "").casefold() == d.casefold()
-            ]
-            on = f" ({', '.join(carry)} carry it)" if carry else ""
-            out.append(
-                f"{name}: its ledger declares team {d}, which no definition of the repo holds{on} — drop it from "
-                "the Fields: line's Team, or add it back, by PR (design §4.4 A stale team)"
-            )
-        if len(defs) >= 2:
-            names = [*declared, *(t for t in defs if t.casefold() not in said)]
-            for t in defs:
-                if t.casefold() not in said:
-                    out.append(
-                        f"{name}: has {len(defs)} teams and its ledger's Fields: line does not declare {t} — add "
-                        f"`Team = {' | '.join(names)}`, and a Team: line on each open entry a lane takes, by PR "
-                        "(design §4.4 The move from one team to two)"
-                    )
+        stale = teams.stale_teams(declared, defs, led.get("entries") or [])
+        names = [*declared, *(s["team"] for s in stale if s["kind"] == "left-out")]
+        for s in stale:
+            if s["kind"] == "declared":
+                on = f" ({', '.join(s['ids'])} carry it)" if s["ids"] else ""
+                out.append(
+                    f"{name}: its ledger declares team {s['team']}, which no definition of the repo holds{on} — drop "
+                    "it from the Fields: line's Team, or add it back, by PR (design §4.4 A stale team)"
+                )
+            else:
+                out.append(
+                    f"{name}: has {len(defs)} teams and its ledger's Fields: line does not declare {s['team']} — add "
+                    f"`Team = {' | '.join(names)}`, and a Team: line on each open entry a lane takes, by PR "
+                    "(design §4.4 The move from one team to two)"
+                )
         need = [str(i) for i in led.get("needs_team") or []]
         if need and not any(org.teams[t].techlead is not None for t in defs if t in org.teams):
             out.append(
