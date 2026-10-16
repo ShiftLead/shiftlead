@@ -73,6 +73,8 @@ def test_entries_read_the_header_fields_and_the_page_kind():
         "blocked_ids": [],
         "pickable": "yes",
         "for_page": "pickable",
+        "added": "",
+        "detail": [],
     }
     # an anchor's `Kind: decision` is no longer *for you* (TD-367): it waits on no person, and is the
     # anchor's *evaluation*; a design-first waiting on an open entry is *blocked* (TD-418)

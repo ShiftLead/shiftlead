@@ -725,7 +725,7 @@
   // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
   const PRESS_VERBS = {
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
-    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", snooze: "snoozing…", attention_snooze: "snoozing…",
+    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", ledger_release: "releasing…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
@@ -1153,7 +1153,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", "shell-here": "Open shell here" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", ledger_release: "Release", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete
