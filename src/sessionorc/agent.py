@@ -858,12 +858,14 @@ class HostAgent(
         p = paths.recent_dirs_file()
         return p.read_text().splitlines() if p.is_file() else []
 
-    async def rpc_repos(self) -> dict[str, dict[str, Any]]:
+    async def rpc_repos(self, omit: list[str] | None = None) -> dict[str, dict[str, Any]]:
         """The repo facts per registered checkout (design §4.4 *Repo facts*, TD-176), keyed by the
         checkout's path: what the team card's Repo facet, the rollup and the Repo page draw, with
-        `balance` beside a reading whose repo a team is over its line in (§6 *Balance*). The home's;
-        a node forwards it (§4.4a)."""
-        return {root: v for root in self._repos if (v := self._repo_view(root)) is not None}
+        `balance` beside a reading whose repo a team is over its line in (§6 *Balance*). `omit` is
+        dotted paths each reading is served without (`reports.omitted`, TD-746): a page leaves out
+        what it never draws. The home's; a node forwards it (§4.4a)."""
+        views = {root: v for root in self._repos if (v := self._repo_view(root)) is not None}
+        return {root: reports.omitted(v, omit) for root, v in views.items()} if omit else views
 
     async def rpc_doing_log(self, team: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """The doing log (design §4.8 *the doing log*, TD-176 slice 2): per team, its last fifty

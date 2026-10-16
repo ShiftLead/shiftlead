@@ -686,6 +686,27 @@ async def agent_call(method: str, **params: Any) -> Any:
 _REPOS_MEMO: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar("repos_memo", default=None)
 REPOS_MEMO_TTL = 2.0
 
+# What a page leaves out of the `repos` reading (the RPC's `omit`, design §4.4 *Repo facts*, TD-746):
+# the parts no reader of the page draws — the ledger's month of history (`ledger.recent`, which only the
+# host agent reads, to build `completed`), the fields of the month's PRs nothing marks (a card's report
+# line and *TDs in motion* read a PR's number, state, title and link), and, on the Org, the Repo page
+# and a card, each entry's detail block, which only the Inbox's ledger rows show; the Inbox draws no
+# facet, so leaves out `completed` instead. An omit, never a list of what to keep: a key the agent
+# grows is drawn the day it lands, and only a page that names it loses it.
+_RECENT_PR_UNDRAWN = ("head", "base", "branch", "author", "created", "closed", "draft")
+REPOS_OMIT_COMMON = ("ledger.recent", *(f"prs.recent.{k}" for k in _RECENT_PR_UNDRAWN))
+REPOS_OMIT_PAGE = (*REPOS_OMIT_COMMON, "ledger.entries.detail")
+REPOS_OMIT_INBOX = (*REPOS_OMIT_COMMON, "completed")
+
+
+def repos_omit(paths: tuple[str, ...]) -> None:
+    """The `repos` reading this request asks for leaves out `paths` (TD-746): a page route says it
+    before its first read; a request that says nothing, and a reader with no memo, reads it whole."""
+    memo = _REPOS_MEMO.get()
+    if memo is not None and memo.get("omit") != paths:
+        memo.clear()
+        memo["omit"] = paths
+
 
 class Readings:
     """The readings the Inbox is counted from (design §4.4 *Each reading has one owner*, *The Inbox's
@@ -716,11 +737,13 @@ class Readings:
         return teamrun.seat_ids(await self.defs(), fleet)
 
     async def repos(self) -> Any:
-        """The `repos` reading, once per request (`_REPOS_MEMO`, TD-739)."""
+        """The `repos` reading, once per request (`_REPOS_MEMO`, TD-739), without what the request's
+        page leaves out (`repos_omit`, TD-746)."""
         memo = _REPOS_MEMO.get()
         if memo is not None and "got" in memo and time.monotonic() - memo["at"] <= REPOS_MEMO_TTL:
             return memo["got"]
-        got = await self.call("repos")
+        omit = (memo or {}).get("omit")
+        got = await (self.call("repos", omit=list(omit)) if omit else self.call("repos"))
         if memo is not None:
             memo.update(got=got, at=time.monotonic())
         return got
@@ -945,7 +968,20 @@ class Readings:
         """The top bar's numbers (`INBOX_COUNTS`) from the Inbox's own sections, nothing rendered
         (TD-611 slice 1), the classification on a worker thread (slice 2): what `counts` holds and
         pushes (§4.4 *The Inbox's counts*, TD-616). With the host agent down, the shape that says so —
-        no number claimed, the reason in words."""
+        no number claimed, the reason in words. Outside a request (the keeper's recount, `ao inbox
+        --counts`) it holds a `repos` memo of its own, so the recount reads the reading once, as the
+        Inbox does (TD-746)."""
+        if (memo := _REPOS_MEMO.get()) is not None:
+            if not memo:  # a request that has read nothing yet: the Inbox's reading
+                memo["omit"] = REPOS_OMIT_INBOX
+            return await self._counts_now(watching)
+        token = _REPOS_MEMO.set({"omit": REPOS_OMIT_INBOX})
+        try:
+            return await self._counts_now(watching)
+        finally:
+            _REPOS_MEMO.reset(token)
+
+    async def _counts_now(self, watching: bool) -> dict[str, Any]:
         try:
             fleet = await self.call("list")
             got, states = await self.person_inbox(fleet, watching=watching), await self.person_states(fleet)
@@ -1190,6 +1226,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     async def org(request: Request):
         # An unreachable agent still gets a page: the banner + Retry are the recovery path
         # (design §4.5 unreachable hosts), never a bare 503.
+        repos_omit(REPOS_OMIT_PAGE)
         agent_down = False
         usage: dict[str, Any] = {}
         person_needs = person_fyi = person_overdue = 0
@@ -1328,6 +1365,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         facets, then the lists behind the numbers — Open PRs, Technical debt, Waiting on you, Doing.
         A registered repo no team services has a page too, its Repo facet alone. `part=1` is the
         page's own refresh: the content without the chrome."""
+        repos_omit(REPOS_OMIT_PAGE)
         now = datetime.now(UTC)
         repos, doing = await repo_facts()
         r = next((v for v in repos.values() if isinstance(v, dict) and v.get("name") == name), None)
@@ -1426,6 +1464,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
     async def focus(request: Request, sid: str, window: str = ""):
+        repos_omit(REPOS_OMIT_PAGE)
         try:
             s = await call("seen", id=sid)  # opening Focus is the "seen" (TD-017); returns the record
         except HTTPException as e:
@@ -2718,6 +2757,7 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/sessions")
     async def api_sessions():
+        repos_omit(REPOS_OMIT_PAGE)
         sessions = await call("list")
         icons = await role_icons(sessions)
         seats = await seats_of(sessions)
@@ -2981,7 +3021,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # which an older agent or a down link may refuse — the settings are still drawn
         with contextlib.suppress(HTTPException):
             fleet = await call("list")
-            readings = await call("repos")
+            readings = await call("repos", omit=[*REPOS_OMIT_PAGE, "completed"])  # numbers alone (TD-746)
         notes: list[str] = [why] if why else []
         try:
             profiles, default = profiles_mod.load()
@@ -3275,6 +3315,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the
         person inbox and the sessions' states in three sections, and the count that means *what is
         waiting on a person*. From step 3 the due board items join **Needs you** too."""
+        repos_omit(REPOS_OMIT_INBOX)
         agent_down, fleet = False, []
         try:
             fleet = await call("list")  # person_view's one list, kept for the usage chip (TD-287)
@@ -3336,6 +3377,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         **Back** returns to the list the page was opened from (`back`, the list's query) at this
         row. An entry the person inbox no longer holds reads *gone*; a refusal (another host's id,
         §4.4a) reads in the host agent's words. Reading marks nothing (§4.10)."""
+        repos_omit(REPOS_OMIT_INBOX)
         back = str(request.query_params.get("back") or "")
         back = back if back.startswith("?") else ""
         ctx: dict[str, Any] = {
@@ -3426,6 +3468,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         `?counts=1` is the top bar's read on every other page (TD-611): the same `inbox_sections`,
         so the numbers are the page's, but nothing rendered and no entries sent — the full read is
         megabytes of markup on the UI's one loop, which every Focus keystroke shares."""
+        repos_omit(REPOS_OMIT_INBOX)
         watching = request.query_params.get("watching") == "1"  # the page is visible (§4.10, TD-319)
         if request.query_params.get("counts") == "1":
             # the keeper's numbers, counted fresh for this page's `watching`; `since=<rev>` it already
