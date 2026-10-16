@@ -3325,6 +3325,151 @@
     return { prev: at > 0 ? rest[at - 1] : null, next: at < rest.length ? rest[at] : null, order: [...rest.slice(0, at), id, ...rest.slice(at)] };
   };
 
+  // The Queue's cards wherever they are drawn (design §4.5a *Queue page: card*, *Queue page, Up next:
+  // grip / ⤒ ↑ ↓*; the Queue page, TD-771, and the Repo page's Technical debt, TD-770): a press on a
+  // card's header folds or opens it, which this browser remembers; an Up next card moves by its grip or
+  // ⤒ ↑ ↓, at once on the page, and back with the home's reason in `#qwhy` when it refuses. The Up next
+  // order is `#qcards`' `data-upnext`, the whole order whatever the page hides.
+  AO.qcards = function (box) {
+    const foldKey = "qfold";
+    function applyFolds() {
+      const folded = new Set(store.get(foldKey, []));
+      $$(".qcard.hasrows", box).forEach((c) => {
+        const f = folded.has(c.dataset.card); c.classList.toggle("folded", f);
+        const h = $(".qhead", c); if (h) h.setAttribute("aria-expanded", f ? "false" : "true");
+      });
+    }
+    function toggleFold(card) {
+      const folded = new Set(store.get(foldKey, []));
+      if (folded.has(card.dataset.card)) folded.delete(card.dataset.card); else folded.add(card.dataset.card);
+      store.set(foldKey, [...folded]); applyFolds();
+    }
+    function upnext() { const q = $("#qcards", box); try { return JSON.parse(q.dataset.upnext || "[]"); } catch (e) { return []; } }
+    function placeCards(order) {  // the page's Up next cards in `order`, after its In progress ones
+      const q = $("#qcards", box); if (!q) return;
+      const ups = $$(".qcard[data-up]", q), at = (c) => order.indexOf(c.dataset.card);
+      const anchor = ups.length ? ups[0].previousElementSibling : null;
+      let after = anchor;
+      ups.sort((a, b) => at(a) - at(b)).forEach((c) => { if (after) after.after(c); else q.prepend(c); after = c; });
+      q.dataset.upnext = JSON.stringify(order);
+    }
+    async function moveCard(card, how) {
+      const before = upnext(), m = AO.rankMove(before, card.dataset.card, how);
+      if (!m) return;
+      const why = $("#qwhy", box); if (why) why.hidden = true;
+      placeCards(m.order);
+      try {
+        const r = await fetch("/api/rank/move", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ids: card.dataset.ids.split(" "), prev: m.prev, next: m.next }),
+        });
+        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
+      } catch (err) {
+        placeCards(before);
+        if (why) { why.textContent = `${card.dataset.card.replace(/^.*#/, "")} stays where it was: ${err.message}`; why.hidden = false; }
+      }
+    }
+    let dragged = null;
+    box.addEventListener("dragstart", (e) => {
+      const g = e.target.closest && e.target.closest(".qgrip[draggable]"); if (!g) return;
+      dragged = g.closest(".qcard"); dragged.classList.add("dragging");
+      try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragged.dataset.card); e.dataTransfer.setDragImage(dragged, 12, 12); } catch (err) {}
+    });
+    const dropOf = (e) => {
+      const c = dragged && e.target.closest && e.target.closest(".qcard[data-up]");
+      if (!c || c === dragged) return null;
+      const box2 = c.getBoundingClientRect();
+      return { card: c, before: e.clientY < box2.top + box2.height / 2 };
+    };
+    const clearDrop = () => $$(".qcard.dropbefore, .qcard.dropafter", box).forEach((c) => c.classList.remove("dropbefore", "dropafter"));
+    box.addEventListener("dragover", (e) => {
+      const d = dropOf(e); clearDrop(); if (!d) return;
+      e.preventDefault(); d.card.classList.add(d.before ? "dropbefore" : "dropafter");
+    });
+    box.addEventListener("drop", (e) => {
+      const d = dropOf(e); clearDrop(); if (!d) return;
+      e.preventDefault();
+      moveCard(dragged, d.before ? { before: d.card.dataset.card } : { after: d.card.dataset.card });
+    });
+    box.addEventListener("dragend", () => { clearDrop(); if (dragged) dragged.classList.remove("dragging"); dragged = null; });
+    box.addEventListener("click", (e) => {
+      const mv = e.target.closest(".qmove[data-move]");
+      if (mv) return moveCard(mv.closest(".qcard"), mv.dataset.move);
+      // a card's header folds it; a link, a button or the grip in it keeps its own press
+      const head = e.target.closest(".qcard.hasrows > .qhead");
+      if (head && !e.target.closest("a, button, .qgrip")) toggleFold(head.closest(".qcard"));
+    });
+    box.addEventListener("keydown", (e) => {  // a card's header is a button: Enter or Space folds it
+      const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qcard.hasrows > .qhead");
+      if (head) { e.preventDefault(); toggleFold(e.target.closest(".qcard")); }
+    });
+    applyFolds();
+    return { applyFolds, toggleFold };
+  };
+
+  // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
+  // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
+  // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
+  // re-read on the poll and on the `queue` event.
+  AO.queue = function () {
+    const box = $("#queuepage"); if (!box) return;
+    const lists = $("#queuelists", box);
+    const qc = AO.qcards(box);
+    function apply() {
+      qc.applyFolds();
+      const win = store.get("qwin", "day");
+      $$(".qwin", box).forEach((b) => b.setAttribute("aria-pressed", b.dataset.win === win ? "true" : "false"));
+      $$(".qwinword", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
+      let shown = 0;
+      $$(".qdline", box).forEach((el) => { el.hidden = !(el.dataset.w || "").split(" ").includes(win); if (!el.hidden) shown++; });
+      const none = $(".qdnone", box); if (none) none.hidden = shown > 0;
+    }
+    function openLine(line) {
+      const body = $(".qdbody", line), head = $(".qdhead", line); if (!body) return;
+      body.hidden = !body.hidden; head.setAttribute("aria-expanded", body.hidden ? "false" : "true");
+    }
+    function showHash() {
+      const id = AO.hashId(location.hash), row = id && document.getElementById(id);
+      if (!row || !box.contains(row)) return;
+      const card = row.closest(".qcard");
+      if (card && card.classList.contains("folded")) qc.toggleFold(card);
+      row.scrollIntoView({ block: "center" });
+    }
+    box.addEventListener("click", (e) => {
+      const w = e.target.closest(".qwin[data-win]");
+      if (w) { store.set("qwin", w.dataset.win); return apply(); }
+      const head = e.target.closest(".qdline.opens > .qdhead");
+      if (head && !e.target.closest("a, button")) openLine(head.parentElement);
+    });
+    box.addEventListener("keydown", (e) => {
+      const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qdline.opens > .qdhead");
+      if (head) { e.preventDefault(); openLine(e.target.parentElement); }
+    });
+    window.addEventListener("hashchange", showHash);
+    let busy = false;
+    async function reread() {
+      if (busy || box.querySelector(".qcard.dragging")) return; busy = true;
+      try {
+        const res = await fetch("/queue?part=1");
+        if (res.ok) {
+          const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
+          lists.innerHTML = await res.text();
+          opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
+          apply();
+        }
+      } catch (err) { /* the next poll tries again */ } finally { busy = false; }
+    }
+    apply();
+    showHash();
+    setInterval(reread, 30000);
+    let soon = null;
+    connectEvents((ev) => {
+      if (ev.event !== "queue") return;  // the mail a card carries re-reads it too once it is drawn there (slice 2)
+      clearTimeout(soon);
+      soon = setTimeout(() => { soon = null; reread(); }, 1500);
+    });
+  };
+
   AO.repo = function () {
     const box = $("#repopage"); if (!box) return;
     const repo = box.dataset.repo, whoKey = "doingwho:" + repo, teamKey = "doingteam:" + repo;
@@ -3388,70 +3533,10 @@
       $$(`.rrow.folded[data-list="${CSS.escape(key)}"]`, box).forEach((r) => r.classList.remove("folded"));
       const b = $(`[data-unfold="${CSS.escape(key)}"]`, box); if (b) { b.hidden = true; b.dataset.unfolded = key; }
     }
-    // The Technical debt cards (§4.5 screen 11 item 2, §4.5a *Queue page: card*, TD-770): a press on a
-    // card's header folds or opens it, which this browser remembers; an Up next card moves by its grip or
-    // ⤒ ↑ ↓, at once on the page, and back with the home's reason under the heading when it refuses.
-    const foldKey = "qfold";
-    function applyFolds() {
-      const folded = new Set(store.get(foldKey, []));
-      $$(".qcard.hasrows", box).forEach((c) => {
-        const f = folded.has(c.dataset.card); c.classList.toggle("folded", f);
-        const h = $(".qhead", c); if (h) h.setAttribute("aria-expanded", f ? "false" : "true");
-      });
-    }
-    function toggleFold(card) {
-      const folded = new Set(store.get(foldKey, []));
-      if (folded.has(card.dataset.card)) folded.delete(card.dataset.card); else folded.add(card.dataset.card);
-      store.set(foldKey, [...folded]); applyFolds();
-    }
-    function upnext() { const q = $("#qcards", box); try { return JSON.parse(q.dataset.upnext || "[]"); } catch (e) { return []; } }
-    function placeCards(order) {  // the page's Up next cards in `order`, after its In progress ones
-      const q = $("#qcards", box); if (!q) return;
-      const ups = $$(".qcard[data-up]", q), at = (c) => order.indexOf(c.dataset.card);
-      const anchor = ups.length ? ups[0].previousElementSibling : null;
-      let after = anchor;
-      ups.sort((a, b) => at(a) - at(b)).forEach((c) => { if (after) after.after(c); else q.prepend(c); after = c; });
-      q.dataset.upnext = JSON.stringify(order);
-    }
-    async function moveCard(card, how) {
-      const before = upnext(), m = AO.rankMove(before, card.dataset.card, how);
-      if (!m) return;
-      const why = $("#qwhy", box); if (why) why.hidden = true;
-      placeCards(m.order);
-      try {
-        const r = await fetch("/api/rank/move", {
-          method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ ids: card.dataset.ids.split(" "), prev: m.prev, next: m.next }),
-        });
-        if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
-      } catch (err) {
-        placeCards(before);
-        if (why) { why.textContent = `${card.dataset.card.replace(/^.*#/, "")} stays where it was: ${err.message}`; why.hidden = false; }
-      }
-    }
-    let dragged = null;
-    box.addEventListener("dragstart", (e) => {
-      const g = e.target.closest && e.target.closest(".qgrip[draggable]"); if (!g) return;
-      dragged = g.closest(".qcard"); dragged.classList.add("dragging");
-      try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", dragged.dataset.card); e.dataTransfer.setDragImage(dragged, 12, 12); } catch (err) {}
-    });
-    const dropOf = (e) => {
-      const c = dragged && e.target.closest && e.target.closest(".qcard[data-up]");
-      if (!c || c === dragged) return null;
-      const box2 = c.getBoundingClientRect();
-      return { card: c, before: e.clientY < box2.top + box2.height / 2 };
-    };
-    const clearDrop = () => $$(".qcard.dropbefore, .qcard.dropafter", box).forEach((c) => c.classList.remove("dropbefore", "dropafter"));
-    box.addEventListener("dragover", (e) => {
-      const d = dropOf(e); clearDrop(); if (!d) return;
-      e.preventDefault(); d.card.classList.add(d.before ? "dropbefore" : "dropafter");
-    });
-    box.addEventListener("drop", (e) => {
-      const d = dropOf(e); clearDrop(); if (!d) return;
-      e.preventDefault();
-      moveCard(dragged, d.before ? { before: d.card.dataset.card } : { after: d.card.dataset.card });
-    });
-    box.addEventListener("dragend", () => { clearDrop(); if (dragged) dragged.classList.remove("dragging"); dragged = null; });
+    // The Technical debt cards (§4.5 screen 11 item 2, TD-770): the Queue's own, folded, opened and moved
+    // as on the Queue page (`AO.qcards`)
+    const qc = AO.qcards(box);
+    const applyFolds = qc.applyFolds, toggleFold = qc.toggleFold;
     // A link to an entry (`/repo/<name>#TD-227`, the Inbox's team start row) names a row its list may
     // have folded, and a hidden row cannot be scrolled to: unfold that list, then go to the row. On the
     // cards, the card that holds the entry is opened first (§4.5a *Repo page: Technical debt cards*).
@@ -3478,11 +3563,6 @@
       if (chip) { store.set(whoKey, chip.dataset.who); if (!chip.dataset.who) store.set(teamKey, ""); return apply(); }
       const more = e.target.closest("[data-unfold]");
       if (more) return unfold(more.dataset.unfold);
-      const mv = e.target.closest(".qmove[data-move]");
-      if (mv) return moveCard(mv.closest(".qcard"), mv.dataset.move);
-      // a card's header folds it; a link, a button or the grip in it keeps its own press
-      const head = e.target.closest(".qcard.hasrows > .qhead");
-      if (head && !e.target.closest("a, button, .qgrip")) return toggleFold(head.closest(".qcard"));
       // **Hold** / **Release** on an entry (§4.5a, TD-710, TD-736): the home's clock, no ledger edit
       const hold = e.target.closest("[data-tdhold]");
       if (hold && !hold.disabled) return holdEntry(hold);
@@ -3491,10 +3571,6 @@
       if (badge && badge.dataset.team) { location.href = "/?team=" + encodeURIComponent(badge.dataset.team); return; }
       const i = e.target.closest(".rsec .imark");
       if (i) { const panel = document.getElementById(i.getAttribute("aria-controls")); if (panel) { panel.hidden = !panel.hidden; i.setAttribute("aria-expanded", panel.hidden ? "false" : "true"); } }
-    });
-    box.addEventListener("keydown", (e) => {  // a card's header is a button: Enter or Space folds it
-      const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qcard.hasrows > .qhead");
-      if (head) { e.preventDefault(); toggleFold(e.target.closest(".qcard")); }
     });
     layout();  // the cards' order, the folds and the facets' faces, as the Org draws them
     apply();

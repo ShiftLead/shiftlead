@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Queue · ShiftLead{% endblock %}
+{% block body %}
+{# design §4.5 screen 12 **Queue** (TD-748, built by TD-771; §4.5a *Queue page*): one card per effort,
+   ranked by the person, in three groups furthest through first — Recently completed, In progress, Up
+   next — drawn from the home's `queue` reading by `ui.queue.queue_view` and the partials the Repo page
+   shares. The lists are `queue_part.html`, which the page re-reads on its poll and on the `queue`
+   event. #}
+<div class="page queuepage" id="queuepage">
+<div id="queuelists">{% include "queue_part.html" %}</div>
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.queue();</script>{% endblock %}

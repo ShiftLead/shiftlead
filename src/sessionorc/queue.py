@@ -38,8 +38,14 @@ PERSON = ledger_mod.PERSON_OWNER
 DESIGNER = ledger_mod.DESIGNER_OWNER
 NO_LANE = ("evaluation", "other")  # the page kinds no lane takes (§4.4 *Repo facts*)
 DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
+# an archived entry's `Resolved:` text as the page opens it (§4.5 screen 12 *Recently completed*), clipped
+RESOLVED_CLIP = 600
 RESOLVED_PR = re.compile(r"\(PR #(\d+)\)")
 ANY_PR = re.compile(r"#(\d+)")
+# an archived entry's `**Resolved:**` line, wherever its body writes it — most write it last, under the
+# header block, where ledgerboard's `fields` do not reach
+ENTRY_HEAD = re.compile(r"^## (TD-\d+):", re.M)
+RESOLVED_LINE = re.compile(r"^\*\*Resolved:\*\*[ \t]*(.+)$", re.M)
 
 # the archive's entries per file: (mtime_ns, size, blob sha, entries) — re-parsed only when its blob changes
 _ARCHIVES: dict[str, tuple[int, int, str, list[dict[str, Any]]]] = {}
@@ -57,7 +63,8 @@ def blob_sha(data: bytes) -> str:
 
 def archive_entries(path: Path) -> list[dict[str, Any]]:
     """ledgerboard's `entries()` of an archive file, cached by its blob sha (a stat first, so an
-    unchanged file is not even read). A file that cannot be read has none."""
+    unchanged file is not even read), each entry's `fields` carrying its `resolved` line wherever the
+    body writes it. A file that cannot be read has none."""
     key = str(path)
     try:
         st = path.stat()
@@ -75,7 +82,17 @@ def archive_entries(path: Path) -> list[dict[str, Any]]:
     if got and got[2] == sha:
         _ARCHIVES[key] = (st.st_mtime_ns, st.st_size, sha, got[3])
         return got[3]
-    ents = lb.entries(ledger_mod.strip_comments(data.decode("utf-8", errors="replace")))
+    text = ledger_mod.strip_comments(data.decode("utf-8", errors="replace"))
+    ents = lb.entries(text)
+    resolved: dict[str, str] = {}
+    heads = list(ENTRY_HEAD.finditer(text))
+    for i, h in enumerate(heads):
+        body = text[h.end() : heads[i + 1].start() if i + 1 < len(heads) else len(text)]
+        if m := RESOLVED_LINE.search(body):
+            resolved.setdefault(h.group(1), m.group(1).strip())
+    for e in ents:
+        if "resolved" not in e["fields"] and e["id"] in resolved:
+            e["fields"] = {**e["fields"], "resolved": resolved[e["id"]]}
     _ARCHIVES[key] = (st.st_mtime_ns, st.st_size, sha, ents)
     return ents
 
@@ -142,6 +159,23 @@ def _resolved_date(fields: Mapping[str, str]) -> str:
     return m.group(0) if m else ""
 
 
+def _resolved_text(fields: Mapping[str, str]) -> str:
+    line = " ".join(str(fields.get("resolved") or "").split())
+    return line if len(line) <= RESOLVED_CLIP else line[: RESOLVED_CLIP - 1].rstrip() + "…"
+
+
+def _closed(fields: Mapping[str, str], close: Mapping[str, Any] | None) -> str:
+    """When an archived entry closed: the closing commit's time where the repo reading's *What closed*
+    holds it (TD-604), else its `Resolved:` date — what the page's windows count by."""
+    return str((close or {}).get("closed") or "") or _resolved_date(fields)
+
+
+def _closed_order(closed: str) -> datetime:
+    """A close as an instant to order by: a commit's time, else a `Resolved:` date as the end of its day."""
+    when = _when(closed if not DATE.fullmatch(closed) else f"{closed}T23:59:59+00:00")
+    return when or datetime.min.replace(tzinfo=UTC)
+
+
 def _key_sort(key: str, q: str) -> tuple[tuple[int, ...], int, str]:
     repo, _, tid = q.partition("#")
     return lb.key_order(key), int(tid[3:]), repo
@@ -196,6 +230,11 @@ def reading(
         path = Path(rs.roots[name]) / ledger_mod.archive_path(str(r["ledger"].get("path") or ledger_mod.DEFAULT))
         for a in archive_entries(path):
             archived.setdefault(qid(name, a["id"]), {**a, "repo": name})
+    closed_at: dict[str, Mapping[str, Any]] = {}  # *What closed* (TD-604): the closing commit's time and PR
+    for name, r in rs.by_name.items():
+        for c in r.get("completed") or []:
+            if isinstance(c, Mapping) and c.get("id"):
+                closed_at.setdefault(qid(name, c["id"]), c)
 
     def xref(item: str) -> str | None:
         m = lb.XREPO_ITEM_RE.match(item)
@@ -320,6 +359,8 @@ def reading(
             "key": "",
             "lined": False,
             "archived": True,
+            "closed": _closed(a["fields"], closed_at.get(q)),
+            "resolved": _resolved_text(a["fields"]),
         }
 
     cards: list[dict[str, Any]] = []
@@ -340,7 +381,7 @@ def reading(
         del c["members"]
     return {
         "cards": cards,
-        "completed": _completed(archived, open_, names_open, rs, xref, now),
+        "completed": _completed(archived, open_, names_open, closed_at, xref, now),
         "other_work": other,
         "at": now.isoformat(),
     }
@@ -540,13 +581,15 @@ def _completed(
     archived: Mapping[str, Mapping[str, Any]],
     open_: Mapping[str, Mapping[str, Any]],
     names_open: Mapping[str, set[str]],
-    rs: _Repos,
+    closed_at: Mapping[str, Mapping[str, Any]],
     xref: Any,
     now: datetime,
 ) -> list[dict[str, Any]]:
     """The completed cards (§4.4 *Completed cards*): the archive's components across repos none of
     whose members an open entry names and whose own `Blocked by:` names no open id, dated by the
-    latest `Resolved:` date of its members, its PR from that line, else *What closed*."""
+    latest `Resolved:` date of its members, its PR from that line, else *What closed*. `entries` are its
+    members as the page opens the card — `qid`, `id`, `title`, `priority`, `closed` (`_closed`), `pr` and
+    `resolved`, the `Resolved:` text — newest first, and `at` the newest `closed`."""
     named_by_open: set[str] = set()
     for e in open_.values():
         named_by_open.update(qid(e["repo"], b) for b in e.get("blocked_ids") or [])
@@ -568,11 +611,6 @@ def _completed(
     comps: dict[str, list[str]] = {}
     for q in archived:
         comps.setdefault(find(q), []).append(q)
-    closed_at: dict[str, Mapping[str, Any]] = {}
-    for name, r in rs.by_name.items():
-        for c in r.get("completed") or []:
-            if isinstance(c, Mapping) and c.get("id"):
-                closed_at.setdefault(qid(name, c["id"]), c)
     out: list[dict[str, Any]] = []
     since = (now - COMPLETED_WINDOW).date()
     for members in comps.values():
@@ -587,6 +625,21 @@ def _completed(
         except ValueError:
             continue
         pr = _resolved_pr(archived[last]["fields"]) or (closed_at.get(last) or {}).get("pr")
+        ents = []
+        for q in members:
+            a = archived[q]
+            ents.append(
+                {
+                    "qid": q,
+                    "id": a["id"],
+                    "title": a.get("title") or "",
+                    "priority": (a.get("priority") or "").lower(),
+                    "closed": _closed(a["fields"], closed_at.get(q)),
+                    "pr": _resolved_pr(a["fields"]) or (closed_at.get(q) or {}).get("pr"),
+                    "resolved": _resolved_text(a["fields"]),
+                }
+            )
+        ents.sort(key=lambda e: _closed_order(e["closed"]), reverse=True)
         out.append(
             {
                 "id": min(members, key=lambda q: (int(q.partition("#")[2][3:]), q)),
@@ -594,6 +647,8 @@ def _completed(
                 "titles": {q: archived[q].get("title") or "" for q in members},
                 "closed": str(when),
                 "pr": pr,
+                "entries": ents,
+                "at": ents[0]["closed"] if ents else str(when),
             }
         )
     out.sort(key=lambda c: c["closed"], reverse=True)

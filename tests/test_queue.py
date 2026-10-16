@@ -299,3 +299,41 @@ def test_review_findings_designer_wait_archived_claim_person_hold_one_flag(tmp_p
     assert cards["r#TD-003"]["top"]["state"] == "held (person)"
     assert [f["by"] for f in cards["r#TD-004"]["passed_over"]] == ["w"]
     assert [o["ref"] for o in q["other_work"]] == ["TD-009"]
+
+
+def test_a_resolved_line_at_the_foot_of_an_archived_entry_is_read(tmp_path):
+    # TD-771: most archived entries write `**Resolved:**` last, under the header block, where ledgerboard's
+    # fields do not reach — the row's PR, its date and its text are still read
+    foot = (
+        "## TD-002: done last week\n\n**Priority:** High\n**Blocked by:** TD-009\n\n**Why:** a step.\n\n"
+        "**Resolved:** 2026-10-15 (grinder, #812) — what was done.\n\n"
+    )
+    alone = "## TD-003: a card of its own\n\n**Priority:** Low\n\n**Resolved:** 2026-10-14 (grinder, #800) — built.\n"
+    root, r = _repo(tmp_path, "r", [_entry(9, "open", Priority="Low", Blocked_by="TD-002")], archive=[foot, alone])
+    q = _cards({root: r})
+    row = q["cards"][0]["rows"][0]
+    assert (row["state"], row["pr"], row["closed"]) == ("done #812", 812, "2026-10-15")
+    assert row["resolved"] == "2026-10-15 (grinder, #812) — what was done."
+    (done,) = q["completed"]
+    assert (done["id"], done["pr"], done["at"]) == ("r#TD-003", 800, "2026-10-14")
+    (e,) = done["entries"]
+    assert (e["qid"], e["title"], e["priority"]) == ("r#TD-003", "a card of its own", "low")
+    assert (e["closed"], e["pr"]) == ("2026-10-14", 800)
+    assert e["resolved"] == "2026-10-14 (grinder, #800) — built."
+
+
+def test_an_archived_entrys_close_is_the_commits_time_where_the_reading_holds_it(tmp_path):
+    root, r = _repo(tmp_path, "r", [_entry(9, "open", Priority="Low")],
+                    archive=[_entry(1, "closed today", Resolved=f"{TODAY} — done (PR #5).")])  # fmt: skip
+    r["completed"] = [{"id": "TD-001", "closed": f"{TODAY}T09:30:00+00:00", "pr": 5}]
+    (done,) = _cards({root: r})["completed"]
+    assert done["at"] == f"{TODAY}T09:30:00+00:00" and done["entries"][0]["closed"] == done["at"]
+
+
+def test_a_completed_cards_entries_are_ordered_by_instant_a_bare_date_its_days_end(tmp_path):
+    root, r = _repo(tmp_path, "r", [_entry(9, "open", Priority="Low")],
+                    archive=[_entry(1, "a commit's time", Resolved=f"{TODAY} — (PR #5)."),
+                             _entry(2, "a bare date", Blocked_by="TD-001", Resolved=f"{TODAY} (PR #6).")])  # fmt: skip
+    r["completed"] = [{"id": "TD-001", "closed": f"{TODAY}T09:30:00-06:00", "pr": 5}]
+    (done,) = _cards({root: r})["completed"]
+    assert [e["id"] for e in done["entries"]] == ["TD-002", "TD-001"] and done["at"] == TODAY

@@ -30,6 +30,7 @@ PAGES = {
     "new.html": "/new",
     "help.html": "/help",
     "settings.html": "/settings",
+    "queue.html": "/queue",
     "repo.html": "/repo/samscrape",
 }
 
