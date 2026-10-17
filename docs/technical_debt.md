@@ -66,7 +66,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Designed — built by TD-802 |
-| TD-802 | Build TD-801: the person's own shell passes the acting gate — `act_gate` reads `person_shell`, a create from it adds no creator and is not attenuated, the usage gate's send refusal passes it | Medium | Open |
+| TD-802 | Build TD-801: the person's own shell passes the acting gate — `act_gate` reads `person_shell`, a create from it adds no creator and is not attenuated, the usage gate's send refusal passes it | Medium | Building — slice 1 #1988 |
 
 ---
 
@@ -1311,7 +1311,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (TD-801's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Building — slice 1 (one host) by #1988: `mail.as_person` at `act_gate`, the usage gate's `send`, `create`'s creator seeding, `start_of`, `keep_mail`, `succeeds`, `_refuse_suspended` (create, resume, `succeeds`, Forget), `set_start` at the ceiling, `host_files`, the refills on `send`, `keys` and `decide`, the *dropped by the person* note; `person_only` reads it too; `tests/test_person_shell_acts.py`. Slice 2, the link: `agent_remote._route_act` and `_lift_by_person` (every act from the shell forwarded with no caller, a create lifting a suspended name), `_forwarded`'s bound for a node's shell, `modes.offline_refusal` taking the node's records — with the Done-when's routed-create, node-ceiling and node-shell tests.
 **Location:** design §4.8 *The person's own shell is the person*, §9 invariants 5 and 11, §6 *Usage gate*, §4.4a; `src/sessionorc/modes.py` (`offline_refusal`, its call in `agent_serve.py` ~L370); `src/sessionorc/mail.py` (`act_gate` ~L229, `person_shell`, new `as_person`), `src/sessionorc/agent_remote.py` (`host_files`, `_route_act`, `_lift_by_person`), `src/sessionorc/agent_hook.py` (the refill), `src/sessionorc/agent.py` (`_gate` ~L3226 and its usage-gate `send` check; `create`'s *Create adds the creator* seeding ~L1084), `src/sessionorc/agent_serve.py` (the caller injected after the gate ~L389); tests beside the gate's and `person_only`'s
 
 **Why:** TD-801: `ao team flow ao-grind --apply` from **Open shell here** was refused with *needs the control grant*; Paul: *a shell should be considered my permissions*.
