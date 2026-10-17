@@ -122,7 +122,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      the supersede so the count survives the restart it counts, and drawn for `RESTART_WINDOW` as
      the card's **restarted** chip, §4.5a; each replay's entry also carries
      `done: [{ref, pr}]` and `left: [ref]`, what the run it replaced reported and what it claimed
-     and did not close, from the old record's `progress`, which the new record does not keep);
+     and did not close, from the old record's `progress`, which the new record does not keep but for
+     its waiting claims, rule 5);
      **the mail is kept**: every replay of the tick's — this rule's, rule 2's, rule 7's and
      rule 8's — is a `create` with `keep_mail` (§4.9b), so the closed run's inbox and outbox move
      to the new record and a reply to an `ask` the run before sent — a reader's to a held PR's,
@@ -332,7 +333,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `controllers`, every seat is its own group with six fills an hour of its own.
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
-     `dropped` entry, a declared `claimed` entry with no `done` or `dropped`, or, for a seat,
+     `dropped` entry, a declared `claimed` entry with no `done` or `dropped` that is not a waiting
+     claim (rule 5, TD-820: its next move is someone else's), or, for a seat,
      `seat_due` set (a question waiting on an idle techlead) — and no declaration, no pending, not
      gated, **no live subagent and no live background shell** (§4.2 *Working on its own*, the card's reading: its own work is
      running, and its card says *working*; TD-734, TD-761; the twenty minutes count from the later of
@@ -416,8 +418,29 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      layers*) is told so **once it is hook-confirmed `idle` and holds no claim in progress** —
      between entries, never mid-turn — by **one fixed line** through `send`'s path, as rule 4's
      is: *[shiftlead] context 231k, over your 200k bound — take nothing new: push, ledger, then
-     `ao progress restart --why "context bound"`*; `context_sent_at` marks it, and it is sent
-     again after twenty minutes if the member is still idle and over. A member that is `working`
+     `ao progress restart --why "context bound"`*, with *; #2015, #2018 carry over* when it holds
+     waiting claims; `context_sent_at` marks it, and it is sent again after twenty minutes if the
+     member is still idle and over. **A waiting claim is not in progress, for this rule and rule 4**
+     (TD-820; rules 9 and 3, the flow's restart (§4.9c) and §4.10 still count it as in progress):
+     a claim whose PR is open (the claim's `pr` or `review_pr`, TD-814's *review* phase) **and**
+     whose next move is someone else's — the *waiting* reading of §4.2: an open `ask` or `steer` of
+     the member's about that reference, or its ask held in a seat's `prs_waiting.asks`. A designer's
+     design waiting on its steer's bound or its reader is a waiting claim; a PR whose CI runs or which
+     waits on its own author's merge is not, since the author's context is what moves it. So a member
+     holding only waiting claims is between entries, and a designer — which holds designs open while
+     their steers run, and so was never told — is told as a grinder is (TD-820: 955 of the
+     designer's 4,105 requests in a week were over 300k). **A replay carries the waiting claims**:
+     every replay of the tick's that keeps mail (rules 1, 2, 7 and 8, `_replay`) copies the old run's
+     waiting claims onto the new record, as a succession carries its claims (§4.9, TD-706), each
+     stamped with the replay's `at` — a renewal of the lease, which §4.8 *A claim is a lease* reads as
+     claiming again — so no other member takes a design whose steer is still running; `left` names
+     the claims that were not waiting, and a person's **Restart** still starts fresh (rule 2). A
+     steer that lapses or is answered meanwhile reaches the new run by the kept mail (§4.10 *A
+     question about a reference outlives its asker*). The new run reads its carried claims first
+     (`ao status --json`, its own `progress`) and finishes each from its PR, its thread and the
+     entry, which hold everything the old run knew of it; a run holding only waiting claims with
+     nothing to pick declares `none` beside them (§4.9a) and ends its turn, woken by the reply or
+     the lapse. A member that is `working`
      past the bound is not interrupted: every `ao` reply it makes ends with *(context 231k over
      the 200k bound)* beside the unread line (§4.10 *Busy for hours*), and its brief says what that
      means — finish the entry in hand, then declare; for a manager, end the round with the
