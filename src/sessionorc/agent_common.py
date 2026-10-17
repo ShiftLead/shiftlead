@@ -318,9 +318,7 @@ def person_only(caller: Any, act: str, section: str, records: Mapping[str, Sessi
     person's own shell (`mail.person_shell`, TD-580), read from `records` at the call: the one graph
     (`_graph`), so a node's shell forwarding a home edit is read from the home's copy of its record
     under `id@host`. A caller it does not hold stays a session, refused."""
-    if mail.is_person(caller):
-        return
-    if mail.person_shell(records.get(caller) if isinstance(caller, str) else None):
+    if mail.as_person(caller, records):
         return
     raise RpcError(
         f"{caller} cannot {act}: a person's own act, refused to every session but the person's own shell "

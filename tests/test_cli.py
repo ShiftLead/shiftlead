@@ -366,7 +366,8 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     def out():
         return json.loads(capsys.readouterr().out)
 
-    assert cli.main(["--json", "shell", "ga", "-d", str(tmp_path)]) == 0
+    (tmp_path / "ga").mkdir()  # a session, not a shell: a directory of its own (the anchor rule)
+    assert cli.main(["--json", "new", "ga", "-a", "agentshell", "-d", str(tmp_path / "ga")]) == 0
     a = out()["id"]
     (tmp_path / "gb").mkdir()  # an agent stand-in (it is made unattended) in a directory of its own
     assert cli.main(["--json", "new", "gb", "-a", "agentshell", "-d", str(tmp_path / "gb")]) == 0
@@ -414,7 +415,8 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
         return json.loads(capsys.readouterr().out)
 
     monkeypatch.chdir(tmp_path)  # `ao control orc add w1` resolves bare names against the cwd
-    assert cli.main(["--json", "shell", "orc", "-d", str(tmp_path)]) == 0
+    (tmp_path / "orc").mkdir()  # a session, not a shell: a directory of its own (the anchor rule)
+    assert cli.main(["--json", "new", "orc", "-a", "agentshell", "-d", str(tmp_path / "orc")]) == 0
     orc = out()["id"]
     (tmp_path / "w1").mkdir()  # an agent stand-in (it is made unattended) in a directory of its own
     assert cli.main(["new", "w1", "-a", "agentshell", "-d", str(tmp_path / "w1")]) == 0

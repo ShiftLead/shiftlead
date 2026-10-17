@@ -122,9 +122,12 @@ async def test_a_session_answers_a_permission_only_as_a_controller(agent, hookst
     than *you*, and it refills nothing (§4.10: a controller's act never restores the wake budget).
     A person's answer, no caller, is served as ever (`test_permission_roundtrip`)."""
     async with LocalClient() as person:
-        lead = (await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))[
-            "id"
-        ]
+        (tmp_path / "lead").mkdir()  # a session, so a directory of its own (the anchor rule)
+        lead = (
+            await person.call(
+                "create", name="lead", dir=str(tmp_path / "lead"), adapter="agentshell", argv=["bash", "--norc"]
+            )
+        )["id"]
         w = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True))["id"]
 
         async def hook():

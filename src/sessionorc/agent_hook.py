@@ -193,7 +193,7 @@ class HookMixin:
         # person's answer is never too quick to record
         self._attention_ended(s.id, self._answered_by(behavior, caller))
         s.set_state("working", confidence="hook")
-        if mail.is_person(caller):
+        if mail.as_person(caller, self._graph()):
             self._refill(s)  # a person's answer to its permission; a controller's refills nothing (§4.10)
         self.store.save(s)
         await self._push_changes()

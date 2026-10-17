@@ -20,7 +20,9 @@ async def test_a_supervised_create_writes_its_launch_record_and_forget_removes_i
     async with LocalClient() as person:
         plain = await person.call("create", name="plain", **shell)
         assert plain["supervised"] is False and not _launch(plain["id"]).exists()
-        mgr = (await person.call("create", name="mgr", capabilities=["control"], **shell))["id"]
+        mgr = (await person.call("create", name="mgr", capabilities=["control"], **{**shell, "adapter": "agentshell"}))[
+            "id"
+        ]
         async with LocalClient(caller=mgr) as mc:
             s = await mc.call(
                 "create",

@@ -203,7 +203,8 @@ def person_shell(record: Session | None) -> bool:
     session, interactive, with no role, no team and no controller — what **Open shell here**, **+ New
     ▾ Shell** and `ao shell` make, and what no session can make, since a session's shell lists its
     creator as a controller from birth. Read from the record at each request, never kept: `ao mode`,
-    `ao control … add` or a role ends it on the next call. The one exception to `PERSON_ONLY`."""
+    `ao control … add` or a role ends it on the next call. The one exception to `PERSON_ONLY`, and it
+    passes the acting gate and every other act a person passes (`as_person`, TD-801)."""
     return (
         record is not None
         and record.adapter == "shell"
@@ -212,6 +213,17 @@ def person_shell(record: Session | None) -> bool:
         and not record.team
         and not record.controllers
     )
+
+
+def as_person(caller: Any, records: Mapping[str, Session]) -> bool:
+    """Whether a request passes where a person passes an act (design §4.8 *The person's own shell is
+    the person*, TD-801): no caller (`is_person`), or a caller whose record in `records` — the one
+    graph, so a node's shell under `id@host` is read from the home's copy — is the person's own shell
+    (`person_shell`). A caller that is not a string, or one `records` does not hold, is a session.
+    `is_person` stays where the absent caller itself is meant: who sent, who closed, the identity."""
+    if is_person(caller):
+        return True
+    return isinstance(caller, str) and person_shell(records.get(caller))
 
 
 Controllers = Callable[[Session], list[str]]
@@ -249,8 +261,11 @@ def act_gate(
     Third, §9 invariant 5 (TD-041): a target that is a person's session (`kind: interactive`
     and not `unattended`) is refused to every session, grant and membership notwithstanding.
 
+    The person's own shell (`as_person`, TD-801) passes as no caller does — grant, membership,
+    invariant 5 and the self-act branches alike: the shell is the person.
+
     Returns the refusal, or None when the call passes."""
-    if is_person(caller) or method not in ACTING_RPCS:
+    if as_person(caller, records) or method not in ACTING_RPCS:
         return None
     if method == "decide" and params.get("id") == caller:
         return self_decide_refusal(caller)

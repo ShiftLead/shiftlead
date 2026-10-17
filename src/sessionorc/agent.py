@@ -1057,7 +1057,11 @@ class HostAgent(
         starting = self.sessions.get(str(start_of)) if start_of else None
         if start_of and (starting is None or starting.state != "scheduled"):
             raise RpcError(f"{start_of} is not a scheduled record: nothing to start (design §6 Start time)")
-        if starting is not None and not mail.is_person(caller) and self._addr(str(caller)) not in self._ctl(starting):
+        if (
+            starting is not None
+            and not mail.as_person(caller, self._graph())
+            and self._addr(str(caller)) not in self._ctl(starting)
+        ):
             # starting a scheduled record supersedes it and takes its mailbox: an act on that record,
             # open to a person and to its own controllers, as keep_mail's is (§4.9b, §9 invariant 11);
             # the tick's own start calls with no caller (techlead's read of #669)
@@ -1079,9 +1083,10 @@ class HostAgent(
         # started, without a second call and without a person in the loop. `caller` is the request
         # envelope's, injected by the dispatcher — a person's create has none, and then the new
         # session begins with only whatever `--controller` asked for (often nothing, which means
-        # nobody may act on it: the explicit default).
+        # nobody may act on it: the explicit default). The person's own shell creates as the person
+        # does (§4.8 *The person's own shell is the person*, TD-801): no creator in the child's list.
         members = [self._addr(c) for c in _controllers(controllers or [])]
-        if caller and caller not in members:
+        if caller and not mail.as_person(caller, self._graph()) and caller not in members:
             members.insert(0, str(caller))
         try:
             ad = adapters.get(adapter)
@@ -1411,7 +1416,7 @@ class HostAgent(
             raise RpcError(
                 "--keep-mail keeps the mail of the record this name held, and no record holds it (design §4.9b)"
             )
-        if not mail.is_person(caller) and self._addr(str(caller)) not in self._ctl(holder):
+        if not mail.as_person(caller, self._graph()) and self._addr(str(caller)) not in self._ctl(holder):
             raise RpcError(
                 f"{caller} is not a controller of {holder.id}: handing a record's mailbox to a successor is an act "
                 "on that record, open to a person and to its own controllers (design §4.9b, §9 invariant 11)"
@@ -1439,7 +1444,7 @@ class HostAgent(
                 f"{old.name} holds this name already: keep_mail is how a start under it keeps the mail {rule}"
             )
         self._refuse_suspended(old, caller, "a create that succeeds it")
-        if not mail.is_person(caller) and self._addr(str(caller)) not in self._ctl(old):
+        if not mail.as_person(caller, self._graph()) and self._addr(str(caller)) not in self._ctl(old):
             raise RpcError(
                 f"{caller} is not a controller of {old.id}: succeeding a record takes its mailbox, an act on that "
                 "record, open to a person and to its own controllers (design §4.9b, §9 invariant 11)"
@@ -1582,14 +1587,13 @@ class HostAgent(
         }
         return out, holder
 
-    @staticmethod
-    def _refuse_suspended(s: Session, caller: Any, road: str) -> None:
+    def _refuse_suspended(self, s: Session, caller: Any, road: str) -> None:
         """A suspended record is not brought back by a session (design §4.8a *An alarm's answers*,
         TD-077 a2). Both roads are closed — `create` under its name, and `create --resume` of its
         conversation — which is **the one exception to §4.1's rule that an exited holder is
         superseded**, and §4.1 says so. A **person** walks either road freely: their own resume is
         one of the two things that lift a suspension, the other being Forget."""
-        if not s.suspended or mail.is_person(caller):
+        if not s.suspended or mail.as_person(caller, self._graph()):
             return
         mark = s.suspended
         raise RpcError(
@@ -2229,7 +2233,7 @@ class HostAgent(
         s.wrapup_at = now_iso() if wrapup else None
         s.wrapup_by = closer_of(caller, None, "")["by"] if wrapup else None  # who stopped it (§6 rule 8, TD-781)
         entry = self._record_send(s, caller, text)
-        if mail.is_person(caller):
+        if mail.as_person(caller, self._graph()):
             self._refill(s)
         try:
             state_sent, rev_sent = await self._submit(id, adapters.get(s.adapter), text)
@@ -2396,7 +2400,7 @@ class HostAgent(
         s = self._get(id)
         self._refuse_gone(s)
         self._record_send(s, caller, " ".join(str(k) for k in keys))
-        if mail.is_person(caller):
+        if mail.as_person(caller, self._graph()):
             self._refill(s)  # keys are how a person answers a menu or a question in the pane
         await asyncio.to_thread(lambda: self.tmux.run("send-keys", "-t", f"={id}:", *keys))
 
@@ -2681,7 +2685,7 @@ class HostAgent(
         s = self._find(id)
         if s.state != "scheduled":
             raise RpcError(f"{id} is {s.state}, not scheduled: a start time is for a record that has not started")
-        if mail.is_person(caller):
+        if mail.as_person(caller, self._graph()):
             # a person's new time is a new start: a ceiling the failed starts reached, and the count
             # that reached it, are spent — as a person's own Resume starts rule 1's count again (§6)
             s.restart_ceiling = None
@@ -2821,7 +2825,7 @@ class HostAgent(
             s.lane_seen = None  # rule 6's memory goes with the declaration it was about (TD-195)
             if s.balance_refused and not self._balance_of(s):
                 s.balance_refused = None  # the line cleared and the member claimed: nothing left to ring
-        if applied and status == "dropped" and entry.source == "declared" and mail.is_person(caller):
+        if applied and status == "dropped" and entry.source == "declared" and mail.as_person(caller, self._graph()):
             # §4.5a *Reports* → Drop, §4.10 (TD-150 slice 3): the session is told its lease went, by a
             # `system` note that wakes it as a person's act does — else it works on, holding nothing
             self._system_note(
@@ -3232,7 +3236,7 @@ class HostAgent(
         reason = mail.act_gate(graph, caller, method, params, controllers=self._ctl)
         if reason:
             raise RpcError(reason)
-        if method == "send" and not mail.is_person(caller) and params.get("id") != caller:
+        if method == "send" and not mail.as_person(caller, graph) and params.get("id") != caller:
             # design §6 *Usage gate*: while gated, a controller's send is refused here, at the home,
             # read from the record's `gated` — a node-owned field, so a replica carries it. A person's
             # own send is not (§9 invariant 11): the way past the gate is a person's.
