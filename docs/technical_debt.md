@@ -1554,7 +1554,7 @@ The other cases:
 **Added:** 2026-10-17 (TD-819's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** In progress — slice 1 (2026-10-17, grinder-ao-1): the sampler, `shape.json`, the reading and its rules, and the `shape` RPC (`src/sessionorc/shape.py`, `agent_shape.py`); §4.4 *Team shape* now says how the home reads the stages from the records, since it sees no flow. Left: the reading's per-role count and median of spend per finished entry, read from `seats` once TD-830 (#2049) merges.
 **Location:** design §4.4 *Team shape*, §4.2 (*Waiting*, *working on its own*), §4.9b (`prs_waiting`), §4.9c (stages); `src/sessionorc/ledger.py` (`in_lanes`, read only, over the home's `_repos` readings as `_balance_marks` and `_repo_view` in `agent_tick.py` already read it — not `shiftlead.teamrun`, which sessionorc never imports), `src/sessionorc/work.py` (`waiting_of`, read only), a new `src/sessionorc/shape.py` (the file, the classes, the rules) beside `spend.py`, `src/sessionorc/agent_tick.py` (the minute's sample), `src/sessionorc/agent_spend.py` or a new mixin (`rpc_shape`), `src/sessionorc/paths.py`
 
 **Why:** TD-819: whether a team has the right members cannot be read. Nothing records how long a member waited for work, or work for a member.

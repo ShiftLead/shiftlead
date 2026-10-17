@@ -53,6 +53,7 @@ READS = frozenset(
         "repos",
         "doing_log",
         "queue",
+        "shape",
         "gate",
         "adapters",
         "ping",

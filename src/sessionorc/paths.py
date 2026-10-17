@@ -138,6 +138,12 @@ def repos_file() -> Path:
     return home() / "repos.json"
 
 
+def shape_file() -> Path:
+    """The teams' shape (design §4.4 *Team shape*, TD-834): each running team's members by class and its
+    stages' queues, sampled once a minute and kept per day (`sessionorc.shape`)."""
+    return home() / "shape.json"
+
+
 def ids_file() -> Path:
     """The ledger ids the home gave (design §4.4 *A ledger entry's id is handed out by the home*, TD-696):
     `{<origin>: {last, given: [{id, by, at}]}}`, the newest 200 given kept per repo."""
