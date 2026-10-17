@@ -284,6 +284,18 @@ def test_the_repo_holds_line_names_three_held_paths_and_counts_the_rest(monkeypa
     )
 
 
+@pytest.mark.parametrize(
+    ("held", "path"), [(["a", "b", "c"], "`a`, `b`, `c`"), (["a", "b", "c", "d"], "`a`, `b`, `c` and 1 more")]
+)
+def test_the_repo_holds_line_counts_more_only_past_three_paths(monkeypatch, capsys, held, path):
+    r = {"root": "/r", "prs": {"open": [{"number": 12, "held": held}]}, "pr_orders": {"unasked": [12], "asked": {}}}
+    _held_world(monkeypatch, None, held, r)
+    assert cli.main(["pr", "held", "12", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["repo_hold"] == (
+        f"the repo holds {path}: the Repo page tags it unasked until a reader is asked"
+    )
+
+
 def test_an_asked_pr_whose_reading_holds_no_path_says_nothing(monkeypatch, capsys):
     r = {
         "root": "/r",
