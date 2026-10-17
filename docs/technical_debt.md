@@ -71,6 +71,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
+| TD-843 | #2021's Gemini adapter tests pass with its launch's `extra_args`, `credentials_ok`'s `GEMINI_API_KEY` branch, `doctor_profiles`' metered key and `GOOGLE_API_KEY` note, `layer_reading`'s prefix filter and the hook timeout's unit each reverted (test audit) | Low | Open |
+| TD-844 | #2024's `_screen_verdict` title-adapter guard fails no test when reverted: the title adapter's own `explain` returns None for a bare tail (test audit) | Low | Open |
 
 ---
 
@@ -1441,3 +1443,48 @@ Then the build entries, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
+
+---
+
+## TD-843: #2021's Gemini adapter tests pass with five of its branches reverted: `extra_args`, the `GEMINI_API_KEY` credential, `doctor_profiles`' metered key and `GOOGLE_API_KEY` note, `layer_reading`'s prefix filter, and the hook timeout's unit
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2021, #2023, #2024, #2027, #2017)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_gemini_adapter.py`; `src/shiftlead/adapters/gemini/__init__.py` (`launch`, `credentials_ok`, `doctor_profiles`, `layer_reading`, `HOOK_TIMEOUT_MS`)
+
+**Why:** Each line reverted alone in a worktree on `origin/main` (97974677), `pytest tests/test_gemini_adapter.py` run; a reversion that still passes is the evidence (the other seven reversions tried — `GOOGLE_API_KEY: ""`, `GEMINI_FORCE_FILE_STORAGE`, `GEMINI_CLI_TRUST_WORKSPACE`, `CLI_TITLE`, `GEMINI_CLI_HOME`, `showStatusInTitle`, the `oauth_creds.json` name — fail it, so this is the narrow remainder):
+- `argv += prof.extra_args` → `pass`: 19 passed. No test gives a profile `extra_args` and reads them in `launch`'s argv.
+- `if os.environ.get("GEMINI_API_KEY"): return True` in `credentials_ok` → `if False:`: 19 passed. The credentials test deletes `GEMINI_API_KEY` (line 175) and never sets it, so the env credential is untested.
+- `layer_reading`'s `if p.stem != profile.name and not p.stem.startswith(f"{profile.name}+"): continue` → `if False:`: 19 passed. Its comment says another profile whose name begins with this one's (`grind` and `grind2`) is skipped; no test writes a sibling's layer.
+- `doctor_profiles`' `row["note"]` (a `GOOGLE_API_KEY` in the host agent's environment) → another key: 19 passed. The metered `row["key"]` and `layers` are likewise not asserted: the only row test reads `config_dir` and `credentials`.
+- `HOOK_TIMEOUT_MS = 10_000` → `10`: 19 passed. The test compares `cmd["timeout"] == gemini.HOOK_TIMEOUT_MS`, the constant against itself; the unit (the tool's milliseconds, the comment beside it) is asserted nowhere.
+
+**Fix:** one assertion each, in the existing tests: a profile with `extra_args` in `launch`'s argv; `GEMINI_API_KEY` set with an auth type and no credential file reads `True`; a sibling profile's layer file absent from `layer_reading`; a metered profile's `key` and a set `GOOGLE_API_KEY`'s `note` in `doctor_profiles`; `timeout == 10_000`. Revert each line to see it fail.
+
+**Done when** each of the five reversions above fails `tests/test_gemini_adapter.py`.
+
+**Related:** TD-785 (slice 2, #2021), TD-112.
+
+---
+
+## TD-844: #2024's title-adapter guard in `_screen_verdict` fails no test when reverted: Gemini's `explain(tail)` without a title returns None
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2024)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_gemini_title.py`; `src/sessionorc/agent_tick.py` (`_screen_verdict`: `getattr(adapter, "state_in_title", False)`)
+
+**Why:** `_screen_verdict`'s new clause `or getattr(adapter, "state_in_title", False)` carries the comment *a title adapter's rule is the title's, read by `_title_verdict`*. Removing it (`if explain is None or self._hook_fresh(s.id, now):`) and running `pytest tests/test_gemini_title.py` on `origin/main` (97974677): 8 passed. Every test uses `GeminiAdapter` (or a `hookstub` whose `explain` forwards to it), whose `explain(tail)` with no title returns None, so the fall-through to the screen rule never has a verdict to apply. The guard does something only for a title adapter whose `explain` answers a bare tail, which no test builds. The other `#2024` lines tried (`_hook_state.pop`, the exited/closed bar, `TITLE_SHELL_WAITS` by state, `not s.told`, `ao explain`'s reason and `--file --title`) each fail a test.
+
+**Fix:** one test with a title adapter whose `explain(tail, title="")` returns a verdict for the tail alone (a `hookstub` variant), a title that says nothing, and a record the screen rule would change: the record stands.
+
+**Done when** removing the guard fails `tests/test_gemini_title.py`.
+
+**Related:** TD-785 (slice 3, #2024), TD-112.
