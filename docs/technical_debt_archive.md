@@ -15203,13 +15203,20 @@ Then the build entry, named in `Blocked by:`.
 
 ---
 
+<<<<<<< HEAD
 ## TD-842: #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised
 
 **Priority:** Low
+=======
+## TD-840: #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test
+
+**Priority:** Medium
+>>>>>>> c2acb0a4 (TD-840 archived (#2027))
 **Type:** debt
 **Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
 **Owner:** grinder
 **Kind:** build
+<<<<<<< HEAD
 **Status:** Done — (1) by TD-827 (#2023), (2) by #2026
 **Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
 
@@ -15222,3 +15229,17 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-810, TD-817, TD-822, TD-827 (rewrites the `team` condition), #2009, #2012.
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2026) — (1) by TD-827 (#2023); (2) by `test_a_queued_end_inside_the_kills_grace_is_judged_by_its_stamp`: kill, resume, a live `idle`, then a queued `exited` stamped at the kill (skipped as stale, the kill's mark unspent) and one stamped after (applied). With `not queued` deleted the second is dropped and the test fails.
+=======
+**Status:** Done (#2027)
+**Location:** `src/sessionorc/agent_tick.py` (the `by == "pending"` seat count); `src/shiftlead/ui/app.py` (the 409 in the permission route); `src/shiftlead/ui/org.py` (`+ terminal_only(m)`); `tests/test_permission_channel.py`
+
+**Why:** #2014 says a permission only the terminal answers is never a seat's (§6 rule 3), is refused by the page with a 409, and reads *answer it in the terminal* on the Org card. Probes, one line removed at a time in an `origin/main` worktree: (1) delete `and adapters.permission_channel(r.adapter)` in `agent_tick.py` → `pdm run pytest -q tests/test_agent.py tests/test_balance.py tests/test_agent_split.py tests/test_mail.py tests/test_finished_tick.py`: **186 passed**; (2) `if s.get("permission_channel") is False:  # §4.3` → `if False:` in `ui/app.py` → `tests/test_ui.py tests/test_ui_popout.py tests/test_ui_waiting_wiring.py`: **85 passed** (and `test_permission_channel.py` passes too); (3) drop `+ terminal_only(m)` in `ui/org.py` → `tests/test_ui.py tests/test_ui_org.py`: **127 passed**. The tests that do exist cover `agent_hook`'s RpcError and `cli.py`'s refusal (each fails when its line is removed), the adapter flag, `answerable` and the card.
+
+**Fix:** in `tests/test_permission_channel.py` (its `nochannel` fixture): (1) a supervisor with a `needs-you` permission member of a no-channel adapter and one of a channel adapter, asserting only the second is counted as a `pending` cause; (2) a POST to the page's Allow route for a no-channel session answers 409 with *answer it in the terminal*; (3) the Org page's member row for such a session carries *— answer it in the terminal*. Revert each line and see its test fail.
+
+**Done when** each of the three lines, removed alone, fails a test.
+
+**Related:** TD-785, #2014.
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2027) — tests in `tests/test_permission_channel.py` for the on-call manager's `pending` cause, the page's 409 on Allow / Deny, and **Answer needed**'s *answer it in the terminal*; each guard removed alone fails one. The first found `_team_causes` reading `Pending` as a dict (`(r.pending or {}).get`), an `AttributeError` since #878 whenever a member held a hook permission: fixed.
+>>>>>>> c2acb0a4 (TD-840 archived (#2027))

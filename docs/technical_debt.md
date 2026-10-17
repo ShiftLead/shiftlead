@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
-| TD-840 | #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test | Medium | Open |
 | TD-841 | #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard | Medium | Open |
 
 ---
@@ -1462,24 +1461,6 @@ Then the build entries, named in `Blocked by:`.
 **Done when** each family of `told` sites has a case that fails when that site is hook-only, and the suite passes.
 
 **Related:** TD-785, TD-784, #2014.
-
-## TD-840: #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_tick.py` (the `by == "pending"` seat count); `src/shiftlead/ui/app.py` (the 409 in the permission route); `src/shiftlead/ui/org.py` (`+ terminal_only(m)`); `tests/test_permission_channel.py`
-
-**Why:** #2014 says a permission only the terminal answers is never a seat's (§6 rule 3), is refused by the page with a 409, and reads *answer it in the terminal* on the Org card. Probes, one line removed at a time in an `origin/main` worktree: (1) delete `and adapters.permission_channel(r.adapter)` in `agent_tick.py` → `pdm run pytest -q tests/test_agent.py tests/test_balance.py tests/test_agent_split.py tests/test_mail.py tests/test_finished_tick.py`: **186 passed**; (2) `if s.get("permission_channel") is False:  # §4.3` → `if False:` in `ui/app.py` → `tests/test_ui.py tests/test_ui_popout.py tests/test_ui_waiting_wiring.py`: **85 passed** (and `test_permission_channel.py` passes too); (3) drop `+ terminal_only(m)` in `ui/org.py` → `tests/test_ui.py tests/test_ui_org.py`: **127 passed**. The tests that do exist cover `agent_hook`'s RpcError and `cli.py`'s refusal (each fails when its line is removed), the adapter flag, `answerable` and the card.
-
-**Fix:** in `tests/test_permission_channel.py` (its `nochannel` fixture): (1) a supervisor with a `needs-you` permission member of a no-channel adapter and one of a channel adapter, asserting only the second is counted as a `pending` cause; (2) a POST to the page's Allow route for a no-channel session answers 409 with *answer it in the terminal*; (3) the Org page's member row for such a session carries *— answer it in the terminal*. Revert each line and see its test fail.
-
-**Done when** each of the three lines, removed alone, fails a test.
-
-**Related:** TD-785, #2014.
 
 ## TD-841: #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard
 
