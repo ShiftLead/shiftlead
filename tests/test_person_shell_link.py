@@ -73,7 +73,9 @@ def test_offline_a_nodes_shell_acts_on_its_sessions_and_each_near_miss_is_still_
 
 
 @pytest.mark.integration
-async def test_a_nodes_shell_kills_its_nodes_session_with_the_link_down_and_an_agent_there_may_not(agent, tmp_path):
+async def test_a_nodes_shell_kills_its_nodes_sessions_link_down_or_up_and_an_agent_there_may_not(
+    agent, tmp_path, monkeypatch
+):
     await park_ticks(agent)
     made = {}
     for name, extra in (("sh", {}), ("w", {"unattended": True}), ("x", {"unattended": True})):
@@ -87,6 +89,18 @@ async def test_a_nodes_shell_kills_its_nodes_session_with_the_link_down_and_an_a
         got = await agent._dispatch({"id": 2, "method": "kill", "params": {"id": made["w"]}, "caller": made["sh"]})
         assert "error" not in got, got
         assert agent.sessions[made["w"]].state == "exited"
+        # the link up: served here as a person's act is, never handed to the home
+        forwarded = []
+
+        async def forward(*args):
+            forwarded.append(args)
+            return {"error": "forwarded"}
+
+        monkeypatch.setattr(agent, "home_reachable", lambda: True)
+        monkeypatch.setattr(agent, "_forward", forward)
+        got = await agent._dispatch({"id": 3, "method": "kill", "params": {"id": made["x"]}, "caller": made["sh"]})
+        assert "error" not in got and not forwarded, got
+        assert agent.sessions[made["x"]].state == "exited"
     finally:
         agent.mode, agent.home = "home", agent.host
         for s in list(agent.sessions.values()):
