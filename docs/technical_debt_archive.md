@@ -15210,7 +15210,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done — (2) by #2026; (1) done by TD-827 (#2023): `not_own_shell` refuses an `unattended` holder and a `role`'s in words of their own, each a parametrize row, and a teamed holder is no longer refused (`test_a_teamed_shell_left_open_is_reopened`); (2) is left
+**Status:** Done — (1) by TD-827 (#2023), (2) by #2026
 **Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
 
 **Why:** (1) `not_own_shell`'s docstring is `mail.person_shell`'s test — *a shell, interactive, no role, no team, no controllers* — but its parametrized test refuses on adapter, controllers, `role` and dir only. In an `origin/main` worktree, `if rec.get("unattended") or rec.get("role") or rec.get("team"):` → `if rec.get("role"):`, and again → `if rec.get("unattended") or rec.get("role"):` and → `if rec.get("team") or rec.get("role"):`: `pdm run pytest -q tests/test_ui_shell_here.py tests/test_ui_popout.py` gives **19 passed** all three times, so a teamed or unattended live shell would be reopened as the person's own. (2) #2012's drop reads `taken and not queued and event.get("state") == "exited"`; deleting `not queued` leaves `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was` **passing** (the queued path is never fed). (Its other three conditions each fail the test when removed.)

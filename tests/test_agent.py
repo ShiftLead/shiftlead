@@ -692,8 +692,8 @@ async def test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was(agent,
 
 
 async def test_a_queued_end_inside_the_kills_grace_is_judged_by_its_stamp(agent, hookstub, tmp_path):
-    """TD-822, TD-842: a queued event carries `at`, so its stamp tells the runs apart and the kill's
-    time is not read. Inside the grace, a queued `exited` stamped before the new run's live hook is
+    """TD-822, TD-842: a queued event carries `at`, so its stamp tells the runs apart and the kill-time
+    drop does not apply. Inside the grace, a queued `exited` stamped before the new run's live hook is
     the killed run's (skipped as stale); one stamped after it is the new run's own end, and applies."""
     async with LocalClient() as c, LocalClient() as feeder:
         s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
