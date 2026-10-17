@@ -14931,3 +14931,72 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-806 (the design), TD-219 (the draft), TD-500 (the composer's bar), TD-805 (page loads: a slow page lengthens the window a second press falls in).
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1999 and #2005) — slice 1 (#1999): `SendEntry.key`, `rpc_send`'s keyed repeat matched first, `SEND_KEY_SECONDS`, `tests/test_send_key.py`; slice 2 (#2005): `app.py`'s `send` and `wrapup` pass `key`; `app.js`'s `AO.wireComposerSend` (the hold, *Sending…*, *not confirmed* after `AO.SEND_PAGE_SECONDS`, the box cleared only of what it sent, an unknown verdict keeping the key), `AO.mintKey` (falls back to `getRandomValues` off a secure context), `act`'s `e.status`, the bar mirroring Send, a keyed chip and Wrap up; `tests/test_ui_send_key.py` and a keyed repeat through the route in `tests/test_ui.py`.
+
+---
+
+## TD-810: **Open shell here** is refused when the session's shell is still open: the create takes the name `<session>-shell`, which the live shell holds, so the placeholder tab opens and closes and the refusal is easy to miss
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done
+**Blocked by:** TD-817
+**Location:** design §4.5a *Focus: Open shell here* (TD-577, TD-580, TD-801); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch: `create` with `name=f"{s['name']}-shell"`, ~L2805); `src/shiftlead/ui/static/app.js` (`AO.shellHere` ~L412: the placeholder opened in the press, closed on a refused create; the press's error path ~L815); `src/sessionorc/agent.py` (`create`'s name check)
+
+**Why:** Paul, 2026-10-16, in Edge: pressed **Open shell here** on an interactive session's Focus; the screen flashed and no tab opened, and on a second press a tab appeared and vanished at once. The UI's log has `POST /api/sessions/ao-shiftlead-ao-queue-vs-inbox/shell-here` answered `400`. The session's shell from earlier that evening, `ao-ao-queue-vs-inbox-ao-queue-vs-inbox-shell`, was still live: Paul had closed its browser tab, which ends nothing (a session lives in tmux), so the create's name `<session>-shell` was taken and the create refused. The page did as §4.5a says (the placeholder closed, the refusal shown as any act's), but the refusal reads as a flash, and the person gets no shell where one is already open beside the session. The first press left no request in the log; why is not known.
+
+**Fix:** design it first:
+1. When the session already has the person's own shell in its directory (a live `shell` record of the name the press makes, or of the same `dir` with no role and no controller), the press opens **that** shell's Focus in the tab or window instead of refusing; or, if the design prefers more than one, names the next one `<session>-shell-2` and so on. Say which, and what a shell the person ran `exit` in (closed) does.
+2. A refusal that does reach the page stays visible long enough to read (not a toast gone with the placeholder), saying what to do.
+3. Say what the first press's silence was if it can be found (the placeholder blocked without the toast, or no request made), and test that a blocked open says so.
+Then the build entry, named in `Blocked by:`.
+
+**Done when** the design says what a press does when the session's shell is open (and when it was closed), what a refused press shows, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-577 and TD-579 (the press opens a tab), TD-580 and TD-801 (the person's own shell), TD-622 (the shell press's untested lines).
+
+**Resolved:** 2026-10-17 (grinder-ao-2) — built by TD-817: #2009.
+
+---
+
+## TD-817: Build TD-810: Open shell here reopens the session's live shell, keeps a refusal in its tab, and keeps a blocked open's toast
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (TD-810's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5a *Focus: Open shell here*; `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch; `/new`'s `elsewhere` for the host); `src/sessionorc/agent.py` (`name_check` / `_name_verdict`, read only); `src/sessionorc/mail.py` (`person_shell`, the test it mirrors); `src/shiftlead/ui/static/app.js` (`AO.shellHere`, `AO.toast`); `tests/` (the shell press's tests, TD-622's)
+
+**Why:** TD-810: a press while the session's shell is still live is refused because the name is taken, and the refusal shows as a tab that flashes open and shut.
+
+**Fix:**
+- **The route.** Before `create`, the `shell-here` branch calls the existing `name_check` RPC (`_name_verdict`) with exactly what the create sends: `dir=s["dir"]`, no `repo`, `name=f"{s['name']}-shell"`, and `host` as below. It does not re-derive the scope: the shell's id comes from its directory's basename, not the session's repo.
+  - On verdict `live` with a recorded holder, the route reads the holder's record with `get` on the reply's `holder`, since `name_check` returns only the id and `holder_state`; for a node session the home has readdressed it to `id@host`. It tests the fields below on that record.
+  - **Verdict `live` with a record that is the person's own shell:** `adapter: shell`, not `unattended`, no `role`, no `team`, no `controllers` (as `mail.person_shell` reads them), with `dir == s["dir"]`. The route returns `{"ok": True, "id": <its id>, "reused": True}` and creates nothing. It still marks the session seen.
+  - **Verdict `live` otherwise:** a 409 naming why, e.g. *`<name>` is a shell with controllers `<ids>` — not your own; close it, or open a shell from its Focus*, *… is held by a shell in `<dir>`*, or *… is not a shell*. A live holder with no record (`holder_state: unrecorded`) gets the 409 in `name_check`'s own message.
+  - **Otherwise** it creates as today, and `create`'s own supersede handles an exited or closed holder. A `suspended` holder falls here too: a person's create supersedes it.
+  - **Two presses:** when `create` is refused for any reason (`agent_call` passes only the message, so the route cannot tell why), the route runs the lookup once more. A holder that qualifies is returned as `reused`, so both tabs land on one shell; otherwise the create's own refusal is re-raised unchanged.
+  - **A node session** (`s["host"]` is not this host): `host` is passed to both `name_check` and `create`, as `/new` passes `elsewhere`, so the shell is made on the session's node in its directory.
+- **The page.**
+  - `AO.shellHere` sends the placeholder to the returned id either way. On `reused` the pressing page toasts *your shell here was already open — opened it*.
+  - A refused create no longer closes the placeholder: it writes the refusal's words and *close this tab* into it, and rethrows, so the pressing page's toast says it too.
+  - A blocked open's toast (*the browser blocked the tab — allow pop-ups for this page*) stays until it is pressed. This is a fifth parameter, `sticky`, on `AO.toast(text, ok, href, wait, sticky)`: it skips the timer and sets `el.onclick = () => el.remove()` with a pointer cursor. **Pop out**'s blocked toast uses it too.
+- **Tests:**
+  - a press with a live shell of that name opens it and creates nothing;
+  - a press with an exited one creates a fresh shell that supersedes it;
+  - a live holder that is not the person's own shell (another adapter, a shell with a controller, another directory) is refused with its reason;
+  - the lookup finds a shell whose id comes from its directory, not the session's repo (TD-810's own case);
+  - two presses yield one shell, both answered with its id;
+  - a node session's press creates on the node;
+  - a refused create leaves the placeholder open with the words (a JS unit with a stubbed `window.open`);
+  - a blocked open makes no request and leaves a sticky toast, removed by a click (the stub in `tests/test_ui_popout.py` records `(t, ok, href, wait, sticky)`).
+
+**Done when** a press with the session's shell still open opens that shell; a press after `exit` opens a fresh one; a refusal stays readable in the tab; a blocked open's words stay until pressed; and the tests above pass.
+
+**Related:** TD-810 (the design), TD-577 (the press opens a tab), TD-580 and TD-801 (the person's own shell), TD-622 (the shell press's tests).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2009) — the `shell-here` route checks the name with `name_check` (on the session's host) and answers the person's own live shell as `reused`, refuses a live holder that is not one with its reason (`not_own_shell`), lets `create` supersede an exited one, and on a refused create looks once more so two presses land on one shell; `AO.shellHere` sends the placeholder to a reused shell with a toast, leaves it open reading a refusal and *close this tab*, and a blocked open's toast (and **Pop out**'s) is `sticky` until pressed. Tests: `tests/test_ui_shell_here.py`, `tests/test_ui_popout.py`; checked on a scratch home (the PR's UI check). The lasting content: design §4.5a *Focus: Open shell here*.

@@ -740,6 +740,23 @@ async def agent_call(method: str, **params: Any) -> Any:
         raise HTTPException(400, str(e)) from e
 
 
+def not_own_shell(rec: dict[str, Any], name: str, directory: str) -> str | None:
+    """Why the live record holding `<session>-shell` is not the person's own shell in `directory`, or
+    None when it is (design §4.5a *Focus: Open shell here*, TD-810): `mail.person_shell`'s test — a
+    `shell`, interactive, no role, no team, no controllers — read on the record's view, and the same
+    directory. The words are the press's refusal."""
+    who, cure = rec.get("id") or name, "close it, or open a shell from its Focus"
+    if rec.get("adapter") != "shell":
+        return f"{name} is held by {who}, which is not a shell — close it, or pick another name"
+    if ctl := rec.get("controllers"):
+        return f"{name} is a shell with controllers {', '.join(ctl)} — not your own; {cure}"
+    if rec.get("unattended") or rec.get("role") or rec.get("team"):
+        return f"{name} is a shell run by a team or a role — not your own; {cure}"
+    if os.path.normpath(str(rec.get("dir") or "")) != os.path.normpath(directory):
+        return f"{name} is held by a shell in {rec.get('dir')} — {cure}"
+    return None
+
+
 # One `repos` reading per page request (TD-739): the reading is the repos' whole facts — 1.3 MB on
 # the live home, ~40 ms a read — and a page asked for it two or three times (the board, the state
 # rows, the ledger's rows). The http middleware gives each request its own memo; a reader with none
@@ -2804,10 +2821,43 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         elif action == "keys":
             await call("keys", id=sid, keys=list(body.get("keys") or []))
         elif action == "shell-here":
+            # §4.5a *Focus: Open shell here*, **One shell per session, reopened** (TD-810): the name the
+            # create would take is checked first, with exactly what the create sends — on the session's
+            # host, so a node session's shell is made on its node in its directory
             s = await call("get", id=sid)
-            new = await call("create", name=f"{s['name']}-shell", dir=s["dir"], adapter="shell")
+            name = f"{s['name']}-shell"
+            where = {"host": s["host"]} if s.get("host") and s["host"] != host_name() else {}
+
+            async def own_shell() -> dict[str, Any] | None:
+                """The person's own live shell holding the name; None when nothing live holds it; a
+                409 naming why for a live holder that is not one."""
+                v = await call("name_check", dir=s["dir"], name=name, **where)
+                if v.get("verdict") != "live":
+                    return None  # free, or an exited or closed holder `create` supersedes
+                if not v.get("holder") or v.get("holder_state") == "unrecorded":
+                    raise HTTPException(409, v.get("message") or f"{name} is running")
+                rec = await call("get", id=v["holder"])
+                if why := not_own_shell(rec, name, s["dir"]):
+                    raise HTTPException(409, why)
+                return rec
+
+            held = await own_shell()
+            if held is None:
+                try:
+                    new = await call("create", name=name, dir=s["dir"], adapter="shell", **where)
+                except HTTPException as refused:
+                    # a second press racing this one took the name between the check and the create:
+                    # both land on its shell; any other refusal is the create's own, unchanged
+                    try:
+                        held = await own_shell()
+                    except HTTPException:
+                        held = None
+                    if held is None:
+                        raise refused from None
             with contextlib.suppress(HTTPException):
                 await call("seen", id=sid)  # acted on this card too (TD-017)
+            if held is not None:
+                return JSONResponse({"ok": True, "id": held["id"], "reused": True})
             return JSONResponse({"ok": True, "id": new["id"]})
         elif action == "drop":
             # design §4.5a Focus **Reports** → Drop: the person let a claim go, and the record says
