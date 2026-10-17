@@ -160,6 +160,10 @@ SHELLS_SAVE_EVERY = timedelta(minutes=1)
 # How long after a `kill` an `exited` hook on a record a new run has taken is the killed run's own
 # `SessionEnd` (TD-822): the walk saw it land within a second or two; fifteen is the walk's own wait.
 KILLED_END_GRACE = 15.0
+# A title's `needs-you` (§4.3 *Two gaps*), written by the state it replaces: over a turn, the tool's
+# embedded shell gone quiet waiting for input; over `idle`, a confirmation shown with no turn.
+TITLE_SHELL_WAITS = "the tool's shell waits for input"
+TITLE_CONFIRMATION = "the tool waits for a confirmation"
 
 
 def _orders(r: dict[str, Any] | None) -> list[Any]:
@@ -4214,6 +4218,8 @@ class TickMixin:
             st = adapter.classify(pane, tail)
             if st and st != s.state:
                 s.set_state(st, confidence="scraped")
+        elif self._title_verdict(s, adapter, pane, now):
+            pass  # the tool's own title replaced the record's state (§4.2 *A title the tool writes its state into*)
         elif (m := self._screen_verdict(s, adapter, now)) is not None:
             # Hook-fed adapter, screen rule fired, no fresher hook state: the labelled fallback
             if m.state != s.state or (m.pending and m.pending != s.pending):
@@ -4243,9 +4249,39 @@ class TickMixin:
         """The adapter's screen-rule match for the session's tail, or None when there is no rule
         set, nothing matched, or a hook state is fresher (design §4.2: scraped never outranks it)."""
         explain = getattr(adapter, "explain", None)
-        if explain is None or self._hook_fresh(s.id, now):
-            return None
+        if explain is None or getattr(adapter, "state_in_title", False) or self._hook_fresh(s.id, now):
+            return None  # a title adapter's rule is the title's, read by `_title_verdict`
         return explain(s.tail)
+
+    def _title_verdict(self, s: Session, adapter: Any, pane: PaneInfo, now: datetime) -> bool:
+        """Whether the title of a tool that writes its state there replaced the record's state (design
+        §4.2 *A title the tool writes its state into*, §4.3 *Two gaps*, TD-785). Read once a hook has
+        reached the record, and only past one tick since the last hook; compared with the record's
+        hook-confirmed state, never `exited` or `closed`, and with `stalled?` only by a verdict other
+        than `working`. A verdict equal to the record's state is no event, so its `pending` stands. It
+        is not held for its screen: what it replaced is dropped, as a hook's report drops it."""
+        if not getattr(adapter, "state_in_title", False) or not s.hook_seen_at:
+            return False
+        last = self._last_hook.get(s.id)
+        if last is not None and now - last <= timedelta(seconds=agent_common.TICK_SECONDS):
+            return False
+        m = adapter.explain(s.tail, title=pane.title)
+        if m is None or m.state == s.state:
+            return False
+        if s.state == "stalled?":
+            if m.state == "working":
+                return False  # the tool still works: the stall stands until it moves on
+        elif not s.told:
+            return False
+        pending = m.pending
+        if m.state == "needs-you":
+            # the glyph cannot say which: the tool's shell waits once a turn ran, a confirmation without one
+            text = TITLE_SHELL_WAITS if s.state in ("working", "stalled?") else TITLE_CONFIRMATION
+            pending = Pending(kind=pending.kind if pending else "question", text=text)
+        self._hook_state.pop(s.id, None)
+        log.info("%s: title %r: %s -> %s", s.id, pane.title.strip()[:40], s.state, m.state)
+        s.set_state(m.state, confidence="title", pending=pending)
+        return True
 
     @staticmethod
     def _screen_held(s: Session) -> bool:

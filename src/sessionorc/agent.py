@@ -27,7 +27,7 @@ import sys
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -2486,6 +2486,22 @@ class HostAgent(
         if explain is None:
             src = "foreground process" if adapter.state_source == "scraped" else "hooks only"
             out["reason"] = f"{s.adapter} has no screen rules; its state comes from {src}"
+            return out
+        if getattr(adapter, "state_in_title", False):
+            # the tool's title is its rule (§4.2 *A title the tool writes its state into*), the evidence
+            pane = (await asyncio.to_thread(self.tmux.main_panes)).get(id)
+            title = pane.title if pane else ""
+            m = explain(tail, title=title)
+            out["title"], out["match"] = title, m.to_dict() if m else None
+            last = self._last_hook.get(id)
+            if m is None:
+                out["reason"] = "the title says no state"
+            elif not s.hook_seen_at:
+                out["reason"] = f"title {m.state}, but no hook has reached the record — the title is not read yet"
+            elif last is not None and now - last <= timedelta(seconds=agent_common.TICK_SECONDS):
+                out["reason"] = f"title {m.state}, but a hook reported within a tick — the hook state wins"
+            else:
+                out["reason"] = f"title {m.state}, read as the tool's own word (confidence: title)"
             return out
         m = explain(tail)
         out["match"] = m.to_dict() if m else None

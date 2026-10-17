@@ -66,6 +66,11 @@ class Adapter(Protocol):
     #   explain(tail) -> screen.Match | None               the screen-rule verdict with its evidence
     #                                                      (hook-fed adapters: applied as `scraped` only
     #                                                      when no fresher hook state exists; TD-015)
+    #   state_in_title: bool                              the tool writes its state into its terminal title:
+    #                                                      `explain(tail, title=…)` reads it, and the tick
+    #                                                      writes the verdict as `confidence: title` (design
+    #                                                      §4.2 *A title the tool writes its state into*,
+    #                                                      TD-785); False where unset
     #   title(pane_title: str) -> str | None              the session's name as the tool holds it, read from
     #                                                      the terminal title the tool set (tmux `#{pane_title}`,
     #                                                      carried on `PaneInfo.title`) with the tool's own
