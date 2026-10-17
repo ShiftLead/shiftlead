@@ -15315,3 +15315,25 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-785 (slice 2, #2021), TD-112.
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2030) — `tests/test_gemini_adapter.py`: the hook timeout asserted as `10_000`; `GEMINI_API_KEY` with an auth type and no credential file reads `True`; `test_a_metered_profile_its_extra_args_its_key_and_the_precautions_note` (a profile's `extra_args` in the argv, a metered row's `key` unset then set, `GOOGLE_API_KEY`'s `note`); `test_a_profiles_layers_leave_out_another_profile_whose_name_begins_with_its_own` (`grind2.json` beside `grind`'s two layers). Each of the five reversions, alone, fails the file.
+
+---
+
+## TD-844: #2024's title-adapter guard in `_screen_verdict` fails no test when reverted: Gemini's `explain(tail)` without a title returns None
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2024)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2031
+**Location:** `tests/test_gemini_title.py`; `src/sessionorc/agent_tick.py` (`_screen_verdict`: `getattr(adapter, "state_in_title", False)`)
+
+**Why:** `_screen_verdict`'s new clause `or getattr(adapter, "state_in_title", False)` carries the comment *a title adapter's rule is the title's, read by `_title_verdict`*. Removing it (`if explain is None or self._hook_fresh(s.id, now):`) and running `pytest tests/test_gemini_title.py` on `origin/main` (97974677): 8 passed. Every test uses `GeminiAdapter` (or a `hookstub` whose `explain` forwards to it), whose `explain(tail)` with no title returns None, so the fall-through to the screen rule never has a verdict to apply. The guard does something only for a title adapter whose `explain` answers a bare tail, which no test builds. The other `#2024` lines tried (`_hook_state.pop`, the exited/closed bar, `TITLE_SHELL_WAITS` by state, `not s.told`, `ao explain`'s reason and `--file --title`) each fail a test.
+
+**Fix:** one test with a title adapter whose `explain(tail, title="")` returns a verdict for the tail alone (a `hookstub` variant), a title that says nothing, and a record the screen rule would change: the record stands.
+
+**Done when** removing the guard fails `tests/test_gemini_title.py`.
+
+**Related:** TD-785 (slice 3, #2024), TD-112.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #2031) — `test_a_title_adapters_screen_rule_is_never_read` gives the Gemini adapter an `explain` that also answers a bare tail, with a title that says nothing and no hook: `_screen_verdict` reads None and the record stands. With the guard removed it fails (1 failed, 8 passed); with it, 9 passed.

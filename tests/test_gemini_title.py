@@ -16,6 +16,7 @@ from conftest import wait_for
 from sessionorc import adapters, agent_tick
 from sessionorc.client import LocalClient
 from sessionorc.models import Pending, Session, now_iso
+from sessionorc.screen import Match
 from sessionorc.tmux import PaneInfo
 from shiftlead import cli
 from shiftlead.adapters.gemini import GeminiAdapter
@@ -136,6 +137,24 @@ async def test_an_equal_verdict_falls_through_to_the_stall_check(agent, gem, tmp
     os.utime(log, (old, old))
     s.run_log = str(log)
     assert _look(agent, s, WORKING).state == "stalled?" and s.confidence == "tick"
+
+
+async def test_a_title_adapters_screen_rule_is_never_read(agent, gem, tmp_path, monkeypatch):
+    # A title adapter whose `explain` also answers a bare tail: a title that says nothing leaves the
+    # record as it stands, rather than falling through to the screen rule (TD-844)
+    title_explain = gem.explain
+
+    def explain(tail, title=None):
+        if title is None:  # the screen rule's call: the tail alone
+            return Match(rule="tail", state="needs-you", evidence=tail, pending=Pending(kind="question", text="?"))
+        return title_explain(tail, title=title)
+
+    monkeypatch.setattr(gem, "explain", explain)
+    s = _rec(tmp_path, state="working")
+    s.tail = ["Allow?"]
+    assert agent._screen_verdict(s, gem, datetime.now(UTC)) is None
+    assert _look(agent, s, "kmaster: ~/src", hook_age=None).state == "working"
+    assert s.confidence == "hook" and s.pending is None
 
 
 async def test_a_title_set_in_the_pane_reaches_the_record_and_explain(agent, hookstub, tmp_path, monkeypatch):
