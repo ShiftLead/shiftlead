@@ -233,11 +233,14 @@ def waiting_clause(name: str, questions: list[dict[str, Any]]) -> str:
     return f"{name} waiting on the person: {q['ref']}{until}{more}"
 
 
-def held_asks(records: Iterable[Any], home: str | None = None) -> dict[str, list[dict[str, Any]]]:
+def held_asks(
+    records: Iterable[Any], home: str | None = None, seats: Collection[str] = ()
+) -> dict[str, list[dict[str, Any]]]:
     """What each member waits on a reader for (design §6 rule 9 *Which members count*, TD-854): a
     member's declared `claimed` entries whose `pr` or `review_pr` is the `pr` of an ask from it that a
-    record among `records` holds in its `prs_waiting.asks` — keyed by the member's `id`, each `{seat,
-    pr}`, the seat the holder's name, in the records' order. An ask's `from` names the member as
+    seat among `records` holds in its `prs_waiting.asks` — a seat as `finished` reads one, a record with
+    `seat` or named in `seats`; an ask a member holds holds nobody — keyed by the member's `id`, each
+    `{seat, pr}`, the seat the holder's name, in the records' order. An ask's `from` names the member as
     `_waiting_claims`' `mine` does: the id, the host defaulting to `home`'s — so `records` are views
     addressed as the home addresses them (a node's member `id@host`, as `_finished_view` and the page's
     view give them), or the home's own `Session`s. Read from the records alone, so the tick and the
@@ -255,6 +258,7 @@ def held_asks(records: Iterable[Any], home: str | None = None) -> dict[str, list
     held = [
         (str(_f(q, "name") or _f(q, "id")), where(a.get("from")), a.get("pr"))
         for q in rows
+        if _f(q, "seat") is not None or _f(q, "name") in seats
         for a in asks(q)
         if isinstance(a, Mapping) and isinstance(a.get("pr"), int)
     ]
@@ -328,7 +332,7 @@ def finished(
       after the person's: *grinder-ao-1 waiting on techlead-ao-1: #2067* (§6 rule 9, TD-854).
     """
     records = list(records)
-    readers = held_asks(records, home)
+    readers = held_asks(records, home, seats)
     mine = [r for r in records if _f(r, "unattended") is not False and not _f(r, "superseded_by")]
     up = [r for r in mine if _f(r, "state") not in DEAD]
     if not up:

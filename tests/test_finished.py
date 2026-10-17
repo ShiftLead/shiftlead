@@ -235,3 +235,10 @@ def test_a_done_claim_or_a_held_ask_for_a_pr_the_member_does_not_claim_blocks_no
     named.inbox[0].from_ = f"{g1.id}@kmaster"
     assert list(work.held_asks([g1, named], home="kmaster")) == [g1.id]
     assert work.held_asks([g1, _held(g1, 2000)], home="kmaster") == {g1.id: [{"seat": "techlead", "pr": 2000}]}
+    # only a seat's held ask counts (§6 rule 9 "a seat of the team holds"): a member holding one holds nobody,
+    # and a seat known by the definition's name alone, its record written before the field, still does
+    peer = _held(g1, 2000)
+    peer.seat, peer.out_of_work = None, OUT
+    assert work.held_asks([g1, peer], home="kmaster") == {}
+    assert work.finished([_manager(), g1, peer], home="kmaster")["why"] == []
+    assert list(work.held_asks([g1, peer], home="kmaster", seats=["techlead"])) == [g1.id]

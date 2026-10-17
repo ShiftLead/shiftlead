@@ -76,7 +76,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
-| TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Designed — built by TD-863 |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
@@ -1614,27 +1613,6 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says the form asks a priority and how it reaches the entry, and the build entry is filed.
 
 **Related:** TD-180 (Add entry), TD-630 (the form's Attach), TD-730 (the form's Team pick).
-
----
-
-## TD-854: Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-2, met building TD-836 in #2048)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-17, PR #2063) — rule 9 reads a waiting claim of either kind as unfinished: a member's own claimed PR whose `ask` a seat of the team holds blocks the reading, *w waiting on <seat>: #n*, read from the records; a wind-down under it would close the reader, and rule 8 starts no team for a held PR. Built by TD-863.
-**Blocked by:** TD-863
-**Location:** design §6 rule 9 (*Which members count*: the *waiting* clause), rule 5 (*A run holding only waiting claims … declares `none` beside them*), §4.9a *Waiting is read, never declared*; `src/sessionorc/work.py` (`finished`, `waiting_of`), `src/sessionorc/agent_tick.py` (`_finished_pass`, `_waiting_claims`)
-
-**Why:** TD-820's design has a run that holds only waiting claims and nothing to pick declare `none` beside them, and says rules 9 and 3 still count a waiting claim as in progress. Rule 9's `finished` counts no claim: it blocks on a member *waiting on the person* (an open `ask` or `steer` in the person inbox), nothing else. A member whose only wait is a reader's held ask (`prs_waiting.asks`, e.g. a grinder's PR with the techlead) and that declared `none` reads finished, so after `FINISHED_SETTLE` the team winds down and closes it while its PR's findings may still come back to it. TD-836's test `test_a_member_that_declared_none_beside_a_waiting_claim_reads_unfinished` covers the person-inbox case alone, which holds today.
-
-**Fix:** a design question first: whether rule 9 reads a member holding a waiting claim (either kind) as unfinished — `finished` taking the held asks beside `waiting`, its clause *w waiting on the techlead: #n* — or whether a wind-down under a reader's held ask is fine because the reply reaches the next run by the kept mail (§4.10 *A question about a reference outlives its asker*) and rule 8 starts it.
-
-**Done when** the design says which, and a build entry (or none) follows.
-
-**Related:** TD-820, TD-836, TD-241 (rule 9), TD-274 (waiting).
 
 ---
 
