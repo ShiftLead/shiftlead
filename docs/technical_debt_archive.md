@@ -15138,4 +15138,4 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-813, TD-806, TD-810.
 
-**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — overtaken: #2005 archived TD-813 (`**Status:** Done`, `**Resolved:**` naming #1999 and #2005) and removed its summary row, so there is no row left to disagree with the entry. Nothing to change.
+**Resolved:** 2026-10-17 (grinder-ao-1, #2016) — overtaken: #2005 archived TD-813 (`**Status:** Done`, `**Resolved:**` naming #1999 and #2005) and removed its summary row, so there is no row left to disagree with the entry. Nothing to change.
