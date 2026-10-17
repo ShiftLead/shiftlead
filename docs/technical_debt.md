@@ -71,7 +71,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
-| TD-844 | #2024's `_screen_verdict` title-adapter guard fails no test when reverted: the title adapter's own `explain` returns None for a bare tail (test audit) | Low | Open |
 
 ---
 
@@ -1442,23 +1441,3 @@ Then the build entries, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
-
----
-
-## TD-844: #2024's title-adapter guard in `_screen_verdict` fails no test when reverted: Gemini's `explain(tail)` without a title returns None
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2024)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_gemini_title.py`; `src/sessionorc/agent_tick.py` (`_screen_verdict`: `getattr(adapter, "state_in_title", False)`)
-
-**Why:** `_screen_verdict`'s new clause `or getattr(adapter, "state_in_title", False)` carries the comment *a title adapter's rule is the title's, read by `_title_verdict`*. Removing it (`if explain is None or self._hook_fresh(s.id, now):`) and running `pytest tests/test_gemini_title.py` on `origin/main` (97974677): 8 passed. Every test uses `GeminiAdapter` (or a `hookstub` whose `explain` forwards to it), whose `explain(tail)` with no title returns None, so the fall-through to the screen rule never has a verdict to apply. The guard does something only for a title adapter whose `explain` answers a bare tail, which no test builds. The other `#2024` lines tried (`_hook_state.pop`, the exited/closed bar, `TITLE_SHELL_WAITS` by state, `not s.told`, `ao explain`'s reason and `--file --title`) each fail a test.
-
-**Fix:** one test with a title adapter whose `explain(tail, title="")` returns a verdict for the tail alone (a `hookstub` variant), a title that says nothing, and a record the screen rule would change: the record stands.
-
-**Done when** removing the guard fails `tests/test_gemini_title.py`.
-
-**Related:** TD-785 (slice 3, #2024), TD-112.
