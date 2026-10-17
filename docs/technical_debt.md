@@ -1470,7 +1470,7 @@ Then the build entry, named in `Blocked by:`.
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** design §4.5 screen 1 (the phase sentence), §4.4 *Repo facts* **Phases**, §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (`motion_rows`: the phase line and its docstring); `tests/test_ui_org.py` or `tests/test_org.py` (where `motion_rows` is tested)
+**Location:** design §4.5 screen 1 (the phase sentence), §4.4 *Repo facts* **Phases**, §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (`motion_rows`: the phase line and its docstring); `tests/test_ui_team_summary.py` (`test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch`, whose comment states the TD-197 reading and gains the TD-814 clause); `docs/glossary.md` already states the rule
 
 **Why:** TD-814: one designer with two design PRs open read as *2 design*, as if two designs were being written.
 
@@ -1479,10 +1479,10 @@ Then the build entry, named in `Blocked by:`.
 - The docstring says the same.
 - A merged or closed design PR keeps *review*, marked, until the claim is marked done or dropped, as a build's does.
 - **Tests:**
-  - a designer holding one design-first claim with a PR and one without reads *1 design · 1 review*, in the rows and in the summary's `phases`;
+  - extending the test above: a designer holding one design-first claim with a PR and one without reads *1 design · 1 review*, in the rows and in the summary's `phases`;
   - a design-first claim found by its branch's open PR alone reads *review*;
   - a build's claim reads as before.
 
-**Done when** a design-first claim with a PR reads *review* on the team card, the rollup and the Repo page's phase filter, one without reads *design*, and the tests above pass.
+**Done when** a design-first claim with a PR reads *review* on the team card and in the rollup's bar (whose segment links are unchanged), one without reads *design*, and the tests above pass.
 
 **Related:** TD-814 (the design), TD-197 (the phases).
