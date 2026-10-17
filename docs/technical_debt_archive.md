@@ -14735,3 +14735,23 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** none.
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1981) — `tests/test_ui_work_row.py` gained `test_one_teams_failed_lanes_read_costs_only_its_own_row_and_note` (two teams with no record, `teamrun.lanes` raising for the first read: `/inbox` and `/` render, the other's Later row and card note stand, `with_lanes` gives the failed one `lanes_hold` None) and `test_a_node_reads_no_teams_lanes` (`is_node()` true: `team_lanes` is `{}`, no `teamrun.lanes`, no RPC, nothing cached). Deleting the `is_node()` return fails the second; `raise` in place of `out[n] = None` fails the first.
+
+## TD-803: `_repo_hold`'s *and n more* threshold (`> 3`) is held at five held paths only: a boundary of four, or three, passes unchanged
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.7 `ao pr held`; `src/shiftlead/cli.py` (`_repo_hold`, the `len(p["held"]) > 3` arm); `tests/test_unasked_shown.py`
+
+**Why:** #1980 (TD-798) added `test_the_repo_holds_line_names_three_held_paths_and_counts_the_rest`, which uses five held paths. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_unasked_shown.py`: baseline 13 passed; with `if len(p["held"]) > 3 else ""` changed to `> 4` 13 passed. With four held paths that mutant names three and drops the fourth with no *and 1 more*, and `>= 3` would print *and 0 more* for three; no test draws four or three held paths. (The other two mutations TD-798 named do fail their tests.)
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** a PR with exactly three held paths reads all three with no *more*, and one with four reads `a`, `b`, `c` *and 1 more*; changing `> 3` to `> 4` or `>= 3` fails one of them.
+
+**Related:** TD-798.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1987) — `tests/test_unasked_shown.py` gained `test_the_repo_holds_line_counts_more_only_past_three_paths`, parametrized over three held paths (`a`, `b`, `c`, no *more*) and four (`a`, `b`, `c` *and 1 more*). `> 4` fails the four-path case, `>= 3` the three-path case.
