@@ -474,6 +474,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-16 (TD-806, the designer; Paul, 2026-10-16, a send from Edge that cleared his next words and landed twice): *Focus composer* **Send** clears only the text it sent, while the box still begins with it. It reads *Sending…* while it waits, and *not confirmed* after `SEND_PAGE_SECONDS`, when a repeat goes under the same key. A prompt chip carries its own key. Built by TD-813.
 - 2026-10-16 (TD-801, the designer; Paul, 2026-10-16: *a shell should be considered my permissions*): *Open shell here*: acts on other sessions run from the shell's prompt too. Built by TD-802.
 - 2026-10-16 (TD-770, grinder-ao-2): *Repo page: Technical debt cards* and *Queue page, Up next: grip / ⤒ ↑ ↓* built on the Repo page (`/api/rank/move` to `rank_move`); *Repo page: decided lines* are listed above the cards.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): rows *Org top bar: Queue tab*, *Queue page: card*, *Queue page, Up next: grip / ⤒ ↑ ↓*, *Queue page, Recently completed: 4 h · day · week · month*, *Queue page: filters, find*, *Queue card: Lift the hold*, *Queue card: passed over*, *Queue page, In progress: other work*, *Repo page: Technical debt cards*; the ledger, held and *Later* rows point at the Queue; *Settings* tab now after Queue.
@@ -1323,6 +1324,7 @@ decisions; this file points at them rather than repeating them.
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 
+- 2026-10-16 (TD-806, the designer; Paul, 2026-10-16, a send from Edge that cleared his next words and landed twice): *A send lands once*. A send the page makes carries a key kept on its `sends` entry, and a repeat from the same caller within `SEND_KEY_SECONDS` types nothing and answers as the first did. `ao send` carries none. Built by TD-813.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): *The Inbox is a queue* renamed *Nothing leaves the Inbox without an answer*, the rules unchanged, since *queue* now names the Queue page.
 - 2026-10-14 (TD-682, the designer): *Told on Telegram when nobody is looking*: *CI not starting* for an account joins the rows told, since every team's merges in it stop. Built by TD-687.
 - 2026-10-12 (TD-616 slice 2, grinder-ao-2; the techlead's ruling m-d5e63070e1e2): *Told on Telegram* — **Looking** rides the page's `/events` stream (`{visible}`), handed to the home on the counts keeper's recount. Was, from TD-319: the page's 20 s poll carried `watching=1`; it still does while the stream is down.
