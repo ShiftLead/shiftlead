@@ -96,6 +96,30 @@ def test_a_held_row_is_counted_whatever_auto_says_and_reads_rolled_back():
     assert 'data-act="clear_promote"' not in html
 
 
+def test_the_smoke_reads_checking_live_and_a_smoke_hold_reads_rolled_back_by_the_smoke():
+    """§4.5a *Inbox row: promote* (§6 *The smoke*, TD-811 slice 2): a run whose `check` read its commit
+    (`phase: smoke`) is FYI, *checking `<sha7>` live · started <t>*, its Promote disabled; a hold a failed
+    smoke wrote reads *rolled back by the smoke from `<sha7>` <t> ago — <why>*, counted."""
+    from shiftlead.ui.app import templates
+
+    now = datetime(2026, 9, 29, 12, 0, tzinfo=UTC)
+    flight = {"sha": MAIN, "at": "2026-09-29T11:50:00+00:00", "by": "person", "log": "/l"}
+    flight |= {"phase": "smoke", "smoke_at": "2026-09-29T11:55:00+00:00"}
+    (r,) = promote_rows({"shiftlead": reading(inflight=flight)}, now)
+    assert r["fyi"] and inbox_sections([], states=[r])["count"] == 0
+    html = templates.get_template("inbox_rows.html").render(rows=[r], section="fyi")
+    assert 'checking 9999999 live · started <span class="localtime" data-at="2026-09-29T11:55:00+00:00">' in html
+    assert "promoting 9999999" not in html and 'disabled title="a promote is in flight"' in html
+    why = "smoke failed on 9999999: the UI did not answer"
+    held = {"sha": LIVE, "from": MAIN, "main": MAIN, "at": "2026-09-29T09:00:00+00:00", "by": "smoke", "why": why}
+    (r,) = promote_rows({"shiftlead": reading(held=held)}, now)
+    assert r["text"] == (
+        f"shiftlead · live 4444444, rolled back by the smoke from 9999999 3h 0m ago — {why}"
+        " · main 9999999, 3 commits ahead · checks green · auto off · held"
+    )
+    assert not r["fyi"] and inbox_sections([], states=[r])["count"] == 1
+
+
 def test_a_snoozed_row_is_in_no_count_and_merges_do_not_wake_it():
     until = (datetime.now(UTC) + timedelta(days=1)).isoformat()
     snoozed = {"promote:shiftlead|promote": until}

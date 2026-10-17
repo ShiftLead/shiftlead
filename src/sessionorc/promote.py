@@ -378,7 +378,8 @@ def start(
     the pid after, so an agent that dies in between still finds it; `n` is how many commits it
     makes live, for the note. `smoke` is read here from the tree the run starts in and kept on the
     intent (§6 *The smoke*), so a pull of the checkout mid-run changes nothing; `why` is a failed smoke's,
-    on the rollback it starts. Returns the intent. Raises ValueError when the worktree cannot be made."""
+    on the rollback it starts. Returns the intent. Raises ValueError when the worktree cannot be made,
+    OSError when `run` cannot be spawned."""
     d = repo_dir(repo)
     d.mkdir(parents=True, exist_ok=True)
     drop_tree(root, repo)
@@ -717,7 +718,7 @@ def _smoke_failed(
         return fail(repo, intent, why, code), None
     try:
         start(r["root"], repo, str(frm), run, "smoke", None, "rollback", str(sha), why)
-    except ValueError as e:
+    except (ValueError, OSError) as e:  # no tree, or the run cannot be spawned in it
         return fail(repo, intent, f"{why}; its rollback could not start: {e}", code), None
     return None, None
 
