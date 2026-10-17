@@ -468,6 +468,36 @@ def test_find_matches_an_id_or_a_title_and_falls_through_to_the_archive():
     assert find("TD-9")["find_miss"]["id"] == "TD-009" and shown(find("TD-9")) == ["s#TD-10"]
 
 
+def test_a_team_and_a_repo_pick_together_keep_only_the_repos_both_name():
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam", "repo": "s"}), {"dbteam": "db"})
+    assert shown(v) == [] and v["shown"] == 0  # the team's db and the repo pick's s disagree: no card
+    v = apply_picks(queue_view(queue(repo2=True), NOW), queue_picks({"team": "dbteam", "repo": "db"}), {"dbteam": "db"})
+    assert shown(v) == ["db#TD-5"]
+
+
+def test_a_find_naming_an_id_an_open_card_holds_offers_no_archive():
+    v = apply_picks(queue_view(queue(), NOW), queue_picks({"find": "TD-21"}), {})
+    assert shown(v) == ["s#TD-20"] and v["find_miss"] is None
+
+
+def test_steering_shows_a_card_with_a_steering_item_whatever_its_status():
+    # a running steer about TD-30: its card stays *needs you* (held by the person) and carries the steering kind
+    secs = inbox_sections([mail("m3", "TD-30 steer", kind="steer", bound=at(-1))], now=NOW, cards=card_index(queue()))
+    v = queue_view(queue(), NOW, attach(secs, lambda e, sec: ""))
+    assert [(c["status"], c["kinds"]) for c in v["up_next"] if c["id"] == "s#TD-30"] == [
+        ("needs you", ["steering", "held-person"])
+    ]
+    assert shown(apply_picks(v, queue_picks({"filter": "steering"}), {})) == ["s#TD-30"]
+
+
+def test_an_archived_rows_need_is_no_kind_of_its_card():
+    q = queue()
+    q["cards"][0]["rows"][0]["needs"] = "owner"  # TD-10's archived TD-9: its owner need was met when it closed
+    v = queue_view(q, NOW)
+    assert v["in_progress"][0]["kinds"] == []
+    assert shown(apply_picks(v, queue_picks({"kind": "yours"}), {})) == []
+
+
 def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(queue(), [mail("m2", "about nothing")]))
     html = c.get("/queue").text
