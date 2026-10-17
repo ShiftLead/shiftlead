@@ -99,6 +99,9 @@ function rig() {
   r.fire();  // thirty seconds: no answer
   out.unconfirmed = r.look();
   r.s.label("→ Send"); out.unconfirmed_view = { hint: r.s.hint("starts a new turn"), label: r.sendBtn.textContent };
+  // the view's newer hint, given during the hold, is the one its end restores
+  { const q = rig(); q.compose.value = "a"; q.sendBtn.click(); q.fire(); q.s.hint("steers the turn in flight");
+    q.posts[0].ok({}); await tick(); out.hint_after = q.look().hint; }
   r.compose.value = "other words"; r.sendBtn.click();
   r.posts[0].ok({}); await tick();
   out.late = { ...r.look(), sents: [...r.sents], keys: r.posts.map((p) => p.body.key) };
@@ -113,6 +116,11 @@ function rig() {
   const refusal = Object.assign(new Error("x"), { status: 400 });
   out.unknown_fn = { none: AO.sendUnknown(null), refusal: AO.sendUnknown(refusal) };
   out.mint = [AO.mintKey(), AO.mintKey()];
+  // act's error carries the status, which tells an unknown verdict from a refusal
+  global.fetch = async () => ({ ok: false, status: 503, statusText: "x", json: async () => ({ detail: "no answer" }) });
+  try { await AO.act("ao-x", "send", {}); } catch (e) {
+    out.act_err = { status: e.status, message: e.message, unknown: AO.sendUnknown(e) };
+  }
   console.log(JSON.stringify(out));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
@@ -182,6 +190,7 @@ def test_after_thirty_seconds_send_is_pressable_and_repeats_under_the_same_key(g
     assert u["disabled"] is False and u["bar_disabled"] is False and u["label"] == "→ Send"
     assert u["hint"] == "not confirmed — Send repeats it safely"
     assert got["unconfirmed_view"] == {"hint": "not confirmed — Send repeats it safely", "label": "→ Send"}
+    assert got["hint_after"] == "steers the turn in flight"
     rp = got["repeat"]
     assert rp["keys"] == ["k1", "k1"] and rp["texts"] == ["once", "once"]
     assert {k: rp["look"][k] for k in WAITING} == WAITING
@@ -200,5 +209,6 @@ def test_a_late_answer_for_an_earlier_key_changes_nothing(got):
 def test_one_press_one_send(got):
     assert got["held_press"] == 1 and got["blank"] == 0
     assert got["unknown_fn"] == {"none": False, "refusal": False}
+    assert got["act_err"] == {"status": 503, "message": "no answer", "unknown": True}
     a, b = got["mint"]
     assert a != b and len(a) >= 32

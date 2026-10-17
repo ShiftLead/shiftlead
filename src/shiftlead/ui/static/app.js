@@ -332,7 +332,8 @@
       press,
       holding: () => !!hold,
       label: (l) => { sendBtn.dataset.label = l; if (!hold || hold.open) sendBtn.textContent = l; },
-      hint: (h) => (hold && hold.open ? AO.SEND_UNCONFIRMED : h),
+      // the view's newer hint is kept for the hold's end, so a state that changed under it is not lost
+      hint: (h) => { if (!hold || !hold.open) return h; hold.was = h; return AO.SEND_UNCONFIRMED; },
     };
   };
 
