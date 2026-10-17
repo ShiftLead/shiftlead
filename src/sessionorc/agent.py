@@ -583,6 +583,8 @@ class HostAgent(
         # submit, and a ring holds it from reading the composer to its own submit — so a ring never
         # pastes into the middle of a `send`, where the two lines would be submitted as one.
         self._typing: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        # (session id, key) → a keyed send still typing: its repeat awaits its outcome (§4.10, TD-806)
+        self._keyed_sends: dict[tuple[str, str], asyncio.Future[None]] = {}
         # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
         # UI's subscription and each blocked `wait` forever (TD-058)
         self._conns: set[asyncio.StreamWriter] = set()
@@ -2213,6 +2215,7 @@ class HostAgent(
         timeout: float | None = None,
         caller: Any = None,
         wrapup: bool = False,
+        key: str | None = None,
     ) -> dict | None:
         """Type a prompt. With `wait` (TD-016, design §4.2): return the record once the session has
         started on *this* prompt and settled again (`SETTLED`). A session that is busy queues the
@@ -2223,8 +2226,14 @@ class HostAgent(
         injected by the dispatcher: every send that reaches the pane is recorded on the record as
         `sends`, with who typed it (design §4.10). `wrapup` says this text is the wrap-up prompt
         (the card's Wrap up, `ao team stop`): it is stamped on the record as `wrapup_at`, which holds
-        the doorbell off, and a send without it clears the stamp (§4.10 "A pending stop beats mail")."""
+        the doorbell off, and a send without it clears the stamp (§4.10 "A pending stop beats mail").
+        `key` is the page's id for this send (§4.10 *A send lands once*, TD-806): a repeat of it from the
+        same caller within `SEND_KEY_SECONDS` answers as that send did, before anything else here."""
         s = self._get(id)
+        if key:
+            first = self._keyed_send(s, caller, str(key))
+            if first is not None:
+                return await first
         self._refuse_gone(s)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
@@ -2232,15 +2241,33 @@ class HostAgent(
             raise RpcError(f"{s.name}: a shell runs no turns: there is nothing to wrap up — Close it (design §4.3)")
         s.wrapup_at = now_iso() if wrapup else None
         s.wrapup_by = closer_of(caller, None, "")["by"] if wrapup else None  # who stopped it (§6 rule 8, TD-781)
-        entry = self._record_send(s, caller, text)
+        entry = self._record_send(s, caller, text, key=str(key) if key else None)
         if mail.as_person(caller, self._graph()):
             self._refill(s)
+        typing: asyncio.Future[None] | None = None
+        if key:
+            typing = self._keyed_sends[(id, str(key))] = asyncio.get_running_loop().create_future()
         try:
             state_sent, rev_sent = await self._submit(id, adapters.get(s.adapter), text)
         except RpcError as e:
             entry.verdict = str(e)
             self.store.save(s)
             raise
+        except BaseException as e:
+            # a failure not put into words (a tmux error from the paste) leaves the entry *submitted*,
+            # as a restart does; a repeat waiting on it gets the same exception
+            if typing is not None and not typing.done():
+                typing.set_exception(e if isinstance(e, Exception) else RpcError(f"{id}: the send was cancelled"))
+            raise
+        finally:
+            if typing is not None:
+                self._keyed_sends.pop((id, str(key)), None)
+                if not typing.done():
+                    if entry.verdict == "submitted":
+                        typing.set_result(None)
+                    else:
+                        typing.set_exception(RpcError(entry.verdict))
+                typing.exception()  # read here, so a failure no repeat awaited is not logged as unread
         if not wait:
             return None
         end = None if timeout is None else time.monotonic() + timeout
@@ -2295,13 +2322,38 @@ class HostAgent(
             code = f" (code {s.exit_code})" if s.exit_code is not None else ""
             raise RpcError(f"{s.id} has exited{code}: there is no turn to type into — resume it, or forget it")
 
-    def _record_send(self, s: Session, caller: Any, text: str) -> SendEntry:
+    def _keyed_send(self, s: Session, caller: Any, key: str) -> Any:
+        """The send a keyed repeat answers as (§4.10 *A send lands once*, TD-806), or None when there is
+        none: an entry of `s.sends` with this key, from this caller (`from_` as `_record_send` writes
+        it), made within `SEND_KEY_SECONDS`. The answer is an awaitable — the first send's outcome
+        while it is still typing, else its verdict — so a repeat passes no gate, stamps nothing,
+        refills nothing and types nothing, and ignores `wait`."""
+        who = PERSON if mail.is_person(caller) else str(caller)
+        first = next((e for e in reversed(s.sends) if e.key == key and e.from_ == who), None)
+        if first is None:
+            return None
+        try:
+            if (datetime.now(UTC) - _parse(first.at)).total_seconds() > mail.SEND_KEY_SECONDS:
+                return None
+        except ValueError:
+            return None
+        typing = self._keyed_sends.get((s.id, key))
+
+        async def answer() -> None:
+            if typing is not None:
+                await asyncio.shield(typing)
+            elif first.verdict != "submitted":
+                raise RpcError(first.verdict)
+
+        return answer()
+
+    def _record_send(self, s: Session, caller: Any, text: str, key: str | None = None) -> SendEntry:
         """`sends` (design §4.10): what was typed into this pane and by whom, minted and stamped
         here like a message, bounded to the last `SENDS_KEEP`. Written at the gate — before the
         paste, since a paste that then sticks still reached the pane — and its verdict amended if
         the submit fails."""
         who = PERSON if mail.is_person(caller) else str(caller)
-        entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text)
+        entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text, key=key)
         s.sends = (s.sends + [entry])[-mail.SENDS_KEEP :]
         self.store.save(s)
         return entry
