@@ -67,7 +67,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Designed — built by TD-828, TD-829 |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833 |
-| TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
+| TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-828 | Build TD-816 (1): the Queue's group headings carry their counts and fold, and a card's items are gathered in the card's sections with Dismiss all | Medium | Open |
@@ -76,6 +76,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
 | TD-832 | Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card | Medium | Open |
 | TD-833 | Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`) | Low | Open |
+| TD-834 | Build TD-819 (1): the team-shape sampler — each member's class and each stage's queue, once a minute, kept; the `shape` RPC and its suggestions | Medium | Open |
+| TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Open |
@@ -1355,7 +1357,8 @@ The other cases:
 **Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to tell if a different shape for a team would be more efficient (e.g. another designer, fewer grinders, etc)?*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-17 (design §4.4 *Team shape*, §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape*, §4.7 `ao team shape`, glossary *starved*, *backed up*; mockup `SpendShape.dc.html`). The home samples each running team once a minute — each member's class and each flow stage's queue — into `shape.json`, kept thirteen months; the Spend page's Shape view and `ao team shape` draw it per role and per queue beside the spend per finished entry, with six fixed rules that suggest a change of members and never make one.
+**Blocked by:** TD-834, TD-835
 **Location:** design §4.9c (flows: design → build → review), §4.2 (the state feed), §4.4 (records, `doing.jsonl`), §4.5 screen 1 (the team card, TDs in motion); `~/.shiftlead/sessions/` (current state only), `~/.shiftlead/events/` (empty), `doing.jsonl`
 
 **Why:**
@@ -1590,6 +1593,73 @@ The other cases:
 **Done when** a seat on the container node reads its figure on the Spend page as a kmaster seat does.
 
 **Related:** TD-818, TD-830, TD-151 slice 4 (the `spend` method it copies).
+
+---
+
+## TD-834: Build TD-819 (1): the team-shape sampler — each member's class and each stage's queue, once a minute, kept; the `shape` RPC and its suggestions
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-819's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Team shape*, §4.2 (*Waiting*, *working on its own*), §4.9b (`prs_waiting`), §4.9c (stages); `src/sessionorc/ledger.py` (`in_lanes`, read only, over the home's `_repos` readings as `_balance_marks` and `_repo_view` in `agent_tick.py` already read it — not `shiftlead.teamrun`, which sessionorc never imports), `src/sessionorc/work.py` (`waiting_of`, read only), a new `src/sessionorc/shape.py` (the file, the classes, the rules) beside `spend.py`, `src/sessionorc/agent_tick.py` (the minute's sample), `src/sessionorc/agent_spend.py` or a new mixin (`rpc_shape`), `src/sessionorc/paths.py`
+
+**Why:** TD-819: whether a team has the right members cannot be read. Nothing records how long a member waited for work, or work for a member.
+
+**Fix:**
+- **The sample.** Once a minute, per running team, the home classes each live record whose role has a stage in the current flow. The manager, a shell carrying the team's badge, and other roles are not sampled. The classes are taken in §4.4's order, the first that holds:
+  - `limited` and `paused`, from the state and the gate.
+  - `working`, the state, with *working on its own* included.
+  - `waiting:review`: the record's ask is in a seat's `prs_waiting.asks`. This wins over `waiting_of`.
+  - `waiting:person`: needs-you, or `waiting_of` naming a reference.
+  - `on_claim`: idle, holding an open claim.
+  - `idle_with_work`: idle with no claim and its `in_lanes` member count above zero.
+  - `starved`: idle with no claim, or out of work, with that count zero.
+  - A seat is `free` when idle with an empty `prs_waiting`, and `idle_with_work` when it is not.
+- **The queues.** Each stage of the flow gets one queue. A lane stage's queue is its unheld `in_lanes` ids of its kind, with its oldest age from a `first_seen` per id, kept while the id stays. A review stage's queue is its seat's `prs_waiting`: `n` and `oldest`, with no second clock. Each queue is marked backed up (it holds work and every sampled member of the stage is working, waiting or on its claim) or unstaffed (it holds work and no member of the stage is live). A review queue is also marked when its oldest is past the repo's `review.bound`.
+- **The file.** `shape.json` holds, per day per team per record, the minutes by class, with name and role. Per day per team per queue it holds minutes, depth sum, max depth, max oldest age, and the minutes non-empty, backed up, unstaffed and (for review) past its bound. The `first_seen` ids are kept too. Kept for `spend.KEEP`, and written only on a minute that sampled a team.
+- **The reading.** `shape {team, window: day|week}` returns, per role (records merged, seats listed), live hours and class shares. Per queue it returns mean and max depth, oldest age, and the non-empty, backed-up and unstaffed shares, plus past-bound for a review stage. It returns the count and median of the role's spend per finished entry from `seats` once TD-830 lands, absent before. It returns `suggestions`: the rules of §4.4 *Team shape*, as `SHAPE_*` constants, each `{rule, role|queue, text, numbers}`. The rules work as follows:
+  - Starved and backed up read worker roles only.
+  - A role both starved and backed up gets the one *bursts* line in place of both.
+  - Two rules naming the same change are merged into one line.
+  - Under eight live hours there are none (`too_little: true`). Read-only, open to a session.
+- **Tests:**
+  - **Classes:** one from each fixture record: a needs-you, an ask about a ref, a held PR ask that is also about a ref (it reads review), idle on a claim, idle with and without lane work, out of work, limited, paused, and a seat free and with PRs waiting.
+  - **Who is sampled:** the manager and a teamed shell are not.
+  - **Queues:** a review stage's queue from `prs_waiting`; backed up and unstaffed; past bound; `first_seen` survives minutes and drops when the id leaves.
+  - **Rules:** each fires at its threshold and not below. The starved rule names the upstream role when the stage before was backed up. No fewer or more line is written for a seat. The bursts line replaces the two, the upstream wording included. Same-change lines merge.
+  - **Edges:** too little to read; a quiet minute writes nothing.
+
+**Done when** `ao team shape`'s RPC returns a running team's class shares, queues and suggestions from a day of samples.
+
+**Related:** TD-819 (the design), TD-818 and TD-830 (spend per finished entry beside it), TD-772 (the Queue trial's idle-while-work reading this generalises), TD-835.
+
+---
+
+## TD-835: Build TD-819 (2): the Spend page's Shape view and `ao team shape`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-819's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-834, TD-832
+**Location:** design §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape*, §4.7 `ao team shape`; mockup `docs/mockups/SpendShape.dc.html` (`reviews/2026-10-17-td819-shape.png`); `src/shiftlead/ui/app.py` (`/spend?view=shape`, `/api/shape`), the Spend page's template and `app.js`, `src/shiftlead/ui/help.py`, `src/shiftlead/cli.py`
+
+**Why:** TD-819: Paul asked whether *a different shape for a team would be more efficient*. That needs the reading where he looks at the team's spend, and from a terminal.
+
+**Fix:**
+- The **Spend · Shape** pick on the Spend page, carried in the URL. The Shape view is drawn as the mockup, per team: suggestions, or *nothing to suggest*, or *too little to read yet*; members by role, as the bar of hours by class with its percents, the hover its seats, and spend per finished entry; queues per flow stage.
+- `ao team shape <team> [--window day|week]` prints §4.7's lines; `--json` gives the RPC's reply.
+- §4.5a's row gets its help text in `ui/help.py`.
+- **Tests:** the view draws the RPC's reply (each suggestion, too little, a role's bar, a queue row); the URL carries the pick; the CLI lines; the doc-bound §4.5a tests.
+
+**Done when** the Spend page's Shape view and `ao team shape` show a running team's shares, queues and suggestions. A screenshot under `docs/mockups/reviews/` is named in the PR.
+
+**Related:** TD-819, TD-834, TD-832 (the page it joins).
 
 ---
 
