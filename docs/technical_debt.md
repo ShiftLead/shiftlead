@@ -70,7 +70,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
-| TD-821 | A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at | Low | Designed — built by TD-827 |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
 | TD-840 | #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test | Medium | Open |
@@ -1426,31 +1425,6 @@ Then the build entries, named in `Blocked by:`.
 **Done when** the reading says where the designer's context goes, and the design either gives the designer a restart point or a bound with its build entries filed and named in `Blocked by:`, or says, with the numbers, why it stays as it is.
 
 **Related:** TD-460 (the grinders' bound trial), TD-378 (the prompt cache, archived), TD-818 (spend per seat), rule 5.
-
----
-
-## TD-821: A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-17 (design §4.5a *Focus: Open shell here*, §4.8 *The person's own shell is the person*, §4.9 *A person in the team*). **Open shell here** on a team member gives the shell the member's `team` and `project` badges and nothing else of the team's (no reader, no controller, no brief), so it draws in the team's group with the compact card and the person mark, as a person's session in the team does (TD-160), and every team act leaves it alone. The person's own shell no longer requires *no team*: a badge grants nothing (§9 invariant 9): the mail gate's edge never reaches a shell, whose mail is refused before the gate (§4.3), and a claim from its prompt reads the badge as any badged record's does (§4.4 *An entry names its team*), so the guards are *no role* and *no controllers*. **+ New ▾ Shell** and a session with no badge give a shell with none; **Resume** carries the badge; a shell on a stopped or concluded team sits in its group as a person's session does. Built by TD-827.
-**Blocked by:** TD-827
-**Location:** design §4.5a *Focus: Open shell here* (the record it creates) and *card: compact* (*the full card stays on a repo's no-team strip*), §4.9 *A person in the team* (TD-160) and *The Org page* (the no-team strip); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch: `create(name=…-shell, dir=…, adapter="shell")`, no `team`, ~L2805); `src/shiftlead/ui/repo.py` (`team_groups`: a card's group is its record's `team`, else `NO_TEAM`, ~L655); `src/sessionorc/mail.py` (`person_shell`: *no team* is among its conditions today; TD-827 drops it)
-
-**Why:** Paul, 2026-10-16, through Add entry: *When a shell is opened from a team, its card should show on that team (instead of "no team") - that way its more easily seen as a user is focused on a particular team.* Today **Open shell here** on a team member creates the person's own shell with no `team`, so its card lands in the repo's *n sessions, no team* strip, away from the team the person pressed it on, and a person working one team has to look for it elsewhere on the page.
-
-**Fix:** design it first: the shell **Open shell here** creates from a session with a `team` carries that `team`, so it draws with the team's cards. Say:
-1. Which presses carry it: Focus's and the card's **more ▾** on a team member, and whether **+ New ▾ → Shell** pressed while a team is in view does.
-2. What the badge does not make it, and the tension it meets: the person's own shell is today a `shell` record that is interactive with **no role, no team** and no controller (§4.8 *The person's own shell is the person*; `mail.person_shell` checks `not record.team`), so a shell that simply carried `team` would lose the person-only acts **Open shell here** exists to give (TD-580, TD-801). Say whether §4.8's definition drops *no team* for a shell, or the team is shown some other way (the card drawn with the team it was opened from, kept apart from the record's `team`). Either way the shell is not a member any team act reaches (TD-160's *left alone by every team act*: Stop, wind down, rule 8, lane counts, TDs in motion), and keeps the full card or takes the compact one — say which, since §4.5a gives the full card to *a repo's no-team strip* and the compact one to *a team member*.
-3. What carries on **Resume** (`team` is in `RESUME_CARRIES`) and what a shell on a concluded or stopped team shows.
-Then the build entry, named in `Blocked by:`.
-
-**Done when** the design says which shells carry the team, what the badge leaves unchanged, and which card they draw, and the build entry is filed and named in `Blocked by:`.
-
-**Related:** TD-577 and TD-580 (Open shell here, the person's own shell), TD-810 (Open shell here refused while the shell is open), TD-160 (a person's session in a team), TD-725 (the no-team strip).
 
 ---
 

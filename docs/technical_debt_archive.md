@@ -15173,3 +15173,30 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-821 (the design), TD-817 (the reuse, built in #2009: the same route), TD-580 and TD-801 (the person's own shell), TD-160 (a person in the team), TD-725 (the no-team strip).
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2023) — `ui/app.py`'s `shell-here` create passes the session's `team` and `project` and nothing else of its team's; `mail.person_shell` drops *no team* (its docstring says why); `not_own_shell` refuses an unattended or a role's shell in its own words, so a teamed shell left open is reopened. Tests flipped from *no team* in `test_person_only.py`, `test_person_shell_acts.py`, `test_person_shell_link.py`; the claim refusal from a teamed person's shell pinned in `test_entry_team.py`; the press, the reuse and the team group in `test_ui_shell_here.py`. UI check on a scratch home: `docs/mockups/reviews/2026-10-17-td827-teamed-shell.png`.
+
+---
+
+## TD-821: A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — built by TD-827 (#2023)
+**Blocked by:** TD-827
+**Location:** design §4.5a *Focus: Open shell here* (the record it creates) and *card: compact* (*the full card stays on a repo's no-team strip*), §4.9 *A person in the team* (TD-160) and *The Org page* (the no-team strip); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch: `create(name=…-shell, dir=…, adapter="shell")`, no `team`, ~L2805); `src/shiftlead/ui/repo.py` (`team_groups`: a card's group is its record's `team`, else `NO_TEAM`, ~L655); `src/sessionorc/mail.py` (`person_shell`: *no team* is among its conditions today; TD-827 drops it)
+
+**Why:** Paul, 2026-10-16, through Add entry: *When a shell is opened from a team, its card should show on that team (instead of "no team") - that way its more easily seen as a user is focused on a particular team.* Today **Open shell here** on a team member creates the person's own shell with no `team`, so its card lands in the repo's *n sessions, no team* strip, away from the team the person pressed it on, and a person working one team has to look for it elsewhere on the page.
+
+**Fix:** design it first: the shell **Open shell here** creates from a session with a `team` carries that `team`, so it draws with the team's cards. Say:
+1. Which presses carry it: Focus's and the card's **more ▾** on a team member, and whether **+ New ▾ → Shell** pressed while a team is in view does.
+2. What the badge does not make it, and the tension it meets: the person's own shell is today a `shell` record that is interactive with **no role, no team** and no controller (§4.8 *The person's own shell is the person*; `mail.person_shell` checks `not record.team`), so a shell that simply carried `team` would lose the person-only acts **Open shell here** exists to give (TD-580, TD-801). Say whether §4.8's definition drops *no team* for a shell, or the team is shown some other way (the card drawn with the team it was opened from, kept apart from the record's `team`). Either way the shell is not a member any team act reaches (TD-160's *left alone by every team act*: Stop, wind down, rule 8, lane counts, TDs in motion), and keeps the full card or takes the compact one — say which, since §4.5a gives the full card to *a repo's no-team strip* and the compact one to *a team member*.
+3. What carries on **Resume** (`team` is in `RESUME_CARRIES`) and what a shell on a concluded or stopped team shows.
+Then the build entry, named in `Blocked by:`.
+
+**Done when** the design says which shells carry the team, what the badge leaves unchanged, and which card they draw, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-577 and TD-580 (Open shell here, the person's own shell), TD-810 (Open shell here refused while the shell is open), TD-160 (a person's session in a team), TD-725 (the no-team strip).
+
+**Resolved:** 2026-10-17 (grinder-ao-1) — built by TD-827: #2023.

@@ -193,6 +193,25 @@ def test_a_press_on_a_team_member_creates_a_shell_with_its_badge_alone(press):
 
 
 @pytest.mark.unit
+def test_a_press_on_a_session_with_no_badge_creates_a_shell_with_none(press):
+    agent = Agent()
+    press(agent)
+    assert agent.made() == [{"name": "w-shell", "dir": "/repo/wt", "adapter": "shell"}]
+
+
+@pytest.mark.unit
+def test_a_team_reads_the_teamed_shell_as_a_persons_session():
+    """`teamrun.persons` keys on `unattended: false`: a team with only that shell live is not live, and
+    neither a stop nor a concluded Start reaches it (`crew`)."""
+    from shiftlead import teamrun
+
+    shell = {"id": "ao-w-shell", "team": "t", "adapter": "shell", "unattended": False, "state": "idle"}
+    member = {"id": "ao-w", "team": "t", "unattended": True, "state": "exited"}
+    assert teamrun.persons(shell) and teamrun.crew("t", [shell, member]) == [member]
+    assert not teamrun.live(teamrun.crew("t", [shell, member]))
+
+
+@pytest.mark.unit
 def test_a_teamed_shell_left_open_is_reopened(press):
     teamed = {**OWN, "team": "ao-grind", "project": "shiftlead"}
     agent = Agent(live(teamed), teamed)

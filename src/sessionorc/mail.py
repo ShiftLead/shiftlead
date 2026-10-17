@@ -206,10 +206,9 @@ def person_shell(record: Session | None) -> bool:
     and `ao shell` make, and what no session can make, since a session's shell lists its creator as a
     controller from birth. A team badge does not end it (TD-821): **Open shell here** on a team member
     gives the shell the member's `team` and `project`, so its card is drawn on that team, and a badge
-    grants nothing (§9 invariant 9). Read from the
-    record at each request, never kept: `ao mode`, `ao control … add` or a role ends it on the next
-    call. The one exception to `PERSON_ONLY`, and it passes the acting gate and every other act a
-    person passes (`as_person`, TD-801)."""
+    grants nothing (§9 invariant 9). Read from the record at each request, never kept: `ao mode`, `ao
+    control … add` or a role ends it on the next call. The one exception to `PERSON_ONLY`, and it passes
+    the acting gate and every other act a person passes (`as_person`, TD-801)."""
     return (
         record is not None
         and record.adapter == "shell"
