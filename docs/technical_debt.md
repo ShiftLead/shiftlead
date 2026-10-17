@@ -87,6 +87,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
 | TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Open |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
+| TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Open |
 
 ---
 
@@ -1905,5 +1906,32 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the form, `ao td add` and the envelope carry the priority as the design says, the drafter's brief writes it, and the tests above pass.
 
 **Related:** TD-851 (the design), TD-180 (Add entry), TD-730 (the form's Team pick).
+
+---
+
+## TD-856: The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a row *Focus side panel, **Git** card — changed files* (and *Focus side panel, Session card — recent files*, which already lists the session's committed paths), §4.2 *The record's `files`*, §4.5 item 4; `src/sessionorc/gitinfo.py` (`git_info` — the porcelain, at most twenty; `changed_files` — the diff from the merge base), `src/sessionorc/modes.py` (where a new read is served, if it needs the record's host), `src/shiftlead/ui/app.py` (the Focus view, `git_root`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw)
+
+**Why:**
+- Paul (2026-10-17, through Add entry): *In the Git card of the focus terminal we show (and importantly link) the currently modified files. Lets add a picker to choose to show those files that have been edited in previous commits (e.g. HEAD~1, HEAD~2, plus one to show all for the session) and also add arrows for navigating them up or down. Medium priority.*
+- The card's lines are `GitInfo.files`, the porcelain alone (§4.5a *changed files*), so the moment a worker commits, the files it just changed leave the card and their links with them — and an agent commits often, so the card is most often empty when the person wants to open what was just done. The Session card's *recent files* holds committed paths, but mixed, capped at twenty and with no way to ask *what did this commit touch*.
+
+**Fix:** design it first. What the round settles:
+1. **The pick**: *Working tree* (today's list, the default) · *HEAD~1* · *HEAD~2* · … · *Session* (every path since the base, as `changed_files` reads it). Whether *HEAD~n* lists the files that one commit changed (`git show --name-status HEAD~n`) or everything from it to the tree; the drafter's lean is the one commit, since *Session* already covers the cumulative read. How far back it goes, and what a pick shows for a commit: its short sha and subject.
+2. **The arrows**: the drafter reads Paul's *arrows for navigating them up or down* as stepping the pick — ↑ one commit newer, ↓ one commit older, *Working tree* at the top — rather than moving through the file list; the round confirms the reading.
+3. **The links**: a committed path is linked as the tree's are (§4.5a *changed files*, the editor's file form), and a path the commit deleted, or one gone from the tree since, is text with its hover, as a deletion is today.
+4. **Where it is read**: on the record's host with the status read, never parsed from the screen; whether the pick is kept per session or resets on load; how *Session* relates to the Session card's *recent files* (one read, or the card's list replaced).
+5. The §4.5a rows for the pick and the arrows, then the build entry, named in `Blocked by:`.
+
+**Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
+
+**Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
 
 ---
