@@ -66,6 +66,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-797 | The conformance walk's `write_home` and `save_capture` are run by no test: the scratch home's `profiles.yml` and the files copied into `tests/conformance/fixtures/` are unheld | Low | Open |
+| TD-798 | `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test | Low | Open |
 
 ---
 
@@ -1292,5 +1293,25 @@ The other cases:
 **Fix:** add the tests below; no change to the code under test.
 
 **Done when** tests: `write_home` in a tmp dir writes a `profiles.yml` that `shiftlead.profiles.load` reads back as the one profile and default, and a git repo with a commit; `save_capture` copies the capture directory's `*.jsonl` and writes `titles.json` (the tmux call can be monkeypatched), and copies no `.jsonl` when the capture directory is empty.
+
+**Related:** none.
+
+---
+
+## TD-798: `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.7 `ao pr held`; `src/shiftlead/cli.py` (`_repo_hold`, the `path` line and `and p["held"]` guard); `tests/test_unasked_shown.py`
+
+**Why:** #1965 (TD-790) added `_repo_hold`. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_unasked_shown.py`: baseline 11 passed; with `f" and {len(p['held']) - 3} more" if len(p["held"]) > 3 else ""` replaced by `""` 11 passed; with `if isinstance(a := ..., dict) and p["held"]:` reduced to drop `and p["held"]` 11 passed. The tests use fewer than four held paths, so the truncation of a PR touching many held paths is never drawn.
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** a PR with five held paths reads `the repo holds` `a`, `b`, `c` *and 2 more*; an asked PR whose reading lists no held path says nothing. Both mutations above fail.
 
 **Related:** none.
