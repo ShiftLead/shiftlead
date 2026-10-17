@@ -86,6 +86,9 @@ def test_a_tool_field_name_in_a_reading_fails():
                         "cache_read": 0,
                         "cache_write": 0,
                         "cost": {"input_tokens": 1},
+                        "conversation": "c",
+                        "cwd": "/w",
+                        "subagent": False,
                     }
                 ],
                 "cursors": {},

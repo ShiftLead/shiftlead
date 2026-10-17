@@ -131,6 +131,31 @@ def test_spend_reads_every_transcript_past_its_cursor_one_turn_per_response(mete
     assert [t["id"] for t in later["turns"]] == ["u5"] and later["cursors"][str(main)] < main.stat().st_size
 
 
+def test_a_turn_says_whose_it_is_and_a_subscription_profile_is_read_too(tmp_path, monkeypatch):
+    """§4.3 *Spend per turn* (TD-830): `conversation`, `cwd` and `subagent` on every turn — a subagent's
+    transcript names its parent's conversation — a `<synthetic>` entry is no turn, and a subscription
+    profile's transcripts are read as a metered one's are (the seat ledger asks)."""
+    home, cfg = tmp_path / "home", tmp_path / "claude-sub"
+    home.mkdir()
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(home))
+    (home / "profiles.yml").write_text(f"profiles:\n  sub: {{config_dir: {cfg}}}\n")
+    proj = cfg / "projects" / "-w-repo"
+    sub = proj / "s1" / "subagents" / "agent-a.jsonl"
+    sub.parent.mkdir(parents=True)
+
+    def at(uid: str, mid: str, cwd: str, **kw) -> str:
+        d = json.loads(_entry(uid, mid, **kw))
+        return json.dumps(d | {"cwd": cwd}) + "\n"
+
+    (proj / "s1.jsonl").write_text(at("u1", "m1", "/w/repo") + at("u2", "m2", "/w/repo", model="<synthetic>"))
+    sub.write_text(at("u3", "m3", "/w/repo/sub"))
+    got = ClaudeCodeAdapter().spend("sub", {})
+    by = {t["id"]: t for t in got["turns"]}
+    assert got["reason"] == "ok" and set(by) == {"u1", "u3"}
+    assert (by["u1"]["conversation"], by["u1"]["cwd"], by["u1"]["subagent"]) == ("s1", "/w/repo", False)
+    assert (by["u3"]["conversation"], by["u3"]["cwd"], by["u3"]["subagent"]) == ("s1", "/w/repo/sub", True)
+
+
 def test_a_cursor_past_the_end_is_a_rewrite_read_from_the_top(metered):
     main = metered / "s1.jsonl"
     main.write_text(_entry("u1", "m1"))

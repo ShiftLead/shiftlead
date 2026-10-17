@@ -83,7 +83,7 @@ from sessionorc.agent_common import (
     log,
 )
 from sessionorc.agent_ids import settle_key
-from sessionorc.agent_spend import _metered_of
+from sessionorc.agent_spend import SEAT_EVERY, _metered_of
 from sessionorc.gitinfo import UNKNOWN as GIT_UNKNOWN
 from sessionorc.gitinfo import changed_files, git_info, work_left
 from sessionorc.models import (
@@ -242,6 +242,14 @@ class TickMixin:
             # detached as the usage poll is: it reads transcripts (§4.4 *Usage*, TD-151); a node's
             # pass sends its turns home over the link (slice 4)
             self._spend_task = asyncio.create_task(self._refresh_spend())
+        if (
+            self.mode == "home"
+            and (self._seats_task is None or self._seats_task.done())
+            and time.monotonic() - self._seats_at >= SEAT_EVERY
+        ):
+            # once a minute, not every tick: nothing waits on the seat ledger (§4.4 *Spend per seat*)
+            self._seats_at = time.monotonic()
+            self._seats_task = asyncio.create_task(self._refresh_seats())
         await self._team_stop_times(snapshot_at)
         await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)

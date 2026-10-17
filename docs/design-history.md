@@ -295,6 +295,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4a Home and nodes: one session graph across hosts (first half)
 
+- 2026-10-17 (TD-830, grinder-ao-1): the seat ledger's `seats` joins the readings' row — forwarded while the link is up, refused offline, since `seat_spend.json` is the home's and a node holds none.
 - 2026-10-16 (TD-801, the designer; Fable round 3): a node's own shell is bound to that node's records as a person there is, and an act of the person's own shell crosses the link with no caller. Built by TD-802.
 - 2026-10-16 (TD-769 slice 3, grinder-ao-1; the techlead's read of #1939): `rank_move`'s row added to the call-by-call table — forwarded while the link is up, refused offline, a person's call as a session's, because `ranks.json` is the home's.
 - 2026-10-09 (TD-489, the designer): *When the home is lost* names the watch — outside the user manager, it starts a stopped manager again and tells the person (§4.10). Built by TD-497.

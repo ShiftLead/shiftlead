@@ -462,7 +462,10 @@ def _turn(line: bytes, source: str, offset: int) -> dict | None:
     """One transcript line as a turn (`spend`), or None when it is not an `assistant` entry with a
     `usage`: the four token kinds kept apart, because a coding agent's input is mostly cache reads
     at a tenth of the input rate. `response` is the API response's id: `spend` counts a response once
-    within a read, and the home's ledger once across two reads it straddles (TD-151)."""
+    within a read, and the home's ledger once across two reads it straddles (TD-151). `conversation`,
+    `cwd` and `subagent` say whose turn it is (§4.4 *Spend per seat*, TD-830): the transcript's stem,
+    or for a subagent's `<session>/subagents/agent-*.jsonl` its parent session's. An entry whose model
+    is `<synthetic>` (the tool's own notice) is no turn."""
     try:
         d = json.loads(line)
     except ValueError:
@@ -471,8 +474,10 @@ def _turn(line: bytes, source: str, offset: int) -> dict | None:
         return None
     msg = d.get("message") if isinstance(d.get("message"), dict) else {}
     usage = msg.get("usage")
-    if not isinstance(usage, dict):
+    if not isinstance(usage, dict) or msg.get("model") == "<synthetic>":
         return None
+    path = Path(source)
+    subagent = path.parent.name == "subagents"
 
     def n(key: str) -> int:
         v = usage.get(key)
@@ -490,6 +495,9 @@ def _turn(line: bytes, source: str, offset: int) -> dict | None:
         "cache_write": n("cache_creation_input_tokens"),
         "cost": None,
         "response": str(msg.get("id") or ""),
+        "conversation": path.parent.parent.name if subagent else path.stem,
+        "cwd": str(d.get("cwd") or ""),
+        "subagent": subagent or bool(d.get("isSidechain")),
     }
 
 
@@ -906,14 +914,16 @@ class ClaudeCodeAdapter:
         return prof.account or prof.name
 
     def spend(self, profile: str, cursors: dict[str, int] | None = None) -> dict:
-        """Spend per turn for a metered profile (design §4.3 *Spend per turn*, TD-151 slice 2):
+        """Spend per turn for any profile (design §4.3 *Spend per turn*, TD-151 slice 2; a subscription's
+        for the seat ledger alone, TD-830):
         `{turns, cursors, reason}` — the design's `(turns, cursors)` with the reason beside them. Every
         transcript under the profile's config directory is read from its cursor (a byte offset; 0
         for one not in `cursors`) to its last whole line, sessions shiftlead did not start and
         subagents' transcripts included, since both are billed. A cursor past its file's end means
         the tool rewrote the file (a compaction does), and it is read from 0 again — dropping what
         was already counted is the home's (§4.4). Each `assistant` entry's `usage` is one turn:
-        `{at, id, source, offset, model, input, output, cache_read, cache_write, cost}`, `id` the
+        `{at, id, source, offset, model, input, output, cache_read, cache_write, cost, conversation, cwd,
+        subagent}`, `id` the
         entry's `uuid`, `cost` None (the tool does not price its turns; the home does, from the
         profile). One API response is written as one entry per content block, each carrying the
         response's usage, so a read counts a response once — its last entry, keyed by

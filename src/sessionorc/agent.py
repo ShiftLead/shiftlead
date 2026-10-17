@@ -47,6 +47,7 @@ from sessionorc import (
     work,
 )
 from sessionorc import balance as balance_mod
+from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
 from sessionorc import spend as spend_mod
@@ -703,6 +704,16 @@ class HostAgent(
         self._billing_seen: dict[str, tuple[float, bool]] = {}  # profile → (monotonic, metered), for the gate
         self._metered_shown: set[str] = set()
         self._spend_task: asyncio.Task[None] | None = None
+        # The seat ledger (§4.4 *Spend per seat*, TD-830): `seat_spend.json`, every profile's turns
+        # charged to a record and a reference, read by `seats`; its pass runs once a minute at the home.
+        self.seat_store = seats_mod.SeatStore()
+        self._seats: dict[str, Any] = self.seat_store.load()
+        self._seats_saved = json.dumps(self._seats, sort_keys=True)
+        self._seats_lock = asyncio.Lock()
+        self._seats_task: asyncio.Task[None] | None = None
+        self._seats_at = 0.0  # monotonic: when the last pass started
+        self._seats_pruned = ""
+        self._seat_reason: dict[str, str] = {}
         # A node's side of the road (§4.4a, TD-151 slice 4): per profile, the cursors and seeding the
         # home answered on this link (cleared on each dial) and the last cursors it acknowledged (kept
         # for the offline figure); per account, the sums the home last sent. The home's side: the
@@ -2884,7 +2895,10 @@ class HostAgent(
                 "another reference, or claim it anyway with --force",
                 holder=holder,
             )
+        claimed_at = next((e.at for e in s.progress if e.ref == entry.ref and e.status == "claimed"), None)
         applied = s.report_progress(entry)
+        if applied and status == "done" and entry.source == "declared" and self.mode != "node":
+            await self._seat_spend_done(s, entry.ref, claimed_at)  # the entry's reading outlives its record (§4.4)
         if applied and status == "claimed" and entry.source == "declared":
             # a session that claims something went on after all — both endings are taken back
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
