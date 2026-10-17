@@ -122,10 +122,12 @@ def test_the_hook_captures_each_payload_as_handed_it(tmp_path, monkeypatch):
     assert (tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()[-1] == '{"a":  1, "b":"x"}'  # its bytes
     hook.capture("hooks", '{"a":\n 1}')
     assert (tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()[-1] == '{"a": 1}'  # one line of JSONL
+    hook.capture("hooks", '{"a": "x\u2028y"}')  # a line separator inside a string splits a line too
+    assert (tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()[-1] == '{"a": "x\\u2028y"}'
     hook.capture("statusline", "not json")  # never fails the hook
     monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"\xff\xfe"), encoding="utf-8"))
     assert hook.main() == 0  # stdin that is not UTF-8 is no payload, and nothing is captured
-    assert len((tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()) == 4
+    assert len((tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()) == 5
     assert not (tmp_path / "statusline.jsonl").exists()
 
 

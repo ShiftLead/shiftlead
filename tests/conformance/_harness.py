@@ -135,8 +135,9 @@ def check_spend(got: object, tool_fields: frozenset[str]) -> None:
 
 
 def hook_reading(params: dict[str, Any] | None) -> dict[str, Any]:
-    """What the host agent's `hook` call makes of an adapter's hook params (`agent_hook.rpc_hook`): the
-    state and the pending kind. A `permission` event waits on the person as `needs-you`; None reports nothing."""
+    """The state and pending kind an adapter's hook params stand for, restated from the host agent's
+    `agent_hook.rpc_hook` (not called): a `permission` event waits on the person as `needs-you`; None
+    reports nothing."""
     if params is None:
         return {"state": None}
     if params.get("kind") == "permission":

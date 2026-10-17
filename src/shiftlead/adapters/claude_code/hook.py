@@ -338,7 +338,7 @@ def capture(kind: str, raw: str) -> None:
     with contextlib.suppress(OSError, ValueError):
         line = (raw or "{}").strip()
         parsed = json.loads(line)
-        if "\n" in line:
+        if len(line.splitlines()) > 1:  # `\r`, U+2028 and the rest split a line as `\n` does
             line = json.dumps(parsed)
         with (Path(where) / f"{kind}.jsonl").open("a", encoding="utf-8") as f:
             f.write(line + "\n")

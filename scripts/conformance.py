@@ -57,7 +57,7 @@ PERMISSION_PROMPT = "Use your shell tool to run exactly this command, then stop:
 SHORT_PROMPT = "Reply with the one word: ready. Use no tools."
 MAIL_TEXT = "The conformance walk's mail. Read it with `ao inbox`, then stop; nothing else is asked."
 # The launch arguments that make each tool ask every permission, whatever its own default: Claude Code's
-# is `auto` (2.1.301), whose classifier allowed the walk's `touch` before any hook saw a permission (TD-784).
+# is `auto` (2.1.302), whose classifier allowed the walk's `touch` before any hook saw a permission (TD-784).
 ASKING_ARGS = {"claude-code": ["--permission-mode", "manual"]}
 
 

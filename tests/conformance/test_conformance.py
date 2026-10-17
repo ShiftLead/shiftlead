@@ -113,8 +113,8 @@ def test_the_title_is_a_name_or_nothing(name):
 
 @pytest.mark.parametrize("name", AGENTS)
 def test_each_hook_payload_reads_as_a_state_and_pending(name):
-    """The hook payloads the live walk captured, each through the adapter's hook to what the host agent
-    makes of it: a state, and a pending kind where the tool waits on the person."""
+    """The hook payloads the live walk captured, each through the adapter's hook to the params it hands
+    the host agent, read as a state and, where the tool waits on the person, a pending kind."""
     harness = HARNESSES[name]
     if not hasattr(harness, "hook_params"):
         pytest.skip(f"{name} has no hook: its state is read from the screen")
