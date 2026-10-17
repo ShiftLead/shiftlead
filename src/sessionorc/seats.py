@@ -324,11 +324,15 @@ def done(ledger: dict[str, Any], repo: str | None, ref: str, claimed_at: str | N
 
 
 def prune(ledger: dict[str, Any], today: date) -> None:
-    """The rows and the cursors older than the account ledger's thirteen months (`spend.KEEP`)."""
+    """The rows, the cursors and the finished references (`done_at`) older than the account ledger's
+    thirteen months (`spend.KEEP`); a reference not finished stays, however old its claim."""
     oldest = (today - spend_mod.KEEP).isoformat()
     days = ledger.get("days") or {}
     for d in [d for d in days if d < oldest]:
         del days[d]
+    refs = ledger.get("refs") or {}
+    for k in [k for k, r in refs.items() if (r or {}).get("done_at") and str(r["done_at"]) < oldest]:
+        del refs[k]
     for h in (ledger.get("hosts") or {}).values():
         cursors = h.get("cursors") or {}
         for s in [s for s, c in cursors.items() if str((c or {}).get("seen") or "") < oldest]:

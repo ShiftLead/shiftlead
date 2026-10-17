@@ -79,7 +79,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
-| TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 
 ---
@@ -1691,26 +1690,6 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the cause is named in this entry's Resolved, and the case passes ten full-suite runs in a row (or its fixture no longer depends on what it was found to depend on).
 
 **Related:** TD-411 (`lane_seen` and the live check that goes live after a `none`).
-
----
-
-## TD-861: The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-1, from the techlead's read of #2049)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.4 *Spend per seat* (the file is kept thirteen months); `src/sessionorc/seats.py` (`prune`); `tests/test_seats.py`
-
-**Why:** the techlead's merge of #2049 (TD-830) noted, as no finding, that `seats.prune` drops the days and the cursors older than `spend.KEEP` but never a `refs` entry, so `seat_spend.json`'s `refs` grows by one key per reference claimed, forever. It is small, but §4.4 says the file is kept thirteen months.
-
-**Fix:** `prune` also drops a `refs` entry whose `done_at` is older than `spend.KEEP`; an entry with no `done_at` (still open) stays. A test: an old finished reference is dropped, a recent one and an unfinished old one stay.
-
-**Done when** a `refs` entry finished before `spend.KEEP` is gone after a prune, and every other one stays.
-
-**Related:** TD-830 (built #2049), TD-818 (the design).
 
 ---
 
