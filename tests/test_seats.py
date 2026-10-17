@@ -3,6 +3,7 @@ built by TD-830): every profile's turns weighed and charged to a record and a re
 `seat_spend.json`, and read by `seats` per seat, per role and per finished entry — while the account
 ledger, the gate and the chip read nothing of it."""
 
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -218,9 +219,10 @@ def test_the_reading_merges_a_seats_runs_shares_its_team_and_sums_a_finished_ent
     assert set(got["roles"]) == {"grinder", "techlead"}
     by_record = seats.reading(ledger, "day", NOW, by="record", weights=W)
     assert sorted(s["records"][0] for s in by_record["seats"]) == ["tl", "w1", "w2", "x"]
-    assert seats.reading(ledger, "week", NOW, weights=W)["begins"].startswith("2026-10-12")
-    with pytest.raises(ValueError, match="day or week"):
-        seats.reading(ledger, "month", NOW)
+    week = seats.reading(ledger, "week", NOW, weights=W)
+    assert (week["at"], week["until"], week["begins"]) == ("2026-10-12", "2026-10-17", "2026-10-17")
+    with pytest.raises(ValueError, match="day, week or month"):
+        seats.reading(ledger, "year", NOW)
 
 
 def test_an_entry_claimed_before_the_ledger_began_reads_partial():
@@ -310,8 +312,11 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
         monkeypatch.setattr(agent.seat_store, "save", lambda ledger: (_ for _ in ()).throw(OSError("full")))
         await person.call("progress", id=w["id"], status="claimed", ref="TD-505")
         assert await person.call("progress", id=w["id"], status="done", ref="TD-505")
-        with pytest.raises(AgentError, match="day or week"):
+        with pytest.raises(AgentError, match="day, week or month"):
             await person.call("seats", window="year")
+        assert (await person.call("seats", window="month", at=None))["window"] == "month"  # the RPC takes `at`
+        with pytest.raises(AgentError, match="starts on the 1st"):
+            await person.call("seats", window="month", at="2026-10-02")
         out = await person.call("set_settings", spend={"weights": {"claude-sonnet": {"input": 1}}})
         assert out["spend"]["weights"]["claude-sonnet"] == {"input": 1.0}
         with pytest.raises(AgentError, match="not a token kind"):
@@ -356,3 +361,170 @@ async def test_the_home_charges_a_nodes_seat_turns_once_and_its_seeding_charges_
     assert set(next(iter(agent._seats["days"].values()))) == {"ao-x-n", seats.OUTSIDE}
     with pytest.raises(Exception, match="names a profile"):
         await agent._take_seat_spend("laptop", {"turns": [], "cursors": {}})
+
+
+# -- over time and across teams (§4.4 *Over time and across teams*, TD-859) ---------------------------
+
+
+def _day(figure, turns=1, metered=False, name="w", team="t", role="grinder", repo="r", model="m", **m):
+    return {
+        "name": name, "team": team, "role": role, "repo": repo, "metered": metered, "refs": {},
+        "models": {model: {"input": 1000, "output": 0, "cache_read": 0, "cache_write": 0, "turns": turns,
+                           "figure": figure, "past_200k": 0.0, "past_300k": 0.0} | m},
+    }  # fmt: skip
+
+
+def _ledger(**days):
+    """`{day: {rid: row}}`, a day written `d2026_10_17`."""
+    return {"days": {k[1:].replace("_", "-"): v for k, v in days.items()}}
+
+
+def test_a_month_and_a_week_sum_their_days_and_a_week_starts_on_monday():
+    ledger = _ledger(
+        d2026_09_30={"a": _day(1.0)},
+        d2026_10_11={"a": _day(2.0)},  # a Sunday: last week's
+        d2026_10_12={"a": _day(4.0)},  # this week's Monday
+        d2026_10_17={"a": _day(8.0)},
+    )
+    figure = {w: seats.reading(ledger, w, NOW, weights=W)["whole"]["figure"] for w in seats.WINDOWS}
+    assert figure == {"day": 8.0, "week": 12.0, "month": 14.0}
+    assert seats.reading(ledger, "month", NOW, weights=W)["at"] == "2026-10-01"
+
+
+def test_at_picks_a_past_period_and_a_bad_future_or_pre_begins_at_is_refused():
+    ledger = _ledger(d2026_09_30={"a": _day(1.0)}, d2026_10_05={"a": _day(2.0)}, d2026_10_17={"a": _day(8.0)})
+    past = seats.reading(ledger, "week", NOW, at="2026-10-05", weights=W)
+    assert (past["at"], past["until"], past["current"], past["whole"]["figure"]) == (
+        "2026-10-05",
+        "2026-10-11",
+        False,
+        2.0,
+    )
+    assert "resets" not in past and "resets" in seats.reading(ledger, "week", NOW, weights=W)
+    assert seats.reading(ledger, "month", NOW, at="2026-09-01", weights=W)["whole"]["figure"] == 1.0
+    assert seats.reading(ledger, "week", NOW, at="2026-09-28", weights=W)["whole"]["figure"] == 1.0  # holds begins
+    assert seats.reading(ledger, "day", NOW, at="2026-10-17", weights=W)["current"]  # the current reads as no at
+    for window, at, words in (
+        ("week", "2026-10-06", "starts on a Monday"),
+        ("month", "2026-10-02", "starts on the 1st"),
+        ("day", "17/10/2026", "YYYY-MM-DD"),
+        ("day", "20261017", "YYYY-MM-DD"),
+        ("week", "2026-10-19", "after the current week"),
+        ("week", "2026-09-21", "before the seat ledger begins (2026-09-30)"),
+        ("day", "2026-09-29", "before the seat ledger begins"),
+    ):
+        with pytest.raises(ValueError, match=re.escape(words)):
+            seats.reading(ledger, window, NOW, at=at, weights=W)
+    with pytest.raises(ValueError, match="holds no turns"):
+        seats.reading({}, "day", NOW, at="2026-10-16", weights=W)
+    assert "begins" not in seats.reading({}, "day", NOW, weights=W)
+
+
+def test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket():
+    ledger = _ledger(
+        d2026_10_14={"a": _day(1.0), "b": _day(2.0, team="u"), "i": _day(4.0, team="", role="")},
+        d2026_10_17={"a": _day(8.0), "c": _day(16.0, name="lead", role="techlead"), "outside": _day(32.0, team="")},
+    )
+    for window, n, last in (("day", 30, "2026-10-17"), ("week", 12, "2026-10-12"), ("month", 13, "2026-10-01")):
+        got = seats.reading(ledger, window, NOW, weights=W)["series"]
+        assert len(got) == n and got[-1]["at"] == last
+    week = seats.reading(ledger, "week", NOW, weights=W)["series"]
+    assert week[0]["at"] == "2026-07-27" and week[-1]["partial"]  # begins is a Wednesday
+    assert {k: v["figure"] for k, v in week[-1]["by"].items()} == {
+        "outside": 32.0, "t": 25.0, "interactive": 4.0, "u": 2.0
+    }  # fmt: skip
+    assert week[-1]["figure"] == 63.0 and not any(b.get("partial") for b in week[:-1])
+    days = seats.reading(ledger, "day", NOW, weights=W)["series"]
+    assert not any(b.get("partial") for b in days) and days[-4]["figure"] == 7.0
+    by_role = seats.reading(ledger, "week", NOW, team="t", weights=W)["series"][-1]["by"]
+    assert {k: v["figure"] for k, v in by_role.items()} == {"techlead": 16.0, "grinder": 9.0}
+    other = seats.reading(ledger, "week", NOW, team="interactive", weights=W)["series"][-1]["by"]
+    assert list(other) == ["other"]  # a record with no role
+    old = _ledger(d2025_10_20={"a": _day(1.0)}, d2026_10_17={"a": _day(1.0)})
+    from_at = seats.reading(old, "week", NOW, at="2025-10-20", weights=W)["series"]
+    assert (from_at[0]["at"], from_at[-1]["at"], from_at[0]["figure"]) == ("2025-10-20", "2026-01-05", 1.0)
+
+
+def test_teams_carry_the_previous_period_to_date_the_week_and_month_and_the_top_seat():
+    ledger = _ledger(
+        d2026_09_30={"a": _day(100.0)},
+        d2026_10_05={"a": _day(1.0)},  # last Monday
+        d2026_10_10={"a": _day(2.0)},  # last Saturday: the sixth day, inside to date
+        d2026_10_11={"a": _day(4.0), "z": _day(64.0, team="gone")},  # last Sunday: outside it
+        d2026_10_12={"a": _day(8.0), "b": _day(12.0, name="w2")},
+        d2026_10_17={"a": _day(16.0), "outside": _day(48.0, team="")},
+    )
+    got = seats.reading(ledger, "week", NOW, weights=W)
+    rows = {r["team"]: r for r in got["teams"]}
+    assert [r["team"] for r in got["teams"]] == ["t", "outside"]  # `gone` spent only after last week's to date
+    t = rows["t"]
+    assert (t["figure"], t["previous"], t["week"], t["month"]) == (
+        36.0, {"figure": 7.0, "unit": "≈$", "to_date": 3.0}, 36.0, 43.0
+    )  # fmt: skip
+    assert t["most"] == {"seat": "w", "share": pytest.approx(0.6667, abs=1e-4)} and t["turns"] == 3
+    assert t["share"] + rows["outside"]["share"] == pytest.approx(1.0) and t["share"] == pytest.approx(0.4286, abs=1e-4)
+    month = {r["team"]: r for r in seats.reading(ledger, "month", NOW, weights=W)["teams"]}
+    assert set(month) == {"t", "gone", "outside"} and month["t"]["previous"] == {
+        "figure": 100.0,
+        "unit": "≈$",
+        "to_date": 0.0,
+    }  # Sept 1-17
+    past = seats.reading(ledger, "week", NOW, at="2026-10-05", weights=W)["teams"]
+    assert past[0]["team"] == "gone" and past[1]["previous"] == {"figure": 100.0, "unit": "≈$", "to_date": 100.0}
+    today = seats.reading(ledger, "day", NOW, weights=W)["teams"][0]
+    assert today["previous"] == {"figure": 0.0, "unit": "≈$"}  # the current day: the whole alone
+    (one,) = seats.reading(ledger, "week", NOW, team="gone", weights=W)["teams"]
+    assert one["team"] == "gone" and one["figure"] == 0.0 and "top" not in seats.reading(ledger, "week", NOW, team="t")
+
+
+def test_the_shares_on_all_sum_to_the_whole_and_top_ranks_every_seat_across_teams():
+    ledger = _ledger(
+        d2026_10_17={
+            "a": _day(10.0, name="g1"), "b": _day(30.0, name="g2", team="u"),
+            "c": _day(20.0, name="me", team="", role="lead"),
+            "outside": _day(40.0, team=""),
+        }
+    )  # fmt: skip
+    got = seats.reading(ledger, "day", NOW, weights=W)
+    assert got["whole"]["figure"] == 100.0
+    assert sum(r["share"] for r in got["teams"]) == pytest.approx(1.0)
+    assert [(s["seat"], s["team"], s["role"], s["share"]) for s in got["top"]] == [
+        ("g2", "u", "grinder", 0.3), ("me", "interactive", "lead", 0.2), ("g1", "t", "grinder", 0.1)
+    ]  # fmt: skip
+    assert got["outside"]["share"] == 0.4
+    by_record = seats.reading(ledger, "day", NOW, by="record", weights=W)
+    assert [s["records"] for s in by_record["seats"]] == [["b"], ["c"], ["a"]]
+    assert by_record["top"] == got["top"]  # `top` reads seats under `by: record` too
+
+
+def test_a_mixed_sum_prints_approx_and_an_unweighed_part_stays_out_of_it():
+    ledger = _ledger(
+        d2026_10_17={
+            "a": _day(10.0, metered=True), "b": _day(10.0, name="w2", metered=True),
+            "c": _day(0.0, name="w3", team="u", model="mystery", turns=2, unweighed=2),
+        }
+    )  # fmt: skip
+    got = seats.reading(ledger, "day", NOW, weights=W)
+    rows = {r["team"]: r for r in got["teams"]}
+    assert (rows["t"]["unit"], rows["u"]["unit"], got["unit"]) == ("$", "≈$", "≈$")
+    assert got["whole"]["figure"] == 20.0 and got["whole"]["unweighed_tokens"] == 1000
+    assert rows["t"]["share"] == 1.0 and rows["u"]["share"] == 0.0
+    assert seats.reading(ledger, "day", NOW, team="t", weights=W)["unit"] == "$"
+
+
+def test_a_record_in_no_team_reads_as_an_interactive_seat_by_name_and_repo_with_its_role():
+    mine = _rec("p1", name="ao-paul", conv="c1", team="", role="")
+    there = _rec("p2", name="ao-paul", conv="c2", team="", role="designer", repo="other")
+    again = _rec("p3", name="ao-paul", conv="c3", team="", role="")  # the same seat, a later run
+    ledger: dict = {}
+    recs = [mine, there, again]
+    _take(
+        ledger, [_t("u1", 0, source="a"), _t("u2", 0, source="b", conv="c2"), _t("u3", 0, source="c", conv="c3")], recs
+    )
+    got = seats.reading(ledger, "day", NOW, weights=W)
+    assert sorted((s["seat"], s["repo"], s["team"], s["role"], s["records"]) for s in got["seats"]) == [
+        ("ao-paul", "other", "interactive", "designer", ["p2"]),
+        ("ao-paul", "r", "interactive", "other", ["p1", "p3"]),
+    ]
+    (row,) = seats.reading(ledger, "day", NOW, team="interactive", weights=W)["teams"]
+    assert row["team"] == "interactive" and row["turns"] == 3

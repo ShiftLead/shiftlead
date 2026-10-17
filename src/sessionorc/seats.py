@@ -38,6 +38,8 @@ from sessionorc.store import _atomic_write
 
 KINDS = spend_mod.KINDS
 OUTSIDE = "outside"  # the record id of a turn no record owns
+INTERACTIVE = "interactive"  # the team the records in no team read under: the person's own sessions
+OTHER = "other"  # the role a record with none reads as
 BETWEEN = "between"  # the reference of a turn whose record held no claim
 BACKFILL = timedelta(days=14)  # the first pass reads the fortnight before it (§4.4 *First read*)
 PAST = (200_000, 300_000)  # the context marks a row's figure is kept past (TD-460's reading)
@@ -337,7 +339,10 @@ def prune(ledger: dict[str, Any], today: date) -> None:
 
 
 def _blank() -> dict[str, Any]:
-    return {"figure": 0.0, "turns": 0, "between": 0.0, "past_200k": 0.0, "past_300k": 0.0, "unweighed": 0}
+    return {
+        "figure": 0.0, "turns": 0, "between": 0.0, "past_200k": 0.0, "past_300k": 0.0, "unweighed": 0,
+        "unweighed_tokens": 0, "metered": True,
+    }  # fmt: skip
 
 
 def _add_row(acc: dict[str, Any], row: dict[str, Any]) -> None:
@@ -346,18 +351,98 @@ def _add_row(acc: dict[str, Any], row: dict[str, Any]) -> None:
         acc["turns"] += int(m.get("turns") or 0)
         acc["past_200k"] += float(m.get("past_200k") or 0.0)
         acc["past_300k"] += float(m.get("past_300k") or 0.0)
-        acc["unweighed"] += int(m.get("unweighed") or 0)
+        unweighed, turns = int(m.get("unweighed") or 0), int(m.get("turns") or 0)
+        acc["unweighed"] += unweighed
+        if unweighed and turns:  # a model is weighed or not, so its turns are all unweighed but a billed one
+            acc["unweighed_tokens"] += sum(int(m.get(k) or 0) for k in KINDS) * unweighed // turns
     acc["between"] += float(((row.get("refs") or {}).get(BETWEEN) or {}).get("figure") or 0.0)
+    acc["metered"] = acc["metered"] and bool(row.get("metered"))
 
 
 def _rounded(acc: dict[str, Any], whole: float | None = None) -> dict[str, Any]:
-    out = {k: round(v, 4) if isinstance(v, float) else v for k, v in acc.items()}
+    out = {k: round(v, 4) if isinstance(v, float) else v for k, v in acc.items() if k != "metered"}
     fig = acc["figure"]
     for k in ("past_200k", "past_300k"):
         out[f"{k}_share"] = round(acc[k] / fig, 4) if fig else 0.0
     if whole is not None:
         out["share"] = round(fig / whole, 4) if whole else 0.0
+    out["unit"] = _unit(acc)
     return out
+
+
+def _unit(acc: dict[str, Any]) -> str:
+    """`$` where every part summed is a bill, else `≈$` (§4.4 *A sum across profiles*)."""
+    return "$" if acc["metered"] and acc["turns"] else "≈$"
+
+
+# -- periods (§4.4 *Over time and across teams*) --------------------------------------------------
+
+WINDOWS = ("day", "week", "month")
+SERIES = {"day": 30, "week": 12, "month": 13}  # the chart's buckets; thirteen months is what is kept
+
+
+def _first(window: str, d: date) -> date:
+    """The first day of the period of `window` holding `d`: itself, its Monday, or its month's 1st."""
+    if window == "week":
+        return d - timedelta(days=d.weekday())
+    return d.replace(day=1) if window == "month" else d
+
+
+def _step(window: str, first: date, n: int) -> date:
+    """The first day of the period `n` periods from the one starting `first`."""
+    if window == "month":
+        m = first.year * 12 + first.month - 1 + n
+        return date(m // 12, m % 12 + 1, 1)
+    return first + timedelta(days=n * (7 if window == "week" else 1))
+
+
+def _period_at(window: str, at: str | None, today: date, begins: str | None) -> date:
+    """The picked period's first day: `at`, refused in words when it is not a period's first day, after
+    the current period, or before the period holding `begins` (every other one while there is none)."""
+    current = _first(window, today)
+    if not at:
+        return current
+    try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(at)):
+            raise ValueError
+        d = date.fromisoformat(str(at))
+    except ValueError:
+        raise ValueError(f"a seats at is a date, YYYY-MM-DD, not {at!r}") from None
+    if d != _first(window, d):
+        raise ValueError(f"a {window} starts on {'a Monday' if window == 'week' else 'the 1st'}, not {at}")
+    if d > current:
+        raise ValueError(f"{at} is after the current {window}, which starts {current.isoformat()}")
+    if d < current and (begins is None or d < _first(window, date.fromisoformat(begins))):
+        raise ValueError(
+            f"{at} is before the seat ledger begins" + (f" ({begins})" if begins else ": it holds no turns")
+        )
+    return d
+
+
+def _seat_rows(ledger: dict[str, Any]) -> list[tuple[str, str, dict[str, Any], str, str]]:
+    """Every per-day row as `(day, record id, row, team, role)`: a record in no team reads under
+    `interactive`, a record with no role as `other`, and *outside shiftlead* as the team `outside`."""
+    out = []
+    for d, rows in (ledger.get("days") or {}).items():
+        if not isinstance(rows, dict):
+            continue
+        for rid, row in rows.items():
+            if not isinstance(row, dict):
+                continue
+            if rid == OUTSIDE:
+                out.append((d, rid, row, OUTSIDE, ""))
+            else:
+                out.append((d, rid, row, str(row.get("team") or INTERACTIVE), str(row.get("role") or OTHER)))
+    return out
+
+
+def _sum(rows: list[Any], first: date, last: date, team: str | None = None) -> dict[str, Any]:
+    lo, hi = first.isoformat(), last.isoformat()
+    acc = _blank()
+    for d, _rid, row, t, _role in rows:
+        if lo <= d <= hi and (team is None or t == team):
+            _add_row(acc, row)
+    return acc
 
 
 def reading(
@@ -367,68 +452,168 @@ def reading(
     team: str | None = None,
     by: str | None = None,
     weights: dict[str, Any] | None = None,
+    at: str | None = None,
 ) -> dict[str, Any]:
-    """The `seats` reading over `window` (`day` or `week`, the home's clock): per seat — the records of
-    one name within a team, or per record under `by: record` — with its share of its team's figure;
-    per role, team and repo; per finished entry (its `done_at` in the window: every row charged to it
-    from its `first_claimed`, by role, `partial` when claimed before the ledger began); and the
-    entries' count, sum and median per role. *Outside shiftlead* is one row."""
-    if window not in ("day", "week"):
-        raise ValueError(f"a seats window is day or week, not {window!r}")
-    start, resets = spend_mod.bounds(now)[window]
-    first, last = start.isoformat(), now.date().isoformat()
-    days = {d: rows for d, rows in (ledger.get("days") or {}).items() if isinstance(rows, dict)}
+    """The `seats` reading over a period (`window` `day`, `week` or `month` of the home's clock, `at` its
+    first day, the current one when absent): per seat — the records of one name within a team and repo,
+    or per record under `by: record` — with its share of its team's figure; per role, team and repo; per
+    finished entry (its `done_at` in the period: every row charged to it from its `first_claimed`, by
+    role, `partial` when claimed before the ledger began); the entries' count, sum and median per role;
+    the window's `series`; `teams`, each against the previous period; and without `team` the `top`
+    seats across the teams. *Outside shiftlead* is one row; the records in no team read as `interactive`."""
+    if window not in WINDOWS:
+        raise ValueError(f"a seats window is day, week or month, not {window!r}")
+    today = now.date()
+    rows = _seat_rows(ledger)
+    held = sorted({d for d, *_ in rows})
+    begins = held[0] if held else None
+    start = _period_at(window, at, today, begins)
+    current = start == _first(window, today)
+    end = min(_step(window, start, 1) - timedelta(days=1), today)
+    first, last = start.isoformat(), end.isoformat()
+    resets = spend_mod.bounds(now)[window][1]
     seats: dict[str, dict[str, Any]] = {}
+    by_seat: dict[str, dict[str, Any]] = {}  # `top` and a team's `most` read seats, even `by: record`
     groups: dict[str, dict[str, dict[str, Any]]] = {"roles": {}, "teams": {}, "repos": {}}
     outside = _blank()
-    metered = True
-    seen_any = False
-    for d, rows in days.items():
-        if d < first or d > last:
+    whole = _blank()
+    in_period = [r for r in rows if first <= r[0] <= last]
+    for _d, rid, row, t, role in in_period:
+        _add_row(whole, row)
+        if rid == OUTSIDE:
+            _add_row(outside, row)
             continue
-        for rid, row in rows.items():
-            if not isinstance(row, dict):
-                continue
-            if rid == OUTSIDE:
-                _add_row(outside, row)
-                continue
-            if team and row.get("team") != team:
-                continue
-            seen_any = True
-            metered = metered and bool(row.get("metered"))
-            key = rid if by == "record" else f"{row.get('team') or ''}\0{row.get('name') or rid}"
-            s = seats.setdefault(
-                key,
-                {"seat": row.get("name") or rid, "team": row.get("team") or "", "role": row.get("role") or "",
-                 "repo": row.get("repo") or "", "records": []} | _blank(),
-            )  # fmt: skip
+        if team and t != team:
+            continue
+        repo = str(row.get("repo") or "")
+        key = f"{t}\0{repo}\0{row.get('name') or rid}"
+        into = [(seats, rid), (by_seat, key)] if by == "record" else [(seats, key)]
+        for acc, k in into:
+            s = acc.setdefault(
+                k, {"seat": row.get("name") or rid, "team": t, "role": role, "repo": repo, "records": []} | _blank()
+            )
             if rid not in s["records"]:
                 s["records"].append(rid)
             _add_row(s, row)
-            for group, field in (("roles", "role"), ("teams", "team"), ("repos", "repo")):
-                _add_row(groups[group].setdefault(str(row.get(field) or ""), _blank()), row)
+        for group, value in (("roles", role), ("teams", t), ("repos", repo)):
+            _add_row(groups[group].setdefault(value, _blank()), row)
+    if by != "record":
+        by_seat = seats
     team_whole: dict[str, float] = {}
     for s in seats.values():
         team_whole[s["team"]] = team_whole.get(s["team"], 0.0) + s["figure"]
+    ranked = sorted(seats.values(), key=lambda s: (-s["figure"], s["team"], s["seat"]))
     out_seats = [
         {**{k: s[k] for k in ("seat", "team", "role", "repo", "records")},
          **_rounded({k: s[k] for k in _blank()}, team_whole[s["team"]])}
-        for s in sorted(seats.values(), key=lambda s: (-s["figure"], s["team"], s["seat"]))
+        for s in ranked
     ]  # fmt: skip
+    days = {d: rs for d, rs in (ledger.get("days") or {}).items() if isinstance(rs, dict)}
     entries, roles = _entries(ledger, days, first, last, resets, team)
-    return {
+    out = {
         "window": window,
-        "begins": spend_mod._begins(start, resets).isoformat(),
-        "resets": resets.isoformat(),
-        "unit": "$" if metered and seen_any else "≈$",
+        "at": first,
+        "until": last,
+        "current": current,
+        "unit": _unit(whole if not team else _sum(in_period, start, end, team)),
         "as_of": (weights or WEIGHTS).get("as_of"),
         "began": ledger.get("began"),
         "seats": out_seats,
-        **{g: {k: _rounded(v) for k, v in sorted(rows.items())} for g, rows in groups.items()},
+        **{g: {k: _rounded(v) for k, v in sorted(rs.items())} for g, rs in groups.items()},
         "entries": entries,
         "finished": roles,
-        "outside": _rounded(outside),
+        "outside": _rounded(outside, whole["figure"]),
+        "whole": _rounded(whole),
+        "series": _series(rows, window, start, today, begins, team),
+        "teams": _teams(rows, by_seat, window, start, end, today, current, whole, team),
     }
+    if begins:
+        out["begins"] = begins
+    if current:
+        out["resets"] = resets.isoformat()
+    if not team:
+        out["top"] = [
+            {**{k: s[k] for k in ("seat", "team", "role", "repo", "records")},
+             **_rounded({k: s[k] for k in _blank()}, whole["figure"])}
+            for s in sorted(by_seat.values(), key=lambda s: (-s["figure"], s["team"], s["seat"]))
+        ]  # fmt: skip
+    return out
+
+
+def _series(
+    rows: list[Any], window: str, start: date, today: date, begins: str | None, team: str | None
+) -> list[dict[str, Any]]:
+    """The window's last buckets ending at the current period, or starting at `start` where it is older
+    than the first of them; each its figure by team, or by role within `team`, and `partial` on the
+    bucket holding `begins` when that is not its first day (never a day)."""
+    n = SERIES[window]
+    current = _first(window, today)
+    first = min(_step(window, current, 1 - n), start)
+    out = []
+    for i in range(n):
+        lo = _step(window, first, i)
+        hi = _step(window, lo, 1) - timedelta(days=1)
+        a, b = lo.isoformat(), hi.isoformat()
+        acc = _blank()
+        by: dict[str, dict[str, Any]] = {}
+        for d, _rid, row, t, role in rows:
+            if not a <= d <= b or (team and t != team):
+                continue
+            _add_row(acc, row)
+            _add_row(by.setdefault(role if team else t, _blank()), row)
+        bucket = {"at": a, **_rounded(acc)}
+        bucket["by"] = {k: _rounded(v) for k, v in sorted(by.items(), key=lambda kv: (-kv[1]["figure"], kv[0]))}
+        if window != "day" and begins and a < begins <= b:
+            bucket["partial"] = True
+        out.append(bucket)
+    return out
+
+
+def _teams(
+    rows: list[Any],
+    seats: dict[str, dict[str, Any]],
+    window: str,
+    start: date,
+    end: date,
+    today: date,
+    current: bool,
+    whole: dict[str, Any],
+    team: str | None,
+) -> list[dict[str, Any]]:
+    """A row per team that spent in the period or the previous one to date, `interactive` among them,
+    most first, then `outside`; with `team`, that team's row alone. Each against the previous period,
+    whole and to date (none on the current day), with the current week's and month's figures so far
+    and the seat that spent most."""
+    prev = _step(window, start, -1)
+    prev_end = start - timedelta(days=1)
+    to_date = min(prev + (end - start), prev_end) if current else prev_end
+    week, month = _first("week", today), _first("month", today)
+    names = {t for d, _rid, _row, t, _role in rows if prev.isoformat() <= d <= end.isoformat()}
+    if team:
+        names = {team}
+    out = []
+    for t in names:
+        acc = _sum(rows, start, end, t)
+        before = _sum(rows, prev, to_date, t)
+        if not team and not acc["turns"] and not before["turns"]:
+            continue
+        row = {"team": t, **_rounded(acc, whole["figure"])}
+        prior = _sum(rows, prev, prev_end, t)
+        row["previous"] = {"figure": round(prior["figure"], 4), "unit": _unit(prior)}
+        if not (current and window == "day"):
+            row["previous"]["to_date"] = round(before["figure"], 4)
+        row["week"] = round(_sum(rows, week, today, t)["figure"], 4)
+        row["month"] = round(_sum(rows, month, today, t)["figure"], 4)
+        mine = [s for s in seats.values() if s["team"] == t]
+        if mine:
+            most = max(mine, key=lambda s: (s["figure"], s["seat"]))
+            row["most"] = {
+                "seat": most["seat"],
+                "share": round(most["figure"] / acc["figure"], 4) if acc["figure"] else 0.0,
+            }
+        out.append(row)
+    out.sort(key=lambda r: (r["team"] == OUTSIDE, -r["figure"], r["team"]))
+    return out
 
 
 def _entries(
@@ -458,9 +643,9 @@ def _entries(
                 fig = float(got.get("figure") or 0.0)
                 figure += fig
                 turns += int(got.get("turns") or 0)
-                role = str(row.get("role") or "")
+                role = str(row.get("role") or OTHER)
                 by_role[role] = by_role.get(role, 0.0) + fig
-                teams.add(str(row.get("team") or ""))
+                teams.add(str(row.get("team") or INTERACTIVE))
         if team and team not in teams:
             continue
         out.append(

@@ -82,7 +82,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
-| TD-859 | Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats | Medium | Open |
 | TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-863 | Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n* | Low | Open |
@@ -1783,53 +1782,6 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the cause is named in this entry's Resolved, and the case passes ten full-suite runs in a row (or its fixture no longer depends on what it was found to depend on).
 
 **Related:** TD-411 (`lane_seen` and the live check that goes live after a `none`).
-
----
-
-## TD-859: Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-818's amendment, the designer; Paul's additions, m-75b50493538d)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-830
-**Location:** design §4.4 *Spend per seat* (*The readings*, *Over time and across teams*, *The person's own sessions*), §4.9 *Names are the org's*; `src/sessionorc/spend.py` and the `seats` RPC TD-830 adds (its reader of `seat_spend.json`); `src/shiftlead/org.py` (`_team`, where a team's name is read: the two reserved names); the tests TD-830 adds for `seats`
-
-**Why:** TD-818, amended: Paul wants to see which teams and which sessions spend most, and each team's total per day, week and month. TD-830 reads a `day` or a `week` and per team; the page's chart and its All view need more from the same per-day rows.
-
-**Fix:** `seats {window, at?, team?, by?}`, as §4.4 *Over time and across teams* says:
-- **The period.** `window` takes `month` beside `day` and `week`. A week runs Monday to Sunday, a month is the calendar month, and both use the home's clock. `at` is `YYYY-MM-DD`: a Monday for a week, the 1st for a month. It is refused in words when it is not a period's first day, after the current period, or before the period holding `begins` (every other `at` while the ledger has no row). The current period's first day reads as no `at`.
-- **`series`.** The window's last buckets: 30, 12 or 13. They end at the current period, or start at `at` where `at` is older than the first of them.
-  - Each bucket's figure is broken out by team (`interactive` and `outside` among them), or by role with `team`.
-  - By role, a series per role the team's records held in the bucket; a record with no role reads `other`.
-  - The bucket holding `begins`, when `begins` is not its first day, is marked `partial`; a day never is.
-  - `begins` is the earliest day holding a row, absent while there is none.
-- **`teams`.** Without `team`: a row per team that spent in the period or the previous one to date, `interactive` among them, by figure, then `outside`. With `team`: that team's row alone; `team` may be `interactive`. Each row holds:
-  - the period's figure, and its share of the whole (the period's total across the teams, `interactive` and `outside`);
-  - the previous period's figure, whole and to date (its first *n* days, *n* the days the current period has run; on a past period the to-date figure is the whole; on the current day no to-date figure, the whole alone);
-  - turns, and the current week's and month's figures so far;
-  - the seat that spent most, with its share of the team.
-- **`top`** (without `team`). Every seat of the period across the teams and `interactive`, most first, each with team, role, figure, share of the whole, turns and past 300k.
-- **Interactive seats.** A record in no team reads as a seat by name within its repo, team `interactive`, wearing its record's role (`other` where none). `interactive` and `outside` are reserved: a team named either is refused where teams are loaded.
-- **Sums across profiles.** A sum prints `≈$` where any part is `≈$`, and `$` only where every part is. An unweighed part is left out of the figure and of every share, and named beside it (its tokens). `unit` is given per row where rows differ.
-- **Unchanged.** Nothing new is written: all of it is summed from `seat_spend.json`'s per-day rows. (`/api/spend`, TD-832's, passes `window`, `at` and `team` through.)
-
-**Tests:**
-- a month and a week sum their days, and a week starts on Monday;
-- `at` picks a past period; a bad, future or pre-`begins` `at` is refused;
-- `series` has 30, 12 and 13 buckets ending at today's period, or starting at an old `at`, stacked by team or by role, with `partial` on a part-held bucket;
-- `teams` carries the previous period to date (a week two days old against the last week's first two days), the week and month so far, the top seat, and with `team` the one row;
-- the shares on All sum to the whole with `outside` in it;
-- a mixed `$` and `≈$` sum prints `≈$`, and an unweighed part stays out of it;
-- `top` ranks every seat across teams and interactive;
-- a no-team record reads under `interactive`, by name and repo, with its role;
-- a team named `interactive` or `outside` is refused, by `ao org check` and at a start.
-
-**Done when** the `seats` RPC answers every reading screen 13 draws from the per-day rows, and the tests above pass.
-
-**Related:** TD-818 (the design), TD-830 (the ledger and the RPC it extends), TD-831 and TD-832 (its readers).
 
 ---
 
