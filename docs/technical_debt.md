@@ -83,6 +83,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Open |
 | TD-852 | #2040's smoke script has six lines no test reads: its browser half, `--setup`, the JSON check on `ao`'s reads and the `reach.url` read | Medium | Open |
+| TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
 
 ---
 
@@ -1802,5 +1803,27 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** each of the four reverts above fails a test in `tests/test_smoke.py`, and the module runs in under 3 s.
 
 **Related:** TD-812 (the smoke), TD-848 (the same audit of #2033's promote code).
+
+---
+
+## TD-853: TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (docs-audit-ao-1, the audit of #2037–#2046)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `docs/technical_debt_archive.md` (`## TD-812`, `## TD-804`)
+
+**Why:** #2043 archived both entries and wrote their `**Resolved:**` lines but left the `**Status:**` lines as they stood:
+- TD-812: `**Status:** Built #2040 (2026-10-17, grinder-ao-1). … Left: the *Done when*'s last clause. Once #2040 is live … read that promote's log …` against `**Resolved:** 2026-10-17 (grinder-ao-1, #2040) — live check held: the auto promote of `ad49dcd` … ran `smoke:` …`. The archive says in one line that the clause is left and in the next that it held.
+- TD-804: `**Status:** Designed 2026-10-16 … Built by TD-811 (the home) and TD-812 (this repo's smoke).` against `**Resolved:** … built by TD-811 and TD-812, #2040`. A reader of the Status alone takes a built design for an open one. #2039 corrected the same drift on TD-847 (*archived Status reads Built*), so the repo treats it as a defect.
+
+**Fix:** TD-812's Status reads `Done — #2040; live check held (2026-10-17)`, dropping the *Left* sentence and the `--setup` clause that Resolved already carries; TD-804's reads `Done — built by TD-811 and TD-812 (#2033, #2037, #2040)`. Archive-only edit.
+
+**Done when** neither archived entry's Status contradicts its Resolved line.
+
+**Related:** TD-812, TD-804, TD-847 (#2039, the same fix).
 
 ---
