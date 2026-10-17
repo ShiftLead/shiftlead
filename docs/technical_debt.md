@@ -65,7 +65,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
+| TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Designed — built by TD-802 |
+| TD-802 | Build TD-801: the person's own shell passes the acting gate — `act_gate` reads `person_shell`, a create from it adds no creator and is not attenuated, the usage gate's send refusal passes it | Medium | Open |
 
 ---
 
@@ -1284,7 +1285,8 @@ The other cases:
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-16, the designer) — §4.8 *The person's own shell is the person*: the shell passes `act_gate` as a request with no caller does (grant, membership, §9 invariant 5, the usage gate's `send` refusal), nothing carved out (`decide`, `set_grants`, `set_controllers` on itself pass); a create from it is the person's create (the shell not added to `controllers`, no attenuation), and acts name the shell's id; §4.8a restates TD-580's risk for the wider right, left with the person; §4.5a *Open shell here*; §9 invariants 5 and 11. Built by TD-802.
+**Blocked by:** TD-802
 **Location:** design §4.8 *The person's own shell is the person* (*nothing else changes*) and the `control` grant's paragraph; §4.8a (identity); §9 invariants 5 and 11; §4.5a *Focus: Open shell here*; `src/sessionorc/mail.py` (`person_shell`; `act_gate`, the control gate, which passes `is_person(caller)` alone, ~L229); `src/sessionorc/agent_common.py` (`person_only`, ~L314)
 
 **Why:** Paul, 2026-10-16, ran `ao team flow ao-grind --apply` in a shell opened with **Open shell here** and it was refused with *cannot create a new session: needs the control grant (design §4.8)*. The same command ran from a terminal outside ShiftLead. TD-580 (built by TD-596, #1583) came from Paul's words *a shell being directly controlled by the user should have permissions to promote/other without interference*, but its design let the person's own shell through `PERSON_ONLY` alone and said *nothing else changes*. Acts on another session (`create`, `send`, `keys`, `kill`, `close`, `mode`, `decide`, …) still pass only a request with no caller, so the dashboard's own shell cannot apply a team's flow, start, stop or message a session. Paul then asked if the TD had been done: *a shell should be considered my permissions*.
@@ -1299,3 +1301,30 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the design says whether and how the person's own shell acts on other sessions, and its build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-580 and TD-596 (the person-only half), TD-077 (identity), TD-036 (membership), TD-041 (invariant 5).
+
+---
+
+## TD-802: Build TD-801: the person's own shell passes the acting gate — `act_gate` reads `person_shell`, a create from it adds no creator and is not attenuated, the usage gate's send refusal passes it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-801's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.8 *The person's own shell is the person*, §9 invariants 5 and 11, §6 *Usage gate*, §4.4a; `src/sessionorc/modes.py` (`offline_refusal`, its call in `agent_serve.py` ~L370); `src/sessionorc/mail.py` (`act_gate` ~L229, `person_shell`, new `as_person`), `src/sessionorc/agent_remote.py` (`host_files`, `_route_act`, `_lift_by_person`), `src/sessionorc/agent_hook.py` (the refill), `src/sessionorc/agent.py` (`_gate` ~L3226 and its usage-gate `send` check; `create`'s *Create adds the creator* seeding ~L1084), `src/sessionorc/agent_serve.py` (the caller injected after the gate ~L389); tests beside the gate's and `person_only`'s
+
+**Why:** TD-801: `ao team flow ao-grind --apply` from **Open shell here** was refused with *needs the control grant*; Paul: *a shell should be considered my permissions*.
+
+**Fix:** as design §4.8 says:
+- **`mail.as_person(caller, records)`**: `is_person(caller)` or `person_shell` of the caller's record in the one graph (a node's shell under `id@host` read from the home's copy). It replaces `is_person` at every branch where a person passes an act — and the seeding's `if caller` becomes `if caller and not as_person(…)` — : `act_gate` (before grant, attenuation, invariant 5, membership and the self-act branches), `_gate`'s usage-gate `send` refusal, `create`'s creator seeding (agent.py ~L1084) and its checks `start_of` (~L1060), `_check_keep_mail` (~L1414), `_check_succeeds` (~L1442), `_refuse_suspended` (~L1592) wherever it is called (a create, a resume, `succeeds`, `rpc_remove`'s Forget ~L2194), the *dropped by the person* note on a Drop (~L2824), `set_start` at the restart ceiling (~L2684), `host_files` (agent_remote.py ~L276), and the wake-budget refill on `send`, `keys` and `decide` (agent.py ~L2232, ~L2399, agent_hook.py ~L196). `is_person` stays where it means the absent `caller` itself (the identity table, a mail sender, `closer`, the mail reads and pass-up in `agent_mail.py`, `_checks_at_ask`, and the rest that are identity or reply-shape uses: `agent_serve.py`'s reply hints, `agent_ids.py`, `agent_wake.py`, `agent_rank.py`, `agent_identity.py`, `person_only` itself). `as_person` takes `person_only`'s `isinstance(caller, str)` guard.
+- `create` from the person's own shell adds no creator to the new record's `controllers` (the controllers the request names, only) and is not attenuated.
+- **Routed to a node** (`agent_remote.py` `_route_act` ~L472, `_lift_by_person` ~L512): **every** act from the person's own shell is forwarded with no caller and a create lifts a suspended name as a person's; the home's `closer` keeps the shell's id; the node records *person* as who typed.
+- **A shell at a node**: `_forwarded` (agent_remote.py ~L112–L135), whose bound today tests `params.get("caller") is None`, applies the same bound where `as_person` reads the forwarded caller (`id@node`) from the home's copy of its record; `modes.offline_refusal` (~L144, ~L164) takes the node's records as a new argument, passed at its call in `agent_serve.py` (~L370), and passes the node's shell on its own node's sessions.
+- `send` and `keys` keep recording the shell's id as who typed.
+- Refusal words keep naming the person (*open to a person and to its own controllers*): the shell is the person; the docstrings of `act_gate`, `person_shell` and `as_person` say the wider right.
+
+**Done when** tests hold: the person's own shell passes each of `ACTING_RPCS` onto another session with no grant and no membership, an interactive target included; `create` from it with grants it does not hold passes, and the child's `controllers` hold only what was asked; its `send` to a gated session passes; a create from it passing `start_of`, `keep_mail` (a closed member with mail) and `succeeds` (a renamed member) and a suspended name; `set_start` at the ceiling and `host_files` from it; its `send` refilling the wake budget; a create from it routed to a node seeding no creator, and `set_start` at the ceiling on a node's record passing; Forget of a suspended record from it; a node's shell bound to its node, and passing on its node's sessions, link up or down; an unattended shell, a shell with a controller, a shell with a role or a team, and an agent session each still fail as today — each test calling the RPC with `caller=<the shell's id>`, as `tests/test_person_only.py` does, not through the identity machinery.
+
+**Related:** TD-801, TD-580, TD-596.
+

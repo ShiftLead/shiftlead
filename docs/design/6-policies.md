@@ -1417,7 +1417,8 @@ teams:
   The wording travels on the record as `wrapup_prompt` does. While gated: the doorbell does not
   ring the session; a controller's `send` is refused at the home with the gate as the reason — read
   from the replica's `gated`, a node-owned field like `state` (§4.4a); a person's own send is not —
-  `ao send` directly (a person is not a session, §9 invariant 11), or from Focus after **Take over**
+  `ao send` directly (a person is not a session, §9 invariant 11), from the person's own shell
+  (§4.8, TD-801), or from Focus after **Take over**
   (the composer of an unattended session is closed), which makes the session interactive and out of
   the gate's reach altogether (§9 invariant 5). The card's slot reads ***paused · usage** — grind
   week 71% ≥ 70%, line moves Thu 07:00* as *what explains a stop* (§4.5 *The card's anatomy*, row 5
