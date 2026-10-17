@@ -15679,7 +15679,7 @@ Then the build entries, named in `Blocked by:`.
 **Added:** 2026-10-17 (TD-819's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done — slice 1 (#2055): the sampler, `shape.json`, the reading and its rules, and the `shape` RPC; slice 2 (this PR): per role the count and median of its spend per finished entry, from the seat ledger's reading (TD-830, #2049) of the same team and window.
+**Status:** Done — slice 1 (#2055): the sampler, `shape.json`, the reading and its rules, and the `shape` RPC; slice 2 (#2060): per role the count and median of its spend per finished entry, from the seat ledger's reading (TD-830, #2049) of the same team and window.
 **Location:** design §4.4 *Team shape*, §4.2 (*Waiting*, *working on its own*), §4.9b (`prs_waiting`), §4.9c (stages); `src/sessionorc/ledger.py` (`in_lanes`, read only, over the home's `_repos` readings as `_balance_marks` and `_repo_view` in `agent_tick.py` already read it — not `shiftlead.teamrun`, which sessionorc never imports), `src/sessionorc/work.py` (`waiting_of`, read only), a new `src/sessionorc/shape.py` (the file, the classes, the rules) beside `spend.py`, `src/sessionorc/agent_tick.py` (the minute's sample), `src/sessionorc/agent_spend.py` or a new mixin (`rpc_shape`), `src/sessionorc/paths.py`
 
 **Why:** TD-819: whether a team has the right members cannot be read. Nothing records how long a member waited for work, or work for a member.
@@ -15708,7 +15708,7 @@ Then the build entries, named in `Blocked by:`.
   - **Rules:** each fires at its threshold and not below. The starved rule names the upstream role when the stage before was backed up. No fewer or more line is written for a seat. The bursts line replaces the two, the upstream wording included. Same-change lines merge.
   - **Edges:** too little to read; a quiet minute writes nothing.
 
-**Resolved:** 2026-10-17 (grinder-ao-1, #2055 and this PR) — `sessionorc/shape.py` (the classes, the queues, `take`, `reading`, the `SHAPE_*` rules) and `agent_shape.py` (the minute's sample, `rpc_shape`, which passes `seats.reading`'s `finished` for the team into each role as `finished: {entries, median}` and gives the reading its `unit`); `shape` among `identity.READS` and `modes.HOME_READS`. Tests: `tests/test_shape.py`.
+**Resolved:** 2026-10-17 (grinder-ao-1, #2055 and #2060) — `sessionorc/shape.py` (the classes, the queues, `take`, `reading`, the `SHAPE_*` rules) and `agent_shape.py` (the minute's sample, `rpc_shape`, which passes `seats.reading`'s `finished` for the team into each role as `finished: {entries, median}` and gives the reading its `unit`); `shape` among `identity.READS` and `modes.HOME_READS`. Tests: `tests/test_shape.py`.
 
 **Done when** `ao team shape`'s RPC returns a running team's class shares, queues and suggestions from a day of samples.
 
