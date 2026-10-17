@@ -958,6 +958,67 @@ def test_a_rollbacks_failed_smoke_stands_as_a_failure_beside_its_hold(checkout):
     assert promote.held("repo")["sha"] == old  # never rolled back: the failure stands beside the hold
 
 
+def _smoke_intent(tmp_path: Path, **kw) -> dict:
+    """An intent at its smoke, as `_conclude` hands it to `start_smoke`: the run's log already written."""
+    log = tmp_path / "run.log"
+    log.write_text("the run says hello\n")
+    return {"sha": "a" * 40, "from": None, "kind": "promote", "by": "person", "log": str(log)} | kw
+
+
+def test_a_rollbacks_smoke_runs_in_its_tree_and_is_told_its_kind(tmp_path, monkeypatch):
+    """§6 *The smoke* (TD-848): a rollback's smoke runs in the rollback's detached tree, not the
+    checkout, and `SHIFTLEAD_PROMOTE_KIND` says `rollback`."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    root, tree, seen = tmp_path / "checkout", tmp_path / "tree", tmp_path / "seen"
+    root.mkdir()
+    tree.mkdir()
+    smoke = f'echo "$(pwd -P) $SHIFTLEAD_PROMOTE_KIND $SHIFTLEAD_PROMOTE_SHA $SHIFTLEAD_PROMOTE_ROOT" > {seen}'
+    intent = _smoke_intent(tmp_path, kind="rollback", tree=str(tree), smoke=smoke)
+    got = promote.start_smoke(root, "repo", intent)
+    _wait_gone(got["smoke_pid"])
+    promote.alive(got["smoke_pid"])  # reaped
+    assert seen.read_text().split() == [str(tree.resolve()), "rollback", "a" * 40, str(root)]
+
+
+def test_a_smoke_that_cannot_start_fails_the_promote(tmp_path, monkeypatch):
+    """TD-848: the smoke's tree is gone, so it cannot be spawned: `_conclude` fails the promote with
+    the reason rather than raising out of the pass."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    root = tmp_path / "checkout"
+    root.mkdir()
+    intent = _smoke_intent(tmp_path, tree=str(tmp_path / "removed"), smoke="true")
+    r = {"inflight": intent, "live": intent["sha"], "live_why": None, "root": str(root), "main": intent["sha"]}
+    failed, note = promote._conclude("repo", r, datetime.now(UTC))
+    assert note is None and failed["why"].startswith(f"smoke failed on {'a' * 7}: ")
+    assert "removed" in failed["why"] and promote.failed("repo")["why"] == failed["why"]
+    assert promote.inflight("repo") is None
+
+
+def test_a_silent_smoke_says_nothing_of_the_runs_output(tmp_path):
+    """TD-849: the smoke's last line is read after `── smoke ──` alone; a smoke that printed nothing
+    reads as "", not the run's last line above the mark."""
+    intent = _smoke_intent(tmp_path)
+    Path(intent["log"]).write_text(f"the run says hello\n{promote.SMOKE_MARK}\n\n")
+    assert promote._last_line(intent) == ""
+    Path(intent["log"]).write_text(f"the run says hello\n{promote.SMOKE_MARK}\nsmoke says 3\n")
+    assert promote._last_line(intent) == "smoke says 3"
+
+
+def test_a_silent_smoke_that_fails_says_its_exit_code(tmp_path, monkeypatch):
+    """TD-849: a smoke that fails with no output reads *smoke failed on <sha7>: it exited <code>*, and
+    nothing the run printed before the mark is in it."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    intent = _smoke_intent(
+        tmp_path, phase="smoke", smoke="exit 3", smoke_pid=None, smoke_at=datetime.now(UTC).isoformat()
+    )
+    Path(intent["log"]).write_text(f"the run says hello\n{promote.SMOKE_MARK}\n")
+    promote._write(promote.repo_dir("repo") / "smoke.json", {"sha": intent["sha"], "exit": 3, "at": intent["smoke_at"]})
+    r = {"inflight": intent, "root": str(tmp_path), "main": intent["sha"]}
+    failed, note = promote._judge_smoke("repo", r, intent, datetime.now(UTC), None)
+    assert note is None and failed["why"] == f"smoke failed on {'a' * 7}: it exited 3" and failed["exit"] == 3
+    assert "hello" not in failed["why"]
+
+
 @pytest.mark.parametrize("frm", [None, "main"])
 def test_no_rollback_for_an_unread_from_or_one_that_is_the_commit(checkout, frm):
     _, code = _smoke_block(checkout)
