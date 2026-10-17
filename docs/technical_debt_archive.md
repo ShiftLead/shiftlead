@@ -14634,4 +14634,4 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 
 **Related:** TD-771, TD-748.
 
-**Resolved:** 2026-10-16 (grinder-ao-2, #PRNUM) — a `decision (paul) — …` entry's reading carries `until`, the words after its dash (`ledger.until_of`), and its Queue card's row reads *held until <them>*, else *held until your decision*; Telegram's link for a question, or a `blocked` outcome, drawn on the Queue is its card's `/queue?card=…&row=…&item=…` (`notify.queue_link`, `queue.mail_card` — `card_index` and the ref reader now `sessionorc.queue`'s, the page's read from it), else `/inbox/<id>` as before.
+**Resolved:** 2026-10-16 (grinder-ao-2, #1972) — a `decision (paul) — …` entry's reading carries `until`, the words after its dash (`ledger.until_of`), and its Queue card's row reads *held until <them>*, else *held until your decision*; Telegram's link for a question, or a `blocked` outcome, drawn on the Queue is its card's `/queue?card=…&row=…&item=…` (`notify.queue_link`, `queue.mail_card` — `card_index` and the ref reader now `sessionorc.queue`'s, the page's read from it), else `/inbox/<id>` as before.
