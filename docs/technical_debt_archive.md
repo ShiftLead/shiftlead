@@ -14695,3 +14695,23 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** none.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1983) — `tests/test_ui_queue.py` gained `test_a_team_and_a_repo_pick_together_keep_only_the_repos_both_name` (dbteam and repo s: no card; dbteam and repo db: its card), `test_a_find_naming_an_id_an_open_card_holds_offers_no_archive` (find TD-21: `find_miss` None), `test_steering_shows_a_card_with_a_steering_item_whatever_its_status` (a steer about TD-30 leaves its card *needs you* and Steering shows it) and `test_an_archived_rows_need_is_no_kind_of_its_card` (an archived row's `owner` need: no kind, hidden under *yours to do*). Each of the four mutations fails one of them.
+
+## TD-796: The `about` from a claim: `_claim_about`'s *declared, else derived* order is held by no test — dropping the derived claim or swapping the order passes
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.10 (`about` from the claim); `src/sessionorc/agent_mail.py` (`_claim_about`, ~L42); `tests/test_mail.py::test_about_is_filled_from_the_senders_one_claim`
+
+**Why:** #1967 (TD-771 slice 5) added `_claim_about`, whose docstring says *its one declared claim, else its one derived claim*. The test claims once through `ao progress` and so reads one source only. Probe, in the audit worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_mail.py`: baseline 77 passed; with `for source in ("declared", "derived"):` changed to `("declared",)` (derived claims ignored) 77 passed; changed to `("derived", "declared")` (derived wins over declared) 77 passed. Reverting the reply branch (`if not about and replied is not None:` → `if False:`) does fail, so only the claim sources are unheld.
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** a sender with one derived claim and no declared one gets that claim as `about`; a sender with a declared claim and a different derived one gets the declared; a sender with two declared claims and one derived gets none (the declared source decides, not the union). Each is a `_claim_about` unit test over records with `progress` rows of both `source`s, and the swapped-order and declared-only mutations above fail.
+
+**Related:** none.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1985) — `tests/test_mail.py` gained `test_claim_about_takes_the_declared_claim_else_the_derived`, a `_claim_about` unit test over records with `progress` rows of both sources: one derived claim alone is the `about`; a declared claim wins over a different derived one; two declared and one derived give none. The declared-only and swapped-order mutations each fail it.

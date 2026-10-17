@@ -65,7 +65,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-796 | The `about` from a claim: `_claim_about`'s *declared, else derived* order is held by no test — dropping the derived claim or swapping the order passes | Medium | Open |
 | TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
 | TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
 
@@ -1276,26 +1275,6 @@ The other cases:
 **Done when** the evaluation's measurements are written here, the debounce has landed or been shown not to help, and any design change has a filed entry of its own.
 
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
-
----
-
-## TD-796: The `about` from a claim: `_claim_about`'s *declared, else derived* order is held by no test — dropping the derived claim or swapping the order passes
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.10 (`about` from the claim); `src/sessionorc/agent_mail.py` (`_claim_about`, ~L42); `tests/test_mail.py::test_about_is_filled_from_the_senders_one_claim`
-
-**Why:** #1967 (TD-771 slice 5) added `_claim_about`, whose docstring says *its one declared claim, else its one derived claim*. The test claims once through `ao progress` and so reads one source only. Probe, in the audit worktree, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_mail.py`: baseline 77 passed; with `for source in ("declared", "derived"):` changed to `("declared",)` (derived claims ignored) 77 passed; changed to `("derived", "declared")` (derived wins over declared) 77 passed. Reverting the reply branch (`if not about and replied is not None:` → `if False:`) does fail, so only the claim sources are unheld.
-
-**Fix:** add the tests below; no change to the code under test.
-
-**Done when** a sender with one derived claim and no declared one gets that claim as `about`; a sender with a declared claim and a different derived one gets the declared; a sender with two declared claims and one derived gets none (the declared source decides, not the union). Each is a `_claim_about` unit test over records with `progress` rows of both `source`s, and the swapped-order and declared-only mutations above fail.
-
-**Related:** none.
 
 ---
 
