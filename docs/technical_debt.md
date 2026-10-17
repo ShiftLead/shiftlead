@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-828 | Build TD-816 (1): the Queue's group headings carry their counts and fold, and a card's items are gathered in the card's sections with Dismiss all | Medium | Open |
 | TD-829 | Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
+| TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
 
 ---
 
@@ -1528,5 +1529,31 @@ The other cases:
 **Done when** the paid option's obligations are written here, and the basics are built or each is archived with its reason.
 
 **Related:** [`docs/decisions/2026-10-13-monetisation.md`](decisions/2026-10-13-monetisation.md) (options 2, 3 and 5), TD-131 (retention), design §2 (multi-user access is a non-goal for now).
+
+---
+
+## TD-850: A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.10 *Waiting on mail is ending the turn*, §4.2 *Working on its own*; `src/shiftlead/skill.md` (*Mail*: *Waiting on mail is ending the turn*); every role preset's first paragraph in `src/shiftlead/briefs/` (`grinder.md`, `designer.md`, `hunter.md`, `auditor.md`, `manager.md`, `manager_on_call.md`, `techlead.md`, and the `.stage.md` variants where they carry the line)
+
+**Why:**
+- Paul's screenshot (2026-10-17, ~19:15Z, grinder-ao-1's Focus): the grinder had declared *out of work* 10 minutes earlier and sat `working` in a foreground loop on `pr:2019` — `timeout 180 tail -f /dev/null; date -u; ao status --json | jq … .checks[] | select(.pr==2019)` — a turn spent on every pass, the card reading *working* while nothing of its own was running, and a host note (*your lane gained 1 entry since you declared out of work: TD-828*) unread behind it. Paul: *make sure our team members know that we will wake them up if they are waiting for work, so that they do not end up running loops (and wasting tokens).*
+- What is written covers mail only. §4.10 and every preset say a loop on `ao wait` or `ao inbox` is never how a member waits; the grinder and designer presets add that a turn ended on a *background* shell wait is said with `ao doing`. None says the other half: **a member never waits inside its own turn** — no foreground sleep, `tail -f /dev/null`, `timeout N …` or re-read of `ao status` in a loop — and none lists what wakes an idle member: mail and a steer's lapse (the doorbell, §4.10), the host's note that its lane gained work (§6 *Keeping a team running*, §4.9a), and its own background shell or subagent ending (the tool re-invokes it; §4.2 *Working on its own* draws it working meanwhile). A member that does not know the lane note will come keeps looking for work itself.
+- So it is guidance, not a new mechanism: every wake the member needs already exists.
+
+**Fix:** one PR, design first in the same diff:
+1. §4.10 *Waiting on mail is ending the turn* gains a sentence: a session waiting on anything — mail, CI, a reader, work for its lane — ends its turn; what it waits on outside mail runs as one background command (`gh pr checks <n> --watch` with a `timeout`, run in the background), said first with `ao doing`; what wakes it is listed (the doorbell, the lane note, its background command's end); a foreground sleep or poll is named as the loop it is.
+2. `src/shiftlead/skill.md`'s bullet and each preset's first paragraph say the same in one or two sentences — the grinder's and designer's existing *background shell wait* sentence is where it goes; the presets without it gain it. An out-of-work member is told it is rung when its lane gains an entry, so *out of work* is declared and the turn ended, never followed by watching.
+3. Run the doc-bound tests (`grep -rln "skill.md\|briefs/" tests`) and update any that quote the changed text.
+
+**Done when** the design, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it; a live check is a week of member transcripts (`ao transcript`) with no foreground wait loop.
+
+**Related:** TD-153 (the *nothing unread* line), TD-734, TD-761 (*Working on its own*).
 
 ---
