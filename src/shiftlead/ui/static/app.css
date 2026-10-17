@@ -880,6 +880,7 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qage { flex: none; min-width: 3.5em; text-align: right; }
 .qdbody { padding: 0 14px 10px calc(3.5em + 22px); display: grid; gap: 6px; font-size: var(--t-small); }
 /* the filter row (§4.5a *Queue page: filters, find*, TD-771): toggles carried in the URL; what they hide is `qoff` */
+html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; } /* until the browser's apply (TD-829) */
 .qoff { display: none !important; }
 .qfilters { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 10px; }
 .qf { border: 1px solid var(--border); border-radius: 5px; padding: 2px 9px; font-size: var(--t-small); color: var(--fg); text-decoration: none; }

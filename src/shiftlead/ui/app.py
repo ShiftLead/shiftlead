@@ -3300,6 +3300,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "pq": picks_query,
             "kinds": KINDS,
             "teams": sorted(n for n, r in teams.items() if r in view["repos"] or n in picks["team"]),
+            "team_repos": teams,  # a team chip's repo, which the browser's apply reads as the server's does (TD-829)
             "in_inbox": in_inbox,
             "labels": WINDOW_LABEL,
             "words": WINDOW_WORD,
