@@ -218,8 +218,10 @@ def browse(base: str, bound: float = PAGE_BOUND) -> int:
             print(json.dumps({"page": page, "route": route, "error": error}), flush=True)
             pg.close()
     finally:
-        b.close()
-        pw.stop()
+        try:
+            b.close()
+        finally:
+            pw.stop()
     return 0
 
 
