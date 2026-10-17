@@ -65,7 +65,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-798 | `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test | Low | Open |
 | TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
 | TD-800 | The Queue's filter row: a team and a repo pick together, the find-miss suppression for a held id, the *steering* kind and archived rows' kinds are held by no test | Low | Open |
 | TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
@@ -1277,26 +1276,6 @@ The other cases:
 **Done when** the evaluation's measurements are written here, the debounce has landed or been shown not to help, and any design change has a filed entry of its own.
 
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
-
----
-
-## TD-798: `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.7 `ao pr held`; `src/shiftlead/cli.py` (`_repo_hold`, the `path` line and `and p["held"]` guard); `tests/test_unasked_shown.py`
-
-**Why:** #1965 (TD-790) added `_repo_hold`. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_unasked_shown.py`: baseline 11 passed; with `f" and {len(p['held']) - 3} more" if len(p["held"]) > 3 else ""` replaced by `""` 11 passed; with `if isinstance(a := ..., dict) and p["held"]:` reduced to drop `and p["held"]` 11 passed. The tests use fewer than four held paths, so the truncation of a PR touching many held paths is never drawn.
-
-**Fix:** add the tests below; no change to the code under test.
-
-**Done when** a PR with five held paths reads `the repo holds` `a`, `b`, `c` *and 2 more*; an asked PR whose reading lists no held path says nothing. Both mutations above fail.
-
-**Related:** none.
 
 ---
 
