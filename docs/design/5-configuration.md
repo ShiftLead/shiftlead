@@ -173,6 +173,7 @@ commands:                             # `test` and `lint` fill the briefs' {test
 promote:                              # §6 *Promote*: how a merge to `main` becomes the live copy
   run: scripts/promote.sh             # makes the tree it is started in live; run at the home
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
+  smoke: scripts/smoke.sh             # optional: exits 0 when what is live works; run after check reads the commit
 ```
 
   **Read by nothing yet** (TD-149): `unattended:` (once the New session switch's precondition; the Role pick that replaced it does not check it, §4.5
@@ -185,7 +186,7 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   profile, and a session's worktree always `<repo>/.claude/worktrees/<name>` (the host agent never
   reads this file, so it could not move it). **`anchor:`** is retired (§4.9b *No anchor seat*): `anchor: false` is read and passed over, any other value refused as retired, since no seat runs in a main checkout (§9 invariant 2).
 
-  **`promote:`** (`run` and `check`, both required; `auto` refused as `settings.yml`'s) is the repo's own
+  **`promote:`** (`run` and `check`, both required; `smoke` optional; `auto` refused as `settings.yml`'s) is the repo's own
   answer to *how does `main` become what is running*, and nothing in shiftlead names pip, a venv,
   systemd, skaffold or wrangler: this repo's `run` is the pip pair of CLAUDE.md and its `check`
   prints the installed build's commit (`sessionorc.build.info()`); samscrape's would be its
@@ -198,9 +199,14 @@ promote:                              # §6 *Promote*: how a merge to `main` bec
   holds. It is judged by what `check` says
   afterwards, never by its exit code; `check` prints one full commit on stdout and exits 0, or
   exits non-zero with the reason on stderr (*not deployed*, *no cluster*), which the row shows as
-  *live: unknown — <reason>*. `auto` lives in `settings.yml` (`repos.<repo>.promote.auto`, the Settings page's switch) and is `false` when absent: the row offers a press. A repo with no
+  *live: unknown — <reason>*. **`smoke`** (TD-804) is run once `check` reads the new commit, in the
+  tree `run` was started in, and judged by its exit code. 0 means what is live works. A failure puts
+  back what was live before, never after a rollback (§6 *The smoke*): this repo's loads the pages
+  and reads `ao`, and samscrape's would hit the deployed service. A block without one concludes on
+  `check` alone. `auto` lives in `settings.yml` (`repos.<repo>.promote.auto`, the Settings page's switch) and is `false` when absent: the row offers a press. A repo with no
   block has no promote, no row and no `ao promote`. It is read **by the host agent**
-  (`sessionorc.promote`, the key alone, from each checkout in the home's registry — the agent
+  (`sessionorc.promote`, the key alone, from each checkout in the home's registry, `smoke:` from the
+  run's tree when a run starts, §6 *The smoke* — the agent
   resolves no role and no brief), because a policy that acts needs its declaration where the policy
   runs; the seams below are read there for the same reason, and the rest of the file is the clients'.
   `ledger:` travels on the record as well, because it is a session's.
