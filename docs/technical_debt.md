@@ -1299,4 +1299,3 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the design says whether and how the person's own shell acts on other sessions, and its build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-580 and TD-596 (the person-only half), TD-077 (identity), TD-036 (membership), TD-041 (invariant 5).
-
