@@ -83,6 +83,42 @@ async def test_a_repeat_while_the_first_is_typing_awaits_it_with_one_paste(agent
     assert t.typed == ["go"] and not agent._keyed_sends
 
 
+async def test_a_waiting_repeat_cancelled_leaves_the_first_send_alone(agent, monkeypatch):
+    """The repeat awaits the first through `asyncio.shield` (TD-824): the page's request dropped
+    cancels the repeat, never the send that is still typing."""
+    await park_ticks(agent)
+    t = Typist(agent, monkeypatch)
+    t.gate = asyncio.Event()
+    s = _rec(agent)
+    first = asyncio.create_task(agent.rpc_send(id=s.id, text="go", key="k"))
+    await _until(lambda: t.typed)
+    again = asyncio.create_task(agent.rpc_send(id=s.id, text="go", key="k"))
+    await asyncio.sleep(0.05)
+    again.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await again
+    t.gate.set()
+    assert await first is None
+    assert t.typed == ["go"] and not agent._keyed_sends
+
+
+async def test_a_repeat_waiting_on_a_send_that_fails_in_words_raises_its_verdict(agent, monkeypatch):
+    """The first send's `finally` answers a waiting repeat with its verdict (TD-825), never as delivered."""
+    await park_ticks(agent)
+    t = Typist(agent, monkeypatch)
+    t.gate, t.fail = asyncio.Event(), RpcError("prompt-stuck: the composer did not empty")
+    s = _rec(agent)
+    first = asyncio.create_task(agent.rpc_send(id=s.id, text="go", key="k"))
+    await _until(lambda: t.typed)
+    again = asyncio.create_task(agent.rpc_send(id=s.id, text="go", key="k"))
+    await asyncio.sleep(0.05)
+    t.gate.set()
+    for task in (first, again):
+        with pytest.raises(RpcError, match="^prompt-stuck: the composer did not empty$"):
+            await task
+    assert t.typed == ["go"] and not agent._keyed_sends
+
+
 async def test_a_paste_that_fails_unworded_still_answers_the_waiting_repeat(agent, monkeypatch):
     await park_ticks(agent)
     t = Typist(agent, monkeypatch)
