@@ -177,10 +177,18 @@
       "h": 980
     },
     {
+      "file": "SpendShape.dc.html",
+      "title": "Spend \u2014 the Shape view: a team's members by class, its queues, the suggestions (TD-819, built by TD-835)",
+      "x": 1540,
+      "y": 8380,
+      "w": 1440,
+      "h": 900
+    },
+    {
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 8380,
+      "y": 9380,
       "w": 1440,
       "h": 820
     },
@@ -188,7 +196,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 9300,
+      "y": 10300,
       "w": 1440,
       "h": 2320
     },
