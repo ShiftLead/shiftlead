@@ -72,6 +72,9 @@ SHELL_WALK_NODES = 256
 SHELL_CMD_LEN = 120
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 SKIP_FLAG = "--dangerously-skip-permissions"  # added to an unattended launch under `permission_prompts: skip`
+# the mode that asks every permission, added under `permission_prompts: all` (§4.2a, §4.3 `asking_args`, TD-823):
+# the default, `auto`, lets its classifier allow a command before any hook sees a permission
+ASKING_ARGS = ["--permission-mode", "manual"]
 CACHE_TTL_ENV = "CLAUDE_CODE_PROMPT_CACHE_TTL"  # the main conversation's cache lifetime (§4.2a, TD-458)
 log = logging.getLogger("shiftlead.claude-code")
 
@@ -510,6 +513,7 @@ class ClaudeCodeAdapter:
     state_source: Confidence = "hook"
     start_context = True  # `--append-system-prompt-file`, given at every launch of the conversation (§4.3, TD-283)
     permission_channel = True  # a pending permission is answered through the hook's decision (§4.3, §4.5a)
+    asking_args = ASKING_ARGS  # added to an unattended launch under `permission_prompts: all` (§4.3, TD-823)
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112); no `mail`: a
     # session of this tool is handed its mail by a pane write (§4.10)
     implements = frozenset({"background", "composer", "context", "links", "spend", "title", "usage_report"})
@@ -544,9 +548,12 @@ class ClaudeCodeAdapter:
         argv += prof.extra_args
         if unattended:
             # the skip flag only under `permission_prompts: skip`, the default (§4.2a, TD-641): under
-            # `ask` the prompts meet the person's rules, the director seat and then the person
+            # `ask` the tool's own mode stands, as the person's settings set it; under `all` the asking
+            # mode is added, so every prompt meets the person's rules, the director seat and the person
             args = prof.unattended_args or [SKIP_FLAG]
             argv += args if prof.permission_prompts == "skip" else [a for a in args if a != SKIP_FLAG]
+            if prof.permission_prompts == "all":
+                argv += self.asking_args
         if start_context:
             # the system prompt's tail, not a turn: the tool keeps it in no file of the session's, so
             # a resume is handed it again (design §4.3, TD-283) — by file, never as prose in the argv,

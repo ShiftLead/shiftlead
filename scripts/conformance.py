@@ -13,7 +13,7 @@ when every step held.
 walk starts its own host agent on a private tmux socket and stops it by the pid it holds, never by a
 name; and the *tool's* home, the named profile's `config_dir`, signed in, where the tool writes its
 chats. The profile is read from the live home's `profiles.yml` (read, never written) and declared in
-the scratch home with `permission_prompts: ask`, so the unattended launch asks its permissions. The
+the scratch home with `permission_prompts: all`, so the unattended launch asks its permissions. The
 session runs in a scratch directory.
 
 It spends a few requests of the profile it names, so it refuses to run in CI (`CI` set), without
@@ -56,9 +56,6 @@ SESSION_END_WAIT = 15.0  # a killed tool's own end hook
 PERMISSION_PROMPT = "Use your shell tool to run exactly this command, then stop: touch conformance-permission.txt"
 SHORT_PROMPT = "Reply with the one word: ready. Use no tools."
 MAIL_TEXT = "The conformance walk's mail. Read it with `ao inbox`, then stop; nothing else is asked."
-# The launch arguments that make each tool ask every permission, whatever its own default: Claude Code's
-# is `auto` (2.1.302), whose classifier allowed the walk's `touch` before any hook saw a permission (TD-784).
-ASKING_ARGS = {"claude-code": ["--permission-mode", "manual"]}
 
 
 class Refused(Exception):
@@ -80,7 +77,9 @@ def refusal(env: dict[str, str], profile: str | None) -> str | None:
 
 def scratch_profile(adapter: str, name: str, live_profiles: Path) -> dict[str, Any]:
     """The named profile's entry from the live home's `profiles.yml`, as the scratch home declares it:
-    `permission_prompts: ask` and the tool's asking arguments (`ASKING_ARGS`), so the walk sees a permission. Refused when it is not there, names
+    `permission_prompts: all`, so the adapter adds its asking arguments (§4.3 `asking_args`: Claude Code's
+    default, `auto`, allowed the walk's `touch` before any hook saw a permission, TD-784, TD-823) and the
+    walk sees a permission. Refused when it is not there, names
     another adapter, or has no `config_dir` of its own."""
     import yaml
 
@@ -108,13 +107,7 @@ def scratch_profile(adapter: str, name: str, live_profiles: Path) -> dict[str, A
         why = f"shares it with {', '.join(shared)}" if shared else "is the tool's default home"
         raise Refused(f"profile {name!r}'s config_dir {prof.config_dir} {why}: a walk takes a home of its own")
     raw = (yaml.safe_load(live_profiles.read_text(encoding="utf-8")) or {}).get("profiles", {})[name] or {}
-    extra = [*(raw.get("extra_args") or []), *ASKING_ARGS.get(adapter, [])]
-    return {
-        **raw,
-        "config_dir": str(prof.config_dir),
-        "permission_prompts": "ask",
-        **({"extra_args": extra} if extra else {}),
-    }
+    return {**raw, "config_dir": str(prof.config_dir), "permission_prompts": "all"}
 
 
 def write_home(home: Path, name: str, entry: dict[str, Any]) -> Path:
@@ -251,7 +244,7 @@ class Walk:
             rec = self.get()
             pending = rec.get("pending") or {}
             if rec.get("state") == "needs-you" and pending.get("kind") == "permission" and pending.get("tool_use_id"):
-                # the tool asks to run `ao inbox` under `permission_prompts: ask`: the walk is its person
+                # the tool asks to run `ao inbox` under `permission_prompts: all`: the walk is its person
                 self.call("decide", id=self.id, tool_use_id=pending["tool_use_id"], behavior="allow")
                 allowed.append(pending.get("text", ""))
             elif by_hook(rec, "idle") and (rec.get("wakes") or []) and not rec.get("unread"):

@@ -32,7 +32,7 @@ from sessionorc import paths
 DEFAULT_ADAPTER = "claude-code"  # a profile that names none, and a team member with no profile (teams.create_params)
 SHELL_ADAPTER = "shell"  # no agent: a profile may name it, a team session may not (teams.plan, TD-329)
 DEFAULT_PERMISSION_WAIT = 600  # seconds; long enough to reach a phone (design §4.2)
-PERMISSION_PROMPTS = ("skip", "ask")  # §4.2a, TD-641: the first is the default
+PERMISSION_PROMPTS = ("skip", "ask", "all")  # §4.2a, TD-641, TD-823: the first is the default
 BILLINGS = ("subscription", "metered")
 PRICE_KINDS = ("input", "output", "cache_read", "cache_write")
 
@@ -47,7 +47,7 @@ class Profile:
     permission_wait: int = DEFAULT_PERMISSION_WAIT
     extra_args: list[str] = field(default_factory=list)
     unattended_args: list[str] = field(default_factory=list)
-    permission_prompts: str = "skip"  # §4.2a: `ask` launches unattended without the adapter's skip flag
+    permission_prompts: str = "skip"  # §4.2a: `ask` and `all` launch unattended without the adapter's skip flag
     billing: str = "subscription"  # §4.2a: or `metered` — never guessed from the directory or the environment
     prices: dict[str, float] = field(default_factory=dict)  # per million tokens, by kind; a metered profile's
 
@@ -90,13 +90,13 @@ def _billing(name: str, raw: dict) -> tuple[str, dict[str, float]]:
 
 
 def _permission_prompts(name: str, raw: dict) -> str:
-    """`permission_prompts: ask | skip` (§4.2a, TD-641), `skip` when absent; anything else is the file's
+    """`permission_prompts: skip | ask | all` (§4.2a, TD-641, TD-823), `skip` when absent; anything else is the file's
     error, named — a guess either way launches a member with or without its prompts."""
     word = raw.pop("permission_prompts", None)
     if word is None:
         return PERMISSION_PROMPTS[0]
     if word not in PERMISSION_PROMPTS:
-        raise ValueError(f"profiles.yml: {name}.permission_prompts is ask or skip, not {word!r}")
+        raise ValueError(f"profiles.yml: {name}.permission_prompts is skip, ask or all, not {word!r}")
     return str(word)
 
 
