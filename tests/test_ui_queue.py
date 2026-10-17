@@ -497,6 +497,7 @@ def test_an_archived_rows_need_is_no_kind_of_its_card():
     assert v["in_progress"][0]["kinds"] == []
     assert shown(apply_picks(v, queue_picks({"kind": "yours"}), {})) == []
 
+
 def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(queue(), [mail("m2", "about nothing")]))
     html = c.get("/queue").text
