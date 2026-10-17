@@ -78,6 +78,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-822 | A killed session resumed at once reads `exited`: the killed process's own `SessionEnd` lands after the kill, on the resumed record of the same id | Low | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
+| TD-824 | `tests/test_send_key.py` would not catch the keyed send's `asyncio.shield` going: a repeat that is cancelled while the first is typing cancels the first's future, and nothing asserts it does not | Medium | Open |
+| TD-825 | `tests/test_send_key.py` has no repeat that awaits a first send which then fails in words (`prompt-stuck`): the `finally`'s `set_exception(RpcError(entry.verdict))` branch is unreached | Low | Open |
 
 ---
 
@@ -1670,3 +1672,39 @@ Then the build entry, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
+
+## TD-824: `tests/test_send_key.py` would not catch the keyed send's `asyncio.shield` going
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, the tests of #1999)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_send_key.py`; `src/sessionorc/agent.py` (`rpc_send`, `_keyed_send`)
+
+**Why:** #1999's `_keyed_send` answers a repeat with `await asyncio.shield(typing)` so that a repeat that is itself cancelled (the page's request dropped) leaves the first send's future alone. Probe: in an `origin/main` worktree, change that line to `await typing` and run `pdm run pytest -q tests/test_send_key.py`: **8 passed**. Without the shield, cancelling the waiting repeat cancels `typing`; the first send's `finally` then reaches `typing.exception()` on a cancelled future and raises `CancelledError` out of a send that was delivered. No test cancels a waiting repeat.
+
+**Fix:** In `tests/test_send_key.py`, a test beside `test_a_repeat_while_the_first_is_typing_awaits_it_with_one_paste`: start the first send gated, start a repeat, `cancel()` the repeat, release the gate, and assert the first returns `None`, `t.typed == ["go"]` and `agent._keyed_sends` is empty. Revert the shield in the worktree and see it fail.
+
+**Done when** that test exists and fails with the shield removed.
+
+**Related:** TD-813, TD-806.
+
+## TD-825: `tests/test_send_key.py` has no repeat that awaits a first send which then fails in words
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, the tests of #1999)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_send_key.py`; `src/sessionorc/agent.py` (`rpc_send`, `_keyed_send`)
+
+**Why:** #1999's `rpc_send` `finally` resolves a waiting repeat with `typing.set_exception(RpcError(entry.verdict))` when the first send's verdict is not `submitted`. `test_after_a_prompt_stuck_the_repeat_raises_the_same_verdict` sends the repeat *after* the first has ended (the `_keyed_send` verdict path); `test_a_paste_that_fails_unworded_...` covers the unworded failure. Probe: change `if entry.verdict == "submitted":` to `if True:` in the `finally` and run the module: **8 passed**, yet a repeat that was waiting on a `prompt-stuck` send would then be answered as delivered.
+
+**Fix:** In `tests/test_send_key.py`, gate the first send, start a repeat, make the paste raise `RpcError("prompt-stuck: …")`, release, and assert both tasks raise that message and `t.typed == ["go"]`. Revert the branch in the worktree and see it fail.
+
+**Done when** that test exists and fails with the branch forced.
+
+**Related:** TD-813, TD-806.
