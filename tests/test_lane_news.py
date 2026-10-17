@@ -441,23 +441,20 @@ async def test_a_live_check_live_at_the_declaration_is_told_to_nobody(agent, tmp
         await person.call("kill", id=sid)
 
 
-async def test_parking_the_ticks_cancels_a_detached_pass_still_in_flight(agent):
+async def test_parking_the_ticks_lands_a_detached_pass_still_in_flight(agent):
     """TD-858: the case above failed once in a full run, its note unsent, when a promote reading the
     fixture's first tick started landed after the test had set `_promotes`, and put back a reading
-    without its live commit. `park_ticks` cancels such a pass, so what the test sets stands."""
+    without its live commit. `park_ticks` lets such a pass land first, so what the test sets stands."""
     import asyncio
 
-    gate = asyncio.Event()
-
     async def late() -> None:
-        await gate.wait()
+        await asyncio.sleep(0.2)  # a reading's thread, slow on a loaded machine
         agent._promotes = {}
 
-    agent._promote_task = asyncio.create_task(late())
+    agent._late_task = asyncio.create_task(late())  # beside the first tick's own `_promote_task`
     await park_ticks(agent)
     agent._promotes["repo"] = {"live": "abc"}
-    gate.set()
-    await asyncio.sleep(0)
+    await asyncio.sleep(0.4)
     assert agent._promotes == {"repo": {"live": "abc"}}
 
 
