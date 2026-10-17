@@ -258,6 +258,85 @@ async def test_an_ask_and_an_alarm_are_told_and_a_steer_is_not(agent, sent, tmp_
         agent.sessions.pop(s.id, None)
 
 
+async def test_a_question_on_an_open_card_is_linked_to_its_card(agent, sent, tmp_path):
+    """§4.10 *What a message says* (TD-795): a question whose item is drawn on the Queue — its `about` an
+    entry an open card holds — is linked to that card, `/queue?card=…&row=…&item=…`; one about no open
+    entry to its message page, `/inbox/<id>`."""
+    _on()
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="idle", since=_z(t0))
+    on_card = MailEntry(id="m-c1", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="which?", about="TD-021")
+    by_text = MailEntry(id="m-c2", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="TD-20, again?")
+    nowhere = MailEntry(id="m-c3", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="x", about="TD-099")
+    agent.person_inbox.extend([on_card, by_text, nowhere])
+    top = {"qid": "s#TD-020"}
+    agent._queue = {"cards": [{"id": "s#TD-020", "top": top, "rows": [top, {"qid": "s#TD-021"}]}], "completed": []}
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        links = sorted(t.split("\n")[1] for _, t in sent)
+        assert links == [
+            "http://kmaster:8765/inbox/m-c3",
+            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-020&item=m-c2",
+            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=m-c1",
+        ]
+    finally:
+        agent._queue = None
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id not in ("m-c1", "m-c2", "m-c3")]
+        agent.sessions.pop(s.id, None)
+
+
+async def test_a_blocked_outcome_on_an_open_card_is_linked_to_it_and_a_reviewers_look_is_not(agent, sent, tmp_path):
+    """TD-795, the review: a `blocked` outcome — the person inbox's and a handed entry's — is drawn on its card
+    and linked to it; an item set aside with a reviewer (`snoozed_for`) stays the Inbox's, so its message page."""
+    _on()
+    t0 = datetime.now(UTC)
+    s = _session(agent, tmp_path, state="idle", since=_z(t0))
+    blocked = {"state": "blocked", "at": _z(t0), "text": "stuck"}
+    mine = MailEntry(
+        id="m-b1", from_=s.id, to=["person"], at=_z(t0), kind="note", text="x", about="TD-021", outcome=blocked
+    )
+    look = MailEntry(
+        id="m-b2", from_=s.id, to=["person"], at=_z(t0), kind="ask", text="x", about="TD-021", snoozed_for="m-h"
+    )
+    handed = MailEntry(
+        id="m-b3",
+        from_="person",
+        to=[s.id],
+        at=_z(t0),
+        kind="ask",
+        text="x",
+        about="TD-020",
+        outcome=blocked,
+        handed=True,
+    )
+    agent.person_inbox.extend([mine, look])
+    s.inbox.append(handed)
+    top = {"qid": "s#TD-020"}
+    agent._queue = {"cards": [{"id": "s#TD-020", "top": top, "rows": [top, {"qid": "s#TD-021"}]}], "completed": []}
+    try:
+        await _pass(agent, t0 + timedelta(seconds=61))
+        links = sorted(t.split("\n")[1] for _, t in sent)
+        assert links == [
+            "http://kmaster:8765/inbox/m-b2",
+            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-020&item=m-b3",
+            "http://kmaster:8765/queue?card=s%23TD-020&row=s%23TD-021&item=m-b1",
+        ]
+    finally:
+        agent._queue = None
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id not in ("m-b1", "m-b2")]
+        agent.sessions.pop(s.id, None)
+
+
+def test_mail_card_reads_about_first_then_the_words():
+    from sessionorc import queue as q
+
+    index = q.card_index({"cards": [{"id": "s#TD-020", "top": {"qid": "s#TD-020"}, "rows": [{"qid": "s#TD-021"}]}]})
+    assert q.mail_card("TD-21", "about TD-20", index) == ("s#TD-020", "s#TD-021")
+    assert q.mail_card("", "about TD-20 and TD-21", index) == ("s#TD-020", "s#TD-020")
+    assert q.mail_card("board:abc", "nothing", index) is None and q.mail_card("TD-99", "TD-20", index) is None
+    assert q.mail_card("TD-20", "", {}) is None  # a home that serves no Queue
+
+
 async def test_the_seventh_in_ten_minutes_is_and_more_and_the_eighth_nothing(agent, sent, tmp_path):
     _on()
     t0 = datetime.now(UTC)

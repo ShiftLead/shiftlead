@@ -2388,6 +2388,7 @@ def ledger_for_you(
                     "holder": str(holders[0].get("id") or "") if holders else "",  # **Open session** (TD-678)
                     "type": str(e.get("type") or ""),  # the role **Start session** takes, by `entries:`
                     "why": "yours" if owner else "decision",  # `repoconfig.WORK_WHY`'s key
+                    "until": str(e.get("until") or "") if for_you else "",  # *held until <it>* (TD-795)
                     "team": team,
                     "at": added,
                     "added": _added_words(added) if for_you else settle_mod.words({"held": hold}, now),

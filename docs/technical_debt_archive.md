@@ -14613,3 +14613,25 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Done when** both mutations above fail a test.
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1971) — `tests/test_held_reading.py` gained `test_asked_is_the_earliest_ask_by_at_whatever_the_order_the_mail_lists_it_in` (two seats, the later ask in the first-read seat's inbox and listed first in its own; the person's earliest still wins) and `test_a_later_ask_on_a_later_pass_never_moves_the_kept_first_one` (the first ask pruned from the mail, a later one to another seat arrives on the next pass, `asked[12]` is still the first's `{at, to}`). Mutation (1) fails the first, mutation (2) the second.
+
+## TD-795: The Queue's two `src/sessionorc/` leftovers from TD-771 — *held until <the words after the dash>* and Telegram's card link for an item drawn on the Queue
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-16 (grinder-ao-2, split from TD-771)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5a *Queue card: what needs the person* (*held until <the words after the dash, as written>*), §4.10 *What a message says* (the link for an item `home: queue`); `src/sessionorc/ledger.py` (the reading's `blocked_by` keeps `decision (paul)` without the words after its dash), `src/sessionorc/notify.py` (`mail_link`, today `/inbox/<id>`); `src/shiftlead/ui/templates/inbox_row.html` (the ledger row's *held until your decision*)
+
+**Why:** TD-771 built the Queue page in `src/shiftlead/`; these two need the home's reading and notifier, the other package, and were more than a line or two there.
+
+**Fix:**
+- The reading carries the words after a `decision (paul) — …` item's dash (beside `blocked_by`, which stays as `ledger.py` lists it), and the Queue card's row reads *held until <those words>*, else *held until your decision*.
+- Telegram's link for a question whose item is `home: queue` is `/queue?card=<top id>&row=<TD-n>&item=<entry id>`: the notifier resolves the item's entry against the open cards as `ui.queue.item_home` does (`about`, else the first `TD-n` of its text), else `/inbox/<id>` as now.
+
+**Done when** tests hold both: a `decision (paul) — after the trial` entry's row reads *held until after the trial*; a question `about` an open card's entry is linked to its card, one about no open entry to `/inbox/<id>`.
+
+**Related:** TD-771, TD-748.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #PRNUM) — a `decision (paul) — …` entry's reading carries `until`, the words after its dash (`ledger.until_of`), and its Queue card's row reads *held until <them>*, else *held until your decision*; Telegram's link for a question, or a `blocked` outcome, drawn on the Queue is its card's `/queue?card=…&row=…&item=…` (`notify.queue_link`, `queue.mail_card` — `card_index` and the ref reader now `sessionorc.queue`'s, the page's read from it), else `/inbox/<id>` as before.

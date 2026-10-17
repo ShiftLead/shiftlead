@@ -56,6 +56,52 @@ def qid(repo: str, tid: str) -> str:
     return f"{repo}#{ledger_mod._norm(tid)}"
 
 
+# an entry named in a mail item, a board line's `Context:` or a PR's title: `TD-n`, or `<repo>#TD-n`
+TD_REF = re.compile(r"(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b")
+
+
+def refs(text: Any) -> list[str]:
+    """The entries a text names, in order, each once: `TD-n` with its number as the ledger writes it."""
+    seen: list[str] = []
+    for repo, n in TD_REF.findall(str(text or "")):
+        ref = f"{repo}#TD-{int(n):03d}" if repo else f"TD-{int(n):03d}"
+        if ref not in seen:
+            seen.append(ref)
+    return seen
+
+
+def card_index(reading: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
+    """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
+    its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
+    the bare `TD-n` too where one repo alone holds it. An entry on a completed card, or on none, is in
+    no card: the item that names it stays in the Inbox."""
+    out: dict[str, tuple[str, str]] = {}
+    bare: dict[str, set[str]] = {}
+    for c in (reading or {}).get("cards") or []:
+        if not isinstance(c, Mapping) or not c.get("top"):
+            continue
+        for r in [c["top"], *(c.get("rows") or [])]:
+            q = str(r.get("qid") or "")
+            got = refs(q)
+            if "#" not in q or not got:
+                continue
+            out.setdefault(got[0], (str(c["id"]), q))
+            bare.setdefault(got[0].partition("#")[2], set()).add(got[0])
+    for tid, qs in bare.items():
+        if len(qs) == 1:
+            out[tid] = out[next(iter(qs))]
+    return out
+
+
+def mail_card(about: Any, words: str, index: Mapping[str, tuple[str, str]] | None) -> tuple[str, str] | None:
+    """The `(card id, row qid)` a mail item is drawn on (§4.5 screen 6 *Where a row is drawn*): the entry
+    its `about` names, else the first `TD-n` of `words` (its subject and text), where an open card holds
+    it; None — its home is the Inbox — for the rest. The Inbox's own `item_home` and Telegram's link
+    (§4.10 *What a message says*, TD-795) read it alike."""
+    named = refs(about) or refs(words)
+    return (index or {}).get(named[0]) if named else None
+
+
 def blob_sha(data: bytes) -> str:
     """The git blob sha of a file's bytes, as `git hash-object` gives it."""
     return hashlib.sha1(b"blob %d\0" % len(data) + data, usedforsecurity=False).hexdigest()

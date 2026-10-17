@@ -99,6 +99,13 @@ def mail_link(link: str, mid: str) -> str:
     return f"{link}/inbox/{urllib.parse.quote(mid, safe='')}" if link else ""
 
 
+def queue_link(link: str, card: str, row: str, mid: str) -> str:
+    """A question drawn on the Queue (§4.10 *What a message says*, §4.5 screen 12 *Addresses*, TD-795): its
+    card, `<link>/queue?card=<top id>&row=<TD-n>&item=<entry id>`, which opens it and rings the item."""
+    query = urllib.parse.urlencode({"card": card, "row": row, "item": mid})
+    return f"{link}/queue?{query}" if link else ""
+
+
 def message(line: str, link: str) -> str:
     return f"{line}\n{link}" if link else line
 

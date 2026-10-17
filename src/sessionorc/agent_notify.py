@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Any
 
 from sessionorc import agent_common, notify
+from sessionorc import queue as queue_mod
 from sessionorc import settings as settings_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import RpcError, _parse, log
@@ -37,6 +38,8 @@ class _Row:
     # a snooze before its first telling is the person's having seen it: never told in this row's life
     # (the *CI not starting* row's spell, §4.4 *Its spell*, TD-687)
     snooze_is_seen: bool = False
+    # a mail row drawn on the Queue: `(card id, row qid)` of the open card its entry is on (TD-795)
+    card: tuple[str, str] | None = None
 
 
 def _restart_at(s: Any) -> str:
@@ -51,6 +54,12 @@ def _restart_at(s: Any) -> str:
     if isinstance(wanted, dict) and wanted.get("early") and s.state in ("idle", "exited"):
         return str(wanted.get("at") or "")
     return ""
+
+
+def _card(e: Any, index: dict[str, tuple[str, str]]) -> tuple[str, str] | None:
+    """The open card a mail row is drawn on, as the Inbox's `item_home` reads it (§4.5 screen 6 *Where a row is
+    drawn*, TD-795); None for one set aside with a reviewer (`snoozed_for`), which the Inbox keeps."""
+    return None if e.snoozed_for else queue_mod.mail_card(e.about, f"{e.subject or ''} {e.text or ''}", index)
 
 
 def _work_ids(mark: dict[str, Any]) -> list[str]:
@@ -82,20 +91,22 @@ class NotifyMixin:
             if at := _restart_at(s):
                 k = f"{sid}|restart"
                 rows[k] = _Row(at, notify.restart_line(s.name or sid, s.team or ""), k, k)
+        index = queue_mod.card_index(self._queue)
         for e in self.person_inbox:
             if e.from_ == PERSON:
                 continue
+            card = _card(e, index)
             s = graph.get(e.from_)
             name, team = (s.name or e.from_, s.team or "") if s is not None else (e.from_, e.team or "")
             ref = reference_of(e.about) or ""
             if e.kind == "ask" and e.open:
                 line = notify.ask_line(name, team, ref)
-                rows[e.id] = _Row(e.passed_up or e.at, line, e.id, e.id, mail=True, until=e.snoozed_until)
+                rows[e.id] = _Row(e.passed_up or e.at, line, e.id, e.id, mail=True, until=e.snoozed_until, card=card)
             outcome = e.outcome or {}
             if outcome.get("state") == "blocked":
                 line = notify.blocked_line(name, team, ref)
                 rows[f"blocked:{e.id}"] = _Row(
-                    str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until
+                    str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until, card=card
                 )
         # work the person handed a session (§4.10 *An entry handed to a seat*): its one copy is the
         # holder's, and the Inbox counts it under Needs you once it comes back `blocked`
@@ -105,7 +116,13 @@ class NotifyMixin:
                 if e.handed_entry and outcome.get("state") == "blocked":
                     line = notify.blocked_line(r.name or addr, r.team or "", reference_of(e.about) or "")
                     rows[f"blocked:{e.id}"] = _Row(
-                        str(outcome.get("at") or ""), line, e.id, e.id, mail=True, until=e.snoozed_until
+                        str(outcome.get("at") or ""),
+                        line,
+                        e.id,
+                        e.id,
+                        mail=True,
+                        until=e.snoozed_until,
+                        card=_card(e, index),
                     )
         doc = settings_mod.load()
         on_work = {
@@ -187,7 +204,12 @@ class NotifyMixin:
                     continue
                 if stood < notify.HOLD or stood > notify.HOLD + notify.LATE or self._notify_snoozed(row, now):
                     continue  # not yet; or a backlog, never told (§4.10 *newly*); or the person's *not now*
-                link = notify.mail_link(tg["link"], row.link) if row.mail else notify.row_link(tg["link"], row.link)
+                if row.card is not None:
+                    link = notify.queue_link(tg["link"], *row.card, row.link)
+                elif row.mail:
+                    link = notify.mail_link(tg["link"], row.link)
+                else:
+                    link = notify.row_link(tg["link"], row.link)
                 due.append((key, notify.message(row.line, link)))
         watched = self._notify_watched_at is not None and now - self._notify_watched_at <= notify.WATCHED
         texts: list[str] = []

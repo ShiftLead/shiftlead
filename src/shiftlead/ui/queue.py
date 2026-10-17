@@ -15,6 +15,9 @@ from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
+from sessionorc.queue import TD_REF, card_index  # noqa: F401 — the page's names for the home's
+from sessionorc.queue import refs as _refs
+
 from .common import _age, _instant
 
 # Recently completed's window picker (§4.5 screen 12, §4.5a *Queue page, Recently completed*): its
@@ -33,8 +36,6 @@ WINDOW_WORD = {
     "month": "in the last month",
 }
 DATE_ONLY = re.compile(r"\d{4}-\d{2}-\d{2}")
-# an entry named in a mail item, a board line's `Context:` or a PR's title: `TD-n`, or `<repo>#TD-n`
-TD_REF = re.compile(r"(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b")
 CONTEXT = re.compile(r"\bContext:\s*(.*?)(?=\s+(?:Due|Answers|Decided|Closed):|$)", re.S)
 # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): the status toggles, and the
 # kind pick's words in its order — the kinds of what needs the person on a card
@@ -47,39 +48,6 @@ KINDS = {
     "held-until": "held until",
     "held-person": "held (person)",
 }
-
-
-def card_index(queue: Mapping[str, Any] | None) -> dict[str, tuple[str, str]]:
-    """The open cards' entries (§4.5 screen 6 *Where a row is drawn*): each `<repo>#TD-n` a card holds —
-    its top entry and every row, an open card's archived rows among them — to `(card id, row qid)`, and
-    the bare `TD-n` too where one repo alone holds it. An entry on a completed card, or on none, is in
-    no card: the item that names it stays in the Inbox."""
-    out: dict[str, tuple[str, str]] = {}
-    bare: dict[str, set[str]] = {}
-    for c in (queue or {}).get("cards") or []:
-        if not isinstance(c, Mapping) or not c.get("top"):
-            continue
-        for r in [c["top"], *(c.get("rows") or [])]:
-            q = str(r.get("qid") or "")
-            refs = _refs(q)
-            if "#" not in q or not refs:
-                continue
-            out.setdefault(refs[0], (str(c["id"]), q))
-            bare.setdefault(refs[0].partition("#")[2], set()).add(refs[0])
-    for tid, qs in bare.items():
-        if len(qs) == 1:
-            out[tid] = out[next(iter(qs))]
-    return out
-
-
-def _refs(text: Any) -> list[str]:
-    """The entries a text names, in order, each once: `TD-n` with its number as the ledger writes it."""
-    seen: list[str] = []
-    for repo, n in TD_REF.findall(str(text or "")):
-        ref = f"{repo}#TD-{int(n):03d}" if repo else f"TD-{int(n):03d}"
-        if ref not in seen:
-            seen.append(ref)
-    return seen
 
 
 def item_home(e: Mapping[str, Any], index: Mapping[str, tuple[str, str]] | None) -> dict[str, Any]:
