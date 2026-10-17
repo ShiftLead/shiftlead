@@ -15254,7 +15254,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done (#PRNUM)
+**Status:** Done (#2028)
 **Location:** `tests/test_ui_send_key.py`; `tests/test_ui.py`; `src/shiftlead/ui/app.py` (`wrapup`); `src/shiftlead/ui/static/app.js` (the `wrapup` body, `#promptchips` handler)
 
 **Why:** #2005 (TD-813 slice 2) gives Wrap up and the prompt chips a key too, so that a repeat types once (its code comments: *a repeat types it once*). Probes, one change at a time in an `origin/main` worktree, each followed by `pdm run pytest -q tests/test_ui_send_key.py tests/test_ui.py tests/test_ui_popout.py tests/test_ui_shell_here.py`, which gave **101 passed** every time: (1) `ui/app.py` `await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True, key=body.get("key"))` → without `key=`; (2) `app.js` delete `if (action === "wrapup") body = { key: AO.mintKey() };`; (3) the chip's `await act(id, "send", { text, key: AO.mintKey() })` → `{ text }`; (4) delete the chip's `b.disabled = true;`. The composer's `wireComposerSend` is probed under node, and `test_pages_and_shell_flow` posts a keyed `send`; the other three paths have no test that carries a key (`tests/test_ui.py` posts `/wrapup` to a shell, which refuses it, and to an agent with no key).
@@ -15265,4 +15265,4 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-813, TD-806, TD-824, #2005.
 
-**Resolved:** 2026-10-17 (grinder-ao-2, #PRNUM) — `tests/test_ui_send_key.py`: `PRESS_PROBE` runs the page's one press handler for Wrap up twice and drives a chip through `AO.wireChip` (the chip's handler, lifted out of `AO.focus` so node can run it), and `test_the_wrapup_route_hands_the_key_to_send` posts `wrapup` twice under one key to a recording client. Each of the four lines, reverted alone, fails a test.
+**Resolved:** 2026-10-17 (grinder-ao-2, #2028) — `tests/test_ui_send_key.py`: `PRESS_PROBE` runs the page's one press handler for Wrap up twice and drives a chip through `AO.wireChip` (the chip's handler, lifted out of `AO.focus` so node can run it), and `test_the_wrapup_route_hands_the_key_to_send` posts `wrapup` twice under one key to a recording client. Each of the four lines, reverted alone, fails a test.
