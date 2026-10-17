@@ -55,6 +55,10 @@ class Adapter(Protocol):
     #   permission_channel: bool                          whether a pending permission is answered through
     #                                                      the hook channel (Allow / Deny, §4.5a): True where
     #                                                      unset, as `agent` is; `shell` has no permissions
+    #   asking_args: list[str]                            the launch arguments that make the tool ask every
+    #                                                      permission, added by the adapter's own `launch`
+    #                                                      under `permission_prompts: all` (§4.2a, TD-823);
+    #                                                      unset, nothing is added
     #   agent: bool                                       False when what is typed at it is no prompt an agent
     #                                                      runs a turn on — `shell` and `command`; True where
     #                                                      unset. Read through `has_agent`, never an adapter's
