@@ -1535,11 +1535,11 @@ Then the build entries, named in `Blocked by:`.
 **Location:** `tests/test_promote.py`; `src/sessionorc/promote.py` (`_conclude`, `start_smoke`)
 
 **Why:** each change below was made alone on `origin/main` (c9a1cad0) and `pytest -q tests/test_promote.py tests/test_ui_promote.py tests/test_ui_inbox.py tests/test_cli.py tests/test_repoconfig.py` still passed:
-- `_conclude`'s `except OSError as e: return _smoke_failed(...)` around `start_smoke` changed to `except ZeroDivisionError`: no test makes the smoke unspawnable (a `cwd` that is gone), so a smoke that cannot start, which must fail the promote and roll back, is unread. Related: #2037 widened `_smoke_failed`'s own catch to `OSError` and has no test either.
-- `start_smoke`'s `cwd=str(intent.get("tree") or root)` changed to `cwd=str(root)`: a rollback's smoke runs in the rollback's detached worktree (§6 *The smoke*), and no test has a smoke print its `pwd`.
-- `"SHIFTLEAD_PROMOTE_KIND": str(intent.get("kind") or "promote")` changed to `"promote"`: no smoke in a test reads its environment, so the four variables the docstring hands it (`_SHA`, `_FROM`, `_ROOT`, `_KIND`) are unchecked.
+- `_conclude`'s `except OSError as e: return _smoke_failed(...)` around `start_smoke` changed to `except ZeroDivisionError`: no test makes the smoke unspawnable (a `cwd` that is gone), so a smoke that cannot start, which must fail the promote and roll back, is unread. (`tests/test_promote.py:1033` covers the rollback's run failing to spawn, not the smoke's own start.)
+- `start_smoke`'s `cwd=str(intent.get("tree") or root)` changed to `cwd=str(root)`: a rollback's smoke runs in the rollback's detached worktree (§6 *The smoke*); the test at line 913 prints `pwd` only for a plain promote, where `tree` is unset, and none does for a rollback.
+- `"SHIFTLEAD_PROMOTE_KIND": str(intent.get("kind") or "promote")` changed to `"promote"`: line 913 reads the variables only for a plain promote (kind `promote`), so `_KIND` for a rollback's smoke is unchecked.
 
-**Fix:** a test with a smoke command `pwd; echo $SHIFTLEAD_PROMOTE_KIND $SHIFTLEAD_PROMOTE_SHA` for a rollback intent whose `tree` differs from `root`, reading the log; and one where `tree` is a removed directory, so `Popen` raises, and the promote is failed.
+**Fix:** a test with a smoke command `pwd; echo $SHIFTLEAD_PROMOTE_KIND $SHIFTLEAD_PROMOTE_SHA` for a rollback intent (as line 913 does for a promote) whose `tree` differs from `root`, reading the log; and one where `tree` is a removed directory, so `Popen` raises, and the promote is failed.
 
 **Done when** each of the three changes above fails `tests/test_promote.py`.
 
