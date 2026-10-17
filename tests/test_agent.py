@@ -653,6 +653,36 @@ async def test_a_closed_record_stays_closed_when_its_run_says_it_ended(agent, ho
         assert got["state"] == "closed" and got["closed_at"] == closed["closed_at"]
 
 
+async def test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was(agent, hookstub, tmp_path, monkeypatch):
+    """Design §4.2 the `SessionEnd` row, TD-822: a kill, a new run under the same id at once, and then
+    the killed run's own SessionEnd (Claude Code runs it on the kill's hangup) — the resume keeps
+    the tool's session id, so only the kill's time tells the runs apart. Dropped once; a second
+    `exited` is the new run's own, and past the grace the killed run's end is read again."""
+    async with LocalClient() as c, LocalClient() as feeder:
+        s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        await c.call("kill", id=s["id"])
+        again = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        assert again["id"] == s["id"]
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        await feeder.call("hook", session=s["id"], state="exited", reason="other")  # the killed run's
+        got = await c.call("get", id=s["id"])
+        assert got["state"] == "idle" and got["confidence"] == "hook"
+        await feeder.call("hook", session=s["id"], state="exited", reason="exit")  # the new run's own
+        await wait_state(c, s["id"], "exited")
+
+        monkeypatch.setattr("sessionorc.agent_tick.KILLED_END_GRACE", 0.0)
+        await c.call("kill", id=s["id"])
+        await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        await feeder.call("hook", session=s["id"], state="exited", reason="other")  # past the grace: applied
+        await wait_state(c, s["id"], "exited")
+        agent.tmux.kill_session(s["id"])
+
+
 async def test_send_to_an_exited_record_is_refused_in_words(agent, hookstub, tmp_path):
     """Design §4.5a *Focus composer*, TD-078: a record with no turn to type into is refused by the
     **host agent**, not only by the page that disables its composer. Until 2026-09-20 an `exited`

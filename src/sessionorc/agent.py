@@ -605,6 +605,9 @@ class HostAgent(
         # it does not observe a session that is already gone (TD-063). Dropped as soon as a
         # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.
         self._killed_at: dict[str, datetime] = {}
+        # When a `kill` ended each id's run (TD-822), kept past `_scrub`: a resume that takes the id at once
+        # must still know that the killed run's own `SessionEnd`, landing late, is not the new run's end.
+        self._killed_run_at: dict[str, float] = {}
         self._derive_task: asyncio.Task[None] | None = None
         self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
         self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
@@ -1887,6 +1890,7 @@ class HostAgent(
         s.set_state("exited", confidence="tick")
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
         self._killed_at[id] = datetime.now(UTC)  # a tick's older pane list must not revive it (TD-063)
+        self._killed_run_at[id] = time.monotonic()  # its own SessionEnd may land after a resume (TD-822)
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()

@@ -15044,3 +15044,25 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-813, TD-806.
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2010) — `test_a_repeat_waiting_on_a_send_that_fails_in_words_raises_its_verdict` in `tests/test_send_key.py`: a repeat waiting on a `prompt-stuck` send raises that verdict; with the `finally`'s branch forced to `True` it fails.
+
+---
+
+## TD-822: A killed session resumed at once reads `exited`: the killed process's own `SessionEnd` lands after the kill, on the resumed record of the same id
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-784's live walk)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #PR
+**Location:** `src/sessionorc/agent_hook.py` (`rpc_hook` → `_apply_event`, the `exited` of a `SessionEnd`); `src/sessionorc/agent.py` (`rpc_kill`, `rpc_create` with `resume`); the identity check (design §4.8a) that already flagged it in observe mode
+
+**Why:** TD-784's live walk killed its session (`rpc_kill`: `exited`, confidence `tick`) and at once created it again with `resume` under the same id. Claude Code ran its `SessionEnd` hook on the kill's hangup (`reason: other`), and that hook landed after the create: the resumed record read `exited (hook)` while the new process started, and the walk failed its resume step (2026-10-16, the second run). The host agent printed `identity alarm (observe): outside claimed 'ao-walk-conformance-walk' on hook` — the event came from a process no longer in the record's pane. A person pressing Kill then Resume within a second or so meets the same. The walk now waits for the late hook (`SESSION_END_WAIT` in `scripts/conformance.py`).
+
+**Fix:** drop a `SessionEnd` (any `exited` by hook) that comes from a process other than the record's current one — the identity check's *outside claimed* verdict, or the event's `adapter_id`/launch older than the record's launch — rather than applying it; a test that a kill, a resume and then the old process's `SessionEnd` leaves the resumed record as it was.
+
+**Done when** a test holds it, and the walk's `SESSION_END_WAIT` can go (or stays as belt and braces, said so).
+
+**Related:** TD-784 (the walk), TD-490 (`ended`), TD-063 (a killed pane revived by an older tick).
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — `_apply_event` drops an `exited` hook landing within `KILLED_END_GRACE` (15 s) of a `kill`, once, on a record a new run has taken under the same id (`_killed_run_at`, kept past `_scrub`, dropped by a forget); design §4.2's `SessionEnd` row says so; `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`. The walk's `SESSION_END_WAIT` stays as belt and braces, said so in `scripts/conformance.py`.
