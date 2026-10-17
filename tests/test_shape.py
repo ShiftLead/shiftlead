@@ -414,7 +414,7 @@ async def test_a_repo_not_read_yet_and_a_member_whose_state_says_nothing_are_not
     agent.sessions[gone.id] = gone  # a live member in a path the registry does not list is no root of the team
     assert agent._shape_pass(NOW) is True
     day = agent._shape["days"][NOW.astimezone().date().isoformat()]["grind"]
-    assert set(day["records"]) == {g1.id, gone.id}  # a node down is not starved
+    assert set(day["records"]) == {g1.id, gone.id}  # g2's node is down: not sampled, so not starved
 
 
 def _team(agent, root, entries=(), **g1):
@@ -494,7 +494,7 @@ async def test_a_review_queue_is_its_live_seats_and_past_the_teams_least_bound(a
     ask = MailEntry(id="m-1", from_=g1.id, to=[tl.id], at="2026-10-14T10:00:00Z", kind="ask", text="read #9")
     ask.pr = 9
     tl.inbox.append(ask)
-    # the seat's earlier record, ended later and listed after it, is not the one whose queue is read
+    # the seat's earlier record, ended, created later and listed after it, is not the one whose queue is read
     gone = _rec("tl", id="ao-x-tl-old", role="techlead", seat={}, repo=g1.repo, controllers=[mgr.id])
     gone.state, gone.created = "closed", "2026-10-14T09:00:00Z"
     _add(agent, g2, tl, gone)
