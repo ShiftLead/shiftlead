@@ -18,7 +18,7 @@ from sessionorc.reports import branch_ref
 from shiftlead import teamrun
 
 from . import uiconf
-from .cards import DEAD
+from .cards import DEAD, terminal_only
 from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
@@ -435,7 +435,7 @@ def answer_blocks(members: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
                 "id": m["id"],
                 "name": m.get("name") or m["id"],
                 "kind": kind,
-                "text": str(pend.get("text") or ""),
+                "text": str(pend.get("text") or "") + terminal_only(m),
                 "deadline": m.get("deadline") or "",
             }
         )

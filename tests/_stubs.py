@@ -11,6 +11,7 @@ class AgentShellStub(ShellAdapter):
 
     name = "agentshell"
     agent = True
+    permission_channel = True  # an agent's permission is answered through the hook, as Claude Code's (TD-785)
 
 
 class HookFedStub:

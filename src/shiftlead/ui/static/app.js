@@ -4771,7 +4771,8 @@
       // the pill's hover (§4.5a **state pill hover**, TD-490): the card's one text, from the view
       let head = `<span class="pill s-${cls}${scraped}" title="${esc(v.pill_title || "")}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
-      if (v.state === "needs-you" && p && p.kind === "permission") {
+      // Allow / Deny only for a tool with a permission channel (§4.3, §4.5a, TD-785): else the terminal's
+      if (v.state === "needs-you" && p && p.kind === "permission" && v.permission_channel !== false) {
         head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>`;
         compose.disabled = true; $("#composehint").textContent = "a permission is pending: answer above";
       } else if (v.state === "needs-you" && p) {

@@ -3636,6 +3636,10 @@ def _counts(args: argparse.Namespace) -> int:
 def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
     pend = s.get("pending") or {}
+    if s.get("permission_channel") is False:
+        # no hook answers this tool's permission (§4.3 *Permissions: no channel*, TD-785): said before any call
+        msg = f"{args.id}'s tool has no permission channel: answer it in the terminal"
+        return fail(args, msg, 1, prose=msg)
     if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
         msg = f"{args.id} has no pending permission"
         return fail(args, msg, 1, prose=msg)  # no "error:" prefix: the line main printed before --json

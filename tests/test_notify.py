@@ -43,7 +43,7 @@ def sent(agent, monkeypatch):
 
 
 def _session(agent, tmp_path, sid="ao-x-w", name="grinder-x-1", team="x-grind", **kw) -> Session:
-    s = Session(id=sid, name=name, kind="agent", adapter="shell", dir=str(tmp_path), team=team)
+    s = Session(id=sid, name=name, kind="agent", adapter="agentshell", dir=str(tmp_path), team=team)
     for k, v in kw.items():
         setattr(s, k, v)
     agent.sessions[s.id] = s

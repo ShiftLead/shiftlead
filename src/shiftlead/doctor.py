@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import ledgerboard
+from sessionorc.models import TOLD
 
 CHECKS = ("agent", "tmux", "hooks", "identity", "profiles", "nodes", "org", "repos", "route")
 # the checks that read the home: on a node they say *home only* and count as neither (§4.7)
@@ -172,7 +173,7 @@ def hooks(r: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
     sessions = r.get("sessions") or []
     for s in sessions:
         young = (_age_s(s.get("since"), now) or 0.0) < FIRST_HOOK
-        if s.get("confidence") != "hook" and not (young and not s.get("last_hook")):  # not a launch's first seconds
+        if s.get("confidence") not in TOLD and not (young and not s.get("last_hook")):  # not a launch's first seconds
             text = f"hooks — {s['id']} scraped for {_ago(s.get('since'), now) or 'an unread time'}"
             out.append(_row("hooks", WARNING, text, session=s))
     q = r.get("queue") or {}

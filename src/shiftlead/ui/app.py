@@ -71,6 +71,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     alarm_to_view,  # noqa: F401
     alarm_view,  # noqa: F401
     alarm_words,  # noqa: F401
+    answerable,  # noqa: F401
     brief_changed_view,  # noqa: F401
     brief_unsent,  # noqa: F401
     card_order,  # noqa: F401
@@ -93,6 +94,7 @@ from .cards import (  # re-exported: routes, templates and tests read these from
     shells_of,  # noqa: F401
     state_counts,  # noqa: F401
     suspended_note,  # noqa: F401
+    terminal_only,  # noqa: F401
     view,  # noqa: F401
     waiting_view,  # noqa: F401
     waits_of,
@@ -2790,6 +2792,8 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if action in ("allow", "deny"):
             s = await call("get", id=sid)
             pend = s.get("pending") or {}
+            if s.get("permission_channel") is False:  # §4.3 *Permissions: no channel* (TD-785)
+                raise HTTPException(409, "this tool has no permission channel: answer it in the terminal")
             if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
                 raise HTTPException(409, "no pending permission (answered, timed out, or in the terminal)")
             await call("decide", id=sid, tool_use_id=pend["tool_use_id"], behavior=action, reason=body.get("reason"))

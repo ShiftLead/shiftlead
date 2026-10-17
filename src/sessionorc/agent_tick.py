@@ -1081,7 +1081,7 @@ class TickMixin:
         # record a `brief` restart left closed clears `brief_changed`, and the mark it left is `brief` (TD-334)
         closed_by_tick = self._closed_by_tick(s, "brief") or self._closed_by_tick(s, "flow") or cache
         if not closed_by_tick:
-            if s.state != "idle" or s.confidence != "hook" or s.pending:
+            if s.state != "idle" or not s.told or s.pending:
                 return
             if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
                 return  # a claim in progress: the clause on its `ao` replies says it
@@ -1211,7 +1211,7 @@ class TickMixin:
         send needs the pane here: a node's member is not nudged yet (TD-103)."""
         if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.host != self.host:
             return
-        if s.state != "idle" or s.confidence != "hook" or s.pending or s.out_of_work or s.restart_wanted:
+        if s.state != "idle" or not s.told or s.pending or s.out_of_work or s.restart_wanted:
             return
         if agent_common.on_its_own(s, now):
             return  # its own work runs — a subagent or a shell — and its card says *working* (§4.2, TD-766)
@@ -1265,7 +1265,7 @@ class TickMixin:
             return
         if not still or not (s.supervised and s.unattended) or s.suspended:
             return
-        if s.confidence != "hook" or s.pending or now - _parse(str(s.nudged_at)) < IDLE_NUDGE:
+        if not s.told or s.pending or now - _parse(str(s.nudged_at)) < IDLE_NUDGE:
             return
         if agent_common.on_its_own(s, now):
             return  # not marked while its own work runs (§6 rule 4, TD-734, TD-766)
@@ -1288,7 +1288,7 @@ class TickMixin:
         over = context_over_text({"context": s.context, "context_bound": s.context_bound})
         if not over:
             return
-        if s.state != "idle" or s.confidence != "hook" or s.pending:
+        if s.state != "idle" or not s.told or s.pending:
             return
         if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
             return  # a claim in progress: the clause on its `ao` replies says it, and it declares after
@@ -1420,7 +1420,7 @@ class TickMixin:
                 continue
             typed = s.host == self.host and s.unattended and not s.suspended
             if typed and s.state == "idle":
-                if s.confidence != "hook" or s.pending or s.wrapup_at or s.wrapup_sent_at:
+                if not s.told or s.pending or s.wrapup_at or s.wrapup_sent_at:
                     continue
                 if s.gated or self._profile_gated(s.profile, now, s.team):
                     continue
@@ -1560,7 +1560,7 @@ class TickMixin:
             return
         if not (s.host == self.host and s.unattended and not s.suspended and s.state == "idle"):
             return
-        if s.confidence != "hook" or s.pending or s.wrapup_at or s.wrapup_sent_at:
+        if not s.told or s.pending or s.wrapup_at or s.wrapup_sent_at:
             return
         if s.gated or self._profile_gated(s.profile, now, s.team):
             return
@@ -2710,8 +2710,10 @@ class TickMixin:
                 if by == "pending":
                     met = (
                         r.state == "needs-you"
-                        and r.confidence == "hook"
+                        and r.told
                         and (r.pending or {}).get("kind") == "permission"
+                        # a permission only the terminal answers is never a seat's (§4.3, §6 rule 3, TD-785)
+                        and adapters.permission_channel(r.adapter)
                     )
                 elif by == "stalled":
                     met = r.state == "stalled?"
@@ -2906,7 +2908,7 @@ class TickMixin:
         idle = agent_common.idle_from(s)  # from the later of `since`, `subagent_at` and `shells_at` (TD-734, TD-766)
         return bool(
             s.state == "idle"
-            and s.confidence == "hook"
+            and s.told
             and idle is not None
             and now - idle >= SEAT_IDLE_GRACE
             and not agent_common.on_its_own(s, now)
@@ -4331,7 +4333,7 @@ class TickMixin:
                 # parallel tool's event too, which `_end_waiters` left the waiter live for (TD-629).
                 pass
             else:
-                if state == "working" and s.state == "idle" and s.confidence == "hook" and event.get("event"):
+                if state == "working" and s.state == "idle" and s.told and event.get("event"):
                     # An event that is not a turn's start woke a session its Stop left idle: the
                     # capture TD-201 asks for, since the one that did it once is not yet named.
                     log.info("%s: %s turned a hook-confirmed idle session working", sid, event["event"])

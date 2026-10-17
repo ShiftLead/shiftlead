@@ -648,7 +648,7 @@ class HostAgent(
         self._last_hook: dict[str, datetime] = {
             sid: datetime.now(UTC)
             for sid, s in self.sessions.items()
-            if s.confidence == "hook" and (s.hook_seen_at or not self._first_prompt_due(s))
+            if s.told and (s.hook_seen_at or not self._first_prompt_due(s))
         }
         # sid → the state, pending and confidence a screen rule's verdict replaced (TD-306): what
         # the record goes back to when that screen is gone and no hook has spoken since; dropped

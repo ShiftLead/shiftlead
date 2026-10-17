@@ -1090,7 +1090,7 @@ def cache_lapsed(s: Session, now: datetime) -> dict[str, Any] | None:
     again, not rung*, TD-459): hook-confirmed `idle` for longer than `CACHE_LIFETIME`, its context
     reading over `CACHE_FLOOR`. Returns the `restarts` entry's `{idle, context}` — the hours idle,
     rounded, and the tokens — or None. Only the cache's half: rule 7's precondition is `tick_ready`."""
-    if s.state != "idle" or s.confidence != "hook":
+    if s.state != "idle" or not s.told:
         return None
     tokens = (s.context or {}).get("tokens")
     if not isinstance(tokens, int) or tokens <= CACHE_FLOOR:
@@ -1127,7 +1127,7 @@ def tick_ready(s: Session, now: datetime) -> bool:
         and not s.suspended
         and not s.gated
         and s.state == "idle"
-        and s.confidence == "hook"
+        and s.told
         and not s.pending
         and not s.out_of_work
         and not s.restart_wanted
