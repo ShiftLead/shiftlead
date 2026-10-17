@@ -852,9 +852,11 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `finished` reads the person inbox's open entries beside the records; so does a live member
      holding a **waiting claim on a reader** (rule 5's second kind, TD-854): a claim declared on its
      own record, still `claimed`, whose `pr` or `review_pr` is the PR of an `ask` of its own that a
-     seat of the team holds in `prs_waiting.asks` (§4.9b *The reader*) — read from the records
-     `finished` already takes, the seat's and the member's, so the page and the tick still read one
-     thing — its clause *grinder-ao-1 waiting on techlead-ao-1: #2049*. A wind-down under it would
+     seat of the team holds in `prs_waiting.asks` (§4.9b *The reader*) — read from the records,
+     the seat's asks and the member's claims, which the tick's view of a record carries as the
+     page's does, so the page and the tick still read one thing — its clause *grinder-ao-1 waiting
+     on techlead-ao-1: #2049*; and the wind-down taken back after the manager was told (below) reads
+     the same wait as the person's. A wind-down under it would
      close the reader with the team, and nothing starts a wound-down team for a held PR or its
      findings — rule 8 starts one on lane news alone — so the PR would sit with nobody to read it
      and nobody to fix what the reader finds; any other dead record is
@@ -890,7 +892,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      `exited` is rule 1's or a person's kill, and is left) gets the same mark on the tick that
      finds it gone, so the team reads *wound down* without its declaration. **A member live and
      not finished after the send takes the wind-down back** — one working, one that never
-     declared, or one that now wants a restart: `finished_sent_at` is removed and the reading is
+     declared, one that now wants a restart, or one now waiting — on the person, or on a reader for
+     its own PR (above) —: `finished_sent_at` is removed and the reading is
      asked afresh; a member left open with work is still finished, and is closed the tick its work
      reads pushed, its manager live or already closed, with nothing said again: a team whose
      manager carries the mark was announced. A manager on a node gets no line and the close alone,
