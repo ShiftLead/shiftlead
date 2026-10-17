@@ -8,7 +8,8 @@
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
    sent to by a policy, and never acted on by another session: an acting RPC from a session onto
    one — `set_controllers` included — is refused whatever the caller's grant and membership
-   (§4.8). Only a person acts on an interactive session, and only a person hands one to
+   (§4.8). Only a person acts on an interactive session — at a terminal, the UI, or the person's
+   own shell (§4.8 *The person's own shell is the person*) — and only a person hands one to
    unattended mode or to a controller. Flipping a session to interactive takes it out of every
    controller's reach on their next call; its `controllers` entries stay, inert. A **message** is
    not an act of control and is not refused by this invariant: it lands in the target's inbox
@@ -46,7 +47,8 @@
     interactive, whatever the list says (invariant 5). Grant and membership are both read from
     the records on every call, so a revoke or a membership edit takes effect on the session's
     next call and neither is cached. Reads are never gated, and a person at a terminal or the
-    UI is not a session. Acting is what changes a session — the host agent's `ACTING_RPCS`:
+    UI is not a session, nor is the person's own shell (§4.8, TD-801). Acting is what changes a
+    session — the host agent's `ACTING_RPCS`:
     `send`, `keys`, `kill`, `close`, `set_mode`, `create`, `remove`, `decide`, `set_grants`,
     `set_controllers` and `set_stop` (`ao until`, §6). **Messaging is not acting** and does not
     pass through this gate: its own, weaker rule is §4.10's graph (my controllers, my members,
