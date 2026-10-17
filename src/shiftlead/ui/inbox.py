@@ -135,7 +135,7 @@ def state_kind(v: dict[str, Any]) -> str:
     pend = pend if isinstance(pend, dict) else {}
     if state == "needs-you":
         # a permission only the terminal answers (§4.3 `permission_channel`, TD-785) is a question row
-        if pend.get("kind") == "permission" and pend.get("tool_use_id") and v.get("permission_channel", True):
+        if pend.get("kind") == "permission" and pend.get("tool_use_id") and v.get("permission_channel") is not False:
             return "permission"
         return "question" if pend.get("text") or pend.get("kind") else "needs"
     if state == "stalled?":
