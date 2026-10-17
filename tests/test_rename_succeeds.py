@@ -18,6 +18,7 @@ from sessionorc import naming, paths
 from sessionorc.client import AgentError, LocalClient
 
 SHELL = {"adapter": "shell", "argv": ["bash", "--norc", "--noprofile"]}
+AGENT = {**SHELL, "adapter": "agentshell"}  # a session: the person's own shell passes as the person (TD-802)
 
 
 def _launch(address: str) -> dict:
@@ -104,7 +105,7 @@ async def test_succeeds_is_refused_touching_nothing(agent, tmp_path):
         live = (await person.call("create", name="a", dir=_own(tmp_path, "a"), **base))["id"]
         ended = (await person.call("create", name="b", dir=_own(tmp_path, "b"), **base))["id"]
         await person.call("kill", id=ended)
-        stranger = (await person.call("create", name="s", dir=_own(tmp_path, "s"), capabilities=["control"], **SHELL))[
+        stranger = (await person.call("create", name="s", dir=_own(tmp_path, "s"), capabilities=["control"], **AGENT))[
             "id"
         ]
         new = {"dir": _own(tmp_path, "n"), **base}

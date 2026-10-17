@@ -641,7 +641,7 @@ def test_no_read_decides_anything_on_its_caller():
 async def test_host_files_from_under_a_pane_is_that_session_never_the_person(agent, tmp_path):
     agent.identity_mode = "enforce"
     async with LocalClient() as me:
-        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]))["id"]
         req = {"id": 1, "method": "host_files", "params": {"host": agent.host, "dir": str(tmp_path), "paths": []}}
         got = await _probe(me, tmp_path, a, "hostfiles", req)  # no caller: it used to pass as the person
         assert "error" in got and "control" in got["error"]
@@ -804,7 +804,9 @@ async def test_suspend_stops_a_session_and_keeps_it_stopped(agent, hookstub, tmp
         # both roads are refused to a session, by name and by conversation — under a caller that
         # holds `control`, so the refusal it meets is the suspension's and not the create gate's
         (tmp_path / "b").mkdir()
-        boss = (await person.call("create", name="b", dir=str(tmp_path / "b"), adapter="shell", argv=["bash"]))["id"]
+        boss = (await person.call("create", name="b", dir=str(tmp_path / "b"), adapter="agentshell", argv=["bash"]))[
+            "id"
+        ]
         await person.call("set_grants", id=boss, add=["control"])
         async with LocalClient(caller=boss) as session:
             with pytest.raises(AgentError, match="suspended by a person.*a create under that name"):

@@ -549,7 +549,9 @@ async def test_the_gate_reads_one_graph_with_every_address_from_the_homes_point_
     re-addressed, so a lead here holding `control` over a member there passes the same two-part
     check it passes today, and is then refused only for what is true: the host is unreachable."""
     async with LocalClient() as person:
-        lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        lead = await person.call(
+            "create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]
+        )
         await person.call("set_grants", id=lead["id"], add=["control"])
     agent._take_records(
         "laptop", [record(controllers=[f"{lead['id']}@{agent.host}", "ao-x-sib"], team="g")], whole=True
@@ -615,7 +617,9 @@ async def test_acts_are_gated_at_the_home_executed_on_the_node_and_the_verdict_r
         address = f"{w['id']}@laptop"
         await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
         async with LocalClient(sock=home.dir / "agent.sock") as person:
-            lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            lead = await person.call(
+                "create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]
+            )
             await person.call("set_grants", id=lead["id"], add=["control"])
             # a person's send: typed on the node and recorded there (a send without `wait` returns nothing,
             # here as everywhere), and the home's copy carries the `sends` entry before the reply
@@ -691,7 +695,9 @@ async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
         async with LocalClient(sock=home.dir / "agent.sock") as person:
-            lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            lead = await person.call(
+                "create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]
+            )
             await person.call("set_grants", id=lead["id"], add=["control"])
             async with LocalClient(sock=home.dir / "agent.sock", caller=lead["id"]) as as_lead:
                 v = await as_lead.call(
@@ -1520,7 +1526,9 @@ async def test_a_persons_offline_create_is_adopted_with_its_controllers_when_the
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
         async with LocalClient(sock=home.dir / "agent.sock") as person:
-            lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            lead = await person.call(
+                "create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]
+            )
         home.write_hosts([])
         node._home_mux.close("the lid closed")
         assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
@@ -1641,7 +1649,9 @@ async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(a
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
         got = await person.call("host_files", host="laptop", dir="/w", paths=[".shiftlead.yml"])
         assert got["files"] == {".shiftlead.yml": "on laptop: .shiftlead.yml"} and mux.sent[0][0] == "files"
-        lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        lead = await person.call(
+            "create", name="lead", dir=str(tmp_path), adapter="agentshell", argv=["bash", "--norc"]
+        )
     async with LocalClient(caller=lead["id"]) as as_lead:
         with pytest.raises(AgentError, match="needs the control grant"):
             await as_lead.call("host_files", host="laptop", dir="/w", paths=["a"])

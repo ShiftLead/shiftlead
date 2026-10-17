@@ -398,7 +398,10 @@ async def test_while_gated_a_controllers_send_is_refused_and_the_doorbell_holds(
     home with the gate as the reason; a person's own send is not (§9 invariant 11)."""
     await park_ticks(agent)  # the test owns the clock: no tick types, polls or re-reads a state
     async with LocalClient() as person:
-        lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        (tmp_path / "lead").mkdir()  # a session, so a directory of its own (the anchor rule)
+        lead = await person.call(
+            "create", name="lead", dir=str(tmp_path / "lead"), adapter="agentshell", argv=["bash", "--norc"]
+        )
         lead = lead["id"]
         await person.call("set_grants", id=lead, add=["control"])
         # a pane with a composer (TD-027's stub): the doorbell's other rules pass, so the gate is what holds it

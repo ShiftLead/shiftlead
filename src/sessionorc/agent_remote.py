@@ -271,9 +271,9 @@ class RemoteMixin:
         4b.3): a team start's repo config and briefs, read where the checkout is — `paths` relative
         to `dir`, confined to it, bounded (`read_checkout`). A read, like `host_dir`, and yet more
         than an existence check: a person's, or a session's holding `control` — one that could
-        start that team anyway. Never for a call forwarded from a node (`_forwarded` refuses it):
-        a laptop does not read another host's files through the home."""
-        if not mail.is_person(caller):
+        start that team anyway, or the person's own shell's (TD-801). Never for a call forwarded from a
+        node (`_forwarded` refuses it): a laptop does not read another host's files through the home."""
+        if not mail.as_person(caller, self._graph()):
             me = self._graph().get(self._addr(caller))
             if me is None or not has_control(me.capabilities):
                 raise RpcError(f"{caller} cannot read files on {host}: needs the control grant (design §4.4a)")
