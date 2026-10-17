@@ -2323,6 +2323,49 @@ def spend_shape_page():
 ''' + TAIL
 
 
+def focus_git_pick():
+    """The Focus Git card's pick (design §4.5a *Focus side panel, Git card: the pick*, §4.2 *The Git
+    card's pick*, TD-856): Working tree, one of the last ten commits by git's own names, or Session,
+    with ↑ ↓ stepping it. Three cards side by side: the default, a commit picked, Session picked."""
+    link = 'style="color: #2563eb; text-decoration: none; cursor: pointer;"'
+    def line(code, path, why=""):
+        p_ = f'<span title="{why}" style="color: #6b7280;">{path}</span>' if why else f'<a {link} title="/home/kmaster/samscrape/.claude/worktrees/tdgrind-1/{path}">{path}</a>'
+        return f'<div><span style="color: #065f46;">{code}</span> {p_}</div>'
+    def pick(label, up=True, down=True):
+        arrow = lambda g, on, t: f'<span class="btn" title="{t}" style="height: 24px; min-width: 24px; padding: 0 6px; font-size: 12px;{"" if on else " opacity: .4;"}">{g}</span>'
+        return (f'<div style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">{arrow("↑", up, "newer")}{arrow("↓", down, "older")}'
+                f'<span class="input mono" style="height: 24px; flex-grow: 1; font-size: 12px; justify-content: space-between; min-width: 0;"><span style="overflow: hidden; white-space: nowrap; text-overflow: ellipsis;">{label}</span><span>▾</span></span></div>')
+    meta = '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead</span>'
+    body = lambda *rows: '<div class="mono" style="font-size: 12px; line-height: 1.7; margin-top: 8px; overflow-wrap: anywhere;">' + "".join(rows) + "</div>"
+    head_line = lambda t, hov: f'<div class="meta mono" style="font-size: 12px; margin-top: 8px;" title="{hov}">{t}</div>'
+    tree = side_card("Git", meta, pick("Working tree", up=False) + body(
+        line("M", "scripts/recover_stuck_notices.py"), line("??", "tests/fixtures/stuck_notice.json")))
+    commit = side_card("Git", meta, pick("HEAD~1 · 4c1e9a2 · TD-301: re-read the stuck notice…")
+        + head_line("4c1e9a2 · TD-301: re-read the stuck notice at… · 12m ago", "TD-301: re-read the stuck notice at the top of each pass — tdgrind-1")
+        + body(line("M", "scripts/recover_stuck_notices.py"), line("A", "tests/test_scripts/test_recover_stuck_notices.py"),
+               line("D", "scripts/old_notice_check.py", "deleted by this commit"), line("M", "docs/notes/td301.md", "not in the worktree now")))
+    session = side_card("Git", meta, pick("Session", down=False) + body(
+        line("M", "scripts/recover_stuck_notices.py"), line("??", "tests/fixtures/stuck_notice.json"),
+        line("A", "tests/test_scripts/test_recover_stuck_notices.py"), line("A", "docs/claude-memory/project_td301.md"),
+        line("D", "scripts/old_notice_check.py", "deleted since the base")))
+    menu = '''<div class="card mono" style="padding: 6px 0; font-size: 12px; line-height: 1.9; width: 320px; white-space: nowrap; overflow: hidden;">
+      <div style="padding: 0 10px;">Working tree</div>
+      <div style="padding: 0 10px;">HEAD · 9b03f6e · TD-301: the fixture for a stuck no…</div>
+      <div style="padding: 0 10px; background: #e8f0fe;">HEAD~1 · 4c1e9a2 · TD-301: re-read the stuck notice…</div>
+      <div style="padding: 0 10px;">HEAD~2 · 77d2b10 · TD-298: archive the board's done l…</div>
+      <div style="padding: 0 10px; color: #6b7280;">… to HEAD~9</div>
+      <div style="padding: 0 10px; border-top: 1px solid #eceef1;">Session</div>
+    </div>'''
+    col = lambda cap, card: f'<div style="width: 320px; display: flex; flex-direction: column; gap: 8px;"><div class="meta" style="white-space: normal;">{cap}</div>{card}</div>'
+    return head("Focus Git pick") + f'''<div style="width: 1440px; min-height: 340px; background: #f4f5f7; padding: 20px; box-sizing: border-box; display: flex; gap: 24px; align-items: flex-start;">
+  {col("Working tree — the default, the porcelain (↑ disabled)", tree)}
+  {col("HEAD~1 picked — the files that one commit changed", commit)}
+  {col("Session — every path since the base (↓ disabled)", session)}
+  {col("The select open: git's own names, HEAD the newest", menu)}
+</div>
+''' + TAIL
+
+
 files = {
     "Main.dc.html": team_desktop(),
     "MainDark.dc.html": darken(team_desktop()),
@@ -2331,6 +2374,7 @@ files = {
     "FocusOrc.dc.html": focus_orchestrator(),
     "FocusReady.dc.html": focus_ready(),
     "FocusRail.dc.html": focus_rail(),
+    "FocusGitPick.dc.html": focus_git_pick(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -2372,6 +2416,7 @@ LAYOUT = [
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("FocusRail.dc.html", "Focus — the side panel put away (TD-408, 2026-10-08)", 0),
+    ("FocusGitPick.dc.html", "Focus — the Git card's pick: Working tree, a commit, Session (TD-856)", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Members.dc.html", "Members — the team card's dialog", 0),

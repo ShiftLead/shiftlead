@@ -82,11 +82,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
 | TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Designed — built by TD-863 |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
-| TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Open |
+| TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
 | TD-859 | Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats | Medium | Open |
 | TD-860 | #2048's waiting-claims tests leave five lines unread: the closed-PR exclusion, the replay's `keep_mail` gate, the held ask's sender, the rename carry and the carry-over dedup; #2045's `shown_in` completed counts too | Medium | Open |
 | TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
+| TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-863 | Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n* | Low | Open |
 
 ---
@@ -1786,7 +1787,8 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-17, PR #2061) — the card's pick is *Working tree* (the default) · the newest ten first-parent commits by git's own names (*HEAD* the newest, *HEAD~1* …) · *Session*; a commit lists the files it changed against its first parent; ↑ ↓ step the pick, not the lines; read by `git_files` on the record's host, on a pick; a deletion and a path gone from the tree are text; not kept across a load. Built by TD-862.
+**Blocked by:** TD-862
 **Location:** design §4.5a row *Focus side panel, **Git** card — changed files* (and *Focus side panel, Session card — recent files*, which already lists the session's committed paths), §4.2 *The record's `files`*, §4.5 item 4; `src/sessionorc/gitinfo.py` (`git_info` — the porcelain, at most twenty; `changed_files` — the diff from the merge base), `src/sessionorc/modes.py` (where a new read is served, if it needs the record's host), `src/shiftlead/ui/app.py` (the Focus view, `git_root`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw)
 
 **Why:**
@@ -1921,6 +1923,38 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Done when** a `refs` entry finished before `spend.KEEP` is gone after a prune, and every other one stays.
 
 **Related:** TD-830 (built #2049), TD-818 (the design).
+
+---
+
+## TD-862: Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-856's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* (and *changed files*, now the pick's Working tree), §4.2 *The Git card's pick*, §4.5 item 4, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`); mockup `docs/mockups/reviews/2026-10-17-td856-git-pick.png` (`gen.py` `focus_git_pick`); `src/sessionorc/gitinfo.py` (`changed_files`, beside which the commit and session reads go), `src/sessionorc/agent.py` (`rpc_paths`, the shape of a record-host read), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/shiftlead/ui/app.py` (the Focus view; a route the page asks, as the transcript's is), `src/shiftlead/ui/templates/focus.html` (`#gitcard`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw); `tests/test_ui_focus_git_files.py`, `tests/test_recent_files.py`, `tests/test_paths_rpc.py`, `tests/test_link.py`
+
+**Why:** TD-856: the Git card lists the porcelain alone, so the moment a worker commits, the files it changed leave the card and their links with them.
+
+**Fix:**
+- **The read.** `git_files {id, pick}` on the record's host, as §4.2 *The Git card's pick* says: `commits` (the newest ten of `git log --first-parent -n 10`, each `{ref, sha, subject, at, author}`, `ref` `HEAD` … `HEAD~9`); `files` for `tree`, a sha of the ten (`git diff --name-status -M -z <sha>^1 <sha>`, the empty tree for a root commit), or `session` (`changed_files` at a limit of a hundred with each path's code — the porcelain's for a dirty one, else the base's letter — `more` the count past it); `gone: true` on a path not in the tree now; a sha outside the ten and an unknown `pick` refused in words. `NODE_READS` gains it; ungated.
+- **The card.** One line under `#gitcard`'s summary: **↑**, **↓**, and a select — *Working tree*, the ten as *HEAD · 1a2b3c4 · subject* (forty characters, whole on hover), *Session*. *Working tree* draws `git.files` from the record as today. A commit draws its naming line (short sha, subject, age; full subject and author on hover) and its lines; Session its lines and *n more*. The lines' links by `AO.gitFiles`' form; `D` and `gone` as text with the §4.5a hovers. ↑ ↓ step the select and are disabled at its ends.
+- **When it reads.** The commits on load and when the record's `git.oid` changes; a commit's lines on its pick; Session's on its pick and when the oid or the porcelain changes. The pick holds a sha: relabelled on a new commit, back to *Working tree* when the sha leaves the ten. A failed read: *could not read: <why>*, the pick kept. Not kept across a load; absent on *not a git directory*.
+
+**Tests:**
+- `git_files` in a scratch repo: `commits` names `HEAD` first and stops at ten; a commit's `files` are its own (an `A`, an `M`, a `D`, an `R` with the new path), a root commit's against the empty tree; `session` carries the porcelain's code for a dirty path (`M`, `??`) and the base's letter otherwise, caps at a hundred with `more`; `gone` on a path deleted after the commit; an old sha and `pick: "x"` refused;
+- `NODE_READS` holds `git_files`, and a node's record's pick goes through `read`;
+- the card draws the pick with *Working tree* selected and ↑ disabled; a pick of *HEAD~1* draws its naming line and links its paths, a `D` and a `gone` path as text with their hovers; ↓ on *Session* is disabled;
+- a new commit relabels a held pick and keeps its lines; a sha gone from the ten returns the pick to *Working tree*.
+
+**Done when** the Focus Git card of a live worker that has just committed lists that commit's files on *HEAD*, steps to *HEAD~1* with ↓, and shows the session's whole change on *Session*, each path opening in the editor.
+
+**Related:** TD-856 (the design), TD-627 / TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line), TD-501 (`paths`, the read's model).
+
+
+
 
 ---
 
