@@ -824,3 +824,256 @@ async def test_the_press_under_auto_promotes_at_once_skipping_the_settle(agent, 
     assert got["sha"] == main and agent._promotes["repo"]["inflight"]["by"] == "person"
     assert agent._promotes["repo"]["auto"] is True
     _wait_gone(agent._promotes["repo"]["inflight"]["pid"])
+
+
+# ── the smoke (§6 *The smoke*, TD-804, built by TD-811) ────────────────────────────────────────
+
+
+def _smoke_block(checkout: Path, smoke: str | None = "default") -> tuple[Path, Path]:
+    """The fixture's block with a smoke that records where it ran and what it was handed, and exits
+    with what `smoke_exit` says (0 until a test says otherwise); live is the block's commit."""
+    live, seen, code = (checkout.parent / n for n in ("live", "smoke_seen", "smoke_exit"))
+    code.write_text("0")
+    handed = "$SHIFTLEAD_PROMOTE_KIND $SHIFTLEAD_PROMOTE_SHA $SHIFTLEAD_PROMOTE_FROM $SHIFTLEAD_PROMOTE_ROOT"
+    if smoke == "default":
+        smoke = f'echo "$(pwd -P) {handed}" > {seen}; echo smoke says $(cat {code}); exit $(cat {code})'
+    b = {"run": f"git rev-parse HEAD > {live}", "check": f"cat {live}"} | ({"smoke": smoke} if smoke else {})
+    (checkout / ".shiftlead.yml").write_text(yaml.safe_dump({"promote": b}))
+    _git(checkout, "add", "-A")
+    _git(checkout, "commit", "-q", "-m", "smoke block")
+    _git(checkout, "push", "-q", "origin", "main")
+    live.write_text(_git(checkout, "rev-parse", "HEAD") + "\n")
+    return seen, code
+
+
+def _pass(checkout: Path, readings: dict, now: datetime | None = None) -> tuple[dict, list[str]]:
+    """One watch pass (`check` alone) once the run or the smoke in flight has ended."""
+    f = readings["repo"]["inflight"]
+    if f:
+        _wait_gone(f["smoke_pid"] if f.get("phase") == "smoke" else f["pid"])
+    readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, now or datetime.now(UTC))
+    return readings, notes
+
+
+def _press(checkout: Path, sha: str, kind: str = "promote", frm: str | None = None) -> dict:
+    readings, _, _ = promote.survey([str(checkout)], {}, True, {}, datetime.now(UTC))
+    run = promote.block(checkout)["run"]
+    readings["repo"]["inflight"] = promote.start(checkout, "repo", sha, run, "person", 1, kind, frm)
+    return readings
+
+
+def test_a_block_with_a_smoke_is_accepted_by_both_readers(tmp_path):
+    from shiftlead import repoconfig
+
+    text = "promote:\n  run: x\n  check: y\n  smoke: scripts/smoke.sh\n"
+    (tmp_path / ".shiftlead.yml").write_text(text)
+    assert promote.block(tmp_path) == {"run": "x", "check": "y", "smoke": "scripts/smoke.sh"}
+    assert repoconfig.load_text(text, tmp_path).promote["smoke"] == "scripts/smoke.sh"
+    with pytest.raises(ValueError, match="must be a command"):
+        repoconfig.load_text("promote:\n  run: x\n  check: y\n  smoke: ''\n", tmp_path)
+
+
+def test_the_smoke_runs_once_check_reads_the_commit_and_the_promote_concludes_on_its_pass(checkout):
+    seen, _ = _smoke_block(checkout)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    promote.repo_dir("repo").mkdir(parents=True)
+    (promote.repo_dir("repo") / "held.json").write_text(json.dumps({"sha": frm, "from": "f" * 40}))
+    readings = _press(checkout, main, frm=frm)
+    assert readings["repo"]["inflight"]["smoke"].startswith('echo "$(pwd -P)')
+    readings, notes = _pass(checkout, readings)  # check reads main: the smoke starts, the promote stays in flight
+    f = readings["repo"]["inflight"]
+    assert notes == [] and f["phase"] == "smoke" and f["smoke_pid"] and f["smoke_at"]
+    assert promote.last("repo")["sha"] == main and promote.held("repo")  # the hold waits for the smoke
+    assert promote.unmet(readings["repo"], press=True)[0] == "inflight"  # precondition (3) refuses a press
+    readings, notes = _pass(checkout, readings)
+    assert len(notes) == 1 and notes[0].startswith(f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in ")
+    assert seen.read_text().split() == [str(checkout.resolve()), "promote", main, frm, str(checkout)]
+    assert readings["repo"]["inflight"] is None and promote.held("repo") is None
+    assert not (promote.repo_dir("repo") / "smoke.json").exists()
+    log = (promote.repo_dir("repo") / f"{main}.log").read_text().splitlines()
+    assert log[-2:] == ["── smoke ──", "smoke says 0"]
+
+
+def test_a_failed_smoke_rolls_back_to_from_with_the_hold_and_why(checkout):
+    _, code = _smoke_block(checkout)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=frm)
+    code.write_text("4")
+    readings, _ = _pass(checkout, readings)
+    readings, notes = _pass(checkout, readings)  # the smoke failed: the rollback starts at once
+    f = readings["repo"]["inflight"]
+    why = f"smoke failed on {main[:7]}: smoke says 4"
+    assert notes == [] and readings["repo"]["failed"] is None
+    assert (f["kind"], f["by"], f["sha"], f["from"], f["why"]) == ("rollback", "smoke", frm, main, why)
+    code.write_text("0")
+    readings, _ = _pass(checkout, readings)  # check reads `from`: the hold, before its own smoke
+    assert promote.held("repo") | {"at": None} == {"sha": frm, "from": main, "main": main, "at": None} | {
+        "by": "smoke",
+        "why": why,
+    }
+    assert readings["repo"]["inflight"]["phase"] == "smoke"
+    readings, notes = _pass(checkout, readings)
+    assert notes[0].startswith(f"rolled back `repo` to `{frm[:7]}`: the smoke failed on `{main[:7]}` — smoke says 4")
+    assert "· smoke passed in " in notes[0] and readings["repo"]["live"] == frm
+    assert readings["repo"]["held"]["by"] == "smoke" and readings["repo"]["unmet"]["name"] == "held"
+
+
+def test_a_rollbacks_failed_smoke_stands_as_a_failure_beside_its_hold(checkout):
+    _, code = _smoke_block(checkout)
+    old = _git(checkout, "rev-parse", "HEAD")
+    new = _merge(checkout, "b")
+    (checkout.parent / "live").write_text(new + "\n")
+    readings = _press(checkout, old, "rollback", new)
+    code.write_text("1")
+    readings, _ = _pass(checkout, readings)
+    readings, notes = _pass(checkout, readings)
+    f = readings["repo"]["failed"]
+    assert notes == [] and readings["repo"]["inflight"] is None and readings["repo"]["live"] == old
+    assert f["why"] == f"smoke failed on {old[:7]}: smoke says 1" and f["exit"] == 1
+    assert promote.held("repo")["sha"] == old  # never rolled back: the failure stands beside the hold
+
+
+@pytest.mark.parametrize("frm", [None, "main"])
+def test_no_rollback_for_an_unread_from_or_one_that_is_the_commit(checkout, frm):
+    _, code = _smoke_block(checkout)
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=main if frm else None)
+    code.write_text("2")
+    readings, _ = _pass(checkout, readings)
+    readings, _ = _pass(checkout, readings)
+    assert readings["repo"]["inflight"] is None and readings["repo"]["failed"]["why"].startswith("smoke failed on")
+
+
+def test_a_smoke_gone_with_no_result_fails(checkout):
+    _smoke_block(checkout, smoke="sleep 60")
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main)
+    readings, _ = _pass(checkout, readings)
+    pid = readings["repo"]["inflight"]["smoke_pid"]
+    os.killpg(pid, 9)
+    readings, _ = _pass(checkout, readings)
+    f = readings["repo"]["failed"]
+    assert f["why"] == f"smoke failed on {main[:7]}: the smoke ended with no result written"
+
+
+def test_a_smoke_past_its_bound_is_killed_and_the_runs_bound_no_longer_applies(checkout):
+    _smoke_block(checkout, smoke="sleep 60")
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main)
+    readings, _ = _pass(checkout, readings)
+    pid = readings["repo"]["inflight"]["smoke_pid"]
+    past_run = datetime.now(UTC) + timedelta(seconds=promote.SMOKE_BOUND - 5)
+    readings, _, _ = promote.survey([str(checkout)], readings, False, {}, past_run)
+    assert readings["repo"]["inflight"]["phase"] == "smoke" and promote.alive(pid)  # past no bound yet
+    later = datetime.now(UTC) + timedelta(seconds=promote.SMOKE_BOUND + 1)
+    readings, _, _ = promote.survey([str(checkout)], readings, False, {}, later)
+    assert (
+        readings["repo"]["failed"]["why"]
+        == f"smoke failed on {main[:7]}: the smoke was still running after 10 minutes: killed"
+    )
+    _wait_gone(pid)
+    assert not promote.alive(pid)
+
+
+def test_a_run_and_its_smoke_past_the_runs_bound_pass(checkout, monkeypatch):
+    _smoke_block(checkout)
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main)
+    readings, _ = _pass(checkout, readings)
+    monkeypatch.setattr(promote, "PROMOTE_BOUND", 0.0)
+    readings, notes = _pass(checkout, readings)
+    assert "smoke passed" in notes[0] and readings["repo"]["failed"] is None
+
+
+def test_the_smokes_rollback_that_cannot_start_leaves_the_hold_beside_both_reasons(checkout, monkeypatch):
+    _, code = _smoke_block(checkout)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    promote.repo_dir("repo").mkdir(parents=True)
+    hold = {"sha": frm, "from": "f" * 40, "main": main, "at": "x"}
+    (promote.repo_dir("repo") / "held.json").write_text(json.dumps(hold))  # a press under a hold
+    readings = _press(checkout, main, frm=frm)
+    code.write_text("3")
+    readings, _ = _pass(checkout, readings)
+
+    def no_tree(root, repo, sha):
+        raise ValueError("the rollback's worktree cannot be made: git worktree: no room")
+
+    monkeypatch.setattr(promote, "make_tree", no_tree)
+    readings, _ = _pass(checkout, readings)
+    why = f"smoke failed on {main[:7]}: smoke says 3; its rollback could not start: the rollback's worktree"
+    assert readings["repo"]["failed"]["why"].startswith(why) and readings["repo"]["live"] == main
+    assert promote.held("repo") == hold  # neither cleared nor rewritten
+
+
+def test_a_press_under_a_hold_whose_smoke_fails_rewrites_the_hold(checkout):
+    _, code = _smoke_block(checkout)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    promote.repo_dir("repo").mkdir(parents=True)
+    (promote.repo_dir("repo") / "held.json").write_text(json.dumps({"sha": frm, "from": "f" * 40}))
+    readings = _press(checkout, main, frm=frm)
+    code.write_text("5")
+    readings, _ = _pass(checkout, readings)
+    readings, _ = _pass(checkout, readings)
+    code.write_text("0")
+    readings, _ = _pass(checkout, readings)
+    readings, _ = _pass(checkout, readings)
+    h = promote.held("repo")
+    assert (h["sha"], h["from"], h["by"]) == (frm, "f" * 40, "smoke")  # its first `from` kept
+
+
+def test_a_rollback_to_a_tree_with_no_smoke_concludes_on_check_and_says_so(checkout):
+    _smoke_block(checkout, smoke=None)
+    old = _git(checkout, "rev-parse", "HEAD")
+    _smoke_block(checkout)
+    new = _git(checkout, "rev-parse", "HEAD")
+    readings = _press(checkout, old, "rollback", new)
+    assert readings["repo"]["inflight"]["smoke"] is None
+    readings, notes = _pass(checkout, readings)
+    assert notes == [
+        f"rolled back `repo` to `{old[:7]}` from `{new[:7]}` — main is 1 commit ahead · no smoke in `{old[:7]}`"
+    ]
+    # a tree whose block cannot be read runs none either, and says why
+    (checkout / ".shiftlead.yml").write_text("promote: {run: x\n")
+    _git(checkout, "add", "-A")
+    _git(checkout, "commit", "-q", "-m", "broken block")
+    broken = _git(checkout, "rev-parse", "HEAD")
+    _smoke_block(checkout)
+    readings = _press(checkout, broken, "rollback", old)
+    readings, notes = _pass(checkout, readings)
+    assert f"· no smoke read in `{broken[:7]}`: " in notes[0] and "cannot be read" in notes[0]
+
+
+def test_the_smoke_is_kept_on_the_intent_when_the_checkout_moves(checkout):
+    seen, _ = _smoke_block(checkout)
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main)
+    _smoke_block(checkout, smoke="exit 9")  # a pull moves the checkout before `check` reads main
+    (checkout.parent / "live").write_text(main + "\n")
+    readings, _ = _pass(checkout, readings)
+    readings, notes = _pass(checkout, readings)
+    assert "smoke passed" in notes[0] and seen.read_text().split()[2] == main
+
+
+def test_an_agent_restarted_mid_smoke_reads_its_result(checkout):
+    _smoke_block(checkout)
+    main = _merge(checkout, "b")
+    d = promote.repo_dir("repo")
+    d.mkdir(parents=True)
+    log = d / f"{main}.log"
+    log.write_text("── smoke ──\nall well\n")
+    at = datetime.now(UTC)
+    intent = {"sha": main, "at": at.isoformat(), "pid": 999999999, "log": str(log), "by": "auto", "ahead": 1}
+    mine = os.getpid()  # a live process another agent started: signalled, never polled
+    intent |= {"smoke": "x", "phase": "smoke", "smoke_pid": mine, "smoke_started": promote.proc_start(mine)}
+    intent["smoke_at"] = at.isoformat()
+    (d / "inflight.json").write_text(json.dumps(intent))
+    (checkout.parent / "live").write_text(main + "\n")
+    readings, _, _ = promote.survey([str(checkout)], {}, False, {}, at)
+    assert readings["repo"]["inflight"]["phase"] == "smoke"  # no result yet, the smoke not ours: in the bound
+    (d / "smoke.json").write_text(json.dumps({"sha": main, "exit": 0, "at": (at + timedelta(seconds=48)).isoformat()}))
+    readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, at)
+    assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s"]
