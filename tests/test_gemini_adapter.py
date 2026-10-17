@@ -45,7 +45,7 @@ def test_launch_argv_and_env(home):
     layer = json.loads(Path(env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"]).read_text())
     assert set(layer["hooks"]) == set(gemini.HOOK_EVENTS)
     cmd = layer["hooks"]["BeforeTool"][0]["hooks"][0]
-    assert cmd["command"].endswith(" --adapter gemini") and cmd["timeout"] == gemini.HOOK_TIMEOUT_MS
+    assert cmd["command"].endswith(" --adapter gemini") and cmd["timeout"] == 10_000  # the tool's milliseconds
     assert layer["hooksConfig"] == {"notifications": False} and layer["general"] == {"enableAutoUpdate": False}
     assert layer["ui"] == {
         "hideTips": True,
@@ -173,6 +173,7 @@ def test_credentials_read_the_homes_auth_type_and_credential(home, monkeypatch):
     from shiftlead import profiles
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     prof = profiles.get("grind")
     ad = GeminiAdapter(binary="gemini")
     assert ad.credentials_ok(prof) is None  # no settings: the auth picker would open
@@ -180,11 +181,44 @@ def test_credentials_read_the_homes_auth_type_and_credential(home, monkeypatch):
     gem.mkdir(parents=True)
     (gem / "settings.json").write_text(json.dumps({"security": {"auth": {"selectedType": "oauth-personal"}}}))
     assert ad.credentials_ok(prof) is None  # an auth type and no credential
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    assert ad.credentials_ok(prof) is True  # …or the key in the environment
+    monkeypatch.delenv("GEMINI_API_KEY")
     (gem / "oauth_creds.json").write_text("{}")
     assert ad.credentials_ok(prof) is True
     rows = {r["profile"]: r for r in ad.doctor_profiles()}
     assert set(rows) == {"gem", "grind", "asks"}
     assert rows["grind"]["config_dir"] == str(home / "g") and rows["grind"]["credentials"] is True
+    assert "key" not in rows["grind"] and "note" not in rows["grind"]
+
+
+def test_a_metered_profile_its_extra_args_its_key_and_the_precautions_note(home, monkeypatch):
+    """A profile's `extra_args` reach the argv; `ao doctor`'s row of a metered profile says whether its key
+    is set, and a `GOOGLE_API_KEY` in the host agent's environment is noted (design §4.3, §4.7, TD-843)."""
+    (home / "home" / "profiles.yml").write_text(
+        "profiles:\n  api: {adapter: gemini, billing: metered, extra_args: [--debug, --sandbox],\n"
+        f"    config_dir: {home / 'api'}}}\n"
+    )
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    ad = GeminiAdapter(binary="gemini")
+    spec = ad.launch(profile="api", resume=None, prompt=None, unattended=False, cwd=home)
+    assert spec.argv[3:] == ["--debug", "--sandbox"]
+    (row,) = ad.doctor_profiles()
+    assert row["metered"] is True and row["credentials"] is None and row["key"] is False and "note" not in row
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    monkeypatch.setenv("GOOGLE_API_KEY", "g")
+    (row,) = ad.doctor_profiles()
+    assert row["key"] is True and "GOOGLE_API_KEY" in row["note"]
+
+
+def test_a_profiles_layers_leave_out_another_profile_whose_name_begins_with_its_own(home):
+    from shiftlead import profiles
+
+    prof = profiles.get("grind")
+    mine = [gemini.write_layer(prof), gemini.write_layer(prof, unattended=True)]
+    (home / "home" / "gemini-settings" / "grind2.json").write_text("{}")  # another profile's, `grind2`
+    assert [r["path"] for r in gemini.layer_reading(prof)] == sorted(str(p) for p in mine)
 
 
 def test_the_hook_entry_dispatches_on_the_adapter_flag(monkeypatch):
