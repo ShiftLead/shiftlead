@@ -74,7 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-845 | A link a program prints with OSC 8 (Claude Code's *Report: Team Spend by Seat*) is plain text in the Focus pane: tmux drops it before the browser, and xterm.js has no handler for it | Medium | Open |
-| TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid road |
+| TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 
 ---
 
@@ -1577,15 +1577,15 @@ Then the build entries, named in `Blocked by:`.
 **Added:** 2026-10-17
 **Owner:** paul
 **Kind:** decision
-**Blocked by:** decision (paul) — which paid road, if any, [the monetisation decision](decisions/2026-10-13-monetisation.md) takes; nothing here is started before then (Paul, 2026-10-17: *low priority, pushed off until we get closer to monetization*)
+**Blocked by:** decision (paul) — which paid option, if any, [the monetisation decision](decisions/2026-10-13-monetisation.md) takes; nothing here is started before then (Paul, 2026-10-17: *low priority, pushed off until we get closer to monetization*)
 **Status:** Open — deferred.
 **Location:** `docs/decisions/2026-10-13-monetisation.md`; the repo root (`SECURITY.md`, absent); `.github/workflows/` (release and scanning); the wheel `ao service install` writes to `~/.shiftlead/wheels/`
 
 **Why:**
 - Paul asked (2026-10-17, the `security` session) whether SOC 2, ISO or other compliance applies to shiftlead.
-- SOC 2 and ISO 27001 certify an organisation that operates a service and holds customer data. shiftlead today is MIT, self-hosted, one person per home (design §1, §2), with nothing hosted, so there is nothing for an auditor to examine. They begin to matter on two of the monetisation doc's roads:
-  - **A hosted or relay part** (push, a connection relay, anything that carries sessions, transcripts or keys): SOC 2 Type II (US buyers) or ISO 27001 (EU buyers), and GDPR processor duties with a DPA.
-  - **A paid team edition sold to companies:** their procurement sends security questionnaires even for self-hosted software. A SOC 2 report helps and is not required. The product features they need are the ones road 2 lists: identity-provider sign-in, roles, an audit log of who typed into which session.
+- SOC 2 and ISO 27001 certify an organisation that operates a service and holds customer data. shiftlead today is MIT, self-hosted, one person per home (design §1, §2), with nothing hosted, so there is nothing for an auditor to examine. They begin to matter on options 2, 3 and 5 of the monetisation doc:
+  - **A hosted or relay part** (option 3's managed host, option 5's ciphertext relay; anything that carries sessions, transcripts or keys): SOC 2 Type II (US buyers) or ISO 27001 (EU buyers), and GDPR processor duties with a DPA.
+  - **A paid team edition sold to companies:** their procurement sends security questionnaires even for self-hosted software. A SOC 2 report helps and is not required. The product features they need are the ones option 2 lists: identity-provider sign-in, roles, an audit log of who typed into which session.
 - What applies to self-hosted software regardless, and is cheap before it is dear:
   - **The EU Cyber Resilience Act.** It covers software with digital elements placed on the EU market. Non-commercial open source is largely exempt; a paid edition is in scope. Vulnerability reporting duties apply from September 2026, the rest from December 2027: a vulnerability disclosure policy, an SBOM, security updates for the support period, secure-by-default settings.
   - **Supply-chain basics a questionnaire asks for:** a `SECURITY.md`, an SBOM of the wheel, signed release artifacts, dependency and secret scanning in CI.
@@ -1594,11 +1594,11 @@ Then the build entries, named in `Blocked by:`.
   - **The EU AI Act:** orchestrating general-purpose models for coding is very unlikely to be high-risk; at most transparency duties, only if sold in the EU.
 - The dates and scopes above are as known on 2026-10-17 and were not re-read against the regulations' text; check them when the entry is picked up.
 
-**Fix:** when the monetisation decision names a paid road:
-1. Read the CRA's obligations for that road (manufacturer of a commercial product, or open-source steward) and Anthropic's current terms for unattended use, and write the answer here.
+**Fix:** when the monetisation decision names a paid option:
+1. Read the CRA's obligations for that option (manufacturer of a commercial product, or open-source steward) and Anthropic's current terms for unattended use, and write the answer here.
 2. Land the basics as build entries: `SECURITY.md` with a disclosure address, an SBOM and a signature on the release wheel, dependency and secret scanning in CI, and a retention and file-mode rule for `~/.shiftlead`'s logs.
 3. Only for a hosted part or a team edition: choose SOC 2 Type II or ISO 27001 by the first buyers' region, and file the controls work (access control, audit log, change management; the cadence's branch, review and merge loop is already most of the last).
 
-**Done when** the paid road's obligations are written here, and the basics are built or each is archived with its reason.
+**Done when** the paid option's obligations are written here, and the basics are built or each is archived with its reason.
 
-**Related:** [`docs/decisions/2026-10-13-monetisation.md`](decisions/2026-10-13-monetisation.md) (roads 1 and 2), TD-131 (retention), design §2 (multi-user access is a non-goal for now).
+**Related:** [`docs/decisions/2026-10-13-monetisation.md`](decisions/2026-10-13-monetisation.md) (options 2, 3 and 5), TD-131 (retention), design §2 (multi-user access is a non-goal for now).
