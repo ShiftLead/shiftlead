@@ -3534,6 +3534,76 @@
     return { applyFolds, toggleFold };
   };
 
+  // The Queue's picks, read in the browser as `ui.queue` reads them on the server (§4.5 screen 12 *Filters*,
+  // §4.5a *Queue page: filters, find*; TD-829): `qPicks` is `queue_picks`, `qQuery` `picks_query`, `qWord` and
+  // `qFinds` `_find_word` and `_finds`, `qRefs` the home's `refs`, and `qPass` the test `apply_picks` makes of a
+  // card, a completed line or an *other work* line. A press answers with these and no request.
+  const Q_FILTERS = ["needs-you", "steering"];
+  const Q_KINDS = ["questions", "steering", "board", "yours", "held-until", "held-person"];
+  AO.qRefs = (text) => {
+    const seen = [];
+    for (const m of String(text || "").matchAll(/(?<![\w-])(?:([\w.-]+)#)?TD-(\d+)\b/g)) {
+      const ref = `${m[1] ? m[1] + "#" : ""}TD-${String(parseInt(m[2], 10)).padStart(3, "0")}`;
+      if (!seen.includes(ref)) seen.push(ref);
+    }
+    return seen;
+  };
+  AO.qWord = (w) => {
+    w = String(w).replace(/\btd-(?=\d)/gi, "TD-");
+    const refs = /^(?:[\w.-]+#)?TD-\d+$/.test(w) ? AO.qRefs(w) : [];
+    return (refs[0] || w).toLowerCase();
+  };
+  AO.qFinds = (w, text) => {
+    if (/^(?:[\w.-]+#)?td-\d+$/.test(w)) return String(text).split(/\s+/).some((t) => t === w || t.endsWith("#" + w));
+    return String(text).includes(w);
+  };
+  AO.qPicks = (search) => {
+    const p = new URLSearchParams(search || "");
+    const many = (k) => {
+      const out = [];
+      p.getAll(k).forEach((v) => String(v).split(",").forEach((w) => { w = w.trim(); if (w && !out.includes(w)) out.push(w); }));
+      return out;
+    };
+    const f = p.get("filter") || "";
+    return { filter: Q_FILTERS.includes(f) ? f : "", team: many("team"), repo: many("repo"),
+      kind: many("kind").filter((k) => Q_KINDS.includes(k)), find: String(p.get("find") || "").split(/\s+/).filter(Boolean).join(" ") };
+  };
+  AO.qQuery = (picks, change) => {
+    const p = { filter: picks.filter || "", team: [...(picks.team || [])], repo: [...(picks.repo || [])], kind: [...(picks.kind || [])], find: picks.find || "" };
+    Object.entries(change || {}).forEach(([k, v]) => {
+      if (k === "team" || k === "repo" || k === "kind") p[k] = p[k].includes(v) ? p[k].filter((x) => x !== v) : [...p[k], v];
+      else if (k === "filter") p.filter = p.filter === v ? "" : v;
+      else p[k] = v;
+    });
+    const parts = p.filter ? [`filter=${p.filter}`] : [];
+    ["team", "repo", "kind"].forEach((k) => { if (p[k].length) parts.push(`${k}=${encodeURIComponent(p[k].join(","))}`); });
+    if (p.find) parts.push(`find=${encodeURIComponent(p.find)}`);
+    return "/queue" + (parts.length ? "?" + parts.join("&") : "");
+  };
+  AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.repo.length || picks.kind.length || picks.find.split(/\s+/).filter(Boolean).length);
+  // `item`: {kind: "card" | "line" | "other", status, kinds, repos, find}; `teams`: a team's name → its repo
+  AO.qPass = (item, picks, teams) => {
+    let repos = null;
+    if (picks.team.length) {
+      repos = new Set(picks.team.map((t) => (teams || {})[t] || "").filter(Boolean));
+      if (!repos.size) repos = new Set(["\0"]);  // a team with no repo holds no card
+    }
+    if (picks.repo.length) {
+      repos = repos ? new Set(picks.repo.filter((r) => repos.has(r))) : new Set(picks.repo);
+      if (!repos.size) repos = new Set(["\0"]);
+    }
+    const words = picks.find.split(/\s+/).filter(Boolean).map(AO.qWord);
+    const statusPick = !!(picks.filter || picks.kind.length);
+    if (item.kind === "other") return !(statusPick || !!repos || words.length > 0);
+    const byRepoFind = !(repos && !(item.repos || []).some((r) => repos.has(r))) && words.every((w) => AO.qFinds(w, item.find || ""));
+    if (item.kind === "line") return !statusPick && byRepoFind;
+    let ok = byRepoFind;
+    if (picks.filter === "needs-you") ok = ok && item.status === "needs you";
+    else if (picks.filter === "steering") ok = ok && (item.status === "steer" || (item.kinds || []).includes("steering"));
+    if (picks.kind.length) ok = ok && picks.kind.some((k) => (item.kinds || []).includes(k));
+    return ok;
+  };
+
   // The Queue page (design §4.5 screen 12, §4.5a *Queue page*; TD-771): the cards (`AO.qcards`), the
   // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
   // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
@@ -3567,8 +3637,58 @@
           AO.DISMISS_ASK[which], reread);
       });
     }
+    // the picks (TD-829): the URL's, applied in the browser; a URL that carries any (but the find's words)
+    // becomes the browser's memory (`qpicks`), which `base.html`'s head restores on a bare `/queue`
+    let picks = AO.qPicks(location.search);
+    const findbox = $("#qfindbox", box), filters = $("#qfilters", box);
+    let teams = {};
+    try { teams = JSON.parse((filters && filters.dataset.teams) || "{}") || {}; } catch (err) { teams = {}; }
+    const remember = () => store.set("qpicks", AO.qQuery({ ...picks, find: "" }).slice("/queue".length));
+    if (picks.filter || picks.team.length || picks.repo.length || picks.kind.length) remember();
+    function applyPicks() {
+      const filtered = AO.qFiltered(picks);
+      const card = (el) => ({ kind: "card", status: el.dataset.status || "", kinds: (el.dataset.kinds || "").split(" ").filter(Boolean),
+        repos: (el.dataset.repos || "").split(" ").filter(Boolean), find: el.dataset.find || "" });
+      $$(".qgroup .qcard", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass(card(el), picks, teams)));
+      $$(".qdline", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "line", repos: [el.dataset.repo || ""], find: el.dataset.find || "" }, picks, teams)));
+      $$(".qother", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "other" }, picks, teams)));
+      // each group's share, *(n of m)* while anything is picked (§4.5 screen 12 *Groups*)
+      const share = (el, shown) => { el.textContent = `(${filtered ? shown + " of " : ""}${el.dataset.of})`; };
+      $$(".qgroup", lists).forEach((g) => {
+        if (g.dataset.group === "completed") {
+          $$(".qghead .qwinword", g).forEach((w) => {
+            const s = $(".qshare", w); if (!s) return;
+            share(s, $$(".qdline:not(.qoff)", g).filter((ln) => (ln.dataset.w || "").split(" ").includes(w.dataset.wv))
+              .reduce((n, ln) => n + Number(ln.dataset.n || 1), 0));
+          });
+        } else {
+          const s = $(".qghead .qshare", g); if (s) share(s, $$(".qcard:not(.qoff)", g).length);
+        }
+      });
+      const none = $("#qnone", lists); if (none) none.hidden = !(filtered && !$(".qgroup .qcard:not(.qoff)", lists));
+      const miss = $("#qfindmiss", lists); if (miss) miss.hidden = (miss.dataset.for || "") !== picks.find;
+      if (filters) $$("a.qf[data-k]", filters).forEach((a) => {
+        const k = a.dataset.k, v = a.dataset.v;
+        const on = k === "all" ? !filtered : k === "filter" ? picks.filter === v : (picks[k] || []).includes(v);
+        a.setAttribute("aria-pressed", on ? "true" : "false");
+        a.setAttribute("href", k === "all" ? "/queue" : AO.qQuery(picks, { [k]: v }));
+      });
+      delete document.documentElement.dataset.qpend;  // `base.html`'s head held the lists back until now
+    }
+    function setPicks(next, push) {
+      picks = next;
+      const url = AO.qQuery(picks);
+      if (url !== location.pathname + location.search) history[push ? "pushState" : "replaceState"](null, "", url + location.hash);
+      apply();
+    }
+    // an id the find names that no open card holds is asked of the server once, for the archive's line
+    function held(ref) {
+      return $$(".qgroup .qcard", lists).some((el) => AO.qRefs((el.dataset.ids || "").split(" ").join(" "))
+        .some((r) => r === ref || r.replace(/^.*#/, "") === ref));
+    }
     function apply() {
       qc.applyFolds();
+      applyPicks();
       const win = store.get("qwin", "day");
       $$(".qwin", box).forEach((b) => b.setAttribute("aria-pressed", b.dataset.win === win ? "true" : "false"));
       $$(".qwinword", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
@@ -3589,11 +3709,14 @@
         || $(`.mailrow[data-msg="${CSS.escape(id)}"]`, box) || $(`[data-card="${CSS.escape(id)}"]`, box);
       return el && box.contains(el) ? el : null;
     }
-    // a target a pick hides (`qoff`) is shown by the page without the picks, at the same address
+    // a target a pick hides (`qoff`) is shown by the page without the picks, at the same address — dropped
+    // in the browser (TD-829), so it is shown at once and the remembered picks stand
     function hidden(el, keep) {
       if (!el.closest(".qoff")) return false;
-      location.href = `/queue${keep}${location.hash}`;
-      return true;
+      picks = AO.qPicks(""); if (findbox) findbox.value = "";
+      history.replaceState(null, "", `/queue${keep}${location.hash}`);
+      apply();
+      return false;
     }
     function reveal(el, ring) {
       const g = el.closest(".qgroup"); if (g && g.classList.contains("qgfolded")) toggleGroup(g, true);
@@ -3618,6 +3741,16 @@
       if (it) reveal(it, true);
     }
     box.addEventListener("click", (e) => {
+      const f = e.target.closest("#qfilters a.qf[data-k]");
+      if (f && !(e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) {
+        e.preventDefault();
+        if (f.dataset.k === "all") {
+          if (findbox) findbox.value = "";
+          setPicks(AO.qPicks(""), true); return store.set("qpicks", "");
+        }
+        setPicks(AO.qPicks(AO.qQuery(picks, { [f.dataset.k]: f.dataset.v }).slice("/queue".length)), true);
+        return remember();
+      }
       const w = e.target.closest(".qwin[data-win]");
       if (w) { store.set("qwin", w.dataset.win); return apply(); }
       const gh = e.target.closest(".qghead");
@@ -3635,6 +3768,24 @@
       if (head) { e.preventDefault(); openLine(e.target.parentElement); }
     });
     window.addEventListener("hashchange", showHash);
+    window.addEventListener("popstate", () => {
+      picks = AO.qPicks(location.search); if (findbox) findbox.value = picks.find;
+      if (picks.filter || picks.team.length || picks.repo.length || picks.kind.length) remember(); else store.set("qpicks", "");
+      apply();
+    });
+    let typing = null;
+    const typed = () => ({ ...picks, find: String(findbox.value || "").split(/\s+/).filter(Boolean).join(" ") });
+    if (findbox) {
+      findbox.addEventListener("input", () => {
+        clearTimeout(typing);
+        typing = setTimeout(() => { typing = null; setPicks(typed(), false); }, 150);
+      });
+      findbox.form.addEventListener("submit", (e) => {
+        e.preventDefault(); clearTimeout(typing);
+        setPicks(typed(), false);
+        if (AO.qRefs(picks.find.replace(/\btd-(?=\d)/gi, "TD-")).some((r) => !held(r))) reread();
+      });
+    }
     let busy = false;
     async function reread() {
       if (busy || box.querySelector(".qcard.dragging")) return; busy = true;

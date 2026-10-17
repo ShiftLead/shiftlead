@@ -492,15 +492,16 @@ def test_a_group_heading_carries_its_count_and_its_share_under_a_pick(tmp_path, 
     the heading folds the group, which the browser remembers (`qgfold`)."""
     c = client(monkeypatch, tmp_path, fake(queue(), []))
     html = c.get("/queue").text
-    assert "Up next (2)</span>" in html and "In progress (1)</span>" in html
+    assert 'Up next <span class="qshare" data-of="2">(2)</span>' in html
+    assert 'In progress <span class="qshare" data-of="1">(1)</span>' in html
     head = html[html.index('id="qcompleted"') : html.index('class="qsub qgfoldword"')]
     assert (
         'Recently completed<span class="qwinword"' in head
-        and '<span class="qwinword" data-wv="day"> (3)</span>' in head
+        and '<span class="qwinword" data-wv="day"> <span class="qshare" data-of="3">(3)</span></span>' in head
     )
     assert html.count('class="h2 qghead" role="button"') == 3 and 'data-group="up_next"' in html
     html = c.get("/queue?find=queue").text
-    assert "Up next (1 of 2)</span>" in html and "In progress (0 of 1)</span>" in html
+    assert 'data-of="2">(1 of 2)</span>' in html and 'data-of="1">(0 of 1)</span>' in html
     js = c.get("/static/app.js").text
     assert 'const groupKey = "qgfold"' in js and "toggleGroup(g, true)" in js
 
@@ -610,13 +611,17 @@ def test_the_page_draws_the_filter_row_and_hides_what_a_pick_hides(tmp_path, mon
     assert "Steering" in row and '+ <span id="qininboxn">1</span> in the Inbox' in row  # the question about nothing
     assert 'name="find"' in row and "held (person)</a>" in row
     html = c.get("/queue?filter=needs-you").text
-    assert re.search(r'id="qfneeds" href="/queue" aria-pressed="true"', html)  # pressed again: All
+    assert re.search(
+        r'id="qfneeds" data-k="filter" data-v="needs-you" href="/queue" aria-pressed="true"', html
+    )  # again: All
     upnext = html[html.index('id="qupnext"') :]
     # what a pick hides is hidden, never dropped: the whole Up next order is still on the page
     assert re.search(r'class="qcard g-up_next st-ready hasrows qoff" data-card="s#TD-20"', upnext)
     assert 'data-card="s#TD-30"' in upnext and "s#TD-20" in upnext[upnext.index("data-upnext") :]
     part = c.get("/queue?part=1&find=TD-3").text
-    assert 'id="qfindmiss"' in part and 'href="/repo/s#TD-003"' in part and 'id="qnone"' in part
+    assert 'id="qfindmiss" data-for="TD-3"' in part and 'href="/repo/s#TD-003"' in part
+    assert '<div class="qnote" id="qnone">' in part  # drawn hidden otherwise, for the browser's apply (TD-829)
+    assert '<div class="qnote" id="qnone" hidden>' in c.get("/queue?part=1").text
     # the row stands outside the lists the page re-reads (typed find words survive); the lists carry its numbers
     html = c.get("/queue").text
     assert html.index('id="qfilters"') < html.index('id="queuelists"')

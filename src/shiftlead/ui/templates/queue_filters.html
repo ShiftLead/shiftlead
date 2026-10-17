@@ -1,16 +1,18 @@
 {# The filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): each a toggle carried in the
-   URL; what it hides is marked `qoff`, never dropped, so a move's neighbours stay the whole Up next order. It
+   URL; what it hides is marked `qoff`, never dropped, so a move's neighbours stay the whole Up next order. A
+   press answers in the browser (TD-829): `app.js` reads each link's `data-k`/`data-v` and the cards' `data-`
+   attributes, and the `href` stays for a page without its script. It
    stands outside the lists the page re-reads, so words typed in the find box and its focus survive a re-read;
    its two numbers are copied from the lists' `#qcounts` #}
 {% set fp = picks.filter %}
-<div class="qfilters" id="qfilters" role="group" aria-label="filters">
-  <a class="qf" href="/queue" aria-pressed="{{ 'false' if q.filtered else 'true' }}">All</a>
-  <a class="qf" id="qfneeds" href="{{ pq(picks, filter='needs-you') }}" aria-pressed="{{ 'true' if fp == 'needs-you' else 'false' }}" title="cards whose status is needs you, in rank order">Needs you (<span id="qfneedsn">{{ q.n.needs_you }}</span>)</a>
+<div class="qfilters" id="qfilters" role="group" aria-label="filters" data-teams='{{ team_repos | tojson }}'>
+  <a class="qf" data-k="all" href="/queue" aria-pressed="{{ 'false' if q.filtered else 'true' }}">All</a>
+  <a class="qf" id="qfneeds" data-k="filter" data-v="needs-you" href="{{ pq(picks, filter='needs-you') }}" aria-pressed="{{ 'true' if fp == 'needs-you' else 'false' }}" title="cards whose status is needs you, in rank order">Needs you (<span id="qfneedsn">{{ q.n.needs_you }}</span>)</a>
   <a class="qsub qininbox" id="qininbox" href="/inbox" title="what needs you that names no entry on a card: drawn in the Inbox, and counted in the top bar's number"{% if not in_inbox %} hidden{% endif %}>+ <span id="qininboxn">{{ in_inbox or 0 }}</span> in the Inbox</a>
-  <a class="qf" href="{{ pq(picks, filter='steering') }}" aria-pressed="{{ 'true' if fp == 'steering' else 'false' }}" title="cards with a steer running">Steering</a>
-  {% for t in teams %}<a class="qf qfteam" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
-  {% if q.repos | length > 1 %}{% for r in q.repos %}<a class="qf" href="{{ pq(picks, repo=r) }}" aria-pressed="{{ 'true' if r in picks.repo else 'false' }}" title="the cards of {{ r }}">{{ r }}</a>{% endfor %}{% endif %}
-  <span class="qkinds"><span class="qsub">kind</span>{% for k, label in kinds.items() %}<a class="qf" href="{{ pq(picks, kind=k) }}" aria-pressed="{{ 'true' if k in picks.kind else 'false' }}">{{ label }}</a>{% endfor %}</span>
+  <a class="qf" data-k="filter" data-v="steering" href="{{ pq(picks, filter='steering') }}" aria-pressed="{{ 'true' if fp == 'steering' else 'false' }}" title="cards with a steer running">Steering</a>
+  {% for t in teams %}<a class="qf qfteam" data-k="team" data-v="{{ t }}" href="{{ pq(picks, team=t) }}" aria-pressed="{{ 'true' if t in picks.team else 'false' }}" title="the cards of {{ t }}'s repo">{{ t }}</a>{% endfor %}
+  {% if q.repos | length > 1 %}{% for r in q.repos %}<a class="qf" data-k="repo" data-v="{{ r }}" href="{{ pq(picks, repo=r) }}" aria-pressed="{{ 'true' if r in picks.repo else 'false' }}" title="the cards of {{ r }}">{{ r }}</a>{% endfor %}{% endif %}
+  <span class="qkinds"><span class="qsub">kind</span>{% for k, label in kinds.items() %}<a class="qf" data-k="kind" data-v="{{ k }}" href="{{ pq(picks, kind=k) }}" aria-pressed="{{ 'true' if k in picks.kind else 'false' }}">{{ label }}</a>{% endfor %}</span>
   <form class="qfind" method="get" action="/queue" role="search">
     {% if fp %}<input type="hidden" name="filter" value="{{ fp }}">{% endif %}
     {% for k in ('team', 'repo', 'kind') %}{% if picks[k] %}<input type="hidden" name="{{ k }}" value="{{ picks[k] | join(',') }}">{% endif %}{% endfor %}
