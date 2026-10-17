@@ -73,6 +73,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-821 | A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at | Low | Designed — built by TD-827 |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-827 | Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team* | Low | Open |
+| TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
+| TD-840 | #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test | Medium | Open |
+| TD-841 | #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard | Medium | Open |
+| TD-842 | #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised | Low | Open |
 
 ---
 
@@ -1498,3 +1502,75 @@ Then the build entry, named in `Blocked by:`.
 **Done when** **Open shell here** on a team member opens a shell drawn in that team's group, which still passes every person-only act and is left alone by every team act, and the tests above pass.
 
 **Related:** TD-821 (the design), TD-817 (the reuse, built in #2009: the same route), TD-580 and TD-801 (the person's own shell), TD-160 (a person in the team), TD-725 (the no-team strip).
+
+## TD-839: Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_permission_channel.py`; `src/sessionorc/{agent,agent_common,agent_tick,agent_wake,mail}.py` (every `s.told` site)
+
+**Why:** #2014 replaced `s.confidence == "hook"` by `s.told` (hook or title) at sixteen sites, and its test docstring says *every rule that acts only on a hook-confirmed state takes a title reading as one*. The only test that uses `confidence="title"` is `test_a_title_reading_is_the_tools_own_word`, which asserts `Session.told` for four confidences and nothing else. Probe, in an `origin/main` worktree: `sed -i -E 's/\bnot s\.told\b/s.confidence != "hook"/g; s/\b(s|r)\.told\b/\1.confidence == "hook"/g'` over `mail.py agent.py agent_common.py agent_wake.py agent_tick.py` (16 lines changed, so every rule is hook-only again) and `pdm run pytest -q tests/test_agent.py tests/test_mail.py tests/test_finished_tick.py tests/test_wanted_and_nudge.py tests/test_notify.py tests/test_balance.py tests/test_agent_restart.py tests/test_attention.py`: **241 passed**. A rule going back to hook-only, or a new `confidence == "hook"` written beside them, would be caught by nothing.
+
+**Fix:** one parametrized test over the rules a Gemini-shaped session meets first — the idle nudge, the doorbell (`mail.py`), the wake's `idle` source, the first-prompt gate (`agent.py` ~651), the finished-tick wrap-up — each run with `confidence="title"` and asserting the rule acts as it does for `hook` (and not for `scraped`). Revert one `told` to `== "hook"` and see its case fail.
+
+**Done when** each family of `told` sites has a case that fails when that site is hook-only, and the suite passes.
+
+**Related:** TD-785, TD-784, #2014.
+
+## TD-840: #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (the `by == "pending"` seat count); `src/shiftlead/ui/app.py` (the 409 in the permission route); `src/shiftlead/ui/org.py` (`+ terminal_only(m)`); `tests/test_permission_channel.py`
+
+**Why:** #2014 says a permission only the terminal answers is never a seat's (§6 rule 3), is refused by the page with a 409, and reads *answer it in the terminal* on the Org card. Probes, one line removed at a time in an `origin/main` worktree: (1) delete `and adapters.permission_channel(r.adapter)` in `agent_tick.py` → `pdm run pytest -q tests/test_agent.py tests/test_balance.py tests/test_agent_split.py tests/test_mail.py tests/test_finished_tick.py`: **186 passed**; (2) `if s.get("permission_channel") is False:  # §4.3` → `if False:` in `ui/app.py` → `tests/test_ui.py tests/test_ui_popout.py tests/test_ui_waiting_wiring.py`: **85 passed** (and `test_permission_channel.py` passes too); (3) drop `+ terminal_only(m)` in `ui/org.py` → `tests/test_ui.py tests/test_ui_org.py`: **127 passed**. The tests that do exist cover `agent_hook`'s RpcError and `cli.py`'s refusal (each fails when its line is removed), the adapter flag, `answerable` and the card.
+
+**Fix:** in `tests/test_permission_channel.py` (its `nochannel` fixture): (1) a supervisor with a `needs-you` permission member of a no-channel adapter and one of a channel adapter, asserting only the second is counted as a `pending` cause; (2) a POST to the page's Allow route for a no-channel session answers 409 with *answer it in the terminal*; (3) the Org page's member row for such a session carries *— answer it in the terminal*. Revert each line and see its test fail.
+
+**Done when** each of the three lines, removed alone, fails a test.
+
+**Related:** TD-785, #2014.
+
+## TD-841: #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_send_key.py`; `tests/test_ui.py`; `src/shiftlead/ui/app.py` (`wrapup`); `src/shiftlead/ui/static/app.js` (the `wrapup` body, `#promptchips` handler)
+
+**Why:** #2005 (TD-813 slice 2) says *Wrap up and the prompt chips carry a key too, so a repeat types once*. Probes, one change at a time in an `origin/main` worktree, each followed by `pdm run pytest -q tests/test_ui_send_key.py tests/test_ui.py tests/test_ui_popout.py tests/test_ui_shell_here.py`, which gave **101 passed** every time: (1) `ui/app.py` `await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True, key=body.get("key"))` → without `key=`; (2) `app.js` delete `if (action === "wrapup") body = { key: AO.mintKey() };`; (3) the chip's `await act(id, "send", { text, key: AO.mintKey() })` → `{ text }`; (4) delete the chip's `b.disabled = true;`. The composer's `wireComposerSend` is probed under node, and `test_pages_and_shell_flow` posts a keyed `send`; the other three paths have no test at all (`/wrapup` is only posted against a shell, which refuses it).
+
+**Fix:** (a) in `tests/test_ui.py`, post `wrapup` twice with one `key` to a session whose agent records its `send` params and assert both carry `wrapup=True` and the key; (b) a node probe beside `PROBE` that fires the Wrap up press handler and a chip click (twice, the second while the first is out) and asserts the body's key, one key per press, and that the second chip press sends nothing. Revert each of the four lines and see its test fail.
+
+**Done when** each of the four changes fails a test.
+
+**Related:** TD-813, TD-806, TD-824, #2005.
+
+## TD-842: #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
+
+**Why:** (1) `not_own_shell`'s docstring is `mail.person_shell`'s test — *a shell, interactive, no role, no team, no controllers* — but its parametrized test refuses on adapter, controllers, `role` and dir only. In an `origin/main` worktree, `if rec.get("unattended") or rec.get("role") or rec.get("team"):` → `if rec.get("role"):`, and again → `if rec.get("unattended") or rec.get("role"):` and → `if rec.get("team") or rec.get("role"):`: `pdm run pytest -q tests/test_ui_shell_here.py tests/test_ui_popout.py` gives **19 passed** all three times, so a teamed or unattended live shell would be reopened as the person's own. (2) #2012's drop reads `taken and not queued and event.get("state") == "exited"`; deleting `not queued` leaves `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was` **passing** (the queued path is never fed). (Its other three conditions each fail the test when removed.)
+
+**Fix:** (1) two more parametrize rows in `test_a_live_holder_that_is_not_the_persons_own_shell_is_refused_with_its_reason`: `{**OWN, "unattended": True}` and `{**OWN, "team": "t"}`, each 409 with *not your own*. (2) a case in the agent test that applies the killed run's `exited` as a queued event (the path `queued=True` takes) after a resume and asserts the record is not exited, or a comment in `_apply_event` saying why the queued path needs no test. Revert each line and see its case fail.
+
+**Done when** each of the three conditions of (1) and `not queued` of (2), removed alone, fails a test.
+
+**Related:** TD-810, TD-817, TD-822, TD-827 (rewrites the `team` condition), #2009, #2012.
