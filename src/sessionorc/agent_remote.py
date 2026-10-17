@@ -113,8 +113,11 @@ class RemoteMixin:
                     p[key] = [self._from_host(x, host) for x in p[key]]
         if rpc == "create":
             p.setdefault("host", host)
-        if params.get("caller") is None:
-            # A person at a node acts only on that node's records (§4.4a): `id@<this home>` collapsed
+        caller = params.get("caller")
+        if caller is None or mail.as_person(self._caller_address(caller, host), self._graph()):
+            # A person at a node — or the person's own shell there, read from the home's copy of its
+            # record (§4.8 *The person's own shell is the person*, TD-801) — acts only on that node's
+            # records (§4.4a): `id@<this home>` collapsed
             # to a home record above, and the person gate would then have passed it (security read of
             # PR #217). The target's host, read after the rewrite, has to be the link's own. A call
             # that names no session — the person inbox, a `wait` — names nothing to bound; the wait
@@ -469,7 +472,10 @@ class RemoteMixin:
         for key in ("controllers", "add", "remove") if method in ("create", "set_controllers") else ():
             if sent.get(key):
                 sent[key] = [self._to_host(x, host) for x in sent[key]]
-        who = None if mail.is_person(caller) else self._to_host(caller, host)
+        # the person's own shell is the person at the node too: every act from it is forwarded with no
+        # caller, so the node records *person* as who typed and seeds no creator (§4.8, TD-801)
+        person = mail.as_person(caller, self._graph())
+        who = None if person else self._to_host(caller, host)
         timeout: float | None = ACT_TIMEOUT
         if method == "send" and sent.get("wait"):
             timeout = None if sent.get("timeout") is None else float(sent["timeout"]) + ACT_TIMEOUT
@@ -509,7 +515,7 @@ class RemoteMixin:
                 # replay recreates this session, not a new one (review of PR #447)
                 made = {**launch_params(params), "name": held.name, "repo": held.repo, "worktree": held.worktree}
                 self._write_launch(f"{held.id}@{host}", held, {k: v for k, v in made.items() if v is not None})
-            if method == "create" and mail.is_person(caller):
+            if method == "create" and person:
                 self._lift_by_person(host, str(reply["record"].get("id") or ""))
         elif reply.get("gone") and rid:
             self._forget_remote(host, rid)
@@ -898,7 +904,7 @@ class RemoteMixin:
         return True
 
     def _lift_by_person(self, host: str, rid: str) -> None:
-        """A person's `create` through the home, on a node: the supersession it made is one the home
+        """A person's `create` through the home, on a node, or its own shell's (§4.8, TD-801):
         authorised, so it lifts a suspension as a person's create or resume does on one host
         (§4.8a) — on the new record, which `_take_supersession` may have marked from the report
         that overtook this reply, and on the conversation it resumed. Only this create's own
