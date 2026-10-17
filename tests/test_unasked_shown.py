@@ -272,3 +272,24 @@ def test_a_held_answer_reads_no_repo_mark(monkeypatch, capsys):
     _held_world(monkeypatch, {"reader": "techlead", "held": ["src/sessionorc/**"]}, ["src/sessionorc/a.py"], r)
     assert cli.main(["pr", "held", "12", "--json"]) == 0
     assert "repo_hold" not in json.loads(capsys.readouterr().out)
+
+
+def test_the_repo_holds_line_names_three_held_paths_and_counts_the_rest(monkeypatch, capsys):
+    held = ["a", "b", "c", "d", "e"]
+    r = {"root": "/r", "prs": {"open": [{"number": 12, "held": held}]}, "pr_orders": {"unasked": [12], "asked": {}}}
+    _held_world(monkeypatch, None, held, r)
+    assert cli.main(["pr", "held", "12", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["repo_hold"] == (
+        "the repo holds `a`, `b`, `c` and 2 more: the Repo page tags it unasked until a reader is asked"
+    )
+
+
+def test_an_asked_pr_whose_reading_holds_no_path_says_nothing(monkeypatch, capsys):
+    r = {
+        "root": "/r",
+        "prs": {"open": [{"number": 12, "held": []}]},
+        "pr_orders": {"unasked": [], "asked": {"12": {"at": _iso(datetime.now(UTC)), "to": "ao-r-techlead-1"}}},
+    }
+    _held_world(monkeypatch, None, ["src/x.py"], r)
+    assert cli.main(["pr", "held", "12", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["repo_hold"] == ""

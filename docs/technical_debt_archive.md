@@ -14655,3 +14655,23 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** none.
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1978) — `tests/test_conformance_walk.py` gained `test_the_scratch_home_holds_the_one_profile_as_default_and_a_committed_walk_directory` (`write_home` from `scratch_profile`'s entry: `profiles.load` reads back the one profile as the default, its adapter, account, model, `permission_prompts` and `config_dir` intact; the walk directory a repo with its one commit) and `test_save_capture_copies_the_payloads_and_writes_the_pane_titles` (every `*.jsonl` copied and nothing else, `titles.json` from a monkeypatched `tmux list-panes` on the walk's socket; an empty capture copies no payload). A wrong `default`, a narrowed glob, an empty `titles.json` and a dropped commit each fail a test.
+
+## TD-798: `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.7 `ao pr held`; `src/shiftlead/cli.py` (`_repo_hold`, the `path` line and `and p["held"]` guard); `tests/test_unasked_shown.py`
+
+**Why:** #1965 (TD-790) added `_repo_hold`. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_unasked_shown.py`: baseline 11 passed; with `f" and {len(p['held']) - 3} more" if len(p["held"]) > 3 else ""` replaced by `""` 11 passed; with `if isinstance(a := ..., dict) and p["held"]:` reduced to drop `and p["held"]` 11 passed. The tests use fewer than four held paths, so the truncation of a PR touching many held paths is never drawn.
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** a PR with five held paths reads `the repo holds` `a`, `b`, `c` *and 2 more*; an asked PR whose reading lists no held path says nothing. Both mutations above fail.
+
+**Related:** none.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1980) — `tests/test_unasked_shown.py` gained `test_the_repo_holds_line_names_three_held_paths_and_counts_the_rest` (five held paths read `a`, `b`, `c` *and 2 more*) and `test_an_asked_pr_whose_reading_holds_no_path_says_nothing` (an asked PR whose reading lists no held path: `repo_hold` is ""). Each mutation above fails one of them.
