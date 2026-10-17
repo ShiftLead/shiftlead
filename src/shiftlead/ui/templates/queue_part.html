@@ -14,9 +14,13 @@
 {% if q.filtered and not q.shown %}<div class="qnote" id="qnone">no open card fits these picks</div>{% endif %}
 
 {# Recently completed — the completed cards and the open cards' archived rows in the window, newest first #}
-<section class="rsec" id="qcompleted">
-  <div class="row gap rsh"><span class="h2">Recently completed</span>
-    {% for w, label in labels.items() %}<span class="qsub qwinword" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>{{ q.completed.counts[w] }} {{ words[w] }}</span>{% endfor %}
+{# each group's heading carries its count in its words, *(4 of 28)* while a pick or a find is on, and a press on
+   its name folds or opens the group, which the browser remembers (§4.5a *Queue page: group heading*, TD-828) #}
+{% macro share(shown, of) %}({% if q.filtered %}{{ shown }} of {% endif %}{{ of }}){% endmacro %}
+<section class="rsec qgroup" id="qcompleted" data-group="completed">
+  <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">Recently completed{% for w, label in labels.items() %}<span class="qwinword" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}> {{ share(q.shown_in.completed[w] if q.shown_in else q.completed.counts[w], q.completed.counts[w]) }}</span>{% endfor %}</span>
+    <span class="qsub qgfoldword">folded</span>
+    {% for w, label in labels.items() %}<span class="qsub qwinword" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>{{ words[w] }}</span>{% endfor %}
     <span class="grow"></span>
     <span class="qwins" role="group" aria-label="the window">{% for w, label in labels.items() %}<button type="button" class="qwin" data-win="{{ w }}" aria-pressed="{{ 'true' if w == 'day' else 'false' }}">{{ label }} ({{ q.completed.counts[w] }})</button>{% endfor %}</span>
   </div>
@@ -35,8 +39,8 @@
 </section>
 
 {# In progress — a card an open member of which a session holds, or a PR naming one names; then the other work #}
-<section class="rsec" id="qinprogress">
-  <div class="row gap rsh"><span class="h2">In progress</span> <span class="qsub">{{ q.n.in_progress }}</span> <span class="qsub">someone holds an entry, or its PR is open</span></div>
+<section class="rsec qgroup" id="qinprogress" data-group="in_progress">
+  <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">In progress {{ share(q.shown_in.in_progress if q.shown_in else q.n.in_progress, q.n.in_progress) }}</span> <span class="qsub qgfoldword">folded</span> <span class="qsub">someone holds an entry, or its PR is open</span></div>
   {% if q.in_progress or q.other %}
   <div class="qcards">
   {% for c in q.in_progress %}{{ qc.card(c) }}{% endfor %}
@@ -46,8 +50,8 @@
 </section>
 
 {# Up next — every other open card, numbered in the pick order, with the grip and ⤒ ↑ ↓ #}
-<section class="rsec" id="qupnext">
-  <div class="row gap rsh"><span class="h2">Up next</span> <span class="qsub">{{ q.n.up_next }}</span> <span class="qsub">worked from the top: drag a card by its grip, or use its arrows, to change the order</span></div>
+<section class="rsec qgroup" id="qupnext" data-group="up_next">
+  <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">Up next {{ share(q.shown_in.up_next if q.shown_in else q.n.up_next, q.n.up_next) }}</span> <span class="qsub qgfoldword">folded</span> <span class="qsub">worked from the top: drag a card by its grip, or use its arrows, to change the order</span></div>
   <div class="qwhy meta" id="qwhy" hidden></div>
   {% if q.up_next %}
   <div class="qcards" id="qcards" data-upnext='{{ q.upnext | tojson }}'>

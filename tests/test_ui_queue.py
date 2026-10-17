@@ -14,7 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from sessionorc.client import AgentError
-from shiftlead.ui.inbox import inbox_sections, rail_rows
+from shiftlead.ui.inbox import horizon_left, inbox_sections, rail_rows
 from shiftlead.ui.queue import (
     apply_picks,
     attach,
@@ -247,7 +247,7 @@ def test_a_resolved_line_is_drawn_without_its_marks():
     )
 
 
-# -- slice 2: the mail on its card (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a row*)
+# -- slice 2: the mail on its card (§4.5 screen 6 *Where a row is drawn*, screen 12 *What is attached to a card*)
 
 
 def mail(mid: str, text: str, kind: str = "ask", **kw) -> dict:
@@ -288,8 +288,11 @@ def test_a_question_about_a_td_is_on_its_card_and_still_counted():
     # the rail counts what the Inbox draws
     assert len([r for r in rail_rows(secs) if r["section"] == "needs"]) == 1
     got = attach(secs, lambda e, sec: f"<{e['id']}>")
-    assert got["s#TD-21"]["items"] == [{"section": "needs", "id": "m1", "html": "<m1>", "kind": "questions"}]
-    assert got["s#TD-20"]["items"][0]["section"] == "steering"
+    # TD-828: by card and section, not by row — TD-21 is a row of TD-20's card
+    assert got["cards"]["s#TD-20"]["needs"] == [
+        {"section": "needs", "id": "m1", "html": "<m1>", "kind": "questions", "on_row": "s#TD-21"}
+    ]
+    assert got["cards"]["s#TD-20"]["steering"][0]["on_row"] == "s#TD-20"
     view = queue_view(queue(), NOW, got)
     status = {c["id"]: c["status"] for c in view["up_next"]}
     assert status["s#TD-20"] == "needs you" and view["n"]["needs_you"] == 2
@@ -399,18 +402,119 @@ def test_a_held_person_card_reads_needs_you():
     assert c30["status"] == "needs you" and v["n"]["needs_you"] == 1
 
 
-def test_a_board_line_not_yet_due_is_drawn_on_its_row_and_leaves_later():
-    """§4.5 screen 12 *What is attached to a row*: a board line is drawn on its row whether or not it is due;
-    one not yet due leaves *Later*'s *Not due yet* for it, uncounted."""
+def test_a_board_line_not_yet_due_is_under_its_cards_needs_you_and_leaves_later():
+    """§4.5 screen 12 *What is attached to a card* (TD-828): a board line about the card's entries is under its
+    *Needs you* whether or not it is due, and whether or not the Inbox's mode folds it — it leaves *Not due
+    yet* and the *not shown* fold for it — drawn with its due date; the card's status is *needs you*."""
     ahead = [
         {"row": "board", "id": "b1", "text": "decide the layout. Context: TD-21. Due: 2026-10-30."},
         {"row": "board", "id": "b2", "text": "something else. Due: 2026-10-30."},
     ]
-    lf, rest, moved = split_later({"n": 0, "groups": []}, ahead, card_index(queue()))
-    assert [e["id"] for e in rest] == ["b2"] and lf["n"] == 0
-    assert [(e["id"], e["on_row"], e["later_section"]) for e in moved] == [("b1", "s#TD-21", "coming")]
+    hidden = [
+        {"row": "board", "id": "b3", "text": "far off. Context: TD-30. Due: 2026-12-30."},
+        {"row": "board", "id": "b4", "text": "far off too. Due: 2026-12-30."},
+    ]
+    lf, rest, moved, unshown = split_later({"n": 0, "groups": []}, ahead, card_index(queue()), hidden)
+    assert [e["id"] for e in rest] == ["b2"] and [e["id"] for e in unshown] == ["b4"] and lf["n"] == 0
+    assert [(e["id"], e["on_row"], e["later_section"]) for e in moved] == [
+        ("b1", "s#TD-21", "coming"),
+        ("b3", "s#TD-30", "coming"),
+    ]
     got = attach({}, lambda e, sec: f"<{e['id']}:{sec}>", moved)
-    assert got["s#TD-21"]["items"] == [{"section": "coming", "id": "b1", "html": "<b1:coming>", "kind": ""}]
+    assert got["cards"]["s#TD-20"] == {
+        "needs": [{"section": "needs", "id": "b1", "html": "<b1:coming>", "kind": "board", "on_row": "s#TD-21"}]
+    }
+    v = queue_view(queue(), NOW, got)
+    c20 = next(c for c in v["up_next"] if c["id"] == "s#TD-20")
+    assert c20["status"] == "needs you" and c20["kinds"] == ["board"] and v["n"]["needs_you"] == 2
+    assert c20["sections"]["needs"][0]["on"] == "TD-21"  # about a lower row: *on TD-21*
+
+
+def test_the_inbox_fold_loses_a_line_a_card_draws():
+    """§4.5 screen 6 *The board's horizon*, TD-828: a line the Inbox's mode folds that a card draws leaves the
+    *not shown* fold and its count, and the line's next date is read from what is left."""
+    hz = {"mode": "next:1", "ahead": [], "today": "2026-10-16", "line": {"n": 2},
+          "hidden": [{"id": "b3", "due": "2026-10-20"}, {"id": "b4", "due": "2026-12-30"}]}  # fmt: skip
+    got = horizon_left(hz, [], [hz["hidden"][1]])
+    assert [r["id"] for r in got["hidden"]] == ["b4"] and got["next_due"] == "2026-12-30"
+    assert got["line"]["n"] == 1 and got["line"]["rest"].startswith("1 not shown")
+
+
+def sections_of(*items: tuple[str, str, str]) -> dict:
+    """A card's attached items as `attach` answers them: (section, id, the row it is about)."""
+    got: dict = {}
+    for sec, mid, on_row in items:
+        got.setdefault(sec, []).append(
+            {
+                "section": sec,
+                "id": mid,
+                "html": f'<div class="mailrow" data-msg="{mid}">{mid}</div>',
+                "kind": "",
+                "on_row": on_row,
+            }
+        )
+    return {"cards": {"s#TD-20": got}, "mentioned": {}}
+
+
+def test_a_cards_sections_draw_their_counts_and_none_at_zero(tmp_path, monkeypatch):
+    """§4.5 screen 12 *What is attached to a card*, §4.5a *Queue page: card* (TD-828): Needs you in the header,
+    the others in the body above the rows, each heading with its count and not drawn at 0; an item about a
+    lower row says *on TD-n*; Dismiss all on Answered for you and FYI alone."""
+    from markupsafe import Markup
+
+    from shiftlead.ui.app import templates
+
+    mail = sections_of(("needs", "m1", "s#TD-20"), ("answered", "a1", "s#TD-21"), ("answered", "a2", "s#TD-20"),
+                       ("fyi", "f1", "s#TD-20"))  # fmt: skip
+    for items in mail["cards"]["s#TD-20"].values():
+        for m in items:
+            m["html"] = Markup(m["html"])
+    view = queue_view(queue(), NOW, mail)
+    c20 = next(c for c in view["up_next"] if c["id"] == "s#TD-20")
+    html = templates.env.get_template("queue_card.html").module.card(c20)
+    head, body = html.split('<div class="qrows">')
+    assert "Needs you (1)" in head and "Answered for you" not in head
+    assert (
+        "Answered for you (2)" in body
+        and "FYI (1)" in body
+        and "Steering" not in body
+        and "Waiting on them" not in body
+    )
+    assert body.index("FYI (1)") < body.index('data-qid="s#TD-21"')  # above the rows
+    assert body.count(">Dismiss all</button>") == 2 and "Dismiss all" not in head
+    assert body.count('class="qon qsub" href="#TD-21"') == 1  # a1 is about TD-21; a2 is the top entry's
+    assert c20["status"] == "needs you"
+
+
+def test_a_group_heading_carries_its_count_and_its_share_under_a_pick(tmp_path, monkeypatch):
+    """§4.5a *Queue page: group heading* (TD-828): *Recently completed (n)* the window's count, *In progress
+    (n)*, *Up next (n)*, *(n of m)* while a pick or a find is on; the bare number beside it is gone; a press on
+    the heading folds the group, which the browser remembers (`qgfold`)."""
+    c = client(monkeypatch, tmp_path, fake(queue(), []))
+    html = c.get("/queue").text
+    assert "Up next (2)</span>" in html and "In progress (1)</span>" in html
+    head = html[html.index('id="qcompleted"') : html.index('class="qsub qgfoldword"')]
+    assert (
+        'Recently completed<span class="qwinword"' in head
+        and '<span class="qwinword" data-wv="day"> (3)</span>' in head
+    )
+    assert html.count('class="h2 qghead" role="button"') == 3 and 'data-group="up_next"' in html
+    html = c.get("/queue?find=queue").text
+    assert "Up next (1 of 2)</span>" in html and "In progress (0 of 1)</span>" in html
+    js = c.get("/static/app.js").text
+    assert 'const groupKey = "qgfold"' in js and "toggleGroup(g, true)" in js
+
+
+def test_dismiss_all_is_the_inboxs_hoisted_press():
+    """§4.5 screen 12 (TD-828): the Inbox's Dismiss all is one function, `AO.dismissOnScreen`, which the Inbox
+    and the Queue's card sections both call with their own re-read."""
+    from pathlib import Path
+
+    js = (Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
+    assert "AO.dismissOnScreen = (btn, rows, empty, ask, refresh)" in js
+    assert 'AO.dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow"' in js and "refreshInbox);" in js
+    assert 'AO.dismissOnScreen(b, () => $$(".mailrow", sec)' in js
+    assert "const dismissOnScreen" not in js
 
 
 # -- slice 4: the filter row, find, the addresses (§4.5 screen 12 *Filters*, *Addresses*; §4.5a *Queue page: filters, find*)
@@ -561,3 +665,54 @@ def test_the_rows_on_cards_and_in_the_inbox_add_up_to_the_top_bars_number(tmp_pa
     m = int(re.search(r'id="qininboxn">(\d+)<', html)[1])
     assert top["needs"] == 4 and top["queue_n"] == 2 and m == 2 and top["queue_n"] + m == top["needs"]
     assert 'Needs you (<span id="qfneedsn">2</span>)' in html  # TD-20's card and the held TD-30's
+
+
+DISMISS_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
+  addEventListener: noop, createElement: el };
+global.window = {}; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+const sent = [], asked = [];
+global.fetch = (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return Promise.resolve({ ok: true, json: () => ({}) }); };
+global.confirm = (t) => { asked.push(t); return true; };
+eval(fs.readFileSync(process.argv[2], "utf8"));
+window.AO.toast = noop;
+let click = null, refreshed = 0;
+const btn = { addEventListener: (k, f) => { click = f; } };
+// a card's FYI section: two rows on screen and one a pick hides; the card beside it is not read
+const rows = [{ dataset: { msg: "f1" } }, { dataset: { msg: "f2" } }, { hidden: true, dataset: { msg: "f3" } }];
+window.AO.dismissOnScreen(btn, () => rows, "nothing", window.AO.DISMISS_ASK.fyi, () => refreshed++);
+click({ preventDefault: noop, stopPropagation: noop }).then(() => console.log(JSON.stringify({ sent, asked, refreshed })));
+"""
+
+
+def test_dismiss_all_on_a_card_dismisses_that_sections_rows_on_screen(tmp_path):
+    """§4.5 screen 12 *What is attached to a card* (TD-828): Dismiss all confirms once with the number and
+    dismisses the ids on screen in that section of that card, then re-reads the page it is on."""
+    import json
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = tmp_path / "dismiss_probe.js"
+    probe.write_text(DISMISS_PROBE)
+    js = Path(__file__).resolve().parents[1] / "src/shiftlead/ui/static/app.js"
+    out = subprocess.run([node, str(probe), str(js)], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout.strip().splitlines()[-1])
+    assert got["sent"] == [{"url": "/api/person/dismiss", "body": {"msg": ["f1", "f2"]}}]
+    assert got["asked"] == [
+        "Dismiss 2 FYI entries? Only the ones on screen now — anything that arrives after this is untouched."
+    ]
+    assert got["refreshed"] == 1

@@ -841,6 +841,18 @@ mark.findmark { background: var(--alarm-bg); color: inherit; border-radius: 2px;
 .qmail > * { margin: 4px 0; }
 .qmention { font-style: italic; }
 .qmail details.more { display: none; }  /* every row's Snooze: the Queue has no Snooze (§4.5 screen 12) */
+/* a card's sections (TD-828): Needs you in the header, the rest in the body above the rows, each with its count */
+.qsec { flex: 1 0 100%; }
+.qsech { display: flex; gap: 8px; align-items: center; padding: 6px 0 0 calc(6ch + 2.4em); font-size: var(--t-small); font-weight: 600; color: var(--muted); }
+.qrows > .qsec .qsech { padding-left: calc(4em + 20px + 2ch); }
+.qrows > .qsec .qmail { padding-left: calc(4em + 20px + 2ch); }
+.qsec-needs .qsech { color: var(--needs-fg); }
+.qon { display: block; margin: 6px 0 -2px; }
+/* a group's heading folds it (TD-828): a folded group keeps its heading, its count and the window picker */
+.queuepage .qghead { cursor: pointer; }
+.qgfoldword { display: none; }
+.qgroup.qgfolded .qgfoldword { display: inline; }
+.qgroup.qgfolded > :not(.rsh) { display: none; }
 .railqueue { display: block; padding: 2px 0 2px 1.6em; font-size: var(--t-small); }
 .qwhy { margin: 4px 0 8px; color: var(--needs-fg); }
 #debt .rlist + .qcards { margin-top: 8px; }

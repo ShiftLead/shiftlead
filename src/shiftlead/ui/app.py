@@ -266,6 +266,7 @@ from .inbox import (  # re-exported: routes, templates and tests read these from
     find_words,  # noqa: F401
     handed_rows,  # noqa: F401
     held_mark,  # noqa: F401
+    horizon_left,
     horizon_of,  # noqa: F401
     idle_open_mark,  # noqa: F401
     inbox_sections,  # noqa: F401
@@ -3257,8 +3258,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         mail: dict[str, Any] = {}
         in_inbox = None  # the counted rows the Inbox draws: the filter row's *+ n in the Inbox*
         if got is not None:
-            # what is attached to a row (§4.5 screen 12, TD-771): the Inbox's own sections over the same
-            # reads, each `home: queue` row drawn under its row by the Inbox's own renderer
+            # what is attached to a card (§4.5 screen 12, TD-771, TD-828): the Inbox's own sections over the
+            # same reads, each `home: queue` row drawn in its card's section by the Inbox's own renderer
             repos_omit(REPOS_OMIT_INBOX)
             index = card_index(got)
             with contextlib.suppress(HTTPException):
@@ -3275,8 +3276,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     fleet=fleet,
                     cards=index,
                 )
-                # *Later*'s ledger rows and the board's lines not yet due whose entry a card holds (TD-771)
-                later = split_later(await h.ledger_view(fleet), hz["ahead"], index)[2]
+                # *Later*'s ledger rows and the board's lines not yet due, folded or not, whose entry a card
+                # holds (TD-771, TD-828)
+                later = split_later(await h.ledger_view(fleet), hz["ahead"], index, hz["hidden"])[2]
                 in_inbox = sections["count"] - sections.get("queue_n", 0)
                 one = templates.get_template("queue_mail.html")
                 origin = page_origin(request)
@@ -3669,8 +3671,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         lf = {"n": 0, "groups": []} if agent_down else await ledger_view(fleet)
         # the ledger's rows and the board's lines not yet due whose entry a Queue card holds are drawn there
         # (§4.5 screen 6 *Where a row is drawn*, TD-771): *Later* keeps the rest
-        lf, ahead, _ = split_later(lf, hz["ahead"], cards)
-        hz = {**hz, "ahead": ahead}
+        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"])
+        hz = horizon_left(hz, ahead, unshown)
         return templates.TemplateResponse(
             request,
             "inbox.html",
@@ -3838,8 +3840,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         origin = page_origin(request)
         gz = gzip_ok(request)
         cards = await h.queue_cards()
-        lf, ahead, _ = split_later(lf, hz["ahead"], cards)  # what a Queue card holds is drawn there (TD-771)
-        hz = {**hz, "ahead": ahead}
+        lf, ahead, _, unshown = split_later(lf, hz["ahead"], cards, hz["hidden"])  # a card's is drawn there (TD-771)
+        hz = horizon_left(hz, ahead, unshown)
 
         def read() -> tuple[list[dict[str, Any]], bytes]:
             """Everything after the awaits, on a worker thread (TD-611 slice 2): the sections, the

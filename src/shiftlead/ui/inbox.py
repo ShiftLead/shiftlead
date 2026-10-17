@@ -1726,6 +1726,17 @@ def horizon_of(h: Mapping[str, Any], root: str | Path) -> dict[str, Any]:
     return out
 
 
+def horizon_left(h: Mapping[str, Any], ahead: Collection[Any], hidden: Collection[Any]) -> dict[str, Any]:
+    """The Inbox's horizon once the lines a Queue card draws have left it (§4.5 screen 12 *What is attached to a
+    card*, TD-828; `queue.split_later`): coming up and the *not shown* fold cut to what is left, and the line's
+    count and next date read again from that fold, so a line drawn on a card is counted in neither."""
+    hidden = list(hidden)
+    out = {**h, "ahead": list(ahead), "hidden": hidden, "next_due": _next_due(hidden, str(h.get("today") or ""))}
+    if h.get("line") is not None:
+        out["line"] = board_line(out)
+    return out
+
+
 def board_line(h: Mapping[str, Any]) -> dict[str, Any]:
     """The line that closes the board rows (§4.5 screen 6 *The board's horizon*, §4.5a): the page
     saying its mode — *showing the next 10 board items per repo* — then what it hides, *14 not shown,
