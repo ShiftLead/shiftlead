@@ -156,6 +156,7 @@ async def test_a_title_adapters_screen_rule_is_never_read(agent, gem, tmp_path, 
     assert _look(agent, s, "kmaster: ~/src", hook_age=None).state == "working"
     assert s.confidence == "hook" and s.pending is None
 
+
 async def test_a_title_set_in_the_pane_reaches_the_record_and_explain(agent, hookstub, tmp_path, monkeypatch):
     """The whole path: a pane's own title (OSC 2) through the tick's pane list to the record, and `ao
     explain` showing the title as the verdict's evidence."""
