@@ -411,6 +411,9 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     team_notes,
     who_for_what,  # noqa: F401
 )
+from .spend import INTERACTIVE as SPEND_INTERACTIVE
+from .spend import OUTSIDE as SPEND_OUTSIDE
+from .spend import spend_picks, spend_view, titles_of
 from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
 
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
@@ -3318,6 +3321,70 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 **ctx,
                 "host": host_name(),
                 "active": "Queue",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call, fleet),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
+
+    async def spend_reading(picks: dict[str, Any]) -> dict[str, Any]:
+        """`seats` over the page's window, period and team (§4.4 *Spend per seat*, TD-859)."""
+        args = {"window": picks["window"], **({"at": picks["at"]} if picks["at"] else {})}
+        return await call("seats", **args, **({"team": picks["team"]} if picks["team"] else {}))
+
+    @app.get("/api/spend")
+    async def spend_api(request: Request):
+        """The `seats` reading the Spend page draws, its `window`, `at` and `team` from the query
+        (§4.5a *Spend page: Day · Week · Month, the team chips, ‹ ›*)."""
+        return await spend_reading(spend_picks(request.query_params))
+
+    @app.get("/spend", response_class=HTMLResponse)
+    async def spend_page(request: Request):
+        """design §4.5 screen 13 / §4.5a **Spend page** (TD-818, built by TD-832): the seat ledger's reading
+        over one window, period and team, shaped by `ui.spend.spend_view`. `part=1` is the body alone,
+        which a pick re-reads in place."""
+        picks = spend_picks(request.query_params)
+        agent_down, got, why = False, None, ""
+        try:
+            got = await spend_reading(picks)
+        except HTTPException as e:
+            if e.status_code == 503:
+                agent_down = True
+            elif e.status_code == 400 and picks["at"]:  # a period the ledger does not hold: the current one, said
+                why = f"{e.detail} — the current period is drawn"
+                picks["at"] = ""
+                with contextlib.suppress(HTTPException):
+                    got = await spend_reading(picks)
+            else:
+                why = f"the home did not serve the seat ledger: {e.detail}"  # an older home: no `seats` RPC
+        fleet: list[dict[str, Any]] = []
+        all_teams: list[str] = []
+        titles: dict[str, str] = {}
+        if got is not None:
+            with contextlib.suppress(HTTPException):
+                fleet = await call("list")
+            teams_of = got.get("teams") or []
+            if picks["team"]:  # a team's reading lists its own row alone: the chips are All's
+                with contextlib.suppress(HTTPException):
+                    teams_of = (await spend_reading({**picks, "team": ""})).get("teams") or []
+                with contextlib.suppress(HTTPException):
+                    titles = titles_of(await call("queue"))
+            all_teams = [str(t["team"]) for t in teams_of if t.get("team") not in (SPEND_INTERACTIVE, SPEND_OUTSIDE)]
+        ctx = {
+            "v": spend_view(got, picks, fleet=fleet, all_teams=all_teams, titles=titles, today=datetime.now().date()),
+            "picks": picks,
+            "why": why,
+            "agent_down": agent_down,
+        }
+        if request.query_params.get("part"):
+            return templates.TemplateResponse(request, "spend_part.html", ctx)
+        return templates.TemplateResponse(
+            request,
+            "spend.html",
+            {
+                **ctx,
+                "host": host_name(),
+                "active": "",
                 "volatile": hosts.local_host().volatile,
                 "usage": {} if agent_down else await chip_usage(call, fleet),
                 "build_chip": None if agent_down else await chip_build(call),

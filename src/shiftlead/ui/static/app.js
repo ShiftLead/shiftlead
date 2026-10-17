@@ -3609,6 +3609,34 @@
   // Recently completed window picker — its choice remembered in this browser, *day* first — a completed
   // line that opens to what was done, `/queue#TD-n` opening the card that holds the entry, and the lists
   // re-read on the poll and on the `queue` event.
+  // the Spend page (design §4.5 screen 13, §4.5a *Spend page*; TD-832): every pick is a link carried in the URL,
+  // and a press re-reads the body (`part=1`) in place rather than the page; a failed read follows the link
+  AO.spend = function () {
+    const box = $("#spendpage"); if (!box) return;
+    const body = $("#spendbody", box);
+    let seq = 0;  // the newest press wins: an older read that lands after it is dropped
+    async function go(href, push) {
+      const u = new URL(href, location.href), mine = ++seq;
+      u.searchParams.set("part", "1");
+      try {
+        const r = await fetch(u, { headers: { Accept: "text/html" } });
+        if (!r.ok) throw new Error(String(r.status));
+        const text = await r.text();
+        if (mine !== seq) return;
+        body.innerHTML = text;
+        u.searchParams.delete("part");
+        if (push) history.pushState({ spend: 1 }, "", u.pathname + u.search);
+      } catch (err) { location.href = href; }
+    }
+    box.addEventListener("click", (ev) => {
+      const a = ev.target.closest("a[data-spend]");
+      if (!a || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button !== 0) return;
+      ev.preventDefault();
+      go(a.getAttribute("href"), true);
+    });
+    window.addEventListener("popstate", () => go(location.href, false));
+  };
+
   AO.queue = function () {
     const box = $("#queuepage"); if (!box) return;
     const lists = $("#queuelists", box);

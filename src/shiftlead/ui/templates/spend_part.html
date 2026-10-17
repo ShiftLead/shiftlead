@@ -1,0 +1,104 @@
+{# The Spend page's body (§4.5 screen 13), which a pick re-reads in place (`part=1`). #}
+{% if agent_down %}
+<p class="note">The host agent is not answering, so the seat ledger cannot be read.</p>
+{% elif not v.served %}
+<span class="h1">Spend</span>
+<p class="note">{{ why or "The home did not serve the seat ledger." }}</p>
+{% else %}
+<div class="sphead">
+  <span class="h1">Spend</span>
+  <span class="spsub">{{ v.period }}{% if not v.metered %} · ≈ API-equivalent at your weights{% if v.as_of %} (as of {{ v.as_of }}){% endif %} — not a bill; a subscription's bound is its quota{% endif %}</span>
+</div>
+{% if why %}<p class="note">{{ why }}</p>{% endif %}
+<div class="sppicks">
+  <span class="seg" role="group" aria-label="window" title="{{ help_title('spend-picks') }}">{% for w, label, href in v.windows %}<a href="{{ href }}" data-spend aria-pressed="{{ 'true' if picks.window == w else 'false' }}">{{ label }}</a>{% endfor %}</span>
+  <span class="spchips" role="group" aria-label="team">{% for t, label, href in v.chips %}<a class="qf" href="{{ href }}" data-spend aria-pressed="{{ 'true' if picks.team == t else 'false' }}">{{ label }}</a>{% endfor %}</span>
+  <span class="spnav">
+    {% if v.back %}<a href="{{ v.back }}" data-spend aria-label="the period before" title="the period before">‹</a>{% else %}<span class="off" aria-disabled="true" title="the ledger holds nothing before this period">‹</span>{% endif %}
+    <b>{{ v.period }}</b>
+    {% if v.forward %}<a href="{{ v.forward }}" data-spend aria-label="the period after" title="the period after">›</a>{% else %}<span class="off" aria-disabled="true" title="this is the current period">›</span>{% endif %}
+  </span>
+</div>
+{% if v.team %}
+<div class="sprh"><span class="h2">{{ v.team }}</span> <span class="spsub">{{ v.line }}</span></div>
+{% else %}
+<div class="sprh"><span class="h2">Over time</span> <span class="spsub">a bar a {{ v.word }}, the last {{ v.chart.bars | length }} {{ v.word }}s, by team</span></div>
+{% endif %}
+<div class="spchart" id="spchart">
+  <div class="splegend">
+    {% for l in v.chart.legend %}<span><i class="spkey{% if l.colour == 'hatch' %} hatch{% endif %}"{% if l.colour != 'hatch' %} style="background: {{ l.colour }}"{% endif %}></i>{{ l.word }}</span>{% endfor %}
+    <span class="spsub spright">{% if v.begins %}the ledger begins {{ v.begins }}{% endif %}{% if v.team %} · by role{% endif %} · press a bar to read that {{ v.word }}</span>
+  </div>
+  {% if v.chart.empty %}<p class="note">no turns read yet</p>{% else %}
+  <div class="spbars">
+    {% for b in v.chart.bars %}
+    {% if b.before %}<span class="spbar before" title="{{ b.name }}: before the ledger began"><span class="spcol"><span class="spstack"></span></span><span class="splabel">{{ b.label }}</span></span>
+    {% else %}<a class="spbar{% if b.picked %} picked{% endif %}" href="{{ b.href }}" data-spend title="{{ b.title }}"{% if b.picked %} aria-current="true"{% endif %}><span class="spcol"><span class="sptotal">{{ b.total }}</span><span class="spstack" style="height: {{ b.h }}%">{% for s in b.segs %}<i class="{% if s.colour == 'hatch' %}hatch{% endif %}" style="height: {{ s.h }}%;{% if s.colour != 'hatch' %} background: {{ s.colour }};{% endif %}"></i>{% endfor %}</span></span><span class="splabel">{{ b.label }}</span></a>{% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% if not v.team %}
+<div class="sprh"><span class="h2">By team</span> <span class="spsub">{{ v.whole }} in {{ v.period }} · most first · a team opens its view</span></div>
+<div class="sptable"><table>
+  <thead><tr><th>team</th><th>{{ v.unit }} figure</th><th>share</th><th>vs {{ v.word }} before{% if picks.window != 'day' %}, to date{% endif %}</th><th class="spfold">turns</th><th>this week · month</th><th class="spfold">spent most</th></tr></thead>
+  <tbody>
+  {% for r in v.by_team %}<tr>
+    <td><i class="spkey{% if r.colour == 'hatch' %} hatch{% endif %}"{% if r.colour != 'hatch' %} style="background: {{ r.colour }}"{% endif %}></i>{% if r.href %}<a href="{{ r.href }}" data-spend>{{ r.name }}</a>{% else %}{{ r.name }}{% endif %}</td>
+    <td class="spfig">{{ r.figure }}</td>
+    <td><span class="spshare"><i style="width: {{ (r.share * 100) | round(1) }}%"></i></span> {{ r.pct }}</td>
+    <td class="{{ 'up' if r.up else 'down' if r.change.startswith('▼') else '' }}">{{ r.change }}</td>
+    <td class="spfold">{{ "{:,}".format(r.turns) }}</td>
+    <td>{{ r.week }} · {{ r.month }}</td>
+    <td class="spfold">{{ r.most }}</td>
+  </tr>{% else %}<tr><td colspan="7" class="note">no team spent in this {{ v.word }} or the one before</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+<div class="sprh"><span class="h2">Top sessions</span> <span class="spsub">every team's seats and your own sessions, most first · {{ v.top | length }} of {{ v.top_n }}{% if v.top_n > 8 %} · {% if picks.top %}<a href="{{ v.top_fold }}" data-spend>top 8</a>{% else %}<a href="{{ v.top_all }}" data-spend>all →</a>{% endif %}{% endif %}</span></div>
+<div class="sptable"><table>
+  <thead><tr><th>session</th><th>team</th><th>role</th><th>{{ v.unit }} figure</th><th>share of all</th><th class="spfold">turns</th><th class="spfold">past 300k</th></tr></thead>
+  <tbody>
+  {% for s in v.top %}<tr title="{{ s.title }}">
+    <td>{% if s.href %}<a href="{{ s.href }}">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}</td>
+    <td><i class="spkey" style="background: {{ s.colour if s.colour != 'hatch' else '' }}"></i>{{ s.team }}</td>
+    <td><span class="sprole">{{ s.role }}</span></td>
+    <td class="spfig">{% if s.unknown %}<span class="dim" title="{{ s.unknown }}">spend unknown</span>{% else %}{{ s.figure }}{% endif %}</td>
+    <td><span class="spshare"><i style="width: {{ (s.share * 100) | round(1) }}%"></i></span> {{ s.pct }}</td>
+    <td class="spfold">{{ "{:,}".format(s.turns) }}</td>
+    <td class="spfold">{{ s.past_300k }}</td>
+  </tr>{% else %}<tr><td colspan="7" class="note">no session spent in this {{ v.word }}</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% else %}
+<div class="sprh"><span class="h2">By seat</span> <span class="spsub">{{ v.team }} · {{ v.total }} in {{ v.period }} · {{ "{:,}".format(v.turns) }} turns</span></div>
+<div class="sptable"><table>
+  <thead><tr><th>seat</th><th>role</th><th>{{ v.unit }} figure</th><th>share</th><th class="spfold">turns</th><th>per finished entry</th><th>between</th><th class="spfold">past 200k</th><th class="spfold">past 300k</th></tr></thead>
+  <tbody>
+  {% for s in v.seats %}<tr{% if s.subtotal %} class="spsubtotal"{% else %} title="{{ s.title }}"{% endif %}>
+    <td>{% if s.href %}<a href="{{ s.href }}">{{ s.name }}</a>{% else %}{{ s.name }}{% endif %}</td>
+    <td>{% if not s.subtotal %}<span class="sprole">{{ s.role }}</span>{% endif %}</td>
+    <td class="spfig">{% if s.unknown %}<span class="dim" title="{{ s.unknown }}">spend unknown</span>{% else %}{{ s.figure }}{% endif %}</td>
+    <td><span class="spshare"><i style="width: {{ (s.share * 100) | round(1) }}%"></i></span> {{ s.pct }}</td>
+    <td class="spfold">{{ "{:,}".format(s.turns) }}</td>
+    <td{% if s.per_title %} title="{{ s.per_title }}"{% endif %}>{{ s.per }}</td>
+    <td>{{ s.between }}</td>
+    <td class="spfold">{{ s.past_200k }}</td>
+    <td class="spfold">{{ s.past_300k }}</td>
+  </tr>{% else %}<tr><td colspan="9" class="note">no seat of {{ v.team }} spent in this {{ v.word }}</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+<div class="sprh"><span class="h2">Finished entries</span> <span class="spsub">{{ v.entries | length }} in {{ v.period }} · by total, most first</span></div>
+<div class="sptable"><table class="spentries">
+  <tbody>
+  {% for e in v.entries %}<tr>
+    <td class="mono">{% if e.href %}<a href="{{ e.href }}">{{ e.ref }}</a>{% else %}{{ e.ref }}{% endif %}</td>
+    <td>{{ e.title }}{% if e.partial %} <span class="dim" title="claimed before the ledger began: its spend before then is not read">partial</span>{% endif %}</td>
+    <td class="dim">{{ e.roles | join(" · ") }}</td>
+    <td class="spfig">{{ e.figure }}</td>
+    <td class="spfold">{{ "{:,}".format(e.turns) }} turns</td>
+    <td class="spfold">{{ e.held }}</td>
+  </tr>{% else %}<tr><td class="note">no entry of {{ v.team }} finished in this {{ v.word }}</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
+{% endif %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Spend · ShiftLead{% endblock %}
+{% block body %}
+{# design §4.5 screen 13 **Spend** (TD-818, built by TD-832; §4.5a *Spend page*; mockups `Spend.dc.html` and
+   `SpendTeam.dc.html`): which teams and which sessions spent the quota, over time, and what a finished
+   entry cost — the home's `seats` reading shaped by `ui.spend.spend_view`. The picks are links carried in
+   the URL; the page's script answers a press by re-reading `spend_part.html` (`part=1`) in place. #}
+<div class="page spendpage" id="spendpage">
+<div id="spendbody">{% include "spend_part.html" %}</div>
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.spend();</script>{% endblock %}

@@ -902,3 +902,52 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .qfind input { width: 100%; min-width: 0; }
   .qrow { padding-left: calc(2.6em + var(--qd, 1) * 1ch); }
 }
+
+/* the Spend page (design §4.5 screen 13, §4.5a *Spend page*; TD-832): one centred column, the picks a row of
+   links, the chart a row of stacked bars, the tables a card each */
+#usagechip { color: inherit; text-decoration: none; } #usagechip:hover { text-decoration: underline; }
+.spendpage { max-width: 1100px; width: 100%; margin: 0 auto; }
+.spendpage .sphead, .spendpage .sprh { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.spendpage .sprh { margin-top: 12px; }
+.spendpage .spsub { color: var(--muted); font-size: var(--t-small); font-family: var(--mono, monospace); }
+.spendpage .sppicks { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.spendpage .seg a { color: var(--muted); font-size: var(--t-small); padding: 2px 10px; text-decoration: none; }
+.spendpage .seg a[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); }
+.spendpage .spchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.spendpage .spchips .qf { border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: var(--t-small); color: var(--fg); text-decoration: none; background: var(--card); }
+.spendpage .spchips .qf[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.spendpage .spnav { margin-left: auto; display: inline-flex; gap: 8px; align-items: baseline; font-family: var(--mono, monospace); }
+.spendpage .spnav a { text-decoration: none; padding: 0 4px; } .spendpage .spnav .off { color: var(--muted); opacity: .45; padding: 0 4px; }
+.spendpage .spchart { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.spendpage .splegend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: var(--t-small); align-items: center; }
+.spendpage .splegend .spright { margin-left: auto; }
+.spendpage .spkey { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+.spendpage .hatch { background: repeating-linear-gradient(45deg, var(--line), var(--line) 2px, transparent 2px, transparent 4px) !important; border: 1px solid var(--border); }
+.spendpage .spbars { display: flex; gap: 6px; align-items: stretch; height: 210px; margin-top: 10px; }
+.spendpage .spbar { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; text-decoration: none; color: var(--muted); }
+.spendpage .spbar .sptotal { font-size: var(--t-cap); text-align: center; white-space: nowrap; overflow: hidden; font-family: var(--mono, monospace); }
+.spendpage .spbar .spcol { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.spendpage .spbar .spstack { flex: none; display: flex; flex-direction: column; justify-content: flex-end; border: 2px solid transparent; border-radius: 2px; box-sizing: border-box; min-height: 3px; }
+.spendpage .spbar .spstack i { display: block; min-height: 1px; }
+.spendpage .spbar.picked .spstack { border-color: var(--fg); }
+.spendpage .spbar.picked .splabel { color: var(--fg); font-weight: 600; }
+.spendpage .spbar.before .spstack { border: 0; border-bottom: 1px dashed var(--border); min-height: 0; height: 0; }
+.spendpage .spbar .splabel { font-size: var(--t-cap); text-align: center; white-space: nowrap; overflow: hidden; margin-top: 3px; }
+.spendpage .sptable { background: var(--card); border: 1px solid var(--line); border-radius: 6px; overflow-x: auto; }
+.spendpage table { width: 100%; border-collapse: collapse; font-size: var(--t-small); }
+.spendpage th { text-align: left; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-size: var(--t-cap); padding: 8px 14px; border-bottom: 1px solid var(--line); }
+.spendpage td { padding: 8px 14px; border-bottom: 1px solid var(--line2); }
+.spendpage tr:last-child td { border-bottom: 0; }
+.spendpage .spfig { font-weight: 600; font-family: var(--mono, monospace); white-space: nowrap; }
+.spendpage .spshare { display: inline-block; width: 90px; height: 6px; background: var(--line2); border-radius: 3px; vertical-align: middle; overflow: hidden; }
+.spendpage .spshare i { display: block; height: 100%; background: #2563eb; }
+.spendpage td.up { color: #c2410c; } .spendpage td.down { color: #15803d; }
+.spendpage .sprole { border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-family: var(--mono, monospace); font-size: var(--t-cap); }
+.spendpage .spsubtotal td { background: var(--hover); font-weight: 600; }
+@media (max-width: 720px) {
+  .spendpage .spbar .sptotal { display: none; }
+  .spendpage .spbars { gap: 1px; }
+  .spendpage .spfold { display: none; }
+  .spendpage .spnav { margin-left: 0; }
+  .spendpage .splegend .spright { margin-left: 0; }
+}

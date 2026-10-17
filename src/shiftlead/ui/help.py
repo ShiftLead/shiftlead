@@ -495,6 +495,39 @@ HELP: tuple[Help, ...] = (
             "if no session acts on it in three days."
         ),
     ),
+    Help(
+        "spend-picks",
+        "Day · Week · Month",
+        "Spend page",
+        (
+            "Picks the period every figure on the page reads — a day, a week from Monday, or a calendar month — "
+            "and the size of the chart's bars; beside it All or a team's chip picks whose spend is drawn, and ‹ ›"
+            " step to the period before or after. Press them to see which teams and which sessions spent the "
+            "quota, and when; the picks are carried in the page's address, so a link opens where it was. They "
+            "change nothing but the view: no weight, no setting and no session is touched."
+        ),
+    ),
+    Help(
+        "spend-bar",
+        "a bar",
+        "Spend page: Over time",
+        (
+            "Picks the period the bar stands for, as ‹ › do, and every table under the chart reads it; its hover "
+            "lists what the bar is made of. Press the bar where spend jumped, to see who spent it. A dashed bar "
+            "is a period before the seat ledger began and cannot be picked, and a press charges, moves or resets "
+            "nothing."
+        ),
+    ),
+    Help(
+        "usage-chip",
+        "usage",
+        "Org top bar, every page",
+        (
+            "Opens the Spend page on All: which teams and which sessions spent the quota, over time. Press it "
+            "when the chip's number climbs faster than you expected. The chip shows each account's worst quota "
+            "window, the rest on hover, and a press changes no reserve and pauses nothing."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -567,6 +600,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
+    ("spend", "Spend", ("usage-chip", "spend-picks", "spend-bar")),
 )
 
 
