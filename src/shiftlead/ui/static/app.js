@@ -86,15 +86,18 @@
 
   // ---- toasts: the one error surface (design §4.5) ----
   // `wait` makes **a toast that waits** (§4.5 screen 6 *A control answers the press*, TD-340): no
-  // clock until `settle(text, ok, href)` rewrites it with the answer and starts one. Returns the toast.
-  AO.toast = function (text, ok, href, wait) {
+  // clock until `settle(text, ok, href)` rewrites it with the answer and starts one. `sticky` makes one
+  // that stays until it is pressed (a blocked open's, TD-810: the page is the only place it shows).
+  // Returns the toast.
+  AO.toast = function (text, ok, href, wait, sticky) {
     const el = document.createElement("div");
     const draw = (t, good, link) => {
       el.className = "toast" + (good ? " ok" : "");
       el.textContent = t;
       // a toast that names a thing links to its page (*handed to techlead-ao-1 · m-…*, TD-219 slice 4)
       if (link) { const a = document.createElement("a"); a.href = link; a.textContent = " open"; el.appendChild(a); }
-      setTimeout(() => el.remove(), link ? 10000 : good ? 3000 : 7000);  // a link needs the time to be pressed
+      if (sticky) { el.style.cursor = "pointer"; el.onclick = () => el.remove(); }
+      else setTimeout(() => el.remove(), link ? 10000 : good ? 3000 : 7000);  // a link needs the time to be pressed
     };
     el.settle = (t, good, link) => { draw(t, good, link); return el; };
     const box = $("#toasts");
@@ -478,7 +481,7 @@
     // An empty URL finds a window of that name without reloading it; a new one comes back blank and
     // is sent to the session's chromeless Focus.
     const w = window.open("", name, AO.popFeatures(store.get(`win.${id}`, null)));
-    if (!w) { AO.toast("the browser blocked the window — allow pop-ups for this page"); return; }
+    if (!w) { AO.toast("the browser blocked the window — allow pop-ups for this page", false, null, false, true); return; }
     let blank = true;
     // a window of that name showing another origin cannot be read: it is not our Focus, so send it there
     try { blank = !w.location.pathname.startsWith("/focus/"); } catch (e) { blank = true; }
@@ -488,17 +491,23 @@
   // §4.5a *Focus: Open shell here* (TD-577): the shell's Focus opens beside the page it was pressed on,
   // never over it — a tab, or a window as Pop out opens one (`asWindow`: Shift, or pressed in a popped-out
   // window). The tab is opened here, in the press, before the RPC: a browser allows one only inside the
-  // click. It reads *opening a shell in <dir>…* until the create answers, then goes to the shell's Focus;
-  // a refused create closes it and throws, so the press's own error path shows the refusal.
+  // click. It reads *opening a shell in <dir>…* until the create answers, then goes to the shell's Focus —
+  // the shell already open there when the answer says `reused` (TD-810); a refused create leaves it open,
+  // reading the refusal and *close this tab*, and throws, so the press's own error path says it too.
   AO.shellHere = async function (id, dir, asWindow) {
     const what = asWindow ? "window" : "tab";
     const w = asWindow ? window.open("", "", AO.popFeatures(null)) : window.open("", "_blank");
-    if (!w) { AO.toast(`the browser blocked the ${what} — allow pop-ups for this page`); return null; }
+    if (!w) { AO.toast(`the browser blocked the ${what} — allow pop-ups for this page`, false, null, false, true); return null; }
     const line = `opening a shell in ${dir || "this session's directory"}…`;
     try { w.document.title = line; w.document.body.textContent = line; } catch (e) { /* a placeholder only */ }
     let res;
-    try { res = await AO.act(id, "shell-here"); } catch (e) { try { w.close(); } catch (e2) { /* gone already */ } throw e; }
+    try { res = await AO.act(id, "shell-here"); } catch (e) {
+      const said = `${e.message} — close this ${what}`;
+      try { w.document.title = said; w.document.body.textContent = said; } catch (e2) { /* a placeholder only */ }
+      throw e;
+    }
     if (!res || !res.id) { try { w.close(); } catch (e) { /* gone already */ } return res; }
+    if (res.reused) AO.toast("your shell here was already open — opened it", true);
     if (asWindow) w.name = AO.popName(res.id);
     w.location.href = `/focus/${encodeURIComponent(res.id)}${asWindow ? "?window=1" : ""}`;
     return res;

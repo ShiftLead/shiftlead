@@ -213,7 +213,7 @@ global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const AO = window.AO;
 const toasts = [];
-AO.toast = (t) => toasts.push(t);
+AO.toast = (t, ok, href, wait, sticky) => toasts.push([t, !!ok, href || null, !!wait, !!sticky]);
 const snap = (w) => ({ name: w.name, features: w.features, href: w.location.href, title: w.document.title,
   text: w.document.body.textContent, closed: w.closed });
 (async () => {
@@ -243,6 +243,10 @@ const snap = (w) => ({ name: w.name, features: w.features, href: w.location.href
   AO.act = async () => { seen = snap(opened[opened.length - 1]); return { id: "ao-sh-2" }; };
   await AO.shellHere("a", "", false);
   out.noDir = seen;
+  // a press while the session's shell is open: the placeholder goes to that shell, and the page says so
+  AO.act = async () => ({ id: "ao-sh-1", reused: true });
+  await AO.shellHere("a", "/repo/x", false);
+  out.reused = snap(opened[opened.length - 1]);
   out.toasts = toasts;
   out.pageHref = location.href;
   console.log(JSON.stringify(out));
@@ -252,10 +256,12 @@ const snap = (w) => ({ name: w.name, features: w.features, href: w.location.href
 
 @pytest.mark.unit
 def test_open_shell_here_opens_beside_the_page_it_was_pressed_on():
-    """§4.5a *Focus: Open shell here* (TD-577): a tab (or, asked for, a window as Pop out opens one)
-    is opened in the press and reads *opening a shell in <dir>…* until the create answers, then goes
-    to the shell's Focus; a refused create closes it and throws to the press's error path; a blocked
-    open creates nothing and says so. The pressing page's own location is never touched."""
+    """§4.5a *Focus: Open shell here* (TD-577, TD-810): a tab (or, asked for, a window as Pop out opens
+    one) is opened in the press and reads *opening a shell in <dir>…* until the create answers, then goes
+    to the shell's Focus — the one already open on a `reused` answer, said in a toast; a refused create
+    leaves it open reading the refusal and *close this tab*, and throws to the press's error path; a
+    blocked open creates nothing and says so in a toast that stays until pressed. The pressing page's own
+    location is never touched."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
@@ -275,17 +281,89 @@ def test_open_shell_here_opens_beside_the_page_it_was_pressed_on():
     assert got["tab"]["after"]["href"] == "/focus/ao-sh-1" and not got["tab"]["after"]["closed"]
     assert got["win"]["features"] == "popup,width=1184,height=860"
     assert got["win"]["name"] == "ao-focus-ao-sh-1" and got["win"]["href"] == "/focus/ao-sh-1?window=1"
-    assert got["refused"] == "refused: no such dir" and got["refusedWin"]["closed"] is True
+    assert got["refused"] == "refused: no such dir" and got["refusedWin"]["closed"] is False
+    said = "refused: no such dir — close this tab"
+    assert got["refusedWin"]["title"] == said and got["refusedWin"]["text"] == said
     assert got["blocked"] is None and got["blockedTab"] is None and got["blockedCalled"] is False
     # the plain press opens a tab, and its blocked toast says so (TD-622)
     assert got["toasts"] == [
-        "the browser blocked the window — allow pop-ups for this page",
-        "the browser blocked the tab — allow pop-ups for this page",
-    ]
+        ["the browser blocked the window — allow pop-ups for this page", False, None, False, True],
+        ["the browser blocked the tab — allow pop-ups for this page", False, None, False, True],
+        ["your shell here was already open — opened it", True, None, False, False],
+    ]  # a blocked open's toast is sticky: the page is the only place it shows
+    assert got["reused"]["href"] == "/focus/ao-sh-1" and not got["reused"]["closed"]
     assert got["noId"] == {} and got["noIdTab"]["closed"] is True and got["noIdTab"]["href"] == "about:blank"
     fallback = "opening a shell in this session's directory…"
     assert got["noDir"]["title"] == fallback and got["noDir"]["text"] == fallback
     assert got["pageHref"] == "/focus/a"
+
+
+TOAST_PROBE = r"""
+const fs = require("fs");
+const noop = () => {};
+const made = [];
+const el = (o) => Object.assign({
+  dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+}, o);
+const box = el({ appendChild(c) { c.shown = true; } });
+const document = { documentElement: el(), body: el(), querySelectorAll: () => [], addEventListener: noop,
+  querySelector: (q) => (q === "#toasts" ? box : null),
+  createElement: () => {
+    const e = el({ removed: false, remove() { this.removed = true; } });
+    made.push(e);
+    return e;
+  } };
+const timers = [];
+global.window = { open: () => null }; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.clearTimeout = noop;
+global.setTimeout = (fn, ms) => { timers.push(ms); };
+global.location = { pathname: "/focus/a", protocol: "http:", host: "x", href: "/focus/a" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const out = {};
+const plain = AO.toast("said", false);
+out.plain = { timers: timers.slice(), click: typeof plain.onclick };
+timers.length = 0;
+const sticky = AO.toast("stays", false, null, false, true);
+out.sticky = { timers: timers.slice(), cursor: sticky.style.cursor, shown: !!sticky.shown };
+sticky.onclick();
+out.sticky.removed = sticky.removed;
+const before = made.length;
+let called = false;
+AO.act = async () => { called = true; return { id: "x" }; };
+AO.popOut("a");  // a blocked Pop out: the same sticky toast
+const pop = made[before];
+out.pop = { text: pop.textContent, cursor: pop.style.cursor, removed: pop.removed, called };
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.unit
+def test_a_blocked_opens_toast_stays_until_it_is_pressed():
+    """§4.5a *Focus: Open shell here* (TD-810): a blocked open sends no request, so its toast is the only
+    place it shows — `AO.toast`'s `sticky` starts no clock and is removed by a press; **Pop out**'s blocked
+    toast is one too. A plain toast keeps its clock."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "toast_probe.js"
+    probe.write_text(TOAST_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    assert got["plain"] == {"timers": [7000], "click": "undefined"}
+    assert got["sticky"] == {"timers": [], "cursor": "pointer", "shown": True, "removed": True}
+    assert got["pop"] == {
+        "text": "the browser blocked the window — allow pop-ups for this page",
+        "cursor": "pointer",
+        "removed": False,
+        "called": False,
+    }
 
 
 @pytest.mark.unit
