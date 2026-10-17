@@ -15447,3 +15447,71 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the pane underlines an OSC 8 label, shows its target on hover and opens it on Ctrl/Cmd+click under §4.6's rules, or the read says Claude Code prints no target and the entry archives with that reason.
 
 **Related:** TD-421 and TD-494 (the URL rule and cut rows), TD-493 and TD-501 (the path rule), TD-071 (no control from the text), TD-818 (the report in the screenshot).
+
+## TD-812: Build TD-804 (2): this repo's smoke — `scripts/smoke.py`, every page loaded and `ao` read against the live copy, and `smoke:` in `.shiftlead.yml`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-804's design, the designer)
+**Owner:** grinder
+**Kind:** live-check #2040
+**Status:** Built #2040 (2026-10-17, grinder-ao-1). It passed a read-only run against the live UI, with every page 200, the `ao` reads at exit 0, and the browser half ok. Left: the *Done when*'s last clause. Once #2040 is live (`ao promote status`) and a promote has concluded after it, read that promote's log (`ao promote status` names it; read-only) and check for the lines after `── smoke ──` and the note's *smoke passed in <s> s*. The browser half runs only once Paul has run `--setup` (on the board, due 2026-10-24); until then the log says *browser half skipped*, which still holds.
+**Location:** design §6 *The smoke* (*This repo's smoke*); `scripts/smoke.py` (new; not a synced file); `.shiftlead.yml` `promote:`; `src/shiftlead/service.py` (`UNIT_DIR`, the `shiftlead-ui.service` unit's `--port`, `DEFAULT_PORT`); `tests/`
+
+**Why:** TD-804, slice 2: the first repo's smoke, so a build that breaks a page or an `ao` read on Paul's real state is put back within minutes rather than found by him.
+
+**Fix:**
+- **`scripts/smoke.py`**, run as `"$HOME/.local/share/shiftlead-venv/bin/python" scripts/smoke.py` in the tree. It presses nothing and changes nothing: GETs and reads only, and never a Focus (`GET /focus/<id>` calls `seen`, and its attach resizes the pane).
+  - It waits up to 90 s for the UI's plain port to answer. The address is read from the installed unit's `ExecStart` (`--bind` and `--port` in `service.UNIT_DIR / "shiftlead-ui.service"`): loopback when `--bind` is absent or `0.0.0.0`, and `service.DEFAULT_PORT` when the unit is absent or names no port.
+  - It loads `/`, `/inbox`, `/queue`, `/repo/shiftlead` and `/settings`.
+  - A page fails on any of: a status other than 200; a body that does not end its `</html>`; a load past `PAGE_BOUND` (the script's own 20 s, not a page budget: those are TD-805's); in the browser half, an uncaught script error (`pageerror`) or a `load` that never fires within the bound.
+  - Where `settings.yml` has `reach.url`, it loads `/` and `/queue` once more through it. Those loads are told and fail nothing: a refusal is written in the log, and the last line says so on a pass.
+  - It reads `ao status --json`, `ao repo --json` and `ao promote status --json`, each of which must exit 0 and parse. Never `ao inbox` (it marks entries read).
+  - One log line per load: page, route, status, first byte, total, bytes.
+  - It exits 0 when all pass, else 1 with the first failure as its last line.
+- **The browser half.**
+  - `scripts/smoke.py --setup` makes `~/.local/share/shiftlead-smoke/`: a venv made from the live venv's base interpreter, never inside the live venv, holding Playwright and its Chromium headless shell. It is run once, at a person's hand.
+  - The script re-execs itself under that venv's python when it exists.
+  - Without it, the HTTP half alone judges, and the log says *browser half skipped: run scripts/smoke.py --setup*.
+- **`.shiftlead.yml`**: `smoke:` beside `run` and `check`, with its comment.
+- **Tests:**
+  - the page list, with no Focus;
+  - the bind and port read from a unit file, and the defaults without one;
+  - each failure (status, truncated body, bound, script error);
+  - the `reach.url` loads, a refusal failing nothing;
+  - the skipped browser half;
+  - the exit code and last line, against a scratch UI or a stub server, never the live one.
+- **README / CLAUDE.md:** one line beside the promote pair naming `--setup`.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #2040) — live check held: the auto promote of `ad49dcd` (#2040 live at 18:32Z) ran `smoke:` after `check`, and its log (`~/.shiftlead/promotes/shiftlead/ad49dcd….log`, read-only) carries the lines after `── smoke ──`: the UI on 127.0.0.1:8765, `/`, `/inbox`, `/queue` (2.48 s), `/repo/shiftlead` and `/settings` each 200, the three `ao` reads at exit 0, `reach.url`'s two loads refused 403 and told without failing, *browser half skipped: run scripts/smoke.py --setup* (Paul's `--setup` is on the board, due 2026-10-24), and the last line *smoke passed; …*.
+
+**Done when** `scripts/smoke.py` passes against a healthy UI and fails, saying why, on each case above; `.shiftlead.yml` carries `smoke:`; and the next promote's log shows the smoke's lines.
+
+**Related:** TD-804 (the design), TD-811 (the home's smoke), TD-805 (page loads: the log lines are its first measure, and its budgets replace `PAGE_BOUND`), TD-291 (`look_home.py`, a scratch UI for the tests).
+
+## TD-804: A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-16 (design §6 *Promote* *The smoke*, §5 `promote:`, §4.5a *Inbox row: promote*, §4.7 `ao promote status`): an optional `smoke:` run at the home once `check` reads the commit; a failed smoke rolls back to `from` with the hold (steer m-bf390074fccb, the default), never after a rollback. A gate before the promote was set aside, and staging is left to the repo's `run`. Built by TD-811 (the home) and TD-812 (this repo's smoke).
+**Blocked by:** TD-811, TD-812
+**Location:** design §6 *Promote* (the three preconditions, the outcome read from `check`, *A rollback* and *The hold*), §5 `promote:` (`run`, `check`), §4.5a *Inbox row: promote*, §4.7 `ao promote`; `src/sessionorc/promote.py`; `.shiftlead.yml` `promote:`
+
+**Why:** Paul, 2026-10-16, after the Queue tab stopped working for him in one browser during a day of merges: *maybe we require integration tests (if defined) to pass before a promote … Certainly for a production system working correctly would be vital.* Today a promote waits for (1) a clean checkout on main's head, (2) CI green on main's head and (3) nothing in flight, and is judged done when `check` reads the new commit. CI runs the test suite against fixtures; nothing loads a page or runs an `ao` read against the live copy with the person's real state (here 197 Queue cards and 886 completed in a month), so a break that only real data shows is found by the person. Promoting only at TD boundaries (an entry and everything its `Blocked by:` joins) was weighed with Paul and set aside: an effort can stay open for weeks (TD-748 until TD-772's read-back), and every merge to main is to be releasable, unfinished but never broken.
+
+**Fix:** design it first:
+1. A repo's own smoke command beside `run` and `check` in its `promote:` block (e.g. `smoke:`), optional, run by the home after `check` reads the new commit; what it is given (the commit, the live URL or port) and how long it may take.
+2. What a failed smoke does: roll back to `from` at once as a rollback does (and the hold that follows), or only tell the person; whether that differs between `auto` and a press, and between a dev repo (this one) and a production one (samscrape's cluster).
+3. This repo's smoke: each page (Org, Inbox, Queue, Repo, Settings, a Focus) loaded headless through the route the person uses, failing on an error status, a script error, a page that never commits or a load past a bound, plus `ao ls` and `ao inbox --json` reads; where it runs and what it needs (the Playwright setup the screenshots use).
+4. Optionally the same smoke before the promote, on a scratch home built from main against a copy of the person's state (`scripts/look_home.py`), so a bad build is caught before it is live.
+5. Staged promotes for a repo that has a staging target: smoke on staging, then production.
+Then the build entries, named in `Blocked by:`.
+
+**Resolved:** 2026-10-17 (built by TD-811 and TD-812, #2040) — design §6 *Promote* *The smoke* and §5 `promote:` carry the rule; the first promote after #2040 ran this repo's smoke and it passed.
+
+**Done when** the design says what a smoke is, when it runs, what a failure does under `auto` and under a press, and this repo's own smoke, and the build entries are filed and named in `Blocked by:`.
+
+**Related:** TD-120 and TD-132 (the promote policy), TD-226 (the rollback), TD-581 (the settle and the wait), TD-291 (`look_home.py`), TD-805 (page loads).
