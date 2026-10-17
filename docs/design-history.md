@@ -476,6 +476,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-16 (TD-810, the designer; Paul, 2026-10-16, a press in Edge that flashed and opened nothing while the session's shell was still live): *Focus: Open shell here*. A live `<session>-shell` that is the person's own shell in the session's directory is reopened rather than refused. An exited or closed one is superseded, any other live holder is refused with its reason, and the shell is made on the session's host. A refusal stays in the placeholder tab, and a blocked open's toast stays until pressed. Built by TD-817.
 - 2026-10-16 (TD-814, the designer; Paul, 2026-10-16, on ao-grind's card reading *2 design · 1 review* with one designer): *team card: TDs in motion*: a design-first claim with a PR reads *review*. Built by TD-815.
 - 2026-10-16 (TD-806, the designer; Paul, 2026-10-16, a send from Edge that cleared his next words and landed twice): *Focus composer* **Send** clears only the text it sent, while the box still begins with it. It reads *Sending…* while it waits, and *not confirmed* after `SEND_PAGE_SECONDS`, when a repeat goes under the same key. A prompt chip carries its own key. Built by TD-813.
 - 2026-10-16 (TD-801, the designer; Paul, 2026-10-16: *a shell should be considered my permissions*): *Open shell here*: acts on other sessions run from the shell's prompt too. Built by TD-802.
