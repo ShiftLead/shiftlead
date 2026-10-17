@@ -958,7 +958,7 @@ def test_a_smoke_gone_with_no_result_fails(checkout):
     assert f["why"] == f"smoke failed on {main[:7]}: the smoke ended with no result written"
 
 
-def test_a_smoke_past_its_bound_is_killed_and_the_runs_bound_no_longer_applies(checkout):
+def test_a_smoke_past_its_bound_is_killed(checkout):
     _smoke_block(checkout, smoke="sleep 60")
     main = _merge(checkout, "b")
     readings = _press(checkout, main)

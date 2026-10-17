@@ -711,6 +711,7 @@ def _smoke_failed(
     or a `from` that is the commit itself — those stand as a failure, live left where it is; so does
     a rollback that cannot start, with both reasons."""
     clear(repo, "smoke")
+    _exits.pop(intent.get("smoke_pid"), None)  # a killed or vanished smoke of ours left its status
     frm, sha = intent.get("from"), intent.get("sha")
     if intent.get("kind") == "rollback" or not frm or frm == sha or not run:
         return fail(repo, intent, why, code), None
