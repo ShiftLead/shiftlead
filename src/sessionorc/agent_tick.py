@@ -4278,10 +4278,12 @@ class TickMixin:
             log.info("%s: ignored the end of a previous run (%s; this run is %s)", sid, aid, s.adapter_id)
             return
         killed_run = self._killed_run_at.get(sid)
-        if killed_run is not None and time.monotonic() - killed_run >= KILLED_END_GRACE:
-            self._killed_run_at.pop(sid, None)
-            killed_run = None
         taken = s.state not in ("exited", "closed")  # a new run holds the id
+        if killed_run is not None and (
+            time.monotonic() - killed_run >= KILLED_END_GRACE or (not taken and event.get("state") == "exited")
+        ):
+            self._killed_run_at.pop(sid, None)  # past the grace, or the killed run's end came before any resume
+            killed_run = None
         if killed_run is not None and taken and not queued and event.get("state") == "exited":
             # The end of the run a `kill` ended, landing after a resume took the id (TD-822): Claude
             # Code runs its SessionEnd on the kill's hangup, and a resume keeps the tool's session id,

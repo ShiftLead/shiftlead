@@ -673,6 +673,14 @@ async def test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was(agent,
         await feeder.call("hook", session=s["id"], state="exited", reason="exit")  # the new run's own
         await wait_state(c, s["id"], "exited")
 
+        await c.call("kill", id=s["id"])  # the killed run's end lands before the resume: nothing left to drop
+        await feeder.call("hook", session=s["id"], state="exited", reason="other")
+        await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        await feeder.call("hook", session=s["id"], state="exited", reason="exit")
+        await wait_state(c, s["id"], "exited")
+
         monkeypatch.setattr("sessionorc.agent_tick.KILLED_END_GRACE", 0.0)
         await c.call("kill", id=s["id"])
         await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
