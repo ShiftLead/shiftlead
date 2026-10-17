@@ -14714,4 +14714,4 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 
 **Related:** none.
 
-**Resolved:** 2026-10-16 (grinder-ao-2, PR) — `tests/test_mail.py` gained `test_claim_about_takes_the_declared_claim_else_the_derived`, a `_claim_about` unit test over records with `progress` rows of both sources: one derived claim alone is the `about`; a declared claim wins over a different derived one; two declared and one derived give none. The declared-only and swapped-order mutations each fail it.
+**Resolved:** 2026-10-16 (grinder-ao-2, #1985) — `tests/test_mail.py` gained `test_claim_about_takes_the_declared_claim_else_the_derived`, a `_claim_about` unit test over records with `progress` rows of both sources: one derived claim alone is the `about`; a declared claim wins over a different derived one; two declared and one derived give none. The declared-only and swapped-order mutations each fail it.
