@@ -68,6 +68,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Open |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-806 | The Focus composer's Send clears whatever the box holds when the send answers, so a late answer wipes what the person typed since, and one send was delivered twice from Edge: nothing makes a send land once | High | Open |
+| TD-810 | **Open shell here** is refused when the session's shell is still open: the create takes the name `<session>-shell`, which the live shell holds, so the placeholder tab opens and closes and the refusal is easy to miss | Medium | Open |
 
 ---
 
@@ -1348,3 +1349,25 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the design says what the composer clears and when, how a send is made to land once, and how long a send may take to answer, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-219 (the draft kept in the browser, which the code cites), TD-500 (the composer's bar, which folds on Send), TD-805 (page loads).
+
+## TD-810: **Open shell here** is refused when the session's shell is still open: the create takes the name `<session>-shell`, which the live shell holds, so the placeholder tab opens and closes and the refusal is easy to miss
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a *Focus: Open shell here* (TD-577, TD-580, TD-801); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch: `create` with `name=f"{s['name']}-shell"`, ~L2805); `src/shiftlead/ui/static/app.js` (`AO.shellHere` ~L412: the placeholder opened in the press, closed on a refused create; the press's error path ~L815); `src/sessionorc/agent.py` (`create`'s name check)
+
+**Why:** Paul, 2026-10-16, in Edge: pressed **Open shell here** on an interactive session's Focus; the screen flashed and no tab opened, and on a second press a tab appeared and vanished at once. The UI's log has `POST /api/sessions/ao-shiftlead-ao-queue-vs-inbox/shell-here` answered `400`. The session's shell from earlier that evening, `ao-ao-queue-vs-inbox-ao-queue-vs-inbox-shell`, was still live: Paul had closed its browser tab, which ends nothing (a session lives in tmux), so the create's name `<session>-shell` was taken and the create refused. The page did as §4.5a says (the placeholder closed, the refusal shown as any act's), but the refusal reads as a flash, and the person gets no shell where one is already open beside the session. The first press left no request in the log; why is not known.
+
+**Fix:** design it first:
+1. When the session already has the person's own shell in its directory (a live `shell` record of the name the press makes, or of the same `dir` with no role and no controller), the press opens **that** shell's Focus in the tab or window instead of refusing; or, if the design prefers more than one, names the next one `<session>-shell-2` and so on. Say which, and what a shell the person ran `exit` in (closed) does.
+2. A refusal that does reach the page stays visible long enough to read (not a toast gone with the placeholder), saying what to do.
+3. Say what the first press's silence was if it can be found (the placeholder blocked without the toast, or no request made), and test that a blocked open says so.
+Then the build entry, named in `Blocked by:`.
+
+**Done when** the design says what a press does when the session's shell is open (and when it was closed), what a refused press shows, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-577 and TD-579 (the press opens a tab), TD-580 and TD-801 (the person's own shell), TD-622 (the shell press's untested lines).
