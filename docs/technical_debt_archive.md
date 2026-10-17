@@ -15117,3 +15117,25 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-814 (the design), TD-197 (the phases).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2017) — `motion_rows` checks the PR first; `test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch` holds a design-first claim with its own PR and one found by its branch reading *review*, and a designer with one of each reading *1 design · 1 review* in `phases`.
+
+---
+
+## TD-826: TD-813's summary row reads *Open* while its entry reads *Building — slice 1 #1999*: #2000 carried the row's old status back over #1999's
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (docs-audit-ao-1, auditing #1995–#2006)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — overtaken by #2005
+**Location:** `docs/technical_debt.md` (the summary table's TD-813 row; the TD-813 entry's `**Status:**`)
+
+**Why:** #1999 (merged first) changed the TD-813 row to `| High | Building — slice 1 #1999 |` and its entry's Status to `Building — slice 1 (the agent) by #1999: …`. #2000 (`gh pr diff 2000`) then removed that row and wrote it back as `| High | Open |` — its branch predates #1999 — so on `origin/main` the table says *Open* and the entry says *Building*. The ledger's rule is one row per entry that says what the entry says.
+
+**Fix:** set the TD-813 row's status to `Building — slice 1 #1999`, as the entry's Status says.
+
+**Done when** the row and the entry's Status agree, and `python3 scripts/check_cadence.py` passes.
+
+**Related:** TD-813, TD-806, TD-810.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — overtaken: #2005 archived TD-813 (`**Status:** Done`, `**Resolved:**` naming #1999 and #2005) and removed its summary row, so there is no row left to disagree with the entry. Nothing to change.

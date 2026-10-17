@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-821 | A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at | Low | Designed — built by TD-827 |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
-| TD-826 | TD-813's summary row reads *Open* while its entry reads *Building — slice 1 #1999*: #2000 carried the row's old status back over #1999's | Low | Open |
 | TD-827 | Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team* | Low | Open |
 
 ---
@@ -1469,24 +1468,6 @@ Then the build entry, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
-
-## TD-826: TD-813's summary row reads *Open* while its entry reads *Building — slice 1 #1999*: #2000 carried the row's old status back over #1999's
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (docs-audit-ao-1, auditing #1995–#2006)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `docs/technical_debt.md` (the summary table's TD-813 row; the TD-813 entry's `**Status:**`)
-
-**Why:** #1999 (merged first) changed the TD-813 row to `| High | Building — slice 1 #1999 |` and its entry's Status to `Building — slice 1 (the agent) by #1999: …`. #2000 (`gh pr diff 2000`) then removed that row and wrote it back as `| High | Open |` — its branch predates #1999 — so on `origin/main` the table says *Open* and the entry says *Building*. The ledger's rule is one row per entry that says what the entry says.
-
-**Fix:** set the TD-813 row's status to `Building — slice 1 #1999`, as the entry's Status says.
-
-**Done when** the row and the entry's Status agree, and `python3 scripts/check_cadence.py` passes.
-
-**Related:** TD-813, TD-806, TD-810.
 
 ## TD-827: Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team*
 
