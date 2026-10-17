@@ -68,7 +68,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Designed — built by TD-828, TD-829 |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833 |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
-| TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
+| TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-828 | Build TD-816 (1): the Queue's group headings carry their counts and fold, and a card's items are gathered in the card's sections with Dismiss all | Medium | Open |
 | TD-829 | Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint | Medium | Open |
@@ -78,6 +78,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-833 | Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`) | Low | Open |
 | TD-834 | Build TD-819 (1): the team-shape sampler — each member's class and each stage's queue, once a minute, kept; the `shape` RPC and its suggestions | Medium | Open |
 | TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
+| TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Open |
+| TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Open |
@@ -1390,7 +1392,8 @@ The other cases:
 **Added:** 2026-10-16 (Paul's session, from a read of the transcripts asked for by Paul)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-17 (design §6 rule 5 *A waiting claim is not in progress*, *A replay carries the waiting claims*; §4.8 *A designer's context*). The reading: the context grows **across** designs, not within one. `_context_line` held the bound's line back while any declared claim stood, and a designer holds its designs claimed while their steers and readers run, so it was never told. A claim with an open PR whose next move is someone else's is now waiting, not in progress; the member is told once it holds only waiting claims; the restart carries the waiting claims, so the leases hold. Every tick replay carries the waiting claims with a renewed lease, the idle nudge passes over them, and a run holding only waiting claims declares `none` beside them. The designer's brief keeps reads small (review rounds as subagents returning a verdict, large replies by the slice). Rejected, with the reasons in design-history §6: a restart point inside a design, a designer-only bound, nothing. TD-818's past-300k share per seat is the measure after.
+**Blocked by:** TD-836, TD-837
 **Location:** design §6 rule 5 (*Context bound*: restarts between entries, never mid-turn), §4.8 *The bound has two layers* (300k for every role that sets none); `src/shiftlead/briefs/designer.md`; `.shiftlead.yml` (`roles: designer:` sets no `context:`)
 
 **Why:**
@@ -1660,6 +1663,65 @@ The other cases:
 **Done when** the Spend page's Shape view and `ao team shape` show a running team's shares, queues and suggestions. A screenshot under `docs/mockups/reviews/` is named in the PR.
 
 **Related:** TD-819, TD-834, TD-832 (the page it joins).
+
+---
+
+## TD-836: Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-820's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §6 rule 5 (*A waiting claim is not in progress*, *A replay carries the waiting claims*), rule 4 (the idle nudge), rule 1 (`left`), §4.9a *The third declaration*, §4.2 *Waiting*, §4.8 *A claim is a lease*; `src/sessionorc/agent_tick.py` (`_context_line`: the `any(e.status == "claimed" and e.source == "declared" …)` test; `_idle_nudge`), `src/sessionorc/work.py` (`waiting_of`, read only), the seats' `prs_waiting`, `src/sessionorc/agent_tick.py` (`_replay`), `src/sessionorc/agent.py` (`_carry`'s copy of claims, the model), `src/sessionorc/models.py` (`review_pr`, `_note_review`)
+
+**Why:** TD-820: the designer is never told it is past its bound. `_context_line` returns while any declared claim stands, and a designer always holds designs waiting on a steer or a reader.
+
+**Fix:**
+- **Waiting.** A helper `waiting_claim(record, entry, now)` is true when two things hold:
+  - The claim's PR is open: its `pr` or `review_pr`.
+  - The record waits on it: `waiting_of` names the reference, or the record's ask for that PR is in a seat's `prs_waiting.asks`.
+  - Rules 9, 3, the flow's restart and §4.10 keep reading the claim as in progress.
+- **Rule 5.** `_context_line` returns only for a declared claim that is not a waiting claim. When the member holds waiting claims, the line ends *; #n, #m carry over*.
+- **Rule 4.** `_idle_nudge` does not count a waiting claim as open work.
+- **The carry.** Every tick replay that keeps mail (rules 1, 2, 7 and 8, `_replay`) copies the old record's waiting claims onto the new record, as `_carry` does, each with `at` set to the replay's time (a lease renewal). `left` names only the claims that were not waiting. A person's **Restart** still starts fresh.
+- **Tests:**
+  - A member idle over its bound whose only claim has an open PR and its own open steer about it is told. With an open PR and nothing waiting (CI running, its own merge), it is not.
+  - With a held-PR ask in `prs_waiting.asks`, it is told.
+  - The line names the PRs.
+  - The idle nudge passes over a waiting claim and still names one that is not.
+  - Each tick replay copies the waiting claims with a new `at`, and `left` lists the rest. A person's Restart copies none.
+  - Another member's claim on a carried reference is refused as a held lease.
+  - A seat is still never told.
+  - A member that declared `none` beside a waiting claim reads unfinished: rule 9 still counts the claim, so its team does not wind down under it.
+
+**Done when** an unattended designer holding only designs that wait on steers is told at its bound, and its next run starts holding those claims, unnudged until their replies land.
+
+**Related:** TD-820 (the design), TD-190 (rule 5), TD-706 (`_carry`), TD-245 (`_replay`), TD-814 (the review phase), TD-837.
+
+## TD-837: Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (TD-820's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.8 *A designer's context*, §6 rule 5; `src/shiftlead/briefs/designer.md` (the shipped template; a repo's own part under `docs/briefs/` is the repo's and is not edited here)
+
+**Why:** TD-820: within a design, the reads that grow the designer's context are large replies read whole, and review transcripts.
+
+**Fix:**
+- **Reviews and large replies.** Add one paragraph to the designer template, in §4.8's words:
+  - Every review round runs as a fresh subagent whose final message is its verdict and findings.
+  - A large reply (`ao repo --json`, a whole section file, a skill's reference) is read by the slice the step needs: filtered through `jq` or a script, or a `grep -n` and then a range.
+- **Waiting designs.** A design whose PR waits on a steer or a reader is a waiting claim. At the bound's line, the run pushes, ledgers and restarts. The next run reads its carried claims first (`ao status --json`, its own `progress`) and its open PRs (`gh pr list`), and finishes each. A run holding only waiting claims, with nothing to pick, declares `ao progress none` beside them and ends its turn; the reply or the steer's lapse wakes it.
+- **Tests:** the template carries the paragraph (the briefs test that reads it).
+
+**Done when** the shipped designer brief says how a design keeps its reads small and what a waiting design is at the bound.
+
+**Related:** TD-820, TD-836.
 
 ---
 
