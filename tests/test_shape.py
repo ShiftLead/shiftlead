@@ -7,11 +7,12 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from conftest import park_ticks
 
 from sessionorc import identity, modes, paths
 from sessionorc import shape as shape_mod
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import MailEntry, ProgressEntry, Session
 
 NOW = datetime(2026, 10, 14, 12, 0, tzinfo=UTC)  # a Wednesday: a week window holds Monday on
@@ -409,8 +410,181 @@ async def test_a_repo_not_read_yet_and_a_member_whose_state_says_nothing_are_not
     agent.sessions[g2.id] = g2
     assert agent._shape_pass(NOW) is False  # after a restart, before the repo's first reading: not *no work*
     agent._repos[root] = {"name": "repo", "ledger": {"entries": []}}
-    gone = _rec("g0", lane=["free-pick"], repo=str(tmp_path / "scratch"), host=agent.host, state="closed")
-    agent.sessions[gone.id] = gone  # an ended member in a path the registry does not list holds nothing back
+    gone = _rec("g0", lane=["free-pick"], repo=str(tmp_path / "scratch"), host=agent.host)
+    agent.sessions[gone.id] = gone  # a live member in a path the registry does not list is no root of the team
     assert agent._shape_pass(NOW) is True
     day = agent._shape["days"][NOW.astimezone().date().isoformat()]["grind"]
-    assert set(day["records"]) == {g1.id}  # a node down is not starved
+    assert set(day["records"]) == {g1.id, gone.id}  # g2's node is down: not sampled, so not starved
+
+
+def _team(agent, root, entries=(), **g1):
+    """A running team at the home: a manager and one free-pick grinder, `g1`'s fields as given, in `root`
+    with its ledger read."""
+    agent._repos[root] = {"name": "repo", "ledger": {"entries": list(entries)}}
+    mgr = _rec("mgr", role="manager", seat={}, repo=root, capabilities=["control"])
+    w = _rec("g1", lane=["free-pick"], repo=root, controllers=[mgr.id], **g1)
+    _add(agent, mgr, w)
+    return mgr, w
+
+
+def _add(agent, *records):
+    for r in records:
+        r.host = agent.host
+        agent.sessions[r.id] = r
+
+
+def _today(agent, at=NOW, team="grind"):
+    return agent._shape["days"][at.astimezone().date().isoformat()][team]
+
+
+async def test_a_second_tick_inside_the_minute_takes_no_sample_and_a_quiet_minute_writes_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    agent._shape_at = 0.0
+    await agent._shape_tick(NOW)
+    assert not paths.shape_file().exists()  # no running team: nothing written
+    _team(agent, str(tmp_path / "repo"), [_entry("TD-1")])
+    agent._shape_at = 0.0
+    await agent._shape_tick(NOW)
+    await agent._shape_tick(NOW + timedelta(seconds=1))
+    assert _today(agent)["minutes"] == 1 and paths.shape_file().exists()
+
+
+async def test_a_superseded_or_sat_out_record_is_no_member_and_a_superseded_claim_holds_nothing(agent, tmp_path):
+    await park_ticks(agent)
+    mgr, g1 = _team(agent, str(tmp_path / "repo"), [_entry("TD-1")])
+    old = _rec("g1", id="ao-x-g1-old", lane=["free-pick"], repo=g1.repo, controllers=[mgr.id])
+    old.superseded_by, old.progress = g1.id, [ProgressEntry(ref="TD-1")]  # its claim died with it
+    sat = _rec("g9", lane=["free-pick"], repo=g1.repo, controllers=[mgr.id], closed_for={"why": "sit_out"})
+    _add(agent, old, sat)
+    assert agent._shape_pass(NOW) is True
+    day = _today(agent)
+    assert {k: next(iter(v["minutes"])) for k, v in day["records"].items()} == {g1.id: "idle_with_work"}
+    assert day["queues"]["build"]["depth_sum"] == 1
+
+
+async def test_a_root_whose_records_carry_no_lane_is_passed_over_and_two_roots_add_their_queues(agent, tmp_path):
+    await park_ticks(agent)
+    one, two, three = (str(tmp_path / n) for n in ("one", "two", "three"))
+    mgr, g1 = _team(agent, one, [_entry("TD-1")])
+    agent._repos[two] = {"name": "two", "ledger": {"entries": [_entry("TD-1")]}}
+    agent._repos[three] = {"name": "three", "ledger": {"entries": [_entry("TD-1")]}}
+    g2 = _rec("g2", lane=["free-pick"], repo=two, controllers=[mgr.id])
+    tl = _rec("tl", role="techlead", seat={}, repo=three, controllers=[mgr.id])  # no lane: `in_lanes` says None
+    _add(agent, g2, tl)
+    assert agent._shape_pass(NOW) is True
+    assert _today(agent)["queues"]["build"]["depth_sum"] == 2  # one:TD-1 and two:TD-1
+    assert agent._shape["first_seen"]["grind"]["build"].keys() == {f"{one}:TD-1", f"{two}:TD-1"}
+
+
+async def test_a_board_order_is_in_the_lanes(agent, tmp_path):
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    _, g1 = _team(agent, root)
+    order = {"id": "board:k", "for_page": "pickable", "pickable": "yes", "work_order": True, "owner": "", "kind": ""}
+    agent._repos[root]["work_orders"] = {"orders": [order]}
+    assert agent._shape_pass(NOW) is True
+    assert next(iter(_today(agent)["records"][g1.id]["minutes"])) == "idle_with_work"
+
+
+async def test_a_review_queue_is_its_live_seats_and_past_the_teams_least_bound(agent, tmp_path):
+    await park_ticks(agent)
+    mgr, g1 = _team(agent, str(tmp_path / "repo"), review={"reader": "tl", "held": ["**"], "bound": "4h"})
+    g2 = _rec("g2", lane=["free-pick"], repo=g1.repo, controllers=[mgr.id], review={"reader": "tl", "bound": "1h"})
+    tl = _rec("tl", role="techlead", seat={}, repo=g1.repo, controllers=[mgr.id], created="2026-10-14T08:00:00Z")
+    ask = MailEntry(id="m-1", from_=g1.id, to=[tl.id], at="2026-10-14T10:00:00Z", kind="ask", text="read #9")
+    ask.pr = 9
+    tl.inbox.append(ask)
+    # the seat's earlier record, ended, created later and listed after it, is not the one whose queue is read
+    gone = _rec("tl", id="ao-x-tl-old", role="techlead", seat={}, repo=g1.repo, controllers=[mgr.id])
+    gone.state, gone.created = "closed", "2026-10-14T09:00:00Z"
+    _add(agent, g2, tl, gone)
+    assert agent._shape_pass(NOW) is True
+    review = _today(agent)["queues"]["review"]
+    assert review["depth_sum"] == 1 and review["past_bound"] == 1  # 2h old: past g2's 1h, not g1's 4h
+
+
+async def test_a_review_queue_with_no_bound_on_a_member_reads_the_default(agent, tmp_path):
+    await park_ticks(agent)
+    mgr, g1 = _team(agent, str(tmp_path / "repo"), review={"reader": "tl"})
+    tl = _rec("tl", role="techlead", seat={}, repo=g1.repo, controllers=[mgr.id])
+    for n, at in ((9, "2026-10-14T10:30:00Z"), (10, "2026-10-14T09:00:00Z")):
+        ask = MailEntry(id=f"m-{n}", from_=g1.id, to=[tl.id], at=at, kind="ask", text=f"read #{n}")
+        ask.pr = n
+        tl.inbox.append(ask)
+    _add(agent, tl)
+    assert agent._shape_pass(NOW) is True
+    assert _today(agent)["queues"]["review"]["past_bound"] == 1  # 3h old, past the 2h default
+    tl.inbox[1].pr = None  # the 3h one is no PR's ask: 90 minutes is inside the default
+    assert agent._shape_pass(NOW + timedelta(minutes=1)) is True
+    assert _today(agent)["queues"]["review"]["past_bound"] == 1
+
+
+async def test_asks_from_a_qualified_sender_class_their_member_waiting(agent, tmp_path):
+    """The inbox and a reader's asks name a sender `id@host`, as a node's do: the class reads the record."""
+    await park_ticks(agent)
+    mgr, g1 = _team(agent, str(tmp_path / "repo"), [_entry("TD-1")], review={"reader": "tl"})
+    g2 = _rec("g2", lane=["free-pick"], repo=g1.repo, controllers=[mgr.id])
+    tl = _rec("tl", role="techlead", seat={}, repo=g1.repo, controllers=[mgr.id])
+    ask = MailEntry(
+        id="m-1", from_=f"{g1.id}@{agent.host}", to=[tl.id], at="2026-10-14T11:00:00Z", kind="ask", text="read #9"
+    )
+    ask.pr = 9
+    tl.inbox.append(ask)
+    _add(agent, g2, tl)
+    q = MailEntry(
+        id="m-2", from_=f"{g2.id}@{agent.host}", to=["person"], at="2026-10-14T11:00:00Z", kind="ask", text="which?"
+    )
+    q.about = "TD-1"
+    agent.person_inbox.append(q)
+    assert agent._shape_pass(NOW) is True
+    classes = {k: next(iter(v["minutes"])) for k, v in _today(agent)["records"].items()}
+    assert classes[g1.id] == "waiting:review" and classes[g2.id] == "waiting:person"
+
+
+async def test_old_days_are_pruned_once_a_day(agent, tmp_path):
+    await park_ticks(agent)
+    _team(agent, str(tmp_path / "repo"), [_entry("TD-1")])
+    agent._shape["days"]["2020-01-01"] = {}
+    assert agent._shape_pass(NOW) is True and "2020-01-01" not in agent._shape["days"]
+    agent._shape["days"]["2020-01-01"] = {}
+    assert agent._shape_pass(NOW + timedelta(minutes=1)) is True and "2020-01-01" in agent._shape["days"]
+    assert agent._shape_pass(NOW + timedelta(days=1)) is True and "2020-01-01" not in agent._shape["days"]
+
+
+async def test_a_surprise_is_a_log_line_never_another_teams_minute_nor_the_tick(agent, tmp_path, monkeypatch):
+    await park_ticks(agent)
+    _team(agent, str(tmp_path / "repo"), [_entry("TD-1")])
+    other = _rec("h1", lane=["free-pick"], repo=str(tmp_path / "repo"))
+    other.team = "a-team"  # sorted first
+    _add(agent, other)
+    real = agent._shape_team
+
+    def team(name, *a):
+        if name == "a-team":
+            raise RuntimeError("boom")
+        return real(name, *a)
+
+    monkeypatch.setattr(agent, "_shape_team", team)
+    assert agent._shape_pass(NOW) is True and _today(agent)["minutes"] == 1
+
+    def save(doc):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(agent.shape_store, "save", save)
+    agent._shape_at = 0.0
+    await agent._shape_tick(NOW)  # a write that fails is a log line
+
+    def boom(now):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(agent, "_shape_pass", boom)
+    agent._shape_at = 0.0
+    await agent._shape_tick(NOW)  # so is a pass that raises
+
+
+async def test_a_shape_window_is_a_day_or_a_week(agent):
+    await park_ticks(agent)
+    async with LocalClient() as person_client:
+        # refused in the RPC's words, before the seat ledger reads a month the shape keeps no reading of
+        with pytest.raises(AgentError, match=r"day or week, not 'month' \(design §4.4"):
+            await person_client.call("shape", team="grind", window="month")
