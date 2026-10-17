@@ -4228,6 +4228,19 @@
     (open || window.open)(uri, "_blank", "noopener");
     return true;
   };
+  // **a hyperlink is a link** (§4.6 *A hyperlink in the pane is a link*, §4.5a, TD-847): xterm's
+  // OSC 8 provider hands a label's hidden target here, the bridge's attach having asked tmux for
+  // `hyperlinks`. `activate` wraps `AO.paneLink`, which would take xterm's third argument (the
+  // range) as its `open`; hover shows the target, since the label does not. The provider itself
+  // drops any target that is not http or https (`allowNonHttpProtocols` stays unset), and
+  // `AO.paneLink` checks again.
+  AO.paneLinkHandler = function (el) {
+    return {
+      activate: (e, uri) => AO.paneLink(e, uri),
+      hover: (e, uri) => { el.title = uri; },
+      leave: () => { el.title = ""; },
+    };
+  };
   // **a path is a link** (§4.6 *A path in the pane is a link*, §4.5a, TD-501): the runs one row of
   // the pane names that could be a file — a run with a `/` in it, relative, `./`, `~/` or absolute,
   // with an optional `:line` or `:line:col`, the bracket or sentence stop at its tail cut off; a run
@@ -4510,7 +4523,7 @@
       setInterval(() => { if (!busy()) location.reload(); }, 20000);
       return;
     }
-    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
+    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0, linkHandler: AO.paneLinkHandler($("#term")) });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     const links = new WebLinksAddon.WebLinksAddon((e, uri) => AO.paneLink(e, uri));  // on a read-only Focus too
     term.loadAddon({ activate: (t) => links.activate(AO.cutRows(t)), dispose: () => links.dispose() });

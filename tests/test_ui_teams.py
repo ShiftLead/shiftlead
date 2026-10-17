@@ -706,7 +706,8 @@ def test_a_container_nodes_session_is_reached_by_docker_exec_and_vs_code_attache
         got = ws.receive_bytes()
     assert b"could not attach a terminal: RuntimeError: no pty in this test" in got
     assert seen["argv"][:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"]
-    assert seen["argv"][6:10] == ["tmux", "attach", "-t", "=ao-repo-w:"]  # the bare id inside the container
+    # the bare id inside the container, the attach asking for hyperlinks (TD-847)
+    assert seen["argv"][6:12] == ["tmux", "-T", "hyperlinks", "attach", "-t", "=ao-repo-w:"]
     page = client.get("/").text
     assert 'href="vscode://vscode-remote/attached-container+7b7d/home/x/repo?windowId=_blank"' in page
 

@@ -115,8 +115,8 @@ class PtySession:
             self.proc.terminate(force=True)
 
 
-def attach_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
-    return tmux_attach_argv(session_id, socket_name=socket_name)
+def attach_argv(session_id: str, *, socket_name: str | None = None, features: tuple[str, ...] = ()) -> list[str]:
+    return tmux_attach_argv(session_id, socket_name=socket_name, features=features)
 
 
 def scroll_argv(

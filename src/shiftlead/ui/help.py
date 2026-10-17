@@ -204,6 +204,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "pane-hyperlink",
+        "a hyperlink is a link",
+        "Focus pane",
+        (
+            "Ctrl+click (Cmd+click on a Mac) on a label a program printed with a link behind it — Claude Code's "
+            "*⧉ Team Spend by Seat* — opens that link in a new tab; the label underlines when the pointer is over "
+            "it, and rest the pointer on it to see where it goes. Only an http:// or https:// link opens. A plain "
+            "click or a drag only selects, and nothing is sent to the session."
+        ),
+    ),
+    Help(
         "pane-path",
         "a path is a link",
         "Focus pane",
@@ -532,7 +543,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "switch-profile",
         ),
     ),
-    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel", "pane-link", "pane-path")),
+    ("focus", "Focus", ("wrap-up", "kill", "resume", "side-panel", "pane-link", "pane-hyperlink", "pane-path")),
     (
         "inbox",
         "Inbox",

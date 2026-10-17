@@ -15396,3 +15396,54 @@ Then the build entry, named in `Blocked by:`.
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2033, #2037) — slice 1 (#2033): the home. `smoke` is read by both readers and kept on the intent from the run's tree. It starts once `check` reads the commit, is judged from `smoke.json` under `SMOKE_BOUND`, and a failed one starts a rollback to `from` (`by: smoke`, the hold's `by` and `why`). Slice 2 (#2037): the row reads *checking `<sha7>` live · started <t>* (FYI, Promote disabled) and *rolled back by the smoke from `<sha7>` <t> ago — <why>*, and `ao promote status` uses the same words. Both were checked on a scratch home, with screenshots under `docs/mockups/reviews/2026-10-17-td811-*`. A smoke's rollback whose run cannot be spawned (an `OSError`) now fails with both reasons, as a tree that cannot be made does. Its live reading is TD-812's, when this repo's smoke lands.
 
+---
+
+## TD-847: Build TD-845: the bridge's attach asks tmux for `hyperlinks`, and the Focus terminal's `linkHandler` opens an OSC 8 target under the URL rule, its target shown on hover
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (the designer, from TD-845)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/tmux.py` (`attach_argv`), `src/sessionorc/containers.py` (`attach_argv_in`), `src/shiftlead/ui/pty_bridge.py` (`attach_argv`) and `src/shiftlead/ui/app.py` (the terminal websocket), `src/shiftlead/cli.py` (`ao focus`, unchanged), `src/shiftlead/ui/static/app.js` (`AO.focus`, `AO.paneLink`), `src/shiftlead/ui/help.py`
+
+**Why:** design §4.6 *A hyperlink in the pane is a link* and §4.5a's **a hyperlink is a link** row (TD-845). Claude Code prints Artifacts, PRs and docs as OSC 8 labels inside tmux; the pty bridge's plain `tmux attach` gets the label without its target, so the Focus pane shows dead text.
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2036) — `sessionorc.tmux.attach_argv`, `containers.attach_argv_in` and `pty_bridge.attach_argv` take `features`; the terminal websocket's two attaches pass `("hyperlinks",)`, `ao focus` nothing. `AO.paneLinkHandler` is the Focus terminal's `linkHandler`. §4.5a's help list and `help.py` carry **a hyperlink is a link** (`pane-hyperlink`). Tests: `tests/test_ui_focus_hyperlinks.py`.
+
+**Done when:**
+- A test drives `tmux -L <private> -T hyperlinks attach`, as the bridge builds it, on a pane that printed an OSC 8 run, and reads the `ESC ] 8 ;` sequence and its target in the attach's bytes. It skips when `tmux -V` is below 3.4. `attach_argv` and `pty_bridge.attach_argv` without `features` have no `-T`, and `ao focus`'s argv has none. `tests/test_ui_teams.py`'s websocket attach for a container node now reads `["tmux", "-T", "hyperlinks", "attach", "-t", "=ao-repo-w:"]`; `tests/test_ui.py`'s `pty_bridge.attach_argv`, `tests/test_containers.py`'s and `tests/test_cli.py`'s `ao focus` assertions stay as they are.
+- A node probe, as `tests/test_ui_focus_links.py`'s, builds `AO.paneLinkHandler(el)` on a stub element, with `window.open` stubbed to record its arguments (the wrapper passes no `open`). `activate({ctrlKey: true}, url, range)` opens `[url, "_blank", "noopener"]`, and `activate({}, url, range)` opens nothing. `hover(e, url, range)` leaves `el.title === url`, and `leave()` clears it. A `javascript:` target opens nothing on Ctrl+click.
+- A text check holds that `new Terminal(` in `AO.focus` carries `linkHandler:` and no `allowNonHttpProtocols`, and that the vendored `xterm.js`'s `OscLinkProvider` keeps its `["http:","https:"]` check. The drop of any other target is xterm's, so the test pins the vendored copy rather than driving it.
+- §4.5a's row is listed in `help.py`, or the URL row's help names it, and `tests/test_help.py` passes.
+
+**Related:** TD-845 (the design), TD-421/TD-422 (the URL rule), TD-071 (no control from the text).
+
+---
+
+## TD-845: A link a program prints with OSC 8 (Claude Code's *Report: Team Spend by Seat*) is plain text in the Focus pane: tmux drops it before the browser, and xterm.js has no handler for it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-17 (design §4.6 *A hyperlink in the pane is a link*; §4.5a *Focus pane: a hyperlink is a link*). Step 1's read: Claude Code emits OSC 8 under tmux 3.4 or later, and tmux 3.5a sends it only to a client attached with `-T hyperlinks`, in copy mode too. The bridge's attach asks for it and `ao focus` does not. The Focus terminal's `linkHandler` opens the target under the URL rule and shows it as the pane's tooltip on hover. With a target that is not `http(s)`, the label is text, read by the URL and path rules. Built by TD-847.
+**Blocked by:** TD-847
+**Location:** design §4.6 *A URL in the pane is a link* (TD-421) and *A path in the pane is a link* (TD-493), §4.5a's Focus link rows; `src/sessionorc/tmux.py` (`attach_argv`); `src/shiftlead/ui/static/app.js` (`AO.focus`: the `Terminal` options, the web-links addon, `AO.paneLink`)
+
+**Why:**
+- Paul's words: *there is a "Team Spend by Seat" that looks like it should be a link … we just check for files that exist. Is there a way we can make it a link?* The screenshot (ao-paul's Focus, 2026-10-17) shows Claude Code's line *Report: ⧉ Team Spend by Seat*. The text is a link label with no URL printed beside it (an Artifact's claude.ai page), so neither of the pane's two readers can take it: the web-links addon underlines only an `http(s)://` run it sees in the text, and the path provider only a run the host says is a file.
+- A label with its target hidden is what an OSC 8 hyperlink is (`ESC ] 8 ; ; <url> ST <text> ESC ] 8 ; ; ST`). Two things stand between one and the person:
+  - **tmux drops it.** tmux 3.4+ keeps a pane's hyperlinks but sends them only to a client whose terminal has the `hyperlinks` feature. kmaster runs tmux 3.5a, and its `terminal-features` default (`xterm*:clipboard:ccolour:cstyle:focus:title`) lacks it, so the pty bridge's `tmux attach` receives the label alone. `tmux -T hyperlinks attach …` asks for it for that one client, and sets no server or session option (`attach_argv`'s rule: attaching sets nothing).
+  - **The page has no handler.** The vendored `@xterm/xterm` 5.5.0 parses OSC 8 and draws a link from its `linkHandler` option. `AO.focus` sets none, so xterm's own fallback would apply (a `confirm()` box on a plain click), and that is not §4.6's rule: underline on hover, Ctrl/Cmd+click, `http`/`https` only, a new tab `noopener`.
+- Not yet checked: that Claude Code emits OSC 8 at all inside tmux (it decides from the environment whether the terminal supports hyperlinks), and what the ⧉ mark is. The first step of the fix reads this on a scratch pane before anything is designed.
+- The value: Claude Code prints Artifacts, PRs and docs as labels more and more. In the pane they are dead text the person has to find again elsewhere, which is the friction §4.6's two link rules exist to remove.
+- TD-071's rule (*nothing on a page is a control that parses what an agent printed*) is met in the same way as the URL rule: the press opens only the target the program attached, behind a modifier. But the label and the target can differ, and that is new: the person sees text, not the URL. The design has to say how the target is shown before the press (a hover title with the URL, as VS Code's terminal does).
+
+**Resolved:** 2026-10-17 (built by TD-847, #2036) — design §4.6 *A hyperlink in the pane is a link* and §4.5a's row carry the rule; checked on a scratch home: an OSC 8 label underlines on hover, its target is the pane's tooltip, and Ctrl+click opens it (`noopener`).
+
+**Done when** the pane underlines an OSC 8 label, shows its target on hover and opens it on Ctrl/Cmd+click under §4.6's rules, or the read says Claude Code prints no target and the entry archives with that reason.
+
+**Related:** TD-421 and TD-494 (the URL rule and cut rows), TD-493 and TD-501 (the path rule), TD-071 (no control from the text), TD-818 (the report in the screenshot).
