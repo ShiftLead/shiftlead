@@ -1761,7 +1761,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Location:** `scripts/smoke.py` (`ao_reads`, `reach_url`, `main`, `browse`, `setup`); `tests/test_smoke.py`
 
 **Why:** each change was made alone on `origin/main` (after #2044), and `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_smoke.py tests/test_ui_focus_hyperlinks.py` still passed (11 passed) every time:
-- `ao_reads`: `json.loads(p.stdout)` replaced by `pass`. The design's rule that each read "must exit 0 *with JSON*" (the module docstring) is unread: the stub `ao` prints JSON on every pass, and no test has one that prints prose.
+- `ao_reads`: `json.loads(p.stdout)` replaced by `pass`. The design's rule that each read "must each exit 0 with JSON" (the module docstring) is unread: the stub `ao` prints JSON on every pass, and no test has one that prints prose.
 - `browse`: `pg.on("pageerror", …)` replaced by `pass`. A page's uncaught script error, the one failure the browser half exists to catch, would pass the promote. `test_the_browser_half_runs_under_the_smoke_venv…` runs a shell stub that prints canned JSON rows, so `browse` itself is never run; nor is the `return UNAVAILABLE` after a failed launch (changed to `return 0`).
 - `setup`: `--only-shell chromium` changed to `chromium` (the docstring and AGENTS.md promise the headless shell). `test_the_cli_takes_setup_and_…` runs only `main(["--help"])`, whatever its name says.
 - `reach_url`: its `return (reach or {}).get("url") or None` changed to `return None`, and `main`'s `smoke(reach=reach_url())` to `smoke()`. Every reach test passes `reach=` straight to `smoke()`, so the read of `settings.yml` and the call that connects it are unread: the reach loads could be dead and the suite green.
