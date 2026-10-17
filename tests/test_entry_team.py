@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from conftest import park_ticks
 
-from sessionorc import ledger, settle, work
+from sessionorc import ledger, mail, settle, work
 from sessionorc.client import AgentError, LocalClient
 
 NOW = datetime.now(UTC)
@@ -148,6 +148,8 @@ async def test_a_claim_across_teams_or_on_a_marked_entry_is_refused_and_force_pa
         g = (await person.call("create", name="g", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
         agent.sessions[g].repo = root
         agent.sessions[g].team = "ops"
+        # the person's own shell with a team's badge (TD-821) reads it as any badged record does
+        assert mail.person_shell(agent.sessions[g])
         with pytest.raises(AgentError, match="TD-001 is db's: g is ops's"):
             await person.call("progress", id=g, ref="TD-001", status="claimed")
         with pytest.raises(AgentError, match=r"TD-002 needs a team \(untagged\)"):

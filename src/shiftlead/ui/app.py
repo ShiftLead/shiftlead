@@ -745,15 +745,17 @@ async def agent_call(method: str, **params: Any) -> Any:
 def not_own_shell(rec: dict[str, Any], name: str, directory: str) -> str | None:
     """Why the live record holding `<session>-shell` is not the person's own shell in `directory`, or
     None when it is (design §4.5a *Focus: Open shell here*, TD-810): `mail.person_shell`'s test — a
-    `shell`, interactive, no role, no team, no controllers — read on the record's view, and the same
-    directory. The words are the press's refusal."""
+    `shell`, interactive, no role, no controllers; a team badge is no bar (TD-821) — read on the
+    record's view, and the same directory. The words are the press's refusal."""
     who, cure = rec.get("id") or name, "close it, or open a shell from its Focus"
     if rec.get("adapter") != "shell":
         return f"{name} is held by {who}, which is not a shell — close it, or pick another name"
     if ctl := rec.get("controllers"):
         return f"{name} is a shell with controllers {', '.join(ctl)} — not your own; {cure}"
-    if rec.get("unattended") or rec.get("role") or rec.get("team"):
-        return f"{name} is a shell run by a team or a role — not your own; {cure}"
+    if rec.get("unattended"):
+        return f"{name} is a shell run unattended — not your own; {cure}"
+    if rec.get("role"):
+        return f"{name} is a shell with a role — not your own; {cure}"
     if os.path.normpath(str(rec.get("dir") or "")) != os.path.normpath(directory):
         return f"{name} is held by a shell in {rec.get('dir')} — {cure}"
     return None
@@ -2848,7 +2850,10 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             held = await own_shell()
             if held is None:
                 try:
-                    new = await call("create", name=name, dir=s["dir"], adapter="shell", **where)
+                    # the member's badge, and nothing else of its team's (TD-821): drawn on the team the
+                    # person pressed it on, still the person's own shell — no controllers, no role
+                    badge = {k: s[k] for k in ("team", "project") if s.get(k)}
+                    new = await call("create", name=name, dir=s["dir"], adapter="shell", **badge, **where)
                 except HTTPException as refused:
                     # a second press racing this one took the name between the check and the create:
                     # both land on its shell; any other refusal is the create's own, unchanged

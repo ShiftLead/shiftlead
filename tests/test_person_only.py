@@ -105,12 +105,15 @@ NOT_THE_PERSONS = {
     "an unattended shell": {"unattended": True},
     "a controlled shell": {"controllers": ["ao-repo-lead"]},
     "a role's shell": {"role": "grinder"},
-    "a team's shell": {"team": "ao-grind"},
+    "a team's shell with a role": {"team": "ao-grind", "role": "grinder"},
+    "a team's shell with a controller": {"team": "ao-grind", "controllers": ["ao-repo-lead"]},
 }
 
 
-def test_person_shell_is_a_shell_interactive_with_no_role_team_or_controller():
+def test_person_shell_is_a_shell_interactive_with_no_role_or_controller():
     assert mail.person_shell(_shell("s"))
+    # a team badge does not end it (TD-821): Open shell here on a team member gives it the member's
+    assert mail.person_shell(_shell("s", team="ao-grind", project="shiftlead"))
     assert not mail.person_shell(None)
     for what, over in NOT_THE_PERSONS.items():
         assert not mail.person_shell(_shell("s", **over)), what
@@ -119,10 +122,10 @@ def test_person_shell_is_a_shell_interactive_with_no_role_team_or_controller():
 def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
     """The one exception, held against the whole list: called from a person's shell each RPC gets
     past the check (whatever it fails on next, it is not the refusal); called from an agent session,
-    an unattended, controlled, role's or team's shell, or a caller the host does not hold, each is
+    an unattended, controlled or role's shell, or a caller the host does not hold, each is
     refused in the new words."""
     rpcs = _rpcs()
-    callers = {"ao-sh": _shell("ao-sh")} | {
+    callers = {"ao-sh": _shell("ao-sh"), "ao-tsh": _shell("ao-tsh", team="ao-grind")} | {
         f"ao-{i}": _shell(f"ao-{i}", **o) for i, o in enumerate(NOT_THE_PERSONS.values())
     }
     bare = HostAgent.__new__(HostAgent)
@@ -136,11 +139,12 @@ def test_the_persons_shell_passes_every_act_in_the_list_and_nothing_else_does():
             if inspect.iscoroutine(out):
                 asyncio.run(out)
 
-        try:
-            call("ao-sh")
-        except Exception as e:  # noqa: BLE001 — the bare agent fails on whatever it reads next
-            assert "a person's own act" not in str(e), (name, str(e))
-        for sid in [*callers.keys() - {"ao-sh"}, "ao-gone"]:
+        for own in ("ao-sh", "ao-tsh"):
+            try:
+                call(own)
+            except Exception as e:  # noqa: BLE001 — the bare agent fails on whatever it reads next
+                assert "a person's own act" not in str(e), (name, own, str(e))
+        for sid in [*callers.keys() - {"ao-sh", "ao-tsh"}, "ao-gone"]:
             with pytest.raises(RpcError, match="refused to every session but the person's own shell") as e:
                 call(sid)
             assert str(e.value).startswith(f"{sid} cannot "), (name, sid)

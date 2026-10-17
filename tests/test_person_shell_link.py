@@ -57,13 +57,16 @@ def test_offline_a_nodes_shell_acts_on_its_sessions_and_each_near_miss_is_still_
         "ao-u": Session(id="ao-u", name="u", kind="interactive", adapter="shell", dir="/tmp", unattended=True),
         "ao-c": Session(id="ao-c", name="c", kind="interactive", adapter="shell", dir="/tmp", controllers=["ao-x"]),
         "ao-r": Session(id="ao-r", name="r", kind="interactive", adapter="shell", dir="/tmp", role="manager"),
+        # a team's badge does not end the person's own shell (TD-821)
         "ao-t": Session(id="ao-t", name="t", kind="interactive", adapter="shell", dir="/tmp", team="t"),
+        "ao-tr": Session(id="ao-tr", name="tr", kind="interactive", adapter="shell", dir="/tmp", team="t", role="x"),
         "ao-a": Session(id="ao-a", name="a", kind="interactive", adapter="claude-code", dir="/tmp"),
     }
     where = {"host": "laptop", "home": "kmaster", "records": records}
     for method in sorted(modes.NODE_ACTS - {"seen", "hook"}):
-        assert modes.offline_refusal(method, "ao-sh", {"id": "ao-w"}, **where) is None, method
-    for caller in ("ao-u", "ao-c", "ao-r", "ao-t", "ao-a", "ao-gone"):
+        for own in ("ao-sh", "ao-t"):
+            assert modes.offline_refusal(method, own, {"id": "ao-w"}, **where) is None, (method, own)
+    for caller in ("ao-u", "ao-c", "ao-r", "ao-tr", "ao-a", "ao-gone"):
         assert "gated at the home" in modes.offline_refusal("kill", caller, {"id": "ao-w"}, **where), caller
     # what is the home's stays the home's, the shell's call or not
     assert "the mailbox is at the home" in modes.offline_refusal("msg", "ao-sh", {}, **where)

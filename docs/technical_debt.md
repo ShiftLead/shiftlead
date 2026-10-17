@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-821 | A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at | Low | Designed — built by TD-827 |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
-| TD-827 | Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team* | Low | Open |
 | TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
 | TD-840 | #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test | Medium | Open |
 | TD-841 | #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard | Medium | Open |
@@ -1472,36 +1471,6 @@ Then the build entry, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
-
-## TD-827: Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team*
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (TD-821's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Focus: Open shell here*, §4.8 *The person's own shell is the person*, §4.9 *A person in the team*; `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch, and TD-817's `not_own_shell` beside it; RPC-side only, no change to `app.js`); `src/sessionorc/mail.py` (`person_shell`); `src/sessionorc/settle.py` (`team_refusal`, read only); `src/shiftlead/ui/repo.py` (`team_groups`, read only: a card's group is its record's `team`); `tests/test_person_only.py` (the *a team's shell* case and `test_person_shell_is_a_shell_interactive_with_no_role_team_or_controller`), `tests/test_person_shell_acts.py` (`_rec("ao-t", team="t")` read as a session) and `tests/test_person_shell_link.py` (a teamed shell at a link): each asserts *no team* today and is flipped, not only added to
-
-**Why:** TD-821: **Open shell here** on a team member makes a shell with no `team`, so its card lands in the repo's *no team* strip, away from the team the person pressed it on.
-
-**Fix:**
-- **The press.** The `shell-here` branch's `create` passes the session's `team` and `project` where the record has them, and nothing else of the team's: no `controllers`, no `review`, no `role`, no `prompt_from`, and `unattended` stays false. The create is the person's (§4.8 *A create from it is the person's create*), so the host agent adds no creator, and the client fills no manager, as `ao new --team --adapter shell` already fills none (`_team_defaults`: a shell asks for nothing). That form, and the New session form with Shell and a Team pick, already make a teamed shell with no controllers; this change makes those the person's own shell too.
-- **The definition.** `mail.person_shell` drops `not record.team`. It reads `adapter == "shell"`, not `unattended`, no `role`, no `controllers`. Its docstring says why, as §4.8 does. TD-817's reuse test, `ui/app.py` `not_own_shell`, is its own copy of `person_shell` on the record's view: it drops `rec.get("team")` from its *run by a team or a role* refusal, which then reads *a shell with a role*, so a teamed shell left open is reopened.
-- **One other reading follows the badge, as designed.** A declared claim from the shell's prompt reads its badge as any badged record's does (`settle.team_refusal`, §4.4 *An entry names its team*): another team's entry is refused unless `--force`. No change; a test pins it.
-- **Nothing else keys on it.** `team_groups` already groups by the record's `team`. `teamrun.persons` keeps it out of live, concluded, wound down and Forget all. `_team_stamp` stamps no stop time on an interactive record. The Wind down and Stop now confirms already name a person's session apart. A change is needed only where a test shows otherwise.
-- **Tests:**
-  - a press on a team member creates a shell carrying its `team` and `project`, with no controllers and no review, and the Org's team group draws it, not the no-team strip;
-  - a press on a session with no badge creates a shell with none, and `/shell` (**+ New ▾ Shell**) makes one with none;
-  - a claim from a teamed shell's prompt on another team's entry is refused without `--force`, as any badged record's is;
-  - `person_shell` is true for a teamed shell with no role and no controllers, and false for one with a role or a controller;
-  - a request from a teamed shell passes `ao promote` and the acting gate as the person's own shell does (TD-580, TD-801);
-  - the team with only that shell live reads *stopped*, and `ao team stop` leaves the shell alone;
-  - a second press with the teamed shell still live reopens it (TD-817's reuse).
-
-**Done when** **Open shell here** on a team member opens a shell drawn in that team's group, which still passes every person-only act and is left alone by every team act, and the tests above pass.
-
-**Related:** TD-821 (the design), TD-817 (the reuse, built in #2009: the same route), TD-580 and TD-801 (the person's own shell), TD-160 (a person in the team), TD-725 (the no-team strip).
 
 ## TD-839: Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone
 

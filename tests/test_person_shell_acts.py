@@ -25,12 +25,13 @@ def _rec(sid: str, **kw) -> Session:
 
 
 def _not_shells() -> list[Session]:
-    """Each still a session: an unattended shell, a shell with a controller, a role or a team, an agent."""
+    """Each still a session: an unattended shell, a shell with a controller or a role (a team's badge
+    beside it or not), an agent."""
     return [
         _rec("ao-u", unattended=True),
         _rec("ao-c", controllers=["ao-x"]),
         _rec("ao-r", role="manager"),
-        _rec("ao-t", team="t"),
+        _rec("ao-tr", team="t", role="grinder"),
         _rec("ao-a", adapter="claude-code"),
     ]
 
@@ -40,13 +41,15 @@ def test_the_shell_passes_every_acting_rpc_and_each_near_miss_is_still_a_session
     person_pane = _rec("ao-p")  # a person's interactive session: §9 invariant 5 refuses it to every session
     worker = _rec("ao-w", unattended=True, controllers=["ao-lead"])
     shell = _rec("ao-sh")
-    records = {s.id: s for s in (person_pane, worker, shell, *_not_shells())}
-    assert mail.as_person(None, records) and mail.as_person("ao-sh", records)
+    teamed = _rec("ao-t", team="t", project="p")  # Open shell here on a team member (TD-821): still the person's
+    records = {s.id: s for s in (person_pane, worker, shell, teamed, *_not_shells())}
+    assert mail.as_person(None, records) and mail.as_person("ao-sh", records) and mail.as_person("ao-t", records)
     assert not mail.as_person("ao-gone", records) and not mail.as_person(0, records)
-    for method in sorted(mail.ACTING_RPCS):
-        for target in ("ao-p", "ao-w", "ao-sh"):
-            assert mail.act_gate(records, "ao-sh", method, {"id": target}) is None, (method, target)
-    assert mail.act_gate(records, "ao-sh", "create", {"capabilities": ["control"]}) is None  # not attenuated
+    for own in ("ao-sh", "ao-t"):
+        for method in sorted(mail.ACTING_RPCS):
+            for target in ("ao-p", "ao-w", "ao-sh"):
+                assert mail.act_gate(records, own, method, {"id": target}) is None, (own, method, target)
+        assert mail.act_gate(records, own, "create", {"capabilities": ["control"]}) is None  # not attenuated
     for s in _not_shells():
         assert not mail.as_person(s.id, records)
         for method in ("send", "kill", "create", "decide"):
