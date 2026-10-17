@@ -849,7 +849,15 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      back is not finished; a live member that is **waiting** on the person (§4.9a *Waiting is read,
      never declared*) — the person inbox holds an open `ask` or `steer` from it about a reference —
      **blocks it too**, declared or not, its clause naming the reference and the bound, so
-     `finished` reads the person inbox's open entries beside the records; any other dead record is
+     `finished` reads the person inbox's open entries beside the records; so does a live member
+     holding a **waiting claim on a reader** (rule 5's second kind, TD-854): a claim declared on its
+     own record, still `claimed`, whose `pr` or `review_pr` is the PR of an `ask` of its own that a
+     seat of the team holds in `prs_waiting.asks` (§4.9b *The reader*) — read from the records
+     `finished` already takes, the seat's and the member's, so the page and the tick still read one
+     thing — its clause *grinder-ao-1 waiting on techlead-ao-1: #2049*. A wind-down under it would
+     close the reader with the team, and nothing starts a wound-down team for a held PR or its
+     findings — rule 8 starts one on lane news alone — so the PR would sit with nobody to read it
+     and nobody to fix what the reader finds; any other dead record is
      passed over, as *concluded* passes it over; and a record the current flow sat out
      (`closed_for: {why: sit_out}`, §4.9c) is passed over whatever it declared — rules 1, 2 and 7
      never recreate it, so a `restart_wanted` on it would otherwise block the reading for good.
