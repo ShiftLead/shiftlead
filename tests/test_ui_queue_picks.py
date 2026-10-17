@@ -66,6 +66,7 @@ SEARCHES = [
     "?find=db%23TD-5",
     "?find=TD-3",
     "?team=a&team=b,a&find=queue",
+    "?filter=needs-you&filter=steering&find=a&find=TD-20",
 ]
 
 

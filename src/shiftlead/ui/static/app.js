@@ -3564,9 +3564,10 @@
       p.getAll(k).forEach((v) => String(v).split(",").forEach((w) => { w = w.trim(); if (w && !out.includes(w)) out.push(w); }));
       return out;
     };
-    const f = p.get("filter") || "";
+    const last = (k) => p.getAll(k).pop() || "";  // a repeated key reads as the server's does: the last
+    const f = last("filter");
     return { filter: Q_FILTERS.includes(f) ? f : "", team: many("team"), repo: many("repo"),
-      kind: many("kind").filter((k) => Q_KINDS.includes(k)), find: String(p.get("find") || "").split(/\s+/).filter(Boolean).join(" ") };
+      kind: many("kind").filter((k) => Q_KINDS.includes(k)), find: last("find").split(/\s+/).filter(Boolean).join(" ") };
   };
   AO.qQuery = (picks, change) => {
     const p = { filter: picks.filter || "", team: [...(picks.team || [])], repo: [...(picks.repo || [])], kind: [...(picks.kind || [])], find: picks.find || "" };
