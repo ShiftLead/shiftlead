@@ -234,6 +234,24 @@ def test_an_entry_claimed_before_the_ledger_began_reads_partial():
     assert ledger["refs"]["r TD-9"]["first_claimed"] == "2026-10-15T08:00:00Z"  # the first sight stands
 
 
+def test_a_prune_drops_old_rows_cursors_and_finished_references_and_keeps_an_open_one():
+    today = NOW.date()
+    old = (today - spend_mod.KEEP - timedelta(days=1)).isoformat()
+    recent = (today - timedelta(days=3)).isoformat()
+    ledger = {
+        "days": {old: {}, recent: {}},
+        "hosts": {"kmaster": {"cursors": {"/t/a.jsonl": {"seen": f"{old}T09:00:00Z"}, "/t/b.jsonl": {"seen": recent}}}},
+        "refs": {
+            "r TD-1": {"first_claimed": f"{old}T09:00:00Z", "done_at": f"{old}T10:00:00Z"},
+            "r TD-2": {"first_claimed": f"{old}T09:00:00Z", "done_at": f"{recent}T10:00:00Z"},
+            "r TD-3": {"first_claimed": f"{old}T09:00:00Z"},  # still open: its claim is no reason to forget it
+        },
+    }
+    seats.prune(ledger, today)
+    assert list(ledger["days"]) == [recent] and list(ledger["hosts"]["kmaster"]["cursors"]) == ["/t/b.jsonl"]
+    assert list(ledger["refs"]) == ["r TD-2", "r TD-3"]
+
+
 def test_the_weights_setting_replaces_a_key_whole_and_refuses_a_bad_price():
     assert settings.weights({}) == seats.WEIGHTS
     doc = {"spend": {"weights": {"as_of": "2026-11-01", "claude-opus": {"input": 3}, "bad": {"input": -1}}}}
