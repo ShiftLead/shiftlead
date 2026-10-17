@@ -15000,3 +15000,47 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-810 (the design), TD-577 (the press opens a tab), TD-580 and TD-801 (the person's own shell), TD-622 (the shell press's tests).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2009) — the `shell-here` route checks the name with `name_check` (on the session's host) and answers the person's own live shell as `reused`, refuses a live holder that is not one with its reason (`not_own_shell`), lets `create` supersede an exited one, and on a refused create looks once more so two presses land on one shell; `AO.shellHere` sends the placeholder to a reused shell with a toast, leaves it open reading a refusal and *close this tab*, and a blocked open's toast (and **Pop out**'s) is `sticky` until pressed. Tests: `tests/test_ui_shell_here.py`, `tests/test_ui_popout.py`; checked on a scratch home (the PR's UI check). The lasting content: design §4.5a *Focus: Open shell here*.
+
+---
+
+## TD-824: `tests/test_send_key.py` would not catch the keyed send's `asyncio.shield` going
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, the tests of #1999)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_send_key.py`; `src/sessionorc/agent.py` (`rpc_send`, `_keyed_send`)
+
+**Why:** #1999's `_keyed_send` answers a repeat with `await asyncio.shield(typing)` so that a repeat that is itself cancelled (the page's request dropped) leaves the first send's future alone. Probe: in an `origin/main` worktree, change that line to `await typing` and run `pdm run pytest -q tests/test_send_key.py`: **8 passed**. Without the shield, cancelling the waiting repeat cancels `typing`; the first send's `finally` then reaches `typing.exception()` on a cancelled future and raises `CancelledError` out of a send that was delivered. No test cancels a waiting repeat.
+
+**Fix:** In `tests/test_send_key.py`, a test beside `test_a_repeat_while_the_first_is_typing_awaits_it_with_one_paste`: start the first send gated, start a repeat, `cancel()` the repeat, release the gate, and assert the first returns `None`, `t.typed == ["go"]` and `agent._keyed_sends` is empty. Revert the shield in the worktree and see it fail.
+
+**Done when** that test exists and fails with the shield removed.
+
+**Related:** TD-813, TD-806.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — `test_a_waiting_repeat_cancelled_leaves_the_first_send_alone` in `tests/test_send_key.py`: a repeat cancelled while the first types leaves the first's answer and `_keyed_sends` as they were; with the shield removed it fails.
+
+---
+
+## TD-825: `tests/test_send_key.py` has no repeat that awaits a first send which then fails in words
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1, the tests of #1999)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_send_key.py`; `src/sessionorc/agent.py` (`rpc_send`, `_keyed_send`)
+
+**Why:** #1999's `rpc_send` `finally` resolves a waiting repeat with `typing.set_exception(RpcError(entry.verdict))` when the first send's verdict is not `submitted`. `test_after_a_prompt_stuck_the_repeat_raises_the_same_verdict` sends the repeat *after* the first has ended (the `_keyed_send` verdict path); `test_a_paste_that_fails_unworded_...` covers the unworded failure. Probe: change `if entry.verdict == "submitted":` to `if True:` in the `finally` and run the module: **8 passed**, yet a repeat that was waiting on a `prompt-stuck` send would then be answered as delivered.
+
+**Fix:** In `tests/test_send_key.py`, gate the first send, start a repeat, make the paste raise `RpcError("prompt-stuck: …")`, release, and assert both tasks raise that message and `t.typed == ["go"]`. Revert the branch in the worktree and see it fail.
+
+**Done when** that test exists and fails with the branch forced.
+
+**Related:** TD-813, TD-806.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — `test_a_repeat_waiting_on_a_send_that_fails_in_words_raises_its_verdict` in `tests/test_send_key.py`: a repeat waiting on a `prompt-stuck` send raises that verdict; with the `finally`'s branch forced to `True` it fails.
