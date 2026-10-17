@@ -15244,3 +15244,25 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-785, #2014.
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2027) — tests in `tests/test_permission_channel.py` for the on-call manager's `pending` cause, the page's 409 on Allow / Deny, and **Answer needed**'s *answer it in the terminal*; each guard removed alone fails one. The first found `_team_causes` reading `Pending` as a dict (`(r.pending or {}).get`), an `AttributeError` since #878 whenever a member held a hook permission: fixed.
+
+---
+
+## TD-841: #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done (#PRNUM)
+**Location:** `tests/test_ui_send_key.py`; `tests/test_ui.py`; `src/shiftlead/ui/app.py` (`wrapup`); `src/shiftlead/ui/static/app.js` (the `wrapup` body, `#promptchips` handler)
+
+**Why:** #2005 (TD-813 slice 2) gives Wrap up and the prompt chips a key too, so that a repeat types once (its code comments: *a repeat types it once*). Probes, one change at a time in an `origin/main` worktree, each followed by `pdm run pytest -q tests/test_ui_send_key.py tests/test_ui.py tests/test_ui_popout.py tests/test_ui_shell_here.py`, which gave **101 passed** every time: (1) `ui/app.py` `await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True, key=body.get("key"))` → without `key=`; (2) `app.js` delete `if (action === "wrapup") body = { key: AO.mintKey() };`; (3) the chip's `await act(id, "send", { text, key: AO.mintKey() })` → `{ text }`; (4) delete the chip's `b.disabled = true;`. The composer's `wireComposerSend` is probed under node, and `test_pages_and_shell_flow` posts a keyed `send`; the other three paths have no test that carries a key (`tests/test_ui.py` posts `/wrapup` to a shell, which refuses it, and to an agent with no key).
+
+**Fix:** (a) in `tests/test_ui.py`, post `wrapup` twice with one `key` to a session whose agent records its `send` params and assert both carry `wrapup=True` and the key; (b) a node probe beside `PROBE` that fires the Wrap up press handler and a chip click (twice, the second while the first is out) and asserts the body's key, one key per press, and that the second chip press sends nothing. Revert each of the four lines and see its test fail.
+
+**Done when** each of the four changes fails a test.
+
+**Related:** TD-813, TD-806, TD-824, #2005.
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #PRNUM) — `tests/test_ui_send_key.py`: `PRESS_PROBE` runs the page's one press handler for Wrap up twice and drives a chip through `AO.wireChip` (the chip's handler, lifted out of `AO.focus` so node can run it), and `test_the_wrapup_route_hands_the_key_to_send` posts `wrapup` twice under one key to a recording client. Each of the four lines, reverted alone, fails a test.

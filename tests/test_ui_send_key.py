@@ -15,14 +15,15 @@ import pytest
 
 UI = pathlib.Path(__file__).resolve().parent.parent / "src" / "shiftlead" / "ui"
 
-PROBE = """
+PRELUDE = """
 const fs = require("fs");
 const noop = () => {};
 const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
   classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
   querySelector: () => null, querySelectorAll: () => [] });
+const docOn = {};  // the page's own document listeners: the press handler every data-act button goes through
 const document = { documentElement: el(), body: el(), querySelector: () => null, querySelectorAll: () => [],
-  addEventListener: noop, createElement: el };
+  addEventListener: (k, f) => { (docOn[k] = docOn[k] || []).push(f); }, createElement: el };
 global.window = {}; global.document = document; global.Event = class { constructor(t) { this.type = t; } };
 global.localStorage = { getItem: () => null, setItem: noop };
 global.matchMedia = () => ({ matches: false });
@@ -37,7 +38,11 @@ const stub = (extra) => { const on = {}; return Object.assign({ on, classList: c
   addEventListener: (k, f) => { on[k] = f; }, dispatchEvent: (e) => on[e.type] && on[e.type](e),
   focus: noop, click() { if (!this.disabled && on.click) return on.click({}); } }, extra); };
 const tick = () => new Promise((r) => setImmediate(r));
+"""
 
+PROBE = (
+    PRELUDE
+    + """
 function rig() {
   const posts = [], drafts = [], sents = [], fails = [];
   let n = 0, timer = null;
@@ -124,14 +129,15 @@ function rig() {
   console.log(JSON.stringify(out));
 })().catch((e) => { console.error(e); process.exit(1); });
 """
+)
 
 
-def _probe() -> dict:
+def _probe(source: str = PROBE) -> dict:
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the composer is JavaScript, and nothing else runs it")
     probe = pathlib.Path(tempfile.mkdtemp()) / "send_probe.js"
-    probe.write_text(PROBE)
+    probe.write_text(source)
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     return json.loads(out.stdout)
@@ -212,3 +218,99 @@ def test_one_press_one_send(got):
     assert got["act_err"] == {"status": 503, "message": "no answer", "unknown": True}
     a, b = got["mint"]
     assert a != b and len(a) >= 32
+
+
+PRESS_PROBE = (
+    PRELUDE
+    + """
+(async () => {
+  const out = {};
+  // Wrap up goes through the page's one press handler: each press posts its own key (TD-806)
+  const posts = [];
+  global.fetch = async (url, init) => { posts.push({ url, body: JSON.parse(init.body) });
+    return { ok: true, status: 200, json: async () => ({ ok: true }) }; };
+  const button = { dataset: { act: "wrapup", id: "ao-x" }, classList: cls([]), closest: () => null };
+  const press = docOn.click.find((f) => String(f).includes("[data-act], [data-copy]"));
+  for (let i = 0; i < 2; i++) {
+    try { await press({ target: { closest: () => button } }); } catch (_) { /* the toast's DOM is not here */ }
+  }
+  out.wrapup = posts;
+  // a chip: its text and a key of its own, the chip held until the send answers
+  const sends = [], fails = [];
+  let shut = 0, done = 0;
+  const chip = stub({ dataset: { text: "run the suite" }, disabled: false });
+  const compose = stub({ value: "", disabled: false });
+  AO.wireChip(chip, { compose, post: (body) => new Promise((ok, no) => sends.push({ body, ok, no })),
+    sent: () => done++, closed: () => shut++, fail: (e) => fails.push(e.message) });
+  chip.on.click({});
+  out.held = chip.disabled;
+  chip.on.click({});  // pressed again while the first is out: nothing goes
+  out.while_out = sends.length;
+  sends[0].ok({ ok: true }); await tick();
+  out.released = chip.disabled;
+  chip.on.click({}); sends[1].no(new Error("prompt-stuck")); await tick();
+  out.chip = { bodies: sends.map((s) => s.body), done, fails, disabled: chip.disabled };
+  chip.on.click({ shiftKey: true }); out.shift = { value: compose.value, sends: sends.length };
+  compose.disabled = true; chip.on.click({}); out.closed = { shut, sends: sends.length };
+  console.log(JSON.stringify(out));
+})().catch((e) => { console.error(e); process.exit(1); });
+"""
+)
+
+
+@pytest.fixture(scope="module")
+def pressed():
+    return _probe(PRESS_PROBE)
+
+
+@pytest.mark.unit
+def test_each_wrap_up_press_posts_a_key_of_its_own(pressed):
+    """§4.5a **Wrap up** (TD-813 slice 2, TD-841): the page's press carries a key, one per press."""
+    (a, b) = pressed["wrapup"]
+    assert a["url"] == b["url"] == "/api/sessions/ao-x/wrapup"
+    assert a["body"]["key"] and b["body"]["key"] and a["body"]["key"] != b["body"]["key"]
+
+
+@pytest.mark.unit
+def test_a_chip_press_sends_its_text_under_its_own_key_and_a_press_while_out_sends_nothing(pressed):
+    """§4.5a *Focus composer* **prompt chips** (TD-170, TD-841): the chip is held while its send is out."""
+    assert pressed["held"] is True and pressed["while_out"] == 1 and pressed["released"] is False
+    first, second = pressed["chip"]["bodies"]
+    assert first["text"] == second["text"] == "run the suite"
+    assert first["key"] and second["key"] and first["key"] != second["key"]
+    assert pressed["chip"] == {**pressed["chip"], "done": 1, "fails": ["prompt-stuck"], "disabled": False}
+    assert pressed["shift"] == {"value": "run the suite", "sends": 2}  # Shift fills the box, sends nothing
+    assert pressed["closed"] == {"shut": 1, "sends": 2}
+
+
+@pytest.mark.unit
+def test_the_wrapup_route_hands_the_key_to_send(tmp_path, monkeypatch):
+    """The route carries the page's key to the host agent's `send`, so a repeat types the prompt once (TD-841)."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from fastapi.testclient import TestClient
+
+    from shiftlead.ui import app as ui
+
+    calls: list = []
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append((method, kw))
+            return {}
+
+    monkeypatch.setattr(ui, "LocalClient", Fake)
+    c = TestClient(ui.create_app())
+    for _ in range(2):
+        assert c.post("/api/sessions/ao-x/wrapup", json={"key": "k-1"}).json() == {"ok": True}
+    sends = [kw for m, kw in calls if m == "send"]
+    assert len(sends) == 2
+    assert all(kw["wrapup"] is True and kw["key"] == "k-1" and kw["text"] == ui.WRAPUP_PROMPT for kw in sends)
