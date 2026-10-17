@@ -487,6 +487,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-17 (TD-851, the designer): *Add entry…* gains **Priority** (*High* · *Medium* · *Low*, *Medium* selected) beside Type, and *Nothing else is asked* no longer lists the priority; *Hand to the techlead* carries `entry.priority`; *Open a session*'s start context names the priority. Built by TD-855.
 - 2026-10-17 (TD-819, the designer; Paul, 2026-10-16: *is there a way to tell if a different shape for a team would be more efficient (e.g. another designer, fewer grinders, etc)?*): row *Spend page: Spend · Shape*. Built by TD-835.
 - 2026-10-17 (TD-818, the designer; Paul, 2026-10-16: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*): rows *Spend page: Day · Week, the team chips*, *Spend page: seat name, entry id*, *team card: spend* and *Settings page: Usage: weights, Save*. Built by TD-832.
 - 2026-10-17 (TD-816, the designer): *Queue page: group heading* is new. *Queue page: card* gains its sections and their **Dismiss all**. *Queue page: filters, find* answers in the browser and persists. *Recently completed*'s window survives a re-read. Built by TD-828 and TD-829.
@@ -846,6 +847,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-17 (TD-851, the designer): `ao td add` gains `--priority high|medium|low`, *medium* when absent, the form's **Priority** pick. Built by TD-855.
 - 2026-10-17 (TD-819, the designer; Paul, 2026-10-16: *is there a way to tell if a different shape for a team would be more efficient (e.g. another designer, fewer grinders, etc)?*): `ao team shape <team> [--window]`. Built by TD-835.
 - 2026-10-17 (TD-818, the designer; Paul, 2026-10-16: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*): `ao spend [--team] [--window] [--entries]`, and `ao status -v`'s `spend` line. Built by TD-831.
 - 2026-10-16 (TD-804, the designer; Paul, 2026-10-16: *for a production system working correctly would be vital*; steer m-bf390074fccb, the default): `ao promote status` uses the row's smoke words. Built by TD-811.
@@ -1054,6 +1056,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-17 (TD-851, the designer; Paul, 2026-10-17, through Add entry: *add a priority selector, defaulted to Medium on the Add entry form so the techlead … does not have to guess at the priority*): *Add an entry to the ledger* — the form asks **Priority** beside Type, *Medium* selected, and neither way asks the person a priority any more; the words win where they name another (a pick left at *Medium* cannot be told from one chosen), the drafter saying so in its outcome. A look's *Not right* reaches no `entry_add` — the builder or the board's reader ledgers it and sets its priority as for any entry — so it carries none. Built by TD-855.
 - 2026-10-17 (TD-821, the designer): *A person in the team* gains *The person's own shell opened from a member* — the badge and nothing else of the team's, read as a person's session in the team in every reading, Resume carrying it. Built by TD-827.
 - 2026-10-16 (TD-775, grinder-ao-2): a `{team: …}` member now fails the org file's load as well as a repo's, naming the key, so *Add or remove a member* no longer lists it among the edits it refuses — such a file never loads.
 - 2026-10-15 (TD-730, the designer): *Add an entry to the ledger* — the entry names its team in its `Team:` line (the pick, else the words, else the seat's own), and `entry.md` tells every filing session to write its own.
@@ -1282,6 +1285,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-05 (TD-309 slice 6b, the members' marks, grinder-ao-2): `cards.flow_mark`. *sits out under <flow>* is read from the record (`sit_out`, `closed_for: {why: sit_out}`), and on a closed card it stands in the slot's place, with the closer on hover. *— close it yourself* is shown on a person's session the flow sits out. *flow changed* is shown on a node member whose host is not answering, which Apply skipped. A sit-out mark is dropped once the flow would start the member again. A sit-out mark stands ahead of the member's doing line, since winding down is what it is doing; the other marks show only where no doing line stands. The node's *restarts when it next works or at the team's next Start* is shown on an idle node member carrying `relaunch`. The last three are read from the page's last flows reading. A delta reads no plan, so `flow_views` leaves the flow by team and each difference's act by id in `cards.FLOWS` and `cards.FLOW_ACTS`, as `inbox.PULLS` holds the pull readings. The Org page now reads the flows before it builds its cards. §4.9c's *Not built* sentence went with this, since every part of it is now built.
 
 ## 4.10 Messages between sessions (first part: through the person inbox)
+- 2026-10-17 (TD-851, the designer): *An entry handed to a seat* — the envelope is `entry: {repo, type, team, priority}` and `entry_add` takes `priority` (*medium* when absent). Built by TD-855.
 
 - 2026-10-16 (TD-771, grinder-ao-2): a reply keeps its thread's `about` before the sender's claim, so one thread is never about two entries.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): a message sent with no `about` takes the sender's one live declared claim. Built by TD-771.

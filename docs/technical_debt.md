@@ -82,10 +82,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-838 | Build TD-823: `permission_prompts: all` launches with the adapter's `asking_args`; `ask` leaves the tool's mode alone | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
-| TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Open |
+| TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
 | TD-852 | #2040's smoke script has six lines no test reads: its browser half, `--setup`, the JSON check on `ao`'s reads and the `reach.url` read | Medium | Open |
 | TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
 | TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Open |
+| TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 
 ---
 
@@ -1783,7 +1784,8 @@ The other cases:
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed (2026-10-17, PR #2050) — the form asks Priority beside Type, *Medium* selected; the words win where they name another; a look's *Not right* reaches no `entry_add` and carries none. Built by TD-855.
+**Blocked by:** TD-855
 **Location:** design §4.5a rows *Repo page, team card: Repo facet — Add entry…* and *Add entry form — Hand to the techlead*, §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*, §4.7 *Entries* (`ao td add`); `src/shiftlead/ui/templates/base.html` and `src/shiftlead/ui/static/app.js` (the form), `src/shiftlead/ui/app.py` (`/api/entry/hand`), `src/shiftlead/ui/repo.py` (`entry_plan`), `src/sessionorc/agent_inbox.py` (the `entry` envelope); `src/shiftlead/cli.py` (`ao td add`, `entry_add`); `src/shiftlead/briefs/entry.md` (*asking the person only for … a priority*)
 
 **Why:**
@@ -1872,3 +1874,36 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says which, and a build entry (or none) follows.
 
 **Related:** TD-820, TD-836, TD-241 (rule 9), TD-274 (waiting).
+
+---
+
+## TD-855: Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority`
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-17 (TD-851's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5a *Repo page, team card: Repo facet — Add entry…*, *Add entry form — Hand to the techlead*, *Open a session*; §4.9 *Add an entry to the ledger*; §4.10 *An entry handed to a seat*; §4.7 *Entries*; mockup `docs/mockups/reviews/2026-10-17-td851-entry-priority.png` (`gen.py` `add_entry`); `src/shiftlead/ui/templates/base.html` and `src/shiftlead/ui/static/app.js` (the form), `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/session`'s `start_context`), `src/shiftlead/repoconfig.py` (`entry_text`, `ENTRY_SLOTS`, `HANDED_ENTRY` and the brief's `entry_text(*(HANDED_ENTRY[slot] …))`), `src/sessionorc/agent_inbox.py` (`rpc_entry_add`, the `entry` mark), `src/shiftlead/cli.py` (`ao td add`), `src/shiftlead/briefs/entry.md`, `src/shiftlead/briefs/techlead.md` (the handed-entry paragraph); `tests/test_handed_entry.py`, `tests/test_ui_entry.py`, `tests/test_entry_team.py`, `tests/test_repoconfig.py` (the slot tests)
+
+**Why:** TD-851: the form asks no priority, so the drafter guesses one or asks the person, though the person knows it as they write.
+
+**Fix:**
+- **The form.** **Priority** — *High* · *Medium* · *Low*, *Medium* selected — beside **Type**, drawn as Type is. `/api/entry/hand` takes `priority` and passes it on.
+- **The envelope.** `entry_add` takes `priority` (`high` · `medium` · `low`, `medium` when absent, anything else refused in words as an unknown type is) and marks the ask `entry: {repo, type, team, priority}`. `ao td add` gains `--priority high|medium|low`, *medium* when absent.
+- **The drafter.** `entry.md` takes `{priority}` beside `{type}`: the entry's `**Priority:**` and its Summary row's priority are the pick's, unless the words name another in so many words, which the drafter follows and says so in its outcome. Its first line no longer lists a priority among what it asks the person. `techlead.md`'s handed-entry paragraph names `entry.priority`. **Open a session**'s start context is the same `entry.md` filled, so it names the priority too (`entry_text` gains it: `ENTRY_SLOTS` gains `{priority}`, and `HANDED_ENTRY` its text for the techlead brief, *the `priority` its `entry` carries*).
+- **A look's *Not right*** is untouched: it reaches no `entry_add`.
+
+**Tests:**
+- the form draws Priority with *Medium* selected, and a press sends the pick;
+- `entry_add` marks `entry.priority`, defaults it to `medium`, and refuses `urgent`;
+- `ao td add --priority low` carries `low`, and with no flag `medium`;
+- the start context of **Open a session** names the picked priority;
+- `entry.md`, filled, names the priority and no longer asks one.
+
+**Done when** the form, `ao td add` and the envelope carry the priority as the design says, the drafter's brief writes it, and the tests above pass.
+
+**Related:** TD-851 (the design), TD-180 (Add entry), TD-730 (the form's Team pick).
+
+---
