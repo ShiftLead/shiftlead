@@ -42,6 +42,8 @@ CLASSES = (
     "free",
 )
 WORKING_STATES = ("working", "stalled?")  # *working on its own* is a working record's (§4.2)
+# the states a sample reads; `unreachable` (a node down) and `scheduled` (not started) say nothing of the work
+SAMPLED_STATES = ("working", "stalled?", "idle", "needs-you", "limited")
 DESIGN, BUILD = "design", "build"  # the worker stages' words, and the lane kinds they read
 LANE_KIND = {DESIGN: "design", BUILD: "pickable"}
 
@@ -191,6 +193,10 @@ def take(
     per sampled record; `queues` one per stage, `{name, role, kind, order, ids?: [key], n?, oldest?}` —
     a lane stage's unheld ids, a review stage's `prs_waiting` depth and oldest instant. A lane stage's
     oldest age is read from `first_seen`, kept per id while it stays."""
+    since = {}  # a review queue's oldest, parsed before the minute is added, so a bad one adds nothing
+    for q in queues:
+        if q["kind"] == "review" and q.get("oldest"):
+            since[q["name"]] = datetime.fromisoformat(str(q["oldest"]).replace("Z", "+00:00"))
     day = now.astimezone().date().isoformat()
     t = doc["days"].setdefault(day, {}).setdefault(team, {"minutes": 0, "limited": 0, "records": {}, "queues": {}})
     t["minutes"] += 1
@@ -212,9 +218,7 @@ def take(
             oldest = max((now - datetime.fromisoformat(v)).total_seconds() for v in mine.values()) if mine else 0.0
         else:
             depth = int(q.get("n") or 0)
-            at = q.get("oldest")
-            since = datetime.fromisoformat(str(at).replace("Z", "+00:00")) if at else now
-            oldest = max(0.0, (now - since).total_seconds())
+            oldest = max(0.0, (now - since.get(q["name"], now)).total_seconds())
         row = t["queues"].setdefault(q["name"], {})
         row.update({"role": q["role"], "kind": q["kind"], "order": q["order"]})
         for k in QUEUE_COUNTS:

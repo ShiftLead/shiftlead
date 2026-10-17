@@ -364,3 +364,17 @@ async def test_a_team_whose_ledger_cannot_be_read_is_not_sampled(agent, tmp_path
 
 def test_shape_is_a_read_open_to_a_session_and_the_homes():
     assert "shape" in identity.READS and "shape" in modes.HOME_READS
+
+
+async def test_a_repo_not_read_yet_and_a_member_whose_state_says_nothing_are_not_sampled(agent, tmp_path):
+    await park_ticks(agent)
+    root = str(tmp_path / "repo")
+    g1 = _rec("g1", lane=["free-pick"], repo=root, host=agent.host)
+    g2 = _rec("g2", lane=["free-pick"], repo=root, host=agent.host, state="unreachable")
+    agent.sessions[g1.id] = g1
+    agent.sessions[g2.id] = g2
+    assert agent._shape_pass(NOW) is False  # after a restart, before the repo's first reading: not *no work*
+    agent._repos[root] = {"name": "repo", "ledger": {"entries": []}}
+    assert agent._shape_pass(NOW) is True
+    day = agent._shape["days"][NOW.astimezone().date().isoformat()]["grind"]
+    assert set(day["records"]) == {g1.id}  # a node down is not starved

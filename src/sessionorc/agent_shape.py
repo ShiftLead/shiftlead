@@ -90,7 +90,10 @@ class ShapeMixin:
             return False
         counts: dict[str, int] = {}
         ids: dict[str, list[str]] = {}
-        for root in sorted({r.repo for r in crew if r.repo and r.repo in self._repos}):
+        roots = sorted({r.repo for r in crew if r.repo and r.adapter != "shell"})
+        if not roots or any(root not in self._repos for root in roots):
+            return False  # a repo not read yet (a restart, a new checkout): could not look, not *no work*
+        for root in roots:
             facts = self._repos.get(root) or {}
             led = facts.get("ledger") or {}
             if "error" in led or not isinstance(led.get("entries"), list):
@@ -118,8 +121,8 @@ class ShapeMixin:
         members = []
         for r in live:
             st = None if r is manager else shape_mod.stage_of(r, stages)
-            if st is None:
-                continue
+            if st is None or r.state not in shape_mod.SAMPLED_STATES:
+                continue  # unreachable or scheduled: nothing the record could be doing is known
             seat = r.seat is not None
             members.append(
                 {
