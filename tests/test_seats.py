@@ -334,7 +334,7 @@ async def test_the_home_charges_a_nodes_seat_turns_once_and_its_seeding_charges_
     agent._take_records(
         "laptop", [record(rid="ao-x-n", name="n", dir="/srv/w/n", team="t", role="grinder")], whole=True
     )
-    agent.sessions["ao-x-mine"] = _rec("ao-x-mine", dir="/srv/w")  # the same path at the home: not the node's
+    agent.sessions["ao-x-mine"] = _rec("ao-x-mine", dir="/srv/w/n/src")  # deeper, and the home's: never the node's
     now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     got = await agent._take_seat_spend("laptop", {"profile": "sub", "prices": None, "turns": [], "cursors": {}})
     assert got == {"cursors": {}, "seeded": False}
@@ -350,5 +350,9 @@ async def test_the_home_charges_a_nodes_seat_turns_once_and_its_seeding_charges_
     rows = next(iter(agent._seats["days"].values()))
     assert set(rows) == {"ao-x-n"} and rows["ao-x-n"]["models"]["claude-sonnet-4-6"]["turns"] == 1
     assert rows["ao-x-n"]["role"] == "grinder" and rows["ao-x-n"]["metered"] is False
+    # a transcript whose `cwd` the node sent no root for matches no record by `cwd`: outside shiftlead
+    other = _t("u2", 0, source="t2", conv="", cwd="/srv/w/n/src", at=now)
+    await agent._take_seat_spend("laptop", {"profile": "sub", "prices": None, "turns": [other], "cursors": {"t2": 1}})
+    assert set(next(iter(agent._seats["days"].values()))) == {"ao-x-n", seats.OUTSIDE}
     with pytest.raises(Exception, match="names a profile"):
         await agent._take_seat_spend("laptop", {"turns": [], "cursors": {}})
