@@ -15010,7 +15010,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (test-audit-ao-1, the tests of #1999)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Done — #2010
 **Location:** `tests/test_send_key.py`; `src/sessionorc/agent.py` (`rpc_send`, `_keyed_send`)
 
 **Why:** #1999's `_keyed_send` answers a repeat with `await asyncio.shield(typing)` so that a repeat that is itself cancelled (the page's request dropped) leaves the first send's future alone. Probe: in an `origin/main` worktree, change that line to `await typing` and run `pdm run pytest -q tests/test_send_key.py`: **8 passed**. Without the shield, cancelling the waiting repeat cancels `typing`; the first send's `finally` then reaches `typing.exception()` on a cancelled future and raises `CancelledError` out of a send that was delivered. No test cancels a waiting repeat.
@@ -15032,7 +15032,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (test-audit-ao-1, the tests of #1999)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Done — #2010
 **Location:** `tests/test_send_key.py`; `src/sessionorc/agent.py` (`rpc_send`, `_keyed_send`)
 
 **Why:** #1999's `rpc_send` `finally` resolves a waiting repeat with `typing.set_exception(RpcError(entry.verdict))` when the first send's verdict is not `submitted`. `test_after_a_prompt_stuck_the_repeat_raises_the_same_verdict` sends the repeat *after* the first has ended (the `_keyed_send` verdict path); `test_a_paste_that_fails_unworded_...` covers the unworded failure. Probe: change `if entry.verdict == "submitted":` to `if True:` in the `finally` and run the module: **8 passed**, yet a repeat that was waiting on a `prompt-stuck` send would then be answered as delivered.
