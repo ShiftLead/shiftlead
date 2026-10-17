@@ -7,11 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import copy
 import json
 import os
 import shutil
 import time
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -92,6 +93,7 @@ from sessionorc.models import (
     RECENT_LINKS,
     SYSTEM,
     Pending,
+    ProgressEntry,
     Session,
     context_over_text,
     lane_refs,
@@ -1238,12 +1240,48 @@ class TickMixin:
             await self._push_changes()
 
     @staticmethod
-    def _open_ref(s: Session) -> str | None:
-        """A member's first open reference (rule 4): a lane reference, then a declared claim, with
-        no `done` or `dropped` entry."""
+    def _open_ref(s: Session, skip: Collection[str] = ()) -> str | None:
+        """A member's first open reference (rule 4): a lane reference, then a declared claim not in
+        `skip` (the waiting claims, TD-820), with no `done` or `dropped` entry."""
         ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
-        claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
+        claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed" and e.ref not in skip]
         return next((r for r in [*lane_refs(s.lane), *claimed] if r not in ended), None)
+
+    def _waiting_claims(self, s: Session) -> list[ProgressEntry]:
+        """Rule 5's *waiting claims* (design §6, §4.2 *Waiting*, TD-820): `s`'s declared claims whose
+        PR is open — the claim's `pr`, not read closed, or its `review_pr` — **and** whose next move is
+        someone else's: the person inbox holds an open `ask` or `steer` of `s`'s about the reference
+        (`work.waiting_of`), or a record's `prs_waiting.asks` holds `s`'s ask for that PR. Read for
+        rules 4 and 5 and the replay's carry alone; rules 9 and 3, the flow's restart and §4.10 still
+        read every claim as in progress."""
+        claims = [
+            e
+            for e in s.progress
+            if e.source == "declared" and e.status == "claimed" and (e.pr or e.review_pr) and e.why != PR_CLOSED
+        ]
+        if not claims:
+            return []
+        me = (s.id, s.host or self.host)
+
+        def mine(address: Any) -> bool:
+            sid, host = naming.split_address(str(address or ""))
+            return (sid, host or self.host) == me
+
+        asked = {q["ref"] for k, qs in work_mod.waiting_of(self.person_inbox).items() if mine(k) for q in qs}
+        handed: set[int] = set()
+        for r in self._graph().values():
+            for a in (r.prs_waiting(home=self.host) or {}).get("asks") or ():
+                if isinstance(a, dict) and mine(a.get("from")) and isinstance(a.get("pr"), int):
+                    handed.add(a["pr"])
+        opened = ((self._repos.get(s.repo or "") or {}).get("prs") or {}).get("open")
+        numbers = {p.get("number") for p in opened if isinstance(p, dict)} if isinstance(opened, list) else None
+
+        def open_pr(e: ProgressEntry) -> int | None:
+            if e.review_pr:
+                return e.review_pr  # held only while that PR is open (TD-150)
+            return e.pr if numbers is None or e.pr in numbers else None
+
+        return [e for e in claims if (n := open_pr(e)) and (e.ref in asked or n in handed)]
 
     async def _idle_open(self, s: Session, now: datetime) -> None:
         """*idle · open work* (design §6 rule 3, TD-259): `idle_open: {at, ref}` on a supervised
@@ -1294,7 +1332,8 @@ class TickMixin:
             return
         if s.state != "idle" or not s.told or s.pending:
             return
-        if any(e.status == "claimed" and e.source == "declared" for e in s.progress):
+        waiting = self._waiting_claims(s)
+        if any(e.status == "claimed" and e.source == "declared" and e not in waiting for e in s.progress):
             return  # a claim in progress: the clause on its `ao` replies says it, and it declares after
         if s.context_sent_at and now - _parse(s.context_sent_at) < CONTEXT_AGAIN:
             return
@@ -1304,6 +1343,8 @@ class TickMixin:
             return
         line = f"[shiftlead] {over.replace(' over the ', ', over your ', 1)} — take nothing new: push, ledger, then "
         line += '`ao progress restart --why "context bound"`'
+        if waiting:
+            line += "; " + ", ".join(dict.fromkeys(f"#{e.review_pr or e.pr}" for e in waiting)) + " carry over"
         if await self._policy_send(s, line):
             s.context_sent_at = now_iso()
             log.info("%s: %s — told", s.id, over)
@@ -2446,7 +2487,7 @@ class TickMixin:
             owed = self._owed_part([e.id for e in s.outbox if e.owes_for(session_inbox=False)])
             parts += [owed] if owed else []
             return "[shiftlead] " + "; ".join(parts) if parts else None
-        ref = self._open_ref(s)
+        ref = self._open_ref(s, {e.ref for e in self._waiting_claims(s)})  # a waiting claim is not open work (TD-820)
         owed = self._owed_part(s.owed())
         minutes = int(IDLE_NUDGE.total_seconds() // 60)
         if ref is None:
@@ -2552,6 +2593,10 @@ class TickMixin:
             **(mark or {}),
             **({"held": True} if held else {}),
         }
+        # a replay that keeps mail carries the waiting claims (§6 rule 5, TD-820): `left` is the rest
+        carried = [copy.deepcopy(e) for e in self._waiting_claims(s)] if extra.get("keep_mail") else []
+        if carried:
+            entry["left"] = [r for r in entry.get("left") or [] if r not in {e.ref for e in carried}]
         history = [*s.restarts, entry]
         address = self._address(s)
         read: dict[str, Any] | None = None
@@ -2595,6 +2640,13 @@ class TickMixin:
             await self._carry_controllers()  # a node member's own record takes the new lead now (TD-712)
         if new is not None:
             new.restarts = history
+            held = {e.ref: e for e in new.progress if e.source == "declared" and e.status == "claimed"}
+            for e in carried:
+                e.at = entry["at"]  # a renewal of the lease (§4.8 *A claim is a lease*)
+                if e.ref in held:
+                    held[e.ref].at = e.at  # a rename's `_carry` copied it already
+                elif new is not s:
+                    new.progress.append(e)
             # the files as this replay read them, not as the create's check did; a replay of the stored
             # prompt carries none, since the create's working-tree read is not what the prompt was made
             # from, and the mark must not compare it (the techlead's read of #745)
