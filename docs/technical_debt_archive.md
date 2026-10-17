@@ -15203,20 +15203,13 @@ Then the build entry, named in `Blocked by:`.
 
 ---
 
-<<<<<<< HEAD
 ## TD-842: #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised
 
 **Priority:** Low
-=======
-## TD-840: #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test
-
-**Priority:** Medium
->>>>>>> c2acb0a4 (TD-840 archived (#2027))
 **Type:** debt
 **Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
 **Owner:** grinder
 **Kind:** build
-<<<<<<< HEAD
 **Status:** Done — (1) by TD-827 (#2023), (2) by #2026
 **Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
 
@@ -15229,7 +15222,16 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-810, TD-817, TD-822, TD-827 (rewrites the `team` condition), #2009, #2012.
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2026) — (1) by TD-827 (#2023); (2) by `test_a_queued_end_inside_the_kills_grace_is_judged_by_its_stamp`: kill, resume, a live `idle`, then a queued `exited` stamped at the kill (skipped as stale, the kill's mark unspent) and one stamped after (applied). With `not queued` deleted the second is dropped and the test fails.
-=======
+
+---
+
+## TD-840: #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
 **Status:** Done (#2027)
 **Location:** `src/sessionorc/agent_tick.py` (the `by == "pending"` seat count); `src/shiftlead/ui/app.py` (the 409 in the permission route); `src/shiftlead/ui/org.py` (`+ terminal_only(m)`); `tests/test_permission_channel.py`
 
@@ -15242,4 +15244,3 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-785, #2014.
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2027) — tests in `tests/test_permission_channel.py` for the on-call manager's `pending` cause, the page's 409 on Allow / Deny, and **Answer needed**'s *answer it in the terminal*; each guard removed alone fails one. The first found `_team_causes` reading `Pending` as a dict (`(r.pending or {}).get`), an `AttributeError` since #878 whenever a member held a hook permission: fixed.
->>>>>>> c2acb0a4 (TD-840 archived (#2027))
