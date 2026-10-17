@@ -138,10 +138,11 @@ def test_the_kill_guard_blocks_a_shell_command_with_exit_2(home, monkeypatch, ca
     assert hook.main() == hook.BLOCK
     out = capsys.readouterr()
     assert REASON in out.err and out.out == ""  # stdout is the tool's JSON channel: nothing on it
-    assert sent and sent[0]["state"] == "working" and sent[0]["session"] == "ao-x-g"  # reported as any BeforeTool
+    assert sent == []  # no call to the host agent: the tool never runs (§4.3 *The kill guard*)
     ok = {**payload, "tool_input": {"command": "kill 1234"}}
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(ok)))
     assert hook.main() == 0
+    assert sent and sent[0]["state"] == "working" and sent[0]["session"] == "ao-x-g"  # a call it passes reports
     other = {**payload, "tool_name": "write_file", "tool_input": {"command": "pkill -f x"}}
     assert hook.refused_command(other) is None
 

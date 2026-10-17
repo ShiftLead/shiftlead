@@ -6,7 +6,7 @@ agent what happened — fire-and-forget, socket first, `events/<session>.jsonl` 
 Claude Code's hook does. No event waits: no Gemini hook answers a confirmation, so a permission is
 reported as `needs-you` and answered in the terminal (§4.3 *Permissions: no channel*). A `BeforeTool` of
 `run_shell_command` whose command the kill guard refuses exits 2 with the reason on stderr, the tool's
-own block, and is reported as any `BeforeTool` is.
+own block, with no call to the host agent: the tool never runs, and its turn's `AfterAgent` reports.
 
 Exits 0 otherwise, printing nothing: the tool parses a hook's stdout as JSON.
 """
@@ -93,14 +93,13 @@ def main() -> int:
     capture("hooks", raw)
     if not isinstance(payload, dict):
         return 0
-    code = 0
     if reason := refused_command(payload):
-        # the tool's own block, before the host agent is asked anything: one it cannot reach still refuses
+        # the tool's own block, with no call to the host agent: one it cannot reach still refuses
         print(reason, file=sys.stderr)
-        code = BLOCK
+        return BLOCK
     params = translate(payload)
     if params is None:
-        return code
+        return 0
     params["session"] = session
     try:
         call_agent(params, timeout=3)
@@ -109,7 +108,7 @@ def main() -> int:
     except Exception:  # noqa: BLE001
         with contextlib.suppress(OSError):
             EventQueue().append(session, {**{k: v for k, v in params.items() if k != "session"}, "at": time.time()})
-    return code
+    return 0
 
 
 if __name__ == "__main__":
