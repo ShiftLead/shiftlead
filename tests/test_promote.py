@@ -714,6 +714,28 @@ def test_ao_promote_status_reads_rolled_back_and_held(monkeypatch, capsys):
     assert calls == [("clear_promote", {"repo": "shiftlead"})] and "the hold is cleared" in capsys.readouterr().out
 
 
+def test_ao_promote_status_reads_checking_live_and_rolled_back_by_the_smoke(monkeypatch, capsys):
+    """§4.7 `ao promote status` (§6 *The smoke*, TD-811 slice 2): the row's words, and `--json` the
+    reading itself, `phase` and `held.by` / `held.why` with it."""
+    from shiftlead import cli
+
+    why = "smoke failed on 9999999: boom"
+    flight = {"sha": "9" * 40, "at": "t0", "by": "auto", "log": "/l", "phase": "smoke", "smoke_at": "t1"}
+    held = {"sha": "4" * 40, "from": "9" * 40, "main": "9" * 40, "at": "t", "by": "smoke", "why": why}
+    for r, want in (
+        ({"inflight": flight}, "\n  checking 9999999 live · started t1 · log /l"),
+        ({"held": held}, f"shiftlead · live 4444444, rolled back by the smoke from 9999999 — {why} · main"),
+    ):
+        reading = {"live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": True, **r}
+        monkeypatch.setattr(
+            cli, "call_sync", lambda m, rd=reading, **p: {"home": "kmaster", "promotes": {"shiftlead": rd}}
+        )
+        assert cli.main(["promote", "status"]) == 0
+        assert want in capsys.readouterr().out
+        assert cli.main(["--json", "promote", "status"]) == 0
+        assert json.loads(capsys.readouterr().out)["shiftlead"] == reading
+
+
 # ── TD-581: the cap on the settle, when the home will act, and the press under `auto` ──────────
 
 
@@ -1006,6 +1028,24 @@ def test_the_smokes_rollback_that_cannot_start_leaves_the_hold_beside_both_reaso
     why = f"smoke failed on {main[:7]}: smoke says 3; its rollback could not start: the rollback's worktree"
     assert readings["repo"]["failed"]["why"].startswith(why) and readings["repo"]["live"] == main
     assert promote.held("repo") == hold  # neither cleared nor rewritten
+
+
+def test_the_smokes_rollback_whose_run_cannot_be_spawned_is_a_failure_with_both_reasons(
+    checkout, monkeypatch, tmp_path
+):
+    """The techlead's note on #2033: `start`'s Popen raising (an OSError, not the tree's ValueError)
+    is a rollback that cannot start too — a failure with both reasons, no intent left in flight."""
+    _, code = _smoke_block(checkout)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=frm)
+    code.write_text("3")
+    readings, _ = _pass(checkout, readings)
+    monkeypatch.setattr(promote, "make_tree", lambda root, repo, sha: tmp_path / "gone")  # Popen's cwd is missing
+    readings, _ = _pass(checkout, readings)
+    why = f"smoke failed on {main[:7]}: smoke says 3; its rollback could not start: "
+    assert readings["repo"]["failed"]["why"].startswith(why) and readings["repo"]["live"] == main
+    assert promote.inflight("repo") is None and readings["repo"]["inflight"] is None
 
 
 def test_a_press_under_a_hold_whose_smoke_fails_rewrites_the_hold(checkout):

@@ -66,7 +66,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Designed — built by TD-811, TD-812 |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
-| TD-811 | Build TD-804 (1): a promote's smoke at the home — `smoke:` run once `check` reads the commit, the promote in flight until it ends, a failed smoke rolling back to `from` with the hold, and the row's and `ao promote status`'s words | Medium | Building — slice 1 #2033 |
 | TD-812 | Build TD-804 (2): this repo's smoke — `scripts/smoke.py`, every page loaded and `ao` read against the live copy, and `smoke:` in `.shiftlead.yml` | Medium | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Open |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
@@ -1305,60 +1304,6 @@ Then the build entries, named in `Blocked by:`.
 **Done when** each page's load is measured and broken down, a budget is set, and the build entries are filed and named in `Blocked by:`.
 
 **Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
-
-## TD-811: Build TD-804 (1): a promote's smoke at the home — `smoke:` run once `check` reads the commit, the promote in flight until it ends, a failed smoke rolling back to `from` with the hold, and the row's and `ao promote status`'s words
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (TD-804's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Building — slice 1 #2033 (2026-10-17, grinder-ao-1): the home — `smoke` read by both readers, kept on the intent from the run's tree, started once `check` reads the commit, judged from `smoke.json`, `SMOKE_BOUND`, the rollback a failed one starts (`by: smoke`, the hold's `by` and `why`), the notes. Slice 2: the row's and `ao promote status`'s words (`promote_rows`, `_promote_line`), with a UI check.
-**Location:** design §6 *Promote* *The smoke*, §5 `promote:`, §4.5a *Inbox row: promote*, §4.7 `ao promote status`; `src/sessionorc/promote.py` (`KEYS`, `block` read on the tree, `_conclude`, `_concluded`, `survey`, `start`, `note_text`), the home's `PromoteMixin`; `src/shiftlead/repoconfig.py` (`PROMOTE_KEYS`, `_promote`); the promote row in `src/shiftlead/ui/` and `ao promote status` in `src/shiftlead/cli.py`
-
-**Why:** TD-804, slice 1: today a promote is done when `check` reads the commit, and a build that breaks on the person's real state stays live until the person finds it.
-
-**Fix:**
-- **The key.** `promote:` takes an optional `smoke`, a non-empty string. `promote.block` returns it when present: today its `KEYS` reads past it silently. `repoconfig._promote` accepts it: today it refuses any key but `run` and `check`, so `ao new` in a repo whose block names `smoke` fails until this lands.
-- **The start.** On the pass whose `check` reads the intent's commit (not `live_why`), with a `smoke` in the block and no `phase: smoke` yet:
-  - split `_concluded` into the write at the `check` reading (`last.json`, and for a rollback `held.json`, so a rollback's failed smoke stands as a failure beside its hold) and the clear at the smoke's pass. A plain promote's `held.json` is cleared only when its smoke passes, or at the `check` reading for a block with no `smoke`.
-  - in `start`, read `smoke` from the run's tree (`block(tree)`: the checkout for a promote, `promotes/<repo>/tree` for a rollback) and keep it on the intent, so a pull of the checkout mid-run changes nothing and a restart needs no second read. A repo whose checkout's block has no `smoke` concludes on `check` with its note unchanged. Where the checkout's block has one and the tree's has none (a missing file reads as no block), no smoke runs and the note says *no smoke in `<sha7>`*. A tree whose file or block cannot be read (`block` raises `ValueError`) runs none either, and its note says *no smoke read in `<sha7>`: <why>*. The raise is caught there and never escapes into `survey`.
-  - start the smoke detached in the intent's tree (the checkout for a promote, `promotes/<repo>/tree` for a rollback);
-  - pass `SHIFTLEAD_PROMOTE_SHA` (now live), `_FROM`, `_ROOT` and `SHIFTLEAD_PROMOTE_KIND`, with output appended to the run's log after `── smoke ──`;
-  - run it through a wrapper (`sh -c '<smoke>; …'`, or a Python one) that writes `{sha, exit, at}` to `promotes/<repo>/smoke.json` when the smoke ends;
-  - record `phase: smoke`, `smoke_pid`, `smoke_started` (the process's start time, as the run's is kept) and `smoke_at` in `inflight.json`.
-  - A repo with no `smoke` concludes as today.
-- **The judgement.** On later passes (at `PROMOTE_WATCH` while in flight):
-  - **The run's bound stops at the smoke's start.** `_conclude`'s `PROMOTE_BOUND` check reads the run's `at` only while there is no `phase: smoke`. From then on, `SMOKE_BOUND` from `smoke_at` is the only clock.
-  - **Pass:** `smoke.json` for the intent's sha reads exit 0 → the intent cleared, a plain promote's hold cleared, a failure standing cleared as today, `smoke.json` removed, and the note *promoted `<repo>` `<sha7>` — n commits · smoke passed in <s> s* (a rollback's note gains the same tail).
-  - **Fail:** a non-zero exit, a smoke gone with no `smoke.json` (`alive` with its start time), or past `SMOKE_BOUND` (600 s; killed only while the pid is still the smoke) → a failed smoke, its why *smoke failed on `<sha7>`: <the log's last non-empty line>*.
-- **A failed smoke.**
-  - **Rolls back** when the intent's `kind` is not `rollback`, its `from` was read, and `from` ≠ the sha. It starts `start(..., kind="rollback", by="smoke", sha=from, frm=sha)` at once, keeping `why` on the new intent. It goes even under a standing hold.
-  - A rollback that cannot start (`start` raises: the tree cannot be made) → `fail(repo, intent, "smoke failed on <sha7>: <why>; its rollback could not start: <why>")`, live left where it is.
-  - When `check` reads that rollback's commit, `held.json` gains `by: smoke` and `why`, rewriting a standing hold as a second rollback does (its `from` kept).
-  - The note: *rolled back `<repo>` to `<sha7>`: the smoke failed on `<sha7>` — <why>*.
-  - **Otherwise** `fail(repo, intent, why)`: a failure standing, live left where it is.
-- **The row.** `promote_rows` reads *checking `<sha7>` live · started <t>* under FYI, with Promote disabled, while `phase: smoke`. A hold with `by: smoke` reads *rolled back by the smoke from `<sha7>` <t> ago — <why>* in place of *rolled back from …*. The build chip's *· promoting…* covers the smoke too.
-- **`ao promote status`** prints the same words, and `--json` carries `phase`, and `held.by` / `held.why`.
-- **Tests:**
-  - a block with `smoke` accepted by both readers;
-  - the smoke started on the reading pass in the right tree with the four variables;
-  - a pass, a non-zero exit, a smoke gone with no result, and the bound;
-  - the rollback started with `by: smoke` and the hold written with `by` and `why` when `check` reads it;
-  - a rollback that cannot start (both reasons on the failure);
-  - a run plus smoke past `PROMOTE_BOUND` passing;
-  - a rollback to a tree whose block has no `smoke` concluding on `check`, with *no smoke in `<sha7>`*, and one whose block cannot be read concluding with *no smoke read*;
-  - the smoke kept on the intent at start, unchanged when the checkout moves before the `check` reading;
-  - a press under a hold whose smoke fails: the hold rewritten, not cleared, and still standing when the smoke's rollback cannot start;
-  - a rollback's failed smoke leaving the hold beside the failure;
-  - no rollback for a rollback's failed smoke, an unread `from`, or `from` equal to the sha (a failure instead);
-  - an agent restarted mid-smoke reading `smoke.json`;
-  - precondition (3) refusing a press while `phase: smoke`;
-  - the row's and status's words.
-
-**Done when** a promote in a repo whose block has `smoke:` is concluded only when its smoke passes; a failed smoke puts `from` back with the hold and says why on the row, the note and `ao promote status`; a rollback's failed smoke stands as a failure; and the tests above pass.
-
-**Related:** TD-804 (the design), TD-812 (this repo's smoke), TD-132 and TD-226 (the promote and the rollback).
 
 ## TD-812: Build TD-804 (2): this repo's smoke — `scripts/smoke.py`, every page loaded and `ao` read against the live copy, and `smoke:` in `.shiftlead.yml`
 

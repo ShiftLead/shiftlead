@@ -1661,7 +1661,8 @@ def _pick_key(e: dict[str, Any]) -> tuple[int, int, int]:
 def _promote_line(name: str, r: dict[str, Any]) -> str:
     """One repo's promote readings (design §4.7 `ao promote status`): *shiftlead · live 485d28b · main
     9c1e0f2, 3 ahead · checks green · auto off*, under `auto` what the home will do (*auto on · settles
-    in 6 min*, TD-581), then a run in flight, a failure, or the first precondition that stands."""
+    in 6 min*, TD-581), then a run in flight — *checking `<sha7>` live* while its smoke runs (TD-811) —
+    a failure, or the first precondition that stands."""
     live = str(r.get("live") or "")[:7] or f"unknown ({r.get('live_why') or 'not read'})"
     main = str(r.get("main") or "")[:7] or f"unknown ({r.get('main_why') or 'not read'})"
     ahead = r.get("ahead")
@@ -1669,13 +1670,18 @@ def _promote_line(name: str, r: dict[str, Any]) -> str:
         f", {ahead} ahead" if isinstance(ahead, int) and ahead else (", live" if r.get("live") == r.get("main") else "")
     )
     checks = str(r.get("checks") or "unknown") + (f" ({r['checks_why']})" if r.get("checks_why") else "")
-    if h := r.get("held"):  # §6 *The hold*: live is older than main because a person put it there
-        live += f", rolled back from {str(h.get('from') or '')[:7] or 'unknown'}"
+    if h := r.get("held"):  # §6 *The hold*: live is older than main because a person (or a failed smoke) put it there
+        by = " by the smoke" if h.get("by") == "smoke" else ""
+        live += f", rolled back{by} from {str(h.get('from') or '')[:7] or 'unknown'}"
+        live += f" — {h['why']}" if by and h.get("why") else ""
     auto = ("on" if r.get("auto") else "off") + (" · held" if r.get("held") else "")
     if words := promote.acts_words(r.get("acts")):  # when the home will act under `auto` (TD-581)
         auto += f" · {words}"
     line = f"{name} · live {live} · main {main} · checks {checks} · auto {auto}"
-    if f := r.get("inflight"):
+    if (f := r.get("inflight")) and f.get("phase") == "smoke":  # §6 *The smoke*: check read it, its smoke runs
+        at = f.get("smoke_at") or f.get("at")
+        line += f"\n  checking {str(f.get('sha'))[:7]} live · started {at} · log {f.get('log')}"
+    elif f:
         what = "rolling back to" if f.get("kind") == "rollback" else "promoting"
         line += f"\n  {what} {str(f.get('sha'))[:7]} · started {f.get('at')} by {f.get('by')} · log {f.get('log')}"
     elif f := r.get("failed"):
