@@ -53,9 +53,22 @@ def record(exc: BaseException) -> None:
         pass
 
 
+def adapter() -> str:
+    """The adapter the hook runs for: `--adapter <name>` in argv, else Claude Code's, whose layer passes
+    none. Read before any import, since a Gemini CLI payload names no adapter and shares event names
+    with Claude Code's (design §4.3 *The second adapter*, TD-785)."""
+    argv = sys.argv[1:]
+    if "--adapter" in argv and argv.index("--adapter") + 1 < len(argv):
+        return argv[argv.index("--adapter") + 1]
+    return "claude-code"
+
+
 def main() -> int:
     try:
-        from shiftlead.adapters.claude_code import hook
+        if adapter() == "gemini":
+            from shiftlead.adapters.gemini import hook
+        else:
+            from shiftlead.adapters.claude_code import hook
     except Exception as e:  # noqa: BLE001 — whatever a half-replaced install raises
         record(e)
         print(f"shiftlead-hook: import failed, see {log_path()}: {e!r}", file=sys.stderr)
