@@ -118,10 +118,11 @@ class RemoteMixin:
             # A person at a node — or the person's own shell there, read from the home's copy of its
             # record (§4.8 *The person's own shell is the person*, TD-801) — acts only on that node's
             # records (§4.4a): `id@<this home>` collapsed to a home record above, and the person gate
-            # would then have passed it (security read of PR #217). The target's host, read after the rewrite, has to be the link's own. A call
-            # that names no session — the person inbox, a `wait` — names nothing to bound; the wait
-            # is scoped to the node's host instead. A `create` for another host is refused at the
-            # node before it gets here; the check is kept as a second line.
+            # would then have passed it (security read of PR #217). The target's host, read after the
+            # rewrite, has to be the link's own. A call that names no session — the person inbox, a
+            # `wait` — names nothing to bound; the wait is scoped to the node's host instead. A
+            # `create` for another host is refused at the node before it gets here; the check is kept
+            # as a second line.
             if rpc == "wait":
                 p["only_host"] = host
             where: str | None = None
