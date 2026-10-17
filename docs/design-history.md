@@ -477,6 +477,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-17 (TD-821, the designer; Paul, 2026-10-16, through Add entry: *when a shell is opened from a team, its card should show on that team*): *Focus: Open shell here* gives the shell the session's `team` and `project` badges, so on a team member it draws in that team's group with the compact card; *One shell per session, reopened* no longer reads *no team*. Built by TD-827.
 - 2026-10-16 (TD-810, the designer; Paul, 2026-10-16, a press in Edge that flashed and opened nothing while the session's shell was still live): *Focus: Open shell here*. A live `<session>-shell` that is the person's own shell in the session's directory is reopened rather than refused. An exited or closed one is superseded, any other live holder is refused with its reason, and the shell is made on the session's host. A refusal stays in the placeholder tab, and a blocked open's toast stays until pressed. Built by TD-817.
 - 2026-10-16 (TD-814, the designer; Paul, 2026-10-16, on ao-grind's card reading *2 design · 1 review* with one designer): *team card: TDs in motion*: a design-first claim with a PR reads *review*. Built by TD-815.
 - 2026-10-16 (TD-806, the designer; Paul, 2026-10-16, a send from Edge that cleared his next words and landed twice): *Focus composer* **Send** clears only the text it sent, while the box still begins with it. It reads *Sending…* while it waits, and *not confirmed* after `SEND_PAGE_SECONDS`, when a repeat goes under the same key. A prompt chip carries its own key. Built by TD-813.
@@ -931,6 +932,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.8 Capabilities, report channels, and role presets
 
+- 2026-10-17 (TD-821, the designer): *The person's own shell is the person* no longer requires *no team*: a badge grants nothing (§9 invariant 9), so the guards are *no role* and *no controllers*, and a shell opened from a team member stays the person's. Built by TD-827.
 - 2026-10-16 (TD-801, the designer; Paul, 2026-10-16: *a shell should be considered my permissions*): *The person's own shell is the person* — it passes the acting gate as a request with no caller does (grant, membership, invariant 5, the usage gate's send refusal), nothing carved out; a create from it is the person's (no creator controller, no attenuation); acts still name the shell; one test, `mail.as_person`, read at every branch where a person passes, every act routed to a node forwarded with no caller, a shell at a node bound as a person there (Fable rounds 1–2 and Sonnet rounds 1–2 adopted). Reverses TD-580's *nothing else changes*. Built by TD-802.
 - 2026-10-16 (TD-769, grinder-ao-1): *Choosing in a free-pick lane*'s rank order is built — the grinder, designer and repo briefs say *work orders first, then the highest-ranked pickable entry in your lane that nobody holds*, and the *Until TD-769* sentence is gone.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): *Choosing in a free-pick lane* — work orders, then the highest-ranked pickable entry in the lane nobody holds; a passed-over line is drawn on the card passed over. Built by TD-769 (the briefs and the flag's reading) and TD-771 (the flag drawn).
@@ -1032,6 +1034,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 
+- 2026-10-17 (TD-821, the designer): *A person in the team* gains *The person's own shell opened from a member* — the badge and nothing else of the team's, read as a person's session in the team in every reading, Resume carrying it. Built by TD-827.
 - 2026-10-16 (TD-775, grinder-ao-2): a `{team: …}` member now fails the org file's load as well as a repo's, naming the key, so *Add or remove a member* no longer lists it among the edits it refuses — such a file never loads.
 - 2026-10-15 (TD-730, the designer): *Add an entry to the ledger* — the entry names its team in its `Team:` line (the pick, else the words, else the seat's own), and `entry.md` tells every filing session to write its own.
 - 2026-10-15 (TD-722 amendment, Fable round 5 and Sonnet round 3, adopted): `anchor: false` is passed over only because no definition writes it today. Built by TD-724.
