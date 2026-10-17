@@ -15500,7 +15500,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (TD-804's design, the designer)
 **Owner:** grinder
 **Kind:** live-check #2040
-**Status:** Built #2040 (2026-10-17, grinder-ao-1). It passed a read-only run against the live UI, with every page 200, the `ao` reads at exit 0, and the browser half ok. Left: the *Done when*'s last clause. Once #2040 is live (`ao promote status`) and a promote has concluded after it, read that promote's log (`ao promote status` names it; read-only) and check for the lines after `── smoke ──` and the note's *smoke passed in <s> s*. The browser half runs only once Paul has run `--setup` (on the board, due 2026-10-24); until then the log says *browser half skipped*, which still holds.
+**Status:** Done — #2040; live check held (2026-10-17).
 **Location:** design §6 *The smoke* (*This repo's smoke*); `scripts/smoke.py` (new; not a synced file); `.shiftlead.yml` `promote:`; `src/shiftlead/service.py` (`UNIT_DIR`, the `shiftlead-ui.service` unit's `--port`, `DEFAULT_PORT`); `tests/`
 
 **Why:** TD-804, slice 2: the first repo's smoke, so a build that breaks a page or an `ao` read on Paul's real state is put back within minutes rather than found by him.
@@ -15541,7 +15541,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-16 (design §6 *Promote* *The smoke*, §5 `promote:`, §4.5a *Inbox row: promote*, §4.7 `ao promote status`): an optional `smoke:` run at the home once `check` reads the commit; a failed smoke rolls back to `from` with the hold (steer m-bf390074fccb, the default), never after a rollback. A gate before the promote was set aside, and staging is left to the repo's `run`. Built by TD-811 (the home) and TD-812 (this repo's smoke).
+**Status:** Done — built by TD-811 and TD-812 (#2033, #2037, #2040).
 **Blocked by:** TD-811, TD-812
 **Location:** design §6 *Promote* (the three preconditions, the outcome read from `check`, *A rollback* and *The hold*), §5 `promote:` (`run`, `check`), §4.5a *Inbox row: promote*, §4.7 `ao promote`; `src/sessionorc/promote.py`; `.shiftlead.yml` `promote:`
 
@@ -15795,3 +15795,25 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Done when** a seat on the container node reads its figure on the Spend page as a kmaster seat does.
 
 **Related:** TD-818, TD-830, TD-151 slice 4 (the `spend` method it copies).
+
+## TD-853: TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (docs-audit-ao-1, the audit of #2037–#2046)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — #2068 (2026-10-17, grinder-ao-1).
+**Location:** `docs/technical_debt_archive.md` (`## TD-812`, `## TD-804`)
+
+**Why:** #2043 archived both entries and wrote their `**Resolved:**` lines but left the `**Status:**` lines as they stood:
+- TD-812: `**Status:** Built #2040 (2026-10-17, grinder-ao-1). … Left: the *Done when*'s last clause. Once #2040 is live … read that promote's log …` against `**Resolved:** 2026-10-17 (grinder-ao-1, #2040) — live check held: the auto promote of `ad49dcd` … ran `smoke:` …`. The archive says in one line that the clause is left and in the next that it held.
+- TD-804: `**Status:** Designed 2026-10-16 … Built by TD-811 (the home) and TD-812 (this repo's smoke).` against `**Resolved:** … built by TD-811 and TD-812, #2040`. A reader of the Status alone takes a built design for an open one. #2039 corrected the same drift on TD-847 (*archived Status reads Built*), so the repo treats it as a defect.
+
+**Fix:** TD-812's Status reads `Done — #2040; live check held (2026-10-17)`, dropping the *Left* sentence and the `--setup` clause that Resolved already carries; TD-804's reads `Done — built by TD-811 and TD-812 (#2033, #2037, #2040)`. Archive-only edit.
+
+**Done when** neither archived entry's Status contradicts its Resolved line.
+
+**Related:** TD-812, TD-804, TD-847 (#2039, the same fix).
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #2068). TD-812's Status reads *Done — #2040; live check held*, TD-804's *Done — built by TD-811 and TD-812 (#2033, #2037, #2040)*; neither contradicts its Resolved line.
