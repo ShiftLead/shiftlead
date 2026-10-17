@@ -18,6 +18,9 @@ read from it at capture.
 - `procs/grinder-two-tasks.json`: `/proc` as `identity.LinuxProc` read it under grinder-ao-2's pane
   process, with two background shell tasks running; each `cmdline` value cut to 160 characters.
 
-Not captured yet, so the suite skips them for this adapter: hook payloads (the state mapping and
-`pending`), the status line's payload (`usage_report`) and pane titles (`title`). The live walk's
-`--capture` records them (TD-784 slice 2).
+- `captured/`: what the live walk's `--capture` recorded (`pdm run conformance claude-code --profile
+  conformance --capture`, Claude Code 2.1.302, 2026-10-16, TD-784 slice 3), unshortened: `hooks.jsonl`,
+  each hook payload the tool handed `shiftlead-hook` across the walk's seven steps, its bytes, one per line
+  (the state mapping and `pending`); `statusline.jsonl`, the status line's payloads (`usage_report`); and
+  `titles.json`, the pane titles on the walk's tmux server at its end (`title`). The walk ran in a scratch
+  directory under `/tmp` on a profile set aside for it, so no person's session is in them.

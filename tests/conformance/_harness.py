@@ -134,6 +134,23 @@ def check_spend(got: object, tool_fields: frozenset[str]) -> None:
     check_neutral(got["turns"], tool_fields)
 
 
+def hook_reading(params: dict[str, Any] | None) -> dict[str, Any]:
+    """The state and pending kind an adapter's hook params stand for, restated from the host agent's
+    `agent_hook.rpc_hook` (not called): a `permission` event waits on the person as `needs-you`; None
+    reports nothing."""
+    if params is None:
+        return {"state": None}
+    if params.get("kind") == "permission":
+        return {"state": "needs-you", "pending": "permission"}
+    kind = (params.get("pending") or {}).get("kind")
+    return {"state": params.get("state"), **({"pending": kind} if kind else {})}
+
+
+def check_hook_reading(got: dict[str, Any]) -> None:
+    check_state(got["state"])
+    assert got.get("pending") in (None, "permission", "question"), f"pending kind {got.get('pending')!r}"
+
+
 def check_background(got: object) -> None:
     assert got is None or isinstance(got, list), f"background returned {got!r}"
     for task in got or ():
@@ -173,7 +190,8 @@ class RecordedProc:
 
 
 class ClaudeCodeHarness:
-    """Claude Code keeps a session's transcript at `<config dir>/projects/<munged cwd>/<id>.jsonl`."""
+    """Claude Code keeps a session's transcript at `<config dir>/projects/<munged cwd>/<id>.jsonl`, and
+    hands each hook payload to `shiftlead-hook`, whose `translate` makes the host agent's `hook` params."""
 
     tool_fields = frozenset(
         {
@@ -207,6 +225,11 @@ class ClaudeCodeHarness:
             f"default: t\nprofiles:\n  t: {{account: t, config_dir: {tmp_path / 'cc'}}}\n", encoding="utf-8"
         )
         return "t"
+
+    def hook_params(self, payload: dict[str, Any], *, at_composer: bool) -> dict[str, Any] | None:
+        from shiftlead.adapters.claude_code.hook import translate
+
+        return translate(payload, at_composer=at_composer)
 
     def place_transcript(self, tmp_path: Path, src: Path, session_id: str) -> Path:
         """Put the fixture where the adapter looks for `session_id`'s transcript; the session's cwd."""

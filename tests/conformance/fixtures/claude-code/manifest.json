@@ -26,5 +26,34 @@
   ],
   "procs": [
     {"file": "procs/grinder-two-tasks.json", "background": ["timeout 300 sleep 290", "python3 procs.py"]}
+  ],
+  "hooks": [
+    {
+      "file": "captured/hooks.jsonl",
+      "at_composer": true,
+      "reads": [
+        {"state": "idle"},
+        {"state": "working"},
+        {"state": "idle"},
+        {"state": "working"},
+        {"state": "working"},
+        {"state": "needs-you", "pending": "permission"},
+        {"state": "working"},
+        {"state": "idle"},
+        {"state": "working"},
+        {"state": "working"},
+        {"state": "needs-you", "pending": "permission"},
+        {"state": "working"},
+        {"state": "idle"},
+        {"state": "exited"},
+        {"state": "idle"}
+      ]
+    }
+  ],
+  "status_lines": [
+    {"file": "captured/statusline.jsonl", "windows": [0, 2, 2, 2, 2, 2, 2, 0]}
+  ],
+  "titles": [
+    {"file": "captured/titles.json", "names": ["conformance-walk"]}
   ]
 }

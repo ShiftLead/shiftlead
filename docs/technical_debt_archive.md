@@ -14808,3 +14808,29 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-801, TD-580, TD-596.
 
 **Resolved:** 2026-10-16 (grinder-ao-1, #1988 and #1990) — slice 1 (#1988): `mail.as_person` at `act_gate`, the usage gate's `send`, `create`'s creator seeding and its `start_of`, `keep_mail` and `succeeds` checks, `_refuse_suspended` at its four calls, `set_start` at the ceiling, `host_files`, the refills on `send`, `keys` and `decide`, the *dropped by the person* note and `person_only`; `tests/test_person_shell_acts.py`. Slice 2 (#1990): `_route_act` forwards every act from the shell with no caller and `_lift_by_person` lifts a suspended name on its create; `_forwarded` bounds a node's shell to its node as a person there; `modes.offline_refusal` takes the node's records and serves its shell on its node's sessions, link up or down; `tests/test_person_shell_link.py` (each of its four tests fails with the `src` change reverted).
+
+---
+
+## TD-784: Build TD-112 (1): the adapter conformance suite — `tests/conformance/`, offline fixtures in CI, `pdm run conformance <adapter>` live by hand; Claude Code passes it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (TD-112's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.3 *The conformance suite*; new `tests/conformance/` (a conftest parametrizing over `sessionorc.adapters.names()` with agents, each adapter's declared methods), fixtures under `tests/conformance/fixtures/<adapter>/`; `pyproject.toml` (`[tool.pdm.scripts] conformance`); `src/sessionorc/adapters.py` (`permission_channel` on the protocol, the `shell` adapter's False); `src/shiftlead/adapters/claude_code/__init__.py` (`permission_channel = True`, the declared optional methods)
+
+**Why:** TD-112: neutrality is checked on every change, not once by a spike; the suite comes first, so the Gemini CLI adapter is built against it.
+
+**Fix:**
+- **The declaration**: each agent adapter says which optional methods it implements (`links`, `background`, `context`, `usage_report`, `mail`, `composer`, `title`, `spend`), and `permission_channel`; the suite tests what is declared and asserts an undeclared method is absent.
+- **Offline (CI)**: fixtures captured from the real tool — panes for `classify`, `composer`, `title`; hook payloads for the state mapping and `pending`; transcripts for `read_transcript`, `context`, `links`, `spend`. The assertions are neutral: a state for every pane and payload fixture, the neutral entry kinds, no tool field name in any returned structure, `context` within `window`. Claude Code's fixtures captured from its current transcripts and panes (from a scratch session, never a person's).
+- **Live (by hand)**: `pdm run conformance <adapter> --profile <p>` — a scratch `SHIFTLEAD_HOME` (short path, memory `scratchpad-too-long-for-unix-sockets`) with its own host agent on a private tmux socket, started and stopped by the pid the walk holds; `SHIFTLEAD_HOME` in every launch's env; the tool's home the profile's; a scratch directory; launch with a chosen id, the first hook, a short prompt (`working` → `idle`), `send` confirmed by `composer`, a permission seen as `needs-you` (a profile with `permission_prompts: ask`), a doorbell delivering a mail the walk sends as the person, a resume with the same id, the transcript read back. Refuses to run without `--profile` and never in CI (`CI` set).
+- **Tests of the suite itself**: a fake adapter missing a declared method fails; one returning a tool field name fails.
+
+**Done when** `pdm run test` runs the offline suite with Claude Code passing it, `pdm run conformance claude-code --profile <p>` passes once live with its output in the PR, and the `shell` adapter is skipped as having no agent.
+
+**Related:** TD-112, TD-785, TD-786.
+
+**Resolved:** 2026-10-16 (grinder-ao-2, #1949, #1969 and #2003) — slice 1 (#1949): the declaration (`implements`, `OPTIONAL_METHODS`, `permission_channel`), the offline suite and its self-tests, Claude Code's pane, transcript and `/proc` fixtures; slice 2 (#1969): the live walk, `pdm run conformance <adapter> --profile <p> [--capture]` (`scripts/conformance.py`), and the hook's capture; slice 3: the walk's first live run on the `conformance` profile passed 7 of 7 with `--capture` (its output in the PR), the captured hook payloads, status lines and pane titles named in `manifest.json` and read by the suite (the state mapping and `pending`, `usage_report`, `title`, and a captured permission for the declared channel, TD-792's second half), `_need` failing a declared method with no fixtures, and the capture writing each payload's own bytes. The walk passes the tool's asking arguments (Claude Code's `--permission-mode manual`, TD-823) and resumes once the killed process's own `SessionEnd` has landed (TD-822). The lasting content: design §4.3 *The conformance suite*, `tests/conformance/`, `scripts/conformance.py`.
