@@ -73,8 +73,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
-| TD-845 | A link a program prints with OSC 8 (Claude Code's *Report: Team Spend by Seat*) is plain text in the Focus pane: tmux drops it before the browser, and xterm.js has no handler for it | Medium | Open |
+| TD-845 | A link a program prints with OSC 8 (Claude Code's *Report: Team Spend by Seat*) is plain text in the Focus pane: tmux drops it before the browser, and xterm.js has no handler for it | Medium | Designed — built by TD-847 |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
+| TD-847 | Build TD-845: the bridge's attach asks tmux for `hyperlinks`, and the Focus terminal's `linkHandler` opens an OSC 8 target under the URL rule, its target shown on hover | Medium | Open |
 
 ---
 
@@ -1550,7 +1551,8 @@ Then the build entries, named in `Blocked by:`.
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-17 (design §4.6 *A hyperlink in the pane is a link*; §4.5a *Focus pane: a hyperlink is a link*). Step 1's read: Claude Code emits OSC 8 under tmux 3.4 or later, and tmux 3.5a sends it only to a client attached with `-T hyperlinks`, in copy mode too. The bridge's attach asks for it and `ao focus` does not. The Focus terminal's `linkHandler` opens the target under the URL rule and shows it as the pane's tooltip on hover. With a target that is not `http(s)`, the label is text, read by the URL and path rules. Built by TD-847.
+**Blocked by:** TD-847
 **Location:** design §4.6 *A URL in the pane is a link* (TD-421) and *A path in the pane is a link* (TD-493), §4.5a's Focus link rows; `src/sessionorc/tmux.py` (`attach_argv`); `src/shiftlead/ui/static/app.js` (`AO.focus`: the `Terminal` options, the web-links addon, `AO.paneLink`)
 
 **Why:**
@@ -1602,3 +1604,28 @@ Then the build entries, named in `Blocked by:`.
 **Done when** the paid option's obligations are written here, and the basics are built or each is archived with its reason.
 
 **Related:** [`docs/decisions/2026-10-13-monetisation.md`](decisions/2026-10-13-monetisation.md) (options 2, 3 and 5), TD-131 (retention), design §2 (multi-user access is a non-goal for now).
+
+## TD-847: Build TD-845: the bridge's attach asks tmux for `hyperlinks`, and the Focus terminal's `linkHandler` opens an OSC 8 target under the URL rule, its target shown on hover
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (the designer, from TD-845)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/tmux.py` (`attach_argv`), `src/sessionorc/containers.py` (`attach_argv_in`), `src/shiftlead/ui/pty_bridge.py` (`attach_argv`) and `src/shiftlead/ui/app.py` (the terminal websocket), `src/shiftlead/cli.py` (`ao focus`, unchanged), `src/shiftlead/ui/static/app.js` (`AO.focus`, `AO.paneLink`), `src/shiftlead/ui/help.py`
+
+**Why:** design §4.6 *A hyperlink in the pane is a link* and §4.5a's **a hyperlink is a link** row (TD-845). Claude Code prints Artifacts, PRs and docs as OSC 8 labels inside tmux; the pty bridge's plain `tmux attach` gets the label without its target, so the Focus pane shows dead text.
+
+**Fix:**
+1. `attach_argv` takes `features` (a tuple, empty by default) and puts `-T <comma-joined>` before `attach`; `attach_argv_in` and `pty_bridge.attach_argv` (what `app.py` imports) pass it through. The flag goes after the binary, so `app.py`'s `inside` still splits the `docker exec` prefix at `"tmux"`. The terminal websocket's two attaches (this host's and a container node's) pass `("hyperlinks",)`; `ao focus` (`cli.py`) passes nothing, so its argv is unchanged.
+2. `AO.paneLinkHandler(el)` returns `{ activate: (e, uri) => AO.paneLink(e, uri), hover: (e, uri) => { el.title = uri; }, leave: () => { el.title = ""; } }`, and `AO.focus` passes `linkHandler: AO.paneLinkHandler($("#term"))` to the `Terminal` (`#term` is the box the terminal opens in, on the pop-out too). `activate` is a wrapper, never `AO.paneLink` itself: xterm passes the link's `range` third, which `AO.paneLink` would take as its `open` and call. `allowNonHttpProtocols` stays unset, so xterm's OSC provider drops any target that is not `http:`/`https:`, and `AO.paneLink` checks again. It applies on a read-only Focus and in the pop-out, as the web-links addon does.
+3. Add §4.5a's row as a `help.py` entry, or widen `pane-link`'s text to name a label with a hidden target. The wording goes in that PR, and §4.5a's help list changes with it.
+
+**Done when:**
+- A test drives `tmux -L <private> -T hyperlinks attach`, as the bridge builds it, on a pane that printed an OSC 8 run, and reads the `ESC ] 8 ;` sequence and its target in the attach's bytes. It skips when `tmux -V` is below 3.4. `attach_argv` and `pty_bridge.attach_argv` without `features` have no `-T`, and `ao focus`'s argv has none. `tests/test_ui_teams.py`'s websocket attach for a container node now reads `["tmux", "-T", "hyperlinks", "attach", "-t", "=ao-repo-w:"]`; `tests/test_ui.py`'s `pty_bridge.attach_argv`, `tests/test_containers.py`'s and `tests/test_cli.py`'s `ao focus` assertions stay as they are.
+- A node probe, as `tests/test_ui_focus_links.py`'s, builds `AO.paneLinkHandler(el)` on a stub element, with `window.open` stubbed to record its arguments (the wrapper passes no `open`). `activate({ctrlKey: true}, url, range)` opens `[url, "_blank", "noopener"]`, and `activate({}, url, range)` opens nothing. `hover(e, url, range)` leaves `el.title === url`, and `leave()` clears it. A `javascript:` target opens nothing on Ctrl+click.
+- A text check holds that `new Terminal(` in `AO.focus` carries `linkHandler:` and no `allowNonHttpProtocols`, and that the vendored `xterm.js`'s `OscLinkProvider` keeps its `["http:","https:"]` check. The drop of any other target is xterm's, so the test pins the vendored copy rather than driving it.
+- §4.5a's row is listed in `help.py`, or the URL row's help names it, and `tests/test_help.py` passes.
+
+**Related:** TD-845 (the design), TD-421/TD-422 (the URL rule), TD-071 (no control from the text).
