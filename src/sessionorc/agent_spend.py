@@ -7,6 +7,11 @@ windows and served under every profile of the account as a polled reading is —
 A node runs the same pass over its own sessions, and its turns reach the home over the link as
 `spend {account, profile, prices, turns, cursors}` (slice 4): the ledger and its cursors are the
 home's, and the account's sums come back to the node in the reply and as `usage {account, sums}`.
+
+Beside it, once a minute, the **seat pass** (§4.4 *Spend per seat*, TD-830): every profile a live
+session runs under, a subscription's included, read with cursors of its own into `seat_spend.json`
+(`sessionorc.seats`), each turn weighed and charged to a record and a reference; the `seats` RPC
+reads it. Nothing gates on it.
 """
 
 from __future__ import annotations
@@ -18,13 +23,14 @@ import time
 from datetime import datetime
 from typing import Any
 
-from sessionorc import adapters, agent_common, link
+from sessionorc import adapters, agent_common, link, seats
 from sessionorc import settings as settings_mod
 from sessionorc import spend as spend_mod
-from sessionorc.agent_common import _usage_key, log
+from sessionorc.agent_common import RpcError, _usage_key, log
 from sessionorc.models import PERSON, now_iso
 
 BILLING_KEEP = 60.0  # seconds a profile's billing, read for the gate, is kept before it is read again
+SEAT_EVERY = 60.0  # seconds between seat passes (§4.4 *Spend per seat*): nothing waits on it
 
 
 def _offsets(held: dict[str, Any]) -> dict[str, int]:
@@ -331,6 +337,98 @@ class SpendMixin:
             text = f"{prof} · {w['label']} {spend_mod.say(amount, got)} of {spend_mod.say(amount, amount['value'])}"
             log.info("spend: %s", text)
             self._system_note(PERSON, text)
+
+    # -- the seat ledger (§4.4 *Spend per seat*, TD-830) ------------------------------------------
+
+    async def _refresh_seats(self) -> None:
+        """One seat pass, detached from the tick as the spend pass is (it reads transcripts)."""
+        try:
+            await self._refresh_seats_inner()
+        except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
+            log.exception("the seat pass failed")
+
+    async def _refresh_seats_inner(self) -> None:
+        """`spend(profile, seat cursors)` for every profile this host's live sessions run under, each
+        turn weighed and charged (`seats.take`); a profile's first read on this host (not yet in the
+        host's `seeded`) is its backfill — the fortnight before it, to `between`. `seat_spend.json` is
+        written only when a turn was charged, a cursor moved or a claim was first seen."""
+        live = {(s.adapter, s.profile) for s in self._usage_live()}
+        metered = await asyncio.to_thread(_metered_of, live)
+        weights = settings_mod.weights(settings_mod.load())
+        now = datetime.now().astimezone()  # the home's own clock, as the account ledger's days
+        ledger = self._seats
+        records = list(self.sessions.values())
+        mine = (ledger.get("hosts") or {}).get(self.host) or {}
+        held = mine.get("cursors") or {}
+        seeded = set(mine.get("seeded") or ())
+        first = bool(live) and "began" not in ledger
+        if first:
+            ledger["began"] = now_iso()
+        # a claim seen by the pass that began the ledger was made before it: its entry reads partial
+        moved = seats.see_claims(ledger, records, now_iso(), first) if live else False
+        for name, prof in sorted(live):
+            ad = adapters.get(name)
+            if not callable(getattr(ad, "spend", None)):
+                continue
+            cursors = {
+                str(src): int(c["offset"]) for src, c in held.items() if isinstance((c or {}).get("offset"), int)
+            }
+            try:
+                r = await asyncio.to_thread(ad.spend, prof, cursors)
+            except Exception as e:  # noqa: BLE001 — the adapter's failure is a reason, never the pass's
+                r = {"reason": f"error: {type(e).__name__}"}
+            if not isinstance(r, dict) or r.get("reason") != "ok":
+                why = str(r.get("reason") or "error") if isinstance(r, dict) else "error"
+                if self._seat_reason.get(prof) != why:
+                    log.info("seat spend for %s: %s", prof, why)  # once per change
+                self._seat_reason[prof] = why
+                continue
+            self._seat_reason.pop(prof, None)
+            backfill = prof not in seeded  # a profile's first read is its backfill, whenever it first runs
+            moved = (
+                seats.take(ledger, self.host, r, records, metered.get((name, prof)), weights, now, backfill) or moved
+            )
+            held = ledger["hosts"][self.host]["cursors"]  # a second profile on one directory reads on from here
+            if backfill:
+                seeded.add(prof)
+                ledger["hosts"][self.host]["seeded"] = sorted(seeded)
+                moved = True
+        if now.date().isoformat() != self._seats_pruned:
+            self._seats_pruned = now.date().isoformat()
+            seats.prune(ledger, now.date())
+        if moved:
+            await self._save_seats()
+
+    async def _save_seats(self) -> None:
+        """`seat_spend.json` written when it changed: one writer (the pass, and a `done` that lands),
+        a snapshot written off the loop."""
+        async with self._seats_lock:
+            text = json.dumps(self._seats, sort_keys=True)
+            if text != self._seats_saved:
+                await asyncio.to_thread(self.seat_store.save, json.loads(text))
+                self._seats_saved = text
+
+    async def _seat_spend_done(self, s: Any, ref: str, claimed_at: str | None) -> None:
+        """A plain `ao progress done` landed (§4.4 *Spend per seat*): the reference's `done_at`, and its
+        `first_claimed` from the claim when no pass saw it."""
+        seats.done(self._seats, s.repo, ref, claimed_at, now_iso())
+        await self._save_seats()
+
+    async def rpc_seats(self, window: str = "day", team: str | None = None, by: str | None = None) -> dict[str, Any]:
+        """The seat ledger's reading (design §4.4 *Spend per seat*, §4.7 `ao spend`; TD-830): over a `day`
+        or a `week`, per seat (per record under `by: record`), per role, team and repo, per finished
+        entry, and *outside shiftlead*; `unknown` the profiles whose spend could not be read, whose
+        seats read *spend unknown*. Read-only, and open to a session."""
+        if by not in (None, "", "seat", "record"):
+            raise RpcError(f"seats by seat or record, not {by!r}")
+        now = datetime.now().astimezone()
+        try:
+            out = seats.reading(
+                self._seats, window, now, team or None, by or None, settings_mod.weights(settings_mod.load())
+            )
+        except ValueError as e:
+            raise RpcError(str(e)) from None
+        return out | {"unknown": dict(sorted(self._seat_reason.items()))}
 
     def _is_metered(self, profile: str) -> bool:
         """Whether `profile` is billed `metered`, known **before** the gate judges (§4.4: keyed on the

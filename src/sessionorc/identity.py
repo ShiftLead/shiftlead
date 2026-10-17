@@ -55,6 +55,7 @@ READS = frozenset(
         "queue",
         "shape",
         "gate",
+        "seats",
         "adapters",
         "ping",
         "whoami",

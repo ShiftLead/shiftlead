@@ -26,6 +26,7 @@ TRANSCRIPT_FIELDS = frozenset(f.name for f in dataclasses.fields(Transcript))
 CONTEXT_FIELDS = frozenset({"tokens", "at", "window"})
 TURN_FIELDS = frozenset(
     {"at", "id", "source", "offset", "response", "model", "input", "output", "cache_read", "cache_write", "cost"}
+    | {"conversation", "cwd", "subagent"}  # whose turn it is (§4.3, §4.4 *Spend per seat*, TD-830)
 )
 TOKEN_KINDS = ("input", "output", "cache_read", "cache_write")
 BACKGROUND_FIELDS = frozenset({"pid", "start", "cmd"})

@@ -149,6 +149,8 @@ class SettingsMixin:
             "usage": {"max_age": settings_mod.usage(doc).get("max_age", settings_mod.MAX_AGE_DEFAULT)},
             # the install's `settle:` as written, `{}` for the built-in alone (§4.4, TD-710)
             "settle": doc["settle"] if isinstance(doc.get("settle"), dict) else {},
+            # the weights the seat pass reads: the design's default under what the person set (TD-830)
+            "spend": {"weights": settings_mod.weights(doc)},
             "person": settings_mod.person(doc),
             "notify": settings_mod.notify(doc),
             "reach": settings_mod.reach(doc),
@@ -189,6 +191,7 @@ class SettingsMixin:
         usage: dict[str, Any] | None = None,
         notify: dict[str, Any] | None = None,
         settle: dict[str, Any] | None = None,
+        spend: dict[str, Any] | None = None,
         reach: Any = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -216,14 +219,18 @@ class SettingsMixin:
         - `settle`: `{kind: duration}` (§4.4 *A new entry settles before it is pickable*, TD-710), the
           whole map replaced — `{}` removes the key, so the built-in `{design-first: 5m}` holds; a Kind
           that is not a word or a duration that is not `5m`, `1h`, `0` is refused.
+        - `spend`: `{weights: {as_of?, <model prefix>: {<kind>: $ per million}}}` (§5 `spend.weights`, §4.4
+          *Spend per seat*, TD-830), the whole key replaced — `{}` removes it, so the design's default
+          holds; an unknown kind or a price that is not a number at or above zero is refused.
 
         `reach` is refused, naming `ao connect`: `set_reach` is the one RPC that writes it (§4.7, TD-648)."""
         agent_common.person_only(caller, "change the settings", "§5 settings.yml", self._graph())
         if reach is not None:
             raise RpcError("set_settings does not write reach: — `ao connect` does, through set_reach (design §4.7)")
-        if all(v is None for v in (reserves, teams, repos, person, usage, notify, settle)):
+        if all(v is None for v in (reserves, teams, repos, person, usage, notify, settle, spend)):
             raise RpcError(
-                "set_settings needs reserves, teams, repos, person, usage, notify or settle (design §5 settings.yml)"
+                "set_settings needs reserves, teams, repos, person, usage, notify, settle or spend "
+                "(design §5 settings.yml)"
             )
         doc = settings_mod.load()
         before = copy.deepcopy(doc)
@@ -289,7 +296,13 @@ class SettingsMixin:
             except ValueError as e:
                 raise RpcError(str(e)) from None
             out["settle"] = doc["settle"]
-        for key in ("teams", "repos", "person", "usage", "notify", "settle"):
+        if spend is not None:
+            try:
+                doc["spend"] = settings_mod.parse_spend(spend) if spend else {}
+            except ValueError as e:
+                raise RpcError(str(e)) from None
+            out["spend"] = {"weights": settings_mod.weights(doc)}
+        for key in ("teams", "repos", "person", "usage", "notify", "settle", "spend"):
             if key in doc and not doc[key]:
                 doc.pop(key)
         settings_mod.save(doc)
@@ -301,7 +314,7 @@ class SettingsMixin:
                     (before_teams.get(str(name)) or {}).get("until"),
                     (after.get(str(name)) or {}).get("until"),
                 )
-        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person", "notify", "settle") if k in doc]
+        held = [k for k in ("usage_gate", "usage", "teams", "repos", "person", "notify", "settle", "spend") if k in doc]
         log.info("settings.yml written; it holds %s", ", ".join(held) or "nothing")
         await self._push_settings()
         # detached, as the tick's hand-edit commit is: a wedged git must not hold Save up to its

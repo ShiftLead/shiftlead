@@ -8,8 +8,8 @@ key is the usage gate's reserves, per profile, per window label as the adapter n
     usage_gate:
       grind: {"5h": 30, wk: {per_day: 10}}
 
-Eight keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319, TD-641, TD-647): `usage_gate`, `usage`
-(`max_age`), `teams`, `repos`, `person`, `notify` (`telegram`), `permissions` (hand-edited: the
+Nine keys (§5 *The settings a person moves*, TD-146, TD-233, TD-319, TD-641, TD-647, TD-830): `usage_gate`, `usage`
+(`max_age`), `teams`, `repos`, `person`, `notify` (`telegram`), `spend` (`weights`), `permissions` (hand-edited: the
 host reads it at the hook, and `set_settings` writes none of it) and `reach` (the UI's route port reads
 it from the file; `set_settings` writes none of it). Each has a reader here that drops whatever is not
 valid — a hand edit can put anything in the file, and a malformed entry must act on nothing — and a
@@ -303,7 +303,58 @@ def usage(doc: dict[str, Any]) -> dict[str, Any]:
         return {}
 
 
-# -- teams, repos, person (§5, TD-146) -------------------------------------------------------------
+# -- spend (§5 `spend.weights`, §4.4 *Spend per seat*, TD-830) ---------------------------------------
+
+SPEND_KEYS = ("weights",)
+WEIGHT_KINDS = ("input", "output", "cache_read", "cache_write")
+
+
+def parse_spend(value: Any, drop: bool = False) -> dict[str, Any]:
+    """`spend: {weights: {as_of?, <model prefix>: {<kind>: $ per million}}}`, checked as a profile's
+    `prices:` is: a known kind, a number at or above zero. Raises on anything else — or, with `drop`
+    (the reader's side), leaves the key out."""
+    if drop and not isinstance(value, dict):
+        return {}
+    spend = _fields(value, SPEND_KEYS, "spend", drop)
+    if "weights" not in spend:
+        return spend
+    raw = spend["weights"]
+    if not isinstance(raw, dict):
+        if drop:
+            return {}
+        raise ValueError(f"spend.weights is a mapping of model prefixes to prices per kind, not {raw!r}")
+    out: dict[str, Any] = {}
+    for key, w in raw.items():
+        try:
+            if key == "as_of":
+                out["as_of"] = str(w.isoformat() if hasattr(w, "isoformat") else datetime.fromisoformat(str(w)).date())
+                continue
+            if not str(key).strip() or not isinstance(w, dict) or not w:
+                raise ValueError(f"spend.weights.{key} is a mapping of {', '.join(WEIGHT_KINDS)} to $ per million")
+            kinds: dict[str, float] = {}
+            for kind, v in w.items():
+                if kind not in WEIGHT_KINDS:
+                    raise ValueError(f"spend.weights.{key}.{kind} is not a token kind ({', '.join(WEIGHT_KINDS)})")
+                if isinstance(v, bool) or not isinstance(v, int | float) or not math.isfinite(v) or v < 0:
+                    raise ValueError(f"spend.weights.{key}.{kind} is $ per million tokens, not {v!r}")
+                kinds[str(kind)] = float(v)
+            out[str(key)] = kinds
+        except ValueError:
+            if not drop:
+                raise
+    return {"weights": out}
+
+
+def weights(doc: dict[str, Any]) -> dict[str, Any]:
+    """The weights the seat pass reads: the design's default (`seats.WEIGHTS`), each key the person
+    set replacing that key whole, and their `as_of` when given."""
+    from sessionorc.seats import WEIGHTS  # the default lives with the ledger that reads it
+
+    mine = parse_spend(doc.get("spend"), drop=True).get("weights") or {}
+    return {**WEIGHTS, **mine}
+
+
+# -- teams, repos, person (§5, TD-146)-------------------------------------------------------------
 
 TEAM_KEYS = ("schedule", "until", "reserve", "balance", "on_work", "flow")
 ON_WORK = (
