@@ -1,14 +1,16 @@
 {# A Queue card (design §4.5 screen 12 *A card*, §4.5a *Queue page: card*, *Queue page, Up next: grip /
    ⤒ ↑ ↓*; TD-770), drawn by the Queue page and the Repo page alike. Its header is the top entry — id,
    Priority badge, the whole title wrapped, then the holder's pill, its state, the count and the card's
-   status — and a press on it folds or opens the card (no chevron; the page remembers which); the top entry's
-   questions are drawn in it (TD-771), so a folded card still shows them. An Up next
+   status — and a press on it folds or opens the card (no chevron; the page remembers which). What is attached
+   to the card is in its sections (TD-828): *Needs you* in the header, so a folded card still shows it, the
+   other four in the body above the rows, each heading hidden at 0. An Up next
    card carries its place, a grip and ⤒ ↑ ↓; an In progress one a green stripe and *d/m done* where the
    status would be. Amber is spent on what needs the person alone. #}
-{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, attached %}
+{% from "queue_row.html" import row, pbadge, state, holder, extras, builds, mentioned, section %}
 {% macro card(c, repo='') %}{% set t = c.top %}{% set up = c.group == 'up_next' %}
-<div class="qcard g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if c.rows %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %}>
-  <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if c.rows %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
+{%- set body = c.rows or ((c.sections or {}) | reject('equalto', 'needs') | list) %}
+<div class="qcard g-{{ c.group or 'new' }} st-{{ (c.status or '') | replace(' ', '-') }}{% if body %} hasrows{% endif %}{% if c.off %} qoff{% endif %}" data-card="{{ c.id }}" data-ids="{{ c.ids | join(' ') }}"{% if up %} data-up="1"{% endif %}>
+  <div class="qhead"{% if t.anchor %} id="{{ t.anchor }}"{% endif %} data-qid="{{ t.qid }}"{% if body %} role="button" tabindex="0" aria-expanded="true" title="fold or open the card"{% endif %}>
     <span class="qgrip"{% if up %} draggable="true" title="drag to move it in the order"{% endif %}>{% if up %}⋮⋮{% endif %}</span>
     <span class="qplace">{{ c.place if c.place else '' }}</span>
     <div class="qmain">
@@ -28,10 +30,11 @@
     {% if c.pending and not c.not_landed %}<div class="qnote">moved — lands within a minute</div>{% endif %}
     {% if c.not_landed %}<div class="qnote">not landed — retrying</div>{% endif %}
     {% for f in c.passed_over or [] %}<div class="qnote">passed over by {{ f.name }}{% if f.why %}: {{ f.why }}{% endif %}</div>{% endfor %}
-    {#- the top entry's own questions are drawn in the header, so a folded card still shows them (§4.5 screen 12) #}
-    {{ attached(t) }}
+    {{ mentioned(t) }}
+    {#- the card's *Needs you* is drawn in the header, so a folded card still shows it (§4.5 screen 12) #}
+    {{ section(c, 'needs') }}
     </div>
   </div>
-  {% if c.rows %}<div class="qrows">{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}</div>{% endif %}
+  {% if body %}<div class="qrows">{% for sec in ('steering', 'waiting', 'answered', 'fyi') %}{{ section(c, sec) }}{% endfor %}{% for r in c.rows %}{{ row(r, repo) }}{% endfor %}</div>{% endif %}
 </div>
 {% endmacro %}

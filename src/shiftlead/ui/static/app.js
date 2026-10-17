@@ -2489,6 +2489,33 @@
     r.classList.add("landed");
     r.focus({ preventScroll: true }); r.scrollIntoView({ block: "center" });
   }
+  // §4.10: **Dismiss all** — the entries this browser has **on screen**, by id, never
+  // *everything FYI holds now*: mail that arrived after the page was drawn is what must not go
+  // unseen. The confirm says the number it is about, and the ids come off the DOM for that
+  // reason. It sits in FYI's `<summary>`, so its press must not also fold the section.
+  // §4.5a *Inbox: Answered for you, Dismiss all* (TD-599) is the same press on that group's rows,
+  // with its own words: an answer dismissed takes its Overrule with it. The Queue's cards carry the
+  // same press on a card's *Answered for you* and *FYI* (§4.5 screen 12, TD-828): `rows` is a selector,
+  // or a function answering the rows, and `refresh` re-reads the page it is on.
+  AO.DISMISS_ASK = {
+    fyi: (n) => `Dismiss ${n} FYI ${n === 1 ? "entry" : "entries"}? Only the ones on screen now — anything that arrives after this is untouched.`,
+    answered: (n) => `Dismiss the ${n} ${n === 1 ? "answer" : "answers"} on screen? Their Overrule goes with them.`,
+  };
+  AO.dismissOnScreen = (btn, rows, empty, ask, refresh) => {
+    if (btn) btn.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const on = typeof rows === "function" ? rows() : $$(rows);
+      const ids = [...on].filter((r) => !r.hidden).map((r) => r.dataset.msg).filter(Boolean);  // on screen: a row the rail hides is not
+      if (!ids.length) return AO.toast(empty, true);
+      if (!confirm(ask(ids.length))) return;
+      try {
+        await act("person", "dismiss", { msg: ids });
+        AO.toast(`dismissed ${ids.length} — the sender is told where one was owed`, true);
+      } catch (err) { AO.toast(`dismiss failed: ${err.message}`); }
+      if (refresh) refresh();
+    });
+  };
+
   AO.inbox = function () {
     const f = $("#ifilter");
     setupInfoMarks();
@@ -2561,29 +2588,8 @@
       const wide = window.matchMedia ? window.matchMedia("(min-width: 721px)") : null;
       if (wide && wide.addEventListener) wide.addEventListener("change", (m) => { if (m.matches && sheet.open) sheet.close(); });
     }
-    // §4.10: **Dismiss all** — the entries this browser has **on screen**, by id, never
-    // *everything FYI holds now*: mail that arrived after the page was drawn is what must not go
-    // unseen. The confirm says the number it is about, and the ids come off the DOM for that
-    // reason. It sits in FYI's `<summary>`, so its press must not also fold the section.
-    // §4.5a *Inbox: Answered for you, Dismiss all* (TD-599) is the same press on that group's rows,
-    // with its own words: an answer dismissed takes its Overrule with it.
-    const dismissOnScreen = (btn, rows, empty, ask) => {
-      if (btn) btn.addEventListener("click", async (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const ids = [...$$(rows)].filter((r) => !r.hidden).map((r) => r.dataset.msg).filter(Boolean);  // on screen: a row the rail hides is not
-        if (!ids.length) return AO.toast(empty, true);
-        if (!confirm(ask(ids.length))) return;
-        try {
-          await act("person", "dismiss", { msg: ids });
-          AO.toast(`dismissed ${ids.length} — the sender is told where one was owed`, true);
-        } catch (err) { AO.toast(`dismiss failed: ${err.message}`); }
-        refreshInbox();
-      });
-    };
-    dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow", "nothing in FYI to dismiss",
-      (n) => `Dismiss ${n} FYI ${n === 1 ? "entry" : "entries"}? Only the ones on screen now — anything that arrives after this is untouched.`);
-    dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow", "no answers on screen to dismiss",
-      (n) => `Dismiss the ${n} ${n === 1 ? "answer" : "answers"} on screen? Their Overrule goes with them.`);
+    AO.dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow", "nothing in FYI to dismiss", AO.DISMISS_ASK.fyi, refreshInbox);
+    AO.dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow", "no answers on screen to dismiss", AO.DISMISS_ASK.answered, refreshInbox);
     AO.refreshInboxPage = refreshInbox;
     inboxFilter();
     // back from an entry's page: the list rings the row it came from (`#<id>`)
@@ -3518,7 +3524,7 @@
       if (mv) return moveCard(mv.closest(".qcard"), mv.dataset.move);
       // a card's header folds it; a link, a button, the grip or an Inbox item in it keeps its own press
       const head = e.target.closest(".qcard.hasrows > .qhead");
-      if (head && !e.target.closest("a, button, .qgrip, .qmail")) toggleFold(head.closest(".qcard"));
+      if (head && !e.target.closest("a, button, .qgrip, .qmail, .qsec")) toggleFold(head.closest(".qcard"));
     });
     box.addEventListener("keydown", (e) => {  // a card's header is a button: Enter or Space folds it
       const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qcard.hasrows > .qhead");
@@ -3536,6 +3542,31 @@
     const box = $("#queuepage"); if (!box) return;
     const lists = $("#queuelists", box);
     const qc = AO.qcards(box);
+    // a group's heading folds or opens it, remembered in this browser (§4.5a *Queue page: group heading*, TD-828);
+    // a find opens the groups that hold what it found, without changing what is remembered
+    const groupKey = "qgfold";
+    function applyGroups() {
+      const folded = new Set(store.get(groupKey, [])), finding = !!($("#qfindbox", box) || {}).value;
+      $$(".qgroup", box).forEach((g) => {
+        const found = finding && !!g.querySelector(".qcard:not(.qoff), .qdline:not(.qoff):not([hidden])");
+        const f = folded.has(g.dataset.group) && !found;
+        g.classList.toggle("qgfolded", f);
+        const h = $(".qghead", g); if (h) h.setAttribute("aria-expanded", f ? "false" : "true");
+      });
+    }
+    function toggleGroup(g, open) {
+      const folded = new Set(store.get(groupKey, []));
+      if (open === true || (open === undefined && folded.has(g.dataset.group))) folded.delete(g.dataset.group); else folded.add(g.dataset.group);
+      store.set(groupKey, [...folded]); applyGroups();
+    }
+    // a card's *Answered for you* and *FYI* each carry Dismiss all over that section's rows on screen (TD-828)
+    function wire() {
+      $$(".qsec .qdismissall", lists).forEach((b) => {
+        const sec = b.closest(".qsec"), which = sec.dataset.sec;
+        AO.dismissOnScreen(b, () => $$(".mailrow", sec), which === "fyi" ? "nothing in this FYI to dismiss" : "no answers on screen to dismiss",
+          AO.DISMISS_ASK[which], reread);
+      });
+    }
     function apply() {
       qc.applyFolds();
       const win = store.get("qwin", "day");
@@ -3544,6 +3575,7 @@
       let shown = 0;
       $$(".qdline", box).forEach((el) => { el.hidden = !(el.dataset.w || "").split(" ").includes(win); if (!el.hidden) shown++; });
       const none = $(".qdnone", box); if (none) none.hidden = shown > 0;
+      applyGroups();  // after the window hides its lines, so a find opens only a group it found something in
     }
     function openLine(line) {
       const body = $(".qdbody", line), head = $(".qdhead", line); if (!body) return;
@@ -3564,6 +3596,7 @@
       return true;
     }
     function reveal(el, ring) {
+      const g = el.closest(".qgroup"); if (g && g.classList.contains("qgfolded")) toggleGroup(g, true);
       const card = el.closest(".qcard");
       if (card && card.classList.contains("folded")) qc.toggleFold(card);
       el.scrollIntoView({ block: "center" });
@@ -3587,11 +3620,18 @@
     box.addEventListener("click", (e) => {
       const w = e.target.closest(".qwin[data-win]");
       if (w) { store.set("qwin", w.dataset.win); return apply(); }
+      const gh = e.target.closest(".qghead");
+      if (gh) return toggleGroup(gh.closest(".qgroup"));
+      // an item about another row says *on TD-n*: the link scrolls to that row and rings it (§4.5 screen 12)
+      const on = e.target.closest("a.qon[data-on]");
+      if (on) { const el = onCard(on.dataset.on); if (el) { e.preventDefault(); reveal(el, true); } return; }
       const head = e.target.closest(".qdline.opens > .qdhead");
       if (head && !e.target.closest("a, button")) openLine(head.parentElement);
     });
     box.addEventListener("keydown", (e) => {
-      const head = (e.key === "Enter" || e.key === " ") && e.target.matches && e.target.matches(".qdline.opens > .qdhead");
+      const key = (e.key === "Enter" || e.key === " ") && e.target.matches;
+      if (key && e.target.matches(".qghead")) { e.preventDefault(); return toggleGroup(e.target.closest(".qgroup")); }
+      const head = key && e.target.matches(".qdline.opens > .qdhead");
       if (head) { e.preventDefault(); openLine(e.target.parentElement); }
     });
     window.addEventListener("hashchange", showHash);
@@ -3614,10 +3654,12 @@
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
           apply();
+          wire();
         }
       } catch (err) { /* the next poll tries again */ } finally { busy = false; }
     }
     apply();
+    wire();
     showHash();
     showAddress();
     setInterval(reread, 30000);

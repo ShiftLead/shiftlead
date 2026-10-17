@@ -1,4 +1,4 @@
-{# One Inbox item drawn on its Queue card (design §4.5 screen 12 *What is attached to a row*, *What needs
+{# One Inbox item drawn on its Queue card (design §4.5 screen 12 *What is attached to a card*, *What needs
    the person*; TD-771): the Inbox's own row renderer, never a copy, so its controls, RPCs and confirms
    are the Inbox's. Imported with context so a row's text knows the page's `origin` (TD-138). #}
 {% import "inbox_row.html" as r with context %}{{ r.row(e, section) }}

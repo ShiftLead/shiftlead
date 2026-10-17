@@ -2711,12 +2711,13 @@ def test_the_answered_groups_dismiss_all_is_fyis_rule_on_its_own_rows(monkeypatc
     assert " hidden" in button(page([entry("m-2", "note")]))  # no row, no button
     assert 'id="dismissall"' in held  # FYI's own is still there
     js = (UI / "static" / "app.js").read_text()
-    rule = js.split("const dismissOnScreen")[1].split("AO.refreshInboxPage")[0]
+    # one rule, hoisted (TD-828) so the Queue's card sections press it too
+    rule = js.split("AO.DISMISS_ASK = {")[1].split("AO.inbox = function")[0]
     assert ".filter((r) => !r.hidden)" in rule  # on screen: what the rail hides is not sent
     assert "$$(rows)" in rule and 'act("person", "dismiss", { msg: ids })' in rule  # the ids from the DOM, FYI's RPC
-    assert 'dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow"' in rule
-    assert 'dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow"' in rule
     assert "Their Overrule goes with them." in rule and "on screen?" in rule
+    assert 'AO.dismissOnScreen($("#dismissall"), "#rows-fyi .mailrow"' in js
+    assert 'AO.dismissOnScreen($("#dismissanswered"), "#rows-answered .mailrow"' in js
     # the poll keeps the button to the rows: a rail pick can draw the heading with none
     assert 'da.hidden = !$$("#rows-answered .mailrow").length' in js
 
