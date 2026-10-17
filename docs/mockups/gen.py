@@ -2137,6 +2137,71 @@ def spend_page():
 ''' + TAIL
 
 
+def spend_shape_page():
+    """Screen 13's **Shape** view (TD-819, built by TD-835; §4.5a *Spend page: Spend · Shape*): a team's suggestions,
+    members by role as one bar of hours by class, and a queue per flow stage. Illustrative figures."""
+    CLS = [("working", "#16a34a"), ("on its claim", "#86efac"), ("waiting on you", "#d97706"), ("waiting on review", "#7c3aed"),
+           ("idle with work", "#2563eb"), ("starved", "#9ca3af"), ("free", "#ffffff"),
+           ("limited / paused", "repeating-linear-gradient(45deg,#cbd5e1 0 4px,#fff 4px 8px)")]
+    def seg(pcts):
+        return ('<span style="display: flex; width: 100%; height: 12px; border-radius: 3px; overflow: hidden; border: 1px solid #e3e7ec;">'
+                + "".join(f'<i style="width: {v}%; background: {c};"></i>' for (_, c), v in zip(CLS, pcts) if v) + "</span>")
+    def chip(t, on=False):
+        return (f'<span style="border: 1px solid #d0d5dc; border-radius: 5px; padding: 2px 9px; font-size: 12px;'
+                f'{" background: #e9edf2; font-weight: 600;" if on else ""}">{t}</span>')
+    def seg_pick(items, on):
+        return ('<span style="display: inline-flex; border: 1px solid #d0d5dc; border-radius: 5px; overflow: hidden; font-size: 12px;">'
+                + "".join(f'<span style="padding: 2px 10px; border-left: 1px solid #d0d5dc;{" background: #e9edf2; font-weight: 600;" if w == on else ""}">{w}</span>' for w in items) + "</span>")
+    def role(name, seats, hours, pcts, per):
+        words = " · ".join(f"{n} {v}%" for (n, _), v in zip(CLS, pcts) if v)
+        return ('<div style="display: grid; grid-template-columns: 170px 70px minmax(0, 1fr) 160px; gap: 12px; padding: 10px 14px; border-top: 1px solid #eef1f4; align-items: center; font-size: 13px;">'
+                f'<span style="white-space: nowrap;"><b>{name}</b> <span class="meta" style="font-size: 12px;">{seats}</span></span><span class="mono" style="white-space: nowrap;">{hours}</span>'
+                f'<span>{seg(pcts)}<span class="meta" style="font-size: 11.5px; display: block; margin-top: 4px; white-space: normal; overflow: visible; text-overflow: clip;">{words}</span></span>'
+                f'<span style="font-size: 12.5px;">{per}</span></div>')
+    def queue(stage, mean, mx, oldest, ne, bu, un):
+        cells = (stage, mean, mx, oldest, ne, bu, un)
+        return ('<div style="display: grid; grid-template-columns: 1.6fr repeat(6, 1fr); gap: 8px; padding: 8px 14px; border-top: 1px solid #eef1f4; font-size: 13px;">'
+                + "".join(f'<span class="{"" if i == 0 else "mono"}">{c}</span>' for i, c in enumerate(cells)) + "</div>")
+    qhead = ('<div style="display: grid; grid-template-columns: 1.6fr repeat(6, 1fr); gap: 8px; padding: 6px 14px; font-size: 11px; text-transform: uppercase; '
+             'letter-spacing: .04em; color: #6b7480;">' + "".join(f"<span>{c}</span>" for c in ("stage", "mean", "largest", "oldest", "non-empty", "backed up", "unstaffed")) + "</div>")
+    def panel(title, sub, body):
+        return (f'<div style="margin-top: 16px;"><div style="display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px;">'
+                f'<span style="font-size: 15px; font-weight: 600;">{title}</span><span class="meta" style="font-size: 12px;">{sub}</span></div>'
+                f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{body}</div></div>')
+    sugg = ('<div style="background: #fff; border: 1px solid #dfe3e8; border-left: 3px solid #2563eb; border-radius: 6px; padding: 10px 14px; margin-top: 14px; font-size: 13.5px;">'
+            '<div style="margin-bottom: 4px;"><b>grinders starved 42% of their 63 h</b> while design was backed up 80%, oldest 14h: <b>one more designer</b></div>'
+            '<div style="margin-bottom: 4px;"><b>designer waiting on you 32%</b> of its 34 h — answers, not members</div>'
+            '<div class="meta" style="font-size: 12px;">suggestions only: a change of members is yours (Members… on the team card)</div></div>')
+    roles = "".join([
+        role("grinder", "2 seats", "63.0 h", [40, 6, 2, 6, 2, 42, 0, 2], "5 · median ≈$13.40"),
+        role("designer", "1 seat", "34.0 h", [54, 6, 32, 0, 0, 6, 0, 2], "2 · median ≈$14.90"),
+        role("techlead", "1 seat", "11.5 h", [70, 0, 0, 0, 0, 0, 30, 0], "—"),
+    ])
+    legend = ('<div style="display: flex; gap: 14px; flex-wrap: wrap; padding: 8px 14px; font-size: 11.5px; color: #4b5563;">'
+              + "".join(f'<span><i style="display: inline-block; width: 10px; height: 10px; background: {c}; border-radius: 2px; border: 1px solid #d0d5dc; margin-right: 4px; vertical-align: -1px;"></i>{n}</span>' for n, c in CLS) + "</div>")
+    queues = qhead + "".join([
+        queue("design (designer)", "2.6", "5", "14h", "88%", "80%", "3%"),
+        queue("build (grinder)", "0.9", "4", "3h", "47%", "8%", "0%"),
+        queue("review (techlead)", "0.4", "3", "1h10m", "22%", "2%", "0% · past bound 0%"),
+    ])
+    note = ('<div class="note" style="margin-top: 16px;">Design notes, not page text. The home samples once a minute; a role\'s bar hover lists its seats '
+            'and their hours by class. The rules are fixed in the code, so one week always reads the same. Figures illustrative. Built by TD-835.</div>')
+    return head("Spend") + f'''<div style="width: 1440px; min-height: 900px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
+  <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Spend</span>
+    <span class="meta" style="font-size: 12px;">this week · the team's shape, sampled each minute</span></div>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;">{seg_pick(("Spend", "Shape"), "Shape")}<span style="width: 6px;"></span>{seg_pick(("Day", "Week"), "Week")}<span style="width: 6px;"></span>{chip("All")}{chip("ao-grind", True)}</div>
+  <div style="font-size: 17px; font-weight: 600; margin-top: 18px;">ao-grind</div>
+  {sugg}
+  {panel("Members by role", "live hours this week, by class", roles + legend)}
+  {panel("Queues", "one per stage of the current flow", queues)}
+  {note}
+</div>
+</div>
+''' + TAIL
+
+
 files = {
     "Main.dc.html": team_desktop(),
     "MainDark.dc.html": darken(team_desktop()),
@@ -2165,6 +2230,7 @@ files = {
     "RepoFacet.dc.html": repo_facet_board(),
     "Queue.dc.html": queue_page(),
     "Spend.dc.html": spend_page(),
+    "SpendShape.dc.html": spend_shape_page(),
     "SettingsDark.dc.html": darken(settings_page()),
 }
 for n, s in files.items():
@@ -2198,6 +2264,7 @@ LAYOUT = [
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Queue.dc.html", "Queue — the cards in rank order (TD-748, built by TD-771)", 1),
     ("Spend.dc.html", "Spend — who spent the quota, per seat and per finished entry (TD-818, built by TD-832)", 1),
+    ("SpendShape.dc.html", "Spend — the Shape view: a team's members by class, its queues, the suggestions (TD-819, built by TD-835)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
