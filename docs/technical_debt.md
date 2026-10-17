@@ -81,7 +81,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
 | TD-838 | Build TD-823: `permission_prompts: all` launches with the adapter's `asking_args`; `ask` leaves the tool's mode alone | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
-| TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
+| TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
 | TD-852 | #2040's smoke script has six lines no test reads: its browser half, `--setup`, the JSON check on `ao`'s reads and the `reach.url` read | Medium | Open |
 | TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
@@ -1757,8 +1757,8 @@ The other cases:
 **Type:** debt
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2051
+**Status:** Built (2026-10-17, #2051): §4.10, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it. Live check, once #2051 is live (`ao promote status`) and a week of runs has started on the new briefs (2026-10-24): read the members' transcripts (`ao transcript <id>`, read-only) for a foreground wait loop — `sleep`, `tail -f /dev/null`, `timeout N` between `ao status` reads; none holds it, one found is a new entry.
 **Location:** design §4.10 *Waiting on mail is ending the turn*, §4.2 *Working on its own*; `src/shiftlead/skill.md` (*Mail*: *Waiting on mail is ending the turn*); every role preset's first paragraph in `src/shiftlead/briefs/` (`grinder.md`, `designer.md`, `hunter.md`, `auditor.md`, `manager.md`, `manager_on_call.md`, `techlead.md`, and the `.stage.md` variants where they carry the line)
 
 **Why:**
