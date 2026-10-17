@@ -15929,3 +15929,30 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-816 (the design), TD-828 (the headings and sections it recounts), TD-805 (page loads), TD-129 (the Inbox rail's remembered picks).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2065). Each card carries `data-status`, `data-kinds`, `data-repos` and `data-find`. A completed line carries `data-n`, `data-repo` and `data-find`, and an other-work line `data-other`. The filter row carries `data-teams` and each link `data-k`/`data-v`. `app.js`'s `AO.qPicks`, `qQuery`, `qWord`, `qFinds`, `qRefs` and `qPass` mirror `queue_picks`, `picks_query`, `_find_word`, `_finds`, `refs` and `apply_picks`. A press re-marks `qoff`, recounts the shares, `#qnone` and the links, and calls `pushState` with no request. Back re-applies. The find narrows 150 ms after typing (`replaceState`). Enter on an id no open card holds re-reads once. The picks without the find are `ao.qpicks`. `base.html`'s head restores them on a bare `/queue` and holds the lists back (`data-qpend`) until the apply, as it does for a remembered window other than *day*. **All** clears them. A target a pick hides is shown by dropping the picks in the browser. The empty window's line now names the window drawn. `tests/test_ui_queue_picks.py` runs `app.js` in node against the server's `apply_picks` on 18 searches. The PR's UI check drove each behaviour on a scratch home. Size: ~235 KB more on the live 1.93 MB Queue, noted on TD-805.
+
+## TD-863: Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (TD-854's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built #2069 (2026-10-17, grinder-ao-1).
+**Location:** design §6 rule 9 (*Which members count*: the waiting claim on a reader), §4.9a *Waiting is read, never declared*; `src/sessionorc/work.py` (`finished`, `waiting_clause`), `src/sessionorc/models.py` (`Session.prs_waiting`, and its `prs_waiting` in a view's dict), `src/sessionorc/agent_tick.py` (`_finished_view`, the view the tick passes `finished`, which carries neither `prs_waiting` nor `progress` today; `_finished_pass` and `_finished_team`, whose take-back test after `finished_sent_at` reads the person inbox's `asked` alone; `_waiting_claims`' docstring, which says rules 9 and 3 read every claim as in progress); `tests/test_finished.py`, `tests/test_finished_tick.py`, `tests/test_waiting_claims.py`
+
+**Why:** TD-854: `finished` blocks only on the person inbox, so a grinder that declared `none` beside its PR held with the techlead reads finished and its team winds down after `FINISHED_SETTLE`, closing the reader with it.
+
+**Fix:** in `finished`, after the person-inbox check: a live member that is not a seat or the manager, with a declared progress entry `claimed` whose `pr` or `review_pr` equals the `pr` of an ask from that member (`from` naming its id, an address read as `_waiting_claims`' `mine` reads one) in any passed record's `prs_waiting.asks`, blocks the reading whatever it declared — the clause `<name> waiting on <seat name>: #<pr>`, the first such PR, *and n more* past one. Read from the records alone: `_finished_view` gains `prs_waiting` (`r.prs_waiting(home=self.host)`) and the record's declared `claimed` entries with their `pr` and `review_pr`, as the page's view (`Session.to_dict`) already carries them, so the page's *concluded* and the tick agree; an ask's `from` is matched to the member as `_waiting_claims`' `mine` matches it (the id, the host defaulting to the home's), since the view addresses ids by `_address`. `_finished_team`'s take-back test — a member no longer idle and declared, or `asked` — reads the held-ask wait beside `asked`, from one helper `finished` uses too. The person-inbox clause keeps its place first.
+
+**Tests:**
+- a member declared `none` with a claimed PR whose ask a seat's record holds reads unfinished, its clause naming the seat and the PR; the same with the ask answered (gone from `prs_waiting`) reads finished;
+- a claim `done`, or a held ask for a PR the member does not claim, blocks nothing;
+- a view (dict) and a `Session` give the same reading;
+- the tick does not wind down a team whose only unfinished member waits on a held ask, and the tick (through `_finished_view`) and the page's view give the same reading (`test_finished_tick.py`);
+- a member whose PR gets a held ask after the manager was told (`finished_sent_at`) takes the wind-down back, as one with a person-inbox ask does.
+
+**Done when** a team whose last member declared `none` beside a PR held by its techlead stays up, its card's *not concluded* line naming the wait, and winds down once the reader answers and the member declares again.
+
+**Related:** TD-854 (the design), TD-820 / TD-836 (waiting claims), TD-241 (rule 9), TD-274 (waiting).
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #2069). `work.held_asks` reads each member's claimed PRs held in a passed record's `prs_waiting`; `finished` blocks on it after the person inbox (*g1 waiting on techlead: #2067*), and the tick's view and take-back read the same helper.
