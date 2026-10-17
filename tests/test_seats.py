@@ -170,6 +170,15 @@ def test_the_backfill_charges_the_fortnight_to_between_and_drops_older_turns():
     assert _row(ledger, "a")["refs"] == {seats.BETWEEN: {"figure": pytest.approx(3.0), "turns": 1}}
 
 
+def test_a_forgotten_owner_kept_on_a_cursor_reads_outside():
+    r = _rec("a", conv="c1")
+    ledger: dict = {}
+    _take(ledger, [_t("u1", 0)], [r])
+    _take(ledger, [_t("u2", 1)], [])  # its record was forgotten since
+    assert _row(ledger, seats.OUTSIDE)["models"]["claude-sonnet-4-6"]["turns"] == 1
+    assert _row(ledger, "a")["models"]["claude-sonnet-4-6"]["turns"] == 1  # a written row never moves
+
+
 def test_a_row_keeps_its_figure_past_200k_and_300k_context():
     ledger: dict = {}
     turns = [
@@ -255,8 +264,25 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
     async with LocalClient() as person:
         w = await person.call("create", name="w", dir=str(tmp_path), adapter="hookstub", profile="sub")
         agent.sessions[w["id"]].adapter_id = "cv"
+        await person.call("progress", id=w["id"], status="claimed", ref="TD-202")
         await agent._refresh_seats_inner()  # the backfill: a month-old turn is dropped
         assert agent._seats.get("days", {}) == {} and agent._seats["hosts"][agent.host]["cursors"]["t1"]["offset"] == 1
+        assert agent._seats["hosts"][agent.host]["seeded"] == ["sub"]
+        # a claim already held when the ledger began reads partial once done, its earlier spend unseen
+        assert (
+            agent._seats["refs"][f"{agent.sessions[w['id']].repo or ''} TD-202"]["first_claimed"]
+            <= agent._seats["began"]
+        )
+        await person.call("progress", id=w["id"], status="done", ref="TD-202")
+        # a profile first live later is backfilled too: its month-old turn is dropped, not charged
+        (tmp_path / "v").mkdir()
+        v = await person.call("create", name="v", dir=str(tmp_path / "v"), adapter="hookstub", profile="sub2")
+        hookstub.spend_turns.append(_t("old2", 0, source="t9", conv="cv2", at=_at(60 * 24 * 30)))
+        agent.sessions[v["id"]].adapter_id = "cv2"
+        await agent._refresh_seats_inner()
+        assert agent._seats.get("days", {}) == {} and agent._seats["hosts"][agent.host]["seeded"] == ["sub", "sub2"]
+        await person.call("kill", id=v["id"])
+        await person.call("remove", id=v["id"])
         now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         hookstub.spend_turns.append(_t("u1", 1, source="t1", conv="cv", at=now))
         await person.call("progress", id=w["id"], status="claimed", ref="TD-303")
@@ -278,7 +304,12 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
         assert meta["first_claimed"] <= meta["done_at"]
         got = await person.call("seats", window="week")
         assert [(s["seat"], s["figure"]) for s in got["seats"]] == [("w", 3.0)]
-        assert [e["ref"] for e in got["entries"]] == ["TD-404"] and got["unknown"] == {}
+        assert [(e["ref"], e["partial"]) for e in got["entries"]] == [("TD-202", True), ("TD-404", False)]
+        assert got["unknown"] == {}
+        # a ledger file that cannot be written never fails a report
+        monkeypatch.setattr(agent.seat_store, "save", lambda ledger: (_ for _ in ()).throw(OSError("full")))
+        await person.call("progress", id=w["id"], status="claimed", ref="TD-505")
+        assert await person.call("progress", id=w["id"], status="done", ref="TD-505")
         with pytest.raises(AgentError, match="day or week"):
             await person.call("seats", window="year")
         out = await person.call("set_settings", spend={"weights": {"claude-sonnet": {"input": 1}}})

@@ -349,18 +349,23 @@ class SpendMixin:
 
     async def _refresh_seats_inner(self) -> None:
         """`spend(profile, seat cursors)` for every profile this host's live sessions run under, each
-        turn weighed and charged (`seats.take`); the first pass, finding no seat cursors, reads the
-        fortnight before it to `between`. `seat_spend.json` is written only when a turn was charged,
-        a cursor moved or a claim was first seen."""
+        turn weighed and charged (`seats.take`); a profile's first read on this host (not yet in the
+        host's `seeded`) is its backfill — the fortnight before it, to `between`. `seat_spend.json` is
+        written only when a turn was charged, a cursor moved or a claim was first seen."""
         live = {(s.adapter, s.profile) for s in self._usage_live()}
         metered = await asyncio.to_thread(_metered_of, live)
         weights = settings_mod.weights(settings_mod.load())
         now = datetime.now().astimezone()  # the home's own clock, as the account ledger's days
         ledger = self._seats
         records = list(self.sessions.values())
-        held = ((ledger.get("hosts") or {}).get(self.host) or {}).get("cursors") or {}
-        backfill = not held
-        moved = seats.see_claims(ledger, records, now_iso())
+        mine = (ledger.get("hosts") or {}).get(self.host) or {}
+        held = mine.get("cursors") or {}
+        seeded = set(mine.get("seeded") or ())
+        first = bool(live) and "began" not in ledger
+        if first:
+            ledger["began"] = now_iso()
+        # a claim seen by the pass that began the ledger was made before it: its entry reads partial
+        moved = seats.see_claims(ledger, records, now_iso(), first) if live else False
         for name, prof in sorted(live):
             ad = adapters.get(name)
             if not callable(getattr(ad, "spend", None)):
@@ -379,11 +384,15 @@ class SpendMixin:
                 self._seat_reason[prof] = why
                 continue
             self._seat_reason.pop(prof, None)
-            ledger.setdefault("began", now_iso())
+            backfill = prof not in seeded  # a profile's first read is its backfill, whenever it first runs
             moved = (
                 seats.take(ledger, self.host, r, records, metered.get((name, prof)), weights, now, backfill) or moved
             )
             held = ledger["hosts"][self.host]["cursors"]  # a second profile on one directory reads on from here
+            if backfill:
+                seeded.add(prof)
+                ledger["hosts"][self.host]["seeded"] = sorted(seeded)
+                moved = True
         if now.date().isoformat() != self._seats_pruned:
             self._seats_pruned = now.date().isoformat()
             seats.prune(ledger, now.date())

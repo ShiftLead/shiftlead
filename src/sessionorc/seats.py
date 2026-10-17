@@ -16,11 +16,11 @@ gates on it. Each turn the adapter reports (§4.3 *Spend per turn*) is
 `seat_spend.json` beside `spend.json`: `{began, days: {YYYY-MM-DD: {<record id>: {name, role, team,
 repo, metered, models: {<model>: {input, output, cache_read, cache_write, turns, figure, past_200k,
 past_300k, unweighed, subagent}}, refs: {<ref>: {figure, turns}}}}}, refs: {"<repo> <ref>":
-{first_claimed, done_at}}, hosts: {<host>: {cursors: {<source>: {offset, seen, at, id, response,
-tokens, owner, root}}}}}`. *Outside shiftlead* is the record id `outside`. A turn is counted once by
-the account ledger's rules (`spend._fresh`), and a cursor moves only after its row is written.
-Tool-agnostic: nothing here knows a tool or a price list by heart, but the default weights the design
-ships (§5)."""
+{first_claimed, done_at, partial?}}, hosts: {<host>: {cursors: {<source>: {offset, seen, at, id,
+response, tokens, owner, root}}, seeded: [<profile>]}}}`. *Outside shiftlead* is the record id
+`outside`. A turn is counted once by the account ledger's rules (`spend._fresh`), and a cursor moves
+only after its row is written. Tool-agnostic: nothing here knows a tool or a price list by heart, but
+the default weights the design ships (§5)."""
 
 from __future__ import annotations
 
@@ -186,7 +186,8 @@ def take(
 ) -> bool:
     """One profile's `spend` read into `ledger` (mutated) for `host`'s cursors; whether anything was
     charged or a cursor moved. `prices` is the profile's when it is metered, else None. A backfill
-    charges every turn to `between` and drops those older than `BACKFILL`."""
+    charges every turn of a transcript it holds no cursor for to `between`; any transcript with no
+    cursor drops its turns older than `BACKFILL`."""
     cursors = ledger.setdefault("hosts", {}).setdefault(host, {}).setdefault("cursors", {})
     by_id = {r.id: r for r in records}
     by_source: dict[str, list[dict[str, Any]]] = {}
@@ -208,7 +209,8 @@ def take(
         cur = cursors.get(source) if isinstance(cursors.get(source), dict) else {}
         turns = sorted(by_source.pop(source, []), key=lambda t: t["offset"])
         keep = spend_mod._fresh(cur, turns)
-        if backfill:
+        back = backfill and not cur  # a transcript another profile's read already holds reads on as live
+        if not cur:  # new to this host: never more than the fortnight, a backfill's or a copied-in file's
             keep = [(t, k) for t, k in keep if (w := spend_mod._when(t.get("at"))) is not None and w >= oldest]
         owner = cur.get("owner")
         root = cur.get("root")
@@ -217,9 +219,11 @@ def take(
             if root is None:
                 root = worktree_root(cwd)
             owner = owner_of(keep[0][0] | {"cwd": cwd}, records, root) or OUTSIDE
+        if owner != OUTSIDE and owner not in by_id:
+            owner = OUTSIDE  # its record was forgotten since: outside shiftlead, as the backfill reads it
         for t, tokens in keep:
             record = by_id.get(owner) if owner != OUTSIDE else None
-            ref = BETWEEN if record is None or backfill else refs_now.setdefault(record.id, current_ref(record))
+            ref = BETWEEN if record is None or back else refs_now.setdefault(record.id, current_ref(record))
             _charge(ledger, owner or OUTSIDE, record, ref, t, tokens, prices, weights, now)
             moved = True
         new = {"offset": offset, "seen": stamp, "owner": owner, "root": root}
@@ -287,9 +291,10 @@ def _charge(
     r["turns"] = int(r.get("turns") or 0) + 1
 
 
-def see_claims(ledger: dict[str, Any], records: list[Any], at: str) -> bool:
+def see_claims(ledger: dict[str, Any], records: list[Any], at: str, first: bool = False) -> bool:
     """Each claimed reference's `first_claimed`, the first time a pass sees it on any record; whether
-    one was written."""
+    one was written. On the pass that began the ledger (`first`) each is marked `partial`: it was
+    claimed before the ledger could see its spend."""
     refs = ledger.setdefault("refs", {})
     wrote = False
     for r in records:
@@ -299,6 +304,7 @@ def see_claims(ledger: dict[str, Any], records: list[Any], at: str) -> bool:
             entry = refs.setdefault(ref_key(r.repo, e.ref), {})
             if "first_claimed" not in entry:
                 entry["first_claimed"] = at
+                entry |= {"partial": True} if first else {}
                 wrote = True
     return wrote
 
@@ -380,13 +386,13 @@ def reading(
         for rid, row in rows.items():
             if not isinstance(row, dict):
                 continue
-            seen_any = True
-            metered = metered and bool(row.get("metered"))
             if rid == OUTSIDE:
                 _add_row(outside, row)
                 continue
             if team and row.get("team") != team:
                 continue
+            seen_any = True
+            metered = metered and bool(row.get("metered"))
             key = rid if by == "record" else f"{row.get('team') or ''}\0{row.get('name') or rid}"
             s = seats.setdefault(
                 key,
@@ -463,7 +469,7 @@ def _entries(
                 "figure": round(figure, 4),
                 "turns": turns,
                 "by_role": {k: round(v, 4) for k, v in sorted(by_role.items())},
-                "partial": bool(began) and str(meta.get("first_claimed") or "") < began,
+                "partial": bool(meta.get("partial")) or (bool(began) and str(meta.get("first_claimed") or "") < began),
             }
         )
     out.sort(key=lambda e: e["done_at"])

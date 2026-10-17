@@ -2898,7 +2898,10 @@ class HostAgent(
         claimed_at = next((e.at for e in s.progress if e.ref == entry.ref and e.status == "claimed"), None)
         applied = s.report_progress(entry)
         if applied and status == "done" and entry.source == "declared" and self.mode != "node":
-            await self._seat_spend_done(s, entry.ref, claimed_at)  # the entry's reading outlives its record (§4.4)
+            try:
+                await self._seat_spend_done(s, entry.ref, claimed_at)  # the entry's reading outlives its record
+            except Exception:  # noqa: BLE001 — the seat ledger's file never fails a report (§4.4 *Spend per seat*)
+                log.exception("the seat ledger did not take the done of %s", entry.ref)
         if applied and status == "claimed" and entry.source == "declared":
             # a session that claims something went on after all — both endings are taken back
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
