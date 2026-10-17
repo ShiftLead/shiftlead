@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
+| TD-845 | A link a program prints with OSC 8 (Claude Code's *Report: Team Spend by Seat*) is plain text in the Focus pane: tmux drops it before the browser, and xterm.js has no handler for it | Medium | Open |
 
 ---
 
@@ -1538,3 +1539,33 @@ Then the build entries, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
+
+---
+
+## TD-845: A link a program prints with OSC 8 (Claude Code's *Report: Team Spend by Seat*) is plain text in the Focus pane: tmux drops it before the browser, and xterm.js has no handler for it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.6 *A URL in the pane is a link* (TD-421) and *A path in the pane is a link* (TD-493), §4.5a's Focus link rows; `src/sessionorc/tmux.py` (`attach_argv`); `src/shiftlead/ui/static/app.js` (`AO.focus`: the `Terminal` options, the web-links addon, `AO.paneLink`)
+
+**Why:**
+- Paul's words: *there is a "Team Spend by Seat" that looks like it should be a link … we just check for files that exist. Is there a way we can make it a link?* The screenshot (ao-paul's Focus, 2026-10-17) shows Claude Code's line *Report: ⧉ Team Spend by Seat*. The text is a link label with no URL printed beside it (an Artifact's claude.ai page), so neither of the pane's two readers can take it: the web-links addon underlines only an `http(s)://` run it sees in the text, and the path provider only a run the host says is a file.
+- A label with its target hidden is what an OSC 8 hyperlink is (`ESC ] 8 ; ; <url> ST <text> ESC ] 8 ; ; ST`). Two things stand between one and the person:
+  - **tmux drops it.** tmux 3.4+ keeps a pane's hyperlinks but sends them only to a client whose terminal has the `hyperlinks` feature. kmaster runs tmux 3.5a, and its `terminal-features` default (`xterm*:clipboard:ccolour:cstyle:focus:title`) lacks it, so the pty bridge's `tmux attach` receives the label alone. `tmux -T hyperlinks attach …` asks for it for that one client, and sets no server or session option (`attach_argv`'s rule: attaching sets nothing).
+  - **The page has no handler.** The vendored `@xterm/xterm` 5.5.0 parses OSC 8 and draws a link from its `linkHandler` option. `AO.focus` sets none, so xterm's own fallback would apply (a `confirm()` box on a plain click), and that is not §4.6's rule: underline on hover, Ctrl/Cmd+click, `http`/`https` only, a new tab `noopener`.
+- Not yet checked: that Claude Code emits OSC 8 at all inside tmux (it decides from the environment whether the terminal supports hyperlinks), and what the ⧉ mark is. The first step of the fix reads this on a scratch pane before anything is designed.
+- The value: Claude Code prints Artifacts, PRs and docs as labels more and more. In the pane they are dead text the person has to find again elsewhere, which is the friction §4.6's two link rules exist to remove.
+- TD-071's rule (*nothing on a page is a control that parses what an agent printed*) is met in the same way as the URL rule: the press opens only the target the program attached, behind a modifier. But the label and the target can differ, and that is new: the person sees text, not the URL. The design has to say how the target is shown before the press (a hover title with the URL, as VS Code's terminal does).
+
+**Fix:** design first, after one read.
+1. On a scratch home (never an `ao-*` pane), run a Claude Code session that prints an Artifact or a PR link. Confirm it emits OSC 8 under tmux (`tmux -T hyperlinks attach` from a terminal that shows them, or the pane's raw bytes). If it does not, say what it would need (an env var in the adapter's launch) or close this as *the tool prints no target*.
+2. §4.6 gains *A hyperlink in the pane is a link*: the bridge's attach asks for `hyperlinks` (`attach_argv`, and `ao focus` keeps the person's own terminal's features); the page sets xterm's `linkHandler` to `AO.paneLink`'s rule (modifier, `http`/`https` only, `noopener`), with a hover that shows the target URL; a read-only Focus and a pop-out have it as the URL rule does. One §4.5a row, or the URL row widened.
+3. A build entry named in `Blocked by:`, with a test that an OSC 8 run in the pane's bytes reaches `AO.paneLink` with its target, and that a `javascript:` or `file:` target opens nothing.
+
+**Done when** the pane underlines an OSC 8 label, shows its target on hover and opens it on Ctrl/Cmd+click under §4.6's rules, or the read says Claude Code prints no target and the entry archives with that reason.
+
+**Related:** TD-421 and TD-494 (the URL rule and cut rows), TD-493 and TD-501 (the path rule), TD-071 (no control from the text), TD-818 (the report in the screenshot).
