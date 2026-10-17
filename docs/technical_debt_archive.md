@@ -15298,7 +15298,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-17 (test-audit-ao-1, the audit of #2021, #2023, #2024, #2027, #2017)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done (#PRNUM)
+**Status:** Done (#2030)
 **Location:** `tests/test_gemini_adapter.py`; `src/shiftlead/adapters/gemini/__init__.py` (`launch`, `credentials_ok`, `doctor_profiles`, `layer_reading`, `HOOK_TIMEOUT_MS`)
 
 **Why:** Each line reverted alone in a worktree on `origin/main` (97974677), `pytest tests/test_gemini_adapter.py` run; a reversion that still passes is the evidence (the other seven reversions tried — `GOOGLE_API_KEY: ""`, `GEMINI_FORCE_FILE_STORAGE`, `GEMINI_CLI_TRUST_WORKSPACE`, `CLI_TITLE`, `GEMINI_CLI_HOME`, `showStatusInTitle`, the `oauth_creds.json` name — fail it, so this is the narrow remainder):
@@ -15314,4 +15314,4 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-785 (slice 2, #2021), TD-112.
 
-**Resolved:** 2026-10-17 (grinder-ao-2, #PRNUM) — `tests/test_gemini_adapter.py`: the hook timeout asserted as `10_000`; `GEMINI_API_KEY` with an auth type and no credential file reads `True`; `test_a_metered_profile_its_extra_args_its_key_and_the_precautions_note` (a profile's `extra_args` in the argv, a metered row's `key` unset then set, `GOOGLE_API_KEY`'s `note`); `test_a_profiles_layers_leave_out_another_profile_whose_name_begins_with_its_own` (`grind2.json` beside `grind`'s two layers). Each of the five reversions, alone, fails the file.
+**Resolved:** 2026-10-17 (grinder-ao-2, #2030) — `tests/test_gemini_adapter.py`: the hook timeout asserted as `10_000`; `GEMINI_API_KEY` with an auth type and no credential file reads `True`; `test_a_metered_profile_its_extra_args_its_key_and_the_precautions_note` (a profile's `extra_args` in the argv, a metered row's `key` unset then set, `GOOGLE_API_KEY`'s `note`); `test_a_profiles_layers_leave_out_another_profile_whose_name_begins_with_its_own` (`grind2.json` beside `grind`'s two layers). Each of the five reversions, alone, fails the file.
