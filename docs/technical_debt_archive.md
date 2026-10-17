@@ -14844,7 +14844,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Done — built by TD-813 (#1999, #PRNUM)
+**Status:** Done — built by TD-813 (#1999, #2005)
 **Blocked by:** TD-813
 **Location:** design §4.5a *Focus composer* **Send** (confirmed by the tool's composer emptying, one `C-m` retry, then `prompt-stuck`) and **prompt chips**; §4.7 `ao send`; `src/shiftlead/ui/static/app.js` (the Focus composer: `$("#send")`'s click, ~L4633, `compose.value = ""` after `await act(id, "send", …)`; the draft in `localStorage`, `AO.draftKey`); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, ~L2770); `src/sessionorc/agent.py` (`rpc_send` ~L2208, `_record_send`, `_submit`)
 
@@ -14863,7 +14863,7 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-219 (the draft kept in the browser, which the code cites), TD-500 (the composer's bar, which folds on Send), TD-805 (page loads).
 
-**Resolved:** 2026-10-16 (grinder-ao-1) — built by TD-813: #1999 and #PRNUM.
+**Resolved:** 2026-10-16 (grinder-ao-1) — built by TD-813: #1999 and #2005.
 
 ---
 
@@ -14874,7 +14874,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (TD-806's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done — slice 1 #1999 (the agent), slice 2 #PRNUM (the page)
+**Status:** Done — slice 1 #1999 (the agent), slice 2 #2005 (the page)
 **Location:** design §4.10 *A send lands once*, §4.5a *Focus composer* **Send**, **prompt chips** and **the bar**, *Focus* **Wrap up**; `src/shiftlead/ui/static/app.js` (the composer's `$("#send")` click, the prompt chips' click, the card's Wrap up, `act`, `wireComposerBar`'s `redraw`, a new `AO.SEND_PAGE_SECONDS = 30`); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`: `send` and `wrapup` pass `key`); `src/sessionorc/agent.py` (`rpc_send`, `_record_send`); `src/sessionorc/models.py` (`SendEntry`, its merge by id in `_overlay`); `src/sessionorc/agent_remote.py` (`_route_act`, whose two *its verdict is unknown* errors the page reads; it forwards `key` untouched); `src/sessionorc/mail.py` (`SEND_KEY_SECONDS`); `tests/` (`test_ui_composer_bar.py` and the agent's send tests)
 
 **Why:** TD-806: a late answer clears what the person typed since, and a repeated request delivers the same text twice.
@@ -14930,4 +14930,4 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-806 (the design), TD-219 (the draft), TD-500 (the composer's bar), TD-805 (page loads: a slow page lengthens the window a second press falls in).
 
-**Resolved:** 2026-10-16 (grinder-ao-1, #1999 and #PRNUM) — slice 1 (#1999): `SendEntry.key`, `rpc_send`'s keyed repeat matched first, `SEND_KEY_SECONDS`, `tests/test_send_key.py`; slice 2 (#PRNUM): `app.py`'s `send` and `wrapup` pass `key`; `app.js`'s `AO.wireComposerSend` (the hold, *Sending…*, *not confirmed* after `AO.SEND_PAGE_SECONDS`, the box cleared only of what it sent, an unknown verdict keeping the key), `AO.mintKey` (falls back to `getRandomValues` off a secure context), `act`'s `e.status`, the bar mirroring Send, a keyed chip and Wrap up; `tests/test_ui_send_key.py` and a keyed repeat through the route in `tests/test_ui.py`.
+**Resolved:** 2026-10-16 (grinder-ao-1, #1999 and #2005) — slice 1 (#1999): `SendEntry.key`, `rpc_send`'s keyed repeat matched first, `SEND_KEY_SECONDS`, `tests/test_send_key.py`; slice 2 (#2005): `app.py`'s `send` and `wrapup` pass `key`; `app.js`'s `AO.wireComposerSend` (the hold, *Sending…*, *not confirmed* after `AO.SEND_PAGE_SECONDS`, the box cleared only of what it sent, an unknown verdict keeping the key), `AO.mintKey` (falls back to `getRandomValues` off a secure context), `act`'s `e.status`, the bar mirroring Send, a keyed chip and Wrap up; `tests/test_ui_send_key.py` and a keyed repeat through the route in `tests/test_ui.py`.
