@@ -71,7 +71,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
-| TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
 
 ---
 
@@ -1442,21 +1441,3 @@ Then the build entries, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
-
-## TD-839: Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_permission_channel.py`; `src/sessionorc/{agent,agent_common,agent_tick,agent_wake,mail}.py` (every `s.told` site)
-
-**Why:** #2014 replaced `s.confidence == "hook"` by `s.told` (hook or title) at sixteen sites, and its test docstring says *every rule that acts only on a hook-confirmed state takes a title reading as one*. The only test that uses `confidence="title"` is `test_a_title_reading_is_the_tools_own_word`, which asserts `Session.told` for four confidences and nothing else. Probe, in an `origin/main` worktree: `sed -i -E 's/\bnot s\.told\b/s.confidence != "hook"/g; s/\b(s|r)\.told\b/\1.confidence == "hook"/g'` over `mail.py agent.py agent_common.py agent_wake.py agent_tick.py` (16 lines changed, so every rule is hook-only again) and `pdm run pytest -q tests/test_agent.py tests/test_mail.py tests/test_finished_tick.py tests/test_wanted_and_nudge.py tests/test_notify.py tests/test_balance.py tests/test_agent_restart.py tests/test_attention.py`: **241 passed**. A rule going back to hook-only, or a new `confidence == "hook"` written beside them, would be caught by nothing.
-
-**Fix:** one parametrized test over the rules a Gemini-shaped session meets first — the idle nudge, the doorbell (`mail.py`), the wake's `idle` source, the first-prompt gate (`agent.py` ~651), the finished-tick wrap-up — each run with `confidence="title"` and asserting the rule acts as it does for `hook` (and not for `scraped`). Revert one `told` to `== "hook"` and see its case fail.
-
-**Done when** each family of `told` sites has a case that fails when that site is hook-only, and the suite passes.
-
-**Related:** TD-785, TD-784, #2014.
