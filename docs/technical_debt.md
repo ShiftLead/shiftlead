@@ -1765,7 +1765,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (grinder-ao-2, met building TD-836 in #2048)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed (2026-10-17, PR #PRNUM) — rule 9 reads a waiting claim of either kind as unfinished: a member's own claimed PR whose `ask` a seat of the team holds blocks the reading, *w waiting on <seat>: #n*, read from the records; a wind-down under it would close the reader, and rule 8 starts no team for a held PR. Built by TD-863.
+**Status:** Designed (2026-10-17, PR #2063) — rule 9 reads a waiting claim of either kind as unfinished: a member's own claimed PR whose `ask` a seat of the team holds blocks the reading, *w waiting on <seat>: #n*, read from the records; a wind-down under it would close the reader, and rule 8 starts no team for a held PR. Built by TD-863.
 **Blocked by:** TD-863
 **Location:** design §6 rule 9 (*Which members count*: the *waiting* clause), rule 5 (*A run holding only waiting claims … declares `none` beside them*), §4.9a *Waiting is read, never declared*; `src/sessionorc/work.py` (`finished`, `waiting_of`), `src/sessionorc/agent_tick.py` (`_finished_pass`, `_waiting_claims`)
 
