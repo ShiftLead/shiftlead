@@ -371,7 +371,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   failure earns one, none typed by a session. What is left reads a screen or weighs words: an
   `ask` addressed to the manager, a permission on an unattended member (rare, since an unattended
   launch skips them — the Claude Code adapter's `--dangerously-skip-permissions`, §4.8; a profile's
-  `permission_prompts: ask` does not, §4.2a, and its prompts go to the person's rules and the director seat
+  `permission_prompts: ask` or `all` does not, §4.2a, and its prompts go to the person's rules and the director seat
   before a manager, §4.9b *The director seat*), a `stalled?` member, one *idle · open work* after the nudge, and the
   prose of an escalation. So **the manager is a seat on call** unless its definition says
   otherwise (`on_call`, §4.9, whose default is the `manager` role's alone), filled by rule 3's
