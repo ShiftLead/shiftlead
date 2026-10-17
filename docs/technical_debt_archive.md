@@ -15601,3 +15601,47 @@ Then the build entries, named in `Blocked by:`.
 **Related:** TD-816 (the design), TD-829 (the filters, built after), TD-771 (the Queue page), TD-599 (the Inbox's Dismiss all).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2045) — `queue.attach` answers each card's sections (`needs`, `steering`, `waiting`, `answered`, `fyi`) and `card_sections` shapes them, each item about another row carrying *on TD-n*; `split_later` reads the horizon's `hidden` too and returns the lines no card holds, which `inbox.horizon_left` recounts; `queue_card.html` draws *Needs you* in the header and the rest above the rows; each group heading reads its count, *(n of m)* under a pick, and folds (`qgfold`); the Inbox's Dismiss all is `AO.dismissOnScreen`, which the card sections call. Tests: `tests/test_ui_queue.py`.
+
+## TD-838: Build TD-823: `permission_prompts: all` launches with the adapter's `asking_args`; `ask` leaves the tool's mode alone
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-823's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built #2054 (2026-10-17, grinder-ao-2). Was: Open.
+**Location:** design §4.2a *`permission_prompts: skip | ask | all`*, §4.3 `asking_args` and the conformance walk, §4.9b *The director seat*; `src/shiftlead/profiles.py` (`PERMISSION_PROMPTS`, `_permission_prompts`), `src/shiftlead/adapters/claude_code/__init__.py` (`launch`, `SKIP_FLAG`), `scripts/conformance.py` (`ASKING_ARGS`; not a SYNCED FILE); the director start's refusal is TD-662's step 2a, which names `ask` and `all`
+
+**Why:** TD-823: under `ask`, Claude Code's `auto` mode allowed a command before any hook saw it, so §4.2a's promise that every prompt meets the person's road was untrue.
+
+**Fix:**
+- **The word.** `profiles.yml` takes `permission_prompts: skip | ask | all`, refusing any other value with the three named.
+- **The adapter.** It gains `asking_args` (Claude Code `["--permission-mode", "manual"]`). Under `all` the launch drops the skip flag and adds `asking_args`. Under `ask` it drops the skip flag and adds nothing, so the tool's mode is the person's settings'.
+- **The conformance walk.** It declares `permission_prompts: all` in its scratch home and drops its own `ASKING_ARGS`.
+- **Tests:** argv under each word; an unknown word refused, its message naming the three. The walk's profile declares `all`. Tests that change with it: `tests/test_conformance_walk.py` (the scratch profile's `"ask"`, twice) and `tests/test_permission_rules.py` (the refusal's *ask or skip*).
+
+**Done when** a profile under `all` launches unattended with `--permission-mode manual` and its permissions reach the host agent, while `ask` launches with the person's own mode, and a live re-run of the walk (`pdm run conformance claude-code --profile conformance`) still sees its permission.
+
+**Related:** TD-823 (the design), TD-641 (`permission_prompts`), TD-784 (the walk).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2054). `permission_prompts` takes `skip | ask | all`, and any other word is refused naming the three. The Claude Code adapter declares `asking_args` (`--permission-mode manual`) and adds them to an unattended launch under `all`. Under `ask` it only drops the skip flag. Gemini declares none, so its `all` launch is the same as its `ask`. The conformance walk declares `all`, and its live re-run on this branch passed 7 of 7 and saw its permission through the hook channel. The lasting content: design §4.2a and §4.3 `asking_args`.
+
+## TD-823: `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-784's live walk)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Built #2054 (2026-10-17, by TD-838). Was: Designed 2026-10-17 (design §4.2a *`permission_prompts: skip | ask | all`*, §4.3 `asking_args` and the conformance walk, §4.9b *The director seat*, §6 rule 3). Under `ask` the tool's own mode stands as the person's settings set it: a mode that decides on its own (Claude Code's `auto` classifier) is the person's first rule, and what it does not allow meets the written rules, the director seat and the person. A third word, `all`, adds the adapter's `asking_args` (`--permission-mode manual`), so every prompt meets that road. shiftlead writes no settings file. Steered to Paul with `ask` keeping the tool's mode as the default. Built by TD-838.
+**Location:** design §4.2a *`permission_prompts: skip | ask | all`* (was *`ask | skip`*), §4.9b *The director seat*; `src/shiftlead/adapters/claude_code/__init__.py` (`launch`: under `ask` it only drops `--dangerously-skip-permissions`); `scripts/conformance.py` (`ASKING_ARGS`)
+
+**Why:** TD-784's first live run (2026-10-16, Claude Code 2.1.302, a fresh config dir): the unattended launch under `permission_prompts: ask` ran in `permission_mode: auto` — the tool's own default now (its `.claude.json` carries `hasSeenAutoDefaultNotice`), and the mode Paul's own `~/.claude/settings.json` sets (`defaultMode: auto`). Its classifier allowed `touch conformance-permission.txt` with a `PreToolUse` and no `PermissionRequest`, so nothing reached the host agent. §4.2a says that under `ask` *the prompts meet the person's rules, the director seat and then the person*; under `auto` only the ones the classifier will not allow do. The walk now launches with `--permission-mode manual` and sees the permission.
+
+**Fix:** design it first: under `ask`, does the adapter launch with the tool's asking mode (Claude Code's `--permission-mode manual`), so every prompt meets shiftlead's road, or leave the tool's mode to the person's settings (the classifier as one more of the person's rules, before the director seat), saying so in §4.2a — or a third word for it. The tool's mode is the person's setting (`defaultMode`), so whichever the design takes is said where the person reads `permission_prompts`.
+
+**Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
+
+**Resolved:** 2026-10-17 (built by TD-838, #2054). Design §4.2a *`permission_prompts: skip | ask | all`* and §4.3 `asking_args` carry the rule.

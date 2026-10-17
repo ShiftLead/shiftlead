@@ -27,6 +27,7 @@ def home(tmp_path, monkeypatch):
         "default: gem\nprofiles:\n  gem: {adapter: gemini, account: paul, model: gemini-3-pro}\n"
         f"  grind: {{adapter: gemini, account: grind, config_dir: {tmp_path / 'g'}}}\n"
         "  asks: {adapter: gemini, permission_prompts: ask}\n"
+        "  close: {adapter: gemini, permission_prompts: all}\n"
     )
     return tmp_path
 
@@ -65,6 +66,8 @@ def test_a_resume_an_unattended_launch_and_ask(home):
     assert g.env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"].endswith("grind+unattended.json")
     a = ad.launch(profile="asks", resume=None, prompt=None, unattended=True, cwd=home)
     assert "yolo" not in a.argv  # under `ask` the tool asks
+    c = ad.launch(profile="close", resume=None, prompt=None, unattended=True, cwd=home)
+    assert c.argv[3:] == a.argv[3:]  # no `asking_args`: under `all` the launch is `ask`'s (§4.3, TD-823)
     assert gemini._without_yolo(["--approval-mode", "yolo", "-s", "--yolo", "--approval-mode", "auto_edit"]) == [
         "-s",
         "--approval-mode",
@@ -187,7 +190,7 @@ def test_credentials_read_the_homes_auth_type_and_credential(home, monkeypatch):
     (gem / "oauth_creds.json").write_text("{}")
     assert ad.credentials_ok(prof) is True
     rows = {r["profile"]: r for r in ad.doctor_profiles()}
-    assert set(rows) == {"gem", "grind", "asks"}
+    assert set(rows) == {"gem", "grind", "asks", "close"}
     assert rows["grind"]["config_dir"] == str(home / "g") and rows["grind"]["credentials"] is True
     assert "key" not in rows["grind"] and "note" not in rows["grind"]
 

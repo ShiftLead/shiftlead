@@ -62,9 +62,9 @@ def test_the_scratch_profile_is_the_named_ones_asking_its_permissions(tmp_path):
         "  other: {adapter: gemini-cli, account: g, config_dir: /tmp/g}\n",
     )
     got = cw.scratch_profile("claude-code", "conformance", live)
-    assert got["permission_prompts"] == "ask" and got["model"] == "sonnet" and got["account"] == "c"
+    assert got["permission_prompts"] == "all" and got["model"] == "sonnet" and got["account"] == "c"
     assert got["config_dir"] == str(Path("~/.claude-conformance").expanduser())
-    assert got["extra_args"] == ["--permission-mode", "manual"]  # the tool's own default mode never decides
+    assert "extra_args" not in got  # the adapter's `asking_args` come with `all` (§4.3, TD-823)
     with pytest.raises(cw.Refused, match="no profile 'missing'"):
         cw.scratch_profile("claude-code", "missing", live)
     with pytest.raises(cw.Refused, match="runs gemini-cli"):
@@ -262,7 +262,7 @@ def test_the_scratch_home_holds_the_one_profile_as_default_and_a_committed_walk_
     got, default = profiles.load(home / "profiles.yml")
     assert default == "conformance" and set(got) == {"conformance"}
     p = got["conformance"]
-    assert (p.adapter, p.account, p.model, p.permission_prompts) == ("claude-code", "c", "sonnet", "ask")
+    assert (p.adapter, p.account, p.model, p.permission_prompts) == ("claude-code", "c", "sonnet", "all")
     assert p.config_dir == cfg
     assert work == home / "walk"
     head = subprocess.run(["git", "-C", str(work), "log", "--format=%s"], capture_output=True, text=True, check=True)

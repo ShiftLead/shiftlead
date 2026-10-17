@@ -143,7 +143,9 @@ def test_the_adapter_names_what_a_prompt_touches():
 # -- the profile's permission_prompts --------------------------------------------------------------
 
 
-def test_permission_prompts_ask_launches_without_the_skip_flag(tmp_path, monkeypatch):
+def test_permission_prompts_ask_and_all_launch_without_the_skip_flag(tmp_path, monkeypatch):
+    """`skip` adds the skip flag; `ask` drops it and leaves the tool's mode alone; `all` drops it and adds
+    the adapter's `asking_args` (§4.2a, §4.3, TD-823); any other word is refused, naming the three."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     (tmp_path / "home").mkdir()
@@ -153,6 +155,7 @@ def test_permission_prompts_ask_launches_without_the_skip_flag(tmp_path, monkeyp
         "  watched: {account: grind, config_dir: /tmp/cc-grind, permission_prompts: ask}\n"
         "  extra: {account: grind, config_dir: /tmp/cc-grind, permission_prompts: ask,\n"
         "          unattended_args: [--dangerously-skip-permissions, --verbose]}\n"
+        "  close: {account: grind, config_dir: /tmp/cc-grind, permission_prompts: all}\n"
     )
     ad = ClaudeCodeAdapter(binary="claude")
 
@@ -163,8 +166,14 @@ def test_permission_prompts_ask_launches_without_the_skip_flag(tmp_path, monkeyp
     assert "--dangerously-skip-permissions" not in argv("watched")
     assert "--dangerously-skip-permissions" not in argv("extra") and "--verbose" in argv("extra")
     assert "--dangerously-skip-permissions" not in argv("grind", unattended=False)
+    for name in ("grind", "watched", "extra"):  # only `all` names a mode: under `ask` the person's settings' stands
+        assert "--permission-mode" not in argv(name)
+    close = argv("close")
+    assert "--dangerously-skip-permissions" not in close
+    assert close[close.index("--permission-mode") + 1] == "manual" and close.count("--permission-mode") == 1
+    assert "--permission-mode" not in argv("close", unattended=False)  # a person's own launch is theirs
     (tmp_path / "home" / "profiles.yml").write_text("profiles:\n  p: {permission_prompts: sometimes}\n")
-    with pytest.raises(ValueError, match="ask or skip"):
+    with pytest.raises(ValueError, match="skip, ask or all, not 'sometimes'"):
         profiles.load()
 
 

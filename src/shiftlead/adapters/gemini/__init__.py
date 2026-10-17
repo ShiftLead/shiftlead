@@ -38,6 +38,7 @@ HOOK_TIMEOUT_MS = 10_000  # the tool's `timeout` is in milliseconds; every hook 
 # where the tool sits when it was installed with npm's user prefix: off `PATH` outside a login shell
 NPM_BINARY = Path("~/.npm-global/bin/gemini")
 YOLO = ["--approval-mode", "yolo"]  # an unattended launch under `permission_prompts: skip` (§4.2a)
+# no `asking_args` (§4.3): under `permission_prompts: all` the launch is `ask`'s, yolo dropped and nothing added
 # The layer's settings besides its hooks (design §4.3 `launch`): no on-screen notification hooks, no
 # tips or banner, the version the build was read against pinned, and the title the state check reads
 # turned on, so the person's own settings cannot turn it off.
@@ -238,7 +239,7 @@ class GeminiAdapter:
 
 
 def _without_yolo(args: list[str]) -> list[str]:
-    """`args` less the approval mode `yolo` (and `--yolo`): under `permission_prompts: ask` the tool asks."""
+    """`args` less the approval mode `yolo` (and `--yolo`): under `permission_prompts: ask` or `all` the tool asks."""
     out: list[str] = []
     for a in args:
         if out and out[-1] == "--approval-mode" and a == "yolo":
