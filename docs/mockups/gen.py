@@ -1204,13 +1204,20 @@ def add_entry():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
   <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
     <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">shiftlead · docs/technical_debt.md</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
-    <div class="note">Write what you have: a title, or a page. The number, the header lines and the file locations are found for you, and you are asked only what cannot be found.</div>
+    <div class="note">Write what you have: a title, or a page. The number, the other header lines and the file locations are found for you, and you are asked only what cannot be found.</div>
     <div class="field"><label>What</label><span class="input" style="height: 132px; align-items: flex-start; padding: 8px 10px; flex-direction: column; gap: 6px;"><span>{words}</span><span class="mono" style="font-size: 12px; color: #2563eb;">~/.shiftlead/attachments/draft-7f3a/paste-2026-10-13-0942.png</span></span></div>
     <div style="display: flex; align-items: center; gap: 10px; margin-top: -4px;"><span class="btn sm">Attach</span><span class="note" title="design §4.5a Add entry form: Attach / drop / paste (TD-630)">or paste a screenshot, or drop a file on the box — its path goes in at the cursor</span></div>
+    <div style="display: flex; gap: 28px; align-items: flex-start;">
     <div class="field"><label>Type</label><div style="display: flex; gap: 10px;">
       <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>debt</div><div class="note">something wrong now</div></div></div>
       <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>feature</div><div class="note">something new</div></div></div>
     </div></div>
+    <div class="field" title="design §4.5a Add entry… (TD-851): Medium selected; words that name another priority win"><label>Priority</label><div style="display: flex; gap: 10px;">
+      <div class="radio" style="gap: 8px;"><span class="rb"></span><div>High</div></div>
+      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div>Medium</div></div>
+      <div class="radio" style="gap: 8px;"><span class="rb"></span><div>Low</div></div>
+    </div></div>
+    </div>
     <div style="border-top: 1px solid #eceef1; padding-top: 12px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
       <div style="display: flex; flex-direction: column; gap: 6px;">
         <span class="btn primary" style="align-self: flex-start;">Hand to the techlead</span>
@@ -1235,7 +1242,7 @@ def add_entry():
     <div style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px;">
       {side_card("Told at start", '<span class="meta" style="font-size: 12px;">7 lines</span>', "", open_=False)}
       {side_card("Told at start", '<span class="meta" style="font-size: 12px;">7 lines</span>', """<div style="font-size: 12px; line-height: 1.5; margin-top: 8px; color: #4b5563; display: flex; flex-direction: column; gap: 6px;" title="the session's start context (design §4.3, TD-283): display only">
-        <div>The person asked for a new entry in the ledger of shiftlead: docs/technical_debt.md, with Type debt. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
+        <div>The person asked for a new entry in the ledger of shiftlead: docs/technical_debt.md, with Type debt and Priority Medium. Their first message is their words for it. Turn them into one entry, asking the person only for what the words and the repo do not settle.</div>
         <div><b>Read before you write</b>: the ledger's preamble and template, and its three newest entries …</div>
         <div><b>The number</b> is the first free one over the ledger, its archive and every open PR …</div>
         <div class="muted">… four more lines</div></div>""")}
