@@ -68,6 +68,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-796 | The `about` from a claim: `_claim_about`'s *declared, else derived* order is held by no test — dropping the derived claim or swapping the order passes | Medium | Open |
 | TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
 | TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
+| TD-803 | `_repo_hold`'s *and n more* threshold (`> 3`) is held at five held paths only: a boundary of four, or three, passes unchanged | Low | Open |
 
 ---
 
@@ -1341,3 +1342,21 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the design says whether and how the person's own shell acts on other sessions, and its build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-580 and TD-596 (the person-only half), TD-077 (identity), TD-036 (membership), TD-041 (invariant 5).
+
+## TD-803: `_repo_hold`'s *and n more* threshold (`> 3`) is held at five held paths only: a boundary of four, or three, passes unchanged
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.7 `ao pr held`; `src/shiftlead/cli.py` (`_repo_hold`, the `len(p["held"]) > 3` arm); `tests/test_unasked_shown.py`
+
+**Why:** #1980 (TD-798) added `test_the_repo_holds_line_names_three_held_paths_and_counts_the_rest`, which uses five held paths. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_unasked_shown.py`: baseline 13 passed; with `if len(p["held"]) > 3 else ""` changed to `> 4` 13 passed. With four held paths that mutant names three and drops the fourth with no *and 1 more*, and `>= 3` would print *and 0 more* for three; no test draws four or three held paths. (The other two mutations TD-798 named do fail their tests.)
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** a PR with exactly three held paths reads all three with no *more*, and one with four reads `a`, `b`, `c` *and 1 more*; changing `> 3` to `> 4` or `>= 3` fails one of them.
+
+**Related:** TD-798.
