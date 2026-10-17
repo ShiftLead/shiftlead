@@ -1357,6 +1357,7 @@ decisions; this file points at them rather than repeating them.
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 
+- 2026-10-17 (TD-850, grinder-ao-2; Paul, 2026-10-17, a grinder out of work polling `pr:2019` in a foreground `timeout 180 tail -f /dev/null` loop: *make sure our team members know that we will wake them up if they are waiting for work*): *A session never waits inside its own turn* — any wait, not mail alone, ends the turn, a wait outside mail runs as one background command, and `ao --skill` and every role preset list what wakes an idle member. Until this date only mail and the manager's round were written down.
 - 2026-10-16 (TD-806, the designer; Paul, 2026-10-16, a send from Edge that cleared his next words and landed twice): *A send lands once*. A send the page makes carries a key kept on its `sends` entry, and a repeat from the same caller within `SEND_KEY_SECONDS` types nothing and answers as the first did. `ao send` carries none. Built by TD-813.
 - 2026-10-16 (TD-748, the designer; [ADR 2026-10-15](decisions/2026-10-15-queue.md), agreed by Paul with Fable and Sonnet, and its mockup reviewed with him over seven rounds): *The Inbox is a queue* renamed *Nothing leaves the Inbox without an answer*, the rules unchanged, since *queue* now names the Queue page.
 - 2026-10-14 (TD-682, the designer): *Told on Telegram when nobody is looking*: *CI not starting* for an account joins the rows told, since every team's merges in it stop. Built by TD-687.
