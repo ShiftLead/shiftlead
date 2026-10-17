@@ -717,7 +717,7 @@ def _smoke_failed(
         return fail(repo, intent, why, code), None
     try:
         start(r["root"], repo, str(frm), run, "smoke", None, "rollback", str(sha), why)
-    except ValueError as e:
+    except (ValueError, OSError) as e:  # no tree, or the run cannot be spawned in it
         return fail(repo, intent, f"{why}; its rollback could not start: {e}", code), None
     return None, None
 

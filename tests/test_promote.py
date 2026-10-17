@@ -1030,6 +1030,24 @@ def test_the_smokes_rollback_that_cannot_start_leaves_the_hold_beside_both_reaso
     assert promote.held("repo") == hold  # neither cleared nor rewritten
 
 
+def test_the_smokes_rollback_whose_run_cannot_be_spawned_is_a_failure_with_both_reasons(
+    checkout, monkeypatch, tmp_path
+):
+    """The techlead's note on #2033: `start`'s Popen raising (an OSError, not the tree's ValueError)
+    is a rollback that cannot start too — a failure with both reasons, no intent left in flight."""
+    _, code = _smoke_block(checkout)
+    frm = _git(checkout, "rev-parse", "HEAD")
+    main = _merge(checkout, "b")
+    readings = _press(checkout, main, frm=frm)
+    code.write_text("3")
+    readings, _ = _pass(checkout, readings)
+    monkeypatch.setattr(promote, "make_tree", lambda root, repo, sha: tmp_path / "gone")  # Popen's cwd is missing
+    readings, _ = _pass(checkout, readings)
+    why = f"smoke failed on {main[:7]}: smoke says 3; its rollback could not start: "
+    assert readings["repo"]["failed"]["why"].startswith(why) and readings["repo"]["live"] == main
+    assert promote.inflight("repo") is None and readings["repo"]["inflight"] is None
+
+
 def test_a_press_under_a_hold_whose_smoke_fails_rewrites_the_hold(checkout):
     _, code = _smoke_block(checkout)
     frm = _git(checkout, "rev-parse", "HEAD")
