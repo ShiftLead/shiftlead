@@ -1051,6 +1051,7 @@ def test_the_smoke_is_kept_on_the_intent_when_the_checkout_moves(checkout):
     seen, _ = _smoke_block(checkout)
     main = _merge(checkout, "b")
     readings = _press(checkout, main)
+    _wait_gone(readings["repo"]["inflight"]["pid"])  # the run has read the checkout's HEAD
     _smoke_block(checkout, smoke="exit 9")  # a pull moves the checkout before `check` reads main
     (checkout.parent / "live").write_text(main + "\n")
     readings, _ = _pass(checkout, readings)
