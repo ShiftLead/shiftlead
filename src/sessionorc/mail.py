@@ -202,17 +202,18 @@ def is_person(caller: Any) -> bool:
 
 def person_shell(record: Session | None) -> bool:
     """The person's own shell (design §4.8 *The person's own shell is the person*, TD-580): a `shell`
-    session, interactive, with no role, no team and no controller — what **Open shell here**, **+ New
-    ▾ Shell** and `ao shell` make, and what no session can make, since a session's shell lists its
-    creator as a controller from birth. Read from the record at each request, never kept: `ao mode`,
-    `ao control … add` or a role ends it on the next call. The one exception to `PERSON_ONLY`, and it
-    passes the acting gate and every other act a person passes (`as_person`, TD-801)."""
+    session, interactive, with no role and no controller — what **Open shell here**, **+ New ▾ Shell**
+    and `ao shell` make, and what no session can make, since a session's shell lists its creator as a
+    controller from birth. A team badge does not end it (TD-821): **Open shell here** on a team member
+    gives the shell the member's `team` and `project`, so its card is drawn on that team, and a badge
+    grants nothing (§9 invariant 9). Read from the record at each request, never kept: `ao mode`, `ao
+    control … add` or a role ends it on the next call. The one exception to `PERSON_ONLY`, and it passes
+    the acting gate and every other act a person passes (`as_person`, TD-801)."""
     return (
         record is not None
         and record.adapter == "shell"
         and not record.unattended
         and not record.role
-        and not record.team
         and not record.controllers
     )
 

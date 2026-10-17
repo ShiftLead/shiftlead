@@ -70,13 +70,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
-| TD-821 | A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at | Low | Designed — built by TD-827 |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
-| TD-827 | Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team* | Low | Open |
 | TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
 | TD-840 | #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test | Medium | Open |
 | TD-841 | #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard | Medium | Open |
-| TD-842 | #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised | Low | Open |
+| TD-842 | #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised | Low | Open — (1) done by TD-827 (#2023); (2) is left |
 
 ---
 
@@ -1430,31 +1428,6 @@ Then the build entries, named in `Blocked by:`.
 
 ---
 
-## TD-821: A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-17 (design §4.5a *Focus: Open shell here*, §4.8 *The person's own shell is the person*, §4.9 *A person in the team*). **Open shell here** on a team member gives the shell the member's `team` and `project` badges and nothing else of the team's (no reader, no controller, no brief), so it draws in the team's group with the compact card and the person mark, as a person's session in the team does (TD-160), and every team act leaves it alone. The person's own shell no longer requires *no team*: a badge grants nothing (§9 invariant 9): the mail gate's edge never reaches a shell, whose mail is refused before the gate (§4.3), and a claim from its prompt reads the badge as any badged record's does (§4.4 *An entry names its team*), so the guards are *no role* and *no controllers*. **+ New ▾ Shell** and a session with no badge give a shell with none; **Resume** carries the badge; a shell on a stopped or concluded team sits in its group as a person's session does. Built by TD-827.
-**Blocked by:** TD-827
-**Location:** design §4.5a *Focus: Open shell here* (the record it creates) and *card: compact* (*the full card stays on a repo's no-team strip*), §4.9 *A person in the team* (TD-160) and *The Org page* (the no-team strip); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch: `create(name=…-shell, dir=…, adapter="shell")`, no `team`, ~L2805); `src/shiftlead/ui/repo.py` (`team_groups`: a card's group is its record's `team`, else `NO_TEAM`, ~L655); `src/sessionorc/mail.py` (`person_shell`: *no team* is among its conditions today; TD-827 drops it)
-
-**Why:** Paul, 2026-10-16, through Add entry: *When a shell is opened from a team, its card should show on that team (instead of "no team") - that way its more easily seen as a user is focused on a particular team.* Today **Open shell here** on a team member creates the person's own shell with no `team`, so its card lands in the repo's *n sessions, no team* strip, away from the team the person pressed it on, and a person working one team has to look for it elsewhere on the page.
-
-**Fix:** design it first: the shell **Open shell here** creates from a session with a `team` carries that `team`, so it draws with the team's cards. Say:
-1. Which presses carry it: Focus's and the card's **more ▾** on a team member, and whether **+ New ▾ → Shell** pressed while a team is in view does.
-2. What the badge does not make it, and the tension it meets: the person's own shell is today a `shell` record that is interactive with **no role, no team** and no controller (§4.8 *The person's own shell is the person*; `mail.person_shell` checks `not record.team`), so a shell that simply carried `team` would lose the person-only acts **Open shell here** exists to give (TD-580, TD-801). Say whether §4.8's definition drops *no team* for a shell, or the team is shown some other way (the card drawn with the team it was opened from, kept apart from the record's `team`). Either way the shell is not a member any team act reaches (TD-160's *left alone by every team act*: Stop, wind down, rule 8, lane counts, TDs in motion), and keeps the full card or takes the compact one — say which, since §4.5a gives the full card to *a repo's no-team strip* and the compact one to *a team member*.
-3. What carries on **Resume** (`team` is in `RESUME_CARRIES`) and what a shell on a concluded or stopped team shows.
-Then the build entry, named in `Blocked by:`.
-
-**Done when** the design says which shells carry the team, what the badge leaves unchanged, and which card they draw, and the build entry is filed and named in `Blocked by:`.
-
-**Related:** TD-577 and TD-580 (Open shell here, the person's own shell), TD-810 (Open shell here refused while the shell is open), TD-160 (a person's session in a team), TD-725 (the no-team strip).
-
----
-
 ## TD-823: `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it
 
 **Priority:** Medium
@@ -1472,36 +1445,6 @@ Then the build entry, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
-
-## TD-827: Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team*
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (TD-821's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Focus: Open shell here*, §4.8 *The person's own shell is the person*, §4.9 *A person in the team*; `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch, and TD-817's `not_own_shell` beside it; RPC-side only, no change to `app.js`); `src/sessionorc/mail.py` (`person_shell`); `src/sessionorc/settle.py` (`team_refusal`, read only); `src/shiftlead/ui/repo.py` (`team_groups`, read only: a card's group is its record's `team`); `tests/test_person_only.py` (the *a team's shell* case and `test_person_shell_is_a_shell_interactive_with_no_role_team_or_controller`), `tests/test_person_shell_acts.py` (`_rec("ao-t", team="t")` read as a session) and `tests/test_person_shell_link.py` (a teamed shell at a link): each asserts *no team* today and is flipped, not only added to
-
-**Why:** TD-821: **Open shell here** on a team member makes a shell with no `team`, so its card lands in the repo's *no team* strip, away from the team the person pressed it on.
-
-**Fix:**
-- **The press.** The `shell-here` branch's `create` passes the session's `team` and `project` where the record has them, and nothing else of the team's: no `controllers`, no `review`, no `role`, no `prompt_from`, and `unattended` stays false. The create is the person's (§4.8 *A create from it is the person's create*), so the host agent adds no creator, and the client fills no manager, as `ao new --team --adapter shell` already fills none (`_team_defaults`: a shell asks for nothing). That form, and the New session form with Shell and a Team pick, already make a teamed shell with no controllers; this change makes those the person's own shell too.
-- **The definition.** `mail.person_shell` drops `not record.team`. It reads `adapter == "shell"`, not `unattended`, no `role`, no `controllers`. Its docstring says why, as §4.8 does. TD-817's reuse test, `ui/app.py` `not_own_shell`, is its own copy of `person_shell` on the record's view: it drops `rec.get("team")` from its *run by a team or a role* refusal, which then reads *a shell with a role*, so a teamed shell left open is reopened.
-- **One other reading follows the badge, as designed.** A declared claim from the shell's prompt reads its badge as any badged record's does (`settle.team_refusal`, §4.4 *An entry names its team*): another team's entry is refused unless `--force`. No change; a test pins it.
-- **Nothing else keys on it.** `team_groups` already groups by the record's `team`. `teamrun.persons` keeps it out of live, concluded, wound down and Forget all. `_team_stamp` stamps no stop time on an interactive record. The Wind down and Stop now confirms already name a person's session apart. A change is needed only where a test shows otherwise.
-- **Tests:**
-  - a press on a team member creates a shell carrying its `team` and `project`, with no controllers and no review, and the Org's team group draws it, not the no-team strip;
-  - a press on a session with no badge creates a shell with none, and `/shell` (**+ New ▾ Shell**) makes one with none;
-  - a claim from a teamed shell's prompt on another team's entry is refused without `--force`, as any badged record's is;
-  - `person_shell` is true for a teamed shell with no role and no controllers, and false for one with a role or a controller;
-  - a request from a teamed shell passes `ao promote` and the acting gate as the person's own shell does (TD-580, TD-801);
-  - the team with only that shell live reads *stopped*, and `ao team stop` leaves the shell alone;
-  - a second press with the teamed shell still live reopens it (TD-817's reuse).
-
-**Done when** **Open shell here** on a team member opens a shell drawn in that team's group, which still passes every person-only act and is left alone by every team act, and the tests above pass.
-
-**Related:** TD-821 (the design), TD-817 (the reuse, built in #2009: the same route), TD-580 and TD-801 (the person's own shell), TD-160 (a person in the team), TD-725 (the no-team strip).
 
 ## TD-839: Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone
 
@@ -1564,7 +1507,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — (1) done by TD-827 (#2023): `not_own_shell` refuses an `unattended` holder and a `role`'s in words of their own, each a parametrize row, and a teamed holder is no longer refused (`test_a_teamed_shell_left_open_is_reopened`); (2) is left
 **Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
 
 **Why:** (1) `not_own_shell`'s docstring is `mail.person_shell`'s test — *a shell, interactive, no role, no team, no controllers* — but its parametrized test refuses on adapter, controllers, `role` and dir only. In an `origin/main` worktree, `if rec.get("unattended") or rec.get("role") or rec.get("team"):` → `if rec.get("role"):`, and again → `if rec.get("unattended") or rec.get("role"):` and → `if rec.get("team") or rec.get("role"):`: `pdm run pytest -q tests/test_ui_shell_here.py tests/test_ui_popout.py` gives **19 passed** all three times, so a teamed or unattended live shell would be reopened as the person's own. (2) #2012's drop reads `taken and not queued and event.get("state") == "exited"`; deleting `not queued` leaves `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was` **passing** (the queued path is never fed). (Its other three conditions each fail the test when removed.)

@@ -113,7 +113,8 @@ def test_a_press_after_exit_creates_a_fresh_shell_that_supersedes_it(press):
     [
         ({**OWN, "adapter": "claude-code"}, "which is not a shell"),
         ({**OWN, "controllers": ["ao-shiftlead-lead"]}, "a shell with controllers ao-shiftlead-lead — not your own"),
-        ({**OWN, "role": "grinder"}, "not your own"),
+        ({**OWN, "role": "grinder"}, "a shell with a role — not your own"),
+        ({**OWN, "unattended": True}, "a shell run unattended — not your own"),
         ({**OWN, "dir": "/elsewhere"}, "is held by a shell in /elsewhere"),
     ],
 )
@@ -174,3 +175,61 @@ def test_a_node_sessions_press_checks_and_creates_on_its_node(press):
     assert r.status_code == 200
     assert agent.checked() == [{"dir": "/repo/wt", "name": "w-shell", "host": "node-b"}]
     assert agent.made() == [{"name": "w-shell", "dir": "/repo/wt", "adapter": "shell", "host": "node-b"}]
+
+
+# ── a team member's shell (design §4.8 *The person's own shell is the person*, §4.9, TD-821, TD-827) ──
+
+
+@pytest.mark.unit
+def test_a_press_on_a_team_member_creates_a_shell_with_its_badge_alone(press):
+    agent = Agent()
+    member = {**SESSION, "team": "ao-grind", "project": "shiftlead", "role": "grinder", "controllers": ["ao-lead"],
+              "review": {"reader": "techlead"}, "unattended": True}  # fmt: skip
+    agent.records[SESSION["id"]] = member
+    r = press(agent)
+    assert r.status_code == 200 and r.json() == {"ok": True, "id": "ao-wt-w-shell"}
+    made = {"name": "w-shell", "dir": "/repo/wt", "adapter": "shell", "team": "ao-grind", "project": "shiftlead"}
+    assert agent.made() == [made]
+
+
+@pytest.mark.unit
+def test_a_press_on_a_session_with_no_badge_creates_a_shell_with_none(press):
+    agent = Agent()
+    press(agent)
+    assert agent.made() == [{"name": "w-shell", "dir": "/repo/wt", "adapter": "shell"}]
+
+
+@pytest.mark.unit
+def test_a_team_reads_the_teamed_shell_as_a_persons_session():
+    """`teamrun.persons` keys on `unattended: false`: a team with only that shell live is not live, and
+    neither a stop nor a concluded Start reaches it (`crew`)."""
+    from shiftlead import teamrun
+
+    shell = {"id": "ao-w-shell", "team": "t", "adapter": "shell", "unattended": False, "state": "idle"}
+    member = {"id": "ao-w", "team": "t", "unattended": True, "state": "exited"}
+    assert teamrun.persons(shell) and teamrun.crew("t", [shell, member]) == [member]
+    assert not teamrun.live(teamrun.crew("t", [shell, member]))
+
+
+@pytest.mark.unit
+def test_a_teamed_shell_left_open_is_reopened(press):
+    teamed = {**OWN, "team": "ao-grind", "project": "shiftlead"}
+    agent = Agent(live(teamed), teamed)
+    agent.records[SESSION["id"]] = {**SESSION, "team": "ao-grind", "project": "shiftlead"}
+    r = press(agent)
+    assert r.status_code == 200 and r.json() == {"ok": True, "id": OWN["id"], "reused": True}
+    assert agent.made() == []
+
+
+@pytest.mark.unit
+def test_the_teamed_shell_draws_in_its_teams_group_not_the_no_team_strip():
+    from shiftlead.ui.app import team_groups
+
+    def v(sid, **kw):
+        return {"id": sid, "name": sid, "state": "idle", "state_class": "idle", "state_label": "idle",
+                "scraped": False, "rank": 5, "controllers": [], "capabilities": [], **kw}  # fmt: skip
+
+    groups = team_groups([v("w", team="t", unattended=True), v("w-shell", team="t", adapter="shell", unattended=False)])
+    (team,) = [g for g in groups if g["team"] == "t"]
+    assert {m["id"] for m in team["members"]} == {"w", "w-shell"}
+    assert all("w-shell" not in {m["id"] for m in g["members"]} for g in groups if g["team"] != "t")
