@@ -367,7 +367,9 @@ class ServeMixin:
                 # the link is up (step 5) and refused as unreachable while it is down; never
                 # served from the replica. A `wait` goes to the home too: that is where the mail
                 # and the other hosts' members are.
-                refusal = modes.offline_refusal(str(name), caller, params, host=self.host, home=self.home)
+                refusal = modes.offline_refusal(
+                    str(name), caller, params, host=self.host, home=self.home, records=self.sessions
+                )
                 if refusal or name == "wait":
                     if not self.home_reachable():
                         raise RpcError(

@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from sessionorc.mail import self_decide_refusal
+from sessionorc.mail import as_person, self_decide_refusal
 
 # The home's, written at the home: a node's replica is overridden by the home's copy on reconnect,
 # so an edit made here would be lost, and said to have worked. **`suspend` is here for exactly
@@ -141,9 +141,19 @@ PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"
 HOME_ONLY = frozenset({"host_files", "host_occupancy", "host_worktrees"})
 
 
-def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:
+def offline_refusal(
+    method: str,
+    caller: Any,
+    params: Mapping[str, Any],
+    *,
+    host: str,
+    home: str,
+    records: Mapping[str, Any] | None = None,
+) -> str | None:
     """Why a node that cannot reach `home` refuses this call, or None when it serves it (design
-    §4.4a, the call-by-call table). `caller` is None for a person. Reads are never listed and never
+    §4.4a, the call-by-call table). `caller` is None for a person; `records` are the node's own,
+    and a caller they hold as the person's own shell acts as a person at this host does (`as_person`,
+    design §4.8 *The person's own shell is the person*, TD-801). Reads are never listed and never
     refused, but for `HOME_READS`, the readings only the home takes. Every refusal names the home
     and says nothing was queued: a refusal the caller can see, never a delivery that is not coming.
     With the link up the agent forwards what this refuses instead of asking (`HostAgent._forward`,
@@ -161,8 +171,8 @@ def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host
         return f"ids.json is the home's: the ledger ids are handed out there alone: {tail}"
     if method in RANKS:
         return f"ranks.json is the home's: a move on the rank is kept and landed there alone: {tail}"
-    if caller is None or method not in NODE_ACTS:
-        return None  # a person at this host acts on its sessions; a read is a read
+    if caller is None or method not in NODE_ACTS or as_person(caller, records or {}):
+        return None  # a person at this host — or its own shell here — acts on its sessions; a read is a read
     if method == "create":
         return f"a session creates nothing while its host is offline — a create is gated on the org's graph: {tail}"
     if params.get("id") == caller:
