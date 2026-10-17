@@ -727,7 +727,9 @@ def test_ao_promote_status_reads_checking_live_and_rolled_back_by_the_smoke(monk
         ({"held": held}, f"shiftlead · live 4444444, rolled back by the smoke from 9999999 — {why} · main"),
     ):
         reading = {"live": "4" * 40, "main": "9" * 40, "ahead": 3, "checks": "green", "auto": True, **r}
-        monkeypatch.setattr(cli, "call_sync", lambda m, **p: {"home": "kmaster", "promotes": {"shiftlead": reading}})
+        monkeypatch.setattr(
+            cli, "call_sync", lambda m, rd=reading, **p: {"home": "kmaster", "promotes": {"shiftlead": rd}}
+        )
         assert cli.main(["promote", "status"]) == 0
         assert want in capsys.readouterr().out
         assert cli.main(["--json", "promote", "status"]) == 0
