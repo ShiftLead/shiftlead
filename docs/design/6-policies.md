@@ -1072,14 +1072,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   outcome is read from `check` on later ticks, never from the run's exit code** (`check` read every
   fifteen seconds, `PROMOTE_WATCH`, while it is in flight), and the agent that judges it need not be
   the one that started it — a restart mid-run finds the file and carries on. Live reads the wanted
-  commit → done: the file cleared and a `system` note to the person inbox, *promoted `<repo>`
+  commit → done (where the run's tree's block has `smoke:`, once the smoke passes, *The smoke* below): the file cleared and a `system` note to the person inbox, *promoted `<repo>`
   `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the nodes follow §4.4a. The process
   gone with live still elsewhere, or `PROMOTE_BOUND` (twenty minutes) passed — the process killed at
   the bound as the stop time kills, and only while it is still the run: the intent keeps the
   process's start time beside its pid, so after a restart of the home a pid taken again by another
   process reads gone and is never killed — → **failed**: `failed.json` `{sha, at, log, exit, why}`
   beside it, the Inbox row under *Needs you*, and **nothing further is promoted for that repo, auto
-  or press, until the person clears it** — the row's Dismiss, or a rollback that concludes (below),
+  or press, until the person clears it** — the row's Dismiss, or a rollback that concludes (below; with a smoke, once it passes),
   the one press a failure does not refuse. Sessions are never told: no send, no state change; they
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. This repo's block is CLAUDE.md's
@@ -1090,7 +1090,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   `main` holds it; with `auto` off, the row or `ao promote` is the person's press, and CLAUDE.md's
   pair by hand stays the fallback while the agent is down.
   **A rollback** is a person's press with a commit: `ao promote --sha <commit>` or `--back` (§4.7),
-  never the policy's and never the page's, since the page may be what broke.
+  never the page's, since the page may be what broke, and the policy's only after a failed smoke
+  (*The smoke* below).
   - **Which commit.** The home fetches, then resolves the commit in the checkout. It is refused when
     it is not hex (a branch, a tag or `HEAD` would be read in the person's checkout, not on main),
     when it names no commit or more than one, when it is **not an ancestor of `origin/main`** (a
@@ -1106,7 +1107,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     why §5 says `run` makes live *the tree it is started in*. It is the one write the promote makes
     to a repo: an entry in the repo's worktree list, touching no branch, no index and no file of the
     person's tree (git runs the repo's `post-checkout` hook, if it has one, in the new tree). The
-    block is read from the checkout as ever, so `run` names a path, and what runs is that path as
+    block's `run` and `check` are read from the checkout as ever (`smoke:` alone from the tree, *The smoke*), so `run` names a path, and what runs is that path as
     the commit had it; a commit older than the script fails to start, and reads as any failure does.
     **The tree stays** until the next promote or rollback of that repo starts, which removes it:
     what was installed from it may name it as its source, as this repo's build record does to say
@@ -1126,8 +1127,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     the note reads *rolled back `<repo>` to `<sha7>` from `<sha7>` — main is n commits ahead*. The
     wheel and the nodes follow as after any promote: the run writes the wheel of what it installed,
     and that is the newest.
-  - **The hold.** A rollback that concludes writes `~/.shiftlead/promotes/<repo>/held.json` — `{sha,
-    from, main, at}` — and the reading carries it as `held`. **While it stands the policy starts
+  - **The hold.** A rollback whose `check` reads its commit writes `~/.shiftlead/promotes/<repo>/held.json` (before its smoke, if it has one, *The smoke*) — `{sha,
+    from, main, at}`, with `by` and `why` when a failed smoke started it (*The smoke*) — and the reading carries it as `held`. **While it stands the policy starts
     nothing for that repo**, whatever `auto` says and however far main moves: the commit the person
     went back from is still on main, and a later merge that is not its cure would put it live again.
     The hold ends by the person's word alone: a plain press that concludes (main's head, by then
@@ -1141,6 +1142,113 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     `ao` that runs. A live copy that does not start is below it: the person makes the worktree and
     starts the repo's `run` in it by hand, and this repo's CLAUDE.md says so beside the promote's
     own pair.
+  **The smoke** (TD-804). CI judges a commit on fixtures, so a build that breaks only on the person's
+  real state passes it. A repo's block may carry **`smoke:`** (§5), a command the home runs **after
+  `check` reads the new commit**, to say whether what is now live works.
+  - **When and where.** It starts on the pass whose `check` reads the run's commit, for a promote
+    and a rollback alike. It runs in the tree `run` was started in: the checkout for a promote,
+    `promotes/<repo>/tree` for a rollback. **`smoke:` is read from that tree's own `.shiftlead.yml`
+    when the run starts**, not from the checkout's, and is kept on the intent. So the smoke that runs is
+    the one that commit carries, and a pull that moves the checkout during the run changes nothing.
+    A repo whose checkout's block has no `smoke:` concludes on `check` with its note unchanged. Where
+    the checkout's block has one but the tree's does not (a rollback to a commit older than the
+    smoke; a tree with no `.shiftlead.yml` reads as no block), no smoke runs and the note says
+    *no smoke in `<sha7>`*. A tree whose file or block cannot be read runs none either: *no smoke
+    read in `<sha7>`: <why>*.
+    It gets `SHIFTLEAD_PROMOTE_SHA`, which for the smoke is the commit now live, along with
+    `SHIFTLEAD_PROMOTE_FROM` (what was live before), `SHIFTLEAD_PROMOTE_ROOT` and
+    **`SHIFTLEAD_PROMOTE_KIND`** (`promote` or `rollback`). Nothing names a URL or a port: what
+    *live* is, and how to reach it, is the repo's, as it is for `check`. It is detached as the run
+    is, and its output goes on to the run's log after a line `── smoke ──`.
+  - **How it is judged.** By its **exit code**: 0 passes, and anything else fails with the log's
+    last lines as the reason. Unlike `run`, a smoke restarts nothing.
+    - The home starts it through a wrapper that writes `{sha, exit, at}` to
+      `~/.shiftlead/promotes/<repo>/smoke.json` when the smoke ends. So an agent restarted
+      mid-smoke reads the result rather than a lost child's exit.
+    - A smoke gone with no result written fails.
+    - So does one past **`SMOKE_BOUND`** (ten minutes), which is killed at the bound as the run is,
+      but only while the pid is still the smoke. Once the smoke starts, the run's `PROMOTE_BOUND`
+      no longer applies: the run reached its commit, and `SMOKE_BOUND` from the smoke's start is
+      the only clock.
+    - A repo with no `smoke:` concludes as before, on `check` alone. So does a rollback to a
+      commit older than its repo's smoke, whose tree's block names none.
+  - **The promote is in flight until the smoke ends.** The intent stays in `inflight.json`, with
+    `phase: smoke` and the smoke's pid, start time and `at`. So precondition (3) refuses a press,
+    `--back` included, and `auto` waits through the smoke.
+    - When `check` reads the commit, `last.json` is written, as before, and so is a rollback's
+      `held.json`. A restart of the home mid-smoke therefore finds both, and a rollback's failed
+      smoke stands as a failure beside its hold.
+    - **A plain promote's hold is cleared only when its smoke passes** (at the `check` reading for a
+      block with no `smoke:`), since that is when it concludes. So under a hold, a press whose smoke
+      fails rewrites the standing hold, and a smoke rollback that cannot start leaves the hold beside
+      the failure.
+    - The note waits for the smoke: *promoted `<repo>` `<sha7>` — n commits · smoke passed in
+      48 s*.
+    - Meanwhile the row reads *checking `<sha7>` live · started <t>* under FYI with its press
+      disabled, and `ao promote status` uses the same words.
+    - The nodes are not held back. `run` wrote its wheel before the home restarted, so a node that
+      is behind follows that wheel during the smoke, and follows the rollback's wheel after a
+      failed smoke (§4.4a).
+  - **A failed smoke puts back what was live before**, at once. This holds under `auto` and a
+    press alike, and whatever the repo (Paul's steer m-bf390074fccb, the default). The home starts
+    a rollback to the intent's `from`, with `by: smoke`. **It is the one rollback that is not a
+    person's press**: a copy the smoke found broken should not stay live until a person reads a
+    row.
+    - It goes as any rollback goes: the tree, the variables, its own smoke and the hold. It
+      always runs, even under a standing hold, which it rewrites as a second rollback does.
+    - The hold it writes carries `by: smoke` and `why`, the failed smoke's *smoke failed on
+      `<sha7>`: <the log's last line>*.
+    - The row then reads, under *Needs you* and counted: *`<repo>` · live `<sha7>`, rolled back
+      by the smoke from `<sha7>` <t> ago — <why> · main `<sha7>`, n commits ahead · checks … ·
+      held*.
+    - The note reads *rolled back `<repo>` to `<sha7>`: the smoke failed on `<sha7>` — <why>*.
+    - The hold ends as any hold does: a press that concludes once main holds the cure, its smoke
+      passing, or Dismiss.
+    - A rollback that cannot start (its tree cannot be made) stands as a
+      failure of the promote, with live left where it is. Its `failed.json` carries both reasons:
+      *smoke failed on `<sha7>`: <why>; its rollback could not start: <why>*.
+    - A rollback whose `run` does not conclude stands as a failure, as any run does.
+  - **It never rolls back a rollback.** In three cases a failed smoke leaves live where it is:
+    a rollback's own smoke fails (the person's or the smoke's), no `from` was read, or `from` is
+    the commit itself. The result stands as a **failure** in `failed.json`, with *smoke failed on
+    `<sha7>`* and the log's tail, under *Needs you*. Nothing further is promoted until the person
+    clears it, as after any failure. After a rollback that leaves the failure beside its hold:
+    Dismiss clears the failure first and the hold second, as *The hold* says.
+  - **What it is not.**
+    - It is no gate before the promote. Nothing runs a build against a copy of the person's state
+      before it is live. A second host agent on a copy of the home acts on what it reads: the
+      tick restarts members, pulls checkouts and reconciles sessions on its own tmux. That is
+      safe only if every act is fenced, and no mode of the agent fences them. So a bad build is
+      live for the run's and the smoke's minutes, and then put back.
+    - It is not a staging step. A staging target belongs to the repo's `run`: a `run` that deploys
+      to staging, tests it, and exits before touching production when that fails reads as any
+      refused run (*What the repo may refuse*). The smoke checks what `check` calls live.
+  - **This repo's smoke** is `scripts/smoke.py`, run by the live venv's interpreter in the tree.
+    It presses nothing and changes nothing.
+    - It waits up to 90 seconds for the UI's plain port to answer, since the run restarts the UI
+      after the agent. The address is read from the installed unit's `ExecStart` (`--bind` and
+      `--port` in `shiftlead-ui.service`): loopback when `--bind` is absent or `0.0.0.0`, and
+      `DEFAULT_PORT` when the unit is absent or names no port.
+    - It loads the Org (`/`), the Inbox (`/inbox`), the Queue (`/queue`), the Repo
+      (`/repo/shiftlead`) and Settings (`/settings`). **It loads no Focus**: opening one is the
+      person's *seen* (§4.2), and its attach sizes the pane (§4.6). Both are the person's acts.
+    - A page fails on any of: a status other than 200; a body that does not end its `</html>`;
+      a load past `PAGE_BOUND`; an uncaught script error; or a page whose `load` never fires.
+      `PAGE_BOUND` is the smoke's own 20 seconds, a constant of the script and not a page budget:
+      the budgets are TD-805's.
+    - Where `settings.yml` has a `reach:`, it loads the Org and the Queue once more through
+      `reach.url`, the route the person uses. Those loads are told and fail nothing: whether the
+      home's own request carries an identity the route allows is the route's business, not the
+      build's. A refusal is written in the log and on the note.
+    - It reads `ao status --json`, `ao repo --json` and `ao promote status --json`, each of which
+      must exit 0 with JSON. It never runs `ao inbox`, since reading marks entries read (§4.10).
+    - Each load prints one line to the log, so every promote also measures the pages TD-805 asks
+      about: the page, its status, time to first byte, total time and size.
+    - The browser half (script errors, `load`) needs Playwright and its Chromium headless shell.
+      They live in `~/.local/share/shiftlead-smoke/`, a venv of their own that
+      `scripts/smoke.py --setup` makes once, at a person's hand, and never inside the live venv.
+      The script re-runs itself under that venv when it exists. Without it, the HTTP half alone
+      judges, and the log says *browser half skipped: run scripts/smoke.py --setup*.
 - **Pull: the main checkout follows origin**: the registry's main checkouts move only when someone
   pulls, and the promote's precondition (1) fails on any checkout no one has pulled since the merge,
   so the home's tick pulls them. It runs **at the home** (§4.4a), in the promote's pass and on its
