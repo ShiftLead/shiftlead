@@ -73,6 +73,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
+| TD-848 | #2033's smoke start fails no test when reverted: a smoke that cannot be spawned, the tree it runs in, and `SHIFTLEAD_PROMOTE_KIND` are each unread by `tests/test_promote.py` | Low | Open |
+| TD-849 | #2033's smoke why fails no test when reverted: `_last_line` keeps lines from before `── smoke ──`, and the *it exited <code>* fallback is never taken | Low | Open |
 
 ---
 
@@ -1519,3 +1521,48 @@ Then the build entries, named in `Blocked by:`.
 **Done when** the paid option's obligations are written here, and the basics are built or each is archived with its reason.
 
 **Related:** [`docs/decisions/2026-10-13-monetisation.md`](decisions/2026-10-13-monetisation.md) (options 2, 3 and 5), TD-131 (retention), design §2 (multi-user access is a non-goal for now).
+
+---
+
+## TD-848: #2033's smoke start fails no test when reverted: a smoke that cannot be spawned, the tree it runs in, and `SHIFTLEAD_PROMOTE_KIND` are each unread by `tests/test_promote.py`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2033)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_promote.py`; `src/sessionorc/promote.py` (`_conclude`, `start_smoke`)
+
+**Why:** each change below was made alone on `origin/main` (c9a1cad0) and `pytest -q tests/test_promote.py tests/test_ui_promote.py tests/test_ui_inbox.py tests/test_cli.py tests/test_repoconfig.py` still passed:
+- `_conclude`'s `except OSError as e: return _smoke_failed(...)` around `start_smoke` changed to `except ZeroDivisionError`: no test makes the smoke unspawnable (a `cwd` that is gone), so a smoke that cannot start, which must fail the promote and roll back, is unread. (`tests/test_promote.py:1033` covers the rollback's run failing to spawn, not the smoke's own start.)
+- `start_smoke`'s `cwd=str(intent.get("tree") or root)` changed to `cwd=str(root)`: a rollback's smoke runs in the rollback's detached worktree (§6 *The smoke*); the test at line 913 prints `pwd` only for a plain promote, where `tree` is unset, and none does for a rollback.
+- `"SHIFTLEAD_PROMOTE_KIND": str(intent.get("kind") or "promote")` changed to `"promote"`: line 913 reads the variables only for a plain promote (kind `promote`), so `_KIND` for a rollback's smoke is unchecked.
+
+**Fix:** a test with a smoke command `pwd; echo $SHIFTLEAD_PROMOTE_KIND $SHIFTLEAD_PROMOTE_SHA` for a rollback intent (as line 913 does for a promote) whose `tree` differs from `root`, reading the log; and one where `tree` is a removed directory, so `Popen` raises, and the promote is failed.
+
+**Done when** each of the three changes above fails `tests/test_promote.py`.
+
+**Related:** TD-811 (slices 1 and 2, #2033, #2037), TD-804.
+
+---
+
+## TD-849: #2033's smoke why fails no test when reverted: `_last_line` keeps lines from before `── smoke ──`, and the *it exited <code>* fallback is never taken
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2033)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_promote.py`; `src/sessionorc/promote.py` (`_last_line`, `_judge_smoke`)
+
+**Why:** each change was made alone on `origin/main` (c9a1cad0), and the five modules named in TD-848 still passed:
+- `_last_line`'s `if SMOKE_MARK in lines: lines = lines[... :]` replaced with `pass`: its docstring says *the smoke's last non-empty line … after `── smoke ──`*, so a smoke that said nothing must read as `""`, not the run's last line before the mark. No test has run output before the mark and a silent smoke.
+- `_judge_smoke`'s `_last_line(intent) or f"it exited {code}"` replaced with `or "x"`: no test gives a smoke that fails with no output, so the why for a silent failure is unread.
+
+**Fix:** two tests: a log with run output, then `── smoke ──` and nothing, and a smoke result `exit: 3`: the why is *smoke failed on <sha7>: it exited 3*, and no line of the run's output is in it.
+
+**Done when** each change above fails `tests/test_promote.py`.
+
+**Related:** TD-811 (#2033), TD-848.
