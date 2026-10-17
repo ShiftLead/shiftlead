@@ -207,7 +207,7 @@ def test_a_member_whose_claimed_pr_waits_on_a_seats_held_ask_is_unfinished_whate
     views = [r.view() for r in team]
     assert work.finished(views, home="kmaster") == got and teamrun.concluded(views) is None
     two = _held(g1, 2067)
-    two.inbox.append(two.inbox[0].__class__(**{**asdict(_held(g1, 2068).inbox[0]), "id": "m-x"}))
+    two.inbox += _held(g1, 2068).inbox
     assert work.finished([_manager(), g1, two], home="kmaster")["why"] == ["g1 waiting on techlead: #2067 and 1 more"]
     # answered: gone from `prs_waiting`
     assert work.finished([_manager(), g1, _held(g1, 2067, closed=True)], home="kmaster")["why"] == []

@@ -238,8 +238,10 @@ def held_asks(records: Iterable[Any], home: str | None = None) -> dict[str, list
     member's declared `claimed` entries whose `pr` or `review_pr` is the `pr` of an ask from it that a
     record among `records` holds in its `prs_waiting.asks` — keyed by the member's `id`, each `{seat,
     pr}`, the seat the holder's name, in the records' order. An ask's `from` names the member as
-    `_waiting_claims`' `mine` does: the id, the host defaulting to `home`'s. Read from the records alone,
-    so the tick and the page's view agree."""
+    `_waiting_claims`' `mine` does: the id, the host defaulting to `home`'s — so `records` are views
+    addressed as the home addresses them (a node's member `id@host`, as `_finished_view` and the page's
+    view give them), or the home's own `Session`s. Read from the records alone, so the tick and the
+    page's view agree."""
     rows = list(records)
 
     def where(address: Any) -> tuple[str, str | None]:
