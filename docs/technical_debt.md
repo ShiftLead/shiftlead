@@ -1784,7 +1784,7 @@ The other cases:
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed (2026-10-17, PR pending) — the form asks Priority beside Type, *Medium* selected; the words win where they name another; a look's *Not right* reaches no `entry_add` and carries none. Built by TD-855.
+**Status:** Designed (2026-10-17, PR #2050) — the form asks Priority beside Type, *Medium* selected; the words win where they name another; a look's *Not right* reaches no `entry_add` and carries none. Built by TD-855.
 **Blocked by:** TD-855
 **Location:** design §4.5a rows *Repo page, team card: Repo facet — Add entry…* and *Add entry form — Hand to the techlead*, §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*, §4.7 *Entries* (`ao td add`); `src/shiftlead/ui/templates/base.html` and `src/shiftlead/ui/static/app.js` (the form), `src/shiftlead/ui/app.py` (`/api/entry/hand`), `src/shiftlead/ui/repo.py` (`entry_plan`), `src/sessionorc/agent_inbox.py` (the `entry` envelope); `src/shiftlead/cli.py` (`ao td add`, `entry_add`); `src/shiftlead/briefs/entry.md` (*asking the person only for … a priority*)
 
