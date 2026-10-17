@@ -438,3 +438,46 @@ async def test_the_host_reading_carries_what_each_session_waits_on(agent):
     got = (await agent.rpc_host())["waiting"]
     assert got == {"ao-x-g1": [{"id": "m-h", "ref": "TD-007", "bound": "2026-10-02T09:57:00Z"}]}
     assert "secret" not in str(got)
+
+
+def _seat_holding(member: Session, pr: int) -> tuple[Session, MailEntry]:
+    """The techlead seat with `member`'s held ask for `pr` in its inbox (§4.9b *The reader*)."""
+    seat = _rec("techlead", seat={"role": "techlead"}, out_of_work=None)
+    ask = MailEntry(id=f"m-{pr}", from_=member.id, to=[seat.id], at=START, kind="ask", text="read it", pr=pr)
+    seat.inbox.append(ask)
+    return seat, ask
+
+
+async def test_a_member_waiting_on_a_seats_held_ask_keeps_the_team_live(agent, monkeypatch):
+    """§6 rule 9 *Which members count* (TD-854, built by TD-863): a member that declared `none` beside
+    a PR its techlead holds is not finished, so rule 9 never settles and the reader stays up; the tick
+    and the page's view read the same; once the ask is answered the wind-down runs as ever."""
+    await park_ticks(agent)
+    g1 = _rec("g1", progress=[ProgressEntry(ref="TD-9", pr=2067)])
+    seat, ask = _seat_holding(g1, 2067)
+    home = _Home(agent, monkeypatch, g1, seat, _manager())
+    now = datetime.now(UTC)
+    views = [agent._finished_view(r, now) for r in (g1, seat, agent.sessions[MANAGER])]
+    page = [agent._view(r) for r in (g1, seat, agent.sessions[MANAGER])]
+    assert work.finished(views, home=agent.host)["why"] == ["g1 waiting on techlead: #2067"]
+    assert work.finished(page, home=agent.host) == work.finished(views, home=agent.host)
+    await agent._finished_pass(now)
+    await agent._finished_pass(now + FINISHED_SETTLE)
+    assert home.closed == [] and home.sent == [], "a member waiting on its reader keeps its team live"
+    ask.closed_reason = "answered"
+    later = now + FINISHED_SETTLE + timedelta(minutes=1)
+    await agent._finished_pass(later)
+    await agent._finished_pass(later + FINISHED_SETTLE)
+    assert "g1" in home.closed
+
+
+async def test_a_held_ask_after_the_line_takes_the_wind_down_back(agent, monkeypatch):
+    """TD-863: once the manager has been told the team is finished, a member whose PR gets a held ask
+    takes the wind-down back, as one with a person-inbox ask does."""
+    await park_ticks(agent)
+    g1, manager = _rec("g1", progress=[ProgressEntry(ref="TD-9", pr=2067)]), _manager()
+    seat, _ = _seat_holding(g1, 2067)
+    _Home(agent, monkeypatch, g1, seat, manager)
+    manager.finished_sent_at = _iso(datetime.now(UTC))
+    await agent._finished_pass(datetime.now(UTC))
+    assert manager.finished_sent_at is None, "a member waiting on its reader is a member at work again"

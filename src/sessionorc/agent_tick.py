@@ -1258,8 +1258,9 @@ class TickMixin:
         PR is open — the claim's `pr`, not read closed, or its `review_pr` — **and** whose next move is
         someone else's: the person inbox holds an open `ask` or `steer` of `s`'s about the reference
         (`work.waiting_of`), or a record's `prs_waiting.asks` holds `s`'s ask for that PR. Read for
-        rules 4 and 5 and the replay's carry alone; rules 9 and 3, the flow's restart and §4.10 still
-        read every claim as in progress."""
+        rules 4 and 5 and the replay's carry alone; rule 9 reads the held-ask half itself
+        (`work.held_asks`, TD-854), and rule 3, the flow's restart and §4.10 still read every claim as
+        in progress."""
         claims = [
             e
             for e in s.progress
@@ -2204,7 +2205,8 @@ class TickMixin:
     def _finished_view(self, r: Session, now: datetime) -> dict[str, Any]:
         """What `work.finished` reads of a record, as this host addresses it: a node's member names
         its controllers in its own host's form (§4.4a), and the manager is found by address; a live
-        subagent is read at the tick's `now`, as the view reads it at its own (§4.2, TD-734)."""
+        subagent is read at the tick's `now`, as the view reads it at its own (§4.2, TD-734); its held
+        asks and its declared claims, as the page's view carries them, for the reader's wait (TD-854)."""
         return {
             "id": self._address(r),
             "name": r.name,
@@ -2219,6 +2221,12 @@ class TickMixin:
             "restart_wanted": r.restart_wanted,
             "subagents_live": agent_common.subagents_live(r, now),
             "shells_live": agent_common.shells_live(r, now),
+            "prs_waiting": r.prs_waiting(home=self.host),
+            "progress": [
+                {"ref": e.ref, "status": e.status, "source": e.source, "pr": e.pr, "review_pr": e.review_pr}
+                for e in r.progress
+                if e.status == "claimed" and e.source == "declared"
+            ],
         }
 
     async def _finished_team(self, team: str, records: list[Session], now: datetime) -> datetime | None:
@@ -2252,8 +2260,13 @@ class TickMixin:
             # acts are work — and only a member live and not finished takes the wind-down back
             since = first or _parse(manager.finished_sent_at) - agent_common.FINISHED_SETTLE
             asked = work_mod.waiting_of(self.person_inbox)
+            held = work_mod.held_asks(views, home=self.host)  # a reader's wait takes it back too (TD-854)
             if any(
-                m.state != "idle" or m.restart_wanted or not m.out_of_work or asked.get(self._address(m))
+                m.state != "idle"
+                or m.restart_wanted
+                or not m.out_of_work
+                or asked.get(self._address(m))
+                or held.get(self._address(m))
                 for m in members
             ):
                 manager.finished_sent_at = None
@@ -2282,7 +2295,7 @@ class TickMixin:
                 await self._push_changes()
                 return None
             return since
-        reading = work_mod.finished(views, waiting=work_mod.waiting_of(self.person_inbox))
+        reading = work_mod.finished(views, waiting=work_mod.waiting_of(self.person_inbox), home=self.host)
         if reading is None or reading["why"] or reading["restart"]:
             self._finished_owed.pop(team, None)  # at work again, or started again: nothing is owed
             return None  # not finished, or one that wants another run: rule 2's

@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from sessionorc import ledger as ledger_mod
+from sessionorc import naming
 from sessionorc.agent_common import FINISHED_SETTLE
 from sessionorc.models import Session, has_control, reference_of
 
@@ -232,8 +233,65 @@ def waiting_clause(name: str, questions: list[dict[str, Any]]) -> str:
     return f"{name} waiting on the person: {q['ref']}{until}{more}"
 
 
+def held_asks(
+    records: Iterable[Any], home: str | None = None, seats: Collection[str] = ()
+) -> dict[str, list[dict[str, Any]]]:
+    """What each member waits on a reader for (design §6 rule 9 *Which members count*, TD-854): a
+    member's declared `claimed` entries whose `pr` or `review_pr` is the `pr` of an ask from it that a
+    seat among `records` holds in its `prs_waiting.asks` — a seat as `finished` reads one, a record with
+    `seat` or named in `seats`; an ask a member holds holds nobody — keyed by the member's `id`, each
+    `{seat, pr}`, the seat the holder's name, in the records' order. An ask's `from` names the member as
+    `_waiting_claims`' `mine` does: the id, the host defaulting to `home`'s — so `records` are views
+    addressed as the home addresses them (a node's member `id@host`, as `_finished_view` and the page's
+    view give them), or the home's own `Session`s. Read from the records alone, so the tick and the
+    page's view agree."""
+    rows = list(records)
+
+    def where(address: Any) -> tuple[str, str | None]:
+        sid, host = naming.split_address(str(address or ""))
+        return sid, host or home
+
+    def asks(q: Any) -> Any:
+        got = _f(q, "prs_waiting")  # a `Session`'s is a method, a view's the reading it was given
+        return ((got(home=home) if callable(got) else got) or {}).get("asks") or ()
+
+    held = [
+        (str(_f(q, "name") or _f(q, "id")), where(a.get("from")), a.get("pr"))
+        for q in rows
+        if _f(q, "seat") is not None or _f(q, "name") in seats
+        for a in asks(q)
+        if isinstance(a, Mapping) and isinstance(a.get("pr"), int)
+    ]
+    out: dict[str, list[dict[str, Any]]] = {}
+    if not held:
+        return out
+    for r in rows:
+        prs = {
+            n
+            for e in _f(r, "progress") or ()
+            if _f(e, "status") == "claimed" and _f(e, "source") == "declared"
+            for n in (_f(e, "pr"), _f(e, "review_pr"))
+            if isinstance(n, int)
+        }
+        me = where(_f(r, "id"))
+        waits = [{"seat": seat, "pr": pr} for seat, frm, pr in held if frm == me and pr in prs]
+        if waits:
+            out[str(_f(r, "id"))] = waits
+    return out
+
+
+def held_clause(name: str, waits: list[dict[str, Any]]) -> str:
+    """A member waiting on a reader, in `finished`'s `why`: *grinder-ao-1 waiting on techlead-ao-1:
+    #2067*, the first such PR, *and n more* past one."""
+    more = f" and {len(waits) - 1} more" if len(waits) > 1 else ""
+    return f"{name} waiting on {waits[0]['seat']}: #{waits[0]['pr']}{more}"
+
+
 def finished(
-    records: Iterable[Any], seats: Collection[str] = (), waiting: Mapping[str, list[dict[str, Any]]] | None = None
+    records: Iterable[Any],
+    seats: Collection[str] = (),
+    waiting: Mapping[str, list[dict[str, Any]]] | None = None,
+    home: str | None = None,
 ) -> dict[str, Any] | None:
     """Whether a live team has finished, read from the records carrying its badge and nothing else
     (design §6 rule 9, §4.9a *A team's finished is the home's reading*, TD-241) — the one reading
@@ -268,8 +326,13 @@ def finished(
     - a live member **waiting** on the person — `waiting` (`waiting_of` over the person inbox) holds
       a question from it, keyed by its `id` — blocks the reading whatever it declared, its clause
       naming the reference and the bound (§4.9a *Waiting is read, never declared*, TD-274). A
-      caller that passes no `waiting` reads nobody as waiting.
+      caller that passes no `waiting` reads nobody as waiting;
+    - a live member **waiting on a reader** — a record among `records` holds, in `prs_waiting`, its
+      ask for a PR it claims (`held_asks`, `home` the host a bare address names) — blocks it too,
+      after the person's: *grinder-ao-1 waiting on techlead-ao-1: #2067* (§6 rule 9, TD-854).
     """
+    records = list(records)
+    readers = held_asks(records, home, seats)
     mine = [r for r in records if _f(r, "unattended") is not False and not _f(r, "superseded_by")]
     up = [r for r in mine if _f(r, "state") not in DEAD]
     if not up:
@@ -298,6 +361,9 @@ def finished(
         asked = (waiting or {}).get(str(_f(r, "id"))) if live else None
         if asked:
             why.append(waiting_clause(name, asked))
+            continue
+        if live and (held := readers.get(str(_f(r, "id")))):
+            why.append(held_clause(name, held))
             continue
         if live:
             if state != "idle":

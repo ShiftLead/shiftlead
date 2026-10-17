@@ -76,13 +76,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
-| TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Designed — built by TD-863 |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
 | TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
-| TD-863 | Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n* | Low | Open |
 | TD-864 | `tests/test_shape.py`'s home tests (#2055) leave the sampler's guards, throttle, write, prune and person/review mapping unread: 26 of 32 single-line reverts in `agent_shape.py` still pass (test audit) | Medium | Open |
 
 ---
@@ -1618,27 +1616,6 @@ Then file the build entry and name it in `Blocked by:`.
 
 ---
 
-## TD-854: Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-2, met building TD-836 in #2048)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-17, PR #2063) — rule 9 reads a waiting claim of either kind as unfinished: a member's own claimed PR whose `ask` a seat of the team holds blocks the reading, *w waiting on <seat>: #n*, read from the records; a wind-down under it would close the reader, and rule 8 starts no team for a held PR. Built by TD-863.
-**Blocked by:** TD-863
-**Location:** design §6 rule 9 (*Which members count*: the *waiting* clause), rule 5 (*A run holding only waiting claims … declares `none` beside them*), §4.9a *Waiting is read, never declared*; `src/sessionorc/work.py` (`finished`, `waiting_of`), `src/sessionorc/agent_tick.py` (`_finished_pass`, `_waiting_claims`)
-
-**Why:** TD-820's design has a run that holds only waiting claims and nothing to pick declare `none` beside them, and says rules 9 and 3 still count a waiting claim as in progress. Rule 9's `finished` counts no claim: it blocks on a member *waiting on the person* (an open `ask` or `steer` in the person inbox), nothing else. A member whose only wait is a reader's held ask (`prs_waiting.asks`, e.g. a grinder's PR with the techlead) and that declared `none` reads finished, so after `FINISHED_SETTLE` the team winds down and closes it while its PR's findings may still come back to it. TD-836's test `test_a_member_that_declared_none_beside_a_waiting_claim_reads_unfinished` covers the person-inbox case alone, which holds today.
-
-**Fix:** a design question first: whether rule 9 reads a member holding a waiting claim (either kind) as unfinished — `finished` taking the held asks beside `waiting`, its clause *w waiting on the techlead: #n* — or whether a wind-down under a reader's held ask is fine because the reply reaches the next run by the kept mail (§4.10 *A question about a reference outlives its asker*) and rule 8 starts it.
-
-**Done when** the design says which, and a build entry (or none) follows.
-
-**Related:** TD-820, TD-836, TD-241 (rule 9), TD-274 (waiting).
-
----
-
 ## TD-855: Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority`
 
 **Priority:** Low
@@ -1767,33 +1744,6 @@ Then file the build entry and name it in `Blocked by:`.
 
 
 
-
----
-
-## TD-863: Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n*
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (TD-854's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §6 rule 9 (*Which members count*: the waiting claim on a reader), §4.9a *Waiting is read, never declared*; `src/sessionorc/work.py` (`finished`, `waiting_clause`), `src/sessionorc/models.py` (`Session.prs_waiting`, and its `prs_waiting` in a view's dict), `src/sessionorc/agent_tick.py` (`_finished_view`, the view the tick passes `finished`, which carries neither `prs_waiting` nor `progress` today; `_finished_pass` and `_finished_team`, whose take-back test after `finished_sent_at` reads the person inbox's `asked` alone; `_waiting_claims`' docstring, which says rules 9 and 3 read every claim as in progress); `tests/test_finished.py`, `tests/test_finished_tick.py`, `tests/test_waiting_claims.py`
-
-**Why:** TD-854: `finished` blocks only on the person inbox, so a grinder that declared `none` beside its PR held with the techlead reads finished and its team winds down after `FINISHED_SETTLE`, closing the reader with it.
-
-**Fix:** in `finished`, after the person-inbox check: a live member that is not a seat or the manager, with a declared progress entry `claimed` whose `pr` or `review_pr` equals the `pr` of an ask from that member (`from` naming its id, an address read as `_waiting_claims`' `mine` reads one) in any passed record's `prs_waiting.asks`, blocks the reading whatever it declared — the clause `<name> waiting on <seat name>: #<pr>`, the first such PR, *and n more* past one. Read from the records alone: `_finished_view` gains `prs_waiting` (`r.prs_waiting(home=self.host)`) and the record's declared `claimed` entries with their `pr` and `review_pr`, as the page's view (`Session.to_dict`) already carries them, so the page's *concluded* and the tick agree; an ask's `from` is matched to the member as `_waiting_claims`' `mine` matches it (the id, the host defaulting to the home's), since the view addresses ids by `_address`. `_finished_team`'s take-back test — a member no longer idle and declared, or `asked` — reads the held-ask wait beside `asked`, from one helper `finished` uses too. The person-inbox clause keeps its place first.
-
-**Tests:**
-- a member declared `none` with a claimed PR whose ask a seat's record holds reads unfinished, its clause naming the seat and the PR; the same with the ask answered (gone from `prs_waiting`) reads finished;
-- a claim `done`, or a held ask for a PR the member does not claim, blocks nothing;
-- a view (dict) and a `Session` give the same reading;
-- the tick does not wind down a team whose only unfinished member waits on a held ask, and the tick (through `_finished_view`) and the page's view give the same reading (`test_finished_tick.py`);
-- a member whose PR gets a held ask after the manager was told (`finished_sent_at`) takes the wind-down back, as one with a person-inbox ask does.
-
-**Done when** a team whose last member declared `none` beside a PR held by its techlead stays up, its card's *not concluded* line naming the wait, and winds down once the reader answers and the member declares again.
-
-**Related:** TD-854 (the design), TD-820 / TD-836 (waiting claims), TD-241 (rule 9), TD-274 (waiting).
 
 ---
 
