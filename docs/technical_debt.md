@@ -69,6 +69,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-798 | `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test | Low | Open |
 | TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
 | TD-800 | The Queue's filter row: a team and a repo pick together, the find-miss suppression for a held id, the *steering* kind and archived rows' kinds are held by no test | Low | Open |
+| TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
 
 ---
 
@@ -1357,3 +1358,26 @@ The other cases:
 **Done when** tests of `apply_picks` with a team and a repo pick that disagree (the card hides), a find naming an id an open card holds (`find_miss` None), a card with a steering item and not status *steer* under *Steering*, and a card whose only `owner` row is archived under the *yours to do* kind (hidden). The four mutations above fail.
 
 **Related:** none.
+
+## TD-801: The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.8 *The person's own shell is the person* (*nothing else changes*) and the `control` grant's paragraph; §4.8a (identity); §9 invariants 5 and 11; §4.5a *Focus: Open shell here*; `src/sessionorc/mail.py` (`person_shell`; `act_gate`, the control gate, which passes `is_person(caller)` alone, ~L229); `src/sessionorc/agent_common.py` (`person_only`, ~L314)
+
+**Why:** Paul, 2026-10-16, ran `ao team flow ao-grind --apply` in a shell opened with **Open shell here** and it was refused with *cannot create a new session: needs the control grant (design §4.8)*. The same command ran from a terminal outside ShiftLead. TD-580 (built by TD-596, #1583) came from Paul's words *a shell being directly controlled by the user should have permissions to promote/other without interference*, but its design let the person's own shell through `PERSON_ONLY` alone and said *nothing else changes*. Acts on another session (`create`, `send`, `keys`, `kill`, `close`, `mode`, `decide`, …) still pass only a request with no caller, so the dashboard's own shell cannot apply a team's flow, start, stop or message a session. Paul then asked if the TD had been done: *a shell should be considered my permissions*.
+
+**Fix:** design it first:
+1. Decide whether the control gate passes the person's own shell (`person_shell(record)`) as it passes a request with no caller: the grant half, the membership half (`controllers`), and §9 invariant 5 (a person's interactive session, which no session may act on).
+2. Decide what stays refused even to the person's shell, if anything: `decide` on its own prompt, and acts on itself that edit authority (`set_grants`, `set_controllers`).
+3. Decide what the act records as its actor (the shell's id, as TD-580's acts do) and what `create` hands a child as its controllers and grants, since attenuation reads the creator's record.
+4. Restate TD-580's risk for the wider right: an agent started inside the shell inherits its identity and could act on every session.
+Then the build entry, named in `Blocked by:`.
+
+**Done when** the design says whether and how the person's own shell acts on other sessions, and its build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-580 and TD-596 (the person-only half), TD-077 (identity), TD-036 (membership), TD-041 (invariant 5).
