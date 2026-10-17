@@ -66,7 +66,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
-| TD-800 | The Queue's filter row: a team and a repo pick together, the find-miss suppression for a held id, the *steering* kind and archived rows' kinds are held by no test | Low | Open |
 | TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
 
 ---
@@ -1298,24 +1297,6 @@ The other cases:
 **Related:** none.
 
 ---
-
-## TD-800: The Queue's filter row: a team and a repo pick together, the find-miss suppression for a held id, the *steering* kind and archived rows' kinds are held by no test
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Queue page: filters, find*; `src/shiftlead/ui/queue.py` (`apply_picks`, `_card_kinds`); `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`
-
-**Why:** #1964 (TD-771 slice 4). Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_queue.py tests/test_ui_queue_cards.py`: baseline 40 passed. Each of these changes also leaves 40 passed: (1) `repos = (repos & set(picks["repo"])) if picks.get("team") else set(picks["repo"])` → `repos = set(picks["repo"])` (a team pick no longer narrows a repo pick); (2) `if ref not in held:` → `if True:` (the *no open card holds it* offer is drawn for an id an open card holds); (3) the `"steering" in (c.get("kinds") or ())` arm of the *Steering* filter replaced by `False`; (4) `_card_kinds` no longer skipping `archived` rows (a completed row's `owner` need counts as a kind). Other mutations of the same function do fail tests, so these four are what is unheld.
-
-**Fix:** add the tests below; no change to the code under test.
-
-**Done when** tests of `apply_picks` with a team and a repo pick that disagree (the card hides), a find naming an id an open card holds (`find_miss` None), a card with a steering item and not status *steer* under *Steering*, and a card whose only `owner` row is archived under the *yours to do* kind (hidden). The four mutations above fail.
-
-**Related:** none.
 
 ## TD-801: The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone
 
