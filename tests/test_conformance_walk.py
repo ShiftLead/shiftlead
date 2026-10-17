@@ -64,6 +64,7 @@ def test_the_scratch_profile_is_the_named_ones_asking_its_permissions(tmp_path):
     got = cw.scratch_profile("claude-code", "conformance", live)
     assert got["permission_prompts"] == "ask" and got["model"] == "sonnet" and got["account"] == "c"
     assert got["config_dir"] == str(Path("~/.claude-conformance").expanduser())
+    assert got["extra_args"] == ["--permission-mode", "manual"]  # the tool's own default mode never decides
     with pytest.raises(cw.Refused, match="no profile 'missing'"):
         cw.scratch_profile("claude-code", "missing", live)
     with pytest.raises(cw.Refused, match="runs gemini-cli"):
@@ -117,18 +118,23 @@ def test_the_hook_captures_each_payload_as_handed_it(tmp_path, monkeypatch):
     lines = (tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()
     assert [json.loads(x)["hook_event_name"] for x in lines] == ["Stop", "UserPromptSubmit"]
     assert json.loads(lines[1])["prompt"] == "hi"  # every field as the tool handed it
+    hook.capture("hooks", '{"a":  1, "b":"x"}\n')
+    assert (tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()[-1] == '{"a":  1, "b":"x"}'  # its bytes
+    hook.capture("hooks", '{"a":\n 1}')
+    assert (tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()[-1] == '{"a": 1}'  # one line of JSONL
     hook.capture("statusline", "not json")  # never fails the hook
     monkeypatch.setattr(sys, "stdin", io.TextIOWrapper(io.BytesIO(b"\xff\xfe"), encoding="utf-8"))
     assert hook.main() == 0  # stdin that is not UTF-8 is no payload, and nothing is captured
-    assert len((tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()) == 2
+    assert len((tmp_path / "hooks.jsonl").read_text(encoding="utf-8").splitlines()) == 4
     assert not (tmp_path / "statusline.jsonl").exists()
 
 
 class FakeAgent:
     """A host agent the walk drives: each call moves one record the way the real tool's hooks would."""
 
-    def __init__(self, work: Path, *, permission: bool = True, lag: int = 0):
-        self.work, self.permission, self.lag = work, permission, lag
+    def __init__(self, work: Path, *, permission: bool = True, lag: int = 0, late_end: int = 0):
+        self.work, self.permission, self.lag, self.late_end = work, permission, lag, late_end
+        self.ending = 0
         self.pending_after: dict | None = None
         self.rec: dict = {}
         self.calls: list[str] = []
@@ -140,11 +146,16 @@ class FakeAgent:
     def __call__(self, method: str, **p):
         self.calls.append(method)
         if method == "create":
+            assert not self.ending, "resumed before the killed process's own end hook landed"
             n = len([c for c in self.calls if c == "create"])
             self.rec = {"id": f"ao-walk-{n}", "adapter_id": p.get("resume") or "tool-1", "state": "working"}
             self._settle(unread=0, wakes=[], sends=[])
             return dict(self.rec)
         if method == "get":
+            if self.ending:
+                self.ending -= 1
+                if not self.ending:
+                    self.rec["confidence"] = "hook"  # the killed process's `SessionEnd`, late
             if self.pending_after is not None:
                 # the prompt's own hook has not landed: the last turn's idle reads `lag` times first
                 if self.lag:
@@ -179,6 +190,8 @@ class FakeAgent:
             return {"entry": {"id": "m-1"}}
         if method == "kill":
             self.rec["state"] = "exited"
+            if self.late_end:
+                self.rec["confidence"], self.ending = "tick", self.late_end
             return None
         if method == "transcript":
             cw = _load()
@@ -208,6 +221,14 @@ def test_the_last_turns_idle_is_not_the_permission_turns_end(tmp_path, monkeypat
     cw = _load()
     monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
     walk = cw.Walk("claude-code", "conformance", tmp_path, FakeAgent(tmp_path, lag=3), out=lambda _s: None)
+    assert walk.run(), walk.results
+
+
+def test_the_resume_waits_for_the_killed_processs_own_end(tmp_path, monkeypatch):
+    """The killed tool's `SessionEnd` lands after the kill: a resume made first read it as its own end (TD-822)."""
+    cw = _load()
+    monkeypatch.setattr(cw.time, "sleep", lambda _s: None)
+    walk = cw.Walk("claude-code", "conformance", tmp_path, FakeAgent(tmp_path, late_end=3), out=lambda _s: None)
     assert walk.run(), walk.results
 
 

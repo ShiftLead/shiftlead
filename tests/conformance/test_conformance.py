@@ -15,12 +15,14 @@ from _harness import (
     check_background,
     check_context,
     check_declaration,
+    check_hook_reading,
     check_links,
     check_spend,
     check_state,
     check_transcript,
     entry_kinds,
     fixture,
+    hook_reading,
     manifest,
 )
 
@@ -32,14 +34,19 @@ AGENTS = agent_adapters()
 
 
 def _need(name: str, method: str, part: str) -> list[dict]:
-    """The manifest's `part` for an adapter that declares `method`; a skip when it declares none or ships none."""
+    """The manifest's `part` for an adapter that declares `method`: a skip when it declares none, a failure
+    when it declares it and ships no fixture of it (the review of #1949)."""
     ad = adapters.get(name)
     if method not in adapters.implements(ad) and not callable(getattr(ad, method, None)):
         pytest.skip(f"{name} does not declare {method}")
     got = manifest(name).get(part) or []
     if not got:
-        pytest.skip(f"{name} ships no {part} fixtures yet")
+        pytest.fail(f"{name} declares {method} and ships no {part} fixtures: the live walk's --capture records them")
     return got
+
+
+def _lines(name: str, rel: str) -> list[dict]:
+    return [json.loads(x) for x in fixture(name, rel).read_text(encoding="utf-8").splitlines() if x.strip()]
 
 
 def test_there_are_agent_adapters_and_each_ships_fixtures_and_a_harness():
@@ -97,9 +104,32 @@ def test_the_composer_reads_what_was_painted(name):
 def test_the_title_is_a_name_or_nothing(name):
     ad = adapters.get(name)
     for t in _need(name, "title", "titles"):
-        got = ad.title(t["title"])
-        assert got is None or (isinstance(got, str) and got.strip() == got and got)
-        assert got == t["name"], f"{t['title']!r}: read {got!r}, captured as {t['name']!r}"
+        titles = json.loads(fixture(name, t["file"]).read_text(encoding="utf-8"))
+        got = [ad.title(x) for x in titles]
+        for g in got:
+            assert g is None or (isinstance(g, str) and g.strip() == g and g)
+        assert got == t["names"], f"{t['file']}: read {got!r}, captured as {t['names']!r}"
+
+
+@pytest.mark.parametrize("name", AGENTS)
+def test_each_hook_payload_reads_as_a_state_and_pending(name):
+    """The hook payloads the live walk captured, each through the adapter's hook to what the host agent
+    makes of it: a state, and a pending kind where the tool waits on the person."""
+    harness = HARNESSES[name]
+    if not hasattr(harness, "hook_params"):
+        pytest.skip(f"{name} has no hook: its state is read from the screen")
+    files = manifest(name).get("hooks") or []
+    assert files, f"{name} is fed by a hook and ships no hook payload fixtures"
+    for h in files:
+        payloads = _lines(name, h["file"])
+        assert len(payloads) == len(h["reads"]), f"{h['file']}: {len(payloads)} payloads, {len(h['reads'])} reads"
+        for i, (payload, want) in enumerate(zip(payloads, h["reads"], strict=True)):
+            got = hook_reading(harness.hook_params(payload, at_composer=h["at_composer"]))
+            check_hook_reading(got)
+            assert got == want, f"{h['file']} line {i + 1}: read {got}, captured as {want}"
+    if adapters.get(name).permission_channel:
+        # a declared channel answers what the tool asked: a captured permission reads as one (TD-792)
+        assert any(r.get("pending") == "permission" for h in files for r in h["reads"]), "no permission captured"
 
 
 @pytest.mark.parametrize("name", AGENTS)
@@ -182,11 +212,14 @@ def test_background_reads_the_tools_shell_tasks(name):
 def test_usage_report_reads_the_windows_a_session_was_told(name):
     ad = adapters.get(name)
     for p in _need(name, "usage_report", "status_lines"):
-        payload = json.loads(fixture(name, p["file"]).read_text(encoding="utf-8"))
-        got = ad.usage_report(payload)
-        assert got is None or {"windows", "work", "sid"} <= set(got)
-        for w in (got or {}).get("windows") or ():
-            assert set(w) == {"label", "pct", "resets"}, f"a window is {w!r}"
+        counts = []
+        for payload in _lines(name, p["file"]):
+            got = ad.usage_report(payload)
+            assert got is None or {"windows", "work", "sid"} <= set(got)
+            for w in (got or {}).get("windows") or ():
+                assert set(w) == {"label", "pct", "resets"}, f"a window is {w!r}"
+            counts.append(len((got or {}).get("windows") or ()))
+        assert counts == p["windows"], f"{p['file']}: windows {counts}, captured as {p['windows']}"
 
 
 @pytest.mark.parametrize("name", AGENTS)

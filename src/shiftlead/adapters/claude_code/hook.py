@@ -331,11 +331,15 @@ def chained_output(raw: str, payload: dict[str, Any]) -> str:
 
 def capture(kind: str, raw: str) -> None:
     """Under the live walk's `--capture` (`CAPTURE_ENV`, design §4.3 *The conformance suite*, TD-784):
-    append the payload as Claude Code handed it, one line of `<dir>/<kind>.jsonl`. Never fails the hook."""
+    append the payload as Claude Code handed it, its bytes, one line of `<dir>/<kind>.jsonl` — re-serialised
+    only when it spans lines, which a line of JSON Lines cannot hold. Never fails the hook."""
     if not (where := os.environ.get(CAPTURE_ENV)):
         return
     with contextlib.suppress(OSError, ValueError):
-        line = json.dumps(json.loads(raw or "{}"))
+        line = (raw or "{}").strip()
+        parsed = json.loads(line)
+        if "\n" in line:
+            line = json.dumps(parsed)
         with (Path(where) / f"{kind}.jsonl").open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 

@@ -61,7 +61,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-723 | Backfill TD-722: samscrape and contractmatch under one ContractMatch project | Low | Open |
 | TD-748 | The Queue: one card per effort — a TD and everything its `Blocked by:` joins, with its asks — ranked by the person, the rank the pick order; the Inbox keeps what names no TD | Medium | Designed — built by TD-769, TD-770, TD-771 (on dev-cadence#TD-119); trial TD-772 |
 | TD-772 | Read back the Queue's two-week trial to Paul — passed-over flags a week, idle-while-work lines, the oldest unanswered TD ask | Medium | Open |
-| TD-784 | Build TD-112 (1): the adapter conformance suite — `tests/conformance/`, offline fixtures in CI, `pdm run conformance <adapter>` live by hand; Claude Code passes it | Medium | Open |
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
@@ -77,6 +76,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
+| TD-822 | A killed session resumed at once reads `exited`: the killed process's own `SessionEnd` lands after the kill, on the resumed record of the same id | Low | Open |
+| TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 
 ---
 
@@ -1179,30 +1180,6 @@ The other cases:
 
 ---
 
-## TD-784: Build TD-112 (1): the adapter conformance suite — `tests/conformance/`, offline fixtures in CI, `pdm run conformance <adapter>` live by hand; Claude Code passes it
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (TD-112's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Building — slice 1 (the declaration — `implements`, `OPTIONAL_METHODS`, `permission_channel`; the offline suite and its self-tests; Claude Code's captured pane, transcript and `/proc` fixtures) by #1949. Slice 2's code — the live walk, `pdm run conformance <adapter> --profile <p> [--capture]` (`scripts/conformance.py`), and the hook's capture (`CAPTURE_ENV`) — by #1969; smoke-run on a signed-out scratch profile (the launch held, the first hook stopped at the first-run screen, the scratch home and its tmux server left nothing). What is left: the walk's first live run on `conformance` with `--capture`, its output in that PR, the captured payloads named in `manifest.json` with tests of the state mapping, `pending`, `usage_report` and `title`, and `_need` failing rather than skipping a declared method with no fixtures. For that slice (the techlead's read of #1969, m-14b5c56cef68): the hook's `capture` re-serialises each payload (`json.dumps(json.loads(raw))`), the same JSON but not the bytes §4.3 calls *as received* — write `raw` itself; and tidy this Status's older sentences on what slice 2 waits for. **Hook-payload fixtures: slice 2, by `--capture`**: until then the suite does not cover the state mapping or `pending`, nor `usage_report` (the status line's payload) or `title`, and skips them for Claude Code. Slice 2 is `pdm run conformance` and the live walk with its `--capture`; the entry stays open until Paul names a profile set aside for the walk (the techlead, m-72b62782213c: every profile on kmaster shares `~/.claude`). **Named 2026-10-16 (Paul):** profile `conformance` in `~/.shiftlead/profiles.yml` — `{adapter: claude-code, account: paul, config_dir: ~/.claude-conformance}`, a Claude Code home of its own, signed in by Paul; `scripts/conformance.py`'s `scratch_profile` accepts it. It is declared with `account: paul`, not the `account: conformance` planned below: it is signed in to Paul's own login, and §4.2a reads usage by the account. The walk can run: `pdm run conformance claude-code --profile conformance --capture`. Once `--capture` has recorded them, `_need` in `tests/conformance/test_conformance.py` fails a declared method whose manifest part is empty, rather than skipping it (the review of #1949). **2026-10-16:** Paul set aside a new profile, `conformance`, with its own config dir (m-95459f8189de, on the techlead's recommendation); declared since (*Named 2026-10-16*, above); it brings TD-792's second half too, a test that Claude Code's declared channel reads a captured pending permission as answerable — asked as an outcome *blocked* (m-2ecf2370c150): `conformance: {adapter: claude-code, account: conformance, config_dir: ~/.claude-conformance}` in `profiles.yml` and a sign-in. A profile names one adapter, so TD-785's Gemini walk takes a profile of its own.
-**Location:** design §4.3 *The conformance suite*; new `tests/conformance/` (a conftest parametrizing over `sessionorc.adapters.names()` with agents, each adapter's declared methods), fixtures under `tests/conformance/fixtures/<adapter>/`; `pyproject.toml` (`[tool.pdm.scripts] conformance`); `src/sessionorc/adapters.py` (`permission_channel` on the protocol, the `shell` adapter's False); `src/shiftlead/adapters/claude_code/__init__.py` (`permission_channel = True`, the declared optional methods)
-
-**Why:** TD-112: neutrality is checked on every change, not once by a spike; the suite comes first, so the Gemini CLI adapter is built against it.
-
-**Fix:**
-- **The declaration**: each agent adapter says which optional methods it implements (`links`, `background`, `context`, `usage_report`, `mail`, `composer`, `title`, `spend`), and `permission_channel`; the suite tests what is declared and asserts an undeclared method is absent.
-- **Offline (CI)**: fixtures captured from the real tool — panes for `classify`, `composer`, `title`; hook payloads for the state mapping and `pending`; transcripts for `read_transcript`, `context`, `links`, `spend`. The assertions are neutral: a state for every pane and payload fixture, the neutral entry kinds, no tool field name in any returned structure, `context` within `window`. Claude Code's fixtures captured from its current transcripts and panes (from a scratch session, never a person's).
-- **Live (by hand)**: `pdm run conformance <adapter> --profile <p>` — a scratch `SHIFTLEAD_HOME` (short path, memory `scratchpad-too-long-for-unix-sockets`) with its own host agent on a private tmux socket, started and stopped by the pid the walk holds; `SHIFTLEAD_HOME` in every launch's env; the tool's home the profile's; a scratch directory; launch with a chosen id, the first hook, a short prompt (`working` → `idle`), `send` confirmed by `composer`, a permission seen as `needs-you` (a profile with `permission_prompts: ask`), a doorbell delivering a mail the walk sends as the person, a resume with the same id, the transcript read back. Refuses to run without `--profile` and never in CI (`CI` set).
-- **Tests of the suite itself**: a fake adapter missing a declared method fails; one returning a tool field name fails.
-
-**Done when** `pdm run test` runs the offline suite with Claude Code passing it, `pdm run conformance claude-code --profile <p>` passes once live with its output in the PR, and the `shell` adapter is skipped as having no agent.
-
-**Related:** TD-112, TD-785, TD-786.
-
----
-
 ## TD-785: Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title
 
 **Priority:** Medium
@@ -1211,7 +1188,6 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-784
 **Location:** design §4.3 *The second adapter: Gemini CLI*, §4.2 *A title the tool writes its state into*, §4.2a, §4.5a **Allow / Deny**, §4.9b, §6 rule 3; new `src/shiftlead/adapters/gemini/` (`__init__.py`, `hook.py`); `src/sessionorc/agent_serve.py` (`_view`'s `permission_channel`); `src/sessionorc/agent_tick.py` (the `title` confidence, the screen-rule call with the title); `src/sessionorc/agent_hook.py` and the `decide` RPC; `src/shiftlead/hook_entry.py` (dispatch by an argv flag, `shiftlead-hook --adapter gemini`, as `--statusline` is read: a Gemini payload names no adapter and shares event names with Claude Code's; the adapter imported inside the `try`); `src/shiftlead/adapters/claude_code/guard.py` moved to `src/shiftlead/kill_guard.py`, both adapters importing it; `src/shiftlead/profiles.py` (`adapter: gemini`, its `config_dir`); the card's and Focus's Allow / Deny (`src/shiftlead/ui/templates/`, gated on `permission_channel`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112: the second adapter, so the product's one-view claim is tested by a second tool.
@@ -1654,3 +1630,43 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the reading says where the designer's context goes, and the design either gives the designer a restart point or a bound with its build entries filed and named in `Blocked by:`, or says, with the numbers, why it stays as it is.
 
 **Related:** TD-460 (the grinders' bound trial), TD-378 (the prompt cache, archived), TD-818 (spend per seat), rule 5.
+
+---
+
+## TD-822: A killed session resumed at once reads `exited`: the killed process's own `SessionEnd` lands after the kill, on the resumed record of the same id
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-784's live walk)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_hook.py` (`rpc_hook` → `_apply_event`, the `exited` of a `SessionEnd`); `src/sessionorc/agent.py` (`rpc_kill`, `rpc_create` with `resume`); the identity check (design §4.8a) that already flagged it in observe mode
+
+**Why:** TD-784's live walk killed its session (`rpc_kill`: `exited`, confidence `tick`) and at once created it again with `resume` under the same id. Claude Code ran its `SessionEnd` hook on the kill's hangup (`reason: other`), and that hook landed after the create: the resumed record read `exited (hook)` while the new process started, and the walk failed its resume step (2026-10-16, the second run). The host agent printed `identity alarm (observe): outside claimed 'ao-walk-conformance-walk' on hook` — the event came from a process no longer in the record's pane. A person pressing Kill then Resume within a second or so meets the same. The walk now waits for the late hook (`SESSION_END_WAIT` in `scripts/conformance.py`).
+
+**Fix:** drop a `SessionEnd` (any `exited` by hook) that comes from a process other than the record's current one — the identity check's *outside claimed* verdict, or the event's `adapter_id`/launch older than the record's launch — rather than applying it; a test that a kill, a resume and then the old process's `SessionEnd` leaves the resumed record as it was.
+
+**Done when** a test holds it, and the walk's `SESSION_END_WAIT` can go (or stays as belt and braces, said so).
+
+**Related:** TD-784 (the walk), TD-490 (`ended`), TD-063 (a killed pane revived by an older tick).
+
+---
+
+## TD-823: `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (grinder-ao-2, TD-784's live walk)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.2a *`permission_prompts: ask | skip`*, §4.9b *The director seat*; `src/shiftlead/adapters/claude_code/__init__.py` (`launch`: under `ask` it only drops `--dangerously-skip-permissions`); `scripts/conformance.py` (`ASKING_ARGS`)
+
+**Why:** TD-784's first live run (2026-10-16, Claude Code 2.1.302, a fresh config dir): the unattended launch under `permission_prompts: ask` ran in `permission_mode: auto` — the tool's own default now (its `.claude.json` carries `hasSeenAutoDefaultNotice`), and the mode Paul's own `~/.claude/settings.json` sets (`defaultMode: auto`). Its classifier allowed `touch conformance-permission.txt` with a `PreToolUse` and no `PermissionRequest`, so nothing reached the host agent. §4.2a says that under `ask` *the prompts meet the person's rules, the director seat and then the person*; under `auto` only the ones the classifier will not allow do. The walk now launches with `--permission-mode manual` and sees the permission.
+
+**Fix:** design it first: under `ask`, does the adapter launch with the tool's asking mode (Claude Code's `--permission-mode manual`), so every prompt meets shiftlead's road, or leave the tool's mode to the person's settings (the classifier as one more of the person's rules, before the director seat), saying so in §4.2a — or a third word for it. The tool's mode is the person's setting (`defaultMode`), so whichever the design takes is said where the person reads `permission_prompts`.
+
+**Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
