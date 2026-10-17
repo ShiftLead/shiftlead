@@ -375,6 +375,8 @@ async def test_a_repo_not_read_yet_and_a_member_whose_state_says_nothing_are_not
     agent.sessions[g2.id] = g2
     assert agent._shape_pass(NOW) is False  # after a restart, before the repo's first reading: not *no work*
     agent._repos[root] = {"name": "repo", "ledger": {"entries": []}}
+    gone = _rec("g0", lane=["free-pick"], repo=str(tmp_path / "scratch"), host=agent.host, state="closed")
+    agent.sessions[gone.id] = gone  # an ended member in a path the registry does not list holds nothing back
     assert agent._shape_pass(NOW) is True
     day = agent._shape["days"][NOW.astimezone().date().isoformat()]["grind"]
     assert set(day["records"]) == {g1.id}  # a node down is not starved

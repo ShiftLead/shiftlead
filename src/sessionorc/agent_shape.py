@@ -90,9 +90,12 @@ class ShapeMixin:
             return False
         counts: dict[str, int] = {}
         ids: dict[str, list[str]] = {}
-        roots = sorted({r.repo for r in crew if r.repo and r.adapter != "shell"})
-        if not roots or any(root not in self._repos for root in roots):
-            return False  # a repo not read yet (a restart, a new checkout): could not look, not *no work*
+        # the team's repos are the ones its live members name that the home reads, as `_balance_mark` takes
+        # them (§6 *Balance*): a path the registry does not list is not the team's repo; none read is a
+        # minute that could not look, not one with *no work*
+        roots = sorted({r.repo for r in live if r.repo and r.adapter != "shell" and r.repo in self._repos})
+        if not roots:
+            return False
         for root in roots:
             facts = self._repos.get(root) or {}
             led = facts.get("ledger") or {}
