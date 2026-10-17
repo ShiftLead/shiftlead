@@ -3569,13 +3569,13 @@
     }
     function apply() {
       qc.applyFolds();
-      applyGroups();
       const win = store.get("qwin", "day");
       $$(".qwin", box).forEach((b) => b.setAttribute("aria-pressed", b.dataset.win === win ? "true" : "false"));
       $$(".qwinword", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
       let shown = 0;
       $$(".qdline", box).forEach((el) => { el.hidden = !(el.dataset.w || "").split(" ").includes(win); if (!el.hidden) shown++; });
       const none = $(".qdnone", box); if (none) none.hidden = shown > 0;
+      applyGroups();  // after the window hides its lines, so a find opens only a group it found something in
     }
     function openLine(line) {
       const body = $(".qdbody", line), head = $(".qdhead", line); if (!body) return;
