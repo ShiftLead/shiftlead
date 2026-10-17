@@ -15,7 +15,7 @@ from conftest import park_ticks
 from sessionorc import reports
 from sessionorc.agent import FILL_CEILING, IDLE_NUDGE, SEAT_IDLE_GRACE
 from sessionorc.client import LocalClient
-from sessionorc.models import ProgressEntry
+from sessionorc.models import Pending, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -109,12 +109,12 @@ async def test_each_reading_of_a_member_fills_the_manager_once(agent, tmp_path):
         await agent._keep_running(now)
         assert agent.sessions[mgr] is first and first.seat_due is None, "nothing to read, nothing due"
         # a question or a menu is a person's; another manager's member is not this one's
-        ra.state, ra.confidence, ra.pending = "needs-you", "hook", {"kind": "question", "text": "which?"}
+        ra.state, ra.confidence, ra.pending = "needs-you", "hook", Pending("question", "which?")
         ro.state = "stalled?"
         await agent._keep_running(now)
         assert agent.sessions[mgr] is first and first.seat_due is None
         # a permission fills it, the cause on the record that was due and on the fill's memory
-        ra.pending = {"kind": "permission", "text": "Bash(rm)"}
+        ra.pending = Pending("permission", "Bash(rm)")
         await agent._keep_running(now)
         second = agent.sessions[mgr]
         assert second is not first and first.seat_due["by"] == "pending" and first.seat_due["member"] == a
@@ -135,7 +135,7 @@ async def test_each_reading_of_a_member_fills_the_manager_once(agent, tmp_path):
         ra.state, ra.pending = "working", None
         await agent._keep_running(now + timedelta(minutes=5))
         assert agent.sessions[mgr] is third and [e["by"] for e in third.seat_filled] == ["stalled"]
-        ra.state, ra.pending = "needs-you", {"kind": "permission", "text": "Bash(rm)"}
+        ra.state, ra.pending = "needs-you", Pending("permission", "Bash(rm)")
         await agent._keep_running(now + timedelta(minutes=6))
         fourth = agent.sessions[mgr]
         assert fourth is not third and third.seat_due["by"] == "pending"
@@ -170,7 +170,7 @@ async def test_a_held_manager_has_no_pane_and_its_first_reading_fills_it(agent, 
         assert ra.controllers == [mgr]
         await agent._keep_running(now)
         assert agent.sessions[mgr] is first and first.state == "closed" and first.seat_due is None
-        ra.state, ra.confidence, ra.pending = "needs-you", "hook", {"kind": "permission", "text": "Bash(rm)"}
+        ra.state, ra.confidence, ra.pending = "needs-you", "hook", Pending("permission", "Bash(rm)")
         await agent._keep_running(now)
         second = agent.sessions[mgr]
         assert second is not first and second.state not in ("exited", "closed")
@@ -229,7 +229,7 @@ async def test_a_fill_prompt_ends_with_the_cause_it_came_for_and_no_other_replay
         agent.sessions[mgr].asks_ids = lambda **kw: ["m-1"]
         assert await fill_for(now) == "the seat's brief\n\n[shiftlead] you are filled for: asks — m-1"
         assert agent.sessions[mgr].restarts[-1]["for"] == "seat_due"
-        ra.state, ra.confidence, ra.pending = "needs-you", "hook", {"kind": "permission", "text": "Bash(rm)"}
+        ra.state, ra.confidence, ra.pending = "needs-you", "hook", Pending("permission", "Bash(rm)")
         assert await fill_for(now) == f"the seat's brief\n\n[shiftlead] you are filled for: pending — {a}"
         ra.state, ra.pending = "stalled?", None
         assert (
