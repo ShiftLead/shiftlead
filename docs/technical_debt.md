@@ -69,7 +69,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-806 | The Focus composer's Send clears whatever the box holds when the send answers, so a late answer wipes what the person typed since, and one send was delivered twice from Edge: nothing makes a send land once | High | Designed — built by TD-813 |
 | TD-810 | **Open shell here** is refused when the session's shell is still open: the create takes the name `<session>-shell`, which the live shell holds, so the placeholder tab opens and closes and the refusal is easy to miss | Medium | Open |
-| TD-813 | Build TD-806: a send lands once — the page's key on every send, a repeat answered as the first, and a composer that clears only what it sent | High | Open |
+| TD-813 | Build TD-806: a send lands once — the page's key on every send, a repeat answered as the first, and a composer that clears only what it sent | High | Building — slice 1 #1999 |
 | TD-814 | A team's TDs in motion reads a design whose PR waits on its round as *design*, the same as the one the designer is writing, so one designer reads as two designs in progress | Low | Designed — built by TD-815 |
 | TD-815 | Build TD-814: a design-first claim with a PR reads *review* in TDs in motion | Low | Open |
 
@@ -1383,7 +1383,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (TD-806's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Building — slice 1 (the agent) by #1999: `SendEntry.key`, `rpc_send`'s keyed repeat (the match first; a done send's verdict, a typing one's outcome through `_keyed_sends`), `SEND_KEY_SECONDS`; `tests/test_send_key.py`. Slice 2, the page: `app.py`'s `send` and `wrapup` passing `key`, the composer's hold, the chips, Wrap up, the bar, and their JS tests.
 **Location:** design §4.10 *A send lands once*, §4.5a *Focus composer* **Send**, **prompt chips** and **the bar**, *Focus* **Wrap up**; `src/shiftlead/ui/static/app.js` (the composer's `$("#send")` click, the prompt chips' click, the card's Wrap up, `act`, `wireComposerBar`'s `redraw`, a new `AO.SEND_PAGE_SECONDS = 30`); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`: `send` and `wrapup` pass `key`); `src/sessionorc/agent.py` (`rpc_send`, `_record_send`); `src/sessionorc/models.py` (`SendEntry`, its merge by id in `_overlay`); `src/sessionorc/agent_remote.py` (`_route_act`, whose two *its verdict is unknown* errors the page reads; it forwards `key` untouched); `src/sessionorc/mail.py` (`SEND_KEY_SECONDS`); `tests/` (`test_ui_composer_bar.py` and the agent's send tests)
 
 **Why:** TD-806: a late answer clears what the person typed since, and a repeated request delivers the same text twice.
