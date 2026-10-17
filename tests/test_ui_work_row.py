@@ -5,6 +5,7 @@ store, Dismiss through `clear_work`, and the card's note beside *wound down*."""
 
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import UTC, datetime, timedelta
 
@@ -374,6 +375,10 @@ def test_a_stopped_teams_row_and_card_on_the_pages(page):
     assert 'data-act="clear_work"' in later  # a stored mark: Dismiss clears it
 
 
+async def _answer(v):
+    return v
+
+
 def lanes(*ids, n=None):
     """A `teamrun.lanes` reading: one grinder role holding `ids`, or `n` None for a ledger unread."""
     got = len(ids) if n is None else n
@@ -442,3 +447,59 @@ def test_a_team_with_no_record_on_the_inbox_and_its_card(page, monkeypatch):
     # an unattended record carrying the badge takes the row and the note away
     c.app.state.answers["list"] = [_session("g", closed_at="2026-09-30T00:56:00+00:00")]
     assert "its lanes hold" not in c.get("/inbox").text and "its lanes hold" not in c.get("/").text
+
+
+def test_one_teams_failed_lanes_read_costs_only_its_own_row_and_note(page, tmp_path, monkeypatch):
+    """TD-799: a `teamrun.lanes` that raises for one of two teams with no record leaves the other's Later
+    row and card note and both pages rendered; the failed one reads *unknown* — `lanes_hold` None."""
+    c, _calls, work = page
+    (tmp_path / "home" / "org.yml").write_text(
+        f"projects:\n  p:\n    repos:\n      r: {{kmaster: {tmp_path}}}\n"
+        "teams:\n  wx:\n    repo: r\n    manager: {role: manager, name: n}\n"
+        "    members: [{role: grinder, name: h}]\n"
+        "  wt:\n    repo: r\n    manager: {role: manager, name: m}\n"
+        "    members: [{role: grinder, name: g}]\n"
+    )
+    reads: list[str] = []
+
+    def fake(call, org, name, host):
+        reads.append(name)
+        if name == "wx":
+            raise RuntimeError("the ledger moved")
+        return lanes("TD-119", "TD-120")
+
+    monkeypatch.setattr(teamrun, "lanes", fake)
+    work.clear()
+    c.app.state.answers["list"] = []
+    got = c.get("/inbox")
+    assert got.status_code == 200
+    later = got.text.split('id="rows-later"', 1)[1].split("</section>", 1)[0]
+    assert "wt · stopped · its lanes hold 2 entries:" in later and "wx · stopped" not in later
+    org = c.get("/")
+    assert org.status_code == 200 and org.text.count("· its lanes hold 2 entries</span>") == 1
+    assert sorted(reads) == ["wt", "wx"]
+    rd = uiapp.Readings(call=lambda method, **kw: _answer({}))
+    rd.defs_cache.update(at=float("inf"), org=object())
+    rows = asyncio.run(rd.with_lanes([{"name": "wx"}, {"name": "wt"}], []))
+    assert [(r["name"], r["lanes_hold"], r["lanes_line"]) for r in rows] == [
+        ("wx", None, ""),
+        ("wt", 2, "grinder: 2 pickable"),
+    ]
+
+
+def test_a_node_reads_no_teams_lanes(monkeypatch):
+    """TD-799: a node reads no definition, so `team_lanes` is `{}` and reads nothing — no RPC, no lanes."""
+    from sessionorc import hosts
+
+    reads, rpcs = [], []
+    monkeypatch.setattr(teamrun, "lanes", lambda *a: reads.append(a) or lanes("TD-1"))
+    monkeypatch.setattr(hosts, "is_node", lambda: True)
+
+    def call(method, **kw):
+        rpcs.append(method)
+        return _answer({})
+
+    rd = uiapp.Readings(call=call)
+    assert asyncio.run(rd.team_lanes([{"name": "wt"}], [])) == {}
+    rows = asyncio.run(rd.with_lanes([{"name": "wt"}], []))
+    assert rows[0]["lanes_hold"] is None and reads == [] and rpcs == [] and rd.lanes_cache == {}
