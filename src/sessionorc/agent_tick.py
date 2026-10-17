@@ -4255,23 +4255,12 @@ class TickMixin:
 
     def _title_verdict(self, s: Session, adapter: Any, pane: PaneInfo, now: datetime) -> bool:
         """Whether the title of a tool that writes its state there replaced the record's state (design
-        §4.2 *A title the tool writes its state into*, §4.3 *Two gaps*, TD-785). Read once a hook has
-        reached the record, and only past one tick since the last hook; compared with the record's
-        hook-confirmed state, never `exited` or `closed`, and with `stalled?` only by a verdict other
-        than `working`. A verdict equal to the record's state is no event, so its `pending` stands. It
-        is not held for its screen: what it replaced is dropped, as a hook's report drops it."""
-        if not getattr(adapter, "state_in_title", False) or not s.hook_seen_at:
+        §4.2 *A title the tool writes its state into*, §4.3 *Two gaps*, TD-785), by `_title_reading`.
+        It is not held for its screen: what it replaced is dropped, as a hook's report drops it."""
+        if not getattr(adapter, "state_in_title", False):
             return False
-        last = self._last_hook.get(s.id)
-        if last is not None and now - last <= timedelta(seconds=agent_common.TICK_SECONDS):
-            return False
-        m = adapter.explain(s.tail, title=pane.title)
-        if m is None or m.state == s.state:
-            return False
-        if s.state == "stalled?":
-            if m.state == "working":
-                return False  # the tool still works: the stall stands until it moves on
-        elif not s.told:
+        m, _why = self._title_reading(s, adapter.explain(s.tail, title=pane.title), now)
+        if m is None:
             return False
         pending = m.pending
         if m.state == "needs-you":
@@ -4282,6 +4271,30 @@ class TickMixin:
         log.info("%s: title %r: %s -> %s", s.id, pane.title.strip()[:40], s.state, m.state)
         s.set_state(m.state, confidence="title", pending=pending)
         return True
+
+    def _title_reading(self, s: Session, m: Any, now: datetime) -> tuple[Any, str]:
+        """The title's verdict `m` if it replaces the record's state, else None, and why (`ao explain`'s
+        reason): read once a hook has reached the record and only past one tick since the last hook;
+        compared with the record's hook-confirmed state, never `exited` or `closed`, and with
+        `stalled?` only by a verdict other than `working`; a verdict equal to the record's state is no
+        event, so its `pending` stands and the stall check still runs."""
+        if m is None:
+            return None, "the title says no state"
+        if not s.hook_seen_at:
+            return None, f"title {m.state}, but no hook has reached the record — the title is not read yet"
+        last = self._last_hook.get(s.id)
+        if last is not None and now - last <= timedelta(seconds=agent_common.TICK_SECONDS):
+            return None, f"title {m.state}, but a hook reported within a tick — the hook state wins"
+        if s.state in ("exited", "closed"):
+            return None, f"title {m.state}, but {s.state} stands"
+        if m.state == s.state:
+            return None, f"title {m.state}, as the record reads — no event"
+        if s.state == "stalled?":
+            if m.state == "working":
+                return None, "title working, which does not end a stall"
+        elif not s.told:
+            return None, f"title {m.state}, but the record's {s.state} is no hook's word — not compared"
+        return m, f"title {m.state}, read as the tool's own word (confidence: title)"
 
     @staticmethod
     def _screen_held(s: Session) -> bool:

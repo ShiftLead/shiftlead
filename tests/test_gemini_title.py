@@ -88,11 +88,36 @@ async def test_action_required_is_written_by_the_state_it_replaces(agent, gem, t
     # answered in the terminal, no hook says so until AfterTool: the title's `✦` ends it
     s = _look(agent, s, WORKING)
     assert s.state == "working" and s.pending is None and s.confidence == "title"
+    # a title's own `working` is hook-confirmed: `✋` over it is the shell waiting
+    s = _look(agent, s, ACTION)
+    assert s.state == "needs-you" and s.pending.text == agent_tick.TITLE_SHELL_WAITS
+
+
+async def test_explains_reason_is_the_ticks_own_rule(agent, gem, tmp_path):
+    ad = GeminiAdapter(binary="gemini")
+    now = datetime.now(UTC)
+    agent._last_hook["ao-x-g"] = now - timedelta(seconds=60)
+
+    def why(s, title):
+        return agent._title_reading(s, ad.explain([], title=title), now)
+
+    assert why(_rec(tmp_path), "kmaster: ~") == (None, "the title says no state")
+    assert "not read yet" in why(_rec(tmp_path, hooked=False), READY)[1]
+    assert "stands" in why(_rec(tmp_path, state="exited"), READY)[1]
+    assert "no event" in why(_rec(tmp_path), WORKING)[1]
+    assert "does not end a stall" in why(_rec(tmp_path, state="stalled?", confidence="tick"), WORKING)[1]
+    assert "not compared" in why(_rec(tmp_path, state="idle", confidence="scraped"), WORKING)[1]
+    m, reason = why(_rec(tmp_path), READY)
+    assert m.state == "idle" and "confidence: title" in reason
+    agent._last_hook["ao-x-g"] = now
+    assert "within a tick" in why(_rec(tmp_path), READY)[1]
 
 
 async def test_the_ticks_own_readings_stand_but_a_stall_ends_when_the_tool_moves_on(agent, gem, tmp_path):
     for st in ("exited", "closed"):
-        assert _look(agent, _rec(tmp_path, state=st, confidence="tick"), READY).state == st
+        for conf in ("tick", "hook"):  # the tool's own SessionEnd is a hook's `exited`: it stands too
+            s = _look(agent, _rec(tmp_path, state=st, confidence=conf), READY)
+            assert s.state == st and s.confidence == conf
     s = _rec(tmp_path, state="stalled?", confidence="tick")
     assert _look(agent, s, WORKING).state == "stalled?"  # still working: no event
     assert _look(agent, s, QUIET).state == "stalled?"
@@ -138,7 +163,7 @@ async def test_a_title_set_in_the_pane_reaches_the_record_and_explain(agent, hoo
         }
         ex = await c.call("explain", id=s["id"])
         assert ex["title"].startswith("✋  Action Required") and ex["match"]["rule"] == "title ✋"
-        assert "confidence: title" in ex["reason"]
+        assert "no event" in ex["reason"]  # the record already reads what the title says
         await c.call("kill", id=s["id"])
 
 

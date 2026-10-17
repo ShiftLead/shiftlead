@@ -27,7 +27,7 @@ import sys
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -2493,15 +2493,7 @@ class HostAgent(
             title = pane.title if pane else ""
             m = explain(tail, title=title)
             out["title"], out["match"] = title, m.to_dict() if m else None
-            last = self._last_hook.get(id)
-            if m is None:
-                out["reason"] = "the title says no state"
-            elif not s.hook_seen_at:
-                out["reason"] = f"title {m.state}, but no hook has reached the record — the title is not read yet"
-            elif last is not None and now - last <= timedelta(seconds=agent_common.TICK_SECONDS):
-                out["reason"] = f"title {m.state}, but a hook reported within a tick — the hook state wins"
-            else:
-                out["reason"] = f"title {m.state}, read as the tool's own word (confidence: title)"
+            out["reason"] = self._title_reading(s, m, now)[1]
             return out
         m = explain(tail)
         out["match"] = m.to_dict() if m else None
