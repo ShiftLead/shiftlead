@@ -86,6 +86,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Open |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Open |
+| TD-860 | #2048's waiting-claims tests leave five lines unread: the closed-PR exclusion, the replay's `keep_mail` gate, the held ask's sender, the rename carry and the carry-over dedup; #2045's `shown_in` completed counts too | Medium | Open |
 
 ---
 
@@ -1888,5 +1889,36 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
 
 **Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
+
+---
+
+## TD-860: #2048's waiting-claims tests leave five lines unread — the closed-PR exclusion, the replay's `keep_mail` gate, the held ask's sender, the rename carry and the carry-over dedup — and #2045's `shown_in` completed counts are read by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2043–#2054)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_tick.py` (`_waiting_claims`, `_context_line`, `_replay`); `tests/test_waiting_claims.py`; `src/shiftlead/ui/queue.py` (`apply_picks`'s `shown_in`); `tests/test_ui_queue.py`
+
+**Why:** each change was made alone on `origin/main` (b0e844a1), and `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_waiting_claims.py` (5 tests) still passed every time:
+- `_waiting_claims`: ` and e.why != PR_CLOSED` deleted. A claim the tick read closed unmerged would still be a waiting claim. No test has a claim with `why == PR_CLOSED`; the closed-PR row (TD-005) is excluded by the open-PR list instead.
+- `_waiting_claims`: `and mine(a.get("from"))` on a held ask replaced by `and True`. Another member's held ask for the same PR would make this member's claim wait; the test's one held ask is its own.
+- `_replay`: `if extra.get("keep_mail") else []` replaced by `if True else []`. The test of a person's Restart (`progress == []`) does not reach the replay path, so no test runs a replay without `keep_mail` beside a waiting claim.
+- `_replay`: the `if e.ref in held:` branch (`held[e.ref].at = e.at`, "a rename's `_carry` copied it already") replaced by `pass`. No test replays a rename, so the lease renewal on a carried-by-rename claim is unread.
+- `_context_line`: `dict.fromkeys(...)` dropped, so a claim with `pr` and `review_pr` on two entries naming one PR would print it twice; both of the test's lines have distinct PRs.
+- #2045's `shown_in["completed"]` (`{w: sum(ln["n"] … if w in ln["wins"] and not ln["off"]) …}`) replaced by zeros: 163 passed in `tests/test_ui_queue.py` and `tests/test_ui_inbox.py`. `queue_part.html` draws the *Completed (n of m)* share from it, and `grep -rn shown_in tests` finds nothing.
+The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition, `scratch_profile`'s `all`, the `ahead`/`hidden` split, `horizon_left`'s line, `_mail_status`, the card's `on` and `shown_in["up_next"]`) each failed a test.
+
+**Fix:** tests, no change to the source:
+1. `_waiting_claims`: a claim with `why=PR_CLOSED` whose `pr` is still in the repo's open list, with a steer about it, is not waiting; a held ask from another member for the same PR makes no wait.
+2. `_replay`: a tick replay with `keep_mail` false (find which callers pass it) carries nothing; a replay whose new record already holds the ref (a rename) has its `at` renewed and no second copy.
+3. `_context_line`: two waiting claims naming one PR print `#n` once.
+4. `apply_picks`: with a filter on, `view["shown_in"]["completed"]` counts only the lines not `off` in each window.
+
+**Done when** each of the five reverts above fails a test in `tests/test_waiting_claims.py` and the `shown_in` revert fails one in `tests/test_ui_queue.py`.
+
+**Related:** TD-836 (built #2048), TD-820, TD-828 (#2045), TD-852 (the same audit's earlier finding).
 
 ---
