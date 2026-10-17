@@ -66,7 +66,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Designed — built by TD-828, TD-829 |
-| TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833 |
+| TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833, TD-859 |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 |
 | TD-829 | Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint | Medium | Open |
@@ -85,6 +85,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Open |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Open |
+| TD-859 | Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats | Medium | Open |
 | TD-860 | #2048's waiting-claims tests leave five lines unread: the closed-PR exclusion, the replay's `keep_mail` gate, the held ask's sender, the rename carry and the carry-over dedup; #2045's `shown_in` completed counts too | Medium | Open |
 
 ---
@@ -1330,8 +1331,8 @@ The other cases:
 **Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-17 (design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §4.2a, §5 `spend.weights`, §4.5 screen 13 *Spend* and screen 1's team header, §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, §4.7 `ao spend` and `ao status -v`; mockup `Spend.dc.html`). Every profile's turns, a subscription's included, are read once a minute into a **seat ledger** (`seat_spend.json`), each turn charged to the record that spent it (by conversation, else by worktree, else *outside shiftlead*) and to the entry it was doing; a subscription's figure is API-equivalent at the person's weights (default: the API's list prices of 2026-10-17, written into §5; steer m-0a1223fad390 to Paul, raw tokens its alternative), never a bill and read by no gate; kept thirteen months; drawn on a Spend page, the team card's header, `ao spend` and `ao status -v`.
-**Blocked by:** TD-830, TD-831, TD-832, TD-833
+**Status:** Designed 2026-10-17 (design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §4.2a, §5 `spend.weights`, §4.5 screen 13 *Spend* and screen 1's team header, §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, §4.7 `ao spend` and `ao status -v`; mockup `Spend.dc.html`). Every profile's turns, a subscription's included, are read once a minute into a **seat ledger** (`seat_spend.json`), each turn charged to the record that spent it (by conversation, else by worktree, else *outside shiftlead*) and to the entry it was doing; a subscription's figure is API-equivalent at the person's weights (default: the API's list prices of 2026-10-17, written into §5; steer m-0a1223fad390 to Paul, raw tokens its alternative), never a bill and read by no gate; kept thirteen months; drawn on a Spend page, the team card's header, `ao spend` and `ao status -v`. **Amended** 2026-10-17 with Paul's additions (m-75b50493538d, from his session ao-paul): a **Month** window and a period picked on an **Over time** chart, **By team** and **Top sessions** on All, the person's own sessions as *interactive sessions*, the usage chip opening the page; the RPC's part is TD-859, the page's TD-832, `ao spend`'s TD-831.
+**Blocked by:** TD-830, TD-831, TD-832, TD-833, TD-859
 **Location:** design §4.3 *Spend per turn* (TD-128: `spend()` is asked for a `metered` profile only), §4.2a (a subscription profile is read by its quota windows), §4.4 (the home's spend ledger), §4.5 screen 1 (the team card), §4.7 (`ao status -v`); `src/shiftlead/adapters/claude_code/transcript.py` (the reader), `src/shiftlead/profiles.py`
 
 **Why:**
@@ -1464,13 +1465,13 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-830
+**Blocked by:** TD-830, TD-859
 **Location:** design §4.7 `ao spend` and `ao status -v`, §4.4 *Spend per seat*; `src/shiftlead/cli.py`
 
 **Why:** TD-818: the seat ledger's reading, from a terminal and from a session (a manager reads its team's spend without a page).
 
 **Fix:**
-- `ao spend [--team <t>] [--window day|week] [--entries]` prints the `seats` RPC's reply in §4.7's words: a block per team, a line per seat, then *outside shiftlead*, and with `--entries` the finished entries. `--json` prints the RPC's reply. Read-only, open to a session.
+- `ao spend [--team <t>] [--window day|week|month] [--at <date>] [--entries]` prints the `seats` RPC's reply for the period in §4.7's words (amended 2026-10-17): without `--team`, first the *By team* block from `teams`; then a block per team, a line per seat, then the *interactive sessions* seats, then *outside shiftlead* (one line; with `--team`, the team's head line from its `teams` row, then its block alone; `--team interactive` the same for the person's own sessions), and with `--entries` the finished entries. `--json` prints the RPC's reply. Read-only, open to a session.
 - `ao status -v` prints each record's `spend` line from `seats` with `by: record`, and `--json` carries the `spend` object (`{day, week, past_200k, past_300k, unit}`, the shares today's, or `unknown`).
 - **Tests:** the line formats for `≈$`, `$` and *unweighed*; `--entries`, with *· partial*; a session may call it; `status -v` prints the line, and its absence where the record spent nothing.
 
@@ -1486,17 +1487,25 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Blocked by:** TD-830
-**Location:** design §4.5 screen 13 *Spend* and screen 1 (the team header), §4.5a *Spend page*, *team card: spend*, *Settings page: weights*; mockup `docs/mockups/Spend.dc.html` (`reviews/2026-10-17-td818-spend.png`); `src/shiftlead/ui/app.py` (`/spend`, `/api/spend`), templates and `app.js`, `src/shiftlead/ui/settings_page.py`, `src/shiftlead/ui/help.py` (bound by `tests/test_help.py`)
+**Blocked by:** TD-830, TD-859
+**Location:** design §4.5 screen 13 *Spend* and screen 1 (the team header), §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, *Org top bar: usage chip*; mockups `docs/mockups/Spend.dc.html` and `SpendTeam.dc.html` (`reviews/2026-10-17-td818-spend-all.png`, `…-spend-team.png`); `src/shiftlead/ui/app.py` (`/spend`, `/api/spend`), templates and `app.js`, `src/shiftlead/ui/settings_page.py`, `src/shiftlead/ui/help.py` (bound by `tests/test_help.py`)
 
 **Why:** TD-818: Paul asked to *see which ones use the most tokens, and make adjustments if there are surprises*. That needs a page, and a figure where he already looks.
 
 **Fix:**
-- **`/spend`**, drawn as the mockup: the head's one line on what the figure is; **Day · Week** and the team chips, carried in the URL; a table per team, with role subtotals where a team holds two of a role; then *outside shiftlead*; then **Finished entries**. Links go to Focus or the Transcript, and to the Queue card. A figure's hover gives tokens by kind and the weights used. Narrow below 720 px.
+- **`/spend`**, drawn as the two mockups (amended 2026-10-17 with Paul's additions):
+  - the head names the period and what the figure is; **Day · Week · Month**, the team chips and **‹ ›**, carried in the URL (`window`, `at`, `team`, `top`);
+  - **Over time**: the `series` as stacked bars — by team (with *interactive sessions* and *outside shiftlead*) on All, by role on a team — the picked bar outlined, a press picking its period, bars before `begins` dashed, *partial* in a hover; **‹** disabled at the period holding `begins`, **›** at the current;
+  - **On All**: **By team** from `teams` (a team's name opens its view) and **Top sessions** from `top`, eight rows and *all →*;
+  - **On a team**: its line from its `teams` row (the period, the previous, the week and month so far, per §4.5's words by window), then **By seat**, with role subtotals where a team holds two of a role, and **Finished entries**, for the period, as #2015 drew them.
+  - `/api/spend` passes `window`, `at` and `team` to `seats`.
+  - Links go to Focus or the Transcript, and to the Queue card. A figure's hover gives tokens by kind and the weights used. Narrow below 720 px.
+  - **Shape** keeps **Day · Week**; a month picked opens it on the week.
+- **The usage chip** opens `/spend` on a press, every chip and every page alike.
 - **The team card's header** gains the **spend** figure: today's figure, a link to `/spend?team=<t>`, with its hover. It is absent while the team spent nothing today.
 - **Settings**: the **weights** card under Usage, with Save and Cancel as every card, and the heading's *by seat →* link.
-- §4.5a's four new rows get their help text in `ui/help.py`, as the build entry's wording.
-- **Tests:** the page draws the RPC's reply (seat rows, subtotals, outside, entries, *partial*, *unweighed*, *spend unknown*); the URL carries the picks; the header figure and its absence; the weights card writes `spend.weights` through `set_settings`; the doc-bound §4.5a tests.
+- §4.5a's new rows (the Spend page's three, the weights card, the team card's figure) and the usage chip's press get their help text in `ui/help.py`, as the build entry's wording.
+- **Tests:** the page draws the RPC's reply (seat rows, subtotals, outside, entries, *partial*, *unweighed*, *spend unknown*; the chart's bars and their stacks, the dashed bars before `begins`; By team's change and *spent most*; Top sessions' eight and *all*); a bar's press and **‹ ›** pick the period; the URL carries the picks; the usage chip links to `/spend`; the header figure and its absence; the weights card writes `spend.weights` through `set_settings`; the doc-bound §4.5a tests.
 
 **Done when** a team card's figure opens a Spend page showing each seat's share and per-entry figure, and the weights are editable on the Settings page. A screenshot under `docs/mockups/reviews/` is named in the PR.
 
@@ -1864,6 +1873,53 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
 
 **Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
+
+---
+
+## TD-859: Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's amendment, the designer; Paul's additions, m-75b50493538d)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-830
+**Location:** design §4.4 *Spend per seat* (*The readings*, *Over time and across teams*, *The person's own sessions*), §4.9 *Names are the org's*; `src/sessionorc/spend.py` and the `seats` RPC TD-830 adds (its reader of `seat_spend.json`); `src/shiftlead/org.py` (`_team`, where a team's name is read: the two reserved names); the tests TD-830 adds for `seats`
+
+**Why:** TD-818, amended: Paul wants to see which teams and which sessions spend most, and each team's total per day, week and month. TD-830 reads a `day` or a `week` and per team; the page's chart and its All view need more from the same per-day rows.
+
+**Fix:** `seats {window, at?, team?, by?}`, as §4.4 *Over time and across teams* says:
+- **The period.** `window` takes `month` beside `day` and `week`. A week runs Monday to Sunday, a month is the calendar month, and both use the home's clock. `at` is `YYYY-MM-DD`: a Monday for a week, the 1st for a month. It is refused in words when it is not a period's first day, after the current period, or before the period holding `begins` (every other `at` while the ledger has no row). The current period's first day reads as no `at`.
+- **`series`.** The window's last buckets: 30, 12 or 13. They end at the current period, or start at `at` where `at` is older than the first of them.
+  - Each bucket's figure is broken out by team (`interactive` and `outside` among them), or by role with `team`.
+  - By role, a series per role the team's records held in the bucket; a record with no role reads `other`.
+  - The bucket holding `begins`, when `begins` is not its first day, is marked `partial`; a day never is.
+  - `begins` is the earliest day holding a row, absent while there is none.
+- **`teams`.** Without `team`: a row per team that spent in the period or the previous one to date, `interactive` among them, by figure, then `outside`. With `team`: that team's row alone; `team` may be `interactive`. Each row holds:
+  - the period's figure, and its share of the whole (the period's total across the teams, `interactive` and `outside`);
+  - the previous period's figure, whole and to date (its first *n* days, *n* the days the current period has run; on a past period the to-date figure is the whole; on the current day no to-date figure, the whole alone);
+  - turns, and the current week's and month's figures so far;
+  - the seat that spent most, with its share of the team.
+- **`top`** (without `team`). Every seat of the period across the teams and `interactive`, most first, each with team, role, figure, share of the whole, turns and past 300k.
+- **Interactive seats.** A record in no team reads as a seat by name within its repo, team `interactive`, wearing its record's role (`other` where none). `interactive` and `outside` are reserved: a team named either is refused where teams are loaded.
+- **Sums across profiles.** A sum prints `≈$` where any part is `≈$`, and `$` only where every part is. An unweighed part is left out of the figure and of every share, and named beside it (its tokens). `unit` is given per row where rows differ.
+- **Unchanged.** Nothing new is written: all of it is summed from `seat_spend.json`'s per-day rows. (`/api/spend`, TD-832's, passes `window`, `at` and `team` through.)
+
+**Tests:**
+- a month and a week sum their days, and a week starts on Monday;
+- `at` picks a past period; a bad, future or pre-`begins` `at` is refused;
+- `series` has 30, 12 and 13 buckets ending at today's period, or starting at an old `at`, stacked by team or by role, with `partial` on a part-held bucket;
+- `teams` carries the previous period to date (a week two days old against the last week's first two days), the week and month so far, the top seat, and with `team` the one row;
+- the shares on All sum to the whole with `outside` in it;
+- a mixed `$` and `≈$` sum prints `≈$`, and an unweighed part stays out of it;
+- `top` ranks every seat across teams and interactive;
+- a no-team record reads under `interactive`, by name and repo, with its role;
+- a team named `interactive` or `outside` is refused, by `ao org check` and at a start.
+
+**Done when** the `seats` RPC answers every reading screen 13 draws from the per-day rows, and the tests above pass.
+
+**Related:** TD-818 (the design), TD-830 (the ledger and the RPC it extends), TD-831 and TD-832 (its readers).
 
 ---
 

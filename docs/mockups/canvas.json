@@ -170,9 +170,17 @@
     },
     {
       "file": "Spend.dc.html",
-      "title": "Spend \u2014 who spent the quota, per seat and per finished entry (TD-818, built by TD-832)",
+      "title": "Spend \u2014 All: over time by team, by team, top sessions (TD-818, built by TD-832 and TD-859)",
       "x": 1540,
       "y": 7300,
+      "w": 1440,
+      "h": 980
+    },
+    {
+      "file": "SpendTeam.dc.html",
+      "title": "Spend \u2014 a team: over time by role, its seats and finished entries (TD-818, built by TD-832 and TD-859)",
+      "x": 1540,
+      "y": 8380,
       "w": 1440,
       "h": 980
     },
@@ -180,7 +188,7 @@
       "file": "SpendShape.dc.html",
       "title": "Spend \u2014 the Shape view: a team's members by class, its queues, the suggestions (TD-819, built by TD-835)",
       "x": 1540,
-      "y": 8380,
+      "y": 9460,
       "w": 1440,
       "h": 900
     },
@@ -188,7 +196,7 @@
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 9380,
+      "y": 10460,
       "w": 1440,
       "h": 820
     },
@@ -196,7 +204,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 10300,
+      "y": 11380,
       "w": 1440,
       "h": 2320
     },

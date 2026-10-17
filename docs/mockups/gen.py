@@ -2095,10 +2095,12 @@ def darken(html):
         html = html.replace(a, b)
     return html
 
-def spend_page():
-    """Screen 13, **Spend** (TD-818, built by TD-832; §4.5a *Spend page*): who spent the quota, a table per team with
-    each seat's API-equivalent figure, its share as a bar, per finished entry, between and the past-context shares,
-    then outside shiftlead, then the finished entries with what each role spent on them. Illustrative figures."""
+def spend_page(view="all"):
+    """Screen 13, **Spend** (TD-818, built by TD-832 and TD-859; §4.5a *Spend page*), amended 2026-10-17 with Paul's
+    additions: the **Day · Week · Month** window and its period, the **Over time** chart (by team on All, by role on
+    a team), and on All **By team** and **Top sessions**, the person's own sessions as *interactive sessions*. A
+    team's view (`view="team"`) keeps the seat table and the finished entries under its chart. Illustrative figures,
+    after Paul's proposal over the transcript tally of Oct 3–17."""
     def chip(t, on=False):
         return (f'<span style="border: 1px solid #d0d5dc; border-radius: 5px; padding: 2px 9px; font-size: 12px;'
                 f'{" background: #e9edf2; font-weight: 600;" if on else ""}">{t}</span>')
@@ -2133,7 +2135,6 @@ def spend_page():
         srow("techlead-ao-1", "techlead", "≈$13.60", 9, "188", "—", "≈$13.60", "4%", "0%"),
         srow("manager-ao-1", "manager", "≈$2.40", 1, "41", "—", "≈$2.40", "0%", "0%"),
     ])
-    outside = thead() + srow("your own sessions", "", "≈$21.70", None, "233", "—", "—", "9%", "1%")
     def erow(t, title, parts, total, turns, held):
         return ('<div style="display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; border-top: 1px solid #eef1f4; font-size: 13px;">'
                 f'<a class="mono" href="#" style="font-size: 12.5px; font-weight: 600;">{t}</a><span style="flex: 1;">{title}</span>'
@@ -2146,23 +2147,111 @@ def spend_page():
         erow("TD-821", "A shell opened from a team member draws on that team", "designer ≈$9.80", "≈$9.80", "104", "1h10m"),
         erow("TD-824", "Send-key tests catch the shield going", "grinder ≈$6.30", "≈$6.30", "77", "50m"),
     ])
+    def money(x):
+        return f"≈${x:,.0f}" if x >= 100 else f"≈${x:,.2f}"
+    def sw(c):
+        return f'<span style="display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; background: {c};"></span>'
+    def chart(series, keys, colors, labels, sel, note, height=150):
+        peak = max(sum(x.values()) for x in series) or 1
+        cols = []
+        for i, x in enumerate(series):
+            total = sum(x.values())
+            segs = "".join(f'<i style="display: block; height: {x.get(k, 0) / peak * height:.1f}px; background: {colors[k]};'
+                           f'{" background-image: repeating-linear-gradient(45deg, #fff 0 2px, transparent 2px 5px);" if k == "outside" else ""}"></i>'
+                           for k in reversed(keys) if x.get(k, 0) > 0)
+            ring = "outline: 2px solid #1c2128; outline-offset: 2px;" if i == sel else ""
+            empty = "" if total else '<span style="display: block; height: 1px; border-top: 1px dashed #cbd0d6;"></span>'
+            cols.append('<div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; justify-content: flex-end;">'
+                        f'<span class="mono" style="font-size: 10.5px; color: #4b5563;">{money(total) if total else ""}</span>'
+                        f'<div style="width: 70%; display: flex; flex-direction: column; border-radius: 2px 2px 0 0; overflow: hidden; {ring}">{segs}{empty}</div>'
+                        f'<span class="mono" style="font-size: 10.5px; color: #6b7480; white-space: nowrap;{" font-weight: 600; color: #1c2128;" if i == sel else ""}">{labels[i]}</span></div>')
+        legend = "".join(f'<span style="font-size: 12px; margin-right: 12px;">{sw(colors[k])}{k}</span>' for k in keys)
+        return ('<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; padding: 12px 14px 10px;">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;"><div>{legend}</div>'
+                f'<span class="meta" style="font-size: 12px;">{note}</span></div>'
+                f'<div style="display: flex; gap: 4px; align-items: flex-end; height: {height + 40}px;">{"".join(cols)}</div></div>')
+    def heading(title, sub):
+        return (f'<div style="display: flex; gap: 8px; align-items: baseline; margin: 20px 0 8px;"><span style="font-size: 17px; font-weight: 600;">{title}</span>'
+                f'<span class="meta" style="font-size: 12px;">{sub}</span></div>')
+    def grid(cols, cells, head_=False):
+        st = ("font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7480; border-bottom: 1px solid #e3e7ec; padding: 6px 14px;"
+              if head_ else "border-top: 1px solid #eef1f4; padding: 8px 14px; font-size: 13px;")
+        return f'<div style="display: grid; grid-template-columns: {cols}; gap: 8px; align-items: center; {st}">' + "".join(f"<span>{c}</span>" for c in cells) + "</div>"
+    def sbar(pct, c):
+        return (f'<span style="display: inline-block; width: 90px; height: 8px; background: #eef1f4; border-radius: 4px; overflow: hidden; vertical-align: middle;">'
+                f'<i style="display: block; height: 100%; width: {pct}%; background: {c};"></i></span> <span class="mono" style="font-size: 12px;">{pct}%</span>')
+    period, window = ("Fri 16 Oct", "Day") if view == "all" else ("week of 12 Oct", "Week")
     wins = ('<span style="display: inline-flex; border: 1px solid #d0d5dc; border-radius: 5px; overflow: hidden; font-size: 12px;">'
-            + "".join(f'<span style="padding: 2px 10px; border-left: 1px solid #d0d5dc;{" background: #e9edf2; font-weight: 600;" if w == "Day" else ""}">{w}</span>'
-                      for w in ("Day", "Week")) + "</span>")
+            + "".join(f'<span style="padding: 2px 10px; border-left: 1px solid #d0d5dc;{" background: #e9edf2; font-weight: 600;" if w == window else ""}">{w}</span>'
+                      for w in ("Day", "Week", "Month")) + "</span>")
     filters = ('<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;">'
-               + wins + '<span style="width: 10px;"></span>' + chip("All") + chip("ao-grind", True) + chip("samscrape-grind") + "</div>")
-    note = ('<div class="note" style="margin-top: 18px;">Design notes, not page text. Reached from a team card\'s spend figure and the '
-            'Settings page\'s Usage heading; no top-bar tab. The figure\'s hover is the tokens by kind and the weights used. '
-            'Figures illustrative. Built by TD-832.</div>')
+               + wins + '<span style="width: 10px;"></span>' + chip("All", view == "all") + chip("ao-grind", view == "team")
+               + chip("dc-grind")
+               + f'<span style="flex-grow: 1;"></span><span class="mono" style="font-size: 12px;">‹ <b>{period}</b> <span style="{"opacity: .35;" if view == "team" else ""}">›</span></span></div>')
+    TEAMC = {"ao-grind": "#2563eb", "samscrape-grind": "#0d9488", "dc-grind": "#d97706", "cm-grind": "#7c3aed",
+             "interactive": "#9ca3af", "outside": "#cbd0d6"}
+    ROLEC = {"grinder": "#2563eb", "designer": "#db2777", "techlead": "#0d9488", "manager": "#d97706", "other": "#9ca3af"}
+    if view == "all":
+        # 30 days, Sep 18 – Oct 17; the ledger begins Oct 3 (the backfill), Fri 16 picked
+        figs = [None] * 15 + [(205, 40, 0, 0, 40, 3), (180, 18, 0, 8, 110, 4), (300, 0, 6, 0, 100, 2),
+                              (150, 20, 0, 0, 30, 2), (160, 15, 4, 0, 24, 2), (260, 15, 0, 0, 44, 2), (300, 6, 2, 0, 108, 3),
+                              (290, 0, 0, 0, 52, 3), (40, 0, 0, 0, 13, 1), (240, 30, 24, 0, 62, 3), (190, 10, 0, 0, 27, 2),
+                              (300, 4, 0, 0, 140, 3), (290, 0, 0, 0, 66, 3), (426, 0, 0, 0, 92, 2), (80, 0, 0, 0, 14, 1)]
+        keys = ("ao-grind", "samscrape-grind", "dc-grind", "cm-grind", "interactive", "outside")
+        series = [dict(zip(keys, f)) if f else {} for f in figs]
+        days = ["Fri 18", "Sat 19", "Sun 20", "Mon 21", "Tue 22", "Wed 23", "Thu 24", "Fri 25", "Sat 26", "Sun 27", "Mon 28", "Tue 29",
+                "Wed 30", "Thu 1", "Fri 2", "Sat 3", "Sun 4", "Mon 5", "Tue 6", "Wed 7", "Thu 8", "Fri 9", "Sat 10", "Sun 11", "Mon 12",
+                "Tue 13", "Wed 14", "Thu 15", "Fri 16", "Sat 17"]
+        labels = [d if i % 2 == 1 or i == 28 else "" for i, d in enumerate(days)]
+        c = chart(series, keys, TEAMC, labels, 28, "the ledger begins 2026-10-03 · press a bar to read that day")
+        tcols = "1.6fr 1fr 1.5fr .9fr .8fr 1.7fr 1.9fr"
+        teams = grid(tcols, ("team", "≈ figure", "share", "vs day before", "turns", "this week · month", "spent most"), True) + "".join(
+            grid(tcols, (sw(TEAMC[k]) + name, f'<span class="mono" style="font-weight: 600;">{fig}</span>', sbar(sh, TEAMC[k]), ch,
+                         f'<span class="mono">{tu}</span>', f'<span class="mono">{wm}</span>', most))
+            for k, name, fig, sh, ch, tu, wm, most in (
+                ("ao-grind", '<a href="#">ao-grind</a>', "≈$426", 82, '<span class="mono" style="color: #b45309;">▲ 51%</span>', "7,716", "≈$1,498 · ≈$3,496", "grinder-ao-2 · 36%"),
+                ("interactive", '<span class="meta">interactive sessions</span>', "≈$92.40", 18, '<span class="mono" style="color: #b45309;">▲ 34%</span>', "1,096", "≈$401 · ≈$803", "ao-paul · shiftlead · 60%"),
+                ("dc-grind", '<a href="#">dc-grind</a>', "≈$0.00", 0, '<span class="mono" style="color: #166534;">▼ 100%</span>', "0", "≈$49.72 · ≈$72.01", "—"),
+                ("outside", '<span class="meta">outside shiftlead</span>', "≈$1.90", 0, "—", "21", "≈$4.10 · ≈$9.80", "—"),
+            ))
+        scols = "1.8fr 1.2fr .9fr 1fr 1.4fr .8fr .9fr"
+        top = grid(scols, ("session", "team", "role", "≈ figure", "share of all", "turns", "past 300k"), True) + "".join(
+            grid(scols, (f'<a href="#">{n}</a>', sw(TEAMC[t]) + ("interactive" if t == "interactive" else t), pillr(r),
+                         f'<span class="mono" style="font-weight: 600;">{f}</span>', sbar(sh, TEAMC[t]), f'<span class="mono">{tu}</span>',
+                         f'<span class="mono">{p3}</span>'))
+            for n, t, r, f, sh, tu, p3 in (
+                ("grinder-ao-2", "ao-grind", "grinder", "≈$151", 29, "2,741", "4%"), ("designer-ao-1", "ao-grind", "designer", "≈$123", 24, "1,822", "9%"),
+                ("grinder-ao-1", "ao-grind", "grinder", "≈$107", 20, "2,116", "3%"), ("ao-paul · shiftlead", "interactive", "other", "≈$56.76", 11, "474", "2%"),
+                ("techlead-ao-1", "ao-grind", "techlead", "≈$33.28", 6, "616", "0%"), ("ao-queue-vs-inbox · shiftlead", "interactive", "other", "≈$24.90", 5, "389", "1%"),
+                ("test-audit-ao-1", "ao-grind", "other", "≈$11.48", 2, "421", "0%"), ("dc-grinder · dev-cadence", "interactive", "grinder", "≈$9.45", 2, "147", "0%"),
+            ))
+        body = (heading("Over time", "a bar a day, the last 30 days, by team") + c
+                + heading("By team", "≈$520 on Fri 16 · most first · a team opens its view")
+                + f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{teams}</div>'
+                + heading("Top sessions", 'every team\'s seats and your own sessions, most first · 8 of 31 · <a href="#">all →</a>')
+                + f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{top}</div>')
+        notes = ("Reached from the top bar's usage chip (here, on All), a team card's spend figure (on its team) and the Settings page's "
+                 "Usage heading; no top-bar tab. A press on a bar, or ‹ ›, picks the period every table reads. Interactive sessions are "
+                 "the person's own (no team): one total row under By team, each its own row under Top sessions. Built by TD-832 and TD-859.")
+    else:
+        weeks = ["27 Jul", "3 Aug", "10 Aug", "17 Aug", "24 Aug", "31 Aug", "7 Sep", "14 Sep", "21 Sep", "28 Sep", "5 Oct", "12 Oct"]
+        roles = ("grinder", "designer", "techlead", "manager", "other")
+        figs = [None] * 9 + [(240, 70, 0, 95, 10), (880, 330, 320, 12, 41), (1030, 280, 150, 8, 30)]
+        series = [dict(zip(roles, f)) if f else {} for f in figs]
+        c = chart(series, roles, ROLEC, weeks, 11, "the ledger begins 2026-10-03 · by role · press a bar to read that week")
+        body = (heading("ao-grind", "≈$1,498 this week (so far) · last week ≈$1,583 · October ≈$3,496") + c
+                + panel("By seat", "ao-grind · ≈$1,498 this week (so far) · 13,410 turns", grind)
+                + panel("Finished entries", "4 this week · by total, most first", entries))
+        notes = ("A team's view, from its card's spend figure or its name under By team: the chart by role, then the seat table and the "
+                 "finished entries for the picked week, as TD-818 first drew them (the rows here are its day figures, not this week's). The week of 28 Sep holds only the ledger's first two days, so its bar's hover says partial. Built by TD-832 and TD-859.")
+    note = f'<div class="note" style="margin-top: 18px;">Design notes, not page text. {notes} Figures illustrative.</div>'
     return head("Spend") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
   <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Spend</span>
-    <span class="meta" style="font-size: 12px;">today · ≈ API-equivalent at your weights (as of 2026-10-17) — not a bill; a subscription's bound is its quota</span></div>
+    <span class="meta" style="font-size: 12px;">{period} · ≈ API-equivalent at your weights (as of 2026-10-17) — not a bill; a subscription's bound is its quota</span></div>
   {filters}
-  {panel("ao-grind", "≈$154.40 today · 1,792 turns", grind)}
-  {panel("Outside shiftlead", "turns on these logins that no session record owns", outside)}
-  {panel("Finished entries", "4 today · by total, most first", entries)}
+  {body}
   {note}
 </div>
 </div>
@@ -2262,6 +2351,7 @@ files = {
     "RepoFacet.dc.html": repo_facet_board(),
     "Queue.dc.html": queue_page(),
     "Spend.dc.html": spend_page(),
+    "SpendTeam.dc.html": spend_page("team"),
     "SpendShape.dc.html": spend_shape_page(),
     "SettingsDark.dc.html": darken(settings_page()),
 }
@@ -2295,7 +2385,8 @@ LAYOUT = [
     ("NewSession.dc.html", "New session", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Queue.dc.html", "Queue — the cards in rank order (TD-748, built by TD-771)", 1),
-    ("Spend.dc.html", "Spend — who spent the quota, per seat and per finished entry (TD-818, built by TD-832)", 1),
+    ("Spend.dc.html", "Spend — All: over time by team, by team, top sessions (TD-818, built by TD-832 and TD-859)", 1),
+    ("SpendTeam.dc.html", "Spend — a team: over time by role, its seats and finished entries (TD-818, built by TD-832 and TD-859)", 1),
     ("SpendShape.dc.html", "Spend — the Shape view: a team's members by class, its queues, the suggestions (TD-819, built by TD-835)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
