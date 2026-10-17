@@ -32,6 +32,7 @@ HTTP half alone judges.
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
 import re
@@ -55,6 +56,7 @@ SMOKE_VENV = Path("~/.local/share/shiftlead-smoke").expanduser()
 UNIT = Path("~/.config/systemd/user/shiftlead-ui.service").expanduser()  # service.UNIT_DIR's
 DEFAULT_PORT = 8765  # service.DEFAULT_PORT
 SKIPPED = "browser half skipped: run scripts/smoke.py --setup"
+UNAVAILABLE = 3  # `--browser`'s exit when Playwright or Chromium cannot start: the venv's fault, not the build's
 
 
 class Failed(Exception):
@@ -112,7 +114,7 @@ def load(base: str, page: str, route: str, bound: float = PAGE_BOUND) -> tuple[s
     except urllib.error.HTTPError as e:
         first, status = time.monotonic() - t0, e.code
         body = e.read() or b""
-    except (OSError, ValueError) as e:
+    except (OSError, ValueError, http.client.HTTPException) as e:  # a body cut short is an IncompleteRead
         reason = getattr(e, "reason", None) or e
         if isinstance(reason, TimeoutError):  # the socket's own bound, which is the page's
             why = f"{page} {route}: no answer within {bound:g} s"
@@ -171,6 +173,11 @@ def browser(python: Path, base: str, bound: float = PAGE_BOUND) -> tuple[list[st
     except (OSError, subprocess.TimeoutExpired) as e:
         return [], f"the browser half did not finish: {e}"
     lines, why = [], None
+    if p.returncode == UNAVAILABLE:  # told, failing nothing: the build is not what broke
+        last = (p.stderr.strip().splitlines() or ["no output"])[-1]
+        return [
+            f"browser half skipped: the smoke venv cannot start a browser ({last}); run scripts/smoke.py --setup"
+        ], None
     for ln in p.stdout.splitlines():
         try:
             r = json.loads(ln)
@@ -187,27 +194,32 @@ def browser(python: Path, base: str, bound: float = PAGE_BOUND) -> tuple[list[st
 def browse(base: str, bound: float = PAGE_BOUND) -> int:
     """`--browser`, under the smoke venv: each page loaded in headless Chromium; one JSON line per page,
     its `error` an uncaught script error or a `load` that never fired."""
-    from playwright.sync_api import Error as PlaywrightError
-    from playwright.sync_api import sync_playwright
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import sync_playwright
 
-    with sync_playwright() as pw:
+        pw = sync_playwright().start()
         b = pw.chromium.launch()
-        try:
-            for page, route in PAGES:
-                pg = b.new_page()
-                errors: list[str] = []
-                pg.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
-                error = None
-                try:
-                    pg.goto(base + route, wait_until="load", timeout=bound * 1000)
-                except PlaywrightError as e:
-                    error = f"load never fired within {bound:g} s: {str(e).splitlines()[0]}"
-                if errors and error is None:
-                    error = f"script error: {errors[0].splitlines()[0]}"
-                print(json.dumps({"page": page, "route": route, "error": error}), flush=True)
-                pg.close()
-        finally:
-            b.close()
+    except Exception as e:  # no Playwright, no Chromium: `UNAVAILABLE`, never a failed page
+        print(f"{type(e).__name__}: {str(e).splitlines()[0] if str(e) else ''}", file=sys.stderr, flush=True)
+        return UNAVAILABLE
+    try:
+        for page, route in PAGES:
+            pg = b.new_page()
+            errors: list[str] = []
+            pg.on("pageerror", lambda e, errors=errors: errors.append(str(e)))
+            error = None
+            try:
+                pg.goto(base + route, wait_until="load", timeout=bound * 1000)
+            except PlaywrightError as e:
+                error = f"load never fired within {bound:g} s: {str(e).splitlines()[0]}"
+            if errors and error is None:
+                error = f"script error: {errors[0].splitlines()[0]}"
+            print(json.dumps({"page": page, "route": route, "error": error}), flush=True)
+            pg.close()
+    finally:
+        b.close()
+        pw.stop()
     return 0
 
 
@@ -243,7 +255,7 @@ def smoke(
     told: list[str] = []
     try:
         host, port = address(unit)
-        base = f"http://{host}:{port}"
+        base = f"http://[{host}]:{port}" if ":" in host else f"http://{host}:{port}"
         wait_for(host, port, wait_bound)
         print(f"the UI answers on {host}:{port}", flush=True)
         for page, route in PAGES:
@@ -264,6 +276,7 @@ def smoke(
             lines, why = browser(python, base, bound)
             for line in lines:
                 print(line, flush=True)
+            told += [ln.split(" (", 1)[0] for ln in lines if ln.startswith("browser half skipped")]
             if why:
                 raise Failed(why)
         else:

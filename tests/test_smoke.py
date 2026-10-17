@@ -33,7 +33,8 @@ sm = _load()
 @pytest.fixture
 def stub():
     """A UI that answers every page, and `behave[route]` to break one: an int is its status, `cut` a body
-    with no `</html>`, a float seconds of delay. `seen` is every route asked."""
+    with no `</html>`, `short` a body cut short of its Content-Length, a float seconds of delay. `seen` is
+    every route asked."""
     behave: dict[str, object] = {}
     seen: list[str] = []
 
@@ -45,7 +46,7 @@ def stub():
                 time.sleep(b)
             body = PAGE[:20] if b == "cut" else PAGE
             self.send_response(b if isinstance(b, int) else 200)
-            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Content-Length", str(len(body) + (100 if b == "short" else 0)))
             self.end_headers()
             self.wfile.write(body)
 
@@ -103,6 +104,7 @@ def test_the_address_is_the_units_bind_and_port_and_the_defaults_without_one(tmp
     u.write_text("[Service]\nExecStart=/v/bin/shiftlead-ui\n")
     assert sm.address(u) == ("127.0.0.1", service.DEFAULT_PORT)
     assert sm.address(tmp_path / "absent.service") == ("127.0.0.1", service.DEFAULT_PORT)
+    assert sm.address(_unit(tmp_path, 8799, "::1")) == ("::1", 8799)  # the base brackets it
     assert sm.DEFAULT_PORT == service.DEFAULT_PORT and sm.UNIT == service.UNIT_DIR / "shiftlead-ui.service"
 
 
@@ -121,6 +123,7 @@ def test_a_healthy_ui_passes_with_a_line_per_load_and_the_browser_half_skipped(t
         (500, "smoke failed: Queue /queue: status 500"),
         ("cut", "smoke failed: Queue /queue: the body does not end its </html> (20 bytes)"),
         (1.5, "smoke failed: Queue /queue: no answer within 1 s"),
+        ("short", "smoke failed: Queue /queue: IncompleteRead"),
     ],
 )
 def test_each_page_failure_is_the_last_line(tmp_path, stub, capsys, behave, why):
@@ -148,26 +151,28 @@ def sm_free_port() -> int:
 
 def test_the_reach_loads_are_told_and_a_refusal_fails_nothing(tmp_path, stub, capsys):
     port, _, _ = stub
-    srv_reach = _Refusing()  # the route the person uses, refusing the Queue
+    srv_reach = _Refusing()  # the route the person uses: the Org cut short, the Queue refused
     try:
         code, lines = _run(tmp_path, port, capsys, reach=srv_reach.url)
     finally:
         srv_reach.close()
     assert code == 0
     assert any(ln.startswith("reach Org / · 200") for ln in lines)
+    assert any(ln.startswith("reach (fails nothing): Org /: IncompleteRead") for ln in lines)
     assert "reach (fails nothing): Queue /queue: status 403" in lines
-    assert lines[-1] == f"smoke passed; reach refused /queue: status 403; {sm.SKIPPED}"
+    assert lines[-1].startswith("smoke passed; reach refused /: IncompleteRead")
+    assert lines[-1].endswith(f"; reach refused /queue: status 403; {sm.SKIPPED}")
 
 
 class _Refusing:
-    """A reach route that lets the Org in and refuses the Queue."""
+    """A reach route that cuts the Org's body short and refuses the Queue."""
 
     def __init__(self):
         class H(BaseHTTPRequestHandler):
             def do_GET(self):
                 ok = self.path != "/queue"
                 self.send_response(200 if ok else 403)
-                self.send_header("Content-Length", str(len(PAGE)))
+                self.send_header("Content-Length", str(len(PAGE) + (100 if ok else 0)))
                 self.end_headers()
                 self.wfile.write(PAGE)
 
@@ -202,8 +207,11 @@ def test_the_browser_half_runs_under_the_smoke_venv_and_a_script_error_fails(tmp
     bad = [*ok[:2], {"page": "Queue", "route": "/queue", "error": "script error: TypeError: x is undefined"}]
     code, lines = _run(tmp_path, port, capsys, venv=_venv(tmp_path / "b", bad))
     assert code == 1 and lines[-1] == "smoke failed: Queue /queue: script error: TypeError: x is undefined"
-    code, lines = _run(tmp_path, port, capsys, venv=_venv(tmp_path / "c", ok[:1], code=3))
-    assert code == 1 and lines[-1].startswith("smoke failed: the browser half exited 3")
+    code, lines = _run(tmp_path, port, capsys, venv=_venv(tmp_path / "c", ok[:1], code=4))
+    assert code == 1 and lines[-1].startswith("smoke failed: the browser half exited 4")
+    # a venv that cannot start a browser is the venv's fault, not the build's: skipped, failing nothing
+    code, lines = _run(tmp_path, port, capsys, venv=_venv(tmp_path / "d", [], code=sm.UNAVAILABLE))
+    assert code == 0 and lines[-1] == "smoke passed; browser half skipped: the smoke venv cannot start a browser"
 
 
 def test_the_cli_takes_setup_and_the_shiftlead_yml_names_the_smoke():
