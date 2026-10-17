@@ -691,6 +691,27 @@ async def test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was(agent,
         agent.tmux.kill_session(s["id"])
 
 
+async def test_a_queued_end_inside_the_kills_grace_is_judged_by_its_stamp(agent, hookstub, tmp_path):
+    """TD-822, TD-842: a queued event carries `at`, so its stamp tells the runs apart and the kill-time
+    drop does not apply. Inside the grace, a queued `exited` stamped before the new run's live hook is
+    the killed run's (skipped as stale); one stamped after it is the new run's own end, and applies."""
+    async with LocalClient() as c, LocalClient() as feeder:
+        s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        killed = time.time()
+        await c.call("kill", id=s["id"])
+        await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        agent._apply_event(s["id"], {"state": "exited", "reason": "other", "at": killed}, queued=True)
+        assert agent.sessions[s["id"]].state == "idle", "the killed run's end, stamped before the new run's hook"
+        assert s["id"] in agent._killed_run_at, "a queued event spends nothing of the kill's mark"
+        agent._apply_event(s["id"], {"state": "exited", "reason": "exit", "at": time.time() + 1}, queued=True)
+        assert agent.sessions[s["id"]].state == "exited", "the new run's own end, queued: applied"
+        agent.tmux.kill_session(s["id"])
+
+
 async def test_send_to_an_exited_record_is_refused_in_words(agent, hookstub, tmp_path):
     """Design §4.5a *Focus composer*, TD-078: a record with no turn to type into is refused by the
     **host agent**, not only by the page that disables its composer. Until 2026-09-20 an `exited`

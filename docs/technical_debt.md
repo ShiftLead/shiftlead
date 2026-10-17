@@ -74,7 +74,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
 | TD-840 | #2014's `permission_channel` guards on the seat count (`agent_tick`), the page's Allow/Deny route (`app.py`) and the Org card's text (`org.py`) are each unexercised by any test | Medium | Open |
 | TD-841 | #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard | Medium | Open |
-| TD-842 | #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised | Low | Open — (1) done by TD-827 (#2023); (2) is left |
 
 ---
 
@@ -1499,21 +1498,3 @@ Then the build entries, named in `Blocked by:`.
 **Done when** each of the four changes fails a test.
 
 **Related:** TD-813, TD-806, TD-824, #2005.
-
-## TD-842: #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — (1) done by TD-827 (#2023): `not_own_shell` refuses an `unattended` holder and a `role`'s in words of their own, each a parametrize row, and a teamed holder is no longer refused (`test_a_teamed_shell_left_open_is_reopened`); (2) is left
-**Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
-
-**Why:** (1) `not_own_shell`'s docstring is `mail.person_shell`'s test — *a shell, interactive, no role, no team, no controllers* — but its parametrized test refuses on adapter, controllers, `role` and dir only. In an `origin/main` worktree, `if rec.get("unattended") or rec.get("role") or rec.get("team"):` → `if rec.get("role"):`, and again → `if rec.get("unattended") or rec.get("role"):` and → `if rec.get("team") or rec.get("role"):`: `pdm run pytest -q tests/test_ui_shell_here.py tests/test_ui_popout.py` gives **19 passed** all three times, so a teamed or unattended live shell would be reopened as the person's own. (2) #2012's drop reads `taken and not queued and event.get("state") == "exited"`; deleting `not queued` leaves `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was` **passing** (the queued path is never fed). (Its other three conditions each fail the test when removed.)
-
-**Fix:** (1) two more parametrize rows in `test_a_live_holder_that_is_not_the_persons_own_shell_is_refused_with_its_reason`: `{**OWN, "unattended": True}` and `{**OWN, "team": "t"}`, each 409 with *not your own*. (2) a case in the agent test that applies the killed run's `exited` as a queued event (the path `queued=True` takes) after a resume and asserts the record is not exited, or a comment in `_apply_event` saying why the queued path needs no test. Revert each line and see its case fail.
-
-**Done when** each of the three conditions of (1) and `not queued` of (2), removed alone, fails a test.
-
-**Related:** TD-810, TD-817, TD-822, TD-827 (rewrites the `team` condition), #2009, #2012.

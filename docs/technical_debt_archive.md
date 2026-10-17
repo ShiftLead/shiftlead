@@ -15200,3 +15200,25 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-577 and TD-580 (Open shell here, the person's own shell), TD-810 (Open shell here refused while the shell is open), TD-160 (a person's session in a team), TD-725 (the no-team strip).
 
 **Resolved:** 2026-10-17 (grinder-ao-1) — built by TD-827: #2023.
+
+---
+
+## TD-842: #2009's `not_own_shell` refusals for an `unattended` or a `team` holder, and #2012's `not queued` condition, are each unexercised
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — (1) by TD-827 (#2023), (2) by #2026
+**Location:** `tests/test_ui_shell_here.py`; `src/shiftlead/ui/app.py` (`not_own_shell`); `tests/test_agent.py::test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`; `src/sessionorc/agent_tick.py` (`_apply_event`)
+
+**Why:** (1) `not_own_shell`'s docstring is `mail.person_shell`'s test — *a shell, interactive, no role, no team, no controllers* — but its parametrized test refuses on adapter, controllers, `role` and dir only. In an `origin/main` worktree, `if rec.get("unattended") or rec.get("role") or rec.get("team"):` → `if rec.get("role"):`, and again → `if rec.get("unattended") or rec.get("role"):` and → `if rec.get("team") or rec.get("role"):`: `pdm run pytest -q tests/test_ui_shell_here.py tests/test_ui_popout.py` gives **19 passed** all three times, so a teamed or unattended live shell would be reopened as the person's own. (2) #2012's drop reads `taken and not queued and event.get("state") == "exited"`; deleting `not queued` leaves `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was` **passing** (the queued path is never fed). (Its other three conditions each fail the test when removed.)
+
+**Fix:** (1) two more parametrize rows in `test_a_live_holder_that_is_not_the_persons_own_shell_is_refused_with_its_reason`: `{**OWN, "unattended": True}` and `{**OWN, "team": "t"}`, each 409 with *not your own*. (2) a case in the agent test that applies the killed run's `exited` as a queued event (the path `queued=True` takes) after a resume and asserts the record is not exited, or a comment in `_apply_event` saying why the queued path needs no test. Revert each line and see its case fail.
+
+**Done when** each of the three conditions of (1) and `not queued` of (2), removed alone, fails a test.
+
+**Related:** TD-810, TD-817, TD-822, TD-827 (rewrites the `team` condition), #2009, #2012.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #2026) — (1) by TD-827 (#2023); (2) by `test_a_queued_end_inside_the_kills_grace_is_judged_by_its_stamp`: kill, resume, a live `idle`, then a queued `exited` stamped at the kill (skipped as stale, the kill's mark unspent) and one stamped after (applied). With `not queued` deleted the second is dropped and the test fails.
