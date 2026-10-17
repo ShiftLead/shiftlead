@@ -408,6 +408,7 @@ def test_at_picks_a_past_period_and_a_bad_future_or_pre_begins_at_is_refused():
         ("week", "2026-10-06", "starts on a Monday"),
         ("month", "2026-10-02", "starts on the 1st"),
         ("day", "17/10/2026", "YYYY-MM-DD"),
+        ("day", "20261017", "YYYY-MM-DD"),
         ("week", "2026-10-19", "after the current week"),
         ("week", "2026-09-21", "before the seat ledger begins (2026-09-30)"),
         ("day", "2026-09-29", "before the seat ledger begins"),
@@ -491,6 +492,9 @@ def test_the_shares_on_all_sum_to_the_whole_and_top_ranks_every_seat_across_team
         ("g2", "u", "grinder", 0.3), ("me", "interactive", "lead", 0.2), ("g1", "t", "grinder", 0.1)
     ]  # fmt: skip
     assert got["outside"]["share"] == 0.4
+    by_record = seats.reading(ledger, "day", NOW, by="record", weights=W)
+    assert [s["records"] for s in by_record["seats"]] == [["b"], ["c"], ["a"]]
+    assert by_record["top"] == got["top"]  # `top` reads seats under `by: record` too
 
 
 def test_a_mixed_sum_prints_approx_and_an_unweighed_part_stays_out_of_it():

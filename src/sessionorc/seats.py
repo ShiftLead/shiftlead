@@ -403,6 +403,8 @@ def _period_at(window: str, at: str | None, today: date, begins: str | None) -> 
     if not at:
         return current
     try:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(at)):
+            raise ValueError
         d = date.fromisoformat(str(at))
     except ValueError:
         raise ValueError(f"a seats at is a date, YYYY-MM-DD, not {at!r}") from None
@@ -471,6 +473,7 @@ def reading(
     first, last = start.isoformat(), end.isoformat()
     resets = spend_mod.bounds(now)[window][1]
     seats: dict[str, dict[str, Any]] = {}
+    by_seat: dict[str, dict[str, Any]] = {}  # `top` and a team's `most` read seats, even `by: record`
     groups: dict[str, dict[str, dict[str, Any]]] = {"roles": {}, "teams": {}, "repos": {}}
     outside = _blank()
     whole = _blank()
@@ -483,15 +486,19 @@ def reading(
         if team and t != team:
             continue
         repo = str(row.get("repo") or "")
-        key = rid if by == "record" else f"{t}\0{repo}\0{row.get('name') or rid}"
-        s = seats.setdefault(
-            key, {"seat": row.get("name") or rid, "team": t, "role": role, "repo": repo, "records": []} | _blank()
-        )
-        if rid not in s["records"]:
-            s["records"].append(rid)
-        _add_row(s, row)
+        key = f"{t}\0{repo}\0{row.get('name') or rid}"
+        into = [(seats, rid), (by_seat, key)] if by == "record" else [(seats, key)]
+        for acc, k in into:
+            s = acc.setdefault(
+                k, {"seat": row.get("name") or rid, "team": t, "role": role, "repo": repo, "records": []} | _blank()
+            )
+            if rid not in s["records"]:
+                s["records"].append(rid)
+            _add_row(s, row)
         for group, value in (("roles", role), ("teams", t), ("repos", repo)):
             _add_row(groups[group].setdefault(value, _blank()), row)
+    if by != "record":
+        by_seat = seats
     team_whole: dict[str, float] = {}
     for s in seats.values():
         team_whole[s["team"]] = team_whole.get(s["team"], 0.0) + s["figure"]
@@ -518,7 +525,7 @@ def reading(
         "outside": _rounded(outside, whole["figure"]),
         "whole": _rounded(whole),
         "series": _series(rows, window, start, today, begins, team),
-        "teams": _teams(rows, seats, window, start, end, today, current, whole, team),
+        "teams": _teams(rows, by_seat, window, start, end, today, current, whole, team),
     }
     if begins:
         out["begins"] = begins
@@ -528,7 +535,7 @@ def reading(
         out["top"] = [
             {**{k: s[k] for k in ("seat", "team", "role", "repo", "records")},
              **_rounded({k: s[k] for k in _blank()}, whole["figure"])}
-            for s in ranked
+            for s in sorted(by_seat.values(), key=lambda s: (-s["figure"], s["team"], s["seat"]))
         ]  # fmt: skip
     return out
 
