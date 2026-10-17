@@ -15560,3 +15560,44 @@ Then the build entries, named in `Blocked by:`.
 **Done when** the design says what a smoke is, when it runs, what a failure does under `auto` and under a press, and this repo's own smoke, and the build entries are filed and named in `Blocked by:`.
 
 **Related:** TD-120 and TD-132 (the promote policy), TD-226 (the rollback), TD-581 (the settle and the wait), TD-291 (`look_home.py`), TD-805 (page loads).
+
+---
+
+## TD-828: Build TD-816 (1): the Queue's group headings carry their counts and fold, and a card's items are gathered in the card's sections with Dismiss all
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-816's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Built (2026-10-17, #2045).
+**Location:** design §4.5 screen 12 (*Groups*, *What is attached to a card*, *What needs the person*), §4.5a *Queue page: group heading*, *Queue page: card*; mockup `docs/mockups/reviews/2026-10-17-td816-queue-sections.png` (`gen.py` `queue_page`); `src/shiftlead/ui/queue.py` (`split_later`, `attach`, and the readers of its row-keyed output: `_row`, `_card_kinds`, `_mail_status`; `queue_view`'s status and counts; `apply_picks`' `shown`); `src/shiftlead/ui/inbox.py` (`with_standings`; the horizon's `hidden`); `tests/test_ui_queue.py` (the `coming` and `later` assertions, e.g. `test_a_board_line_not_yet_due_is_drawn_on_its_row_and_leaves_later`: flipped, not only added to), `src/shiftlead/ui/templates/queue_part.html` (the three `rsec` headings), `queue_card.html` (`attached(t)` in the header), `queue_row.html` (`attached` per row), `queue_mail.html`; `src/shiftlead/ui/static/app.js` (`AO.queue`, `qfold`; the Inbox's `dismissOnScreen` for Dismiss all); the Repo page draws the same cards (`test_ui_queue_cards.py`)
+
+**Why:** TD-816: the groups carry no count in their headings and do not fold, and a card's attached mail is one run with no sections, counts or Dismiss all.
+
+**Fix:**
+- **Group headings.** `apply_picks` returns each group's `shown` count beside its total, so a load with picks in the URL draws *(n of m)*. Each `rsec` heading reads its count in its words: *Recently completed (n)*, the window's count, which changes with the picker; *In progress (n)*; and *Up next (n)*. The bare number beside the heading goes. A press on the heading's name folds or opens the group, and the window picker and other controls in it do not fold. Which groups are folded is kept in the browser beside `qfold`. A find, a `#TD-n` or a `?card=` address opens the group that holds its target before it scrolls.
+- **A card's sections.** `attach` returns a card's items by section rather than by row:
+  - The sections are `needs`, `steering`, `waiting`, `answered` and `fyi`, each item keeping its `on_row`.
+  - `split_later`'s ledger rows (`later`) and board lines not yet due (`coming`) both go to `needs`. It reads the horizon's `hidden` lines as well as `ahead` (both already stood by `with_standings`), so a line the Inbox's mode folds still reaches its card. It returns the `hidden` lines no card holds, which the Inbox's *not shown (n)* fold draws and counts, so a line drawn on a card leaves that fold as it leaves `ahead`.
+  - `attach`'s output is keyed by card, so `_row`, `_card_kinds` and `_mail_status`, which read it per row today, read the card's sections.
+  - *Needs you* is drawn in the header (where `attached(t)` is now, its comment in `queue_card.html` reworded), and the other four in the body above the rows. Each heading is drawn with its count, and not at all at 0.
+  - An item whose row is not the top entry carries *on TD-n*, a link that scrolls to and rings that row. A row no longer draws its own items; its *also mentioned in …* line stays.
+  - The comments and tests that cite §4.5 screen 12 *What is attached to a row* (`queue.py` `attach`, `queue_mail.html`, `queue_row.html`, `tests/test_ui_queue.py`) cite *What is attached to a card*.
+- **The card's status and counts.** A card holding a `needs` item is *needs you*: a board line not yet due and a person's ledger row count now. They count in the card's *Needs you (n)* and in the filter's **Needs you (n)**, never in the top bar's number, which stays the Inbox's.
+- **Dismiss all** on *Answered for you* and *FYI*: the Inbox's `dismissOnScreen`, a closure in the Inbox page's init today, is hoisted to `AO.dismissOnScreen(btn, rows, empty, ask, refresh)`. The Inbox passes `refreshInbox`, and the Queue passes its re-read, over the ids drawn in that section of that card. It confirms with the number, as the Inbox's does.
+
+**Tests:**
+- each heading's count and its fold, kept across a reload;
+- a find opens a folded group;
+- a card with items in three sections draws three headings with their counts and none at 0;
+- a board line not yet due is under *Needs you*, and the card's status is *needs you*;
+- an item on a lower row reads *on TD-n*;
+- Dismiss all dismisses only that section's on-screen ids;
+- the top bar's number is unchanged by a not-yet-due board line.
+
+**Done when** the page draws the mockup's groups and sections from live data, and the tests above pass.
+
+**Related:** TD-816 (the design), TD-829 (the filters, built after), TD-771 (the Queue page), TD-599 (the Inbox's Dismiss all).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2045) — `queue.attach` answers each card's sections (`needs`, `steering`, `waiting`, `answered`, `fyi`) and `card_sections` shapes them, each item about another row carrying *on TD-n*; `split_later` reads the horizon's `hidden` too and returns the lines no card holds, which `inbox.horizon_left` recounts; `queue_card.html` draws *Needs you* in the header and the rest above the rows; each group heading reads its count, *(n of m)* under a pick, and folds (`qgfold`); the Inbox's Dismiss all is `AO.dismissOnScreen`, which the card sections call. Tests: `tests/test_ui_queue.py`.
