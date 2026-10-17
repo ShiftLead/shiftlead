@@ -173,6 +173,7 @@ def test_credentials_read_the_homes_auth_type_and_credential(home, monkeypatch):
     from shiftlead import profiles
 
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     prof = profiles.get("grind")
     ad = GeminiAdapter(binary="gemini")
     assert ad.credentials_ok(prof) is None  # no settings: the auth picker would open
