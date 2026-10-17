@@ -15066,3 +15066,54 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-784 (the walk), TD-490 (`ended`), TD-063 (a killed pane revived by an older tick).
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2012) — `_apply_event` drops an `exited` hook landing within `KILLED_END_GRACE` (15 s) of a `kill`, once, on a record a new run has taken under the same id (`_killed_run_at`, kept past `_scrub`, dropped by a forget); design §4.2's `SessionEnd` row says so; `test_a_killed_runs_late_end_leaves_the_resumed_record_as_it_was`. The walk's `SESSION_END_WAIT` stays as belt and braces, said so in `scripts/conformance.py`.
+
+---
+
+## TD-814: A team's TDs in motion reads a design whose PR waits on its round as *design*, the same as the one the designer is writing, so one designer reads as two designs in progress
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed 2026-10-16 (design §4.5 screen 1's phase sentence, §4.4 *Repo facts* **Phases**, §4.5a *team card: TDs in motion*). A claim with a PR reads *review* whatever the entry's kind; *design* is a design-first claim with no PR yet. Built by TD-815.
+**Location:** design §4.5 screen 1 (the phase sentence: *design* — a designer holds a design-first entry), §4.4 *Repo facts* (**Phases**), §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (the phase line, `row["phase"] = "design" if e.get("kind") == "design-first" else …`, ~L354)
+
+**Why:** Paul, 2026-10-16, on ao-grind's card: one designer working, and TDs in motion read *2 design · 1 review* — TD-806 (designer-ao-1, #1995) and TD-804 (designer-ao-1, #1993) — and he asked whether that is a bug. It is as designed: designer-ao-1 held both claims, each design written and its PR open — TD-804's #1993 waiting on Paul's steer, TD-806's #1995 in its round (a design is held until its round ends); the phase rule reads any claim on a design-first entry as *design*, whatever its PR, where a build's claim with an open PR reads *review*. So the facet cannot tell a design being written from one that waits on the person or its reviewers, and a person reading it sees two designs in progress from one designer and wonders what is wrong.
+
+**Fix:** design it first: a design-first claim whose PR is open (its `pr` or `review_pr`, or an open PR whose branch names it) reads *review*, as a build's does, so the card above would read *3 review*, and a design still being written, with no PR yet, alone reads *design*; the PR column already names #1993 and #1995. Say it in §4.5 screen 1's phase sentence, §4.4 *Phases* and the §4.5a row, then the build entry: the phase line in `org.py` and a test of a designer holding one claim with an open PR and one without.
+
+**Done when** the design says what phase a design-first claim with an open PR reads, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-197 (the phases: design-first reads *design*), TD-722 (the Org's team cards).
+
+**Resolved:** 2026-10-17 (grinder-ao-2) — built by TD-815: #2017.
+
+---
+
+## TD-815: Build TD-814: a design-first claim with a PR reads *review* in TDs in motion
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (TD-814's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5 screen 1 (the phase sentence), §4.4 *Repo facts* **Phases**, §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (`motion_rows`: the phase line and its docstring); `tests/test_ui_team_summary.py` (`test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch`, whose comment states the TD-197 reading and gains the TD-814 clause); `docs/glossary.md` already states the rule
+
+**Why:** TD-814: one designer with two design PRs open read as *2 design*, as if two designs were being written.
+
+**Fix:**
+- In `motion_rows`, the phase is `"review" if pr else "design" if e.get("kind") == "design-first" else "grind"`. `pr` stays what it is today: the claim's own `pr`, the tick's `review_pr`, or an open PR whose head branch names the reference. The PR check comes first.
+- The docstring says the same.
+- A merged or closed design PR keeps *review*, marked, until the claim is marked done or dropped, as a build's does.
+- **Tests:**
+  - extending the test above: a designer holding one design-first claim with a PR and one without reads *1 design · 1 review*, in the rows and in the summary's `phases`;
+  - a design-first claim found by its branch's open PR alone reads *review*;
+  - a build's claim reads as before.
+
+**Done when** a design-first claim with a PR reads *review* on the team card and in the rollup's bar (whose segment links are unchanged), one without reads *design*, and the tests above pass.
+
+**Related:** TD-814 (the design), TD-197 (the phases).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2017) — `motion_rows` checks the PR first; `test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch` holds a design-first claim with its own PR and one found by its branch reading *review*, and a designer with one of each reading *1 design · 1 review* in `phases`.
