@@ -74,6 +74,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-829 | Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Open |
+| TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Open |
 
 ---
 
@@ -1544,16 +1545,42 @@ The other cases:
 
 **Why:**
 - Paul's screenshot (2026-10-17, ~19:15Z, grinder-ao-1's Focus): the grinder had declared *out of work* 10 minutes earlier and sat `working` in a foreground loop on `pr:2019` — `timeout 180 tail -f /dev/null; date -u; ao status --json | jq … .checks[] | select(.pr==2019)` — a turn spent on every pass, the card reading *working* while nothing of its own was running, and a host note (*your lane gained 1 entry since you declared out of work: TD-828*) unread behind it. Paul: *make sure our team members know that we will wake them up if they are waiting for work, so that they do not end up running loops (and wasting tokens).*
-- What is written covers mail only. §4.10 and every preset say a loop on `ao wait` or `ao inbox` is never how a member waits; the grinder and designer presets add that a turn ended on a *background* shell wait is said with `ao doing`. None says the other half: **a member never waits inside its own turn** — no foreground sleep, `tail -f /dev/null`, `timeout N …` or re-read of `ao status` in a loop — and none lists what wakes an idle member: mail and a steer's lapse (the doorbell, §4.10), the host's note that its lane gained work (§6 *Keeping a team running*, §4.9a), and its own background shell or subagent ending (the tool re-invokes it; §4.2 *Working on its own* draws it working meanwhile). A member that does not know the lane note will come keeps looking for work itself.
+- What is written covers mail, and the manager's round, only. §4.10 says every preset tells a member to mail and then end the turn, and the grinder and designer presets add that a loop on `ao wait` or `ao inbox` is never how it waits; the grinder and designer presets add that a turn ended on a *background* shell wait is said with `ao doing`. Only the manager's `ao wait` round says *never a sleep* (`manager.md`, `skill.md`'s *instead of sleeping*); none says the other half: **a member never waits inside its own turn** — no foreground sleep, `tail -f /dev/null`, `timeout N …` or re-read of `ao status` in a loop — and none lists what wakes an idle member: mail and a steer's lapse (the doorbell, §4.10), the host's note that its lane gained work (§6 *Keeping a team running*, §4.9a), and its own background shell or subagent ending (the tool re-invokes it; §4.2 *Working on its own* draws it working meanwhile). A member that does not know the lane note will come keeps looking for work itself.
 - So it is guidance, not a new mechanism: every wake the member needs already exists.
 
 **Fix:** one PR, design first in the same diff:
 1. §4.10 *Waiting on mail is ending the turn* gains a sentence: a session waiting on anything — mail, CI, a reader, work for its lane — ends its turn; what it waits on outside mail runs as one background command (`gh pr checks <n> --watch` with a `timeout`, run in the background), said first with `ao doing`; what wakes it is listed (the doorbell, the lane note, its background command's end); a foreground sleep or poll is named as the loop it is.
-2. `src/shiftlead/skill.md`'s bullet and each preset's first paragraph say the same in one or two sentences — the grinder's and designer's existing *background shell wait* sentence is where it goes; the presets without it gain it. An out-of-work member is told it is rung when its lane gains an entry, so *out of work* is declared and the turn ended, never followed by watching.
+2. `src/shiftlead/skill.md`'s bullet and each preset's first paragraph say the same in one or two sentences — the grinder's and designer's existing *background shell wait* sentence is where it goes; the presets without it gain it, and `manager.md`'s *never a sleep*, written for its round, is widened to every wait. An out-of-work member is told it is rung when its lane gains an entry, so *out of work* is declared and the turn ended, never followed by watching.
 3. Run the doc-bound tests (`grep -rln "skill.md\|briefs/" tests`) and update any that quote the changed text.
 
 **Done when** the design, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it; a live check is a week of member transcripts (`ao transcript`) with no foreground wait loop.
 
 **Related:** TD-153 (the *nothing unread* line), TD-734, TD-761 (*Working on its own*).
+
+---
+
+## TD-851: The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5a rows *Repo page, team card: Repo facet — Add entry…* and *Add entry form — Hand to the techlead*, §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*, §4.7 *Entries* (`ao td add`); `src/shiftlead/ui/templates/repo_part.html`, `src/shiftlead/ui/repo.py` (the form and `/api/entry/hand`); `src/shiftlead/cli.py` (`ao td add`, `entry_add`); `src/shiftlead/briefs/entry.md` (*asking the person only for … a priority*)
+
+**Why:**
+- Paul (2026-10-17, through Add entry): *add a priority selector, defaulted to Medium on the Add entry form so the techlead (who receives the entry) does not have to guess at the priority.*
+- §4.5a's **Add entry…** row says today *Nothing else is asked: the number, the header lines, the locations and the priority are the drafter's to find or to ask*, and `entry.md` names a priority first among what the drafter asks the person. So a priority the words do not carry costs either a guess the person may overrule or an `ask` and a second seat fill — while the person knows it at the moment they write the words. Paul has taken to writing it as the first words of **What** (*Medium Priority.*, *Low priority.*), which the drafter must spot.
+
+**Fix:** design it first — a reversal of §4.5a's *nothing else is asked* for the priority:
+1. The form gains **Priority** — *High* · *Medium* · *Low*, *Medium* selected — beside **Type**; the envelope becomes `entry: {repo, type, team, priority}`; `ao td add` gains `--priority high|medium|low` (Medium when absent).
+2. `entry.md` writes `**Priority:** {priority}` as it writes Type, and drops a priority from what it asks the person — unless the words name another, which the drafter follows and says so in its outcome. The design says which wins.
+3. A *Not right* handed from a look (§4.5a's *Works / Not right…* row) carries Medium.
+Then file the build entry and name it in `Blocked by:`.
+
+**Done when** the design says the form asks a priority and how it reaches the entry, and the build entry is filed.
+
+**Related:** TD-180 (Add entry), TD-630 (the form's Attach), TD-730 (the form's Team pick).
 
 ---
