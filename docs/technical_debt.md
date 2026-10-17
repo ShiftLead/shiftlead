@@ -74,6 +74,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-815 | Build TD-814: a design-first claim with a PR reads *review* in TDs in motion | Low | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Open |
 | TD-817 | Build TD-810: Open shell here reopens the session's live shell, keeps a refusal in its tab, and keeps a blocked open's toast | Medium | Open |
+| TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
+| TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
+| TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 
 ---
 
@@ -1557,3 +1560,97 @@ Then the build entry, named in `Blocked by:`.
 **Done when** a press with the session's shell still open opens that shell; a press after `exit` opens a fresh one; a refusal stays readable in the tab; a blocked open's words stay until pressed; and the tests above pass.
 
 **Related:** TD-810 (the design), TD-577 (the press opens a tab), TD-580 and TD-801 (the person's own shell), TD-622 (the shell press's tests).
+
+---
+
+## TD-818: Nobody can see what each team member spends: the spend ledger reads metered profiles only, so on a subscription a seat's tokens, and its cost per finished entry, are nowhere
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.3 *Spend per turn* (TD-128: `spend()` is asked for a `metered` profile only), §4.2a (a subscription profile is read by its quota windows), §4.4 (the home's spend ledger), §4.5 screen 1 (the team card), §4.7 (`ao status -v`); `src/shiftlead/adapters/claude_code/transcript.py` (the reader), `src/shiftlead/profiles.py`
+
+**Why:**
+- Every team member on Paul's subscription spends from one account-wide quota. The usage chip says how much of the window is gone, not who spent it, and the window keeps no history (ADR 2026-10-08: *the weekly window … is account-wide and keeps no history, so it cannot be split per grinder*).
+- The data exists. Each Claude Code transcript carries the `usage` of every reply, and each seat has its own worktree. A one-off read of 2026-10-02 to 10-16 (Paul's session, read only) put shiftlead's grinders at 2.5–3.2B tokens each, the designer at 1.5B and the techlead at 0.55B. Cache reads were about 97% of the tokens, so a raw token total misleads: the read has to weigh the four kinds (TD-128 keeps them apart) and the model, since a Fable request costs 2.5× an Opus one at the same size on Anthropic's API list prices ($10 against $4 per million input tokens).
+- The readings that have been taken (TD-378's ADR, TD-460's trial) were each a hand-written script over the transcripts. Every new question pays for that again.
+
+**Fix:** design first.
+- Read spend per turn for **every** profile the adapter can read it for, a subscription's included. A subscription's reading has a different meaning: weighted tokens at the profile's declared prices, or at the API's as an API-equivalent figure, labelled so, never a bill.
+- Key each turn by the session record it came from (seat, role, team, repo). Subagent turns go to their parent's record, marked so.
+- Show per seat, per role and per team, over a day and a week:
+  - weighted spend, and its share of the team's;
+  - **spend per finished entry**: the seat's spend between claim and `ao progress done`, the sum over entries it finished (a design and a build counted apart);
+  - the share spent past each context size (200k, 300k), the reading TD-460 had to write by hand.
+- Say where it is drawn (the team card, `ao status -v`, a Spend page or a fold on the Org) and what is kept, for how long (TD-131's limits).
+- Which prices a subscription is weighed at is the person's: a `steer` with the API's list prices as the default.
+
+**Done when** the design says what is read for a subscription profile, how a turn is attributed to a seat, which readings are drawn where, and how long they are kept, and the build entries are filed and named in `Blocked by:`.
+
+**Related:** TD-128 and TD-151 (metered spend, archived), TD-378 and TD-460 (the hand readings), TD-819 (team shape reads this), TD-820 (a surprise this would have shown), TD-131 (retention).
+
+---
+
+## TD-819: Whether a team's shape is right — another designer, one grinder fewer — cannot be read: nothing records how long each member waited for work, or how long work waited for a member
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to tell if a different shape for a team would be more efficient (e.g. another designer, fewer grinders, etc)?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.9c (flows: design → build → review), §4.2 (the state feed), §4.4 (records, `doing.jsonl`), §4.5 screen 1 (the team card, TDs in motion); `~/.shiftlead/sessions/` (current state only), `~/.shiftlead/events/` (empty), `doing.jsonl`
+
+**Why:**
+- A team is a pipeline: filed → design-first → designed → build → review → merge. A shape is right when no stage starves the next and no member idles with work waiting. Two readings answer it: a member's **starved time** (idle, out of work, while it is on the team) and each handoff's **queue depth and age** (design-first entries waiting for the designer, pickable builds waiting for a grinder, PRs waiting for the techlead or a merge).
+- Neither can be read. A session record holds its current state and nothing before it, the events directory is empty, and `doing.jsonl` has a member's progress lines but not its idle stretches. TD-772 will read *idle while its lane held pickable work* from the doing log by hand for one trial; that reading is one stage's, and it is written once.
+- Throughput alone does not decide it. shiftlead merged 1,071 PRs from 2026-10-02 to 10-16 (GitHub's search count), and the median open time over the 1,000 the list returns was about 14 minutes, so merging is not the bottleneck. Which stage is cannot be read from that number.
+
+**Fix:** design first.
+- Keep each session's state changes (working, idle, waiting on whom, out of work, limited) as a timeline per record, held as long as TD-818's readings are.
+- Sample each handoff's queue on the tick: depth and the oldest item's age.
+- From the two, draw per team and per role over a day and a week:
+  - starved time (a member idle while nothing in its lane is pickable);
+  - blocked time (waiting on a person, a review or CI);
+  - each queue's depth and age;
+  - beside TD-818's spend per finished entry.
+- Say what the reading suggests, never acts on: *grinders starved 40% of the week while design-first waited 0: one grinder fewer, or a second designer*; *pickable builds aged 6 h with both grinders busy: one grinder more*. The team's shape stays the person's to change (`.shiftlead.yml`, Members…).
+- Usage-window waits (`limited`) are counted apart: a shape cannot fix the account's quota.
+
+**Done when** the design says what is recorded, what is drawn per role and team, and the wording of a shape suggestion, and the build entries are filed and named in `Blocked by:`.
+
+**Related:** TD-818 (spend per finished entry), TD-772 (the Queue trial's idle-while-work reading), TD-749 (a lane split that idled a grinder, archived), TD-118 (where a team-run-day spends tokens, archived).
+
+---
+
+## TD-820: The designer runs far past its context bound inside one design: nearly a quarter of its requests read over 300k tokens and its median is 209k, against the grinders' 151k
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul's session, from a read of the transcripts asked for by Paul)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 rule 5 (*Context bound*: restarts between entries, never mid-turn), §4.8 *The bound has two layers* (300k for every role that sets none); `src/shiftlead/briefs/designer.md`; `.shiftlead.yml` (`roles: designer:` sets no `context:`)
+
+**Why:**
+- designer-ao-1 is an unattended member, so it takes the 300k default bound. Rule 5 only asks a member to restart between entries, and a design is one long entry: the Fable proposal, its rounds with Sonnet and Fable reviewers, the fact-check and the PR.
+- Read from its transcripts, 2026-10-09 to 10-16 (main conversation, each response once): 4,105 requests, median context 209k, p90 395k, **955 over 300k**, the largest 813k. Over the same days grinder-ao-1 read a median 151k, p90 223k, and 48 requests over 300k. The techlead read a median 88k, with none over 300k.
+- Requests over 200k carried 35% of the weighted cost in TD-378's week. Fable's input is priced at 2.5× Opus 5.5's ($10 against $4 per million tokens on Anthropic's API list), and about 30% of the designer's requests that week were Fable.
+- TD-460 measured the grinders' bound and found it flat: the saving in context went on extra restarts. That says nothing about the designer, whose context grows within one entry, where the bound never acts.
+
+**Fix:** design first; measure before choosing.
+- From the transcripts, find where a design's context grows: reading the design sections, the review rounds coming back, fact-checks.
+- The candidates:
+  - a restart point inside a design (after the proposal is written to its branch, before the rounds), carried by the branch and the entry;
+  - review rounds run as fresh subagents that return a verdict, not whole transcripts;
+  - a designer-specific bound with a mid-entry checkpoint;
+  - nothing, if the cost per finished design is already lowest as it is.
+- TD-818's spend per finished entry is the measure once it exists. Until then, the hand read is the same as TD-460's.
+
+**Done when** the reading says where the designer's context goes, and the design either gives the designer a restart point or a bound with its build entries filed and named in `Blocked by:`, or says, with the numbers, why it stays as it is.
+
+**Related:** TD-460 (the grinders' bound trial), TD-378 (the prompt cache, archived), TD-818 (spend per seat), rule 5.
