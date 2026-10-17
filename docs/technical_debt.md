@@ -67,10 +67,14 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Open |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Open |
-| TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
+| TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833 |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
+| TD-830 | Build TD-818 (1): the seat ledger — every profile's turns charged to a seat and an entry, weighed, kept; the `seats` RPC | Medium | Open |
+| TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
+| TD-832 | Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card | Medium | Open |
+| TD-833 | Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`) | Low | Open |
 
 ---
 
@@ -1337,7 +1341,8 @@ Then the build entries, named in `Blocked by:`.
 **Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open
+**Status:** Designed 2026-10-17 (design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §4.2a, §5 `spend.weights`, §4.5 screen 13 *Spend* and screen 1's team header, §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, §4.7 `ao spend` and `ao status -v`; mockup `Spend.dc.html`). Every profile's turns, a subscription's included, are read once a minute into a **seat ledger** (`seat_spend.json`), each turn charged to the record that spent it (by conversation, else by worktree, else *outside shiftlead*) and to the entry it was doing; a subscription's figure is API-equivalent at the person's weights (default: the API's list prices of 2026-10-17, written into §5; steer m-0a1223fad390 to Paul, raw tokens its alternative), never a bill and read by no gate; kept thirteen months; drawn on a Spend page, the team card's header, `ao spend` and `ao status -v`.
+**Blocked by:** TD-830, TD-831, TD-832, TD-833
 **Location:** design §4.3 *Spend per turn* (TD-128: `spend()` is asked for a `metered` profile only), §4.2a (a subscription profile is read by its quota windows), §4.4 (the home's spend ledger), §4.5 screen 1 (the team card), §4.7 (`ao status -v`); `src/shiftlead/adapters/claude_code/transcript.py` (the reader), `src/shiftlead/profiles.py`
 
 **Why:**
@@ -1441,3 +1446,92 @@ Then the build entries, named in `Blocked by:`.
 **Done when** §4.2a says what `ask` does under a tool whose default mode allows on its own, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-636 and TD-641 (`permission_prompts`), TD-784 (the walk).
+
+## TD-830: Build TD-818 (1): the seat ledger — every profile's turns charged to a seat and an entry, weighed, kept; the `seats` RPC
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §4.2a, §5 `spend.weights`; `src/shiftlead/adapters/claude_code/__init__.py` (`spend`, `_turn`), `src/sessionorc/spend.py` (beside the account ledger, `KEEP`), `src/sessionorc/agent_spend.py` (the pass), `src/sessionorc/settings.py` and `src/sessionorc/agent_settings.py` (the `spend` key and `set_settings` taking it), `src/sessionorc/agent_spend.py` (also the new `rpc_seats`), `src/sessionorc/paths.py`; the handler of `ao progress done` (the reference's `done_at`)
+
+**Why:** TD-818: the spend ledger reads metered profiles only, so on a subscription nobody can see which seat spent the quota, or what a finished entry cost.
+
+**Fix:**
+- **The turn.** The claude-code adapter's `_turn` adds `conversation` (the transcript's stem; for a file `<session>/subagents/agent-*.jsonl`, `p.parent.parent.name`), `cwd` (the entry's own) and `subagent` (the file is under `subagents/`, or the entry is `isSidechain`), and skips an entry whose model is `<synthetic>`. `spend` answers for any profile, metered or not.
+- **The weights.** `settings.yml` gains `spend: {weights: {as_of, <model prefix>: {input, output, cache_read, cache_write}}}`, validated as `prices:` is (non-negative numbers; a missing kind weighs at `input`). The default is §5's block as written there: `as_of: 2026-10-17`, the four families' current generations and the longer keys for the older ones. The values are the design's; a newer price is the person's settings change, not a build-time correction. `set_settings` takes the key.
+- **The pass.** Once a minute (`SEAT_EVERY`, 60 s), the home reads `spend(profile, seat_cursors)` for every profile its live sessions run under. It weighs each turn (its `cost`, else the profile's prices when metered, else the weights by longest model prefix, else *unweighed* in tokens). It charges the turn to an owner: the record whose `adapter_id` is the conversation or whose `transcript` is the source; else the record, live or kept, whose `dir` is the `cwd` or above it (the deepest wins) within the `cwd`'s git worktree root (read once per transcript, kept on the cursor; a removed worktree, its root unreadable, matches by `cwd` nothing); else `outside`. It charges it to a reference: among the references the record holds `claimed`, the one whose id is a whole token of its `doing` text (case-insensitive, the longest when several are, `doing` read only on a live record); else the claim with the newest `at`; else `between`. Then it adds the turn to `seat_spend.json`, written only when the pass charged a turn or moved a cursor. The cursor moves only after the row is written, and the rewrite rules are `spend.py`'s, shared rather than copied.
+- **The file.** Per day per record per model: tokens by kind, turns, figure, the figure past 200k and past 300k context (input + cache read + cache write). Per day per record per reference: figure and turns. Per reference, `first_claimed` (the pass's first sight of the claim) and `done_at` (written by the `ao progress done` handler for a plain done, which writes `first_claimed` from the claim's `since` when no pass saw the claim). The record's name, role, team and repo are kept on its first row of the day. The cursors are kept per host per transcript, each with its owner. Kept for `spend.KEEP`. The first pass backfills fourteen days, charged to `between`, dropping turns older than the fourteen days.
+- **The reading.** The `seats {window: day|week, team?, by?}` RPC returns per seat (the records of one name within a team, merged, their ids listed), role, team and repo — per record under `by: record` — the figure, share, turns, `between` and the past-context shares. Per finished entry (its `done_at` in the window), it returns every row charged to that reference from its `first_claimed`, by role, flagged `partial` when it was first claimed before the ledger began. It also returns `outside`, the unit (`$` metered, `≈$` otherwise) and the weights' `as_of`. Read-only, open to a session.
+- **Tests:** a subscription profile's turns land in `seat_spend.json` and never in `spend.json` or a reading's `pct`; a turn is charged by conversation, then by `cwd` (a subdirectory of a record's `dir` included), then to `outside`; an adopted session's turns go to its record; a subagent's turn goes to its parent, marked; a turn with a held reference in `doing` goes to it, one without to the newest claim, none to `between`, and an exited record's `doing` is not read; an unmatched model is unweighed and a `<synthetic>` entry is no turn; a rewritten transcript is not counted twice; the backfill reads fourteen days once and drops older turns; a quiet pass writes nothing; two runs of one seat read as one row; a forgotten seat's worktree, present or removed, is not charged to the anchor; a claim made and done inside one pass has a `first_claimed`; `claude-opus-4-8` weighs at the `claude-opus-4` key and `claude-opus-5-5` at its own; a finished entry's figure sums every record's rows for it.
+
+**Done when** a subscription team's seats each read a weighed figure, a share and a figure per finished entry from the `seats` RPC, and nothing the gate or the chip reads has changed.
+
+**Related:** TD-818 (the design), TD-151 (the account ledger it sits beside), TD-460 (the past-context reading it replaces), TD-831, TD-832, TD-833.
+
+## TD-831: Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v`
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-830
+**Location:** design §4.7 `ao spend` and `ao status -v`, §4.4 *Spend per seat*; `src/shiftlead/cli.py`
+
+**Why:** TD-818: the seat ledger's reading, from a terminal and from a session (a manager reads its team's spend without a page).
+
+**Fix:**
+- `ao spend [--team <t>] [--window day|week] [--entries]` prints the `seats` RPC's reply in §4.7's words: a block per team, a line per seat, then *outside shiftlead*, and with `--entries` the finished entries. `--json` prints the RPC's reply. Read-only, open to a session.
+- `ao status -v` prints each record's `spend` line from `seats` with `by: record`, and `--json` carries the `spend` object (`{day, week, past_200k, past_300k, unit}`, the shares today's, or `unknown`).
+- **Tests:** the line formats for `≈$`, `$` and *unweighed*; `--entries`, with *· partial*; a session may call it; `status -v` prints the line, and its absence where the record spent nothing.
+
+**Done when** `ao spend` prints what the Spend page draws, and `ao status -v` shows each record's figure.
+
+**Related:** TD-818, TD-830.
+
+## TD-832: Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-830
+**Location:** design §4.5 screen 13 *Spend* and screen 1 (the team header), §4.5a *Spend page*, *team card: spend*, *Settings page: weights*; mockup `docs/mockups/Spend.dc.html` (`reviews/2026-10-17-td818-spend.png`); `src/shiftlead/ui/app.py` (`/spend`, `/api/spend`), templates and `app.js`, `src/shiftlead/ui/settings_page.py`, `src/shiftlead/ui/help.py` (bound by `tests/test_help.py`)
+
+**Why:** TD-818: Paul asked to *see which ones use the most tokens, and make adjustments if there are surprises*. That needs a page, and a figure where he already looks.
+
+**Fix:**
+- **`/spend`**, drawn as the mockup: the head's one line on what the figure is; **Day · Week** and the team chips, carried in the URL; a table per team, with role subtotals where a team holds two of a role; then *outside shiftlead*; then **Finished entries**. Links go to Focus or the Transcript, and to the Queue card. A figure's hover gives tokens by kind and the weights used. Narrow below 720 px.
+- **The team card's header** gains the **spend** figure: today's figure, a link to `/spend?team=<t>`, with its hover. It is absent while the team spent nothing today.
+- **Settings**: the **weights** card under Usage, with Save and Cancel as every card, and the heading's *by seat →* link.
+- §4.5a's four new rows get their help text in `ui/help.py`, as the build entry's wording.
+- **Tests:** the page draws the RPC's reply (seat rows, subtotals, outside, entries, *partial*, *unweighed*, *spend unknown*); the URL carries the picks; the header figure and its absence; the weights card writes `spend.weights` through `set_settings`; the doc-bound §4.5a tests.
+
+**Done when** a team card's figure opens a Spend page showing each seat's share and per-entry figure, and the weights are editable on the Settings page. A screenshot under `docs/mockups/reviews/` is named in the PR.
+
+**Related:** TD-818, TD-830, TD-819 (team shape reads this page's numbers).
+
+## TD-833: Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`)
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-830
+**Location:** design §4.4 *Spend per seat* (*A node's turns*), §4.4a; `src/sessionorc/agent_spend.py` (the node's send, beside the `spend` call), `src/sessionorc/agent_remote.py` (the home's handler, beside `_take_spend`), `src/sessionorc/agent_link.py`
+
+**Why:** TD-818: a seat on a container node spends from the same login, and its turns are read only on that node.
+
+**Fix:** the node's seat pass sends `seat_spend {turns, cursors}`, a link method of `spend`'s shape. The cursors are the home's; the first call is a read of them; the seeding sends cursors alone; long batches go in pieces ending at a turn's offset; a lost request or reply is resent and deduplicated turn by turn. The home charges the turns against the node's records it holds. **Tests:** a node's turn lands once under its record; a lost reply does not double it; the seeding sends no turns.
+
+**Done when** a seat on the container node reads its figure on the Spend page as a kmaster seat does.
+
+**Related:** TD-818, TD-830, TD-151 slice 4 (the `spend` method it copies).

@@ -36,6 +36,17 @@ usage_gate:                                   # §6 *Usage gate* — per profile
   grind: {"5h": 30, week: {per_day: 10}}      # line 70% on the session window; 100 − 10 × days left on the weekly
   grind-api: {day: "$5", week: "$20"}        # a metered profile's reserve is an amount (§4.2a): the window's 100; "2M tok" without prices
 settle: {design-first: 5m}                    # §4.4 *A new entry settles before it is pickable* (TD-707): per Kind, how long a new ledger entry waits, holdable, before a lane may take it; a Kind not listed 0; a repo's .shiftlead.yml settle: wins key by key; set_settings and the Settings page's field
+spend:                                        # §4.4 *Spend per seat* (TD-818): what a turn with no cost of its own is weighed at; read by the seat pass, set by set_settings and the Settings page
+  weights: {as_of: "2026-10-17",              # the date the defaults were taken from the API's list prices; shown beside them
+            claude-fable: {input: 10, output: 50, cache_read: 0.25, cache_write: 20},
+            claude-opus: {input: 4, output: 20, cache_read: 0.2, cache_write: 8},
+            claude-sonnet: {input: 2, output: 10, cache_read: 0.2, cache_write: 4},
+            claude-haiku: {input: 0.1, output: 0.5, cache_read: 0.01, cache_write: 0.2},
+            claude-opus-5: {input: 5, output: 25, cache_read: 0.5, cache_write: 10},      # the longer keys: older generations still served, so a /model to one weighs true; claude-opus-5-5 is the current one, as the family row
+            claude-opus-5-5: {input: 4, output: 20, cache_read: 0.2, cache_write: 8},
+            claude-opus-4: {input: 5, output: 25, cache_read: 0.5, cache_write: 10},
+            claude-sonnet-4: {input: 3, output: 15, cache_read: 0.3, cache_write: 6},
+            claude-haiku-4: {input: 1, output: 5, cache_read: 0.1, cache_write: 2}}   # $ per million tokens per kind, by model prefix (longest wins); a model none matches is drawn unweighed
 usage: {max_age: 1h}                          # §6 *A reading the gate can no longer trust* (read by the gate, set by set_settings, ao gate --max-age and the Settings page's field): past it the gate projects; `off` never. A key of its own: every key under usage_gate is a profile's name
 teams:                                        # per team, by the name org.yml or a repo's teams: defines
   ao-grind:
@@ -70,6 +81,7 @@ reach:                                        # §4.5b *The setting*: the person
   # aud: "4f1c…"                              # cloudflare only: the Access application's audience tag
 ```
 
+  `spend.weights` holds the API's list prices of 2026-10-17 as its default, a key per model family Claude Code reports, its current generation, and a longer key per older generation still served — the values above, the design's own, `as_of` the date they were taken (a newer price is the person's settings change, never a build-time correction), `cache_write` at twice `input` (the one-hour write a Claude Code session makes, §4.2a) and Haiku's `cache_read` at a tenth of its input; Haiku's dearer rate past a 100k prompt is not modelled, so its figure there reads low; the person's own values replace them whole per key, and a key with a kind missing weighs that kind at its `input`, the safe side, as `prices:` does (§4.2a). The figure is *API-equivalent* (§4.4 *Spend per seat*), and a weight changed applies from then on: a written row is not re-weighed.
   A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
   no schedule, no stop time and no priority, and starts the team, or the member, when work appears (`on_work: start`); a repo absent under `repos:` promotes by hand, is pulled (§6 *Pull*: `pull: false` is the opt-out), and has its mechanical sync PRs merged at the home (§6 *Sync*: `sync: {auto: false}` is the opt-out).
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
