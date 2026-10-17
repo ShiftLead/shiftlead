@@ -757,11 +757,11 @@ def observe_reach(n: ContainerNode, r: Runner) -> dict[str, str] | None:
     return reach(n, cid, _remote_user(n), container_name(r, cid))
 
 
-def attach_argv_in(cid: str, user: str, session: str) -> list[str]:
+def attach_argv_in(cid: str, user: str, session: str, *, features: tuple[str, ...] = ()) -> list[str]:
     """The Focus terminal's and `ao focus`'s command for a session inside a container node (§4.4a
     "Reach"): `docker exec -it` into the container as the node's user, then the very `tmux attach`
     a local session gets — the node's tmux server is the default one of that user inside."""
-    return ["docker", "exec", "-u", user, "-it", cid, *tmux_attach_argv(session)]
+    return ["docker", "exec", "-u", user, "-it", cid, *tmux_attach_argv(session, features=features)]
 
 
 def _remote_user(n: ContainerNode) -> str:

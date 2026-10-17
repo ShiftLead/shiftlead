@@ -4418,7 +4418,8 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
         sid = sid.removesuffix(f"@{host_name()}")  # a self-addressed id is this host's tmux session
         sock = os.environ.get("SHIFTLEAD_TMUX_SOCKET")
         inside: list[str] = []  # the `docker exec` prefix every tmux command takes for a container node's session
-        argv = attach_argv(sid, socket_name=sock)
+        # OSC 8 targets reach xterm.js only when the client says it takes them (§4.6, TD-847)
+        argv = attach_argv(sid, socket_name=sock, features=("hyperlinks",))
         if s.get("host") and s["host"] != host_name():
             # Another host's session (design §4.4a "Reach"): a container node on this machine is
             # reached by `docker exec` into it, from what the home derived when it dialed in; a
@@ -4433,7 +4434,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 await ws.close(code=4404)
                 return
             sid, sock = naming.split_address(sid)[0], None  # the bare id, on the user's default server inside
-            argv = attach_argv_in(reach["container"], reach.get("user") or "root", sid)
+            argv = attach_argv_in(reach["container"], reach.get("user") or "root", sid, features=("hyperlinks",))
             inside = argv[: argv.index("tmux")]
         if s.get("state") == "closed" or not s.get("pane", True):  # no pane to attach (TD-023)
             await ws.send_bytes(b"\r\n[shiftlead] this session's pane is gone (see the banner).\r\n")

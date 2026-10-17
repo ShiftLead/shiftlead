@@ -28,15 +28,22 @@ MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
 _PASTE_SEQ = itertools.count()  # with the pid, makes each paste buffer name unique on a shared server (TD-043)
 
 
-def attach_argv(session: str, *, socket_name: str | None = None, binary: str = "tmux") -> list[str]:
+def attach_argv(
+    session: str, *, socket_name: str | None = None, binary: str = "tmux", features: tuple[str, ...] = ()
+) -> list[str]:
     """The client command that attaches a terminal to a session: what the UI's pty bridge runs and
     what `ao focus` execs. Attaching writes nothing to the session's pane (design §9 invariant 1),
     and sets no option on the session: **the mouse is the browser's** (design §4.6, TD-164, built by
     TD-174), so tmux asks for no mouse tracking and a plain drag selects in xterm.js. The wheel
-    reaches tmux's history as a scroll message instead (`scroll_argv` in the UI's pty bridge)."""
+    reaches tmux's history as a scroll message instead (`scroll_argv` in the UI's pty bridge).
+    `features` are the client's terminal features (`-T`): the bridge asks for `hyperlinks`, so an
+    OSC 8 run in the pane reaches xterm.js with its target (design §4.6, TD-847); `ao focus` asks
+    for none, and the person's own terminal says what it supports."""
     argv = [binary]
     if socket_name:
         argv += ["-L", socket_name]
+    if features:
+        argv += ["-T", ",".join(features)]
     return argv + ["attach", "-t", f"={session}:"]
 
 
