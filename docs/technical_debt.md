@@ -65,7 +65,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-795 | The Queue's two `src/sessionorc/` leftovers from TD-771 — *held until <the words after the dash>* and Telegram's card link for an item drawn on the Queue | Low | Open |
 
 ---
 
@@ -1275,24 +1274,3 @@ The other cases:
 
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
 
----
-
-## TD-795: The Queue's two `src/sessionorc/` leftovers from TD-771 — *held until <the words after the dash>* and Telegram's card link for an item drawn on the Queue
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-16 (grinder-ao-2, split from TD-771)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Queue card: what needs the person* (*held until <the words after the dash, as written>*), §4.10 *What a message says* (the link for an item `home: queue`); `src/sessionorc/ledger.py` (the reading's `blocked_by` keeps `decision (paul)` without the words after its dash), `src/sessionorc/notify.py` (`mail_link`, today `/inbox/<id>`); `src/shiftlead/ui/templates/inbox_row.html` (the ledger row's *held until your decision*)
-
-**Why:** TD-771 built the Queue page in `src/shiftlead/`; these two need the home's reading and notifier, the other package, and were more than a line or two there.
-
-**Fix:**
-- The reading carries the words after a `decision (paul) — …` item's dash (beside `blocked_by`, which stays as `ledger.py` lists it), and the Queue card's row reads *held until <those words>*, else *held until your decision*.
-- Telegram's link for a question whose item is `home: queue` is `/queue?card=<top id>&row=<TD-n>&item=<entry id>`: the notifier resolves the item's entry against the open cards as `ui.queue.item_home` does (`about`, else the first `TD-n` of its text), else `/inbox/<id>` as now.
-
-**Done when** tests hold both: a `decision (paul) — after the trial` entry's row reads *held until after the trial*; a question `about` an open card's entry is linked to its card, one about no open entry to `/inbox/<id>`.
-
-**Related:** TD-771, TD-748.

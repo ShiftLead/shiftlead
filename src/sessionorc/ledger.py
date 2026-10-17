@@ -98,6 +98,17 @@ def waits_of(value: str) -> dict[str, str] | None:
     return {"on": first, "date": date, "why": rest.strip().lstrip("—–-").strip()}
 
 
+def until_of(blocked_raw: str | None) -> str:
+    """The words after a `decision (<who>)` item's dash, as written — what the Queue card's row reads as
+    *held until <them>* (design §4.5 screen 12, §4.5a *Queue card: what needs the person*, TD-795);
+    '' when the line has no decision, nothing after it, or a list going on past it."""
+    d = lb.DECISION_RE.search(blocked_raw or "")
+    if d is None:
+        return ""
+    rest = (blocked_raw or "")[d.end() :].strip()
+    return "" if rest.startswith(",") else rest.lstrip("—–-").strip()
+
+
 def answers_of(value: str) -> tuple[list[str], int | None]:
     """An `**Answers:**` line read in the board's `Answers:` grammar (cadence §3.5), by ledgerboard's
     split and mark: the items split on `|` (`\\|` a literal bar), the closing full stop dropped, and
@@ -507,6 +518,7 @@ def entries(
         e["detail"] = detail_of(t[m.end() : nxt.start() if nxt else len(t)])
         if e["for_page"] == "for-you":
             e["answers"], e["default"] = answers_of(fields.get("answers", ""))
+            e["until"] = until_of(read["blocked_raw"])
         out.append(e)
     return out
 

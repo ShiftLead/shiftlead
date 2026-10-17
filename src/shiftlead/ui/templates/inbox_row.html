@@ -954,7 +954,7 @@
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-ledger">{{ e.kind }}</span>
   {%- if e.held %} <span class="st">{{ 'claimed by' if e.claimed else 'held by' }} {{ e.held }}</span>{% endif %}
-  {%- if e.home == 'queue' %} <span class="st qneed">{% if e.claimed %}held (person){% elif e.why == 'yours' %}yours to do{% else %}held until your decision{% endif %}</span>{% endif %}
+  {%- if e.home == 'queue' %} <span class="st qneed">{% if e.claimed %}held (person){% elif e.why == 'yours' %}yours to do{% else %}held until {{ e.until or 'your decision' }}{% endif %}</span>{% endif %}
   <span class="grow"></span>
   <span class="st" title="Added: {{ e.at or 'not written' }} · Priority: {{ e.pri }}">{% if e.added %}{{ e.added }} · {% endif %}{{ e.pri }}</span>
 </div>

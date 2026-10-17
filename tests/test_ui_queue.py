@@ -363,6 +363,15 @@ def test_the_ledger_rows_leave_later_for_their_cards(tmp_path, monkeypatch):
     assert "entry TD-99" in poll and "entry TD-21" not in poll
 
 
+def test_a_hold_reads_the_words_after_its_dash(tmp_path, monkeypatch):
+    """§4.5a *Queue card: what needs the person* (TD-795): *held until <the words after the dash>*."""
+    repos = ledger_repos()
+    repos["/r/s"]["ledger"]["entries"][1]["until"] = "after the trial"
+    html = client(monkeypatch, tmp_path, fake(queue(), [], repos)).get("/queue").text
+    card20 = html[html.index('data-card="s#TD-20"') : html.index('data-card="s#TD-30"')]
+    assert "held until after the trial" in card20 and "held until your decision" not in card20
+
+
 def test_the_ledger_kind_leaves_the_rail_once_every_row_is_on_a_card(tmp_path, monkeypatch):
     repos = ledger_repos()
     repos["/r/s"]["ledger"]["entries"].pop()  # TD-99: every row is now on a card

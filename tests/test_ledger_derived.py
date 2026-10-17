@@ -341,3 +341,22 @@ def test_a_for_you_entry_carries_added_answers_and_detail():
     assert not {"answers", "default"} & set(build)
     assert (build["added"], build["detail"]) == ("2026-10-07", ["**Why:** x"])
     assert (bare["added"], bare["answers"], bare["default"], bare["detail"]) == ("", [], None, [])
+
+
+def test_a_decisions_words_after_its_dash_are_what_it_is_held_until():
+    """§4.5a *Queue card: what needs the person* (TD-795): *held until <the words after the dash, as
+    written>* — `until` on a *for you* entry's reading, '' where the decision has no words after it."""
+    text = (
+        "## TD-060: trial\n\n**Blocked by:** decision (paul) — after the trial\n\n"
+        "## TD-061: bare\n\n**Blocked by:** TD-001, Decision (Paul)\n\n"
+        "## TD-062: a build\n\n**Owner:** grinder\n"
+    )
+    trial, bare, build = ledger.entries(text)
+    assert trial["until"] == "after the trial" and bare["until"] == ""
+    assert "until" not in build  # not *for you*: no row reads it
+    assert (
+        ledger.until_of("decision (paul) – snoozed to 2026-10-21 (Paul); ask m-1")
+        == "snoozed to 2026-10-21 (Paul); ask m-1"
+    )
+    assert ledger.until_of("decision (paul), TD-002") == ""  # a list going on past it: no words of its own
+    assert ledger.until_of("TD-001") == ledger.until_of(None) == ""
