@@ -257,11 +257,15 @@ def _hours(minutes: float) -> float:
     return round(minutes / 60, 1)
 
 
-def reading(doc: dict[str, Any], team: str, window: str, now: datetime) -> dict[str, Any]:
+def reading(
+    doc: dict[str, Any], team: str, window: str, now: datetime, finished: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """The `shape` reading of one team over `day` or `week` (the home's clock): per role its live hours
-    and the share of them in each class, its seats under it; per queue its mean and largest depth, its
-    oldest age, and the shares of the team's sampled minutes it was non-empty, backed up, unstaffed and
-    — a review stage — past its bound; the suggestions, none under `SHAPE_MIN_HOURS` live hours."""
+    and the share of them in each class, its seats under it, and — given the seat ledger's `finished`
+    for the team over the same window (`seats.reading`) — the count and median of its spend per
+    finished entry; per queue its mean and largest depth, its oldest age, and the shares of the team's
+    sampled minutes it was non-empty, backed up, unstaffed and — a review stage — past its bound; the
+    suggestions, none under `SHAPE_MIN_HOURS` live hours."""
     if window not in ("day", "week"):
         raise ValueError(f"a shape window is day or week, not {window!r}")
     local = now.astimezone()
@@ -315,6 +319,9 @@ def reading(doc: dict[str, Any], team: str, window: str, now: datetime) -> dict[
                 ],
             }
         )
+        if finished is not None:
+            f = finished.get(str(r["role"])) or {}
+            out_roles[-1]["finished"] = {"entries": f.get("entries", 0), "median": f.get("median")}
     out_queues = []
     for q in sorted(queues.values(), key=lambda q: (q.get("order") or 0, q["stage"])):
         row = {

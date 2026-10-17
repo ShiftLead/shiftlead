@@ -303,6 +303,18 @@ def test_a_role_merges_its_records_and_lists_its_seats_and_a_week_reads_back_to_
     assert shape_mod.reading(doc, "other", "week", NOW)["roles"] == []
 
 
+def test_a_role_reads_its_spend_per_finished_entry_when_given_the_seat_ledgers():
+    doc = _day(
+        shape_mod.blank(),
+        records={**_row("g1", "grinder", "build", working=60), **_row("tl", "techlead", "review", free=60)},
+    )
+    finished = {"grinder": {"entries": 3, "sum": 6.0, "median": 1.5}}
+    got = {r["role"]: r for r in shape_mod.reading(doc, "grind", "day", NOW, finished)["roles"]}
+    assert got["grinder"]["finished"] == {"entries": 3, "median": 1.5}
+    assert got["techlead"]["finished"] == {"entries": 0, "median": None}  # none finished is a count, not a gap
+    assert all("finished" not in r for r in shape_mod.reading(doc, "grind", "day", NOW)["roles"])
+
+
 # -- at the home ------------------------------------------------------------------------------------
 
 
@@ -351,6 +363,28 @@ async def test_the_home_samples_a_running_team_and_serves_its_shape(agent, tmp_p
         got = await person_client.call("shape", team="grind", window="week")
     assert got["team"] == "grind" and {r["role"] for r in got["roles"]} == {"grinder", "techlead"}
     assert got["too_little"] is True and got["suggestions"] == []
+
+
+async def test_the_shape_rpc_reads_each_roles_spend_per_finished_entry_from_the_seat_ledger(agent):
+    await park_ticks(agent)
+    now = datetime.now().astimezone()
+    today, at = now.date().isoformat(), now.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _day(agent._shape, records=_row("ao-x-g1", "grinder", "build", working=60), at=now)
+
+    def row(team, figure, ref):
+        spent = {"figure": figure, "turns": 1}
+        return {"name": "g1", "role": "grinder", "team": team, "repo": "r", "metered": False,
+                "models": {"m": spent}, "refs": {ref: spent}}  # fmt: skip
+
+    agent._seats["days"] = {today: {"ao-x-g1": row("grind", 2.0, "TD-1"), "ao-y-g1": row("other", 9.0, "TD-2")}}
+    agent._seats["refs"] = {
+        "r TD-1": {"first_claimed": at, "done_at": at},
+        "r TD-2": {"first_claimed": at, "done_at": at},
+    }
+    async with LocalClient() as person_client:
+        got = await person_client.call("shape", team="grind", window="day")
+    assert got["roles"][0]["finished"] == {"entries": 1, "median": 2.0}  # the other team's TD-2 is not grind's
+    assert got["unit"] == "≈$"
 
 
 async def test_a_team_whose_ledger_cannot_be_read_is_not_sampled(agent, tmp_path):
