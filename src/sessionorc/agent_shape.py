@@ -16,6 +16,8 @@ from typing import Any
 from sessionorc import balance as balance_mod
 from sessionorc import ledger as ledger_mod
 from sessionorc import naming
+from sessionorc import seats as seats_mod
+from sessionorc import settings as settings_mod
 from sessionorc import shape as shape_mod
 from sessionorc import work as work_mod
 from sessionorc.agent_common import RpcError, log
@@ -162,7 +164,15 @@ class ShapeMixin:
     async def rpc_shape(self, team: str, window: str = "day") -> dict[str, Any]:
         """A team's shape over `day` or `week` (design §4.4 *Team shape*, TD-834): per role its live hours
         and class shares, per queue its depth, oldest age and shares, and the suggestions — read from
-        `shape.json`, never acting. The home's; a node forwards it (§4.4a)."""
+        `shape.json`, never acting; per role the count and median of its spend per finished entry from the
+        seat ledger's reading of the same team and window (§4.4 *Spend per seat*), in its `unit`. The
+        home's; a node forwards it (§4.4a)."""
         if window not in ("day", "week"):
             raise RpcError(f"a shape window is day or week, not {window!r} (design §4.4 *Team shape*)")
-        return shape_mod.reading(self._shape, str(team), window, datetime.now().astimezone())
+        now = datetime.now().astimezone()
+        spent = seats_mod.reading(
+            self._seats, window, now, str(team), weights=settings_mod.weights(settings_mod.load())
+        )
+        got = shape_mod.reading(self._shape, str(team), window, now, spent["finished"])
+        got["unit"] = spent["unit"]
+        return got

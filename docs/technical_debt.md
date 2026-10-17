@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
 | TD-832 | Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card | Medium | Open |
 | TD-833 | Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`) | Low | Open |
-| TD-834 | Build TD-819 (1): the team-shape sampler — each member's class and each stage's queue, once a minute, kept; the `shape` RPC and its suggestions | Medium | Open |
 | TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
@@ -87,6 +86,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Open |
 | TD-859 | Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats | Medium | Open |
 | TD-860 | #2048's waiting-claims tests leave five lines unread: the closed-PR exclusion, the replay's `keep_mail` gate, the held ask's sender, the rename carry and the carry-over dedup; #2045's `shown_in` completed counts too | Medium | Open |
+| TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
 
 ---
 
@@ -1532,48 +1532,6 @@ The other cases:
 
 ---
 
-## TD-834: Build TD-819 (1): the team-shape sampler — each member's class and each stage's queue, once a minute, kept; the `shape` RPC and its suggestions
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-819's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** In progress — slice 1 (2026-10-17, grinder-ao-1): the sampler, `shape.json`, the reading and its rules, and the `shape` RPC (`src/sessionorc/shape.py`, `agent_shape.py`); §4.4 *Team shape* now says how the home reads the stages from the records, since it sees no flow. Left: the reading's per-role count and median of spend per finished entry, read from `seats` once TD-830 (#2049) merges.
-**Location:** design §4.4 *Team shape*, §4.2 (*Waiting*, *working on its own*), §4.9b (`prs_waiting`), §4.9c (stages); `src/sessionorc/ledger.py` (`in_lanes`, read only, over the home's `_repos` readings as `_balance_marks` and `_repo_view` in `agent_tick.py` already read it — not `shiftlead.teamrun`, which sessionorc never imports), `src/sessionorc/work.py` (`waiting_of`, read only), a new `src/sessionorc/shape.py` (the file, the classes, the rules) beside `spend.py`, `src/sessionorc/agent_tick.py` (the minute's sample), `src/sessionorc/agent_spend.py` or a new mixin (`rpc_shape`), `src/sessionorc/paths.py`
-
-**Why:** TD-819: whether a team has the right members cannot be read. Nothing records how long a member waited for work, or work for a member.
-
-**Fix:**
-- **The sample.** Once a minute, per running team, the home classes each live record whose role has a stage in the current flow. The manager, a shell carrying the team's badge, and other roles are not sampled. The classes are taken in §4.4's order, the first that holds:
-  - `limited` and `paused`, from the state and the gate.
-  - `working`, the state, with *working on its own* included.
-  - `waiting:review`: the record's ask is in a seat's `prs_waiting.asks`. This wins over `waiting_of`.
-  - `waiting:person`: needs-you, or `waiting_of` naming a reference.
-  - `on_claim`: idle, holding an open claim.
-  - `idle_with_work`: idle with no claim and its `in_lanes` member count above zero.
-  - `starved`: idle with no claim, or out of work, with that count zero.
-  - A seat is `free` when idle with an empty `prs_waiting`, and `idle_with_work` when it is not.
-- **The queues.** Each stage of the flow gets one queue. A lane stage's queue is its unheld `in_lanes` ids of its kind, with its oldest age from a `first_seen` per id, kept while the id stays. A review stage's queue is its seat's `prs_waiting`: `n` and `oldest`, with no second clock. Each queue is marked backed up (it holds work and every sampled member of the stage is working, waiting or on its claim) or unstaffed (it holds work and no member of the stage is live). A review queue is also marked when its oldest is past the repo's `review.bound`.
-- **The file.** `shape.json` holds, per day per team per record, the minutes by class, with name and role. Per day per team per queue it holds minutes, depth sum, max depth, max oldest age, and the minutes non-empty, backed up, unstaffed and (for review) past its bound. The `first_seen` ids are kept too. Kept for `spend.KEEP`, and written only on a minute that sampled a team.
-- **The reading.** `shape {team, window: day|week}` returns, per role (records merged, seats listed), live hours and class shares. Per queue it returns mean and max depth, oldest age, and the non-empty, backed-up and unstaffed shares, plus past-bound for a review stage. It returns the count and median of the role's spend per finished entry from `seats` once TD-830 lands, absent before. It returns `suggestions`: the rules of §4.4 *Team shape*, as `SHAPE_*` constants, each `{rule, role|queue, text, numbers}`. The rules work as follows:
-  - Starved and backed up read worker roles only.
-  - A role both starved and backed up gets the one *bursts* line in place of both.
-  - Two rules naming the same change are merged into one line.
-  - Under eight live hours there are none (`too_little: true`). Read-only, open to a session.
-- **Tests:**
-  - **Classes:** one from each fixture record: a needs-you, an ask about a ref, a held PR ask that is also about a ref (it reads review), idle on a claim, idle with and without lane work, out of work, limited, paused, and a seat free and with PRs waiting.
-  - **Who is sampled:** the manager and a teamed shell are not.
-  - **Queues:** a review stage's queue from `prs_waiting`; backed up and unstaffed; past bound; `first_seen` survives minutes and drops when the id leaves.
-  - **Rules:** each fires at its threshold and not below. The starved rule names the upstream role when the stage before was backed up. No fewer or more line is written for a seat. The bursts line replaces the two, the upstream wording included. Same-change lines merge.
-  - **Edges:** too little to read; a quiet minute writes nothing.
-
-**Done when** `ao team shape`'s RPC returns a running team's class shares, queues and suggestions from a day of samples.
-
-**Related:** TD-819 (the design), TD-818 and TD-830 (spend per finished entry beside it), TD-772 (the Queue trial's idle-while-work reading this generalises), TD-835.
-
----
-
 ## TD-835: Build TD-819 (2): the Spend page's Shape view and `ao team shape`
 
 **Priority:** Medium
@@ -1952,5 +1910,25 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Done when** each of the five reverts above fails a test in `tests/test_waiting_claims.py` and the `shown_in` revert fails one in `tests/test_ui_queue.py`.
 
 **Related:** TD-836 (built #2048), TD-820, TD-828 (#2045), TD-852 (the same audit's earlier finding).
+
+---
+
+## TD-861: The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-1, from the techlead's read of #2049)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.4 *Spend per seat* (the file is kept thirteen months); `src/sessionorc/seats.py` (`prune`); `tests/test_seats.py`
+
+**Why:** the techlead's merge of #2049 (TD-830) noted, as no finding, that `seats.prune` drops the days and the cursors older than `spend.KEEP` but never a `refs` entry, so `seat_spend.json`'s `refs` grows by one key per reference claimed, forever. It is small, but §4.4 says the file is kept thirteen months.
+
+**Fix:** `prune` also drops a `refs` entry whose `done_at` is older than `spend.KEEP`; an entry with no `done_at` (still open) stays. A test: an old finished reference is dropped, a recent one and an unfinished old one stay.
+
+**Done when** a `refs` entry finished before `spend.KEEP` is gone after a prune, and every other one stays.
+
+**Related:** TD-830 (built #2049), TD-818 (the design).
 
 ---
