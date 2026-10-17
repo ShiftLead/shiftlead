@@ -620,7 +620,9 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
     **After a rollback** (§6 *A rollback*, TD-226 slice 3) the row is drawn while the home's `held`
     stands, whatever `auto` says, under *Needs you*: *live `<sha7>`, rolled back from `<sha7>` <t>
     ago · main … · auto on · held* — *rolled back*, never *behind*, since a person put live there;
-    its Dismiss ends the hold when no failure stands."""
+    its Dismiss ends the hold when no failure stands. A hold a failed smoke wrote (`by: smoke`, §6 *The
+    smoke*, TD-811) reads *rolled back by the smoke from `<sha7>` <t> ago — <why>*; a run in flight
+    whose `check` read its commit (`phase: smoke`) reads *checking `<sha7>` live* on the row."""
     at = now or datetime.now(UTC)
     out: list[dict[str, Any]] = []
     for repo, r in sorted((promotes or {}).items()):
@@ -640,7 +642,10 @@ def promote_rows(promotes: Mapping[str, Any] | None, now: datetime | None = None
         text = f"{repo} · live {live or 'unknown'}"
         if held:
             frm, since = str(held.get("from") or "")[:7], _age(held.get("at"), at)
-            text += f", rolled back from {frm or 'unknown'}" + (f" {since} ago" if since else "")
+            by = " by the smoke" if held.get("by") == "smoke" else ""  # §6 *The smoke*: a failed smoke put it back
+            text += f", rolled back{by} from {frm or 'unknown'}" + (f" {since} ago" if since else "")
+            if by and held.get("why"):
+                text += f" — {held['why']}"
         text += f" · main {main or 'unknown'}"
         if isinstance(ahead, int) and ahead:
             text += f", {ahead} commit{'' if ahead == 1 else 's'} ahead"
