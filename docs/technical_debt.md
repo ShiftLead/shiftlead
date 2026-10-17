@@ -66,8 +66,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Open |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
-| TD-814 | A team's TDs in motion reads a design whose PR waits on its round as *design*, the same as the one the designer is writing, so one designer reads as two designs in progress | Low | Designed — built by TD-815 |
-| TD-815 | Build TD-814: a design-first claim with a PR reads *review* in TDs in motion | Low | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Open |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
@@ -1185,7 +1183,7 @@ The other cases:
 **Added:** 2026-10-16 (TD-112's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Building — slice 1 #2014 (2026-10-17, grinder-ao-2): `confidence: title` read through `Session.told`, `permission_channel` on the view and every reader, `decide` and `ao allow`/`ao deny` refusing a tool without one, the kill guard at `shiftlead/kill_guard.py`. Next: the adapter (profile, launch, layer, hook module and `--adapter gemini`, the title verdict in the tick), then composer/title, fixtures and the live walk — a Gemini profile for fixtures and the live walk asked of the techlead 2026-10-17.
+**Status:** Building — slice 1 #2014 (2026-10-17, grinder-ao-2): `confidence: title` read through `Session.told`, `permission_channel` on the view and every reader, `decide` and `ao allow`/`ao deny` refusing a tool without one, the kill guard at `shiftlead/kill_guard.py`. Next: the adapter (profile, launch, layer, hook module and `--adapter gemini`, the title verdict in the tick), then composer/title, fixtures and the live walk — a Gemini profile for fixtures and the live walk asked of the techlead 2026-10-17. The techlead's notes on merging #2014: the director's `prompt` trigger (§6 rule 3, TD-641/642), when built, gates on `permission_channel` as the manager's `pending` cause does; and `agent_tick`'s TD-306 restore (`saved[2] == "hook"`) is checked against §4.2 once slice 2 writes title readings — a title reading is not held for its screen.
 **Location:** design §4.3 *The second adapter: Gemini CLI*, §4.2 *A title the tool writes its state into*, §4.2a, §4.5a **Allow / Deny**, §4.9b, §6 rule 3; new `src/shiftlead/adapters/gemini/` (`__init__.py`, `hook.py`); `src/sessionorc/agent_serve.py` (`_view`'s `permission_channel`); `src/sessionorc/agent_tick.py` (the `title` confidence, the screen-rule call with the title); `src/sessionorc/agent_hook.py` and the `decide` RPC; `src/shiftlead/hook_entry.py` (dispatch by an argv flag, `shiftlead-hook --adapter gemini`, as `--statusline` is read: a Gemini payload names no adapter and shares event names with Claude Code's; the adapter imported inside the `try`); `src/shiftlead/adapters/claude_code/guard.py` moved to `src/shiftlead/kill_guard.py`, both adapters importing it; `src/shiftlead/profiles.py` (`adapter: gemini`, its `config_dir`); the card's and Focus's Allow / Deny (`src/shiftlead/ui/templates/`, gated on `permission_channel`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112: the second adapter, so the product's one-view claim is tested by a second tool.
@@ -1306,54 +1304,6 @@ Then the build entries, named in `Blocked by:`.
 **Done when** each page's load is measured and broken down, a budget is set, and the build entries are filed and named in `Blocked by:`.
 
 **Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
-
-## TD-814: A team's TDs in motion reads a design whose PR waits on its round as *design*, the same as the one the designer is writing, so one designer reads as two designs in progress
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-16 (design §4.5 screen 1's phase sentence, §4.4 *Repo facts* **Phases**, §4.5a *team card: TDs in motion*). A claim with a PR reads *review* whatever the entry's kind; *design* is a design-first claim with no PR yet. Built by TD-815.
-**Blocked by:** TD-815
-**Location:** design §4.5 screen 1 (the phase sentence: *design* — a designer holds a design-first entry), §4.4 *Repo facts* (**Phases**), §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (the phase line, `row["phase"] = "design" if e.get("kind") == "design-first" else …`, ~L354)
-
-**Why:** Paul, 2026-10-16, on ao-grind's card: one designer working, and TDs in motion read *2 design · 1 review* — TD-806 (designer-ao-1, #1995) and TD-804 (designer-ao-1, #1993) — and he asked whether that is a bug. It is as designed: designer-ao-1 held both claims, each design written and its PR open — TD-804's #1993 waiting on Paul's steer, TD-806's #1995 in its round (a design is held until its round ends); the phase rule reads any claim on a design-first entry as *design*, whatever its PR, where a build's claim with an open PR reads *review*. So the facet cannot tell a design being written from one that waits on the person or its reviewers, and a person reading it sees two designs in progress from one designer and wonders what is wrong.
-
-**Fix:** design it first: a design-first claim whose PR is open (its `pr` or `review_pr`, or an open PR whose branch names it) reads *review*, as a build's does, so the card above would read *3 review*, and a design still being written, with no PR yet, alone reads *design*; the PR column already names #1993 and #1995. Say it in §4.5 screen 1's phase sentence, §4.4 *Phases* and the §4.5a row, then the build entry: the phase line in `org.py` and a test of a designer holding one claim with an open PR and one without.
-
-**Done when** the design says what phase a design-first claim with an open PR reads, and the build entry is filed and named in `Blocked by:`.
-
-**Related:** TD-197 (the phases: design-first reads *design*), TD-722 (the Org's team cards).
-
----
-
-## TD-815: Build TD-814: a design-first claim with a PR reads *review* in TDs in motion
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (TD-814's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5 screen 1 (the phase sentence), §4.4 *Repo facts* **Phases**, §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (`motion_rows`: the phase line and its docstring); `tests/test_ui_team_summary.py` (`test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch`, whose comment states the TD-197 reading and gains the TD-814 clause); `docs/glossary.md` already states the rule
-
-**Why:** TD-814: one designer with two design PRs open read as *2 design*, as if two designs were being written.
-
-**Fix:**
-- In `motion_rows`, the phase is `"review" if pr else "design" if e.get("kind") == "design-first" else "grind"`. `pr` stays what it is today: the claim's own `pr`, the tick's `review_pr`, or an open PR whose head branch names the reference. The PR check comes first.
-- The docstring says the same.
-- A merged or closed design PR keeps *review*, marked, until the claim is marked done or dropped, as a build's does.
-- **Tests:**
-  - extending the test above: a designer holding one design-first claim with a PR and one without reads *1 design · 1 review*, in the rows and in the summary's `phases`;
-  - a design-first claim found by its branch's open PR alone reads *review*;
-  - a build's claim reads as before.
-
-**Done when** a design-first claim with a PR reads *review* on the team card and in the rollup's bar (whose segment links are unchanged), one without reads *design*, and the tests above pass.
-
-**Related:** TD-814 (the design), TD-197 (the phases).
-
----
 
 ## TD-816: The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab
 

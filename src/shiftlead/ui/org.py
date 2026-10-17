@@ -312,11 +312,12 @@ def _holders_width(members: Collection[Mapping[str, Any]]) -> int:
 
 def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None) -> list[dict[str, Any]]:
     """**TDs in motion** (§4.5a *team card: TDs in motion*): one row per reference a member holds as
-    a `claimed` progress entry, with its **phase** derived here, never declared — *design* on an
-    entry whose `Kind:` is design-first (its kind, not the page's bucket: one blocked by a decision
-    sits under *for you*, TD-197, TD-228), *review* with a PR (its own `pr`, the tick's
-    `review_pr`, or else an open PR whose head branch names the reference — the tick reads only the
-    branch checked out, and a grinder that asked its reader has moved on), *grind* without one; a PR
+    a `claimed` progress entry, with its **phase** derived here, never declared — *review* with a
+    PR (its own `pr`, the tick's `review_pr`, or else an open PR whose head branch names the
+    reference — the tick reads only the branch checked out, and a grinder that asked its reader has
+    moved on), a design's as a build's (TD-814); without one, *design* on an entry whose `Kind:` is
+    design-first (its kind, not the page's bucket: one blocked by a decision sits under *for you*,
+    TD-197, TD-228), else *grind*; a PR
     that is no longer open keeps *review*, marked *merged* / *closed*, until the member marks the
     claim done or dropped. A reference two members hold is one row naming both. Each row carries
     the entry's `priority` — *high*, *medium* or *low*, else '' (a foreign or archived reference, an
@@ -351,7 +352,7 @@ def motion_rows(members: Collection[dict[str, Any]], r: Mapping[str, Any] | None
         pr = row["pr"] = row["pr"] or by_branch.get(ref)
         known = prs.get(pr) if pr else None
         state = str((known or {}).get("state") or "")
-        row["phase"] = "design" if e.get("kind") == "design-first" else "review" if pr else "grind"
+        row["phase"] = "review" if pr else "design" if e.get("kind") == "design-first" else "grind"
         if not e and (n := pr_ref(ref)) is not None:
             e = {"title": (prs.get(n) or {}).get("title") or ""}
         row["title"] = str(e.get("title") or "")
