@@ -65,11 +65,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
-| TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Designed — built by TD-828, TD-829 |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833, TD-859 |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 |
-| TD-829 | Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint | Medium | Open |
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
 | TD-832 | Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card | Medium | Open |
 | TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
@@ -1281,7 +1279,7 @@ The other cases:
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** evaluation
-**Status:** Open
+**Status:** Open. TD-829 (#2065) adds `data-` attributes to each Queue card and completed line for the in-browser picks: an estimated ~235 KB (~12%) on the live Queue's 1,927,082 bytes (209 cards, 829 completed lines, 2026-10-17), most of it `data-find` (each id written three ways, and each title).
 **Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
 
 **Why:** Paul, 2026-10-16: *we need analysis done on our page loads — they all seem to take a long time (org, repo, inbox, queue).* Measured the same evening on kmaster's plain port (time to first byte, size): Org 0.43–0.55 s, 284 KB; Inbox 0.27–0.29 s, 847 KB; Repo (shiftlead) 0.57–0.73 s, 750 KB; Settings 0.15–0.22 s, 82 KB; Queue 2.37–2.66 s, 1.87 MB. A page is sent uncompressed with `Accept-Encoding: gzip` (the Queue's 1,873,503 bytes either way), and the person reaches the UI over the tailnet through `tailscale serve`, so the transfer, the parse of a large DOM and the page's scripts add to every number above, and none of that is measured.
@@ -1294,35 +1292,6 @@ The other cases:
 **Done when** each page's load is measured and broken down, a budget is set, and the build entries are filed and named in `Blocked by:`.
 
 **Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
-
-## TD-816: The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (Paul, in an interactive session)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-17 (design §4.5 screen 12 *Groups*, *What is attached to a card*, *Filters*; §4.5a *Queue page: group heading*, *card*, *filters, find*; mockup `docs/mockups/reviews/2026-10-17-td816-queue-sections.png`). Each group's heading reads its count, *Up next (28)*, or *(4 of 28)* while a pick is on, and folds on a press, remembered in the browser. A card's items are gathered in the **card's** sections, not each row's: *Needs you* in the header, then *Steering*, *Waiting on them*, *Answered for you* and *FYI* in the body, each hidden at 0, with **Dismiss all** on the last two. An item about another row says *on TD-n*. A board line, due or not, and the person's ledger rows are under *Needs you*; the card has no *Later* or *Coming*. The top bar's number stays the Inbox's. A pick answers in the browser with no request; the picks persist per browser and are restored on a bare `/queue`. The window stays the Queue's own and is drawn before the first paint. Neither is a setting in `settings.yml`. Built by TD-828 and TD-829.
-**Blocked by:** TD-828, TD-829
-**Location:** design §4.5 screen 12 (*Groups* ~L1165, *What is attached to a card*, *Filters*), §4.5a *Queue page* rows (*card*, *Recently completed: 4 h · day · week · month*, *filters, find*); `src/shiftlead/ui/templates/queue_part.html` (the three `rsec` groups), `queue_filters.html` (each pick an `<a href>` to `/queue?…`), `queue_row.html` (`attached`: one `qmail` run per row), `src/shiftlead/ui/queue.py` (`attach`, `queue_picks`, `apply_picks`, `WINDOW_LABEL`), `src/shiftlead/ui/static/app.js` (`AO.queue`, `store` key `qwin`; the Inbox's `dismissOnScreen` for *Dismiss all*), `base.html` (the Queue tab's bare `href="/queue"`)
-
-**Why:** Paul, 2026-10-16, on the Queue page while it is still being built out: *each section should have a count e.g. "Recently completed (9)" and should be collapsible. Each card should have "Needs you (n)", "Steering (n)", "Answered for you (n)" and "FYI (n)" sections with counts that are hidden if the count is zero, and the "Answered for you" and "FYI" sections should have dismiss all options. The filters should be far more responsive (right now they are seconds per push) … The filter settings seem to get lost/reset - maybe on navigate? They should persist (and so should the duration setting of 4h, day, etc).* What the code does today:
-- **Groups.** Each writes its number as a quiet word after the heading, not in it: *In progress* and *Up next* a bare number, *Recently completed* the window's (*9 in the last day*, and each window button its own, *Day (9)*). No group folds.
-- **A card's mail.** `attach` draws a row's Inbox items as one `qmail` run in the Inbox's order (`later`, `needs`, `steering`, `coming`, `waiting`, `answered`, `fyi`), with no heading or count per section; *Dismiss all* exists only on the Inbox page's Answered for you and FYI groups (TD-599, §4.10).
-- **Filters.** Every pick is a link that reloads `/queue`, which takes 2.4–2.7 s to its first byte and sends 1.9 MB (TD-805's measure), although the page already draws every card and marks what a pick hides `qoff`.
-- **Persistence.** The picks live only in the URL, and the top bar's Queue tab is a bare `/queue`, so leaving the page and coming back by the tab drops them. The window is remembered per browser (`ao.qwin` in `localStorage`), so it carries neither to another browser (Paul uses Edge and Firefox) nor to the Repo page's own picker (`ao.win`); whether it is also lost within one browser is not yet reproduced.
-
-**Fix:** design it first, then file the builds:
-1. **Groups.** Each heading carries its count in the words, *Recently completed (9)* (the window's), *In progress (n)*, *Up next (n)*, and folds on a press, remembered in the browser as a card's fold is; a find, a `#TD-n` or a `?card=` address opens the group that holds its target.
-2. **A card's sections, and no due dates on the Queue.** Under a row (the top entry's in the header), its attached items are grouped *Needs you (n)*, *Steering (n)*, *Waiting on them (n)*, *Answered for you (n)*, *FYI (n)* — the Inbox's names and order — each heading hidden at 0; *Answered for you* and *FYI* each carry **Dismiss all**, the Inbox's rule (the items on screen, by id, never one that arrived after the page was drawn). There is no *Later* or *Coming* on a card, because a `Due:` date orders nothing on the Queue. Paul, the same evening: *It does not make sense to me to have due dates affecting the queue. If an item is up next, then its up next. If it needs user input, it needs user input. Regardless of a due date.* So a board line about a card's entry is under *Needs you*, whatever its `Due:` (today `split_later` moves one not yet due to the card as `coming`, counted nowhere). A ledger row that is the person's (*yours to do*, *your decision*; today `later`, drawn first under its row) is *Needs you* too, drawn at its own row with its answers and Reply. Both make the card's status *needs you* and count in its *Needs you (n)* and the filter's. Say whether they also count in the top bar's number, which today leaves out what is not yet due. A `Waits:` date is not a `Due:` date: it says when an entry may start (TD-772's trial), and it stays the row's *waits until <date>*. Say whether the sections are a card's or each row's.
-3. **Filters answer at once.** A pick re-marks `qoff` in the browser from what each card already carries (its status, kinds, repo and find text as `data-` attributes) and rewrites the URL with `history.replaceState`, with no request; the server keeps applying the URL's picks on a load, so a shared link still works. The find box filters as it is typed.
-4. **Picks persist.** The last picks are remembered in the browser and restored on a bare `/queue` (the tab), and **All** clears them; say whether the window is one choice across the Queue and the Repo page, and whether either belongs in `settings.yml` (the person's, across browsers) rather than `localStorage`.
-
-**Done when** the design says all four, and the build entries are filed and named in `Blocked by:`.
-
-**Related:** TD-748 (the Queue), TD-771 (the Queue page), TD-772 (its trial, read back 2026-10-30), TD-599 (the Inbox's Dismiss all), TD-805 (page loads: the Queue's 2.4 s and 1.9 MB, which a client-side filter stops paying per press).
-
----
 
 ## TD-818: Nobody can see what each team member spends: the spend ledger reads metered profiles only, so on a subscription a seat's tokens, and its cost per finished entry, are nowhere
 
@@ -1418,42 +1387,6 @@ The other cases:
 **Done when** the reading says where the designer's context goes, and the design either gives the designer a restart point or a bound with its build entries filed and named in `Blocked by:`, or says, with the numbers, why it stays as it is.
 
 **Related:** TD-460 (the grinders' bound trial), TD-378 (the prompt cache, archived), TD-818 (spend per seat), rule 5.
-
----
-
-## TD-829: Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-816's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-828
-**Location:** design §4.5 screen 12 (*Filters*), §4.5a *Queue page: filters, find*, *Queue page, Recently completed*; `src/shiftlead/ui/templates/queue_filters.html` (each pick an `<a href>`), `queue_card.html` (the card's `data-` attributes), `src/shiftlead/ui/queue.py` (`queue_picks`, `apply_picks`: the server's reading of the same picks, kept for a load), `src/shiftlead/ui/static/app.js` (`AO.queue`, `store` keys `qwin` and a new `qpicks`; the Inbox rail's remembered picks for the pattern), `base.html` (the Queue tab's bare `/queue`)
-
-**Why:** TD-816: a pick reloads a page that takes 2.4–2.7 s to its first byte and sends 1.9 MB (TD-816's and TD-805's measures), and the picks live only in the URL, so the bare Queue tab drops them. A window lost within one browser was not reproduced: a re-read keeps it today, and only a load draws *day* before the script applies `qwin`. Paul's loss may be the Edge and Firefox split, which the design keeps.
-
-**Fix:**
-- **Data on each card.** It carries what `apply_picks` reads: `data-status`, `data-kinds`, `data-repos` and `data-find`, the text `_find_text` builds. A completed line and an *other work* line carry their repos and find text. A team pick maps to its repo as the server's does.
-- **A press.** It toggles the pick's `aria-pressed`, sets `qoff` on what the picks hide, and recounts **Needs you (n)** and the groups' headings (*(n of m)* while anything is picked). It then puts the picks in the URL with `history.pushState`, so Back undoes it, as the Inbox's rail does (a `popstate` re-applies them), with no request. Typing in the find box uses `replaceState`. The pick's `<a href>` stays, for a page without its script.
-- **The find box.** It narrows as it is typed, 150 ms after the last key. Enter on an id that matches no card asks `/queue?part=1&find=<id>` once, for the archive's *find_miss* line.
-- **A re-read** (`?part=1`, on the `queue` and `inbox` events). It carries the page's current URL picks, and after the swap the page applies the picks and the window again.
-- **Persistence.** The picks without the find's words are written to `qpicks` on each press. A bare `/queue` restores them before the first paint (`replaceState`, then the browser apply), and **All** clears them and `qpicks`. A URL that carries picks wins and is written to `qpicks`.
-- **The window and the picks before the first paint.** An inline script in `base.html`'s head, beside the theme's, reads `qwin` and `qpicks` and sets them on `<html>` (`data-win`, the picks) before the body is drawn, since `app.js` loads at the body's end. A load then never draws *day* first. A re-read already keeps the window (`reread()` calls `apply()` after the swap), and the window stays apart from the Repo page's `ao.win`.
-- **Size.** `data-find` repeats each card's ids and titles, which adds to the page's 1.9 MB. Measure it beside TD-805's numbers, and note the difference there.
-
-**Tests:**
-- a pick sends no request and hides what the server's `apply_picks` hides for the same picks;
-- the URL after a press loads the same view;
-- a bare `/queue` after a pick restores it, and **All** clears it;
-- the find narrows on typing, and Enter on an archived id shows the archive line;
-- a re-read keeps the picks and the window;
-- a load with `qwin=week` draws *week*.
-
-**Done when** a pick answers with no request, the picks survive leaving and coming back by the tab, the window survives a re-read, and the tests above pass.
-
-**Related:** TD-816 (the design), TD-828 (the headings and sections it recounts), TD-805 (page loads), TD-129 (the Inbox rail's remembered picks).
 
 ---
 
