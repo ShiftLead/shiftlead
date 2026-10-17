@@ -1,10 +1,11 @@
 """The kill guard (design §4.3 *A kill the guard refuses*, TD-489): a net under §4.8's process rule.
 
-A session signals only a pid it started and holds. `refuse` reads a `Bash` command's shape and names
+A session signals only a pid it started and holds. `refuse` reads a shell command's shape and names
 the commands that reach what nobody looked at — `pkill` or `killall` as a command word; `kill` of `-1`,
 of `1` or of `$PPID`; `kill` of a substitution that runs `ps` or `pgrep`; a command that both reads a
 parent pid and runs `kill`. A literal pid, a variable, a job and a pidfile pass: the guard cannot tell
-a held pid from a found one, and the rule allows them. It reads text only and calls nothing.
+a held pid from a found one, and the rule allows them. It reads text only and calls nothing. Every
+adapter whose tool runs shell commands wires it (Claude Code's `Bash`, Gemini CLI's `run_shell_command`, TD-785).
 """
 
 from __future__ import annotations

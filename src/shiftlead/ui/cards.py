@@ -484,6 +484,8 @@ def view(
     # never a prompt — the host agent's `agent` on the view, never an adapter's name. A view built
     # without it (an older host, a test's record) is an agent's, as the host's own default is.
     d["agent"] = s.get("agent") is not False
+    # §4.3 *Permissions: no channel* (TD-785): the view's `permission_channel`, True where a view lacks it
+    d["permission_channel"] = s.get("permission_channel") is not False
     # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
     # over an unattended session; hand an interactive one back where there is someone to hand it
     # to — its `controllers` as written, or a team — and otherwise just switch it.
@@ -917,6 +919,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # a hook permission says its tool and command; a question says that it is one
         kind = "needs"
         text = ptext if pend.get("kind") == "permission" else f"{pend.get('kind')}: {ptext}"
+        text += terminal_only(d)
     elif state == "unreachable" and pend and pend.get("host_unreachable"):
         # design §4.4a "Permission prompts follow the same line": the waiter is on the node
         kind, text = "needs", f"{pend.get('kind')}: {ptext} — answer it at {d['host']}"
@@ -1049,7 +1052,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         tail_last = (d.get("tail") or [""])[-1]
         text = f"last: {tail_last}" if tail_last else "at prompt"
     caption, ccls = "", ""
-    if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
+    if state == "needs-you" and answerable(d):
         caption, ccls = "via hook", "countdown"  # the page's clock fills in the time left
     elif d.get("seat"):
         # never *ready to close ✓*: a seat is not closed while the definition names it (§4.5)
@@ -1061,6 +1064,25 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     elif kind == "doing":
         caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")
     return {"kind": kind, "text": text, "full": full or text, "caption": caption, "ccls": ccls}
+
+
+def answerable(v: Mapping[str, Any]) -> bool:
+    """A pending permission **Allow / Deny** answers (§4.5a): the hook gave something to answer
+    (`tool_use_id`) and the tool has a permission channel (§4.3 `permission_channel`, TD-785)."""
+    pend = v.get("pending") if isinstance(v.get("pending"), dict) else {}
+    return (
+        pend.get("kind") == "permission" and bool(pend.get("tool_use_id")) and v.get("permission_channel") is not False
+    )
+
+
+def terminal_only(v: Mapping[str, Any]) -> str:
+    """What a permission only the terminal answers adds to its text (§4.3 *Permissions: no channel*,
+    §4.5a **Allow / Deny**, TD-785): *answer it in the terminal*, drawn beside the Focus link in place
+    of the buttons; "" for every other pending."""
+    pend = v.get("pending") if isinstance(v.get("pending"), dict) else {}
+    if pend.get("kind") == "permission" and v.get("permission_channel") is False:
+        return " — answer it in the terminal"
+    return ""
 
 
 def closed_keep() -> str:
@@ -1080,8 +1102,8 @@ def next_act(d: dict[str, Any]) -> str:
     `details` when the pane is gone; else `focus`. A `limited`
     session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus. A seat on call
     (TD-097) → `message`: asking it is how it comes, and it is never Forget or Close session."""
-    state, pend = d["state"], d["pending"]
-    if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
+    state = d["state"]
+    if state == "needs-you" and answerable(d):
         return "allow"
     if d.get("seat"):
         return "message"

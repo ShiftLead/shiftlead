@@ -104,8 +104,8 @@
     {# a compact needs-you card leads with Focus: the answer is given in the team's facet (§4.5a) #}
     {% set next_act = 'focus' if s.compact and s.next_act == 'allow' else s.next_act %}
     {% if next_act == 'allow' %}
-      {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s
-         without it (review of PR #251) #}
+      {# Allow / Deny only when the hook gave something to answer (`tool_use_id`) and the tool has a
+         permission channel (§4.3, TD-785): the route 409s without either (review of PR #251) #}
       <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
       <button class="btn sm next" data-act="deny" data-id="{{ s.id }}">Deny</button>
       {# Deny's optional reason (§4.5a, TD-117): one line the session reads with the refusal #}

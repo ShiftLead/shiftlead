@@ -262,6 +262,16 @@ def has_agent(adapter: str) -> bool:
         return True
 
 
+def permission_channel(adapter: str) -> bool:
+    """Whether a pending permission of this adapter's sessions is answered through the hook channel
+    (design §4.3 *Permissions: no channel*, §4.5a **Allow / Deny**, TD-785): the adapter's
+    `permission_channel`, True where unset, as `has_agent` reads `agent`."""
+    try:
+        return bool(getattr(get(adapter), "permission_channel", True))
+    except KeyError:
+        return True
+
+
 def short_model(adapter: str, model: str | None) -> str:
     """An observed model name as its adapter spells it short (TD-031) — `claude-fable-5-1` reads
     `fable-5-1` on a card. An adapter with no opinion, or none at all: the name as observed."""

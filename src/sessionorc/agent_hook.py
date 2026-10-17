@@ -182,6 +182,9 @@ class HookMixin:
         """Answer a pending permission through the hook (design §4.2). An act, gated like `send`
         (§4.8, TD-116): a session answers another's only as one of its controllers holding `control`."""
         s = self._get(id)
+        if not adapters.permission_channel(s.adapter):
+            # the backstop to `ao allow`/`ao deny` and the page (§4.3 *Permissions: no channel*, TD-785)
+            raise RpcError(f"{s.name}'s tool has no permission channel: answer it in the terminal")
         fut = self._waiters.get((id, tool_use_id))
         if fut is None or fut.done():
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")

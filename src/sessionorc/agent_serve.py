@@ -57,6 +57,9 @@ class ServeMixin:
         # §4.3 *A record with no agent* (TD-665): derived here from the adapter, a node's own
         # records included, never stored — every reader keys on it, never on an adapter's name
         v["agent"] = adapters.has_agent(s.adapter)
+        # §4.3 *Permissions: no channel* (TD-785): whether Allow / Deny can answer its permission, the
+        # same derivation — a tool with no channel (Gemini CLI) is answered in its terminal alone
+        v["permission_channel"] = adapters.permission_channel(s.adapter)
         # design §4.8a *An alarm's answers* (TD-077 b): **who answers for this record** — its
         # first live controller, read from the control graph and never from a badge (§9 invariant
         # 9). The page draws **Log TD** only where this is non-null and says *no session answers

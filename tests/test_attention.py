@@ -236,7 +236,7 @@ async def test_a_nodes_row_is_trailed_under_its_address_and_keeps_by_you(agent, 
     change and knows its own `decide`s, so `by you` is always known*). A node's record is keyed
     `id@host` in the graph, and the act that ends its row runs **at the node** — so the home writes
     the word itself, under the same address, or every node-hosted row would read *resolved*."""
-    r = Session(id="ao-x-w", name="w", kind="agent", adapter="shell", dir="/tmp/x", host="laptop")
+    r = Session(id="ao-x-w", name="w", kind="agent", adapter="agentshell", dir="/tmp/x", host="laptop")
     r.state, r.pending, r.since = (
         "needs-you",
         Pending(kind="permission", text="rm -r?", tool_use_id="t1"),

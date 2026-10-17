@@ -583,9 +583,9 @@ def read_when(
         return f"read once its {what} is answered and its turn ends" + tail
     if state in ("working", "stalled?"):
         return "read when its turn ends: it is rung on the tick after its Stop" + tail
-    if s.confidence == "hook" and not rings:
+    if s.told and not rings:
         return "lands; nothing is typed into this tool's pane — read on its next look or its next `ao` reply" + tail
-    if s.confidence == "hook":
+    if s.told:
         # the budget gates the ring alone: a busy session reads its mail at its Stop regardless
         # (review of PR #583)
         if not person and wake_budget_spent(s, now):

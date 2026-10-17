@@ -18,8 +18,11 @@ from sessionorc import naming
 # the directory's slot, but no pane yet — the home's tick creates the session at its `start_at`
 State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited", "closed", "unreachable", "scheduled"]
 Kind = Literal["interactive", "command"]
-# `tick`: the host agent observed it — a pane dead or gone, a kill, a close, `stalled?` (design §4.2, TD-490)
-Confidence = Literal["hook", "scraped", "tick"]
+# `tick`: the host agent observed it — a pane dead or gone, a kill, a close, `stalled?` (design §4.2, TD-490);
+# `title`: the tool wrote its state into its terminal title (§4.2 *A title the tool writes its state into*, TD-785)
+Confidence = Literal["hook", "scraped", "tick", "title"]
+# The tool's own word for its state, a hook's or its title's: what every hook-confirmed rule acts on (§4.2)
+TOLD = ("hook", "title")
 
 # Where a report entry came from (design §4.8, on the same rule as state): the session said so,
 # the tick worked it out, or a screen rule read it off the pane. §9 invariant 10 gives `declared`
@@ -286,9 +289,12 @@ def attention_kind(s: Session) -> str:
     read the **one measure**, `git.unpushed`, never the porcelain's `ahead` (design §4.2, TD-080):
     a launch branch tracking `origin/main` and pushed to its own ref is *ahead* for ever and is
     not stranded work (review of PR #269)."""
+    from sessionorc import adapters  # models is imported by adapters
+
     pend = s.pending.to_dict() if s.pending else {}
     if s.state == "needs-you":
-        if pend.get("kind") == "permission" and pend.get("tool_use_id"):
+        # a permission only the terminal answers (§4.3 `permission_channel`) is a question row (TD-785)
+        if pend.get("kind") == "permission" and pend.get("tool_use_id") and adapters.permission_channel(s.adapter):
             return "permission"
         return "question" if pend.get("text") or pend.get("kind") else "needs"
     if s.state == "stalled?":
@@ -1442,6 +1448,11 @@ class Session:
     # Transition counter, in memory only (dropped by `to_dict`, so 0 on load): `since` is whole
     # seconds, so a turn that starts and ends inside one second would look unchanged to a waiter.
     rev: int = field(default=0, compare=False, repr=False)
+
+    @property
+    def told(self) -> bool:
+        """The state is the tool's own word — a hook's or its title's — not a parse of the screen (§4.2)."""
+        return self.confidence in TOLD
 
     def set_state(self, state: State, *, confidence: Confidence, pending: Pending | None = None) -> None:
         if state != self.state:

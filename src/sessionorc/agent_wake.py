@@ -119,7 +119,7 @@ class WakeMixin:
         """Why the doorbell may not ring for `s` now, or None when it may. The order is the
         design's: a session that cannot be rung at all, then a pending stop, then — in `_ring`, the
         wake decision — the budget and new mail."""
-        if s.state != "idle" or s.confidence != "hook":
+        if s.state != "idle" or not s.told:
             return "not hook-confirmed idle"  # never a scraped idle or `stalled?` (a takeover)
         if self._first_prompt_due(s):
             return "its brief is not typed yet"  # the first prompt is the brief, never the doorbell's line
@@ -251,7 +251,7 @@ class WakeMixin:
         if s.superseded_by:
             return None
         if s.id in self._last_hook:
-            return "hook" if s.state == "idle" and s.confidence == "hook" else None
+            return "hook" if s.state == "idle" and s.told else None
         if s.hook_seen_at or s.first_prompt_tries or s.state in ("needs-you", "exited", "closed"):
             return None
         if s.state != "idle":

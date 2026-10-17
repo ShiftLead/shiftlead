@@ -42,7 +42,7 @@ from shiftlead.adapters.claude_code import (
     displaced_status_line,
     usage_report,
 )
-from shiftlead.adapters.claude_code.guard import refuse
+from shiftlead.kill_guard import refuse
 
 STATE_EVENTS = {
     "SessionStart": "working",

@@ -7,8 +7,8 @@ import pytest
 from conftest import run_hook
 
 import shiftlead
-from shiftlead.adapters.claude_code.guard import REASON, refuse
 from shiftlead.adapters.claude_code.hook import refused_command, translate
+from shiftlead.kill_guard import REASON, refuse
 
 # the 2026-10-09 loop that killed `systemd --user`, as it was run
 THE_LOOP = (
