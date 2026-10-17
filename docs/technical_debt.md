@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-839 | Nothing drives a `confidence: title` reading through any of #2014's sixteen hook-confirmed rules: `test_a_title_reading_is_the_tools_own_word` tests the `told` property alone | Medium | Open |
-| TD-841 | #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard | Medium | Open |
 
 ---
 
@@ -1461,21 +1460,3 @@ Then the build entries, named in `Blocked by:`.
 **Done when** each family of `told` sites has a case that fails when that site is hook-only, and the suite passes.
 
 **Related:** TD-785, TD-784, #2014.
-
-## TD-841: #2005's keys on Wrap up and on the prompt chips are covered by no test: the route's `key=` on `wrapup`, the page's `body = { key }`, the chip's `mintKey()` and its `disabled` guard
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, the tests of #2005–#2014)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_ui_send_key.py`; `tests/test_ui.py`; `src/shiftlead/ui/app.py` (`wrapup`); `src/shiftlead/ui/static/app.js` (the `wrapup` body, `#promptchips` handler)
-
-**Why:** #2005 (TD-813 slice 2) gives Wrap up and the prompt chips a key too, so that a repeat types once (its code comments: *a repeat types it once*). Probes, one change at a time in an `origin/main` worktree, each followed by `pdm run pytest -q tests/test_ui_send_key.py tests/test_ui.py tests/test_ui_popout.py tests/test_ui_shell_here.py`, which gave **101 passed** every time: (1) `ui/app.py` `await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True, key=body.get("key"))` → without `key=`; (2) `app.js` delete `if (action === "wrapup") body = { key: AO.mintKey() };`; (3) the chip's `await act(id, "send", { text, key: AO.mintKey() })` → `{ text }`; (4) delete the chip's `b.disabled = true;`. The composer's `wireComposerSend` is probed under node, and `test_pages_and_shell_flow` posts a keyed `send`; the other three paths have no test that carries a key (`tests/test_ui.py` posts `/wrapup` to a shell, which refuses it, and to an agent with no key).
-
-**Fix:** (a) in `tests/test_ui.py`, post `wrapup` twice with one `key` to a session whose agent records its `send` params and assert both carry `wrapup=True` and the key; (b) a node probe beside `PROBE` that fires the Wrap up press handler and a chip click (twice, the second while the first is out) and asserts the body's key, one key per press, and that the second chip press sends nothing. Revert each of the four lines and see its test fail.
-
-**Done when** each of the four changes fails a test.
-
-**Related:** TD-813, TD-806, TD-824, #2005.

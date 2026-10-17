@@ -272,6 +272,18 @@
     else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
     return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
   };
+  // A prompt chip's press (§4.5a *Focus composer* **prompt chips**, TD-170): its own key, and the chip
+  // disabled until its send answers, so a repeat press types nothing (TD-806); Shift fills the box.
+  AO.wireChip = function (b, { compose, post, sent, closed, fail }) {
+    b.addEventListener("click", async (e) => {
+      const text = b.dataset.text || "";
+      if (e.shiftKey) { compose.value = text; compose.focus(); return; }
+      if (compose.disabled) { closed(); return; }
+      if (b.disabled) return;
+      b.disabled = true;
+      try { await post({ text, key: AO.mintKey() }); sent(); } catch (err) { fail(err); } finally { b.disabled = false; }
+    });
+  };
   // How long the composer waits on a send before Send is pressable again under the same key.
   AO.SEND_PAGE_SECONDS = 30;
   AO.SEND_UNCONFIRMED = "not confirmed — Send repeats it safely";
@@ -4737,13 +4749,10 @@
     // and Shift+press fills the composer for editing instead. The text is the definition's, carried
     // on the chip, never a session's words. Each press carries its own key, and the chip is disabled
     // until its send answers; the composer's box is not touched (TD-806).
-    $$("#promptchips .chip").forEach((b) => b.addEventListener("click", async (e) => {
-      const text = b.dataset.text || "";
-      if (e.shiftKey) { compose.value = text; compose.focus(); return; }
-      if (compose.disabled) { banner($("#composehint").textContent || "nothing can be sent now"); return; }
-      if (b.disabled) return;
-      b.disabled = true;
-      try { await act(id, "send", { text, key: AO.mintKey() }); term.focus(); } catch (err) { banner(`Send failed: ${err.message}`); } finally { b.disabled = false; }
+    $$("#promptchips .chip").forEach((b) => AO.wireChip(b, {
+      compose, post: (body) => act(id, "send", body), sent: () => term.focus(),
+      closed: () => banner($("#composehint").textContent || "nothing can be sent now"),
+      fail: (err) => banner(`Send failed: ${err.message}`),
     }));
     // design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002): each
     // file goes to the host agent through `/api/sessions/<id>/attach`, and the path it answers is
