@@ -16005,3 +16005,23 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-834 (built #2055, #2060), TD-819 (the design), TD-860 (the same audit's earlier finding).
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2070). New home tests in `tests/test_shape.py` cover the throttle, the quiet minute, the crew's superseded and sat-out filters, the superseded claim, a lane-less root, two roots' queues, the board orders, the live seat's queue, the least bound and its default, `id@host` senders for both waits, the once-a-day prune, each `except`, and the RPC's window refusal; the unlisted-path test uses a live member. Each revert listed fails but `counts.get(…, 0) + …`, which no record can reach: a record has one repo and each root's views are that repo's.
+
+## TD-861: The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-1, from the techlead's read of #2049)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2071 (2026-10-17, grinder-ao-1). Was: Open.
+**Location:** design §4.4 *Spend per seat* (the file is kept thirteen months); `src/sessionorc/seats.py` (`prune`); `tests/test_seats.py`
+
+**Why:** the techlead's merge of #2049 (TD-830) noted, as no finding, that `seats.prune` drops the days and the cursors older than `spend.KEEP` but never a `refs` entry, so `seat_spend.json`'s `refs` grows by one key per reference claimed, forever. It is small, but §4.4 says the file is kept thirteen months.
+
+**Fix:** `prune` also drops a `refs` entry whose `done_at` is older than `spend.KEEP`; an entry with no `done_at` (still open) stays. A test: an old finished reference is dropped, a recent one and an unfinished old one stay.
+
+**Done when** a `refs` entry finished before `spend.KEEP` is gone after a prune, and every other one stays.
+
+**Related:** TD-830 (built #2049), TD-818 (the design).
+
+**Resolved:** 2026-10-17 (grinder-ao-1, #2071). `seats.prune` drops a `refs` entry whose `done_at` is older than `spend.KEEP`; one with no `done_at` stays. `test_a_prune_drops_old_rows_cursors_and_finished_references_and_keeps_an_open_one` is the first test of `prune` itself.
