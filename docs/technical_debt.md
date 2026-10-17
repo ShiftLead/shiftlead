@@ -88,7 +88,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-863 | Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n* | Low | Open |
-| TD-864 | `tests/test_shape.py`'s home tests (#2055) leave the sampler's guards, throttle, write, prune and person/review mapping unread: 24 of 32 single-line reverts in `agent_shape.py` still pass (test audit) | Medium | Open |
+| TD-864 | `tests/test_shape.py`'s home tests (#2055) leave the sampler's guards, throttle, write, prune and person/review mapping unread: 26 of 32 single-line reverts in `agent_shape.py` still pass (test audit) | Medium | Open |
 
 ---
 
