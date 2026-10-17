@@ -591,6 +591,8 @@ class RemoteMixin:
                 return await self._take_derived(host, params)
             if method == "spend":
                 return await self._take_spend(host, params)
+            if method == "seat_spend":
+                return await self._take_seat_spend(host, params)
             if method == "usage_report":
                 await self._take_usage_report(host, params)
                 return None
