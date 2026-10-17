@@ -1221,6 +1221,8 @@ def _print_explanation(x: dict[str, Any]) -> None:
     if x.get("pending"):
         head += f"  ← {x['pending']['kind']}: {x['pending']['text']}"
     print(head)
+    if "title" in x:
+        print(f"title: {x['title']}")
     m = x.get("match")
     if m:
         pend = f"  ← {m['pending']['kind']}: {m['pending']['text']}" if m.get("pending") else ""
@@ -1251,10 +1253,13 @@ def cmd_explain(args: argparse.Namespace) -> int:
             tail = pathlib.Path(args.file).read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError as e:
             return fail(args, f"cannot read {args.file}: {e.strerror or e}", 1)
-        m = explain(tail)
+        # a tool that writes its state into its title is read by the title (§4.2), which a fixture carries
+        titled = getattr(ad, "state_in_title", False)
+        m = explain(tail, title=args.title or "") if titled else explain(tail)
         x = {
             "file": args.file,
             "adapter": args.adapter,
+            **({"title": args.title or ""} if titled else {}),
             "match": m.to_dict() if m else None,
             "reason": f"rule {m.rule} matched" if m else "no screen rule matched",
             "tail": tail,
@@ -4197,6 +4202,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id", nargs="?")
     p.add_argument("--file", help="a saved screen to classify with an adapter's rules instead of a live session")
     p.add_argument("-a", "--adapter", default="claude-code", help="whose rules, with --file")
+    p.add_argument("--title", help="the pane's title, with --file, for a tool that writes its state there")
     p.add_argument("-n", "--lines", type=int, default=40)
     p.set_defaults(fn=cmd_explain)
 

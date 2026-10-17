@@ -2487,6 +2487,14 @@ class HostAgent(
             src = "foreground process" if adapter.state_source == "scraped" else "hooks only"
             out["reason"] = f"{s.adapter} has no screen rules; its state comes from {src}"
             return out
+        if getattr(adapter, "state_in_title", False):
+            # the tool's title is its rule (§4.2 *A title the tool writes its state into*), the evidence
+            pane = (await asyncio.to_thread(self.tmux.main_panes)).get(id)
+            title = pane.title if pane else ""
+            m = explain(tail, title=title)
+            out["title"], out["match"] = title, m.to_dict() if m else None
+            out["reason"] = self._title_reading(s, m, now)[1]
+            return out
         m = explain(tail)
         out["match"] = m.to_dict() if m else None
         if m is None:

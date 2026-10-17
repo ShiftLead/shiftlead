@@ -22,7 +22,8 @@ from pathlib import Path
 
 from sessionorc import paths
 from sessionorc.adapters import LaunchSpec
-from sessionorc.models import Confidence, State
+from sessionorc.models import Confidence, Pending, State
+from sessionorc.screen import Match
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
 from shiftlead.adapters.claude_code import _resolves, hook_command
@@ -119,6 +120,9 @@ class GeminiAdapter:
     name = NAME
     label = "Gemini"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
+    # the tool writes its state into its terminal title: the tick asks `explain` with the pane's title
+    # and writes its verdict with `confidence: title` (design §4.2 *A title the tool writes its state into*)
+    state_in_title = True
     # no hook answers a confirmation: a pending permission is answered in the terminal (§4.3, §4.5a)
     permission_channel = False
     # the optional methods it has, tested by the conformance suite (design §4.3, TD-112): none yet — the
@@ -169,6 +173,15 @@ class GeminiAdapter:
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
         return None  # hook-fed: the screen has no opinion; the title's check is the tick's (§4.3)
+
+    def explain(self, tail: list[str], title: str = "") -> Match | None:
+        """The title's verdict (design §4.3 *Two gaps*): the state its leading glyph says, `✋` a question
+        with no text — the tick writes the text by the state it replaces. The tail is not read."""
+        state = title_state(title)
+        if state is None:
+            return None
+        pending = Pending(kind="question", text="") if state == "needs-you" else None
+        return Match(rule=f"title {title.lstrip()[0]}", state=state, evidence=[title.strip()], pending=pending)
 
     # -- account ---------------------------------------------------------------------------------
 
