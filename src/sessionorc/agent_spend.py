@@ -11,7 +11,9 @@ home's, and the account's sums come back to the node in the reply and as `usage 
 Beside it, once a minute, the **seat pass** (§4.4 *Spend per seat*, TD-830): every profile a live
 session runs under, a subscription's included, read with cursors of its own into `seat_spend.json`
 (`sessionorc.seats`), each turn weighed and charged to a record and a reference; the `seats` RPC
-reads it. Nothing gates on it.
+reads it. Nothing gates on it. A node's seat pass sends its turns home as `seat_spend {profile,
+prices, turns, cursors, roots}` (TD-833), of `spend`'s shape, and the home charges them against the
+node's records it holds.
 """
 
 from __future__ import annotations
@@ -351,9 +353,13 @@ class SpendMixin:
         """`spend(profile, seat cursors)` for every profile this host's live sessions run under, each
         turn weighed and charged (`seats.take`); a profile's first read on this host (not yet in the
         host's `seeded`) is its backfill — the fortnight before it, to `between`. `seat_spend.json` is
-        written only when a turn was charged, a cursor moved or a claim was first seen."""
+        written only when a turn was charged, a cursor moved or a claim was first seen. A node's pass
+        sends its turns home instead (`_seats_to_home`)."""
         live = {(s.adapter, s.profile) for s in self._usage_live()}
         metered = await asyncio.to_thread(_metered_of, live)
+        if self.mode == "node":
+            await self._seats_to_home(live, metered)
+            return
         weights = settings_mod.weights(settings_mod.load())
         now = datetime.now().astimezone()  # the home's own clock, as the account ledger's days
         ledger = self._seats
@@ -364,26 +370,17 @@ class SpendMixin:
         first = bool(live) and "began" not in ledger
         if first:
             ledger["began"] = now_iso()
-        # a claim seen by the pass that began the ledger was made before it: its entry reads partial
-        moved = seats.see_claims(ledger, records, now_iso(), first) if live else False
+        # a claim seen by the pass that began the ledger was made before it: its entry reads partial; a
+        # node's claims are seen here too, since its turns are charged here (`_take_seat_spend`)
+        claimants = [*records, *(r for recs in self.remote.values() for r in recs.values())]
+        moved = seats.see_claims(ledger, claimants, now_iso(), first) if live else False
         for name, prof in sorted(live):
-            ad = adapters.get(name)
-            if not callable(getattr(ad, "spend", None)):
-                continue
             cursors = {
                 str(src): int(c["offset"]) for src, c in held.items() if isinstance((c or {}).get("offset"), int)
             }
-            try:
-                r = await asyncio.to_thread(ad.spend, prof, cursors)
-            except Exception as e:  # noqa: BLE001 — the adapter's failure is a reason, never the pass's
-                r = {"reason": f"error: {type(e).__name__}"}
-            if not isinstance(r, dict) or r.get("reason") != "ok":
-                why = str(r.get("reason") or "error") if isinstance(r, dict) else "error"
-                if self._seat_reason.get(prof) != why:
-                    log.info("seat spend for %s: %s", prof, why)  # once per change
-                self._seat_reason[prof] = why
+            r = await self._read_seats(name, prof, cursors)
+            if r is None:
                 continue
-            self._seat_reason.pop(prof, None)
             backfill = prof not in seeded  # a profile's first read is its backfill, whenever it first runs
             moved = (
                 seats.take(ledger, self.host, r, records, metered.get((name, prof)), weights, now, backfill) or moved
@@ -398,6 +395,107 @@ class SpendMixin:
             seats.prune(ledger, now.date())
         if moved:
             await self._save_seats()
+
+    async def _read_seats(self, name: str, prof: str, cursors: dict[str, int]) -> dict[str, Any] | None:
+        """The adapter's `spend` for `prof` from `cursors`, or None with its reason logged once per change."""
+        ad = adapters.get(name)
+        if not callable(getattr(ad, "spend", None)):
+            return None
+        try:
+            r = await asyncio.to_thread(ad.spend, prof, cursors)
+        except Exception as e:  # noqa: BLE001 — the adapter's failure is a reason, never the pass's
+            r = {"reason": f"error: {type(e).__name__}"}
+        if not isinstance(r, dict) or r.get("reason") != "ok":
+            why = str(r.get("reason") or "error") if isinstance(r, dict) else "error"
+            if self._seat_reason.get(prof) != why:
+                log.info("seat spend for %s: %s", prof, why)  # once per change
+            self._seat_reason[prof] = why
+            return None
+        self._seat_reason.pop(prof, None)
+        return r
+
+    # -- a node's seat turns (§4.4 *Spend per seat*, *A node's turns*; TD-833) ----------------------
+
+    async def _seats_to_home(self, live: set[tuple[str, str]], metered: dict[tuple[str, str], Any]) -> None:
+        """A node's seat pass: the seat ledger and its cursors are the home's, which holds this node's
+        records, so each profile's turns go home as `seat_spend {profile, prices, turns, cursors,
+        roots}` and the reply's cursors are the ones read from next — `spend`'s road (§4.4a). The first
+        call on each link is a read; while the profile is not seeded on this host only the cursors
+        travel (the transcripts' ends), with the turns of a transcript the home already holds; a long
+        batch goes in pieces. `roots` is each turn's `cwd`'s worktree, read on this node's disk, where
+        the record's `dir` is. Offline nothing is read: the turns wait in the transcripts, from the
+        home's cursors, for the next dial."""
+        mux = self._home_mux if self._snapshot_sent else None
+        if mux is None:
+            return
+        for name, prof in sorted(live):
+            prices = metered.get((name, prof))
+
+            async def call(turns: list[dict[str, Any]], cursors: dict[str, int], prof: str = prof, prices=prices):
+                roots = {c: seats.worktree_root(c) for c in sorted({str(t.get("cwd") or "") for t in turns}) if c}
+                reply = await mux.request(
+                    "seat_spend", timeout=link.LINK_SILENCE, profile=prof, prices=prices, turns=turns, cursors=cursors,
+                    roots=roots,
+                )  # fmt: skip
+                if not isinstance(reply, dict) or not isinstance(reply.get("cursors"), dict):
+                    raise link.LinkError(f"a seat_spend reply without cursors: {reply!r}")
+                state = {"cursors": _offsets(reply), "seeded": bool(reply.get("seeded"))}
+                self._seat_link[prof] = state
+                return state
+
+            try:
+                state = self._seat_link.get(prof) or await call([], {})
+                r = await self._read_seats(name, prof, state["cursors"])
+                if r is None:
+                    continue
+                turns = [t for t in r.get("turns") or () if isinstance(t, dict)]
+                if not state["seeded"]:
+                    turns = [t for t in turns if t.get("source") in state["cursors"]]
+                cursors = {s: o for s, o in (r.get("cursors") or {}).items() if isinstance(o, int)}
+                if not turns and state["seeded"] and cursors == state["cursors"]:
+                    continue
+                for piece in spend_mod.pieces({"turns": turns, "cursors": cursors}):
+                    await call(piece["turns"], piece["cursors"])
+            except (link.LinkError, link.LinkClosed, TimeoutError) as e:
+                # the home drops what it already charged turn by turn: the next pass sends it again
+                log.warning("seat spend for %s did not reach %s: %s", prof, self.home, e)
+                self._seat_link.pop(prof, None)
+
+    async def _take_seat_spend(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """A node's `seat_spend` (TD-833): its turns into the seat ledger under that host's cursors,
+        each owned among the node's records the home holds and charged as the home's own are — a turn
+        at or before its transcript's cursor dropped, so a resent batch is never charged twice. While
+        the profile is not seeded on that host, a transcript the home holds no cursor for takes its end
+        and charges nothing (the seeding sends cursors alone), and the call seeds it. With no turns and
+        no cursors it is a read; the reply is the cursors and whether the profile is seeded."""
+        prof = str(params.get("profile") or "")
+        turns, cursors = params.get("turns") or [], params.get("cursors") or {}
+        roots = params.get("roots") if isinstance(params.get("roots"), dict) else {}
+        if not prof or not isinstance(turns, list) or not isinstance(cursors, dict):
+            raise link.LinkError("a seat_spend names a profile, with turns and cursors")
+        raw = params.get("prices")
+        prices = {k: float(v) for k, v in raw.items() if _amount(v)} if isinstance(raw, dict) else None
+        turns = [t | {"cost": t.get("cost") if _amount(t.get("cost")) else None} for t in turns if isinstance(t, dict)]
+        ledger = self._seats
+        h = ledger.setdefault("hosts", {}).setdefault(host, {})
+        seeded = set(h.get("seeded") or ())
+        if turns or cursors:
+            if prof not in seeded:
+                held = h.get("cursors") or {}
+                turns = [t for t in turns if t.get("source") in held]  # a known transcript keeps counting
+            if "began" not in ledger:
+                ledger["began"] = now_iso()
+            records = list((self.remote.get(host) or {}).values())
+            seats.see_claims(ledger, records, now_iso())
+            seats.take(
+                ledger, host, {"turns": turns, "cursors": cursors}, records, prices,
+                settings_mod.weights(settings_mod.load()), datetime.now().astimezone(),
+                root_of=lambda cwd: str(roots.get(cwd) or seats.ROOT_GONE),
+            )  # fmt: skip
+            h = ledger["hosts"][host]
+            h["seeded"] = sorted(seeded | {prof})
+            await self._save_seats()
+        return {"cursors": _offsets(h), "seeded": prof in (h.get("seeded") or [])}
 
     async def _save_seats(self) -> None:
         """`seat_spend.json` written when it changed: one writer (the pass, and a `done` that lands),

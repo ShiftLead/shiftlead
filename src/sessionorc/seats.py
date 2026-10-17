@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import re
 import statistics
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -183,11 +184,13 @@ def take(
     weights: dict[str, Any],
     now: datetime,
     backfill: bool = False,
+    root_of: Callable[[str], str] = worktree_root,
 ) -> bool:
     """One profile's `spend` read into `ledger` (mutated) for `host`'s cursors; whether anything was
     charged or a cursor moved. `prices` is the profile's when it is metered, else None. A backfill
     charges every turn of a transcript it holds no cursor for to `between`; any transcript with no
-    cursor drops its turns older than `BACKFILL`."""
+    cursor drops its turns older than `BACKFILL`. `root_of` gives a `cwd`'s worktree: the home reads
+    its own disk, and a node's turns carry the roots the node read (`seat_spend`, TD-833)."""
     cursors = ledger.setdefault("hosts", {}).setdefault(host, {}).setdefault("cursors", {})
     by_id = {r.id: r for r in records}
     by_source: dict[str, list[dict[str, Any]]] = {}
@@ -217,7 +220,7 @@ def take(
         if keep and (owner is None or owner == OUTSIDE):
             cwd = str(next((t.get("cwd") for t, _ in keep if t.get("cwd")), "") or "")
             if root is None:
-                root = worktree_root(cwd)
+                root = root_of(cwd)
             owner = owner_of(keep[0][0] | {"cwd": cwd}, records, root) or OUTSIDE
         if owner != OUTSIDE and owner not in by_id:
             owner = OUTSIDE  # its record was forgotten since: outside shiftlead, as the backfill reads it

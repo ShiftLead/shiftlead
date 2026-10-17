@@ -714,6 +714,7 @@ class HostAgent(
         self._seats_at = 0.0  # monotonic: when the last pass started
         self._seats_pruned = ""
         self._seat_reason: dict[str, str] = {}
+        self._seat_link: dict[str, dict[str, Any]] = {}  # a node's: per profile, the home's seat cursors on this link
         # A node's side of the road (§4.4a, TD-151 slice 4): per profile, the cursors and seeding the
         # home answered on this link (cleared on each dial) and the last cursors it acknowledged (kept
         # for the offline figure); per account, the sums the home last sent. The home's side: the

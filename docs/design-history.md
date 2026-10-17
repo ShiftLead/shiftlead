@@ -297,6 +297,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.4a Home and nodes: one session graph across hosts (first half)
 
+- 2026-10-17 (TD-833, grinder-ao-1): a node's seat turns travel home as `seat_spend {profile, prices, turns, cursors, roots}`, `spend`'s road: a read first on each dial, a seeding that sends cursors alone, pieces, and a resend charged once; the home charges them against the node's records, owned by `cwd` under the worktree root the node read (`roots`).
 - 2026-10-17 (TD-856, the designer): `NODE_READS` gains `git_files`, the sixth — the Focus Git card's pick reads a tree only the node's disk holds.
 - 2026-10-17 (TD-830, grinder-ao-1): the seat ledger's `seats` joins the readings' row — forwarded while the link is up, refused offline, since `seat_spend.json` is the home's and a node holds none.
 - 2026-10-16 (TD-801, the designer; Fable round 3): a node's own shell is bound to that node's records as a person there is, and an act of the person's own shell crosses the link with no caller. Built by TD-802.

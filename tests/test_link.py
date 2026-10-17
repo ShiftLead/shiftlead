@@ -12,7 +12,7 @@ import sys
 import pytest
 from conftest import CHILD, FAST_TICK, kill_private_server, private_socket_name, wait_for
 
-from sessionorc import link, paths
+from sessionorc import link, paths, seats
 from sessionorc.agent import HostAgent
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.tmux import Tmux
@@ -2161,6 +2161,75 @@ async def test_a_nodes_metered_turns_are_ledgered_at_the_home_once_and_its_readi
         await node._refresh_spend_inner()
         await node._refresh_spend_inner()
         assert ledgered() == 3_000_000 and node._usage["api"]["windows"][0]["pct"] == 60
+        async with LocalClient() as c:
+            await c.call("kill", id=w["id"])
+
+
+async def test_a_nodes_seat_turns_reach_the_homes_seat_ledger_once_under_its_record(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """§4.4 *Spend per seat* (*A node's turns*, TD-833): a node's seat pass sends its turns home as
+    `seat_spend`; the first call on a link reads the home's cursors, the seeding carries only the
+    cursors, and a turn is charged at the home once, to the node's record its `cwd` names under the
+    worktree root the node read."""
+    import json
+    from datetime import UTC, datetime
+
+    from conftest import park_ticks
+
+    at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    cwd = str(tmp_path)
+
+    def turn(uid, offset):
+        return {"at": at, "id": uid, "source": "t1", "offset": offset, "response": f"r-{uid}", "model": "m",
+                "input": 1_000_000, "output": 0, "cache_read": 0, "cache_write": 0, "cost": None,
+                "conversation": "", "cwd": cwd}  # fmt: skip
+
+    def ledger():
+        try:
+            return json.loads((home.dir / "seat_spend.json").read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def charged(rid):
+        return sum(
+            m.get("turns", 0)
+            for rows in ledger().get("days", {}).values()
+            for m in rows.get(rid, {}).get("models", {}).values()
+        )
+
+    hookstub.billing, hookstub.accounts = {}, {}  # a subscription: read for the seat ledger alone
+    hookstub.spend_turns = [turn("u0", 0)]  # history: the seeding charges none of it
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
+        node._seats_at = float("inf")  # the tick's own pass never races the passes taken here
+        assert await wait_for(lambda: node._snapshot_sent, timeout=10.0, step=0.05)
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=cwd, adapter=hookstub.name, profile="sub")
+        for _ in range(150):  # the home holds the node's record before its turns arrive
+            async with LocalClient(sock=home.dir / "agent.sock") as h:
+                if f"{w['id']}@laptop" in {v["id"] for v in await h.call("list")}:
+                    break
+            await asyncio.sleep(0.1)
+        await park_ticks(node)
+        sent: list[dict] = []
+        real = node._home_mux.request
+
+        async def spy(method, timeout=None, **params):
+            if method == "seat_spend":
+                sent.append(params)
+            return await real(method, timeout=timeout, **params)
+
+        monkeypatch.setattr(node._home_mux, "request", spy)
+        await node._refresh_seats_inner()  # the read, then the seeding: cursors only
+        assert [(p["turns"], p["cursors"]) for p in sent] == [([], {}), ([], {"t1": 1})]
+        assert node._seat_link["sub"] == {"cursors": {"t1": 1}, "seeded": True}
+        assert ledger()["hosts"]["laptop"]["seeded"] == ["sub"] and charged(w["id"]) == 0
+        hookstub.spend_turns.append(turn("u1", 1))
+        await node._refresh_seats_inner()
+        await node._refresh_seats_inner()  # nothing new: nothing sent, nothing charged twice
+        assert len(sent) == 3 and sent[2]["roots"] == {cwd: seats.worktree_root(cwd)}
+        assert charged(w["id"]) == 1 and node._seats.get("days") in (None, {}), "the node keeps no ledger"
         async with LocalClient() as c:
             await c.call("kill", id=w["id"])
 

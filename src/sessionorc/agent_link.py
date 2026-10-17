@@ -182,6 +182,7 @@ class LinkMixin:
             self._home_mux = mux
             self._snapshot_sent = False
             self._spend_link.clear()  # the first `spend` on a new link reads the home's cursors again
+            self._seat_link.clear()  # and the first `seat_spend` (TD-833)
             if up:
                 task = asyncio.ensure_future(self._send_snapshot(mux))
                 self._bg.add(task)

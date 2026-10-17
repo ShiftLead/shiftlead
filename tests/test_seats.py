@@ -321,3 +321,34 @@ async def test_a_subscription_profiles_turns_reach_the_seat_ledger_and_nothing_t
         assert "spend" not in settings.load()
         await person.call("kill", id=w["id"])
         await person.call("remove", id=w["id"])
+
+
+async def test_the_home_charges_a_nodes_seat_turns_once_and_its_seeding_charges_nothing(agent):
+    """`seat_spend` at the home (TD-833): a read answers the cursors and whether the profile is
+    seeded; the seeding takes a new transcript's end and charges nothing; a turn is owned among the
+    node's records by the roots the node read, and a resent batch — a lost reply — is not charged
+    twice. The home's own records never own a node's turn."""
+    from test_link import record
+
+    await park_ticks(agent)
+    agent._take_records(
+        "laptop", [record(rid="ao-x-n", name="n", dir="/srv/w/n", team="t", role="grinder")], whole=True
+    )
+    agent.sessions["ao-x-mine"] = _rec("ao-x-mine", dir="/srv/w")  # the same path at the home: not the node's
+    now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    got = await agent._take_seat_spend("laptop", {"profile": "sub", "prices": None, "turns": [], "cursors": {}})
+    assert got == {"cursors": {}, "seeded": False}
+    old = _t("u0", 0, conv="", cwd="/srv/w/n/src", at=now)
+    got = await agent._take_seat_spend(
+        "laptop", {"profile": "sub", "prices": None, "turns": [old], "cursors": {"t1": 1}}
+    )
+    assert got == {"cursors": {"t1": 1}, "seeded": True} and agent._seats.get("days", {}) == {}
+    new = _t("u1", 1, conv="", cwd="/srv/w/n/src", at=now)
+    call = {"profile": "sub", "prices": None, "turns": [new], "cursors": {"t1": 2}, "roots": {"/srv/w/n/src": "/srv/w"}}
+    assert (await agent._take_seat_spend("laptop", call))["cursors"] == {"t1": 2}
+    await agent._take_seat_spend("laptop", call)  # the reply was lost: the node sends it again
+    rows = next(iter(agent._seats["days"].values()))
+    assert set(rows) == {"ao-x-n"} and rows["ao-x-n"]["models"]["claude-sonnet-4-6"]["turns"] == 1
+    assert rows["ao-x-n"]["role"] == "grinder" and rows["ao-x-n"]["metered"] is False
+    with pytest.raises(Exception, match="names a profile"):
+        await agent._take_seat_spend("laptop", {"turns": [], "cursors": {}})

@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-829 | Build TD-816 (2): the Queue's picks answer in the browser and persist, and the window is drawn before the first paint | Medium | Open |
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
 | TD-832 | Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card | Medium | Open |
-| TD-833 | Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`) | Low | Open |
 | TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
@@ -1512,24 +1511,6 @@ The other cases:
 
 **Related:** TD-818, TD-830, TD-819 (team shape reads this page's numbers).
 
-## TD-833: Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`)
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-17 (TD-818's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-830
-**Location:** design §4.4 *Spend per seat* (*A node's turns*), §4.4a; `src/sessionorc/agent_spend.py` (the node's send, beside the `spend` call), `src/sessionorc/agent_remote.py` (the home's handler, beside `_take_spend`), `src/sessionorc/agent_link.py`
-
-**Why:** TD-818: a seat on a container node spends from the same login, and its turns are read only on that node.
-
-**Fix:** the node's seat pass sends `seat_spend {turns, cursors}`, a link method of `spend`'s shape. The cursors are the home's; the first call is a read of them; the seeding sends cursors alone; long batches go in pieces ending at a turn's offset; a lost request or reply is resent and deduplicated turn by turn. The home charges the turns against the node's records it holds. **Tests:** a node's turn lands once under its record; a lost reply does not double it; the seeding sends no turns.
-
-**Done when** a seat on the container node reads its figure on the Spend page as a kmaster seat does.
-
-**Related:** TD-818, TD-830, TD-151 slice 4 (the `spend` method it copies).
 
 ---
 
