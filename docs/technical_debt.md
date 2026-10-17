@@ -66,7 +66,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Designed — built by TD-811, TD-812 |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
-| TD-811 | Build TD-804 (1): a promote's smoke at the home — `smoke:` run once `check` reads the commit, the promote in flight until it ends, a failed smoke rolling back to `from` with the hold, and the row's and `ao promote status`'s words | Medium | Open |
+| TD-811 | Build TD-804 (1): a promote's smoke at the home — `smoke:` run once `check` reads the commit, the promote in flight until it ends, a failed smoke rolling back to `from` with the hold, and the row's and `ao promote status`'s words | Medium | Building — slice 1 #2033 |
 | TD-812 | Build TD-804 (2): this repo's smoke — `scripts/smoke.py`, every page loaded and `ao` read against the live copy, and `smoke:` in `.shiftlead.yml` | Medium | Open |
 | TD-816 | The Queue page reads as one long list: its groups carry no count and do not fold, a card's attached mail is one run with no sections or Dismiss all, a filter press reloads the 2.4 s page, and the picks are lost on the Queue tab | Medium | Open |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Open |
@@ -1315,7 +1315,7 @@ Then the build entries, named in `Blocked by:`.
 **Added:** 2026-10-16 (TD-804's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Building — slice 1 #2033 (2026-10-17, grinder-ao-1): the home — `smoke` read by both readers, kept on the intent from the run's tree, started once `check` reads the commit, judged from `smoke.json`, `SMOKE_BOUND`, the rollback a failed one starts (`by: smoke`, the hold's `by` and `why`), the notes. Slice 2: the row's and `ao promote status`'s words (`promote_rows`, `_promote_line`), with a UI check.
 **Location:** design §6 *Promote* *The smoke*, §5 `promote:`, §4.5a *Inbox row: promote*, §4.7 `ao promote status`; `src/sessionorc/promote.py` (`KEYS`, `block` read on the tree, `_conclude`, `_concluded`, `survey`, `start`, `note_text`), the home's `PromoteMixin`; `src/shiftlead/repoconfig.py` (`PROMOTE_KEYS`, `_promote`); the promote row in `src/shiftlead/ui/` and `ao promote status` in `src/shiftlead/cli.py`
 
 **Why:** TD-804, slice 1: today a promote is done when `check` reads the commit, and a build that breaks on the person's real state stays live until the person finds it.

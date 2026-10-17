@@ -760,11 +760,13 @@ def _mapping(value: Any, where: str) -> dict[str, Any]:
 
 
 PROMOTE_KEYS = ("run", "check")
+PROMOTE_OPTIONAL = ("smoke",)  # run once `check` reads the commit (§6 *The smoke*, TD-804)
 
 
 def _promote(value: Any, where: str) -> dict[str, str] | None:
-    """`promote: {run, check}` (design §5): both commands, each a non-empty string. `auto` is not
-    this file's: it is the person's switch, in `settings.yml` (§5, the Settings page)."""
+    """`promote: {run, check[, smoke]}` (design §5): `run` and `check` both, `smoke` optional, each a
+    command, a non-empty string. `auto` is not this file's: it is the person's switch, in
+    `settings.yml` (§5, the Settings page)."""
     if value is None:
         return None
     if not isinstance(value, dict):
@@ -774,8 +776,8 @@ def _promote(value: Any, where: str) -> dict[str, str] | None:
         k = str(k)
         if k == "auto":
             raise ValueError(f"{where}.auto is not this file's: it is `repos.<repo>.promote.auto` in settings.yml")
-        if k not in PROMOTE_KEYS:
-            raise ValueError(f"{where}.{k} is not a promote key ({', '.join(PROMOTE_KEYS)})")
+        if k not in PROMOTE_KEYS + PROMOTE_OPTIONAL:
+            raise ValueError(f"{where}.{k} is not a promote key ({', '.join(PROMOTE_KEYS + PROMOTE_OPTIONAL)})")
         if not isinstance(v, str) or not v.strip():
             raise ValueError(f"{where}.{k} must be a command, a non-empty string")
         out[k] = v.strip()
