@@ -2241,10 +2241,7 @@ class HostAgent(
             raise RpcError(f"{s.name}: a shell runs no turns: there is nothing to wrap up — Close it (design §4.3)")
         s.wrapup_at = now_iso() if wrapup else None
         s.wrapup_by = closer_of(caller, None, "")["by"] if wrapup else None  # who stopped it (§6 rule 8, TD-781)
-        entry = self._record_send(s, caller, text)
-        if key:
-            entry.key = str(key)
-            self.store.save(s)
+        entry = self._record_send(s, caller, text, key=str(key) if key else None)
         if mail.as_person(caller, self._graph()):
             self._refill(s)
         typing: asyncio.Future[None] | None = None
@@ -2350,13 +2347,13 @@ class HostAgent(
 
         return answer()
 
-    def _record_send(self, s: Session, caller: Any, text: str) -> SendEntry:
+    def _record_send(self, s: Session, caller: Any, text: str, key: str | None = None) -> SendEntry:
         """`sends` (design §4.10): what was typed into this pane and by whom, minted and stamped
         here like a message, bounded to the last `SENDS_KEEP`. Written at the gate — before the
         paste, since a paste that then sticks still reached the pane — and its verdict amended if
         the submit fails."""
         who = PERSON if mail.is_person(caller) else str(caller)
-        entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text)
+        entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text, key=key)
         s.sends = (s.sends + [entry])[-mail.SENDS_KEEP :]
         self.store.save(s)
         return entry
