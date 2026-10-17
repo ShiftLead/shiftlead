@@ -231,6 +231,7 @@ class TickMixin:
             await self._red_prs(snapshot_at)
             await self._queue_pass(snapshot_at)
             await self._rank_pass(snapshot_at)
+            await self._shape_tick(snapshot_at)
         if self.mode == "home" and (self._promote_task is None or self._promote_task.done()):
             # detached as the repo facts are: a fetch, `gh` and a repo's own `check` (§6 *Promote*)
             self._promote_task = asyncio.create_task(self._refresh_promotes())
