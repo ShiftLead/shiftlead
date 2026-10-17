@@ -220,3 +220,56 @@ def test_a_step_that_fails_says_what_it_read_and_stops_the_walk(tmp_path, monkey
     assert walk.results[-1][:2] == ("a permission", False)
     assert said[-1].startswith("FAIL  a permission: no permission was seen: state idle (hook)")
     assert "msg" not in fake.calls  # nothing after a failed step
+
+
+def test_the_scratch_home_holds_the_one_profile_as_default_and_a_committed_walk_directory(tmp_path):
+    """TD-797: `write_home`'s `profiles.yml` is read back by `profiles.load`, and the walk's directory is a repo."""
+    import subprocess
+
+    from shiftlead import profiles
+
+    cw = _load()
+    cfg = tmp_path / "claude-conformance"
+    live = _profiles(
+        tmp_path, f"profiles:\n  conformance: {{adapter: claude-code, account: c, model: sonnet, config_dir: {cfg}}}\n"
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+    work = cw.write_home(home, "conformance", cw.scratch_profile("claude-code", "conformance", live))
+    got, default = profiles.load(home / "profiles.yml")
+    assert default == "conformance" and set(got) == {"conformance"}
+    p = got["conformance"]
+    assert (p.adapter, p.account, p.model, p.permission_prompts) == ("claude-code", "c", "sonnet", "ask")
+    assert p.config_dir == cfg
+    assert work == home / "walk"
+    head = subprocess.run(["git", "-C", str(work), "log", "--format=%s"], capture_output=True, text=True, check=True)
+    assert head.stdout.split() == ["walk"]
+
+
+def test_save_capture_copies_the_payloads_and_writes_the_pane_titles(tmp_path, monkeypatch):
+    """TD-797: every `*.jsonl` of the capture directory and `titles.json` from the walk's tmux server
+    land in `dest`; an empty capture copies no payload."""
+    cw = _load()
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        return cw.subprocess.CompletedProcess(cmd, 0, stdout="claude · walk\n✳ thinking\n", stderr="")
+
+    monkeypatch.setattr(cw.subprocess, "run", run)
+    capture = tmp_path / "capture"
+    capture.mkdir()
+    (capture / "Stop.jsonl").write_text('{"hook": "Stop"}\n', encoding="utf-8")
+    (capture / "statusline.jsonl").write_text('{"model": "m"}\n', encoding="utf-8")
+    (capture / "notes.txt").write_text("not a payload", encoding="utf-8")
+    dest = tmp_path / "fixtures" / "claude-code" / "captured"
+    out = cw.save_capture(capture, dest, "ao-walk")
+    assert sorted(p.name for p in out) == ["Stop.jsonl", "statusline.jsonl", "titles.json"]
+    assert (dest / "Stop.jsonl").read_text(encoding="utf-8") == '{"hook": "Stop"}\n'
+    assert not (dest / "notes.txt").exists()
+    assert json.loads((dest / "titles.json").read_text(encoding="utf-8")) == ["claude · walk", "✳ thinking"]
+    assert calls == [["tmux", "-L", "ao-walk", "list-panes", "-a", "-F", "#{pane_title}"]]
+    empty, dest2 = tmp_path / "empty", tmp_path / "dest2"
+    empty.mkdir()
+    assert [p.name for p in cw.save_capture(empty, dest2, "ao-walk")] == ["titles.json"]
+    assert sorted(p.name for p in dest2.iterdir()) == ["titles.json"]
