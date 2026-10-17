@@ -519,6 +519,7 @@ class SendEntry:
     text: str
     verdict: str = "submitted"  # or the submit error (`prompt-stuck`, …): the paste still reached the pane
     scraped: bool = False  # the brief sent on a scraped `idle`, no hook having reported (§4.1, TD-348)
+    key: str | None = None  # the page's id for this send: a repeat with it lands once (§4.10, TD-806)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

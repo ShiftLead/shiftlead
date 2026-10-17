@@ -78,6 +78,8 @@ MAIL_RETENTION: timedelta | None = timedelta(hours=12)  # how long a read entry 
 # questions in one night alike, and a seat filled by `--keep-mail` carries the outbox with it.
 SOURCED_RETENTION = timedelta(days=7)
 SENDS_KEEP = 20  # `sends` entries a record keeps
+# how long a send's `key` answers a repeat as the first send (§4.10 *A send lands once*, TD-806)
+SEND_KEY_SECONDS = 600
 NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonce retry
 WAKE_BUDGET: int | None = 30  # mail-caused wakes a session may take per WAKE_WINDOW; measured: a lead took 4 an hour
 WAKE_WINDOW = timedelta(hours=1)  # the rolling window the wake budget counts charged wakes in
