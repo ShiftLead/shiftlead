@@ -79,11 +79,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
-| TD-852 | #2040's smoke script has six lines no test reads: its browser half, `--setup`, the JSON check on `ao`'s reads and the `reach.url` read | Medium | Open |
 | TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
 | TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Open |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Open |
+| TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
 | TD-859 | Build TD-818 (5): the `seats` RPC's month, period, series, team rows, top sessions and interactive seats | Medium | Open |
 | TD-860 | #2048's waiting-claims tests leave five lines unread: the closed-PR exclusion, the replay's `keep_mail` gate, the held ask's sender, the rename carry and the carry-over dedup; #2045's `shown_in` completed counts too | Medium | Open |
 | TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
@@ -1704,37 +1704,6 @@ Then file the build entry and name it in `Blocked by:`.
 
 ---
 
-## TD-852: #2040's smoke script has six lines no test reads: its browser half (`browse`'s page-error catch and `UNAVAILABLE`), `--setup`'s Chromium step, the JSON check on `ao`'s reads, and the `reach.url` read
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, the audit of #2033–#2042)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `scripts/smoke.py` (`ao_reads`, `reach_url`, `main`, `browse`, `setup`); `tests/test_smoke.py`
-
-**Why:** each change was made alone on `origin/main` (after #2044), and `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_smoke.py tests/test_ui_focus_hyperlinks.py` still passed (11 passed) every time:
-- `ao_reads`: `json.loads(p.stdout)` replaced by `pass`. The design's rule that each read "must each exit 0 with JSON" (the module docstring) is unread: the stub `ao` prints JSON on every pass, and no test has one that prints prose.
-- `browse`: `pg.on("pageerror", …)` replaced by `pass`. A page's uncaught script error, the one failure the browser half exists to catch, would pass the promote. `test_the_browser_half_runs_under_the_smoke_venv…` runs a shell stub that prints canned JSON rows, so `browse` itself is never run; nor is the `return UNAVAILABLE` after a failed launch (changed to `return 0`).
-- `setup`: `--only-shell chromium` changed to `chromium` (the docstring and AGENTS.md promise the headless shell). `test_the_cli_takes_setup_and_…` runs only `main(["--help"])`, whatever its name says.
-- `reach_url`: its `return (reach or {}).get("url") or None` changed to `return None`, and `main`'s `smoke(reach=reach_url())` to `smoke()`. Every reach test passes `reach=` straight to `smoke()`, so the read of `settings.yml` and the call that connects it are unread: the reach loads could be dead and the suite green.
-- Also: `PAGE_BOUND`-shaped tests sleep for real (`(1.5, …)` against a 1.0 s bound, `wait_bound=1.0`), which is why the module takes ~7 s; a `bound` that was shorter would do.
-`browse` needs Playwright, which the suite does not have: a fake `playwright.sync_api` module in `sys.modules` (a page whose `goto` raises, one whose `on("pageerror")` callback fires, a `launch` that raises) reaches it without a browser.
-
-**Fix:** tests, no change to `scripts/smoke.py`:
-1. `ao_reads`: a stub `ao` that exits 0 printing `not json` fails with `its output is not JSON`.
-2. `browse`: with a fake `playwright.sync_api`, a `pageerror` shows as the row's `error`, a `goto` that raises as `load never fired`, a `launch` that raises returns `UNAVAILABLE` and prints its first line to stderr.
-3. `setup`: with `subprocess.run` patched, the third step carries `--only-shell chromium`, and a failing step returns 1 naming it. Rename `test_the_cli_takes_setup_and_…` to what it checks, or have it check `main(["--setup"])`.
-4. `reach_url`: a `settings.yml` under `SHIFTLEAD_HOME` with `reach: {url: …}` reads back, a malformed one reads `None`; `main([])` with `smoke` patched receives it.
-5. Shorten the real sleeps with a smaller `bound`.
-
-**Done when** each of the four reverts above fails a test in `tests/test_smoke.py`, and the module runs in under 3 s.
-
-**Related:** TD-812 (the smoke), TD-848 (the same audit of #2033's promote code).
-
----
-
 ## TD-853: TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done
 
 **Priority:** Low
@@ -1832,6 +1801,26 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
 
 **Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
+
+---
+
+## TD-858: `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-2, met in TD-838's full local run)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_lane_news.py` (the `[after]` case, its last assertion at line ~440); `src/sessionorc/agent_tick.py` `_lane_news`
+
+**Why:** 2026-10-17, on `td838-permission-prompts-all` (which touches no `sessionorc` logic), `pdm run test -q -x` stopped on `assert len(notes) == 1 and "gained 1 entry since you declared out of work: TD-002" in notes[0]` with `notes == []`. The test file then passed three times alone, and CI passed the same commit on 3.12 and 3.13. So something in the case depends on timing or on state the full suite leaves behind. Candidates: `now` is `datetime.now(UTC)` while `out_of_work.at` and `last.json`'s `at` are fixed 2026-09-27 times, and the git commit is dated too. Or `_lane_news` reads the promote's `last.json` and the repo's ledger through a cache that an earlier test's home warmed.
+
+**Fix:** reproduce under the full suite (`pdm run test -q -p no:randomly` up to the file, or `--lf` after a failing run), find what the note waits on, and make the test hold it. No change to the rule unless the cause is in `_lane_news`.
+
+**Done when** the cause is named in this entry's Resolved, and the case passes ten full-suite runs in a row (or its fixture no longer depends on what it was found to depend on).
+
+**Related:** TD-411 (`lane_seen` and the live check that goes live after a `none`).
 
 ---
 
