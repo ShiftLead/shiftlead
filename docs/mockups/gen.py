@@ -2063,6 +2063,80 @@ def darken(html):
         html = html.replace(a, b)
     return html
 
+def spend_page():
+    """Screen 13, **Spend** (TD-818, built by TD-832; §4.5a *Spend page*): who spent the quota, a table per team with
+    each seat's API-equivalent figure, its share as a bar, per finished entry, between and the past-context shares,
+    then outside shiftlead, then the finished entries with what each role spent on them. Illustrative figures."""
+    def chip(t, on=False):
+        return (f'<span style="border: 1px solid #d0d5dc; border-radius: 5px; padding: 2px 9px; font-size: 12px;'
+                f'{" background: #e9edf2; font-weight: 600;" if on else ""}">{t}</span>')
+    def pillr(t):
+        return f'<span class="mono" style="font-size: 11.5px; border: 1px solid #c7d2fe; border-radius: 10px; padding: 0 7px;">{t}</span>'
+    def bar(pct):
+        return (f'<span style="display: inline-flex; align-items: center; gap: 6px;"><span style="display: inline-block; width: 90px; height: 8px; '
+                f'background: #eef1f4; border-radius: 4px; overflow: hidden;"><i style="display: block; height: 100%; width: {pct}%; background: #2563eb;"></i></span>'
+                f'<span class="mono" style="font-size: 12px;">{pct}%</span></span>')
+    cols = ("seat", "role", "≈ figure", "share", "turns", "per finished entry", "between", "past 200k", "past 300k")
+    def thead():
+        return ('<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.6fr .8fr 1.8fr 1fr .9fr .9fr; gap: 8px; padding: 6px 14px; '
+                'font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7480; border-bottom: 1px solid #e3e7ec;">'
+                + "".join(f"<span>{c}</span>" for c in cols) + "</div>")
+    def srow(name, role, fig, share, turns, per, between, p2, p3, sub=False):
+        st = "background: #f7f8fa; font-weight: 600;" if sub else ""
+        return ('<div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1.6fr .8fr 1.8fr 1fr .9fr .9fr; gap: 8px; padding: 8px 14px; '
+                f'border-top: 1px solid #eef1f4; align-items: center; font-size: 13px; {st}">'
+                f'<span>{"<a href=\"#\">" + name + "</a>" if not sub else name}</span><span>{pillr(role) if role else ""}</span>'
+                f'<span class="mono" style="font-weight: 600;">{fig}</span><span>{bar(share) if share is not None else ""}</span>'
+                f'<span class="mono">{turns}</span><span>{per}</span><span class="mono">{between}</span>'
+                f'<span class="mono">{p2}</span><span class="mono">{p3}</span></div>')
+    def panel(title, sub, body):
+        return (f'<div style="margin-top: 18px;"><div style="display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px;">'
+                f'<span style="font-size: 17px; font-weight: 600;">{title}</span><span class="meta" style="font-size: 12px;">{sub}</span></div>'
+                f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{body}</div></div>')
+    grind = thead() + "".join([
+        srow("grinder-ao-1", "grinder", "≈$52.30", 34, "611", "3 · median ≈$11.20", "≈$4.80", "12%", "2%"),
+        srow("grinder-ao-2", "grinder", "≈$47.90", 31, "540", "2 · median ≈$19.60", "≈$6.10", "15%", "4%"),
+        srow("grinders", "", "≈$100.20", 65, "1151", "5 · median ≈$13.40", "≈$10.90", "13%", "3%", sub=True),
+        srow("designer-ao-1", "designer", "≈$38.20", 25, "412", "2 · median ≈$14.90", "≈$3.10", "22%", "6%"),
+        srow("techlead-ao-1", "techlead", "≈$13.60", 9, "188", "—", "≈$13.60", "4%", "0%"),
+        srow("manager-ao-1", "manager", "≈$2.40", 1, "41", "—", "≈$2.40", "0%", "0%"),
+    ])
+    outside = thead() + srow("your own sessions", "", "≈$21.70", None, "233", "—", "—", "9%", "1%")
+    def erow(t, title, parts, total, turns, held):
+        return ('<div style="display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; border-top: 1px solid #eef1f4; font-size: 13px;">'
+                f'<a class="mono" href="#" style="font-size: 12.5px; font-weight: 600;">{t}</a><span style="flex: 1;">{title}</span>'
+                f'<span class="meta" style="font-size: 12px;">{parts}</span><span class="mono" style="font-weight: 600; width: 6em; text-align: right;">{total}</span>'
+                f'<span class="meta mono" style="font-size: 12px; width: 6em; text-align: right;">{turns} turns</span>'
+                f'<span class="meta" style="font-size: 12px; width: 5em; text-align: right;">{held}</span></div>')
+    entries = "".join([
+        erow("TD-813", "The page's send lands once (slice 2)", "grinder ≈$24.70", "≈$24.70", "301", "5h40m"),
+        erow("TD-817", "Open shell here reopens the session's live shell", "grinder ≈$11.20", "≈$11.20", "142", "2h05m"),
+        erow("TD-821", "A shell opened from a team member draws on that team", "designer ≈$9.80", "≈$9.80", "104", "1h10m"),
+        erow("TD-824", "Send-key tests catch the shield going", "grinder ≈$6.30", "≈$6.30", "77", "50m"),
+    ])
+    wins = ('<span style="display: inline-flex; border: 1px solid #d0d5dc; border-radius: 5px; overflow: hidden; font-size: 12px;">'
+            + "".join(f'<span style="padding: 2px 10px; border-left: 1px solid #d0d5dc;{" background: #e9edf2; font-weight: 600;" if w == "Day" else ""}">{w}</span>'
+                      for w in ("Day", "Week")) + "</span>")
+    filters = ('<div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px;">'
+               + wins + '<span style="width: 10px;"></span>' + chip("All") + chip("ao-grind", True) + chip("samscrape-grind") + "</div>")
+    note = ('<div class="note" style="margin-top: 18px;">Design notes, not page text. Reached from a team card\'s spend figure and the '
+            'Settings page\'s Usage heading; no top-bar tab. The figure\'s hover is the tokens by kind and the weights used. '
+            'Figures illustrative. Built by TD-832.</div>')
+    return head("Spend") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
+  <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Spend</span>
+    <span class="meta" style="font-size: 12px;">today · ≈ API-equivalent at your weights (as of 2026-10-17) — not a bill; a subscription's bound is its quota</span></div>
+  {filters}
+  {panel("ao-grind", "≈$154.40 today · 1,792 turns", grind)}
+  {panel("Outside shiftlead", "turns on these logins that no session record owns", outside)}
+  {panel("Finished entries", "4 today · by total, most first", entries)}
+  {note}
+</div>
+</div>
+''' + TAIL
+
+
 files = {
     "Main.dc.html": team_desktop(),
     "MainDark.dc.html": darken(team_desktop()),
@@ -2090,6 +2164,7 @@ files = {
     "Settings.dc.html": settings_page(),
     "RepoFacet.dc.html": repo_facet_board(),
     "Queue.dc.html": queue_page(),
+    "Spend.dc.html": spend_page(),
     "SettingsDark.dc.html": darken(settings_page()),
 }
 for n, s in files.items():
@@ -2122,6 +2197,7 @@ LAYOUT = [
     ("NewSession.dc.html", "New session", 1),
     ("RepoPage.dc.html", "Repo — the page (checked in from the canvas, 2026-09-26)", 1),
     ("Queue.dc.html", "Queue — the cards in rank order (TD-748, built by TD-771)", 1),
+    ("Spend.dc.html", "Spend — who spent the quota, per seat and per finished entry (TD-818, built by TD-832)", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
