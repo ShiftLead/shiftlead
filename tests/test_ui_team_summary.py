@@ -115,8 +115,9 @@ def test_tds_in_motion_derive_the_phase_and_merge_a_shared_reference():
 
 def test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch():
     # TD-197, the screenshot's three rows: a pickable design-first entry (the page's bucket says
-    # *pickable*) reads *design*; a claim whose PR waits for its reader while the grinder has moved
-    # to another branch reads *review*, found by the PR's head branch; a claim with nothing reads *grind*
+    # *pickable*) reads *design* while it has no PR (TD-814: with one, *review*); a claim whose PR
+    # waits for its reader while the grinder has moved to another branch reads *review*, found by
+    # the PR's head branch; a claim with nothing reads *grind*
     r = reading("/r/s")
     r["ledger"]["entries"] += [
         {"id": "TD-175", "title": "round log", "for_page": "pickable", "kind": "design-first", "priority": "medium"},
@@ -134,6 +135,23 @@ def test_tds_in_motion_read_the_entrys_kind_and_find_a_claims_pr_by_its_branch()
     assert rows["TD-186"]["pr_url"].endswith("/pull/628")
     # a merged slice's branch does not make the entry's next slice *review*
     assert rows["TD-146"]["phase"] == "grind" and rows["TD-146"]["pr"] is None
+    # TD-814: a design-first claim with a PR reads *review*, a design's PR as a build's — its own `pr`,
+    # or an open PR found by its branch alone; one without a PR still reads *design*
+    r["ledger"]["entries"] += [
+        {"id": "TD-177", "title": "designed", "for_page": "pickable", "kind": "design-first", "priority": "low"},
+        {"id": "TD-178", "title": "by branch", "for_page": "pickable", "kind": "design-first", "priority": "low"},
+    ]
+    r["prs"]["open"].append({"number": 631, "branch": "td178-design"})
+    ms[1]["progress"] += [claim("TD-177", pr=630), claim("TD-178")]
+    rows = {x["ref"]: x for x in ui.motion_rows(ms, r)}
+    assert rows["TD-175"]["phase"] == "design"
+    assert rows["TD-177"]["phase"] == "review" and rows["TD-177"]["pr"] == 630
+    assert rows["TD-178"]["phase"] == "review" and rows["TD-178"]["pr"] == 631
+    assert rows["TD-186"]["phase"] == "review" and rows["TD-146"]["phase"] == "grind"  # a build's as before
+    # one designer, one design without a PR and one with: *1 design · 1 review*, not *2 design*
+    d = [member("d1", progress=[claim("TD-175"), claim("TD-177", pr=630)])]
+    s = ui.team_summary("design", d, {"/r/samscrape": r}, {}, now=NOW)
+    assert s["phases"]["design"] == 1 and s["phases"]["review"] == 1
 
 
 def test_tds_in_motion_carry_the_entrys_priority_as_a_letter_and_sort_by_it():
@@ -295,7 +313,7 @@ def test_the_doing_feed_keeps_its_scroll_across_the_summary_swap():
     assert restore > js.index("showSummary(sum);", sync) > sync  # the face is shown, then the box scrolled
     # …and the Repo page draws the same cards, swapped by the same deltas (TD-740): its re-read is the lists alone
     repo = js[js.index("AO.repo = function") : js.index("AO.heldWords = function")]
-    assert 'lists.innerHTML = await res.text();' in repo and "groupsEvent(ev, repo);" in repo
+    assert "lists.innerHTML = await res.text();" in repo and "groupsEvent(ev, repo);" in repo
 
 
 def test_a_live_teams_members_are_compact_and_the_header_drops_its_chips():
