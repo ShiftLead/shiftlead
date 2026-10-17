@@ -169,10 +169,18 @@
       "h": 1180
     },
     {
+      "file": "Spend.dc.html",
+      "title": "Spend \u2014 who spent the quota, per seat and per finished entry (TD-818, built by TD-832)",
+      "x": 1540,
+      "y": 7300,
+      "w": 1440,
+      "h": 980
+    },
+    {
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 7300,
+      "y": 8380,
       "w": 1440,
       "h": 820
     },
@@ -180,7 +188,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 8220,
+      "y": 9300,
       "w": 1440,
       "h": 2320
     },
