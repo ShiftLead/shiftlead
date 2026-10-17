@@ -15500,7 +15500,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (TD-804's design, the designer)
 **Owner:** grinder
 **Kind:** live-check #2040
-**Status:** Built #2040 (2026-10-17, grinder-ao-1). It passed a read-only run against the live UI, with every page 200, the `ao` reads at exit 0, and the browser half ok. Left: the *Done when*'s last clause. Once #2040 is live (`ao promote status`) and a promote has concluded after it, read that promote's log (`ao promote status` names it; read-only) and check for the lines after `── smoke ──` and the note's *smoke passed in <s> s*. The browser half runs only once Paul has run `--setup` (on the board, due 2026-10-24); until then the log says *browser half skipped*, which still holds.
+**Status:** Done — #2040; live check held (2026-10-17).
 **Location:** design §6 *The smoke* (*This repo's smoke*); `scripts/smoke.py` (new; not a synced file); `.shiftlead.yml` `promote:`; `src/shiftlead/service.py` (`UNIT_DIR`, the `shiftlead-ui.service` unit's `--port`, `DEFAULT_PORT`); `tests/`
 
 **Why:** TD-804, slice 2: the first repo's smoke, so a build that breaks a page or an `ao` read on Paul's real state is put back within minutes rather than found by him.
@@ -15541,7 +15541,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed 2026-10-16 (design §6 *Promote* *The smoke*, §5 `promote:`, §4.5a *Inbox row: promote*, §4.7 `ao promote status`): an optional `smoke:` run at the home once `check` reads the commit; a failed smoke rolls back to `from` with the hold (steer m-bf390074fccb, the default), never after a rollback. A gate before the promote was set aside, and staging is left to the repo's `run`. Built by TD-811 (the home) and TD-812 (this repo's smoke).
+**Status:** Done — built by TD-811 and TD-812 (#2033, #2037, #2040).
 **Blocked by:** TD-811, TD-812
 **Location:** design §6 *Promote* (the three preconditions, the outcome read from `check`, *A rollback* and *The hold*), §5 `promote:` (`run`, `check`), §4.5a *Inbox row: promote*, §4.7 `ao promote`; `src/sessionorc/promote.py`; `.shiftlead.yml` `promote:`
 
