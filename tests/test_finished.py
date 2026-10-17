@@ -178,3 +178,60 @@ def test_prose_a_closed_question_a_note_and_a_dead_asker_hold_nothing():
         assert work.finished(team, waiting=work.waiting_of(entries))["why"] == []
     # the manager's or a seat's question is not a member's wait
     assert work.finished(team, waiting=work.waiting_of([_q(LEAD, "TD-222")]))["why"] == []
+
+
+def _held(member: Session, pr: int, closed: bool = False):
+    """The techlead seat holding `member`'s ask for `pr` (§4.9b *The reader*)."""
+    from sessionorc.models import MailEntry
+
+    seat = _seat()
+    seat.host = "kmaster"
+    ask = MailEntry(id=f"m-{pr}", from_=member.id, to=[seat.id], at=OUT["at"], kind="ask", text="read it", pr=pr)
+    if closed:
+        ask.closed_reason = "answered"
+    seat.inbox.append(ask)
+    return seat
+
+
+def test_a_member_whose_claimed_pr_waits_on_a_seats_held_ask_is_unfinished_whatever_it_declared():
+    """§6 rule 9 *Which members count* (TD-854, built by TD-863): a member declared `none` beside a PR
+    its techlead holds is waiting on that reader; once the ask is answered, it reads finished."""
+    from sessionorc.models import ProgressEntry
+
+    g1 = _rec("g1", out_of_work=OUT, host="kmaster")
+    g1.progress = [ProgressEntry(ref="TD-9", pr=2067), ProgressEntry(ref="TD-8", review_pr=2068)]
+    team = [_manager(), g1, _held(g1, 2067)]
+    got = work.finished(team, home="kmaster")
+    assert got["why"] == ["g1 waiting on techlead: #2067"] and got["at"] is None
+    # the view the page holds reads the same, its `prs_waiting` the reading `Session.view` gives
+    views = [r.view() for r in team]
+    assert work.finished(views, home="kmaster") == got and teamrun.concluded(views) is None
+    two = _held(g1, 2067)
+    two.inbox.append(two.inbox[0].__class__(**{**asdict(_held(g1, 2068).inbox[0]), "id": "m-x"}))
+    assert work.finished([_manager(), g1, two], home="kmaster")["why"] == ["g1 waiting on techlead: #2067 and 1 more"]
+    # answered: gone from `prs_waiting`
+    assert work.finished([_manager(), g1, _held(g1, 2067, closed=True)], home="kmaster")["why"] == []
+    # a person-inbox question keeps its clause first
+    waiting = {g1.id: [{"id": "m-q", "ref": "TD-9", "bound": None}]}
+    assert work.finished(team, waiting=waiting, home="kmaster")["why"] == ["g1 waiting on the person: TD-9"]
+
+
+def test_a_done_claim_or_a_held_ask_for_a_pr_the_member_does_not_claim_blocks_nothing():
+    from sessionorc.models import ProgressEntry
+
+    g1 = _rec("g1", out_of_work=OUT, host="kmaster")
+    g1.progress = [ProgressEntry(ref="TD-9", status="done", pr=2067), ProgressEntry(ref="TD-7", pr=2000)]
+    assert work.finished([_manager(), g1, _held(g1, 2067)], home="kmaster")["why"] == []
+    other = _rec("g2", out_of_work=OUT)
+    other.progress = [ProgressEntry(ref="TD-9", pr=2067)]
+    assert work.finished([_manager(), g1, other, _held(g1, 2067)], home="kmaster")["why"] == []
+    # an ask from a node's member names it `id@host`: not the home's record of the same id, but the
+    # node's view of it, and a bare address is the home's own (`ao-t-g1@kmaster` is `ao-t-g1`)
+    node = _held(g1, 2000)
+    node.inbox[0].from_ = f"{g1.id}@laptop"
+    assert work.held_asks([g1, node], home="kmaster") == {}
+    assert list(work.held_asks([{**g1.view(), "id": f"{g1.id}@laptop"}, node], home="kmaster")) == [f"{g1.id}@laptop"]
+    named = _held(g1, 2000)
+    named.inbox[0].from_ = f"{g1.id}@kmaster"
+    assert list(work.held_asks([g1, named], home="kmaster")) == [g1.id]
+    assert work.held_asks([g1, _held(g1, 2000)], home="kmaster") == {g1.id: [{"seat": "techlead", "pr": 2000}]}
