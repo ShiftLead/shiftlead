@@ -15149,7 +15149,7 @@ Then the build entry, named in `Blocked by:`.
 **Added:** 2026-10-17 (TD-821's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done — #PR
+**Status:** Done — #2023
 **Location:** design §4.5a *Focus: Open shell here*, §4.8 *The person's own shell is the person*, §4.9 *A person in the team*; `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, the `shell-here` branch, and TD-817's `not_own_shell` beside it; RPC-side only, no change to `app.js`); `src/sessionorc/mail.py` (`person_shell`); `src/sessionorc/settle.py` (`team_refusal`, read only); `src/shiftlead/ui/repo.py` (`team_groups`, read only: a card's group is its record's `team`); `tests/test_person_only.py` (the *a team's shell* case and `test_person_shell_is_a_shell_interactive_with_no_role_team_or_controller`), `tests/test_person_shell_acts.py` (`_rec("ao-t", team="t")` read as a session) and `tests/test_person_shell_link.py` (a teamed shell at a link): each asserts *no team* today and is flipped, not only added to
 
 **Why:** TD-821: **Open shell here** on a team member makes a shell with no `team`, so its card lands in the repo's *no team* strip, away from the team the person pressed it on.
@@ -15172,4 +15172,4 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-821 (the design), TD-817 (the reuse, built in #2009: the same route), TD-580 and TD-801 (the person's own shell), TD-160 (a person in the team), TD-725 (the no-team strip).
 
-**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — `ui/app.py`'s `shell-here` create passes the session's `team` and `project` and nothing else of its team's; `mail.person_shell` drops *no team* (its docstring says why); `not_own_shell` refuses an unattended or a role's shell in its own words, so a teamed shell left open is reopened. Tests flipped from *no team* in `test_person_only.py`, `test_person_shell_acts.py`, `test_person_shell_link.py`; the claim refusal from a teamed person's shell pinned in `test_entry_team.py`; the press, the reuse and the team group in `test_ui_shell_here.py`. UI check on a scratch home: `docs/mockups/reviews/2026-10-17-td827-teamed-shell.png`.
+**Resolved:** 2026-10-17 (grinder-ao-1, #2023) — `ui/app.py`'s `shell-here` create passes the session's `team` and `project` and nothing else of its team's; `mail.person_shell` drops *no team* (its docstring says why); `not_own_shell` refuses an unattended or a role's shell in its own words, so a teamed shell left open is reopened. Tests flipped from *no team* in `test_person_only.py`, `test_person_shell_acts.py`, `test_person_shell_link.py`; the claim refusal from a teamed person's shell pinned in `test_entry_team.py`; the press, the reuse and the team group in `test_ui_shell_here.py`. UI check on a scratch home: `docs/mockups/reviews/2026-10-17-td827-teamed-shell.png`.
