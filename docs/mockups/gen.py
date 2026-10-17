@@ -1985,6 +1985,18 @@ def queue_page():
                 f'<div style="flex: 1; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap;">{tid(t)}{badge(p)}'
                 f'<span style="flex: 1; min-width: 20em; font-weight: 500;">{title}</span>'
                 f'<span style="display: flex; gap: 10px; align-items: center;">{right}</span></div></div>{body}</div>')
+    def sec(title, n, items, dismiss=False):
+        """One of a card's sections (TD-816): its heading with its count, hidden at 0; Dismiss all on Answered for you and FYI."""
+        if not n:
+            return ""
+        btn = '<span class="btn sm" style="margin-left: 8px;">Dismiss all</span>' if dismiss else ""
+        return (f'<div style="margin: 10px 0 0 calc(2.6em + 18px);"><div style="display: flex; align-items: center; font-size: 12px; font-weight: 600; '
+                f'color: #4b5563;">{title} ({n}){btn}</div>{items}</div>')
+    def item(text, on="", buttons=()):
+        btns = "".join(f'<span class="btn sm">{b}</span>' for b in buttons)
+        where = f'<a class="meta" style="font-size: 12px; white-space: nowrap;" href="#">on {on}</a>' if on else ""
+        return (f'<div style="border-left: 3px solid #d0d5dc; background: #fff; padding: 6px 12px; margin-top: 4px; display: flex; gap: 12px; '
+                f'align-items: baseline;"><span style="flex: 1; font-size: 13px;">{text}</span>{where}<span style="display: flex; gap: 6px;">{btns}</span></div>')
     def need(kind, text, buttons):
         btns = "".join(f'<span class="btn sm">{b}</span>' for b in buttons)
         return (f'<div style="margin: 10px 0 2px calc(2.6em + 18px); border-left: 3px solid #d97706; background: #fff; padding: 8px 12px; '
@@ -1994,11 +2006,15 @@ def queue_page():
         return (f'<div style="display: flex; gap: 8px; align-items: baseline; padding: 8px 14px; border-top: 1px solid #eef1f4;">'
                 f'<span class="meta" style="width: 3.5em; text-align: right; font-size: 12px;">{age}</span>{tid(t)}{badge(p)}'
                 f'<span style="flex: 1;">{title}</span><span class="meta" style="font-size: 12px;">{right}</span></div>')
-    def panel(title, sub, body, right=""):
-        return (f'<div style="margin-top: 18px;"><div style="display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px;">'
-                f'<span style="font-size: 17px; font-weight: 600;">{title}</span><span class="meta" style="font-size: 12px;">{sub}</span>'
-                f'<span style="flex: 1;"></span>{right}</div>'
-                f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{body}</div></div>')
+    def panel(title, sub, body, right="", folded=False):
+        """A group (TD-816): its count in its heading's words; a press on the heading folds it, and a folded group keeps
+        its heading, its count and the window picker."""
+        box = ("" if folded else
+               f'<div style="background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; overflow: hidden;">{body}</div>')
+        fold = '<span class="meta" style="font-size: 12px;">folded</span>' if folded else ""
+        return (f'<div style="margin-top: 18px;"><div style="display: flex; gap: 8px; align-items: baseline; margin-bottom: 8px; cursor: pointer;">'
+                f'<span style="font-size: 17px; font-weight: 600;">{title}</span>{fold}<span class="meta" style="font-size: 12px;">{sub}</span>'
+                f'<span style="flex: 1;"></span>{right}</div>{box}</div>')
     wins = ('<span style="display: inline-flex; border: 1px solid #d0d5dc; border-radius: 5px; overflow: hidden; font-size: 12px;">'
             + "".join(f'<span style="padding: 2px 10px; border-left: 1px solid #d0d5dc;{" background: #e9edf2; font-weight: 600;" if w.startswith("Day") else ""}">{w}</span>'
                       for w in ("4 h (3)", "Day (31)", "Week (261)", "Month (609)")) + "</span>")
@@ -2022,13 +2038,18 @@ def queue_page():
              body='<div class="meta" style="font-size: 12px; margin: 6px 0 0 calc(2.6em + 18px);">passed over by grinder-ao-1: TD-789 holds the review seat\'s reading it needs first</div>'),
         card(2, "TD-156", "M", "UI review of the end of a session: Focus offers Kill in the header and Close only in the side panel",
              moves + needs_badge, needs=True,
-             body=need("Yours to do", "<b>Why:</b> the end of a session is the one moment the person must act…", ["Reply", "Open", "Start session", "Done"])),
+             body=sec("Needs you", 1, need("Yours to do", "<b>Why:</b> the end of a session is the one moment the person must act…", ["Reply", "Open", "Start session", "Done"]).replace("margin: 10px 0 2px calc(2.6em + 18px)", "margin: 4px 0 2px"))
+             + sec("Answered for you", 2,
+                   item("techlead-ao-1 answered <i>does Close also reap the worktree?</i> — <i>yes, as Kill does not</i>", "TD-157", ["Overrule", "Dismiss"])
+                   + item("techlead-ao-1 answered <i>which button goes first?</i> — <i>Close, outlined</i>", "", ["Overrule", "Dismiss"]), dismiss=True)
+             + sec("FYI", 1, item("designed TD-157: Close reaps the worktree — PR #2012", "TD-157", ["Dismiss"]), dismiss=True)),
         card(3, "TD-460", "M", "Read back the one-week trial of a 200k context bound on ao-grind's grinders",
              moves + '<span class="meta" style="font-size: 12px;">waits until 2026-10-23</span>' + word("steer", "#7c3aed"),
-             body=need("Steer", "take the 200k line out; the 300k default returns — lapses to <i>run another week</i> in 3h", ["Reply", "Pause"]).replace("#d97706", "#a78bfa").replace("#92400e", "#5b21b6")),
+             body=sec("Steering", 1, need("Steer", "take the 200k line out; the 300k default returns — lapses to <i>run another week</i> in 3h", ["Reply", "Pause"]).replace("#d97706", "#a78bfa").replace("#92400e", "#5b21b6").replace("margin: 10px 0 2px calc(2.6em + 18px)", "margin: 4px 0 2px"))),
         card(4, "TD-623", "M", "No document says how a repo gets its first ShiftLead team",
              moves + needs_badge, needs=True,
-             body=need("Held until", "when guardians-devenv TD-028's <i>doc gaps</i> list is enough to write from", ["Lift the hold", "Reply", "Open"])),
+             body=sec("Needs you", 2, need("Held until", "when guardians-devenv TD-028's <i>doc gaps</i> list is enough to write from", ["Lift the hold", "Reply", "Open"]).replace("margin: 10px 0 2px calc(2.6em + 18px)", "margin: 4px 0 2px")
+                   + need("Board line", "<i>Due 2026-10-24</i> — read guardians-devenv's doc gaps list and say whether it is enough", ["Done", "Reply"]).replace("margin: 10px 0 2px calc(2.6em + 18px)", "margin: 4px 0 2px"))),
         card(5, "TD-553", "L", "Drop the <span class=\"mono\">.agentorc.yml</span> fallback once samscrape, contractmatch and dev-cadence have renamed theirs",
              moves + '<span class="meta" style="font-size: 12px;">after contractmatch#TD-055</span>' + word("blocked", "#9ca3af")),
     ])
@@ -2042,16 +2063,20 @@ def queue_page():
     note = ('<div class="note" style="margin-top: 18px;">Design notes, not page text. The top bar\'s one number stays the Inbox\'s (it counts the '
             'questions drawn on cards, and opens the needs-you filter while any is here); the Queue tab carries none. A move\'s neighbours are '
             'the whole Up next order, whatever a filter hides; the filters are carried in the URL. No Snooze here: the rank orders the Queue, '
-            'not a date. Built by TD-769–TD-771.</div>')
+            'not a date. Built by TD-769–TD-771. <b>TD-816</b>: each group\'s heading carries its count and folds on a press (Recently completed '
+            'is drawn folded); a card\'s items are in the card\'s sections — <i>Needs you</i> in the header, then <i>Steering</i>, <i>Waiting on them</i>, '
+            '<i>Answered for you</i> and <i>FYI</i> with <b>Dismiss all</b> — each hidden at 0, an item about another row saying <i>on TD-n</i>; a board line '
+            'is under Needs you whatever its Due (TD-623\'s). A pick answers in the browser with no request, and the picks persist per browser. '
+            'Built by TD-828 and TD-829.</div>')
     return head("Queue") + f'''<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Queue")}
 <div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
   <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Queue</span>
-    <span class="meta" style="font-size: 12px;">31 cards: 3 in progress, 28 up next. <b style="color: #b45309;">2 need you.</b></span></div>
+    <span class="meta" style="font-size: 12px;">29 cards: 1 in progress, 28 up next. <b style="color: #b45309;">2 need you.</b></span></div>
   {filters}
-  {panel("Recently completed", "26 in the last day", completed, wins)}
-  {panel("In progress", "1 · someone holds an entry, or its PR is open", in_progress)}
-  {panel("Up next", "28 · worked from the top: drag a card by its grip, or use its arrows, to change the order", up_next)}
+  {panel("Recently completed (31)", "in the last day", completed, wins, folded=True)}
+  {panel("In progress (1)", "someone holds an entry, or its PR is open", in_progress)}
+  {panel("Up next (28)", "worked from the top: drag a card by its grip, or use its arrows, to change the order", up_next)}
   {note}
 </div>
 </div>
