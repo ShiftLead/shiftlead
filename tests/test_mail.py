@@ -1296,6 +1296,23 @@ async def test_about_is_filled_from_the_senders_one_claim(agent, tmp_path):
         assert held["closed_reason"] is None and held["orphaned"]["ref"] == "TD-771"
 
 
+def test_claim_about_takes_the_declared_claim_else_the_derived():
+    """Design §4.10 (TD-748, TD-796): `_claim_about` reads the declared claims first and the derived only
+    when none is declared — a derived claim alone is the `about`, a declared one wins over a different
+    derived one, and two declared leave it empty whatever is derived (the declared source decides)."""
+    from types import SimpleNamespace
+
+    from sessionorc.agent_mail import _claim_about
+    from sessionorc.models import ProgressEntry
+
+    def rec(*rows):
+        return SimpleNamespace(progress=[ProgressEntry(ref=r, source=src) for r, src in rows])
+
+    assert _claim_about(rec(("TD-5", "derived"))) == "TD-5"
+    assert _claim_about(rec(("TD-6", "derived"), ("TD-7", "declared"))) == "TD-7"
+    assert _claim_about(rec(("TD-7", "declared"), ("TD-8", "declared"), ("TD-6", "derived"))) is None
+
+
 async def test_a_question_about_a_reference_outlives_its_asker(agent, tmp_path):
     """Design §4.10 *A question about a reference outlives its asker* (TD-213, TD-215): a wind-down
     closes two members, each with an open question to the person whose `about` names a reference —
