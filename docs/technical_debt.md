@@ -65,6 +65,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
+| TD-804 | A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand | Medium | Open |
+| TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 
 ---
 
@@ -1275,3 +1277,48 @@ The other cases:
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
 
 ---
+
+## TD-804: A promote is judged by `check` alone: nothing loads the pages or runs `ao` against the new live copy, so a build that passes CI on fixtures but breaks on the person's real state stays live until the person finds it and rolls back by hand
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 *Promote* (the three preconditions, the outcome read from `check`, *A rollback* and *The hold*), §5 `promote:` (`run`, `check`), §4.5a *Inbox row: promote*, §4.7 `ao promote`; `src/sessionorc/promote.py`; `.shiftlead.yml` `promote:`
+
+**Why:** Paul, 2026-10-16, after the Queue tab stopped working for him in one browser during a day of merges: *maybe we require integration tests (if defined) to pass before a promote … Certainly for a production system working correctly would be vital.* Today a promote waits for (1) a clean checkout on main's head, (2) CI green on main's head and (3) nothing in flight, and is judged done when `check` reads the new commit. CI runs the test suite against fixtures; nothing loads a page or runs an `ao` read against the live copy with the person's real state (here 197 Queue cards and 886 completed in a month), so a break that only real data shows is found by the person. Promoting only at TD boundaries (an entry and everything its `Blocked by:` joins) was weighed with Paul and set aside: an effort can stay open for weeks (TD-748 until TD-772's read-back), and every merge to main is to be releasable, unfinished but never broken.
+
+**Fix:** design it first:
+1. A repo's own smoke command beside `run` and `check` in its `promote:` block (e.g. `smoke:`), optional, run by the home after `check` reads the new commit; what it is given (the commit, the live URL or port) and how long it may take.
+2. What a failed smoke does: roll back to `from` at once as a rollback does (and the hold that follows), or only tell the person; whether that differs between `auto` and a press, and between a dev repo (this one) and a production one (samscrape's cluster).
+3. This repo's smoke: each page (Org, Inbox, Queue, Repo, Settings, a Focus) loaded headless through the route the person uses, failing on an error status, a script error, a page that never commits or a load past a bound, plus `ao ls` and `ao inbox --json` reads; where it runs and what it needs (the Playwright setup the screenshots use).
+4. Optionally the same smoke before the promote, on a scratch home built from main against a copy of the person's state (`scripts/look_home.py`), so a bad build is caught before it is live.
+5. Staged promotes for a repo that has a staging target: smoke on staging, then production.
+Then the build entries, named in `Blocked by:`.
+
+**Done when** the design says what a smoke is, when it runs, what a failure does under `auto` and under a press, and this repo's own smoke, and the build entries are filed and named in `Blocked by:`.
+
+**Related:** TD-120 and TD-132 (the promote policy), TD-226 (the rollback), TD-581 (the settle and the wait), TD-291 (`look_home.py`), TD-805 (page loads).
+
+## TD-805: Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** evaluation
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
+
+**Why:** Paul, 2026-10-16: *we need analysis done on our page loads — they all seem to take a long time (org, repo, inbox, queue).* Measured the same evening on kmaster's plain port (time to first byte, size): Org 0.43–0.55 s, 284 KB; Inbox 0.27–0.29 s, 847 KB; Repo (shiftlead) 0.57–0.73 s, 750 KB; Settings 0.15–0.22 s, 82 KB; Queue 2.37–2.66 s, 1.87 MB. A page is sent uncompressed with `Accept-Encoding: gzip` (the Queue's 1,873,503 bytes either way), and the person reaches the UI over the tailnet through `tailscale serve`, so the transfer, the parse of a large DOM and the page's scripts add to every number above, and none of that is measured.
+
+**Fix:**
+1. Measure each page end to end from a browser through the route the person uses: first byte, transfer, DOM ready, the page's scripts done, the stream up; and the server's time split by the RPCs each route makes (`list`, `queue`, `person_inbox`, `board_view`, …) and the render.
+2. Say where each page's time goes and the size of each fix: compressing pages, markup that need not be sent at load (completed cards, archived rows, folded sections), RPCs read twice or that could be cached between loads, render work on the UI's one loop that holds every other request and Focus keystroke while it runs.
+3. Set a budget per page, and file one build entry per page (or per shared cause) that misses it, each named in `Blocked by:`.
+
+**Done when** each page's load is measured and broken down, a budget is set, and the build entries are filed and named in `Blocked by:`.
+
+**Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
