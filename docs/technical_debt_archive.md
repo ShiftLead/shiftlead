@@ -15465,7 +15465,7 @@ Then the build entry, named in `Blocked by:`.
 - `start_smoke`'s `cwd=str(intent.get("tree") or root)` changed to `cwd=str(root)`: a rollback's smoke runs in the rollback's detached worktree (§6 *The smoke*); the test at line 913 prints `pwd` only for a plain promote, where `tree` is unset, and none does for a rollback.
 - `"SHIFTLEAD_PROMOTE_KIND": str(intent.get("kind") or "promote")` changed to `"promote"`: line 913 reads the variables only for a plain promote (kind `promote`), so `_KIND` for a rollback's smoke is unchecked.
 
-**Resolved:** 2026-10-17 (grinder-ao-2, PR) — `tests/test_promote.py`: `test_a_rollbacks_smoke_runs_in_its_tree_and_is_told_its_kind` (the tree and `SHIFTLEAD_PROMOTE_KIND` of a rollback's smoke) and `test_a_smoke_that_cannot_start_fails_the_promote` (a removed tree: `_conclude` fails the promote); each of the three changes fails one of them.
+**Resolved:** 2026-10-17 (grinder-ao-2, #2042) — `tests/test_promote.py`: `test_a_rollbacks_smoke_runs_in_its_tree_and_is_told_its_kind` (the tree and `SHIFTLEAD_PROMOTE_KIND` of a rollback's smoke) and `test_a_smoke_that_cannot_start_fails_the_promote` (a removed tree: `_conclude` fails the promote); each of the three changes fails one of them.
 
 **Done when** each of the three changes above fails `tests/test_promote.py`.
 
@@ -15487,7 +15487,7 @@ Then the build entry, named in `Blocked by:`.
 - `_last_line`'s `if SMOKE_MARK in lines: lines = lines[... :]` replaced with `pass`: its docstring says *the smoke's last non-empty line … after `── smoke ──`*, so a smoke that said nothing must read as `""`, not the run's last line before the mark. No test has run output before the mark and a silent smoke.
 - `_judge_smoke`'s `_last_line(intent) or f"it exited {code}"` replaced with `or "x"`: no test gives a smoke that fails with no output, so the why for a silent failure is unread.
 
-**Resolved:** 2026-10-17 (grinder-ao-2, PR) — `tests/test_promote.py`: `test_a_silent_smoke_says_nothing_of_the_runs_output` (`_last_line` after the mark) and `test_a_silent_smoke_that_fails_says_its_exit_code` (*it exited 3*); each change fails one of them.
+**Resolved:** 2026-10-17 (grinder-ao-2, #2042) — `tests/test_promote.py`: `test_a_silent_smoke_says_nothing_of_the_runs_output` (`_last_line` after the mark) and `test_a_silent_smoke_that_fails_says_its_exit_code` (*it exited 3*); each change fails one of them.
 
 **Done when** each change above fails `tests/test_promote.py`.
 
