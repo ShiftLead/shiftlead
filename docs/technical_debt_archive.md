@@ -14715,3 +14715,23 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** none.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1985) — `tests/test_mail.py` gained `test_claim_about_takes_the_declared_claim_else_the_derived`, a `_claim_about` unit test over records with `progress` rows of both sources: one derived claim alone is the `about`; a declared claim wins over a different derived one; two declared and one derived give none. The declared-only and swapped-order mutations each fail it.
+
+## TD-799: `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §6 rule 8 *A team with no record*; `src/shiftlead/ui/app.py` (`team_lanes`: `if hosts.is_node(): return {}`, `except Exception: out[n] = None`); `tests/test_ui_work_row.py::test_a_team_with_no_record_on_the_inbox_and_its_card`
+
+**Why:** #1968 (TD-782 slice 3) added `team_lanes` whose docstring says *a read that fails is None, which says nothing; a node reads no definition, so has none*. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_work_row.py tests/test_ui_org.py`: baseline 70 passed; with the `is_node()` early return deleted 70 passed; with `out[n] = None` replaced by `raise` (one team's `teamrun.lanes` failing now propagates out of `asyncio.to_thread`, so the Org page and the Inbox's rows fail) 70 passed. The cache is held (removing the TTL check fails a test).
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** a `teamrun.lanes` that raises for one of two teams leaves the other team's row and the page rendered, and the failed one reads *unknown* (`lanes_hold` None); on a node `team_lanes` returns `{}` and calls nothing. Both mutations above fail.
+
+**Related:** none.
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #1981) — `tests/test_ui_work_row.py` gained `test_one_teams_failed_lanes_read_costs_only_its_own_row_and_note` (two teams with no record, `teamrun.lanes` raising for the first read: `/inbox` and `/` render, the other's Later row and card note stand, `with_lanes` gives the failed one `lanes_hold` None) and `test_a_node_reads_no_teams_lanes` (`is_node()` true: `team_lanes` is `{}`, no `teamrun.lanes`, no RPC, nothing cached). Deleting the `is_node()` return fails the second; `raise` in place of `out[n] = None` fails the first.

@@ -65,7 +65,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
 | TD-801 | The person's own shell is refused acts on other sessions: `ao team flow --apply` from **Open shell here** needs the control grant, since TD-580 let the shell through the person-only list alone | Medium | Open |
 | TD-803 | `_repo_hold`'s *and n more* threshold (`> 3`) is held at five held paths only: a boundary of four, or three, passes unchanged | Low | Open |
 
@@ -1276,26 +1275,6 @@ The other cases:
 **Done when** the evaluation's measurements are written here, the debounce has landed or been shown not to help, and any design change has a filed entry of its own.
 
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
-
----
-
-## TD-799: `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §6 rule 8 *A team with no record*; `src/shiftlead/ui/app.py` (`team_lanes`: `if hosts.is_node(): return {}`, `except Exception: out[n] = None`); `tests/test_ui_work_row.py::test_a_team_with_no_record_on_the_inbox_and_its_card`
-
-**Why:** #1968 (TD-782 slice 3) added `team_lanes` whose docstring says *a read that fails is None, which says nothing; a node reads no definition, so has none*. Probe, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_work_row.py tests/test_ui_org.py`: baseline 70 passed; with the `is_node()` early return deleted 70 passed; with `out[n] = None` replaced by `raise` (one team's `teamrun.lanes` failing now propagates out of `asyncio.to_thread`, so the Org page and the Inbox's rows fail) 70 passed. The cache is held (removing the TTL check fails a test).
-
-**Fix:** add the tests below; no change to the code under test.
-
-**Done when** a `teamrun.lanes` that raises for one of two teams leaves the other team's row and the page rendered, and the failed one reads *unknown* (`lanes_hold` None); on a node `team_lanes` returns `{}` and calls nothing. Both mutations above fail.
-
-**Related:** none.
 
 ---
 
