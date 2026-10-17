@@ -11,9 +11,9 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks, wait_for
 
-from sessionorc import work
+from sessionorc import naming, work
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import MailEntry, ProgressEntry
+from sessionorc.models import PR_CLOSED, MailEntry, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -95,6 +95,15 @@ async def test_a_waiting_claim_has_an_open_pr_and_someone_elses_next_move(agent,
         # no repo reading: a claim's PR is not read closed
         agent._repos.pop("/r")
         assert [e.ref for e in agent._waiting_claims(rec)] == ["TD-003", "TD-005"]
+        # a claim the tick read closed unmerged is not waiting, though its PR is in the open list (TD-860)
+        agent._repos["/r"] = {"prs": {"open": [{"number": 13}, {"number": 15}]}}
+        rec.progress[4].why = PR_CLOSED
+        assert [e.ref for e in agent._waiting_claims(rec)] == ["TD-003"]
+        # another member's held ask for the same PR makes no wait of this member's claim
+        rec.progress[2].pr = 14
+        agent._repos["/r"]["prs"]["open"].append({"number": 14})
+        agent.sessions[seat].inbox.append(_held_ask(seat, seat, 14))
+        assert agent._waiting_claims(rec) == []
         for i in (sid, seat):
             await person.call("kill", id=i)
 
@@ -132,6 +141,22 @@ async def test_a_member_whose_only_claims_wait_is_told_at_its_bound_and_the_line
         assert await _submitted(agent, tl) == [] and t.context_sent_at is None
         for i in (sid, tl):
             await person.call("kill", id=i)
+
+
+async def test_two_waiting_claims_on_one_pr_name_it_once(agent, composerstubs, tmp_path):
+    """TD-860: a claim's `review_pr` and another's `pr` naming one PR carry it over once."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        await agent.rpc_hook(sid, state="idle")
+        rec.context = dict(OVER)
+        rec.progress = [ProgressEntry(ref="TD-001", review_pr=2015), ProgressEntry(ref="TD-002", pr=2015)]
+        agent.person_inbox[:] = [_steer(sid, "TD-001", "m-1"), _steer(sid, "TD-002", "m-2")]
+        await agent._keep_running(datetime.now(UTC))
+        (line,) = await _submitted(agent, sid)
+        assert line.endswith("; #2015 carry over")
+        await person.call("kill", id=sid)
 
 
 async def test_the_idle_nudge_passes_over_a_waiting_claim(agent, tmp_path):
@@ -179,6 +204,43 @@ async def test_a_tick_replay_carries_the_waiting_claims_and_a_persons_restart_no
         await person.call("restart", id=sid)
         assert agent.sessions[sid] is not new and agent.sessions[sid].progress == []
         for i in (sid, other):
+            await person.call("kill", id=i)
+
+
+async def test_a_replay_that_keeps_no_mail_carries_no_claim(agent, tmp_path):
+    """TD-860: a scheduled start (`start_of`, no `keep_mail`) moves the mail itself and carries nothing."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _shell(person, tmp_path, "w")
+        old = agent.sessions[sid]
+        old.progress = [ProgressEntry(ref="TD-001", review_pr=11)]
+        agent.person_inbox[:] = [_steer(sid, "TD-001")]
+        assert [e.ref for e in agent._waiting_claims(old)] == ["TD-001"]
+        _crash(agent, sid)
+        await agent._replay(old, "crash")
+        new = agent.sessions[sid]
+        assert new is not old and new.progress == [] and new.restarts[-1]["left"] == ["TD-001"]
+        await person.call("kill", id=sid)
+
+
+async def test_a_renamed_replay_renews_the_carried_claim_once(agent, tmp_path):
+    """TD-860: a rename's `_carry` copies the claim onto the new record; the replay renews its lease there
+    rather than adding a second copy."""
+    await park_ticks(agent)
+    then = _iso(datetime.now(UTC) - timedelta(hours=11))
+    async with LocalClient() as person:
+        sid = await _shell(person, tmp_path, "w")
+        old = agent.sessions[sid]
+        old.progress = [ProgressEntry(ref="TD-001", review_pr=11, at=then)]
+        agent.person_inbox[:] = [_steer(sid, "TD-001")]
+        await person.call("relaunch", id=sid, launch={"name": "w2"})
+        _crash(agent, sid)  # a record is succeeded once it has ended
+        await agent._replay(old, "flow", keep_mail=True)
+        assert old.superseded_by
+        new = agent.sessions[naming.split_address(old.superseded_by)[0]]
+        (carried,) = new.progress
+        assert carried.ref == "TD-001" and carried.at == new.restarts[-1]["at"] != then
+        for i in (sid, new.id):
             await person.call("kill", id=i)
 
 

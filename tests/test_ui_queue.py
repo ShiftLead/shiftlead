@@ -716,3 +716,13 @@ def test_dismiss_all_on_a_card_dismisses_that_sections_rows_on_screen(tmp_path):
         "Dismiss 2 FYI entries? Only the ones on screen now — anything that arrives after this is untouched."
     ]
     assert got["refreshed"] == 1
+
+
+def test_the_completed_share_counts_only_the_lines_a_pick_leaves_on():
+    """TD-860: `shown_in["completed"]` is what *Completed (n of m)* draws (`queue_part.html`), per window."""
+    v = apply_picks(queue_view(queue(), NOW), queue_picks({}), {})
+    assert v["shown_in"]["completed"] == v["completed"]["counts"] == {"4h": 3, "day": 3, "week": 4, "month": 5}
+    v = apply_picks(queue_view(queue(), NOW), queue_picks({"find": "TD-3"}), {})
+    assert v["shown_in"]["completed"] == {"4h": 0, "day": 0, "week": 1, "month": 1}
+    v = apply_picks(queue_view(queue(), NOW), queue_picks({"filter": "needs-you"}), {})
+    assert v["shown_in"]["completed"] == {"4h": 0, "day": 0, "week": 0, "month": 0}
