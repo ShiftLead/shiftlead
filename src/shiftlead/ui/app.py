@@ -2787,9 +2787,10 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             s = await call("restart", id=sid)
             return JSONResponse({"ok": True, "id": s.get("id") or sid, "unattended": bool(s.get("unattended"))})
         elif action == "send":
-            await call("send", id=sid, text=body.get("text", ""))
+            # the page's key (design §4.10 *A send lands once*, TD-806): a repeat answers as the first
+            await call("send", id=sid, text=body.get("text", ""), key=body.get("key"))
         elif action == "wrapup":
-            await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True)
+            await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True, key=body.get("key"))
         elif action == "mode":
             on = bool(body.get("unattended"))
             s = await call("set_mode", id=sid, unattended=on, **teams.gate_prompts(on))  # §6's two texts

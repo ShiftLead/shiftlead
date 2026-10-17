@@ -95,6 +95,15 @@ def test_pages_and_shell_flow(client, tmp_path):
         time.sleep(0.1)
     else:
         raise AssertionError("composer text never reached the pane")
+    # the page's key (design §4.10 *A send lands once*, TD-813): a repeat answers as the first and types nothing
+    for _ in range(2):
+        r = client.post(f"/api/sessions/{sid}/send", json={"text": "echo via-key", "key": "k-1"})
+        assert r.json() == {"ok": True}
+    for _ in range(30):
+        if any("via-key" in line and "echo" not in line for line in session_tail(client, sid)):
+            break
+        time.sleep(0.1)
+    assert sum("echo via-key" in line for line in session_tail(client, sid)) == 1
     # Wrap up is an agent's: a shell runs no turns, so it is refused in words (design §4.3)
     r = client.post(f"/api/sessions/{sid}/wrapup")
     assert r.status_code == 400 and "a shell runs no turns" in r.json()["detail"]

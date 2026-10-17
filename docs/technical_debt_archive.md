@@ -14834,3 +14834,100 @@ Then the build entry, named in `Blocked by:`.
 **Related:** TD-112, TD-785, TD-786.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1949, #1969 and #2003) — slice 1 (#1949): the declaration (`implements`, `OPTIONAL_METHODS`, `permission_channel`), the offline suite and its self-tests, Claude Code's pane, transcript and `/proc` fixtures; slice 2 (#1969): the live walk, `pdm run conformance <adapter> --profile <p> [--capture]` (`scripts/conformance.py`), and the hook's capture; slice 3: the walk's first live run on the `conformance` profile passed 7 of 7 with `--capture` (its output in the PR), the captured hook payloads, status lines and pane titles named in `manifest.json` and read by the suite (the state mapping and `pending`, `usage_report`, `title`, and a captured permission for the declared channel, TD-792's second half), `_need` failing a declared method with no fixtures, and the capture writing each payload's own bytes. The walk passes the tool's asking arguments (Claude Code's `--permission-mode manual`, TD-823) and resumes once the killed process's own `SessionEnd` has landed (TD-822). The lasting content: design §4.3 *The conformance suite*, `tests/conformance/`, `scripts/conformance.py`.
+
+---
+
+## TD-806: The Focus composer's Send clears whatever the box holds when the send answers, so a late answer wipes what the person typed since, and one send was delivered twice from Edge: nothing makes a send land once
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-16 (Paul, in an interactive session)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Done — built by TD-813 (#1999, #2005)
+**Blocked by:** TD-813
+**Location:** design §4.5a *Focus composer* **Send** (confirmed by the tool's composer emptying, one `C-m` retry, then `prompt-stuck`) and **prompt chips**; §4.7 `ao send`; `src/shiftlead/ui/static/app.js` (the Focus composer: `$("#send")`'s click, ~L4633, `compose.value = ""` after `await act(id, "send", …)`; the draft in `localStorage`, `AO.draftKey`); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`, ~L2770); `src/sessionorc/agent.py` (`rpc_send` ~L2208, `_record_send`, `_submit`)
+
+**Why:** Paul, 2026-10-16, sending to an interactive session from the Focus composer in Edge while the session was mid-turn: the message was sent but the box did not clear; it cleared by itself halfway through his next message, wiping what he had typed; and the session received the first message twice. In Firefox the box clears as the message goes. The UI's log shows two `POST /api/sessions/ao-shiftlead-ao-queue-vs-inbox/send`, 200 each, at 21:36:51 and 21:37:47, the second on a new connection, each delivering the same text. Two causes in the code, and one to establish:
+1. The click handler sets `compose.value = ""` when the send answers, whatever the box then holds. A send waits for the tool's composer to empty (§4.5a **Send**), so an answer can come long after the press; what the person typed in between is lost, and the draft key is removed with it.
+2. A send carries no id, so a second request with the same text, whoever or whatever makes it, is delivered again.
+3. Not established: why Edge's first request did not finish in the page and a second was made 56 seconds later (a browser retry over the tailnet's `tailscale serve`, a press while the box still showed the text, or the send's wait outliving a timeout).
+
+**Fix:** design it first:
+1. When the send answers, remove only the text that was sent, and only while the box still begins with it; never clear words typed since. While the send is in flight, say so on the composer (Send disabled or *sending…*) so a second press is not made by hand.
+2. A send id made by the page, carried on the request and kept by the host agent for a while: a repeat of an id already delivered answers as the first did and types nothing. The same for a prompt chip and for `ao send`, if it can repeat.
+3. Establish cause 3 from Edge (the developer tools' network log on a send to a working session), and say how long a send may wait before the page is answered.
+Then the build entry, named in `Blocked by:`.
+
+**Done when** the design says what the composer clears and when, how a send is made to land once, and how long a send may take to answer, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-219 (the draft kept in the browser, which the code cites), TD-500 (the composer's bar, which folds on Send), TD-805 (page loads).
+
+**Resolved:** 2026-10-16 (grinder-ao-1) — built by TD-813: #1999 and #2005.
+
+---
+
+## TD-813: Build TD-806: a send lands once — the page's key on every send, a repeat answered as the first, and a composer that clears only what it sent
+
+**Priority:** High
+**Type:** debt
+**Added:** 2026-10-16 (TD-806's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done — slice 1 #1999 (the agent), slice 2 #2005 (the page)
+**Location:** design §4.10 *A send lands once*, §4.5a *Focus composer* **Send**, **prompt chips** and **the bar**, *Focus* **Wrap up**; `src/shiftlead/ui/static/app.js` (the composer's `$("#send")` click, the prompt chips' click, the card's Wrap up, `act`, `wireComposerBar`'s `redraw`, a new `AO.SEND_PAGE_SECONDS = 30`); `src/shiftlead/ui/app.py` (`/api/sessions/{sid}/{action}`: `send` and `wrapup` pass `key`); `src/sessionorc/agent.py` (`rpc_send`, `_record_send`); `src/sessionorc/models.py` (`SendEntry`, its merge by id in `_overlay`); `src/sessionorc/agent_remote.py` (`_route_act`, whose two *its verdict is unknown* errors the page reads; it forwards `key` untouched); `src/sessionorc/mail.py` (`SEND_KEY_SECONDS`); `tests/` (`test_ui_composer_bar.py` and the agent's send tests)
+
+**Why:** TD-806: a late answer clears what the person typed since, and a repeated request delivers the same text twice.
+
+**Fix:**
+- **The key.**
+  - `SendEntry` gains `key: str | None`, kept in `to_dict` / `from_dict` and through the merge by id.
+  - `rpc_send` takes `key=None`, and the lookup is **its first step**, above `_refuse_gone`, the pending refusal, the `wrapup_at` / `wrapup_by` stamps, `_record_send` and `_refill`. It looks in `s.sends` for an entry with that key from the same caller (`from_` as `_record_send` writes it), made within `SEND_KEY_SECONDS` (600).
+  - **Found and done:** it returns as that send did: `None`, or `RpcError(entry.verdict)` when the verdict is an error. A keyed repeat ignores `wait` and returns at once.
+  - **Found and still typing:** the agent that runs `rpc_send` keeps an in-memory `{(sid, key): asyncio.Future}` for each keyed send under way, and the repeat awaits that send's outcome. This is needed because the verdict reads *submitted* from the gate onward.
+  - The future is resolved, and removed, in a `finally`: with the verdict, or with the exception.
+  - A failure the agent does not put into words (a `TmuxError` from the paste, which `except RpcError` does not catch) leaves the entry *submitted*, as a restart does.
+  - **Not found:** as today, with `key` on the entry.
+  - The match runs wherever `rpc_send` runs (the home, or the node that owns the pane): `_route_act` forwards the params as they are, so `key` crosses the link.
+  - `rpc_keys` takes no key.
+- **The UI.** `/api/sessions/{sid}/send` and `/wrapup` pass `body.get("key")` to `send`.
+- **The page.**
+  - The composer's Send mints `crypto.randomUUID()` and holds `{key, text}`. While it waits, Send is disabled and reads *Sending…*, and the box stays editable.
+  - `wireComposerBar`'s `redraw` reads the composer button's `disabled` and label as well as `compose.disabled`, so the bar's Send mirrors it.
+  - **On success:** it removes `text` from the start of `compose.value` only when the box still begins with it (trimming one following newline), rewrites the draft key from what is left (removing it when nothing is), and folds the bar only when the box is empty.
+  - **On failure:** the box is left untouched and the banner shows as today.
+  - **A verdict ends the hold**: success, or an agent refusal (`act` throwing with the agent's words). The next press mints a new key.
+  - **An unknown verdict leaves the hold standing**, as the 30 s path does: a 503 (any `AgentUnavailable`, a stuck agent or a dropped connection alike), or a 400 whose words carry `_route_act`'s *its verdict is unknown* (`agent_remote.py`: the link dropped while the send was out, or the node did not answer within `ACT_TIMEOUT`). `act` puts `r.status` on the error it throws (`e.status`), so the composer can tell these from a refusal.
+  - **The hold is keyed** `{key, text}`. An answer is applied only while its key is the one held; any other answer is dropped.
+  - `render(v)` leaves Send's label as the hold set it while it stands. Today it rewrites the label on every view event and never sets `disabled`, and the bar's `redraw` reads `compose.disabled`, so it must read the button too (above). The hold's start and end call `cbar.redraw()`.
+  - **No answer after `AO.SEND_PAGE_SECONDS`:** Send is re-enabled with the hint *not confirmed — Send repeats it safely*. A press while the box still begins with the held text sends that text with the same key; any other text gets a new key.
+  - A prompt chip mints its own key and is disabled until its send answers, never touching the box. The card's Wrap up mints one per press.
+- **No help paragraph:** Send has none in `help.py` or §4.5a's help list, and gains none. The words the person sees are the hints above. If the build gives Send a `title`, `test_help.py` then requires a paragraph, so it gives none.
+- **Tests:**
+  - **The agent:**
+    - a keyed repeat after success types nothing and answers OK, with no stamp, refill or gate (a repeat to a session that has since exited answers OK);
+    - a paste raising a non-`RpcError` still answers a waiting repeat;
+    - after a resume, a repeat answers as the first at the id the conversation holds, and one to an old id (where the resume took a new one) is refused as closed;
+    - after a `prompt-stuck`, the repeat raises the same verdict;
+    - a repeat while the first is typing awaits it, with one paste only;
+    - a repeat from another caller is typed;
+    - a key older than `SEND_KEY_SECONDS`, or pruned from `sends`, is typed;
+    - a send with no key behaves as today;
+    - the key survives `to_dict` / `from_dict` and the node merge.
+  - **The page** (a JS unit, as the composer bar's tests are):
+    - text typed after the press is kept;
+    - a box edited at its start is left whole;
+    - the draft is rewritten;
+    - the bar folds only when the box is empty;
+    - after a refused send, the next press mints a new key;
+    - after a 503, or either of `_route_act`'s *its verdict is unknown* messages (the link dropped, or no answer in time), the hold stands and the next press reuses the key;
+    - a late answer for an earlier key changes nothing;
+    - a view event during a hold keeps *Sending…* on both buttons;
+    - after 30 s, Send is re-enabled and a repeat goes under the same key;
+    - the bar's Send mirrors *Sending…*.
+
+**Done when** a send repeated with its key, whatever repeats it, types once and answers as the first did; the composer clears only the text it sent and never words typed since; Send and the bar's Send say *Sending…* while it waits and *not confirmed* after thirty seconds; and the tests above pass.
+
+**Related:** TD-806 (the design), TD-219 (the draft), TD-500 (the composer's bar), TD-805 (page loads: a slow page lengthens the window a second press falls in).
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #1999 and #2005) — slice 1 (#1999): `SendEntry.key`, `rpc_send`'s keyed repeat matched first, `SEND_KEY_SECONDS`, `tests/test_send_key.py`; slice 2 (#2005): `app.py`'s `send` and `wrapup` pass `key`; `app.js`'s `AO.wireComposerSend` (the hold, *Sending…*, *not confirmed* after `AO.SEND_PAGE_SECONDS`, the box cleared only of what it sent, an unknown verdict keeping the key), `AO.mintKey` (falls back to `getRandomValues` off a secure context), `act`'s `e.status`, the bar mirroring Send, a keyed chip and Wrap up; `tests/test_ui_send_key.py` and a keyed repeat through the route in `tests/test_ui.py`.

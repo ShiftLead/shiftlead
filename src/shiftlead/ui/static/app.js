@@ -126,7 +126,10 @@
     const r = await fetch(id === "person" ? `/api/person/${action}` : `/api/sessions/${id}/${action}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}),
     });
-    if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
+    if (!r.ok) {
+      let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {}
+      const err = new Error(t); err.status = r.status; throw err;  // a 503 is a verdict unknown (TD-806)
+    }
     return r.json();
   }
   AO.act = act;
@@ -239,7 +242,7 @@
       text.textContent = AO.barText(compose.value, off ? hint.textContent || "nothing can be sent now" : "", (text.dataset || {}).invite);
       text.classList.toggle("draft", !off && !!compose.value.trim());
       text.classList.toggle("off", off);
-      send.disabled = off;
+      send.disabled = off || !!sendBtn.disabled;  // a send that waits holds both Sends (TD-806)
       send.textContent = sendBtn.textContent;
     };
     const open = () => { composer.classList.remove("folded"); bar.classList.add("under"); compose.focus(); };
@@ -254,6 +257,84 @@
     });
     compose.addEventListener("input", redraw);
     return { open, fold, folded, redraw };
+  };
+
+  // §4.10 *A send lands once* (TD-806): the key a page's send carries, minted at the press.
+  // `randomUUID` is a secure context's alone, and the page may be served over plain http on a LAN.
+  AO.mintKey = function () {
+    const c = globalThis.crypto;
+    if (c && typeof c.randomUUID === "function") return c.randomUUID();
+    const b = new Uint8Array(16);
+    if (c && typeof c.getRandomValues === "function") c.getRandomValues(b);
+    else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+    return [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  };
+  // How long the composer waits on a send before Send is pressable again under the same key.
+  AO.SEND_PAGE_SECONDS = 30;
+  AO.SEND_UNCONFIRMED = "not confirmed — Send repeats it safely";
+  // A send's answer that leaves its verdict unknown: the UI's 503 (the host agent did not answer), or a
+  // forward's *its verdict is unknown* (`_route_act`: the link dropped, or the node did not answer in time).
+  AO.sendUnknown = (e) => !!e && (e.status === 503 || /its verdict is unknown/.test(e.message || ""));
+  // The composer's Send (§4.5a *Focus composer* **Send**, TD-806), its elements and its post handed in so
+  // it runs under node: a press mints a key and holds `{key, text}`; until the send answers Send is
+  // disabled and reads *Sending…*, the box left editable. A verdict ends the hold: on success the sent
+  // text leaves the box only while the box still begins with it, the draft is rewritten from what is
+  // left, and `sent(empty)` is told whether the box is now empty (the bar folds only then); a refusal
+  // leaves the box as it is and goes to `fail`. An unknown verdict, or no answer in `SEND_PAGE_SECONDS`,
+  // leaves the hold standing with Send pressable and the hint *not confirmed*: a press while the box
+  // still begins with the held text sends that text under the same key, any other text is a new send.
+  // An answer for a key no longer held changes nothing. `label(l)` and `hint(h)` are for the view's
+  // redraw, which must leave *Sending…* and *not confirmed* as the hold set them.
+  AO.wireComposerSend = function ({ sendBtn, compose, hint, post, draft, sent, fail, redraw, mint, later, cancel }) {
+    mint = mint || AO.mintKey; later = later || setTimeout; cancel = cancel || clearTimeout;
+    let hold = null;  // {key, text, open, timer}: `open` once Send is pressable again under the same key
+    const label = () => sendBtn.dataset.label || "→ Send";
+    const reopen = () => {
+      if (!hold || hold.open) return;
+      hold.open = true; cancel(hold.timer);
+      hold.was = hint.textContent; hint.textContent = AO.SEND_UNCONFIRMED;
+      sendBtn.disabled = false; sendBtn.textContent = label(); redraw();
+    };
+    const end = () => {
+      if (hold) cancel(hold.timer);
+      if (hold && hold.open && hint.textContent === AO.SEND_UNCONFIRMED) hint.textContent = hold.was;
+      hold = null; sendBtn.disabled = false; sendBtn.textContent = label(); redraw();
+    };
+    async function press() {
+      if (hold && !hold.open) return;
+      let text = compose.value, key;
+      if (hold && compose.value.startsWith(hold.text)) ({ text, key } = hold);
+      else { if (!text.trim()) return; key = mint(); }
+      if (hold && hold.open && hint.textContent === AO.SEND_UNCONFIRMED) hint.textContent = hold.was;
+      hold = { key, text, open: false, timer: null };
+      hold.timer = later(reopen, AO.SEND_PAGE_SECONDS * 1000);
+      sendBtn.disabled = true; sendBtn.textContent = "Sending…"; redraw();
+      try {
+        await post({ text, key });
+        if (!hold || hold.key !== key) return;
+        end();
+        if (compose.value.startsWith(text)) {
+          let rest = compose.value.slice(text.length);
+          if (rest.startsWith("\n")) rest = rest.slice(1);
+          compose.value = rest;
+          draft(rest);
+        }
+        redraw();
+        sent(!compose.value);
+      } catch (e) {
+        if (!hold || hold.key !== key) return;
+        if (AO.sendUnknown(e)) reopen(); else end();
+        fail(e);
+      }
+    }
+    sendBtn.addEventListener("click", press);
+    return {
+      press,
+      holding: () => !!hold,
+      label: (l) => { sendBtn.dataset.label = l; if (!hold || hold.open) sendBtn.textContent = l; },
+      // the view's newer hint is kept for the hold's end, so a state that changed under it is not lost
+      hint: (h) => { if (!hold || !hold.open) return h; hold.was = h; return AO.SEND_UNCONFIRMED; },
+    };
   };
 
   // The terminal's **Paste** (§4.5a *Copy / Paste*, TD-472): the clipboard as `clip.read()` gives it.
@@ -819,6 +900,7 @@
       if (action === "mode") body = { unattended: "unattended" in b.dataset ? b.dataset.unattended !== "1" : !b.classList.contains("on") };
       // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
       if (action === "drop") body = { ref: b.dataset.ref };
+      if (action === "wrapup") body = { key: AO.mintKey() };  // one per press: a repeat types it once (TD-806)
       // design §4.5a **Deny** (TD-117): the reason box beside this Deny, if one was filled
       if (action === "deny") { const w = b.parentElement && b.parentElement.querySelector("input.denywhy"); body = AO.denyBody(w && w.value); }
       if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
@@ -4630,22 +4712,29 @@
       if (!cbar || handed) { if (cbar) cbar.open(); compose.focus(); } else cbar.redraw();
     }
     compose.addEventListener("input", () => { try { if (compose.value) localStorage.setItem(AO.draftKey(id), compose.value); else localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } });
-    $("#send").addEventListener("click", async () => {
-      const text = compose.value; if (!text.trim()) return;
-      try {
-        await act(id, "send", { text }); compose.value = ""; try { localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ }
-        if (cbar) cbar.fold(); else term.focus();
-      } catch (e) { banner(`Send failed: ${e.message}`); }
+    // **One press, one send** (§4.5a *Focus composer* **Send**, TD-806): the press's key and the text it
+    // sent are held until the send answers; the box keeps what was typed since, and the bar folds only
+    // once the box is empty
+    const sender = AO.wireComposerSend({
+      sendBtn: $("#send"), compose, hint: $("#composehint"),
+      post: (body) => act(id, "send", body),
+      draft: (v) => { try { if (v) localStorage.setItem(AO.draftKey(id), v); else localStorage.removeItem(AO.draftKey(id)); } catch (_) { /* no storage */ } },
+      sent: (empty) => { if (empty) { if (cbar) cbar.fold(); else term.focus(); } },
+      fail: (e) => banner(`Send failed: ${e.message}`),
+      redraw: () => { if (cbar) cbar.redraw(); },
     });
     // design §4.5a *Focus composer* **prompt chips** (§4.8 *A role has saved prompts*, TD-170): a
     // press is **Send** with the chip's text — the same `send`, its confirmation and its refusals —
     // and Shift+press fills the composer for editing instead. The text is the definition's, carried
-    // on the chip, never a session's words.
+    // on the chip, never a session's words. Each press carries its own key, and the chip is disabled
+    // until its send answers; the composer's box is not touched (TD-806).
     $$("#promptchips .chip").forEach((b) => b.addEventListener("click", async (e) => {
       const text = b.dataset.text || "";
       if (e.shiftKey) { compose.value = text; compose.focus(); return; }
       if (compose.disabled) { banner($("#composehint").textContent || "nothing can be sent now"); return; }
-      try { await act(id, "send", { text }); term.focus(); } catch (err) { banner(`Send failed: ${err.message}`); }
+      if (b.disabled) return;
+      b.disabled = true;
+      try { await act(id, "send", { text, key: AO.mintKey() }); term.focus(); } catch (err) { banner(`Send failed: ${err.message}`); } finally { b.disabled = false; }
     }));
     // design §4.5a *Focus composer* **Attach** / drop / paste (§4.4 *Attachment drop*, TD-002): each
     // file goes to the host agent through `/api/sessions/<id>/attach`, and the path it answers is
@@ -4714,13 +4803,14 @@
         // always types the line and presses Enter, into the running command while one runs
         const agent = v.agent !== false;
         const steering = agent && (v.state === "working" || v.state === "stalled?");
-        $("#send").textContent = steering ? "→ Steer" : "→ Send";
-        $("#composehint").textContent =
+        // a send that waits keeps *Sending…* and its *not confirmed* hint over a view event (TD-806)
+        sender.label(steering ? "→ Steer" : "→ Send");
+        $("#composehint").textContent = sender.hint(
           !agent ? (v.state === "working" || v.state === "stalled?" ? "types the line and presses Enter — into the command that is running" : "types the line and presses Enter")
           : v.state === "limited" ? "the profile is at its cap: what you send waits until the window resets"
           : v.state === "stalled?" ? "steers the turn in flight — this session looks stalled, so it may not be read until it moves"
           : steering ? "steers the turn in flight — this session is working, and Claude Code queues what you type"
-          : "starts a new turn";
+          : "starts a new turn");
       }
       const kept = AO.denyWhys($("#fstate"));
       $("#fstate").innerHTML = head;
