@@ -126,3 +126,75 @@ async def test_decide_refuses_a_tool_with_no_channel(agent, nochannel, tmp_path)
         with pytest.raises(AgentError, match="answer it in the terminal"):
             await person.call("decide", id=s["id"], tool_use_id="tu-1", behavior="allow")
         await person.call("kill", id=s["id"])
+
+
+@pytest.mark.integration
+async def test_only_a_permission_with_a_channel_is_a_manager_on_calls_cause(agent, hookstub, nochannel, tmp_path):
+    """§6 rule 3: a member's hook-confirmed permission is the on-call manager's `pending` cause only
+    where a hook can answer it; the same pending of a tool with no channel is the terminal's (TD-840)."""
+    async with LocalClient() as person:
+        mgr = await person.call("create", name="mgr", dir=str(tmp_path), adapter="hookstub", seat={"trigger": "team"})
+        ids = {}
+        for ad in ("hookstub", "nochannel"):
+            (tmp_path / ad).mkdir()
+            ids[ad] = (
+                await person.call("create", name=ad, dir=str(tmp_path / ad), adapter=ad, controllers=[mgr["id"]])
+            )["id"]
+        for sid in ids.values():
+            agent.sessions[sid].supervised = True
+            agent.sessions[sid].set_state("needs-you", confidence="hook", pending=Pending.from_dict(PERM))
+        records = list(agent.sessions.values())
+        causes = agent._team_causes(agent.sessions[mgr["id"]], records)
+        assert [(c["by"], c["member"]) for c in causes] == [
+            ("pending", agent._address(agent.sessions[ids["hookstub"]]))
+        ]
+        for sid in (mgr["id"], *ids.values()):
+            await person.call("kill", id=sid)
+
+
+@pytest.mark.unit
+def test_the_page_refuses_allow_for_a_tool_with_no_channel(tmp_path, monkeypatch):
+    """The page's Allow / Deny route answers 409 in words before any `decide` (TD-840)."""
+    from fastapi.testclient import TestClient
+
+    from shiftlead.ui import app as uiapp
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
+    calls = []
+    record = {"id": "ao-g", "state": "needs-you", "pending": PERM, "permission_channel": False}
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append(method)
+            return record if method == "get" else {}
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    with TestClient(uiapp.create_app()) as c:
+        for act in ("allow", "deny"):
+            r = c.post(f"/api/sessions/ao-g/{act}", json={})
+            assert r.status_code == 409 and "answer it in the terminal" in r.json()["detail"]
+        assert "decide" not in calls
+        record["permission_channel"] = True
+        assert c.post("/api/sessions/ao-g/allow", json={}).status_code == 200 and "decide" in calls
+
+
+@pytest.mark.unit
+def test_answer_needed_says_answer_it_in_the_terminal(tmp_path, monkeypatch):
+    """The team card's **Answer needed** facet: a no-channel member's permission reads *— answer it in
+    the terminal* after its text; one with a channel reads its text alone (TD-840)."""
+    from shiftlead.ui.org import answer_blocks
+
+    m = {"id": "ao-g", "name": "g", "state": "needs-you", "pending": PERM, "permission_channel": False}
+    [row] = answer_blocks([m])
+    assert row["text"] == "Shell: rm -rf build — answer it in the terminal"
+    [row] = answer_blocks([{**m, "permission_channel": True}])
+    assert row["text"] == "Shell: rm -rf build"
