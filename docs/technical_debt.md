@@ -65,7 +65,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Open |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-797 | The conformance walk's `write_home` and `save_capture` are run by no test: the scratch home's `profiles.yml` and the files copied into `tests/conformance/fixtures/` are unheld | Low | Open |
 | TD-798 | `ao pr held`'s *the repo holds* line (`_repo_hold`): the *and n more* truncation and the empty-`held` guard are held by no test | Low | Open |
 | TD-799 | `Readings.team_lanes` (the Org and Inbox read of a team with no record): the node skip and one team's failed read costing only its own row are held by no test | Medium | Open |
 | TD-800 | The Queue's filter row: a team and a repo pick together, the find-miss suppression for a held id, the *steering* kind and archived rows' kinds are held by no test | Low | Open |
@@ -1277,26 +1276,6 @@ The other cases:
 **Done when** the evaluation's measurements are written here, the debounce has landed or been shown not to help, and any design change has a filed entry of its own.
 
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
-
----
-
-## TD-797: The conformance walk's `write_home` and `save_capture` are run by no test: the scratch home's `profiles.yml` and the files copied into `tests/conformance/fixtures/` are unheld
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `scripts/conformance.py` (`write_home`, `save_capture`, `main`); `tests/test_conformance_walk.py`
-
-**Why:** #1969 (TD-784 slice 2) has tests for `refusal`, `scratch_profile`, `agent_env`, the hook's `capture` and the `Walk` steps against a fake, but `grep -n "save_capture\|write_home\|titles.json" tests/*.py` finds nothing. `write_home` writes the `profiles.yml` (`default` plus the one profile) the host agent reads and `git init`s the walk directory; `save_capture` copies `*.jsonl` into the repo's `tests/conformance/fixtures/<adapter>/captured/` and writes `titles.json` from the walk's tmux server. A wrong key in the first, or a `titles.json` written empty or a `.jsonl` not copied, fails only in the by-hand live run that needs Paul's `conformance` profile, which has not happened yet (TD-784 Status).
-
-**Fix:** add the tests below; no change to the code under test.
-
-**Done when** tests: `write_home` in a tmp dir writes a `profiles.yml` that `shiftlead.profiles.load` reads back as the one profile and default, and a git repo with a commit; `save_capture` copies the capture directory's `*.jsonl` and writes `titles.json` (the tmux call can be monkeypatched), and copies no `.jsonl` when the capture directory is empty.
-
-**Related:** none.
 
 ---
 

@@ -14635,3 +14635,23 @@ The suite's full run with the first mutation applied failed only in `test_link.p
 **Related:** TD-771, TD-748.
 
 **Resolved:** 2026-10-16 (grinder-ao-2, #1972) — a `decision (paul) — …` entry's reading carries `until`, the words after its dash (`ledger.until_of`), and its Queue card's row reads *held until <them>*, else *held until your decision*; Telegram's link for a question, or a `blocked` outcome, drawn on the Queue is its card's `/queue?card=…&row=…&item=…` (`notify.queue_link`, `queue.mail_card` — `card_index` and the ref reader now `sessionorc.queue`'s, the page's read from it), else `/inbox/<id>` as before.
+
+## TD-797: The conformance walk's `write_home` and `save_capture` are run by no test: the scratch home's `profiles.yml` and the files copied into `tests/conformance/fixtures/` are unheld
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `scripts/conformance.py` (`write_home`, `save_capture`, `main`); `tests/test_conformance_walk.py`
+
+**Why:** #1969 (TD-784 slice 2) has tests for `refusal`, `scratch_profile`, `agent_env`, the hook's `capture` and the `Walk` steps against a fake, but `grep -n "save_capture\|write_home\|titles.json" tests/*.py` finds nothing. `write_home` writes the `profiles.yml` (`default` plus the one profile) the host agent reads and `git init`s the walk directory; `save_capture` copies `*.jsonl` into the repo's `tests/conformance/fixtures/<adapter>/captured/` and writes `titles.json` from the walk's tmux server. A wrong key in the first, or a `titles.json` written empty or a `.jsonl` not copied, fails only in the by-hand live run that needs Paul's `conformance` profile, which has not happened yet (TD-784 Status).
+
+**Fix:** add the tests below; no change to the code under test.
+
+**Done when** tests: `write_home` in a tmp dir writes a `profiles.yml` that `shiftlead.profiles.load` reads back as the one profile and default, and a git repo with a commit; `save_capture` copies the capture directory's `*.jsonl` and writes `titles.json` (the tmux call can be monkeypatched), and copies no `.jsonl` when the capture directory is empty.
+
+**Related:** none.
+
+**Resolved:** 2026-10-16 (grinder-ao-1, #1978) — `tests/test_conformance_walk.py` gained `test_the_scratch_home_holds_the_one_profile_as_default_and_a_committed_walk_directory` (`write_home` from `scratch_profile`'s entry: `profiles.load` reads back the one profile as the default, its adapter, account, model, `permission_prompts` and `config_dir` intact; the walk directory a repo with its one commit) and `test_save_capture_copies_the_payloads_and_writes_the_pane_titles` (every `*.jsonl` copied and nothing else, `titles.json` from a monkeypatched `tmux list-panes` on the walk's socket; an empty capture copies no payload). A wrong `default`, a narrowed glob, an empty `titles.json` and a dropped commit each fail a test.
