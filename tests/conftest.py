@@ -340,6 +340,14 @@ async def park_ticks(agent) -> None:
     t.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await t
+    # a tick's detached passes (`_promote_task`, `_repos_task`, …) outlive it: one still in flight lands
+    # after the test has set the state it replaces — a late promote reading put back `_promotes` without
+    # the test's live commit, and a lane note went unsent (TD-858) — so each is cancelled here too
+    for name, task in list(vars(agent).items()):
+        if name.endswith("_task") and isinstance(task, asyncio.Task) and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
 
 
 @pytest.fixture
