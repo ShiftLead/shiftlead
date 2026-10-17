@@ -77,7 +77,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-833 | Build TD-818 (4): a node's turns reach the seat ledger over the link (`seat_spend`) | Low | Open |
 | TD-834 | Build TD-819 (1): the team-shape sampler — each member's class and each stage's queue, once a minute, kept; the `shape` RPC and its suggestions | Medium | Open |
 | TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
-| TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Open |
+| TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
 | TD-838 | Build TD-823: `permission_prompts: all` launches with the adapter's `asking_args`; `ask` leaves the tool's mode alone | Medium | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
@@ -85,6 +85,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Open |
 | TD-852 | #2040's smoke script has six lines no test reads: its browser half, `--setup`, the JSON check on `ao`'s reads and the `reach.url` read | Medium | Open |
 | TD-853 | TD-812's archived Status still says the live check is *Left*, and TD-804's says *Designed*, beside Resolved lines that say both are done | Low | Open |
+| TD-854 | Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim | Low | Open |
 
 ---
 
@@ -1638,8 +1639,8 @@ The other cases:
 **Type:** debt
 **Added:** 2026-10-17 (TD-820's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2048
+**Status:** Built (2026-10-17, #2048): `agent_tick._waiting_claims` reads the waiting claims; `_context_line` and `_nudge_line` pass over them, the line ends *; #n carry over*, and `_replay` carries them. Live check, once #2048 is live (`ao promote status`): read an unattended designer (or any member) idle over its bound whose only claims wait on a steer or a reader — `ao status -v` shows `context_sent_at` set and its pane's last send is the line ending *carry over*; after its restart, its new record's `progress` holds those claims `claimed` with `at` the `restarts` entry's `at`, and the entry's `left` lacks them; and no idle nudge names them while their replies are out.
 **Location:** design §6 rule 5 (*A waiting claim is not in progress*, *A replay carries the waiting claims*), rule 4 (the idle nudge), rule 1 (`left`), §4.9a *The third declaration*, §4.2 *Waiting*, §4.8 *A claim is a lease*; `src/sessionorc/agent_tick.py` (`_context_line`: the `any(e.status == "claimed" and e.source == "declared" …)` test; `_idle_nudge`), `src/sessionorc/work.py` (`waiting_of`, read only), the seats' `prs_waiting`, `src/sessionorc/agent_tick.py` (`_replay`), `src/sessionorc/agent.py` (`_carry`'s copy of claims, the model), `src/sessionorc/models.py` (`review_pr`, `_note_review`)
 
 **Why:** TD-820: the designer is never told it is past its bound. `_context_line` returns while any declared claim stands, and a designer always holds designs waiting on a steer or a reader.
@@ -1853,3 +1854,21 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-812, TD-804, TD-847 (#2039, the same fix).
 
 ---
+
+## TD-854: Rule 9 reads a member that declared `none` beside a claim waiting on a reader's held ask as finished, so its team can wind down under the claim
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-2, met building TD-836 in #2048)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §6 rule 9 (*Which members count*: the *waiting* clause), rule 5 (*A run holding only waiting claims … declares `none` beside them*), §4.9a *Waiting is read, never declared*; `src/sessionorc/work.py` (`finished`, `waiting_of`), `src/sessionorc/agent_tick.py` (`_finished_pass`, `_waiting_claims`)
+
+**Why:** TD-820's design has a run that holds only waiting claims and nothing to pick declare `none` beside them, and says rules 9 and 3 still count a waiting claim as in progress. Rule 9's `finished` counts no claim: it blocks on a member *waiting on the person* (an open `ask` or `steer` in the person inbox), nothing else. A member whose only wait is a reader's held ask (`prs_waiting.asks`, e.g. a grinder's PR with the techlead) and that declared `none` reads finished, so after `FINISHED_SETTLE` the team winds down and closes it while its PR's findings may still come back to it. TD-836's test `test_a_member_that_declared_none_beside_a_waiting_claim_reads_unfinished` covers the person-inbox case alone, which holds today.
+
+**Fix:** a design question first: whether rule 9 reads a member holding a waiting claim (either kind) as unfinished — `finished` taking the held asks beside `waiting`, its clause *w waiting on the techlead: #n* — or whether a wind-down under a reader's held ask is fine because the reply reaches the next run by the kept mail (§4.10 *A question about a reference outlives its asker*) and rule 8 starts it.
+
+**Done when** the design says which, and a build entry (or none) follows.
+
+**Related:** TD-820, TD-836, TD-241 (rule 9), TD-274 (waiting).
