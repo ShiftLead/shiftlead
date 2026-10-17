@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Open |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Open |
 | TD-821 | A shell opened from a team member's **Open shell here** draws in the repo's *no team* strip, not on the team the person was looking at | Low | Designed — built by TD-827 |
-| TD-822 | A killed session resumed at once reads `exited`: the killed process's own `SessionEnd` lands after the kill, on the resumed record of the same id | Low | Open |
 | TD-823 | `permission_prompts: ask` asks nothing Claude Code's `auto` mode allows: its classifier decides before any hook sees a permission, so the person's rules, the director seat and the person never see it | Medium | Open |
 | TD-826 | TD-813's summary row reads *Open* while its entry reads *Building — slice 1 #1999*: #2000 carried the row's old status back over #1999's | Low | Open |
 | TD-827 | Build TD-821: Open shell here on a team member gives the shell the member's `team` and `project`, and the person's own shell no longer requires *no team* | Low | Open |
@@ -1500,26 +1499,6 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the design says which shells carry the team, what the badge leaves unchanged, and which card they draw, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-577 and TD-580 (Open shell here, the person's own shell), TD-810 (Open shell here refused while the shell is open), TD-160 (a person's session in a team), TD-725 (the no-team strip).
-
----
-
-## TD-822: A killed session resumed at once reads `exited`: the killed process's own `SessionEnd` lands after the kill, on the resumed record of the same id
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-16 (grinder-ao-2, TD-784's live walk)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/agent_hook.py` (`rpc_hook` → `_apply_event`, the `exited` of a `SessionEnd`); `src/sessionorc/agent.py` (`rpc_kill`, `rpc_create` with `resume`); the identity check (design §4.8a) that already flagged it in observe mode
-
-**Why:** TD-784's live walk killed its session (`rpc_kill`: `exited`, confidence `tick`) and at once created it again with `resume` under the same id. Claude Code ran its `SessionEnd` hook on the kill's hangup (`reason: other`), and that hook landed after the create: the resumed record read `exited (hook)` while the new process started, and the walk failed its resume step (2026-10-16, the second run). The host agent printed `identity alarm (observe): outside claimed 'ao-walk-conformance-walk' on hook` — the event came from a process no longer in the record's pane. A person pressing Kill then Resume within a second or so meets the same. The walk now waits for the late hook (`SESSION_END_WAIT` in `scripts/conformance.py`).
-
-**Fix:** drop a `SessionEnd` (any `exited` by hook) that comes from a process other than the record's current one — the identity check's *outside claimed* verdict, or the event's `adapter_id`/launch older than the record's launch — rather than applying it; a test that a kill, a resume and then the old process's `SessionEnd` leaves the resumed record as it was.
-
-**Done when** a test holds it, and the walk's `SESSION_END_WAIT` can go (or stays as belt and braces, said so).
-
-**Related:** TD-784 (the walk), TD-490 (`ended`), TD-063 (a killed pane revived by an older tick).
 
 ---
 

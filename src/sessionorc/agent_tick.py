@@ -157,6 +157,9 @@ def _carry_live(reading: dict[str, Any], old: dict[str, Any]) -> None:
 # how often a record whose only change is `shells_at` is written to disk (§4.2 *A background shell task*,
 # TD-766): it moves every tick in memory, and a minute's lag on disk only matters across a restart
 SHELLS_SAVE_EVERY = timedelta(minutes=1)
+# How long after a `kill` an `exited` hook on a record a new run has taken is the killed run's own
+# `SessionEnd` (TD-822): the walk saw it land within a second or two; fifteen is the walk's own wait.
+KILLED_END_GRACE = 15.0
 
 
 def _orders(r: dict[str, Any] | None) -> list[Any]:
@@ -4274,6 +4277,21 @@ class TickMixin:
             # `exited` and made its own tool session read as *outside shiftlead* to the anchor rule.
             log.info("%s: ignored the end of a previous run (%s; this run is %s)", sid, aid, s.adapter_id)
             return
+        killed_run = self._killed_run_at.get(sid)
+        taken = s.state not in ("exited", "closed")  # a new run holds the id
+        if killed_run is not None and (
+            time.monotonic() - killed_run >= KILLED_END_GRACE or (not taken and event.get("state") == "exited")
+        ):
+            self._killed_run_at.pop(sid, None)  # past the grace, or the killed run's end came before any resume
+            killed_run = None
+        if killed_run is not None and taken and not queued and event.get("state") == "exited":
+            # The end of the run a `kill` ended, landing after a resume took the id (TD-822): Claude
+            # Code runs its SessionEnd on the kill's hangup, and a resume keeps the tool's session id,
+            # so the check above cannot tell the runs apart. Dropped once; a new run that really
+            # ends inside the grace is still read `exited` by the tick, from its pane.
+            self._killed_run_at.pop(sid, None)
+            log.info("%s: ignored the killed run's own end, after a new run took the id", sid)
+            return
         if s.state == "closed":
             # Closed is final (§4.2 *Close*: the card kept a day, then forgotten). `ao close` kills
             # the pane, and the tool's own SessionEnd for the run it killed lands after it: applied,
@@ -4449,6 +4467,7 @@ class TickMixin:
         for last in self._subscribers.values():
             last.pop(sid, None)
         self._scrub(sid)
+        self._killed_run_at.pop(sid, None)  # kept past `_scrub` for a resume (TD-822), not past a forget
         self._gone.append(sid)
 
 

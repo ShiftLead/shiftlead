@@ -265,8 +265,8 @@ class Walk:
         rec = poll(self.get, lambda r: r.get("state") in ("exited", "closed"), 30)
         if rec.get("state") not in ("exited", "closed"):
             raise StepFailed(f"the kill left it {describe(rec)}")
-        # the killed process's own `SessionEnd` lands after the kill: a resume made before it reads that
-        # late hook as its own end (TD-822), so the walk waits for it, a while at most
+        # the killed process's own `SessionEnd` lands after the kill; the host agent drops it once a resume
+        # has taken the id (TD-822), and the walk still waits for it, a while at most, as belt and braces
         poll(self.get, lambda r: by_hook(r, "exited"), SESSION_END_WAIT)
         rec = self.call(
             "create",
