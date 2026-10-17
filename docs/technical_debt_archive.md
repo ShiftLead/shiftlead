@@ -15021,7 +15021,7 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-813, TD-806.
 
-**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — `test_a_waiting_repeat_cancelled_leaves_the_first_send_alone` in `tests/test_send_key.py`: a repeat cancelled while the first types leaves the first's answer and `_keyed_sends` as they were; with the shield removed it fails.
+**Resolved:** 2026-10-17 (grinder-ao-1, #2010) — `test_a_waiting_repeat_cancelled_leaves_the_first_send_alone` in `tests/test_send_key.py`: a repeat cancelled while the first types leaves the first's answer and `_keyed_sends` as they were; with the shield removed it fails.
 
 ---
 
@@ -15043,4 +15043,4 @@ Then the build entry, named in `Blocked by:`.
 
 **Related:** TD-813, TD-806.
 
-**Resolved:** 2026-10-17 (grinder-ao-1, #PR) — `test_a_repeat_waiting_on_a_send_that_fails_in_words_raises_its_verdict` in `tests/test_send_key.py`: a repeat waiting on a `prompt-stuck` send raises that verdict; with the `finally`'s branch forced to `True` it fails.
+**Resolved:** 2026-10-17 (grinder-ao-1, #2010) — `test_a_repeat_waiting_on_a_send_that_fails_in_words_raises_its_verdict` in `tests/test_send_key.py`: a repeat waiting on a `prompt-stuck` send raises that verdict; with the `finally`'s branch forced to `True` it fails.
