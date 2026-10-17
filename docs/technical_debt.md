@@ -88,6 +88,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-861 | The seat ledger's `refs` (`first_claimed`, `done_at` per reference) are never pruned, while its days and cursors keep `spend.KEEP` | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-863 | Build TD-854: rule 9 reads a member whose own claimed PR waits on a seat's held ask as unfinished, *w waiting on <seat>: #n* | Low | Open |
+| TD-864 | `tests/test_shape.py`'s home tests (#2055) leave the sampler's guards, throttle, write, prune and person/review mapping unread: 26 of 32 single-line reverts in `agent_shape.py` still pass (test audit) | Medium | Open |
 
 ---
 
@@ -1950,5 +1951,33 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a team whose last member declared `none` beside a PR held by its techlead stays up, its card's *not concluded* line naming the wait, and winds down once the reader answers and the member declares again.
 
 **Related:** TD-854 (the design), TD-820 / TD-836 (waiting claims), TD-241 (rule 9), TD-274 (waiting).
+
+---
+
+## TD-864: `tests/test_shape.py`'s home tests (#2055) leave the sampler's guards, throttle, write, prune and person/review mapping unread
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, test audit of #2055 and #2060)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/agent_shape.py` (`_shape_tick`, `_shape_pass`, `_shape_team`, `rpc_shape`); `tests/test_shape.py` (the "at the home" tests)
+
+**Why:** #2055 (TD-834) added the home's sampler with three tests (`test_the_home_samples_a_running_team_and_serves_its_shape`, `test_a_team_whose_ledger_cannot_be_read_is_not_sampled`, `test_a_repo_not_read_yet_and_a_member_whose_state_says_nothing_are_not_sampled`). I reverted single lines of `agent_shape.py` in my worktree and ran `PYTHONPATH=$PWD/src pdm run pytest -q -x tests/test_shape.py` (21 pass at baseline); each of these still passed:
+- `_shape_tick`'s throttle (`if time.monotonic() - self._shape_at < shape_mod.SHAPE_EVERY: return` replaced by `pass`): the test only sets `_shape_at = 0.0` and ticks once, never a second tick inside the minute.
+- `if not sampled: return  # a quiet minute writes nothing`, removed: the test's comment says "a minute with no running team writes nothing" but it asserts only `_shape_pass(...) is False`, never that `shape.json` is left alone by `_shape_tick`.
+- `not r.superseded_by` and `not work_mod.sat_out(r)` in `_shape_pass`'s crew filter, `not r.superseded_by` in the `held` set, `if got is None: continue` (→ `return False`), `.sort(key=… state not in DEAD, created)` picking the reader's live seat, the `min(bounds)` and `REVIEW_BOUND` default of a team's review bound, `_orders(facts)` in the `in_lanes` call, the sum over several `roots` (`counts.get(…, 0) + …`), and `and r.repo in self._repos` in `roots`.
+- `shape_mod.prune` and its once-a-day guard (`self._shape_pruned != day.isoformat()`): the test never samples a second day.
+- Every `except` — a team's surprise, the pass's, `OSError` on the write: swapped for `ZeroDivisionError`, nothing fails.
+- `rpc_shape`'s `window not in ("day","week")` refusal, removed.
+- **Fake the real caller never sees:** `person = {naming.split_address(k)[0] …}` and `review.add(naming.split_address(str(a["from"]))[0])` survive when the `split_address` is dropped, because the test's ask is `from_=g3.id` (a bare id) and `person_inbox` is never filled, so `waiting_person` is never true at the home. The code's own comment says the inbox names a sender `id@host`; no test hands it one. The `waiting:person` class is covered only by `_cls(...)` units, not by the pass that feeds it.
+- `test_a_repo_not_read_yet_…` says "an ended member in a path the registry does not list holds nothing back", but the member is `closed`, so `live` already drops it; with `and r.repo in self._repos` removed the test passes. A *live* member in an unlisted path is the case it names.
+
+**Fix:** tests only, at the home with `agent._shape_pass` / `_shape_tick`: a second tick within `SHAPE_EVERY` takes no sample; a tick with no running team leaves `shape.json` unwritten; a superseded and a sat-out member are not in the crew; a second day prunes a day older than the keep; a person-inbox ask and a review ask from `id@host` classify `waiting:person` / `waiting:review`; a live member in an unlisted repo is not a root; two roots sum a member's lane count; a raising team does not stop another's sample; `shape` with `window="month"` is refused. Each fails when its line is reverted.
+
+**Done when** the reverts listed above each fail `tests/test_shape.py`, and the unlisted-path test uses a live member.
+
+**Related:** TD-834 (built #2055, #2060), TD-819 (the design), TD-860 (the same audit's earlier finding).
 
 ---
