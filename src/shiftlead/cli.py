@@ -1679,7 +1679,8 @@ def _promote_line(name: str, r: dict[str, Any]) -> str:
         auto += f" · {words}"
     line = f"{name} · live {live} · main {main} · checks {checks} · auto {auto}"
     if (f := r.get("inflight")) and f.get("phase") == "smoke":  # §6 *The smoke*: check read it, its smoke runs
-        line += f"\n  checking {str(f.get('sha'))[:7]} live · started {f.get('smoke_at')} · log {f.get('log')}"
+        at = f.get("smoke_at") or f.get("at")
+        line += f"\n  checking {str(f.get('sha'))[:7]} live · started {at} · log {f.get('log')}"
     elif f:
         what = "rolling back to" if f.get("kind") == "rollback" else "promoting"
         line += f"\n  {what} {str(f.get('sha'))[:7]} · started {f.get('at')} by {f.get('by')} · log {f.get('log')}"
