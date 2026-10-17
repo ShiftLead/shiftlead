@@ -512,17 +512,26 @@ class SpendMixin:
         seats.done(self._seats, s.repo, ref, claimed_at, now_iso())
         await self._save_seats()
 
-    async def rpc_seats(self, window: str = "day", team: str | None = None, by: str | None = None) -> dict[str, Any]:
-        """The seat ledger's reading (design §4.4 *Spend per seat*, §4.7 `ao spend`; TD-830): over a `day`
-        or a `week`, per seat (per record under `by: record`), per role, team and repo, per finished
-        entry, and *outside shiftlead*; `unknown` the profiles whose spend could not be read, whose
-        seats read *spend unknown*. Read-only, and open to a session."""
+    async def rpc_seats(
+        self, window: str = "day", team: str | None = None, by: str | None = None, at: str | None = None
+    ) -> dict[str, Any]:
+        """The seat ledger's reading (design §4.4 *Spend per seat*, §4.7 `ao spend`; TD-830, TD-859): over a
+        `day`, `week` or `month`, `at` its first day, per seat (per record under `by: record`), per role,
+        team and repo, per finished entry, and *outside shiftlead*; the window's `series`, the `teams`
+        against the previous period and the `top` seats; `unknown` the profiles whose spend could not be
+        read, whose seats read *spend unknown*. Read-only, and open to a session."""
         if by not in (None, "", "seat", "record"):
             raise RpcError(f"seats by seat or record, not {by!r}")
         now = datetime.now().astimezone()
         try:
             out = seats.reading(
-                self._seats, window, now, team or None, by or None, settings_mod.weights(settings_mod.load())
+                self._seats,
+                window,
+                now,
+                team or None,
+                by or None,
+                settings_mod.weights(settings_mod.load()),
+                at=at or None,
             )
         except ValueError as e:
             raise RpcError(str(e)) from None

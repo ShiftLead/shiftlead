@@ -51,6 +51,7 @@ import yaml
 from sessionorc import hosts, paths
 from sessionorc import settings as settings_mod
 from sessionorc.models import GRANTS
+from sessionorc.seats import INTERACTIVE, OUTSIDE
 from shiftlead import repoconfig
 
 DEFAULT_MANAGER_ROLE = "manager"
@@ -629,6 +630,8 @@ TECHLEAD_ROLE = "techlead"
 # TD-722*, TD-757): kept among the keys so `anchor: false`, which says what is now true, is passed over;
 # any other value is refused by `_team` in these words
 ANCHOR_RETIRED = "`anchor:` is retired — the anchor seat is gone (§4.9b *No anchor seat*); delete the key"
+# the seat ledger reads the person's own sessions and the unowned turns under these (§4.9 *Names are the org's*)
+RESERVED = (INTERACTIVE, OUTSIDE)
 SEAT_KEYS = ("name", "role", "trigger", "brief", "profile")
 # A definition written before TD-722 (design §4.9): `projects:` on a team and `home:` on any of its
 # sessions pass `_no_stray` so `_validate` can refuse them by name, saying the fix (`_refuse_old`)
@@ -677,6 +680,11 @@ def _member(raw: Any, key: str, old: dict[str, Any], who: str) -> MemberDef:
 def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     raw = _mapping(raw, key)
     _no_stray(raw, TEAM_KEYS, key, OLD_TEAM_KEYS)
+    if name in RESERVED:
+        raise ValueError(
+            f"{key}: `{name}` is reserved — the seat ledger reads the person's own sessions as `interactive` "
+            "and turns no session owns as `outside` (design §4.9 *Names are the org's*); rename the team"
+        )
     if "anchor" in raw and raw["anchor"] is not False:
         raise ValueError(f"{key}: {ANCHOR_RETIRED}")
     old: dict[str, Any] = {}

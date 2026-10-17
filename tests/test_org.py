@@ -856,3 +856,15 @@ def test_a_manager_is_on_call_when_its_definition_says_so(tmp_path):
     ):
         with pytest.raises(ValueError, match=why):
             team(block)
+
+
+@pytest.mark.parametrize("name", ["interactive", "outside"])
+def test_a_team_named_as_a_seat_ledger_reading_is_refused(tmp_path, name):
+    """§4.9 *Names are the org's* (TD-818, built by TD-859): the seat ledger reads the person's own
+    sessions as `interactive` and unowned turns as `outside`, so a team of either name fails to load —
+    in the org file (`ao org check`, a start) and in a repo's definitions."""
+    doc = {"projects": {"p": {"repos": {"r": {"h": "/r"}}}}, "teams": {name: {"repo": "r", "members": [{"role": "g"}]}}}
+    with pytest.raises(ValueError, match=rf"teams\.{name}: `{name}` is reserved .* rename the team"):
+        org.load(write(tmp_path, doc))
+    with pytest.raises(ValueError, match=rf"`{name}` is reserved"):
+        org.merge_repo_teams(org.Org(), tmp_path / "solo", {name: {"members": [{"role": "g"}]}})
