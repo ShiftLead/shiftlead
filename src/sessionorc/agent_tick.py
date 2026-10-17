@@ -2715,7 +2715,8 @@ class TickMixin:
                     met = (
                         r.state == "needs-you"
                         and r.told
-                        and (r.pending or {}).get("kind") == "permission"
+                        and r.pending is not None
+                        and r.pending.kind == "permission"
                         # a permission only the terminal answers is never a seat's (§4.3, §6 rule 3, TD-785)
                         and adapters.permission_channel(r.adapter)
                     )
