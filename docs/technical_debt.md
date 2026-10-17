@@ -69,6 +69,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-806 | The Focus composer's Send clears whatever the box holds when the send answers, so a late answer wipes what the person typed since, and one send was delivered twice from Edge: nothing makes a send land once | High | Open |
 | TD-810 | **Open shell here** is refused when the session's shell is still open: the create takes the name `<session>-shell`, which the live shell holds, so the placeholder tab opens and closes and the refusal is easy to miss | Medium | Open |
+| TD-814 | A team's TDs in motion reads a design whose PR waits on its round as *design*, the same as the one the designer is writing, so one designer reads as two designs in progress | Low | Open |
 
 ---
 
@@ -1371,3 +1372,21 @@ Then the build entry, named in `Blocked by:`.
 **Done when** the design says what a press does when the session's shell is open (and when it was closed), what a refused press shows, and the build entry is filed and named in `Blocked by:`.
 
 **Related:** TD-577 and TD-579 (the press opens a tab), TD-580 and TD-801 (the person's own shell), TD-622 (the shell press's untested lines).
+
+## TD-814: A team's TDs in motion reads a design whose PR waits on its round as *design*, the same as the one the designer is writing, so one designer reads as two designs in progress
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Open
+**Location:** design §4.5 screen 1 (the phase sentence: *design* — a designer holds a design-first entry), §4.4 *Repo facts* (**Phases**), §4.5a *team card: TDs in motion*; `src/shiftlead/ui/org.py` (the phase line, `row["phase"] = "design" if e.get("kind") == "design-first" else …`, ~L354)
+
+**Why:** Paul, 2026-10-16, on ao-grind's card: one designer working, and TDs in motion read *2 design · 1 review* — TD-806 (designer-ao-1, #1995) and TD-804 (designer-ao-1, #1993) — and he asked whether that is a bug. It is as designed: designer-ao-1 held both claims, each design written and its PR open — TD-804's #1993 waiting on Paul's steer, TD-806's #1995 in its round (a design is held until its round ends); the phase rule reads any claim on a design-first entry as *design*, whatever its PR, where a build's claim with an open PR reads *review*. So the facet cannot tell a design being written from one that waits on the person or its reviewers, and a person reading it sees two designs in progress from one designer and wonders what is wrong.
+
+**Fix:** design it first: a design-first claim whose PR is open (its `pr` or `review_pr`, or an open PR whose branch names it) reads *review*, as a build's does, so the card above would read *3 review*, and a design still being written, with no PR yet, alone reads *design*; the PR column already names #1993 and #1995. Say it in §4.5 screen 1's phase sentence, §4.4 *Phases* and the §4.5a row, then the build entry: the phase line in `org.py` and a test of a designer holding one claim with an open PR and one without.
+
+**Done when** the design says what phase a design-first claim with an open PR reads, and the build entry is filed and named in `Blocked by:`.
+
+**Related:** TD-197 (the phases: design-first reads *design*), TD-722 (the Org's team cards).
