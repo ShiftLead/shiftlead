@@ -113,6 +113,13 @@ def test_session_carries_the_porcelains_code_for_a_dirty_path_and_the_bases_lett
     assert {(f["code"], f["path"]) for f in tree} == {("M", "base.txt"), ("??", "fresh.txt")}
 
 
+def test_a_path_git_would_quote_comes_whole(tmp_path):
+    repo = cloned(tmp_path)
+    (repo / "naïve file.txt").write_text("n")
+    for pick in ("tree", "session"):
+        assert pick_files(repo, "origin/main", pick)["files"] == [{"code": "??", "path": "naïve file.txt"}]
+
+
 def test_session_caps_at_a_hundred_with_more(tmp_path):
     repo = cloned(tmp_path)
     for i in range(GIT_PICK_SESSION + 5):

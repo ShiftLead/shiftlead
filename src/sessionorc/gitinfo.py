@@ -286,11 +286,11 @@ def pick_files(directory: Path | str, base_ref: str | None, pick: str, timeout: 
             {"ref": "HEAD" if i == 0 else f"HEAD~{i}", "sha": sha, "subject": subject, "at": at, "author": author}
         )
     out: dict[str, Any] = {"commits": commits}
-    if pick == "tree":
-        info = git_info(top, timeout=timeout)
-        if info is None:
+    if pick == "tree":  # `GitInfo.files`' lines, read with -z so a path git would quote comes whole
+        status = _git(top, "status", "--porcelain=v1", "-z", "--untracked-files=normal", timeout=timeout)
+        if status is None:
             raise GitPickError("git status failed")
-        files = [dict(zip(("code", "path"), line.split(" ", 1), strict=True)) for line in info.files[:GIT_PICK_TREE]]
+        files = [{"code": code, "path": path} for path, code in _porcelain(status).items()][:GIT_PICK_TREE]
     elif pick == "session":
         files, out["more"] = _session_files(top, base_ref, timeout)
     elif isinstance(pick, str) and pick and any(c["sha"] == pick for c in commits):
@@ -323,6 +323,22 @@ def _name_status(raw: str) -> list[dict[str, Any]]:
     return [f for f in files if f["path"]]
 
 
+def _porcelain(status: str) -> dict[str, str]:
+    """`git status --porcelain=v1 -z`'s paths in its order, each with its code as `GitInfo.files` writes it
+    (the blanks dropped: `M`, `MD`, `??`), a rename by its new path."""
+    codes: dict[str, str] = {}
+    fields, i = status.split("\0"), 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        codes[entry[3:]] = entry[:2].replace(" ", "")
+        if "R" in entry[:2] or "C" in entry[:2]:
+            i += 1  # the source follows the path: no longer in the tree
+    return codes
+
+
 def _commit_files(top: str, sha: str, timeout: float) -> list[dict[str, Any]]:
     parents = _git(top, "rev-list", "--parents", "-n1", sha, timeout=timeout)
     if parents is None:
@@ -341,17 +357,7 @@ def _session_files(top: str, base_ref: str | None, timeout: float) -> tuple[list
     every = changed_files(top, base_ref, limit=1 << 30, timeout=timeout)
     if every is None:
         raise GitPickError("git read failed")
-    status = _git(top, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=timeout) or ""
-    codes: dict[str, str] = {}
-    fields, i = status.split("\0"), 0
-    while i < len(fields):
-        entry = fields[i]
-        i += 1
-        if len(entry) < 4:
-            continue
-        codes[entry[3:]] = entry[:2].replace(" ", "")
-        if "R" in entry[:2] or "C" in entry[:2]:
-            i += 1
+    codes = _porcelain(_git(top, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=timeout) or "")
     base = (_git(top, "merge-base", "HEAD", base_ref, timeout=timeout) or "").strip() if base_ref else ""
     if base and (raw := _git(top, "diff", "--name-status", "-z", base, timeout=timeout)) is not None:
         for f in _name_status(raw):

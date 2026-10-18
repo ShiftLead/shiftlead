@@ -84,6 +84,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-866 | Rule 9's held-ask wait has two guards no test pins: a derived or scraped claim is not read, and a dead member's held ask blocks nothing | Medium | Open |
 | TD-867 | `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
+| TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 
 ---
 
@@ -1815,5 +1816,25 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a shortened `PASS_DRAIN` fails a test.
 
 **Related:** TD-858 (built #2073).
+
+---
+
+## TD-869: `GitInfo.files` reads the porcelain without `-z`, so a path git quotes — a non-ASCII name, a tab, a quote — reaches the Git card quoted and its link opens nothing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-1, building TD-862; found by its review)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/gitinfo.py` (`git_info`, its `git status --porcelain=v2 --branch` read); `tests/test_gitinfo.py`; the readers of `git.files` (`src/shiftlead/ui/static/app.js` `AO.gitFiles`, the cards' dirty lines)
+
+**Why:** `git_info` runs `git status --porcelain=v2` without `-z`, so under git's default `core.quotePath` a path with a non-ASCII byte or a special character comes C-quoted: an untracked `naïve.txt` is `?? "na\303\257ve.txt"` in `GitInfo.files`, and the Focus Git card's *changed files* (§4.5a, TD-628) links that quoted string, which names no file. TD-862's `git_files` read builds its Working tree from `--porcelain=v1 -z` (`gitinfo._porcelain`) and is unaffected.
+
+**Fix:** read the porcelain with `-z` (`--porcelain=v2 --branch -z`: entries are NUL-terminated, and a rename's source is the next field rather than after a tab) and keep `GitInfo.files`' line form (`<code> <path>`), so its readers do not change.
+
+**Done when** a test holds an untracked `naïve file.txt` and a renamed path with a tab as unquoted lines of `GitInfo.files`, and the existing `git_info` tests pass.
+
+**Related:** TD-628, TD-862.
 
 ---
