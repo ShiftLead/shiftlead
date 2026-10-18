@@ -104,6 +104,38 @@ let card;
   answers.push(new Error("git_files: git read failed"));
   card.update(v("o3", ["M a.py", "?? n.txt"]), editor, "/w/wt"); await tick();
   out.failed = snap();
+
+  // TD-878: a second card whose reads the probe settles itself, and a select that counts its writes
+  const counted = () => { const n = node(); let html = ""; n.writes = 0;
+    Object.defineProperty(n, "innerHTML", { get: () => html, set: (x) => { html = x; n.writes++; } }); return n; };
+  const els2 = { sel: counted(), up: node(), down: node(), line: node(), files: node() };
+  const pending = [];
+  const card2 = AO.gitPick(els2, (pick) => new Promise((resolve, reject) => pending.push({ pick, resolve, reject })));
+  const snap2 = () => ({ pick: card2.state.pick, sel: els2.sel.innerHTML, files: els2.files.innerHTML,
+    answer: card2.state.answer, asked: pending.map((p) => p.pick) });
+  card2.update(v("p1", ["M a.py"]), editor, "/w/wt");
+  pending[0].resolve({ commits: commits(1), files: [] }); await tick();
+  // a paint with the same commits leaves the select's markup alone: an open select stays open
+  const loaded = els2.sel.writes;
+  card2.update(v("p1", ["M b.py"]), editor, "/w/wt");
+  card2.update(v("p1", ["M c.py"]), editor, "/w/wt");
+  out.selWrites = [loaded, els2.sel.writes];
+  // a commit picked, then Session: the commit's answer, settled last, is not drawn
+  els2.sel.value = sha(2); els2.sel.h.change();
+  els2.sel.value = "session"; els2.sel.h.change();
+  pending[2].resolve({ commits: commits(1), files: [{ code: "??", path: "s.txt" }], more: 0 }); await tick();
+  pending[1].resolve({ commits: commits(4), files: [{ code: "M", path: "stale.py" }] }); await tick();
+  out.stale = snap2();
+  // a pick that moved on while its read was out (the sha left the ten it answered with): no answer kept
+  els2.sel.value = sha(3); els2.sel.h.change();
+  pending[3].resolve({ commits: commits(5), files: [{ code: "M", path: "moved-on.py" }] }); await tick();
+  out.movedOn = snap2();
+  // and an earlier pick's failure, landing after a later pick's answer, is not said either
+  els2.sel.value = sha(6); els2.sel.h.change();
+  els2.sel.value = "session"; els2.sel.h.change();
+  pending[5].resolve({ commits: commits(5), files: [{ code: "??", path: "s2.txt" }], more: 0 }); await tick();
+  pending[4].reject(new Error("git_files: git read failed")); await tick();
+  out.staleFailure = snap2();
   console.log(JSON.stringify(out));
 })();
 """
@@ -237,3 +269,32 @@ def test_the_route_hands_the_pick_to_the_git_files_read(monkeypatch):
     assert ("git_files", {"id": "ao-x-1", "pick": "session"}) in asked
     r = c.get("/api/sessions/ao-x-1/git_files?pick=x")
     assert r.status_code == 400 and "pick is tree, session" in r.text
+
+
+@pytest.mark.unit
+def test_an_earlier_picks_answer_settled_last_is_not_drawn(got):
+    """TD-878: a commit picked, then Session, and the commit's answer lands after Session's: Session's
+    lines and commits stay drawn (`n !== st.asked`)."""
+    st = got["stale"]
+    assert st["asked"] == ["tree", S(2), "session"] and st["pick"] == "session"
+    assert "s.txt" in st["files"] and "stale.py" not in st["files"]
+    assert S(1) in st["sel"] and S(11) not in st["sel"]  # the stale answer's commits (from 4) never drawn
+    sf = got["staleFailure"]  # the error handler's own guard: an earlier read's failure is not said
+    assert sf["asked"][-2:] == [S(6), "session"] and sf["pick"] == "session"
+    assert "s2.txt" in sf["files"] and "could not read" not in sf["files"]
+
+
+@pytest.mark.unit
+def test_an_answer_for_a_pick_that_moved_on_is_not_kept(got):
+    """TD-878: the read's own answer moved the pick to Working tree (its sha left the ten): the answer
+    is for a pick no longer held, and is dropped (`st.pick === pick`)."""
+    mo = got["movedOn"]
+    assert mo["asked"][-1] == S(3) and mo["pick"] == "tree" and mo["answer"] is None
+    assert "moved-on.py" not in mo["files"]
+
+
+@pytest.mark.unit
+def test_a_paint_with_unchanged_commits_leaves_the_selects_markup_alone(got):
+    """TD-878: the select's options are written once while the commits stand, so an open select stays open."""
+    loaded, after = got["selWrites"]
+    assert loaded == 2 and after == loaded  # the empty list, then the ten; two paints since wrote nothing
