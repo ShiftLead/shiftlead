@@ -272,6 +272,25 @@ def test_a_team_card_carries_today_s_figure_linking_to_its_spend_page_and_none_w
     assert asyncio.run(rd.team_spend()) == {}  # an older home: the figures are left off
 
 
+def test_the_org_and_repo_pages_draw_the_team_cards_spend_figure(tmp_path, monkeypatch):
+    """TD-873: each page hands `team_groups` the `seats` reading by team, so the card's **spend** figure
+    is drawn on a page load, not only by `team_groups` called apart (§4.5a *team card: spend*, TD-832)."""
+    import test_ui_repo_page as rp
+
+    root = str(tmp_path / "samscrape")
+    base = rp.fake({root: rp.reading(root)}, [rp.rec("grinder-ao-1", root, team="ao-grind")])
+
+    class Fake(base):
+        async def call(self, method, **kw):
+            return reading(**kw) if method == "seats" else await super().call(method, **kw)
+
+    c = rp.client(monkeypatch, tmp_path, Fake)
+    for path in ("/", "/repo/samscrape"):
+        html = c.get(path).text
+        assert '<a class="meta spendfig" href="/spend?team=ao-grind"' in html, path
+        assert "≈$138 today</a>" in html, path
+
+
 def test_the_weights_card_draws_the_read_weights_and_saves_only_what_differs_from_the_default():
     """§4.5a *Settings page: Usage* **weights** (TD-832 slice 3): a row per model prefix with its four prices
     and the *as of* date; Save sends the rows that are not the design's own at its own prices."""
@@ -301,6 +320,8 @@ def test_the_weights_card_draws_the_read_weights_and_saves_only_what_differs_fro
         ([{"model": "a", "input": "1"}, {"model": "a", "input": "2"}], "a is named twice"),
         ([{"model": "a", "input": "cheap"}], "a input: $ per million tokens, not 'cheap'"),
         ([{"model": "a", "output": "-1"}], "at or above 0"),
+        ([{"model": "a", "input": "inf"}], "at or above 0, not inf"),  # `float()` parses both (TD-873)
+        ([{"model": "a", "input": "1", "output": "nan"}], "a output: $ per million tokens, at or above 0, not nan"),
         ([{"model": "a"}], "a: give it at least its input price"),
         ([{"model": "a", "output": "1"}], "a: give it at least its input price"),
         (None, "send {rows"),
