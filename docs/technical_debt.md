@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
-| TD-898 | #2139's lazy-fold script (`AO.fillFold`) has no test that runs it: its tests read `app.js` as text | Low | Open |
 
 ---
 
@@ -1500,24 +1499,3 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 ---
 
 ---
-
-
-
-
-## TD-898: #2139's lazy-fold script (`AO.fillFold`) has no test that runs it: its tests read `app.js` as text
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (test audit of #2139–#2148, test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/shiftlead/ui/static/app.js` (`AO.fillFold`, the `toggle` listener, `AO.reopenFolds`); `tests/test_ui_queue_cards.py` (`test_the_browser_reads_a_lazy_fold_once_keeps_it_by_key_and_refills_it_after_a_reread`)
-
-**Why:** the test is named for behaviour — the browser "reads a lazy fold once, keeps it by key and refills it after a re-read" — and asserts only that substrings are in the script: `"foldBodies.set(key, html)"`, `"if (foldBodies.has(key)) put(foldBodies.get(key));"`, `"gone — reload"`, `"AO.fillFold(d)"` in `reopenFolds` and `"AO.reopenFolds(lists);"` before `wire();`. None of the paths runs: the `data.filled` guard, a 404 dropping the kept body, a failed read clearing `filled` so the next open reads again, the `put` that keeps the summary and replaces the rest. Deleting the `d.dataset.filled` check (a second open fetches again) or the `delete d.dataset.filled` in the `catch` (a failed read is never retried) keeps the strings it looks for in place. #2141 (TD-894) put `AO.wholeOnHover` under node for the same reason; `tests/test_ui_whole_on_hover.py` is the harness.
-
-**Fix:** run `AO.fillFold` under node with a fake element (`dataset`, `children`, `insertAdjacentHTML`) and a fake `fetch`, as `test_ui_whole_on_hover.py` does: one fetch for two opens; a 404 puts *gone — reload* and forgets the kept body; a thrown or non-ok read puts the retry line only when nothing is kept and the next call fetches again; a re-read fold is filled from the kept body before the fetch returns. Drop the string-presence test it replaces.
-
-**Done when** removing the `filled` guard, the `catch`'s `delete d.dataset.filled`, or the 404 branch each fails a test.
-
-**Related:** TD-891, TD-894.
