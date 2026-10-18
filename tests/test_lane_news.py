@@ -447,15 +447,38 @@ async def test_parking_the_ticks_lands_a_detached_pass_still_in_flight(agent):
     without its live commit. `park_ticks` lets such a pass land first, so what the test sets stands."""
     import asyncio
 
+    landed = []
+
     async def late() -> None:
         await asyncio.sleep(0.2)  # a reading's thread, slow on a loaded machine
         agent._promotes = {}
+        landed.append(True)  # its last step: set only by a pass that ran to its end
 
     agent._late_task = asyncio.create_task(late())  # beside the first tick's own `_promote_task`
     await park_ticks(agent)
+    assert landed == [True] and agent._late_task.done(), "park_ticks returned before the pass landed"
     agent._promotes["repo"] = {"live": "abc"}
-    await asyncio.sleep(0.4)
+    await asyncio.sleep(0)  # nothing is left to land over it
     assert agent._promotes == {"repo": {"live": "abc"}}
+
+
+async def test_parking_the_ticks_cancels_a_pass_past_its_drain_and_returns(agent, monkeypatch):
+    """TD-868: a pass not finished in `PASS_DRAIN` is cancelled, so a hung reading never holds the test;
+    the drain is the conftest's, patched short here, and the pass sleeps well past it."""
+    import asyncio
+
+    monkeypatch.setitem(park_ticks.__globals__, "PASS_DRAIN", 0.05)
+    landed = []
+
+    async def hung() -> None:
+        await asyncio.sleep(30)
+        landed.append(True)
+
+    agent._hung_task = asyncio.create_task(hung())
+    started = asyncio.get_running_loop().time()
+    await park_ticks(agent)
+    assert asyncio.get_running_loop().time() - started < 5, "park_ticks waited out the pass, not its drain"
+    assert agent._hung_task.cancelled() and landed == []
 
 
 async def test_a_decided_board_line_is_told_at_once_to_the_free_pick_lane_and_claimed_as_a_lease(agent, tmp_path):

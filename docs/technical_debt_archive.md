@@ -16445,3 +16445,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** PR #2086 (where it was met).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2098). The test parks the ticks before writing its reading, broadcasts the view it takes once, and compares against that view. The root is overwritten with a bare reading before the comparison, so a re-read cannot fail it.
+
+## TD-868: `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/conftest.py` (`park_ticks`, `PASS_DRAIN`); `tests/test_lane_news.py`
+
+**Why:** #2073 (TD-858) says a pass not finished in `PASS_DRAIN` is cancelled. With `PASS_DRAIN = 0.01` instead of `30.0`, `pytest -q tests/test_lane_news.py` read `18 passed`: the one test the PR added has a 0.2 s task that either lands or is cancelled, and its last assertion, `agent._promotes == {"repo": {"live": "abc"}}`, holds in both cases (the task only resets `_promotes` to `{}` before the test sets it). Its `sleep(0.4)` is a wait in place of a condition, though a short one.
+
+**Fix:** Make the late task set a flag as its last step; with a `PASS_DRAIN` patched to a small value and the task sleeping past it, assert the task was cancelled (flag unset) and `park_ticks` returned; with the default, assert the flag is set. Replace the `sleep(0.4)` with a yield or the task's own completion.
+
+**Done when** a shortened `PASS_DRAIN` fails a test.
+
+**Related:** TD-858 (built #2073).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2095). The late pass sets a flag as its last step, and `park_ticks` is asserted to return only once that pass has landed (the `sleep(0.4)` is gone). A second test patches `PASS_DRAIN` to 0.05 s and asserts that a 30 s pass is cancelled and `park_ticks` returns. With `PASS_DRAIN = 0.01`, the first test fails.
