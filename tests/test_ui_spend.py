@@ -266,3 +266,60 @@ def test_a_team_card_carries_today_s_figure_linking_to_its_spend_page_and_none_w
     assert calls == [("seats", {"window": "day"})]
     rd.spend_cache["at"] = -1e9
     assert asyncio.run(rd.team_spend()) == {}  # an older home: the figures are left off
+
+
+def test_the_weights_card_draws_the_read_weights_and_saves_only_what_differs_from_the_default():
+    """§4.5a *Settings page: Usage* **weights** (TD-832 slice 3): a row per model prefix with its four prices
+    and the *as of* date; Save sends the rows that are not the design's own at its own prices."""
+    from shiftlead.ui.settings_page import weights_body, weights_card
+
+    card = weights_card({**W, "claude-opus": {"input": 6, "output": 30}, "my-model": {"input": 1.5}})
+    rows = {r["model"]: r for r in card["rows"]}
+    assert card["as_of"] == "2026-10-17" and list(rows)[0] == "claude-fable"
+    assert rows["claude-fable"] == {"model": "claude-fable", "input": "10", "output": "50", "cache_read": "0.25",
+                                         "cache_write": "20", "default": True, "shipped": True}  # fmt: skip
+    assert not rows["claude-opus"]["default"] and rows["claude-opus"]["cache_read"] == ""
+    assert not rows["my-model"]["shipped"] and weights_card(None)["rows"][0]["default"]
+    same = [
+        {k: r[k] for k in ("model", "input", "output", "cache_read", "cache_write")} for r in weights_card(W)["rows"]
+    ]
+    assert weights_body(same, "2026-10-17") == {}  # nothing differs: the default holds
+    assert weights_body(same[1:], "2026-10-17") == {}  # a shipped row removed comes back at its default
+    priced = [{**same[1], "input": "$5", "cache_read": ""}, {"model": " mine ", "input": "2", "output": "8"}]
+    assert weights_body(priced, "2026-11-01") == {
+        "weights": {"as_of": "2026-11-01", "claude-opus": {"input": 5.0, "output": 20.0, "cache_write": 8.0},
+                    "mine": {"input": 2.0, "output": 8.0}}
+    }  # fmt: skip
+    for rows_, words in (
+        ([{"model": "", "input": "1"}], "needs its model prefix"),
+        ([{"model": "a", "input": "1"}, {"model": "a", "input": "2"}], "a is named twice"),
+        ([{"model": "a", "input": "cheap"}], "a input: $ per million tokens, not 'cheap'"),
+        ([{"model": "a", "output": "-1"}], "at or above 0"),
+        ([{"model": "a"}], "a: give it at least its input price"),
+        (None, "send {rows"),
+    ):
+        with pytest.raises(ValueError, match=re.escape(words)):
+            weights_body(rows_)
+    with pytest.raises(ValueError, match="as of is a date"):
+        weights_body([{"model": "a", "input": "1"}], "soon")
+
+
+def test_the_weights_card_writes_spend_weights_through_set_settings(subprocess_agent):
+    from sessionorc.client import call_sync
+    from shiftlead.ui.app import create_app
+
+    with TestClient(create_app()) as c:
+        page = c.get("/settings").text
+        assert 'id="setweights"' in page and 'value="claude-opus-5-5"' in page and 'href="/spend"' in page
+        assert "API-equivalent" in page and 'name="as_of" value="2026-10-17"' in page
+        rows = [{"model": "claude-opus", "input": "6", "output": "30", "cache_read": "", "cache_write": ""},
+                {"model": "mine", "input": "1", "output": "", "cache_read": "", "cache_write": ""}]  # fmt: skip
+        assert c.post("/api/settings/spend", json={"rows": rows, "as_of": "2026-10-17"}).json()["ok"]
+        got = call_sync("settings")["spend"]["weights"]
+        assert got["claude-opus"] == {"input": 6.0, "output": 30.0} and got["mine"] == {"input": 1.0}
+        assert got["claude-fable"] == W["claude-fable"]  # the rows not sent keep the default
+        assert 'value="mine"' in c.get("/settings").text
+        bad = c.post("/api/settings/spend", json={"rows": [{"model": "x", "input": "free"}]})
+        assert bad.status_code == 400 and "x input: $ per million tokens" in bad.json()["detail"]
+        assert c.post("/api/settings/spend", json={"rows": [], "as_of": ""}).json()["ok"]
+        assert call_sync("settings")["spend"]["weights"] == W  # nothing differs: the key is gone

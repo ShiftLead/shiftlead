@@ -742,10 +742,17 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .setpage .setvals dd { margin: 0; font-size: var(--t-mono-s); overflow-wrap: anywhere; }
 .setpage .badge.defmark { cursor: default; color: var(--muted); border-color: transparent; font-family: inherit; }
 .setpage .setfoot { border-top: 1px solid var(--line); padding-top: 8px; align-items: center; }
+/* **weights** (§4.5a *Settings page: Usage*, TD-832): a row per model prefix, its four prices and its × */
+.setpage .setweights { display: flex; flex-direction: column; gap: 4px; }
+.setpage .setweight { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)) 2em; gap: 6px; align-items: center; }
+.setpage .setweight.sethead { font-size: var(--t-small); }
+.setpage .setweight input[readonly] { border-color: transparent; background: transparent; }
 .setpage .setfoot .note { overflow-wrap: anywhere; }
 @media (max-width: 720px) {
   .setpage .setrow, .setpage .setvals { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .setpage .setage { grid-column: auto; margin-top: 0; }
+  .setpage .setweight { grid-template-columns: repeat(4, minmax(0, 1fr)) 2em; }
+  .setpage .setweight > :first-child { grid-column: 1 / -1; }
   .setpage .setvals dd { margin-bottom: 6px; }
   .setpage .setpicks label { white-space: normal; }  /* board items shown wraps rather than widening the page (TD-296 #9) */
 }
