@@ -16390,3 +16390,19 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-832, TD-830, TD-859.
 
 **Resolved:** 2026-10-17 (grinder-ao-1, PR #2090). Design §4.4 *Spend per seat* (the readings' paragraph: *per seat … its own*) carries the rule. `seats.reading` gives each seat (and each record under `by: record`, and each of `top`) its own `finished` — the count, sum and median of its figure on each finished entry it spent on, and their `refs` — and its `tokens` by kind (`_entries`' per-seat spend, `_finished`, `_add_tokens`); `spend_view` draws By seat's *per finished entry* from it, the role's count staying on the subtotal, and `_weights_title` opens a seat's hover with its tokens. Design §4.4 *Spend per seat* says so; `tests/test_seats.py::test_each_seat_reads_its_own_finished_entries_and_its_tokens_by_kind`, `tests/test_ui_spend.py`; screenshot `docs/mockups/reviews/2026-10-17-td865-by-seat.png`.
+
+## TD-872: `pick_files`' Working-tree cap, its porcelain rename skip and its `--first-parent` each leave `tests/test_git_files.py` passing when removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2077 (TD-862 (1)))
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2100 (2026-10-18, grinder-ao-1)
+**Location:** `src/sessionorc/gitinfo.py` (`pick_files`, `_porcelain`); `tests/test_git_files.py`
+
+**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_git_files.py` still reports `10 passed` with (a) `[:GIT_PICK_TREE]` deleted from the `tree` branch (no test reads `tree` with more than two dirty paths, so the twenty-line cap §4.2 states is unpinned; `test_session_caps_at_a_hundred_with_more` covers Session only), (b) `i += 1  # the source follows the path` in `_porcelain` replaced by `pass` (the one `git mv` is committed before `pick_files` reads, so no test gives the porcelain a rename, and the rename's source path would surface as a bogus extra entry in Working tree and Session), and (c) `"--first-parent", ` deleted from the `git log` call (every test's history is linear, so a merge commit's second-parent commits would enter the ten). The spec at TD-856 names all three.
+
+**Related:** TD-856, TD-862.
+
+**Resolved:** 2026-10-18 (grinder-ao-1, PR #2100). `tests/test_git_files.py` pins the three against design §4.2 *The Git card's pick*: `test_tree_caps_at_twenty` (25 untracked paths, twenty from `tree`), `test_a_staged_rename_is_one_entry_by_its_new_path` (a staged `git mv` is one `R` entry by its new path in `tree` and `session`) and `test_the_commits_are_the_first_parent_line_without_a_merged_branchs_own` (a `--no-ff` merge leaves the side commit out of `commits`); each fails when its line is reverted.

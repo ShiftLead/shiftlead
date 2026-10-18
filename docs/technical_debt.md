@@ -74,7 +74,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
-| TD-872 | #2077's `pick_files` has three guards no test fails without: Working tree's twenty-line cap, the porcelain's rename source, and `--first-parent` | Low | Open |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
 | TD-874 | `test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole` fails now and then: the reading it compares is replaced under it | Low | Open |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
@@ -1529,26 +1528,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the design names where a Gemini launch's hooks come from, a launch with it delivers `SessionStart` to the record on kmaster, and TD-785's capture is unblocked.
 
 **Related:** TD-112, TD-785, TD-786.
-
----
-
-## TD-872: `pick_files`' Working-tree cap, its porcelain rename skip and its `--first-parent` each leave `tests/test_git_files.py` passing when removed
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2077 (TD-862 (1)))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/gitinfo.py` (`pick_files`, `_porcelain`); `tests/test_git_files.py`
-
-**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_git_files.py` still reports `10 passed` with (a) `[:GIT_PICK_TREE]` deleted from the `tree` branch (no test reads `tree` with more than two dirty paths, so the twenty-line cap §4.2 states is unpinned; `test_session_caps_at_a_hundred_with_more` covers Session only), (b) `i += 1  # the source follows the path` in `_porcelain` replaced by `pass` (the one `git mv` is committed before `pick_files` reads, so no test gives the porcelain a rename, and the rename's source path would surface as a bogus extra entry in Working tree and Session), and (c) `"--first-parent", ` deleted from the `git log` call (every test's history is linear, so a merge commit's second-parent commits would enter the ten). The spec at TD-856 names all three.
-
-**Fix:** add the case to the PR's test module.
-
-**Done when** a test with 25 dirty paths gets twenty from `tree` (Session's 105-path test does not read `tree`); an uncommitted staged `git mv` gives one entry with the new path in `tree` and `session`; a history with a merged side branch lists only the first-parent line, and each fails when its line above is reverted.
-
-**Related:** TD-856, TD-862.
 
 ---
 
