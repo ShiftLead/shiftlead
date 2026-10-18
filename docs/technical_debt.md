@@ -72,10 +72,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
-| TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | In progress (slice 1 #2119) |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 | TD-885 | #2109's `_Gzip` and `_Static` guards (a ranged request, a non-200, an already-encoded body, a chunked body, an empty `?v=`) each leave `tests/test_ui_gzip.py` passing when removed | Low | Open |
 | TD-886 | #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed | Low | Open |
+| TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Open |
 
 ---
 
@@ -1504,33 +1504,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-882: Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (TD-805's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2121
-**Status:** Built (grinder-ao-2). Slice 1 #2119 (2026-10-18): the Queue sends the picked window's completed lines alone (`queue_window`, `send_window`, `data-loaded`), a wider pick read once by `part=1&win=` (`AO.qWinFetch`). Slice 2 #2121 (2026-10-18): the Repo page sends each Technical debt list to its fourth row and Recently completed to its window (`win`, *day*) and eight rows (`send_folds`, `repo_window`, `data-unsent`, `data-loaded`); the rest by `part=1` with `win` and `open` (a list's key, or an anchor's id). Built; the live check left: once #2121 is live (`ao promote status`), read the gzipped size of a headless GET of `/queue` and `/repo/shiftlead` (`curl -s -H 'Accept-Encoding: gzip' -o /dev/null -w '%{size_download}'`) — each under 150 KB holds *Done when*.
-**Blocked by:** TD-880
-**Location:** design §4.5 *Page loads* (*Only what is shown*), §4.5 screen 12 (the Queue's *Recently completed* and its window), the Repo page; `src/shiftlead/ui/templates/queue_part.html` (`q.completed.lines`), `src/shiftlead/ui/queue.py` (`queue_view`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the window picker, TD-829's in-browser picks), the Repo page's template and its folds; `tests/test_ui_queue_picks.py`
-
-**Why:** TD-805: the Queue sends 829 completed lines across every window and 18,487 DOM nodes; even gzipped it is 370 KB against the 150 KB budget. The Repo page sends 825 KB and 11,219 nodes, 517 KB of it rows drawn folded (past the fourth of a group).
-
-**Fix:** at load the Queue sends the completed lines of the picked window only (the day, unless the URL or the browser's kept pick says another); a pick of another window fetches that window's lines by `part=1` once and keeps them, so a pick back answers at once. The Repo page sends a group's first four rows and the count of the rest, and the rest on the group's first unfold — and on an anchor or a find that names a row not yet sent (the ledger row's **Open**, `/repo/<name>#TD-156`, §4.5 screen 6), which fetches the group's rows before it scrolls. Blocked by TD-880 so the size measured after is the compressed one.
-
-**Tests:**
-- the Queue at load holds the day's completed lines alone and the week's after its pick;
-- a Repo group holds its first four rows until opened;
-- `/repo/shiftlead#TD-n` for a row past the fourth fetches its group and lands on the row.
-
-**Done when** the live Queue and Repo pages each send under 150 KB of HTML on the wire at load.
-
-**Related:** TD-805, TD-829 (the Queue's picks in the browser), TD-816.
-
----
-
-
 ## TD-884: The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads
 
 **Priority:** Low
@@ -1588,5 +1561,25 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** each reversion above fails a test.
 
 **Related:** TD-881, TD-805.
+
+---
+
+## TD-888: The live Queue's HTML is 148 KB on the wire against its 150 KB budget: the open cards alone fill it, so a few more cards cross it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-2, reading TD-882 live)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Only what is shown*, the 150 KB budget), §4.5 screen 12 (the Queue); `src/shiftlead/ui/templates/queue_part.html`, `src/shiftlead/ui/queue.py`
+
+**Why:** With TD-882 live, a gzipped GET of the live `/queue` on 2026-10-18 08:16Z read 148,246 bytes (1,033,433 uncompressed) with the picked window's completed lines alone; its markup is some 200 cards' heads (`qhead`, `qgrip`, `qplace`, 591 `qmove` controls, 487 `btn`). The budget's margin is 1.7 KB, so the Queue misses it as soon as a handful of cards are added, and a promote's smoke then names it.
+
+**Fix:** measure what each card sends that is not shown at load (the move controls drawn per card, a card's folded body), and send it once or on open, as TD-882 did for the completed lines.
+
+**Done when** the live Queue sends under 120 KB of HTML on the wire at load.
+
+**Related:** TD-805, TD-882.
 
 ---
