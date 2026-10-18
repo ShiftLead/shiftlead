@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
-| TD-890 | Build TD-888 (1): a Queue card's mail rows send no `data-find`, no Snooze and no `title` repeating its text | Low | Open |
 | TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Open |
 | TD-892 | Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles | Low | Open |
 
@@ -1522,24 +1521,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Related:** TD-805, TD-882.
 
 ---
-
----
-
-## TD-890: Build TD-888 (1): a Queue card's mail rows send no `data-find`, no Snooze and no `title` repeating its text
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (TD-888's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5 *Page loads* (*Nothing the page does not read*), §4.5 screen 12 (*The Queue has no Snooze*), §4.5a *Queue page: card*; `src/shiftlead/ui/templates/queue_mail.html`, `src/shiftlead/ui/templates/inbox_row.html` (the rows' `data-find`, the Snooze menus, the board row's foot sentence, `subj`'s `title`), `src/shiftlead/ui/app.py` (`queue_page`'s mail render); `tests/test_ui_queue_cards.py`
-
-**Why:** TD-888: on the live Queue (2026-10-18, 141 KB gzipped) the 124 mail rows' `data-find` is 10 KB, though the Queue's find reads the card's ids and titles and never a row's; 37 board rows draw a Snooze the Queue does not have (2 KB); a row's subject repeats itself as its `title`.
-
-**Fix:** the Inbox's row renderer takes the page it draws for (one flag passed by `queue_mail.html`, never a copy of a macro): on the Queue it writes no `data-find` on a mail row, no Snooze menu on any kind, and the board row's foot sentence without *Snooze moves its `Due:` date*. On every page a `title` equal to its element's text is not drawn (the `subj` line first; grep the row templates for the rest). The Inbox's rows keep `data-find` and Snooze.
-
-**Done when** a Queue render's `.mailrow` elements carry no `data-find` and no Snooze, an Inbox render's carry both as before, no `subj` carries a `title` equal to its text, each under a test that fails when reverted, and the Inbox's find tests pass unchanged.
 
 ---
 

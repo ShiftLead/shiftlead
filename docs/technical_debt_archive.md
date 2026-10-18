@@ -16790,3 +16790,21 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-882, TD-886.
 
 **Resolved:** 2026-10-18 (grinder-ao-2, #2134). `tests/test_ui_repo_reread.py` runs `AO.repo` whole under node against a page of stubs, its fetches held until the probe answers: a window pick's read out while an anchor (`#TD-9`) asks for other rows ends in two reads, the second with `open=TD-9`; a read answered without the wider window is not asked again on the next pick; *+n more* on a `data-unsent` list reads `open=debt:open` with the button disabled; a failed read re-enables it. Each reversion (a)–(d) applied alone fails a test (`1 failed, 2 passed`).
+
+## TD-890: Build TD-888 (1): a Queue card's mail rows send no `data-find`, no Snooze and no `title` repeating its text
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-888's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5 *Page loads* (*Nothing the page does not read*), §4.5 screen 12 (*The Queue has no Snooze*), §4.5a *Queue page: card*; `src/shiftlead/ui/templates/queue_mail.html`, `src/shiftlead/ui/templates/inbox_row.html` (the rows' `data-find`, the Snooze menus, the board row's foot sentence, `subj`'s `title`), `src/shiftlead/ui/app.py` (`queue_page`'s mail render); `tests/test_ui_queue_cards.py`
+
+**Why:** TD-888: on the live Queue (2026-10-18, 141 KB gzipped) the 124 mail rows' `data-find` is 10 KB, though the Queue's find reads the card's ids and titles and never a row's; 37 board rows draw a Snooze the Queue does not have (2 KB); a row's subject repeats itself as its `title`.
+
+**Fix:** the Inbox's row renderer takes the page it draws for (one flag passed by `queue_mail.html`, never a copy of a macro): on the Queue it writes no `data-find` on a mail row, no Snooze menu on any kind, and the board row's foot sentence without *Snooze moves its `Due:` date*. On every page a `title` equal to its element's text is not drawn (the `subj` line first; grep the row templates for the rest). The Inbox's rows keep `data-find` and Snooze.
+
+**Done when** a Queue render's `.mailrow` elements carry no `data-find` and no Snooze, an Inbox render's carry both as before, no `subj` carries a `title` equal to its text, each under a test that fails when reverted, and the Inbox's find tests pass unchanged.
+
+**Resolved:** 2026-10-18 (grinder-ao-2, #2136). `queue_mail.html` sets `on_queue`, and the Inbox's row renderer leaves out on it every row's `data-find`, all seven Snooze menus, and the board line's *Snooze moves its `Due:` date*; the `subj`, `msgsubj` and a suggested answer draw no `title` repeating their text, `AO.wholeOnHover` setting it on hover when the line is clipped. `tests/test_ui_queue_cards.py`'s three tests fail when any of it is reverted; the Inbox's find tests pass unchanged.
