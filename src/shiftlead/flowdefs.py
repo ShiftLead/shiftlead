@@ -118,7 +118,7 @@ def parse(name: str, place: str, flow_dir: Path, text: str | None, place_root: P
         flow.problems.append(f"{where}: no {FILE}")
         return flow
     try:
-        data = yaml.safe_load(text)
+        data = repoconfig.parse_yaml(text)
     except yaml.YAMLError as e:
         flow.problems.append(f"{where}: not valid YAML ({e})")
         return flow

@@ -27,9 +27,11 @@ repo's own `roles:`, each overriding per key.
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
+from functools import lru_cache
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -625,6 +627,19 @@ class RepoConfig:
     read: Reader | None = field(default=None, repr=False, compare=False)
 
 
+@lru_cache(maxsize=64)
+def _parsed(text: str) -> Any:
+    return yaml.safe_load(text)
+
+
+def parse_yaml(text: str) -> Any:
+    """`yaml.safe_load(text)`, parsed once per text (TD-896): a team's plan reads its repo's
+    `.shiftlead.yml` once per member and every flow's files again, and the pure-Python parse was
+    ~11 ms a read — some 100 ms of every Org and Repo page load. Each caller gets its own copy, so
+    nothing it changes reaches the next; a text that does not parse raises `yaml.YAMLError` every time."""
+    return copy.deepcopy(_parsed(text))
+
+
 def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
     """`<repo>/.shiftlead.yml`, or the defaults when there is none. `read` is how the file is read:
     this host's disk by default, another host's checkout across the link for a team started there
@@ -656,7 +671,7 @@ def load_text(text: str | None, repo_root: Path | str, *, path: Path | None = No
         return cfg
     cfg.path = path
     try:
-        data = yaml.safe_load(text)
+        data = parse_yaml(text)
     except yaml.YAMLError as e:
         raise ValueError(f"{path}: not valid YAML ({e})") from None
     if data is None:
@@ -990,7 +1005,7 @@ def _defined_block(name: str, place: str, d: Path, text: str, read: Reader | Non
     `brief:` refused — the directory's `template.md` is its mechanics — and the template required."""
     where = f"{d / ROLE_FILE}"
     try:
-        data = yaml.safe_load(text)
+        data = parse_yaml(text)
     except yaml.YAMLError as e:
         raise ValueError(f"{where}: not valid YAML ({e})") from None
     data = {} if data is None else data
