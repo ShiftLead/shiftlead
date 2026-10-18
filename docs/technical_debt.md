@@ -70,7 +70,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
-| TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
@@ -1439,26 +1438,6 @@ The other cases:
 **Done when** the design says how a Gemini reader is run, on which profile, how its verdict is recorded and accepted, and how the trial is judged, and the build entry is filed.
 
 **Related:** TD-112 (the adapter contract and its neutrality), TD-784, TD-785, TD-786 (the adapter's build), TD-035 (start hooks for an adapter without them).
-
----
-
-## TD-870: `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError*
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (grinder-ao-1, met on #2077's CI)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_ui_listener.py` (`test_route_port_0_and_a_node_run_no_route_listener`, `_free_port`)
-
-**Why:** #2077's CI (run 39084062206, Python 3.12) failed this case, which the PR does not touch; 3.13 passed, and so did the rerun. The case takes a port from `_free_port()`, closes it, and asserts a connect to it raises because a node runs no route listener. Between the close and the connect, any other process can bind that port, a test under xdist included. The connect then succeeds, and the test reads that as a listener that should not be there.
-
-**Fix:** assert on what the UI process itself listens on rather than on a connect to a released port. For example, read the process's listening sockets (`/proc/<pid>/net/tcp` for its inodes, or `psutil.Process(pid).net_connections()` if it is a dependency) and assert `route` is not among them. Alternatively, keep the port bound by the test with `SO_REUSEADDR` off, so the UI's bind would fail loudly, and assert the UI's log line alone.
-
-**Done when** the case no longer depends on a released port staying free, and still fails if a node starts a route listener.
-
-**Related:** none.
 
 ---
 

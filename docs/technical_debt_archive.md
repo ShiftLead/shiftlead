@@ -16465,3 +16465,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-858 (built #2073).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2095). The late pass sets a flag as its last step, and `park_ticks` is asserted to return only once that pass has landed (the `sleep(0.4)` is gone). A second test patches `PASS_DRAIN` to 0.05 s and asserts that a 30 s pass is cancelled and `park_ticks` returns. With `PASS_DRAIN = 0.01`, the first test fails.
+
+## TD-870: `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, met on #2077's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_ui_listener.py` (`test_route_port_0_and_a_node_run_no_route_listener`, `_free_port`)
+
+**Why:** #2077's CI (run 39084062206, Python 3.12) failed this case, which the PR does not touch; 3.13 passed, and so did the rerun. The case takes a port from `_free_port()`, closes it, and asserts a connect to it raises because a node runs no route listener. Between the close and the connect, any other process can bind that port, a test under xdist included. The connect then succeeds, and the test reads that as a listener that should not be there.
+
+**Fix:** assert on what the UI process itself listens on rather than on a connect to a released port. For example, read the process's listening sockets (`/proc/<pid>/net/tcp` for its inodes, or `psutil.Process(pid).net_connections()` if it is a dependency) and assert `route` is not among them. Alternatively, keep the port bound by the test with `SO_REUSEADDR` off, so the UI's bind would fail loudly, and assert the UI's log line alone.
+
+**Done when** the case no longer depends on a released port staying free, and still fails if a node starts a route listener.
+
+**Related:** none.
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2096). The node case asserts on the UI process's own LISTEN sockets (`_listening(pid)`: its `/proc/<pid>/fd` socket inodes matched against `net/tcp`/`tcp6` rows in state `0A`). `plain` is held and `route` is not, and nothing connects to a released port. The both-listeners test pins the helper reading both ports.
