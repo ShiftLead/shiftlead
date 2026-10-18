@@ -109,8 +109,10 @@ def write_layer() -> Path:
         same = p.read_text(encoding="utf-8") == text
     except OSError:
         same = False
-    if not same:
-        p.write_text(text, encoding="utf-8")
+    if not same:  # whole or not at all: an overlapping launch reads the copy while it is written
+        tmp = p.with_name(f".{p.name}.{os.getpid()}.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, p)
     for old in p.parent.glob("*.json"):
         if old != p:
             old.unlink(missing_ok=True)
