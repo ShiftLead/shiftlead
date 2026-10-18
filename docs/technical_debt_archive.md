@@ -16525,3 +16525,79 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-831, TD-818.
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2112). `test_by_team_marks_each_team_against_the_previous_period_to_date` gives a week reading a previous week to compare: the By team line reads `▲ 58%`, `▼ 38%`, and `—` where the previous spent nothing. `test_a_reading_with_no_outside_turns_prints_no_outside_line` covers a reading with no outside turns. Each of the entry's two reverts fails a test.
+
+## TD-879: Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** live-check #2108
+**Status:** Done
+**Location:** design §4.5 *Page loads* (*Each fact once per request*); `src/shiftlead/ui/app.py` (`queue_page`: the `queue_mail.html` lambda passing `board_choices()` per row; `person_inbox`'s `boards_of`; the Inbox and Repo routes), `src/shiftlead/ui/inbox.py` (`board_choices`); `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`
+
+**Why:** TD-805 measured the Queue at 2.5 s to its first byte against 358 ms rebuilt offline with no person inbox; `board_choices()` costs 14.6 ms (seven repos' boards resolved on disk) and the Queue's row render calls it once per attached row.
+
+**Fix:** `queue_page` reads `board_choices()` once and passes the list to every row's render. The same pass over the Inbox, Repo and Org routes and `person_inbox`: a per-request fact read inside a per-row loop or lambda is read once before it.
+
+**Tests:**
+- a Queue with five attached rows calls `board_choices` once (patched and counted);
+- the Inbox route and `person_inbox` call it at most once per request.
+
+**Done when** the live Queue's first byte is under 500 ms (the smoke's line, or `curl -w %{time_starttransfer}`), with its rows unchanged.
+
+**Related:** TD-805 (the design), TD-771 (the Queue page), TD-828 (rows on cards).
+
+**Resolved:** 2026-10-18 (grinder-ao-1, read live in `3b265ae`). Six headless GETs of the live `/queue` (`curl -w %{time_starttransfer}`): first byte 0.68 s and 0.84 s on the two cold first loads, 0.40–0.44 s on the four warm ones, under the 500 ms budget; its `Server-Timing` puts `render` at ~100 ms and the person inbox at ~105 ms, no step near TD-805's 2 s. The page is 2,320,350 bytes plain, its rows as before (TD-882 makes it smaller).
+
+## TD-880: Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** live-check #2109
+**Status:** Done
+**Location:** design §4.5 *Page loads* (*Compressed*, *Cached*); `src/shiftlead/ui/app.py` (`gzip_ok`, `app.mount("/static", StaticFiles(…))`, the page routes' `TemplateResponse`s), the templates' `?v=` hash on `app.js` and `app.css`; `tests/` for the UI routes
+
+**Why:** TD-805: nothing is sent compressed — the Queue's 2.29 MB of HTML is 370 KB gzipped, the Inbox's 718 KB is 79 KB, `app.js`'s 399 KB is 126 KB — and the static files carry no `Cache-Control`, so a load revalidates or refetches 495 KB of script and style though their URLs carry a hash.
+
+**Fix:** a response of 1 KB or more goes gzipped (level 5, as the counts' JSON is) to a request whose `Accept-Encoding` takes it (`gzip_ok`), with `Vary: Accept-Encoding` — pages, `part=1` fragments and static files; the pushed event stream and the terminal's websocket are left as they are. A body is compressed on a worker thread, as `json_body` compresses the counts (TD-611), never on the loop that also serves Focus's keystrokes. A static request carrying `?v=` is answered `Cache-Control: public, max-age=31536000, immutable`; without it, `no-cache` and its ETag.
+
+**Tests:**
+- a page and a fragment come back `Content-Encoding: gzip` with `Accept-Encoding: gzip` and plain without, and `gzip;q=0` is plain;
+- `/static/app.js?v=x` carries the immutable header and `/static/app.js` `no-cache`;
+- the event stream is not compressed;
+- a large page's compression runs off the loop (a Focus write answered while it runs, or the call patched and its thread checked).
+
+**Done when** the live Queue sends under 400 KB of HTML on the wire and a second load of any page fetches no script or stylesheet (devtools, or the smoke's line).
+
+**Related:** TD-805, TD-572 (the light stream), TD-616 (the counts' JSON, already gzipped).
+
+**Resolved:** 2026-10-18 (grinder-ao-1, read live in `3b265ae`). A headless GET of the live `/queue` with `Accept-Encoding: gzip` came back `Content-Encoding: gzip`, `Vary: Accept-Encoding`, 375,434 bytes on the wire (2,320,350 plain), under 400 KB; `/static/app.js?v=fc3b60d91c4d` (the hash the page names) answers `Cache-Control: public, max-age=31536000, immutable`, and `/static/app.js` alone `no-cache` with its ETag, so a second load fetches no script or stylesheet. The 150 KB budget is TD-882's.
+
+## TD-881: Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** live-check #2111
+**Status:** Done
+**Location:** design §4.5 *Page loads* (*Measured on every load*), §6 *This repo's smoke*; `src/shiftlead/ui/app.py` (the page routes, `agent_call`/`call`, the person-inbox helpers), `scripts/smoke.py` (the load line, the note); `tests/test_smoke.py`
+
+**Why:** TD-805 could split the server's time only by rebuilding a page offline: nothing records where a live page's time goes, and the smoke prints first byte and size with no budget.
+
+**Fix:**
+- **The header.** Each page route (`/`, `/inbox`, `/queue`, `/repo/<repo>`, `/settings`, `/spend`, `/transcript/<id>`) times each RPC by name (summed per name), the person inbox (`person_inbox` with `person_states`), the board and ledger reads, and the render, and answers `Server-Timing: rpc_list;dur=31, inbox;dur=…, render;dur=…, total;dur=…`. The last twenty per route are kept in memory, never on disk.
+- **The smoke.** Each page is loaded twice, the first printed *cold*, the second judged; each load is one line merging the HTTP half's numbers with the browser half's DOM ready and the header's steps; a page over §4.5's budget — first byte, HTML on the wire, DOM ready — is a line on the promote's note naming the page and its longest step. It fails nothing.
+
+**Tests:**
+- a page route answers a `Server-Timing` naming each RPC it made and `total`;
+- the smoke, against a stub page over the budget, writes the note's line and exits as a pass; one under writes none.
+
+**Done when** a promote's note names a page over budget with its longest step, and the live Queue's header shows where its time goes.
+
+**Related:** TD-805, TD-812 (the smoke), TD-804 (a promote's smoke).
+
+**Resolved:** 2026-10-18 (grinder-ao-1, read live in `3b265ae`). The live `/queue` answers `Server-Timing: rpc_queue;dur=19.2, rpc_list;dur=28.7, rpc_inbox;dur=20.0, inbox;dur=100.6, rpc_repos;dur=16.3, rpc_doing_log;dur=2.1, rpc_host;dur=3.6, board;dur=59.0, ledger;dur=3.4, render;dur=100.6, rpc_usage;dur=1.4, rpc_gate;dur=14.9, total;dur=434.8`. The promote of `3b265ae`'s note (the person inbox, read on a headless GET of `/inbox`) reads *smoke passed in 7 s; Queue over budget: 364 KB of HTML over 150 KB — longest step render 126 ms; Settings over budget: first byte 0.33 s over 0.2 s — longest step rpc_repos 148 ms; reach refused /: status 403; …*. Settings' miss is TD-884.

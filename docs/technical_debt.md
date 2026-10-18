@@ -74,11 +74,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | In progress (slices #2110, #2113) |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
-| TD-879 | Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request | Medium | Built (#2108) — live check |
-| TD-880 | Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable | Medium | Built (#2109) — live check |
-| TD-881 | Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget | Medium | Open |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
 | TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
+| TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 
 ---
 
@@ -1546,82 +1544,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-879: Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (TD-805's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2108
-**Status:** Built #2108 (2026-10-18, grinder-ao-1) — a live check once #2108 is live (`ao promote status`): read the live Queue's first byte, `curl -s -o /dev/null -w %{time_starttransfer} http://127.0.0.1:<the UI's port>/queue` (a headless GET, a few reads), under 500 ms with its rows as before; the scratch home read 375 ms with every attached row drawn (#2108's UI check)
-**Location:** design §4.5 *Page loads* (*Each fact once per request*); `src/shiftlead/ui/app.py` (`queue_page`: the `queue_mail.html` lambda passing `board_choices()` per row; `person_inbox`'s `boards_of`; the Inbox and Repo routes), `src/shiftlead/ui/inbox.py` (`board_choices`); `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`
-
-**Why:** TD-805 measured the Queue at 2.5 s to its first byte against 358 ms rebuilt offline with no person inbox; `board_choices()` costs 14.6 ms (seven repos' boards resolved on disk) and the Queue's row render calls it once per attached row.
-
-**Fix:** `queue_page` reads `board_choices()` once and passes the list to every row's render. The same pass over the Inbox, Repo and Org routes and `person_inbox`: a per-request fact read inside a per-row loop or lambda is read once before it.
-
-**Tests:**
-- a Queue with five attached rows calls `board_choices` once (patched and counted);
-- the Inbox route and `person_inbox` call it at most once per request.
-
-**Done when** the live Queue's first byte is under 500 ms (the smoke's line, or `curl -w %{time_starttransfer}`), with its rows unchanged.
-
-**Related:** TD-805 (the design), TD-771 (the Queue page), TD-828 (rows on cards).
-
----
-
-## TD-880: Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-17 (TD-805's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2109
-**Status:** Built #2109 (2026-10-17, grinder-ao-2) — a live check once #2109 is live (`ao promote status`): read the live Queue's bytes on the wire, `curl -s -H 'Accept-Encoding: gzip' -o /dev/null -w %{size_download} http://127.0.0.1:<the UI's port>/queue` (a headless GET), under 400 KB; and `curl -sI 'http://127.0.0.1:<port>/static/app.js?v=x'` carrying `immutable`. The scratch home read the Queue 42,519 bytes plain, 8,213 gzipped, and a second load fetching no script or stylesheet (#2109's UI check)
-**Location:** design §4.5 *Page loads* (*Compressed*, *Cached*); `src/shiftlead/ui/app.py` (`gzip_ok`, `app.mount("/static", StaticFiles(…))`, the page routes' `TemplateResponse`s), the templates' `?v=` hash on `app.js` and `app.css`; `tests/` for the UI routes
-
-**Why:** TD-805: nothing is sent compressed — the Queue's 2.29 MB of HTML is 370 KB gzipped, the Inbox's 718 KB is 79 KB, `app.js`'s 399 KB is 126 KB — and the static files carry no `Cache-Control`, so a load revalidates or refetches 495 KB of script and style though their URLs carry a hash.
-
-**Fix:** a response of 1 KB or more goes gzipped (level 5, as the counts' JSON is) to a request whose `Accept-Encoding` takes it (`gzip_ok`), with `Vary: Accept-Encoding` — pages, `part=1` fragments and static files; the pushed event stream and the terminal's websocket are left as they are. A body is compressed on a worker thread, as `json_body` compresses the counts (TD-611), never on the loop that also serves Focus's keystrokes. A static request carrying `?v=` is answered `Cache-Control: public, max-age=31536000, immutable`; without it, `no-cache` and its ETag.
-
-**Tests:**
-- a page and a fragment come back `Content-Encoding: gzip` with `Accept-Encoding: gzip` and plain without, and `gzip;q=0` is plain;
-- `/static/app.js?v=x` carries the immutable header and `/static/app.js` `no-cache`;
-- the event stream is not compressed;
-- a large page's compression runs off the loop (a Focus write answered while it runs, or the call patched and its thread checked).
-
-**Done when** the live Queue sends under 400 KB of HTML on the wire and a second load of any page fetches no script or stylesheet (devtools, or the smoke's line).
-
-**Related:** TD-805, TD-572 (the light stream), TD-616 (the counts' JSON, already gzipped).
-
----
-
-## TD-881: Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-805's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2111
-**Status:** Built #2111 (2026-10-17, grinder-ao-1): the header, the twenty kept, the smoke's two loads and its budget line, and a passing smoke's told part on the note, each tested and the header read on a scratch home. Left is the live half: once #2111 is live (`ao promote status`), read the live Queue's `Server-Timing` (a headless GET of `/queue`, its header) and the next promote's note for a page over budget with its longest step.
-**Location:** design §4.5 *Page loads* (*Measured on every load*), §6 *This repo's smoke*; `src/shiftlead/ui/app.py` (the page routes, `agent_call`/`call`, the person-inbox helpers), `scripts/smoke.py` (the load line, the note); `tests/test_smoke.py`
-
-**Why:** TD-805 could split the server's time only by rebuilding a page offline: nothing records where a live page's time goes, and the smoke prints first byte and size with no budget.
-
-**Fix:**
-- **The header.** Each page route (`/`, `/inbox`, `/queue`, `/repo/<repo>`, `/settings`, `/spend`, `/transcript/<id>`) times each RPC by name (summed per name), the person inbox (`person_inbox` with `person_states`), the board and ledger reads, and the render, and answers `Server-Timing: rpc_list;dur=31, inbox;dur=…, render;dur=…, total;dur=…`. The last twenty per route are kept in memory, never on disk.
-- **The smoke.** Each page is loaded twice, the first printed *cold*, the second judged; each load is one line merging the HTTP half's numbers with the browser half's DOM ready and the header's steps; a page over §4.5's budget — first byte, HTML on the wire, DOM ready — is a line on the promote's note naming the page and its longest step. It fails nothing.
-
-**Tests:**
-- a page route answers a `Server-Timing` naming each RPC it made and `total`;
-- the smoke, against a stub page over the budget, writes the note's line and exits as a pass; one under writes none.
-
-**Done when** a promote's note names a page over budget with its longest step, and the live Queue's header shows where its time goes.
-
-**Related:** TD-805, TD-812 (the smoke), TD-804 (a promote's smoke).
-
----
-
 ## TD-882: Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened
 
 **Priority:** Medium
@@ -1668,3 +1590,24 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Related:** TD-869.
 
 ---
+
+## TD-884: The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, reading TD-881 live)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (the 200 ms budget of Settings, Spend, Transcript); `src/shiftlead/ui/app.py` (the `/settings` route); the host agent's `settings` and `repos` RPCs (`src/sessionorc/`)
+
+**Why:** The promote of `3b265ae`'s smoke told *Settings over budget: first byte 0.33 s over 0.2 s — longest step rpc_repos 148 ms*. Three headless GETs of the live `/settings` on 2026-10-18 read 0.20 s, 0.28 s and 0.15 s; their `Server-Timing` put `rpc_settings` at 28, 147 and 12 ms and `rpc_repos` at 14–15 ms, with `total` 150–283 ms and some 45 ms of it in no named step. Which RPC spikes moves between loads, so the page misses its budget on a share of loads and every promote's note may say so.
+
+**Fix:** find what `settings` (and `repos`, on the smoke's load) waits on when it is slow — a file read whole, a lock shared with the tick, a `git` call — and take it off the request's path or read it once per tick; name the unnamed ~45 ms in `Server-Timing` if it is the route's own.
+
+**Done when** ten warm loads of the live `/settings` each read under 200 ms to the first byte, and a promote's note no longer names Settings.
+
+**Related:** TD-805, TD-881.
+
+---
+
