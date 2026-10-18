@@ -179,7 +179,10 @@ def test_a_team_draws_its_line_by_seat_with_a_role_subtotal_and_its_finished_ent
     assert rows == [("grinder-ao-1", False), ("grinder-ao-2", False), ("grinders", True), ("designer-ao-1", False)]
     g1, g2, sub, d1 = v["seats"]
     assert sub["figure"] == "≈$100" and sub["pct"] == "72%" and sub["per"] == "1 · median ≈$24.70"
-    assert g1["per"] == "—" and d1["per"] == "—"  # two grinders: the count is the subtotal's
+    # each seat's own: grinder-ao-1 spent on TD-813, grinder-ao-2 on nothing finished
+    assert (g1["per"], g1["per_title"]) == ("1 · median ≈$24.70", "TD-813")
+    assert (g2["per"], g2["per_title"], d1["per"]) == ("—", "", "—")
+    assert g1["title"].splitlines()[0] == "input 1k tok · output 0 tok · cache read 0 tok · cache write 0 tok"
     assert g2["between"] == "≈$6.10" and g1["past_200k"] == "12%"
     assert [g["word"] for g in v["chart"]["legend"]] == ["grinder", "designer"]  # by role
     (e,) = v["entries"]

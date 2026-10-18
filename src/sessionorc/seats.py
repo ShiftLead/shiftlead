@@ -363,6 +363,13 @@ def _add_row(acc: dict[str, Any], row: dict[str, Any]) -> None:
     acc["metered"] = acc["metered"] and bool(row.get("metered"))
 
 
+def _add_tokens(into: dict[str, int], row: dict[str, Any]) -> None:
+    """A row's tokens by kind (`KINDS`), summed over its models, into `into`."""
+    for m in (row.get("models") or {}).values():
+        for k in KINDS:
+            into[k] += int(m.get(k) or 0)
+
+
 def _rounded(acc: dict[str, Any], whole: float | None = None) -> dict[str, Any]:
     out = {k: round(v, 4) if isinstance(v, float) else v for k, v in acc.items() if k != "metered"}
     fig = acc["figure"]
@@ -499,6 +506,7 @@ def reading(
             if rid not in s["records"]:
                 s["records"].append(rid)
             _add_row(s, row)
+            _add_tokens(s.setdefault("tokens", dict.fromkeys(KINDS, 0)), row)
         for group, value in (("roles", role), ("teams", t), ("repos", repo)):
             _add_row(groups[group].setdefault(value, _blank()), row)
     if by != "record":
@@ -506,14 +514,21 @@ def reading(
     team_whole: dict[str, float] = {}
     for s in seats.values():
         team_whole[s["team"]] = team_whole.get(s["team"], 0.0) + s["figure"]
-    ranked = sorted(seats.values(), key=lambda s: (-s["figure"], s["team"], s["seat"]))
-    out_seats = [
-        {**{k: s[k] for k in ("seat", "team", "role", "repo", "records")},
-         **_rounded({k: s[k] for k in _blank()}, team_whole[s["team"]])}
-        for s in ranked
-    ]  # fmt: skip
     days = {d: rs for d, rs in (ledger.get("days") or {}).items() if isinstance(rs, dict)}
-    entries, roles = _entries(ledger, days, first, last, resets, team)
+    entries, roles, spent = _entries(ledger, days, first, last, resets, team)
+
+    def seat_out(k: str, s: dict[str, Any], whole_of: float, keyed: str) -> dict[str, Any]:
+        """A seat's (or under `by: record` a record's) row: its figure, its tokens by kind and its own
+        spend on each finished entry it spent on (`keyed` says which of `spent` its key `k` reads)."""
+        return {
+            **{f: s[f] for f in ("seat", "team", "role", "repo", "records")},
+            **_rounded({f: s[f] for f in _blank()}, whole_of),
+            "tokens": dict(s["tokens"]),
+            "finished": _finished(spent[keyed].get(k) or {}),
+        }
+
+    ranked = sorted(seats.items(), key=lambda kv: (-kv[1]["figure"], kv[1]["team"], kv[1]["seat"]))
+    out_seats = [seat_out(k, s, team_whole[s["team"]], "record" if by == "record" else "seat") for k, s in ranked]
     out = {
         "window": window,
         "at": first,
@@ -537,10 +552,9 @@ def reading(
         out["resets"] = resets.isoformat()
     if not team:
         out["top"] = [
-            {**{k: s[k] for k in ("seat", "team", "role", "repo", "records")},
-             **_rounded({k: s[k] for k in _blank()}, whole["figure"])}
-            for s in sorted(by_seat.values(), key=lambda s: (-s["figure"], s["team"], s["seat"]))
-        ]  # fmt: skip
+            seat_out(k, s, whole["figure"], "seat")
+            for k, s in sorted(by_seat.items(), key=lambda kv: (-kv[1]["figure"], kv[1]["team"], kv[1]["seat"]))
+        ]
     return out
 
 
@@ -622,11 +636,13 @@ def _teams(
 
 def _entries(
     ledger: dict[str, Any], days: dict[str, Any], first: str, last: str, resets: datetime, team: str | None
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]], dict[str, dict[str, dict[str, float]]]]:
     """The entries finished in the window, each its whole figure from its `first_claimed`, and per
-    role (the role that spent most on it) the count, sum and median."""
+    role (the role that spent most on it) the count, sum and median; and each seat's (`team\0repo\0name`)
+    and each record's own figure on each of those entries, `{"seat": {key: {ref: figure}}, "record": …}`."""
     began = str(ledger.get("began") or "")
     out = []
+    spent: dict[str, dict[str, dict[str, float]]] = {"seat": {}, "record": {}}
     for key, meta in (ledger.get("refs") or {}).items():
         done_at = str((meta or {}).get("done_at") or "")
         done_day = _local_day(done_at, resets)
@@ -635,6 +651,7 @@ def _entries(
         repo, _, ref = key.partition(" ")
         since = _local_day(str(meta.get("first_claimed") or ""), resets) or first
         figure, turns, by_role, teams = 0.0, 0, {}, set()
+        mine: dict[str, dict[str, float]] = {"seat": {}, "record": {}}
         for d, rows in days.items():
             if d < since:
                 continue
@@ -650,8 +667,14 @@ def _entries(
                 role = str(row.get("role") or OTHER)
                 by_role[role] = by_role.get(role, 0.0) + fig
                 teams.add(str(row.get("team") or INTERACTIVE))
+                seat = f"{row.get('team') or INTERACTIVE}\0{row.get('repo') or ''}\0{row.get('name') or rid}"
+                for kind, k in (("seat", seat), ("record", rid)):
+                    mine[kind][k] = mine[kind].get(k, 0.0) + fig
         if team and team not in teams:
             continue
+        for kind, figs in mine.items():
+            for k, fig in figs.items():
+                spent[kind].setdefault(k, {})[ref] = fig  # a seat's repo is its rows', so the ref alone
         out.append(
             {
                 "ref": ref,
@@ -673,7 +696,20 @@ def _entries(
         r: {"entries": len(v), "sum": round(sum(v), 4), "median": round(statistics.median(v), 4)}
         for r, v in sorted(per_role.items())
     }
-    return out, roles
+    return out, roles, spent
+
+
+def _finished(figs: dict[str, float]) -> dict[str, Any]:
+    """One seat's finished entries: how many it spent on, the sum and median of its own figure on each,
+    and their references, most spent first."""
+    if not figs:
+        return {"entries": 0, "sum": 0.0, "median": 0.0, "refs": []}
+    return {
+        "entries": len(figs),
+        "sum": round(sum(figs.values()), 4),
+        "median": round(statistics.median(figs.values()), 4),
+        "refs": [k for k, _ in sorted(figs.items(), key=lambda kv: (-kv[1], kv[0]))],
+    }
 
 
 def _local_day(stamp: str, resets: datetime) -> str:

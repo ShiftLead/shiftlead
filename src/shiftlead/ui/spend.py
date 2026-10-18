@@ -19,6 +19,7 @@ WINDOW_LABEL = {"day": "Day", "week": "Week", "month": "Month"}
 INTERACTIVE = "interactive"  # sessionorc.seats' team for the records in no team: the person's own
 OUTSIDE = "outside"  # and its one row for the turns no record owns
 OTHER = "other"
+TOKEN_KINDS = ("input", "output", "cache_read", "cache_write")  # sessionorc.spend's KINDS, a seat's `tokens`
 TEAM_WORD = {INTERACTIVE: "interactive sessions", OUTSIDE: "outside shiftlead"}
 TOP = 8  # Top sessions' rows until *all →*
 SPEND_TTL = 60.0  # seconds a team card's **spend** figure keeps its reading (§4.5a *team card: spend*)
@@ -392,6 +393,7 @@ def spend_view(
         ]
         per_word = f"{per['entries']} · median {money(per.get('median'), unit)}" if per.get("entries") else "—"
         for s in group:
+            own = s.get("finished") or {}
             out["seats"].append(
                 {
                     "name": _seat_name(s),
@@ -402,10 +404,10 @@ def spend_view(
                     "share": float(s.get("share") or 0.0),
                     "pct": pct(s.get("share")),
                     "turns": int(s.get("turns") or 0),
-                    # the reading counts finished entries per role, not per seat: a role of one seat is its
-                    # seat's, and a role of two reads on its subtotal
-                    "per": per_word if len(group) == 1 else "—",
-                    "per_title": ", ".join(listed) if len(group) == 1 else "",
+                    # the seat's own spend on each finished entry it spent on; its role's count, by the
+                    # role that spent most on each entry, is the subtotal's
+                    "per": f"{own['entries']} · median {money(own.get('median'), unit)}" if own.get("entries") else "—",
+                    "per_title": ", ".join(str(r) for r in own.get("refs") or []),
                     "between": money(s.get("between"), unit),
                     "past_200k": pct(s.get("past_200k_share")),
                     "past_300k": pct(s.get("past_300k_share")),
@@ -454,8 +456,14 @@ def spend_view(
 
 def _weights_title(s: Mapping[str, Any], got: Mapping[str, Any]) -> str:
     """A seat's hover (§4.5a *Spend page: seat name, entry id*): what its figure holds and the weights
-    it was weighed at — the reading carries the figure, turns and context marks, not each kind's tokens."""
-    bits = [f"{int(s.get('turns') or 0):,} turns", f"past 200k {pct(s.get('past_200k_share'))}"]
+    it was weighed at: its tokens by kind, turns and context marks."""
+    got_tokens = s.get("tokens") or {}
+    bits = [
+        " · ".join(f"{k.replace('_', ' ')} {tokens(got_tokens.get(k))}" for k in TOKEN_KINDS) if got_tokens else "",
+        f"{int(s.get('turns') or 0):,} turns",
+        f"past 200k {pct(s.get('past_200k_share'))}",
+    ]
+    bits = [b for b in bits if b]
     bits.append(f"past 300k {pct(s.get('past_300k_share'))}")
     if s.get("unweighed"):
         bits.append(f"{int(s['unweighed'])} turns unweighed ({tokens(s.get('unweighed_tokens'))})")
