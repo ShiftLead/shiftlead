@@ -2810,6 +2810,14 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         return JSONResponse(await call("paths", id=sid, runs=body.get("runs")))
 
+    @app.get("/api/sessions/{sid}/git_files")
+    async def git_files(sid: str, pick: str = "tree"):
+        """design §4.5a *Focus side panel, Git card: the pick* (§4.2 *The Git card's pick*, TD-856): the
+        record's newest ten commits and the files of `pick` — `tree`, a sha of the ten, or `session` —
+        through the `git_files` read on the record's host, a node's through `read`. A read, gated by
+        nobody beyond the UI's own (§9 invariant 11); its refusals are the host agent's, in its words."""
+        return JSONResponse(await call("git_files", id=sid, pick=pick))
+
     @app.post("/api/sessions/{sid}/{action}")
     async def action(sid: str, action: str, request: Request):
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}

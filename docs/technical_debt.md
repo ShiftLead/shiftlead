@@ -73,13 +73,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
-| TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
-| TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
 | TD-867 | `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
+| TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Open |
 | TD-872 | #2077's `pick_files` has three guards no test fails without: Working tree's twenty-line cap, the porcelain's rename source, and `--first-parent` | Low | Open |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
@@ -1531,34 +1530,6 @@ Then file the build entry and name it in `Blocked by:`.
 
 ---
 
-## TD-856: The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-17, PR #2061) — the card's pick is *Working tree* (the default) · the newest ten first-parent commits by git's own names (*HEAD* the newest, *HEAD~1* …) · *Session*; a commit lists the files it changed against its first parent; ↑ ↓ step the pick, not the lines; read by `git_files` on the record's host, on a pick; a deletion and a path gone from the tree are text; not kept across a load. Built by TD-862.
-**Blocked by:** TD-862
-**Location:** design §4.5a row *Focus side panel, **Git** card — changed files* (and *Focus side panel, Session card — recent files*, which already lists the session's committed paths), §4.2 *The record's `files`*, §4.5 item 4; `src/sessionorc/gitinfo.py` (`git_info` — the porcelain, at most twenty; `changed_files` — the diff from the merge base), `src/sessionorc/modes.py` (where a new read is served, if it needs the record's host), `src/shiftlead/ui/app.py` (the Focus view, `git_root`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw)
-
-**Why:**
-- Paul (2026-10-17, through Add entry): *In the Git card of the focus terminal we show (and importantly link) the currently modified files. Lets add a picker to choose to show those files that have been edited in previous commits (e.g. HEAD~1, HEAD~2, plus one to show all for the session) and also add arrows for navigating them up or down. Medium priority.*
-- The card's lines are `GitInfo.files`, the porcelain alone (§4.5a *changed files*), so the moment a worker commits, the files it just changed leave the card and their links with them — and an agent commits often, so the card is most often empty when the person wants to open what was just done. The Session card's *recent files* holds committed paths, but mixed, capped at twenty and with no way to ask *what did this commit touch*.
-
-**Fix:** design it first. What the round settles:
-1. **The pick**: *Working tree* (today's list, the default) · *HEAD~1* · *HEAD~2* · … · *Session* (every path since the base, as `changed_files` reads it). Whether *HEAD~n* lists the files that one commit changed (`git show --name-status HEAD~n`) or everything from it to the tree; the drafter's lean is the one commit, since *Session* already covers the cumulative read. How far back it goes, and what a pick shows for a commit: its short sha and subject.
-2. **The arrows**: the drafter reads Paul's *arrows for navigating them up or down* as stepping the pick — ↑ one commit newer, ↓ one commit older, *Working tree* at the top — rather than moving through the file list; the round confirms the reading.
-3. **The links**: a committed path is linked as the tree's are (§4.5a *changed files*, the editor's file form), and a path the commit deleted, or one gone from the tree since, is text with its hover, as a deletion is today.
-4. **Where it is read**: on the record's host with the status read, never parsed from the screen; whether the pick is kept per session or resets on load; how *Session* relates to the Session card's *recent files* (one read, or the card's list replaced).
-5. The §4.5a rows for the pick and the arrows, then the build entry, named in `Blocked by:`.
-
-**Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
-
-**Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
-
----
-
 ## TD-857: Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's
 
 **Priority:** Medium
@@ -1585,38 +1556,6 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says how a Gemini reader is run, on which profile, how its verdict is recorded and accepted, and how the trial is judged, and the build entry is filed.
 
 **Related:** TD-112 (the adapter contract and its neutrality), TD-784, TD-785, TD-786 (the adapter's build), TD-035 (start hooks for an adapter without them).
-
----
-
-## TD-862: Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-856's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 (the `git_files` read: `gitinfo.pick_files`, `rpc_git_files`, `NODE_READS`, `identity.READS`) by #2077. Slice 2 is the card: the page's route, `#gitcard`'s pick line, `AO.gitFiles`' redraw and the card's tests.
-**Location:** design §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* (and *changed files*, now the pick's Working tree), §4.2 *The Git card's pick*, §4.5 item 4, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`); mockup `docs/mockups/reviews/2026-10-17-td856-git-pick.png` (`gen.py` `focus_git_pick`); `src/sessionorc/gitinfo.py` (`changed_files`, beside which the commit and session reads go), `src/sessionorc/agent.py` (`rpc_paths`, the shape of a record-host read), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/shiftlead/ui/app.py` (the Focus view; a route the page asks, as the transcript's is), `src/shiftlead/ui/templates/focus.html` (`#gitcard`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw); `tests/test_ui_focus_git_files.py`, `tests/test_recent_files.py`, `tests/test_paths_rpc.py`, `tests/test_link.py`
-
-**Why:** TD-856: the Git card lists the porcelain alone, so the moment a worker commits, the files it changed leave the card and their links with them.
-
-**Fix:**
-- **The read.** `git_files {id, pick}` on the record's host, as §4.2 *The Git card's pick* says: `commits` (the newest ten of `git log --first-parent -n 10`, each `{ref, sha, subject, at, author}`, `ref` `HEAD` … `HEAD~9`); `files` for `tree`, a sha of the ten (`git diff --name-status -M -z <sha>^1 <sha>`, the empty tree for a root commit), or `session` (`changed_files` at a limit of a hundred with each path's code — the porcelain's for a dirty one, else the base's letter — `more` the count past it); `gone: true` on a path not in the tree now; a sha outside the ten and an unknown `pick` refused in words. `NODE_READS` gains it; ungated.
-- **The card.** One line under `#gitcard`'s summary: **↑**, **↓**, and a select — *Working tree*, the ten as *HEAD · 1a2b3c4 · subject* (forty characters, whole on hover), *Session*. *Working tree* draws `git.files` from the record as today. A commit draws its naming line (short sha, subject, age; full subject and author on hover) and its lines; Session its lines and *n more*. The lines' links by `AO.gitFiles`' form; `D` and `gone` as text with the §4.5a hovers. ↑ ↓ step the select and are disabled at its ends.
-- **When it reads.** The commits on load and when the record's `git.oid` changes; a commit's lines on its pick; Session's on its pick and when the oid or the porcelain changes. The pick holds a sha: relabelled on a new commit, back to *Working tree* when the sha leaves the ten. A failed read: *could not read: <why>*, the pick kept. Not kept across a load; absent on *not a git directory*.
-
-**Tests:**
-- `git_files` in a scratch repo: `commits` names `HEAD` first and stops at ten; a commit's `files` are its own (an `A`, an `M`, a `D`, an `R` with the new path), a root commit's against the empty tree; `session` carries the porcelain's code for a dirty path (`M`, `??`) and the base's letter otherwise, caps at a hundred with `more`; `gone` on a path deleted after the commit; an old sha and `pick: "x"` refused;
-- `NODE_READS` holds `git_files`, and a node's record's pick goes through `read`;
-- the card draws the pick with *Working tree* selected and ↑ disabled; a pick of *HEAD~1* draws its naming line and links its paths, a `D` and a `gone` path as text with their hovers; ↓ on *Session* is disabled;
-- a new commit relabels a held pick and keeps its lines; a sha gone from the ten returns the pick to *Working tree*.
-
-**Done when** the Focus Git card of a live worker that has just committed lists that commit's files on *HEAD*, steps to *HEAD~1* with ↓, and shows the session's whole change on *Session*, each path opening in the editor.
-
-**Related:** TD-856 (the design), TD-627 / TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line), TD-501 (`paths`, the read's model).
-
-
-
 
 ---
 
@@ -1697,6 +1636,26 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a test holds an untracked `naïve file.txt` and a renamed path with a tab as unquoted lines of `GitInfo.files`, and the existing `git_info` tests pass.
 
 **Related:** TD-628, TD-862.
+
+---
+
+## TD-870: `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, met on #2077's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_listener.py` (`test_route_port_0_and_a_node_run_no_route_listener`, `_free_port`)
+
+**Why:** #2077's CI (run 39084062206, Python 3.12) failed this case, which the PR does not touch; 3.13 passed, and so did the rerun. The case takes a port from `_free_port()`, closes it, and asserts a connect to it raises because a node runs no route listener. Between the close and the connect, any other process can bind that port, a test under xdist included. The connect then succeeds, and the test reads that as a listener that should not be there.
+
+**Fix:** assert on what the UI process itself listens on rather than on a connect to a released port. For example, read the process's listening sockets (`/proc/<pid>/net/tcp` for its inodes, or `psutil.Process(pid).net_connections()` if it is a dependency) and assert `route` is not among them. Alternatively, keep the port bound by the test with `SO_REUSEADDR` off, so the UI's bind would fail loudly, and assert the UI's log line alone.
+
+**Done when** the case no longer depends on a released port staying free, and still fails if a node starts a route listener.
+
+**Related:** none.
 
 ---
 
