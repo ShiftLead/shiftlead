@@ -65,7 +65,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
-| TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833, TD-859 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
@@ -1289,38 +1288,6 @@ The other cases:
 **Done when** each page's load is measured and broken down, a budget is set, and the build entries are filed and named in `Blocked by:`.
 
 **Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
-
-## TD-818: Nobody can see what each team member spends: the spend ledger reads metered profiles only, so on a subscription a seat's tokens, and its cost per finished entry, are nowhere
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to keep a token count per team member … see which ones use the most tokens, and make adjustments if there are surprises*)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed 2026-10-17 (design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §4.2a, §5 `spend.weights`, §4.5 screen 13 *Spend* and screen 1's team header, §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, §4.7 `ao spend` and `ao status -v`; mockup `Spend.dc.html`). Every profile's turns, a subscription's included, are read once a minute into a **seat ledger** (`seat_spend.json`), each turn charged to the record that spent it (by conversation, else by worktree, else *outside shiftlead*) and to the entry it was doing; a subscription's figure is API-equivalent at the person's weights (default: the API's list prices of 2026-10-17, written into §5; steer m-0a1223fad390 to Paul, raw tokens its alternative), never a bill and read by no gate; kept thirteen months; drawn on a Spend page, the team card's header, `ao spend` and `ao status -v`. **Amended** 2026-10-17 with Paul's additions (m-75b50493538d, from his session ao-paul): a **Month** window and a period picked on an **Over time** chart, **By team** and **Top sessions** on All, the person's own sessions as *interactive sessions*, the usage chip opening the page; the RPC's part is TD-859, the page's TD-832, `ao spend`'s TD-831.
-**Blocked by:** TD-830, TD-832, TD-833, TD-859
-**Location:** design §4.3 *Spend per turn* (TD-128: `spend()` is asked for a `metered` profile only), §4.2a (a subscription profile is read by its quota windows), §4.4 (the home's spend ledger), §4.5 screen 1 (the team card), §4.7 (`ao status -v`); `src/shiftlead/adapters/claude_code/transcript.py` (the reader), `src/shiftlead/profiles.py`
-
-**Why:**
-- Every team member on Paul's subscription spends from one account-wide quota. The usage chip says how much of the window is gone, not who spent it, and the window keeps no history (ADR 2026-10-08: *the weekly window … is account-wide and keeps no history, so it cannot be split per grinder*).
-- The data exists. Each Claude Code transcript carries the `usage` of every reply, and each seat has its own worktree. A one-off read of 2026-10-02 to 10-16 (Paul's session, read only) put shiftlead's grinders at 2.5–3.2B tokens each, the designer at 1.5B and the techlead at 0.55B. Cache reads were about 97% of the tokens, so a raw token total misleads: the read has to weigh the four kinds (TD-128 keeps them apart) and the model, since a Fable request costs 2.5× an Opus one at the same size on Anthropic's API list prices ($10 against $4 per million input tokens).
-- The readings that have been taken (TD-378's ADR, TD-460's trial) were each a hand-written script over the transcripts. Every new question pays for that again.
-
-**Fix:** design first.
-- Read spend per turn for **every** profile the adapter can read it for, a subscription's included. A subscription's reading has a different meaning: weighted tokens at the profile's declared prices, or at the API's as an API-equivalent figure, labelled so, never a bill.
-- Key each turn by the session record it came from (seat, role, team, repo). Subagent turns go to their parent's record, marked so.
-- Show per seat, per role and per team, over a day and a week:
-  - weighted spend, and its share of the team's;
-  - **spend per finished entry**: the seat's spend between claim and `ao progress done`, the sum over entries it finished (a design and a build counted apart);
-  - the share spent past each context size (200k, 300k), the reading TD-460 had to write by hand.
-- Say where it is drawn (the team card, `ao status -v`, a Spend page or a fold on the Org) and what is kept, for how long (TD-131's limits).
-- Which prices a subscription is weighed at is the person's: a `steer` with the API's list prices as the default.
-
-**Done when** the design says what is read for a subscription profile, how a turn is attributed to a seat, which readings are drawn where, and how long they are kept, and the build entries are filed and named in `Blocked by:`.
-
-**Related:** TD-128 and TD-151 (metered spend, archived), TD-378 and TD-460 (the hand readings), TD-819 (team shape reads this), TD-820 (a surprise this would have shown), TD-131 (retention).
-
----
 
 ## TD-820: The designer runs far past its context bound inside one design: nearly a quarter of its requests read over 300k tokens and its median is 209k, against the grinders' 151k
 
