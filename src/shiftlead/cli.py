@@ -268,7 +268,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(_node_status_line(), file=sys.stderr)
     # each record's seat-ledger figure (design §4.7, TD-831): `-v` reads the `seats` reading by record
     seat_spend: dict[str, dict[str, Any]] = {}
-    if args.verbose and sessions:
+    if args.verbose and sessions and not hosts.is_node():  # the ledger is the home's, and a node's link may be down
         with contextlib.suppress(Exception):
             seat_spend = record_spend(sessions, call_sync)
     if args.json:
@@ -2277,6 +2277,8 @@ def spend_lines(got: dict[str, Any], team: str | None, today: date | None = None
 
     today = today or date.today()
     unit = str(got.get("unit") or "≈$")
+    if not got.get("at"):
+        return ["nothing read: the home served no period"]
     window, start = str(got.get("window") or "day"), date.fromisoformat(str(got.get("at"))[:10])
     finished = got.get("finished") or {}
 
@@ -2293,9 +2295,12 @@ def spend_lines(got: dict[str, Any], team: str | None, today: date | None = None
         ]
         return " · ".join(parts)
 
+    # `finished` is per role across the reading's teams, so a seat carries it only where it is the reading's
+    # one seat of that role
+    roles = [str(s.get("role") or "") for s in got.get("seats") or []]
+
     def block(t: str) -> list[str]:
         mine = [s for s in got.get("seats") or [] if s.get("team") == t]
-        roles = [str(s.get("role") or "") for s in mine]
         return [f"  {seat_line(s, roles.count(str(s.get('role') or '')) == 1)}" for s in mine]
 
     out: list[str] = []

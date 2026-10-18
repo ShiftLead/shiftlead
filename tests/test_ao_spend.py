@@ -74,6 +74,8 @@ def test_by_team_then_each_teams_seats_then_interactive_then_outside():
     # a role of one seat carries its finished entries; a role of two does not split them
     assert grind[2].startswith("  designer-ao-1 · designer · ≈$38.20 · 28% · 412 turns · 1 done, median ≈$54.70 ·")
     assert " done" not in grind[0] + grind[1]
+    # dc-grind's grinder is not the reading's one grinder, so the grinders' finished entry is on no seat's line
+    assert " done" not in lines[lines.index("dc-grind") + 1]
     assert lines[lines.index("interactive sessions") + 1].startswith(
         "  ao-paul · shiftlead · ≈$9.45 · 100% · 147 turns"
     )
@@ -112,6 +114,16 @@ def test_the_finished_entries_their_roles_and_the_partial_mark():
     led["began"] = "2026-10-17T07:00:00Z"  # TD-813 was first claimed before it
     assert cli.entry_lines(got(led=led))[0].endswith("· 5h40m · partial")
     assert cli.entry_lines({"entries": []}) == ["no entry finished in the period"]
+
+
+def test_an_empty_ledger_prints_nothing_spent_and_raises_nowhere():
+    empty = {"began": None, "days": {}, "refs": {}}
+    for window in ("day", "week", "month"):
+        assert cli.spend_lines(got(window, led=empty), None, TODAY)[0].endswith(" · ≈$0.00")
+        alone = cli.spend_lines(got(window, "ao-grind", led=empty), "ao-grind", TODAY)
+        assert len(alone) == 1 and alone[0].startswith("ao-grind · ≈$0.00 ")  # the head line, and no seat
+    assert cli.record_spend([{"id": "g1"}], lambda method, **kw: got(kw["window"], by="record", led=empty)) == {}
+    assert cli.spend_lines({}, None, TODAY) == ["nothing read: the home served no period"]
 
 
 def test_ao_spend_asks_the_seats_rpc_and_json_prints_its_reply(monkeypatch, capsys):
@@ -183,8 +195,36 @@ def test_status_v_prints_each_records_figure_and_none_where_it_spent_nothing(mon
     assert cli.cmd_status(argparse.Namespace(json=False, verbose=True)) == 0
     out = capsys.readouterr().out
     assert "spend ≈$52.30 today · ≈$72.30 week · past 200k 12%" in out and out.count("spend ≈$") == 1
+    assert "spend unknown (no key)" in out
     assert cli.cmd_status(argparse.Namespace(json=True, verbose=True)) == 0
     records = {r["id"]: r for r in json.loads(capsys.readouterr().out)}
     assert records["g1"]["spend"]["week"] == 72.3 and "spend" not in records["x9"]
+    assert records["m1"]["spend"] == {"unknown": "no key"}
     assert cli.cmd_status(argparse.Namespace(json=True, verbose=False)) == 0
     assert all("spend" not in r for r in json.loads(capsys.readouterr().out))  # without -v it is not asked
+
+
+def test_status_v_without_the_seats_reading_prints_the_rest(monkeypatch, capsys):
+    """A refused or failed `seats` (the home down, a node's link down) leaves `ao status -v` as it was; a node
+    does not ask, the ledger being the home's."""
+    asked = []
+
+    def call(method, **kw):
+        asked.append(method)
+        if method == "list":
+            return [{"id": "g1", "name": "grinder-ao-1", "profile": "grind"} | REC]
+        raise RuntimeError("refused")
+
+    monkeypatch.setattr(cli, "call_sync", call)
+    monkeypatch.setattr(cli, "_identity_line", lambda: None)
+    monkeypatch.setattr(cli, "_running_build", lambda: None)
+    assert cli.cmd_status(argparse.Namespace(json=False, verbose=True)) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("g1") and "spend" not in out and "seats" in asked
+    assert cli.cmd_status(argparse.Namespace(json=True, verbose=True)) == 0
+    assert "spend" not in json.loads(capsys.readouterr().out)[0]
+    asked.clear()
+    monkeypatch.setattr(cli.hosts, "is_node", lambda: True)
+    monkeypatch.setattr(cli, "_node_status_line", lambda: "a node")
+    assert cli.cmd_status(argparse.Namespace(json=True, verbose=True)) == 0
+    assert "seats" not in asked
