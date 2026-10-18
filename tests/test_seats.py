@@ -458,6 +458,13 @@ def test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket():
     assert {k: v["figure"] for k, v in by_role.items()} == {"techlead": 16.0, "grinder": 9.0}
     other = seats.reading(ledger, "week", NOW, team="interactive", weights=W)["series"][-1]["by"]
     assert list(other) == ["other"]  # a record with no role
+    # a ledger that begins on a bucket's first day leaves that bucket whole: a Monday its week, the 1st its month
+    def partial(begins: str, window: str) -> list[str]:
+        got = seats.reading({"days": {begins: {"a": _day(1.0)}}}, window, NOW, weights=W)["series"]
+        return [b["at"] for b in got if b.get("partial")]
+
+    assert partial("2026-10-12", "week") == [] and partial("2026-10-12", "month") == ["2026-10-01"]
+    assert partial("2026-10-01", "month") == [] and partial("2026-10-01", "week") == ["2026-09-28"]
     old = _ledger(d2025_10_20={"a": _day(1.0)}, d2026_10_17={"a": _day(1.0)})
     from_at = seats.reading(old, "week", NOW, at="2025-10-20", weights=W)["series"]
     assert (from_at[0]["at"], from_at[-1]["at"], from_at[0]["figure"]) == ("2025-10-20", "2026-01-05", 1.0)

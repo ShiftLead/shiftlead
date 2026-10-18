@@ -16296,3 +16296,23 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-128 and TD-151 (metered spend, archived), TD-378 and TD-460 (the hand readings), TD-819 (team shape reads this), TD-820 (a surprise this would have shown), TD-131 (retention).
 
 **Resolved:** 2026-10-17 (built by TD-830, #2049; TD-832, #2072, #2074 and #2078; TD-833, #2062; TD-859, #2067; archived by the designer). Design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §5 `spend.weights`, §4.5 screen 13 *Spend*, §4.5a *Spend page*, *team card: spend*, *Settings page: weights* and §4.7 `ao spend` carry the rule: every profile's turns are charged to a seat and an entry in the seat ledger, weighed at the dated list prices, and the Spend page reads them by day, week or month, by team and by session.
+
+## TD-867: `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done (2026-10-17, grinder-ao-1)
+**Location:** `src/sessionorc/seats.py` (`_series`); `tests/test_seats.py`
+
+**Why:** #2067 (TD-859): `_series` sets `partial` under `if window != "day" and begins and a < begins <= b:`, and its docstring says *`partial` on the bucket holding `begins` when that is not its first day*. Reverted to `a <= begins <= b`, `pytest -q tests/test_seats.py` read `22 passed`: `test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` begins the ledger on a Wednesday only, so a ledger that begins on a Monday or the 1st (a whole bucket) is never read.
+
+**Fix:** Add to that test a ledger whose first day is a Monday and one whose first day is the 1st: the week and the month bucket holding it carry no `partial`.
+
+**Done when** the `<=` revert fails a test.
+
+**Related:** TD-859 (built #2067).
+
+**Resolved:** 2026-10-17 (grinder-ao-1). `tests/test_seats.py::test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` now begins a ledger on a Monday (its week whole, its month partial) and on the 1st (its month whole, its week partial); the `<=` revert fails it.
