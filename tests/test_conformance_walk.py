@@ -310,7 +310,7 @@ def test_a_tool_with_no_permission_channel_is_answered_by_an_enter_in_its_termin
     `keys` RPC, for the permission step and the doorbell's `ao inbox` alike, and never calls `decide`."""
     cw = _load()
     fake, said = FakeAgent(tmp_path, channel=False), []
-    walk = cw.Walk("gemini-cli", "conformance", tmp_path, fake, out=said.append)
+    walk = cw.Walk("gemini", "conformance", tmp_path, fake, out=said.append)
     assert walk.run(), walk.results
     assert fake.calls.count("keys") == 2 and "decide" not in fake.calls
     assert "allowed in the terminal (Enter: Allow once)" in said[3]
@@ -329,7 +329,7 @@ def test_an_enter_that_leaves_the_dialog_up_fails_the_step(tmp_path, monkeypatch
     def stuck(method, **p):
         return None if method == "keys" else real(method, **p)
 
-    walk = cw.Walk("gemini-cli", "conformance", tmp_path, stuck, out=said.append)
+    walk = cw.Walk("gemini", "conformance", tmp_path, stuck, out=said.append)
     assert not walk.run()
     assert said[-1].startswith("FAIL  a permission: Enter pressed on Bash: touch …, and it still reads state needs-you")
 
@@ -360,7 +360,7 @@ def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
             assert seen[-1].endswith("needs-you")
         return real(method, **p)
 
-    assert cw.Walk("gemini-cli", "c", tmp_path, watched, out=lambda _s: None, snap=lambda n, _i: seen.append(n)).run()
+    assert cw.Walk("gemini", "c", tmp_path, watched, out=lambda _s: None, snap=lambda n, _i: seen.append(n)).run()
 
     def boom(*_a):
         raise OSError("no tmux")
