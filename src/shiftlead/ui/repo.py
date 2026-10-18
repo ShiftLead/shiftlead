@@ -40,6 +40,7 @@ from .org import (
     team_repo,
     team_summary,
 )
+from .spend import team_figure
 
 # -- Add entry (design §4.9 *Add an entry to the ledger*, §4.5a **Add entry…**, TD-219 slice 3) -------
 
@@ -611,6 +612,7 @@ def team_groups(
     flows: Mapping[str, Any] | None = None,
     balance: Mapping[str, Any] | None = None,
     needs: Collection[dict[str, Any]] = (),
+    spend: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -647,7 +649,10 @@ def team_groups(
     cannot follow its flow, and, on a live team, *flow changed — Apply* (`flow_head`).
 
     `balance` is the home's balance marks by team (`host`'s `balance`, §6 *Balance*, TD-330): every
-    mark, one with no `repo` too, which no checkout's reading in `repos` carries."""
+    mark, one with no `repo` too, which no checkout's reading in `repos` carries.
+
+    `spend` is today's `seats` row by team (`Readings.team_spend`): the header's **spend** figure (§4.5a
+    *team card: spend*, TD-832), absent while the team spent nothing today."""
     defs = {str(r["name"]): r for r in rows}
     order = {name: i for i, name in enumerate(defs)}  # definition order, within a repo (§4.9 *The Org page*)
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
@@ -728,6 +733,7 @@ def team_groups(
                 "projects": projects or ([row["project"]] if row.get("project") else []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "prs_waiting": waiting,
+                "spend": team_figure(team, (spend or {}).get(team)) if team != NO_TEAM else None,
                 "summary": summary,
                 "live": live,
                 # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the

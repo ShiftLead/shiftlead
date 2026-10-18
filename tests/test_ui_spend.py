@@ -229,3 +229,40 @@ def test_a_bar_of_a_chart_shifted_back_keeps_its_period_and_only_the_current_dro
     assert bars[0]["at"] == "2026-09-01" and bars[0]["picked"]  # the picked day is the first bar
     assert bars[-1]["at"] == "2026-09-30" and bars[-1]["href"] == "/spend?at=2026-09-30"  # not today's link
     assert spend_view({"window": "day"}, spend_picks({}), today=TODAY) == {"served": False}  # no `at`: not served
+
+
+def test_a_team_card_carries_today_s_figure_linking_to_its_spend_page_and_none_while_it_spent_nothing():
+    """§4.5a *team card: spend* (TD-832 slice 2): today's figure, the week's and the seat that spent most in
+    its hover, the press the Spend page on the team; absent while the team spent nothing today."""
+    import asyncio
+
+    from shiftlead.ui.app import Readings, team_groups, templates
+    from shiftlead.ui.spend import team_figure
+
+    rows = {t["team"]: t for t in reading()["teams"]}
+    fig = team_figure("ao-grind", rows["ao-grind"])
+    assert fig["text"] == "≈$138 today" and fig["href"] == "/spend?team=ao-grind"
+    assert fig["title"].startswith("≈$158 this week · grinder-ao-1 spent most today, 38%")
+    assert team_figure("dc-grind", None) is None and team_figure("t", {"team": "t", "figure": 0.0, "turns": 0}) is None
+    views = [{"id": "g1", "name": "grinder-ao-1", "team": "ao-grind", "state": "idle", "rank": 5, "controllers": []}]
+    (g,) = team_groups(views, spend=rows)
+    head = templates.get_template("group_head.html").render(g=g)
+    assert '<a class="meta spendfig" href="/spend?team=ao-grind" title="≈$158 this week' in head
+    assert "≈$138 today</a>" in head
+    (quiet,) = team_groups(views)
+    assert "spendfig" not in templates.get_template("group_head.html").render(g=quiet)
+
+    calls: list = []
+
+    async def call(method, **kw):
+        calls.append((method, kw))
+        if len(calls) > 1:
+            raise AgentError("unknown method: seats")
+        return reading(**kw)
+
+    rd = Readings(call)
+    assert set(asyncio.run(rd.team_spend())) == {"ao-grind", "dc-grind", "interactive", "outside"}
+    asyncio.run(rd.team_spend())  # the cached reading: no second read inside SPEND_TTL
+    assert calls == [("seats", {"window": "day"})]
+    rd.spend_cache["at"] = -1e9
+    assert asyncio.run(rd.team_spend()) == {}  # an older home: the figures are left off

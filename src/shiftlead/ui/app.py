@@ -413,7 +413,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
 )
 from .spend import INTERACTIVE as SPEND_INTERACTIVE
 from .spend import OUTSIDE as SPEND_OUTSIDE
-from .spend import spend_picks, spend_view, titles_of
+from .spend import SPEND_TTL, spend_picks, spend_view, titles_of
 from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
 
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
@@ -810,6 +810,7 @@ class Readings:
         self.needs_cache: dict[str, Any] = {"rows": []}
         self.waits_cache: dict[str, Any] = {"at": 0.0, "waits": None}
         self.lanes_cache: dict[str, tuple[float, Any]] = {}
+        self.spend_cache: dict[str, Any] = {"at": 0.0, "teams": None}
 
     async def queue_cards(self) -> dict[str, tuple[str, str]]:
         """The open Queue cards' entries (`ui.queue.card_index`), which say where an Inbox row is drawn
@@ -870,6 +871,18 @@ class Readings:
             except HTTPException:
                 self.identity_cache.update(at=now, info={})
         return self.identity_cache["info"] or {}
+
+    async def team_spend(self) -> dict[str, Any]:
+        """Today's `seats` row by team, for each team card's **spend** figure (§4.5a *team card: spend*,
+        TD-832): read at most once in `SPEND_TTL` seconds, since every delta re-renders the headers and
+        a day's figure moves by the turn. An agent that is down or too old leaves the figures off."""
+        now = time.monotonic()
+        if self.spend_cache["teams"] is None or now - self.spend_cache["at"] > SPEND_TTL:
+            got: dict[str, Any] = {}
+            with contextlib.suppress(Exception):
+                got = {str(t.get("team")): t for t in (await self.call("seats", window="day")).get("teams") or []}
+            self.spend_cache.update(at=now, teams=got)
+        return self.spend_cache["teams"] or {}
 
     async def pull_marks(self) -> None:
         """The home's pull readings (`host`'s `pulls`, §6 *Pull*) into `inbox.PULLS`, which the
@@ -1263,6 +1276,7 @@ def create_app() -> FastAPI:
         seats, waits = await seats_of(fleet), await person_waits()  # *waiting* (§4.2, TD-428)
         rows, marks = await team_rows(fleet), await work_marks()
         flows, balance, needs = flow_cache["flows"], work_cache["balance"], needs_cache["rows"]
+        spend = await rd.team_spend()  # each header's *spend* figure (TD-832)
         projects = list((await defs()).projects.values())
 
         def build() -> dict[str, Any]:
@@ -1276,6 +1290,7 @@ def create_app() -> FastAPI:
                 flows,  # the page load's reading: a delta reads no plan
                 balance,  # the home's balance marks, read beside `work` (TD-330)
                 needs,  # a member's open ask to the person: its team's *asked you* line (TD-354)
+                spend,
             )
             ro = templates.get_template("rollup.html").render(ro=rollup(groups))
             return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
@@ -1357,6 +1372,7 @@ def create_app() -> FastAPI:
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
         queue_cards=rd.queue_cards,  # where an Inbox row is drawn (§4.5 screen 6, TD-771)
+        team_spend=rd.team_spend,  # each team card's *spend* figure (TD-832)
         needs_cache=needs_cache,  # the Inbox's needs rows for the Org's *asked you* lines (TD-354)
         # the Inbox's counts, kept once and pushed (§4.4, TD-616); `LocalClient` read when it connects
         counts=CountsKeeper(counts_now, client=lambda: LocalClient(), omit=REPOS_OMIT_PAGE),
@@ -1478,6 +1494,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                         flows,
                         {} if agent_down else (info or {}).get("balance"),
                         h.needs_cache["rows"],
+                        {} if agent_down else await h.team_spend(),
                     ),
                     repos,
                     (await h.defs()).projects.values(),
@@ -1560,6 +1577,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             await flow_views(sessions),
             info.get("balance"),
             h.needs_cache["rows"],
+            await h.team_spend(),
         )
         # no team anywhere (the Org's flat page): the repo's sessions still stand under its line, as a strip
         groups = groups if groups is not None else [{"team": NO_TEAM, "members": vs}]

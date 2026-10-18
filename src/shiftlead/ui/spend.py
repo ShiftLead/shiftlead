@@ -21,6 +21,7 @@ OUTSIDE = "outside"  # and its one row for the turns no record owns
 OTHER = "other"
 TEAM_WORD = {INTERACTIVE: "interactive sessions", OUTSIDE: "outside shiftlead"}
 TOP = 8  # Top sessions' rows until *all →*
+SPEND_TTL = 60.0  # seconds a team card's **spend** figure keeps its reading (§4.5a *team card: spend*)
 # a colour per team in By team's order, and per role on a team (§4.5 screen 13 *Over time*); the
 # interactive sessions grey and *outside shiftlead* hatched, as the legend says
 TEAM_COLOURS = ("#2563eb", "#0d9488", "#d97706", "#7c3aed", "#db2777", "#65a30d", "#0891b2", "#b45309")
@@ -83,6 +84,24 @@ def figure(acc: Mapping[str, Any], unit: str | None = None) -> str:
     if unweighed and not float(acc.get("figure") or 0.0):
         return f"unweighed · {tokens(unweighed)}"
     return money(acc.get("figure"), u) + (f" + {tokens(unweighed)} unweighed" if unweighed else "")
+
+
+def team_figure(team: str, row: Mapping[str, Any] | None) -> dict[str, str] | None:
+    """A team card's **spend** figure (§4.5 screen 1, §4.5a *team card: spend*; TD-832): today's figure from
+    the team's `seats` row, a link to this page on the team, the week's figure and the seat that spent most
+    today in its hover; `None` while the team spent nothing today."""
+    if not row or not (int(row.get("turns") or 0) or float(row.get("figure") or 0.0)):
+        return None
+    unit = str(row.get("unit") or "≈$")
+    title = f"{money(row.get('week'), unit)} this week"
+    most = row.get("most") or {}
+    if most.get("seat"):
+        title += f" · {most['seat']} spent most today, {pct(most.get('share'))}"
+    return {
+        "text": f"{figure(row)} today",
+        "href": spend_query({"team": team}),
+        "title": title + " — the team's Spend page (API-equivalent where it is ≈$)",
+    }
 
 
 def pct(share: Any) -> str:
