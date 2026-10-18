@@ -1273,7 +1273,7 @@ The other cases:
 **Type:** debt
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
-**Kind:** evaluation
+**Kind:** design-first
 **Status:** Open. TD-829 (#2065) adds `data-` attributes to each Queue card and completed line for the in-browser picks: an estimated ~235 KB (~12%) on the live Queue's 1,927,082 bytes (209 cards, 829 completed lines, 2026-10-17), most of it `data-find` (each id written three ways, and each title).
 **Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
 
