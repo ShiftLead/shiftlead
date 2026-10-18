@@ -242,3 +242,29 @@ def test_a_done_claim_or_a_held_ask_for_a_pr_the_member_does_not_claim_blocks_no
     assert work.held_asks([g1, peer], home="kmaster") == {}
     assert work.finished([_manager(), g1, peer], home="kmaster")["why"] == []
     assert list(work.held_asks([g1, peer], home="kmaster", seats=["techlead"])) == [g1.id]
+
+
+def test_a_derived_or_scraped_claim_of_a_held_pr_blocks_nothing():
+    """§6 rule 9 counts a member's *declared* claims (TD-866): a claim the home derived or scraped for the
+    PR a seat holds the member's ask for is not one it waits on."""
+    from sessionorc.models import ProgressEntry
+
+    for source in ("derived", "scraped"):
+        g1 = _rec("g1", out_of_work=OUT, host="kmaster")
+        g1.progress = [ProgressEntry(ref="TD-9", pr=2000, source=source)]
+        assert work.held_asks([g1, _held(g1, 2000)], home="kmaster") == {}, source
+        assert work.finished([_manager(), g1, _held(g1, 2000)], home="kmaster")["why"] == [], source
+    g1.progress = [ProgressEntry(ref="TD-9", pr=2000)]  # the same claim declared waits on the reader
+    assert work.finished([_manager(), g1, _held(g1, 2000)], home="kmaster")["why"] == ["g1 waiting on techlead: #2000"]
+
+
+def test_a_dead_members_held_ask_blocks_nothing_and_its_declaration_counts():
+    """A member that exited after declaring `none` is counted by its `out_of_work` (§6 rule 9, TD-866):
+    a seat still holding its ask for the PR it claims does not make it *waiting on*, which is a live member's."""
+    from sessionorc.models import ProgressEntry
+
+    g1 = _rec("g1", "exited", out_of_work=OUT, host="kmaster")
+    g1.progress = [ProgressEntry(ref="TD-9", pr=2000)]
+    assert list(work.held_asks([g1, _held(g1, 2000)], home="kmaster")) == [g1.id]
+    got = work.finished([_manager(), g1, _held(g1, 2000)], home="kmaster")
+    assert got["why"] == [] and got["at"] == OUT["at"]
