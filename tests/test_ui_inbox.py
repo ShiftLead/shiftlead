@@ -1469,7 +1469,7 @@ def test_the_answers_are_a_group_of_their_own_apart_from_the_rows_controls():
     for i, a in enumerate(("merge it", "hold it")):
         assert f'data-act="answer" data-id="person" data-msg="m-1" data-index="{i}"' in html
         assert f"&ldquo;{a}&rdquo;" in html  # in quotation marks, so the words read as the sender's
-        assert f'title="{a}"' in html  # cut with an ellipsis in CSS, whole on hover
+        assert f'title="{a}"' not in html  # cut with an ellipsis in CSS, whole on hover by the script (TD-890)
     assert "<button" in html and "<a " not in html.split('class="row gap wrap sugg"')[1].split("</div>")[0]
     css = (UI / "static" / "app.css").read_text()
     assert ".inboxpage .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis;" in css
@@ -3681,11 +3681,11 @@ def test_a_mail_row_draws_its_subject_first_and_the_find_matches_it():
 
     given = entry("m-1", "ask", text="Which branch? The fix is ready.", subject="branch for the fix")
     html = rows("needs", [given])
-    assert '<div class="subj" title="branch for the fix">branch for the fix</div>' in html
+    assert '<div class="subj">branch for the fix</div>' in html
     assert html.index('class="subj"') < html.index('class="body md"')
     assert "branch for the fix" in row_find(given)
     older = rows("fyi", [entry("m-2", "note", text="merged #517. one gap left")])
-    assert '<div class="subj" title="merged #517.">merged #517.</div>' in older
+    assert '<div class="subj">merged #517.</div>' in older
     css = (UI / "static" / "app.css").read_text()
     assert ".inboxpage .mailrow .subj {" in css and "text-overflow: ellipsis" in css.split(".mailrow .subj {")[1]
 
@@ -3698,5 +3698,5 @@ def test_the_message_page_heads_with_the_subject_and_its_tab_says_it(client, tmp
     ask = send(sid, text="merge #9?\n\nthe reading", kind="ask", subject="merge the font fix")
     html = client.get(f"/inbox/{ask['id']}").text
     assert "<title>merge the font fix · Inbox · ShiftLead</title>" in html
-    assert '<span class="h1 msgsubj" title="merge the font fix">merge the font fix</span>' in html
+    assert '<span class="h1 msgsubj">merge the font fix</span>' in html
     assert ".msgpage .msgentry > .mailrow > .subj { display: none; }" in (UI / "static" / "app.css").read_text()

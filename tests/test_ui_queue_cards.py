@@ -248,3 +248,74 @@ def test_a_moves_neighbours_are_the_whole_orders():
     assert down == {"prev": "c", "next": "d", "order": ["a", "c", "b", "d"]}
     assert after == {"prev": "c", "next": "d", "order": ["b", "c", "a", "d"]}
     assert before == {"prev": "a", "next": "b", "order": ["a", "d", "b", "c"]}
+
+
+# -- TD-890 (TD-888's design, §4.5 *Page loads* *Nothing the page does not read*, screen 12 *the Queue has
+# no Snooze*): a Queue card's mail rows send no `data-find` and no Snooze; the Inbox's keep both --------
+
+TEMPLATES = JS.parent.parent / "templates"
+
+
+def _lean_rows(tmp_path, monkeypatch):
+    from test_ui_board import host, item, report
+    from test_ui_inbox import entry
+
+    from shiftlead.ui.app import board_rows, templates
+
+    host(tmp_path, monkeypatch)
+    root = tmp_path / "samscrape"
+    of = {"name": "samscrape", "label": "samscrape", "teams": ["sam"]}
+    board = board_rows(
+        report(root, item(9, "pick a name. Due: 2026-09-20.", "2026-09-20", "2d overdue")), {str(root.resolve()): of}
+    )
+    es = [entry("m-1", "ask", text="merge PR 9?", subject="merge PR 9?", answers=["merge it", "hold it"]), *board]
+    queue = "".join(templates.get_template("queue_mail.html").render(e=e, section="needs") for e in es)
+    inbox = templates.get_template("inbox_rows.html").render(rows=es, section="needs")
+    return queue, inbox
+
+
+def test_a_queue_cards_mail_rows_send_no_find_text_and_no_snooze(tmp_path, monkeypatch):
+    queue, inbox = _lean_rows(tmp_path, monkeypatch)
+    assert queue.count('class="mailrow') == inbox.count('class="mailrow') == 2
+    assert "data-find=" not in queue and inbox.count("data-find=") == 2
+    assert ">Snooze" not in queue and 'data-act="snooze"' not in queue and 'data-board-act="snooze"' not in queue
+    assert 'data-act="snooze"' in inbox and inbox.count('data-board-act="snooze"') == 3
+    # the board row's foot says what the Queue's row does: no Snooze moving its `Due:` date
+    assert "Snooze moves its" not in queue and "Reply writes on its line and Done checks it off" in queue
+    assert "Snooze moves its <code>Due:</code> date" in inbox
+
+
+def test_no_subject_or_answer_draws_a_title_repeating_its_text(tmp_path, monkeypatch):
+    """A `title` equal to its element's text is not drawn (TD-888): the subject line and an answer's label
+    are whole on hover by the script, which sets the title on a line that is in fact clipped."""
+    queue, inbox = _lean_rows(tmp_path, monkeypatch)
+    for html in (queue, inbox):
+        assert '<div class="subj">merge PR 9?</div>' in html
+        assert 'title="merge PR 9?"' not in html and 'title="merge it"' not in html
+    js = JS.read_text()
+    assert "AO.wholeOnHover" in js and ".mailrow .subj, .msgsubj, .btn.answer .alabel" in js
+    assert 'class="h1 msgsubj">' in (TEMPLATES / "inbox_entry.html").read_text()
+
+
+def test_every_snooze_in_the_row_renderer_is_the_inboxs_alone():
+    """Each of the row renderer's Snooze menus (an ask, a state row, a board line, a promote, a red PR, CI
+    not run, work waiting) is drawn only off the Queue, so a kind added later is caught here too."""
+    src = (TEMPLATES / "inbox_row.html").read_text()
+    menus = [m.start() for m in re.finditer(r"<summary[^>]*>Snooze", src)]
+    assert len(menus) == 7
+    for at in menus:
+        assert src[:at].rstrip().rsplit("\n", 2)[-2].strip() == "{%- if not drawn_on_queue %}", src[at - 200 : at]
+    assert "{% set drawn_on_queue = true %}" in (TEMPLATES / "queue_mail.html").read_text()
+
+
+def test_the_inbox_pages_own_queue_count_leaves_its_rows_whole(tmp_path, monkeypatch):
+    """The Inbox page's context carries `on_queue`, its rail's *+ n on the Queue* count: the renderer's
+    flag is a name no page defines, so an Inbox with entries on the Queue keeps its rows' find text and
+    Snooze (#2136's review)."""
+    from test_ui_inbox import entry
+
+    from shiftlead.ui.app import templates
+
+    host_rows = [entry("m-1", "ask", text="merge PR 9?")]
+    html = templates.get_template("inbox_rows.html").render(rows=host_rows, section="needs", on_queue=3)
+    assert "data-find=" in html and 'data-act="snooze"' in html
