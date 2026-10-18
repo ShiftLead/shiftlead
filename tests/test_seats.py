@@ -225,6 +225,38 @@ def test_the_reading_merges_a_seats_runs_shares_its_team_and_sums_a_finished_ent
         seats.reading(ledger, "year", NOW)
 
 
+def test_each_seat_reads_its_own_finished_entries_and_its_tokens_by_kind():
+    def row(name, refs, inp, out):
+        r = _day(sum(refs.values()) + 1.0, name=name, input=inp, output=out, cache_read=7, cache_write=3)
+        return r | {"refs": {k: {"figure": v, "turns": 1} for k, v in refs.items()}}
+
+    ledger = _ledger(
+        d2026_10_17={
+            "a1": row("grinder-1", {"TD-1": 4.0, "TD-2": 6.0}, 100, 10),
+            "a2": row("grinder-1", {"TD-3": 2.0}, 50, 5),  # the same seat restarted
+            "b1": row("grinder-2", {"TD-2": 1.0, "TD-4": 9.0}, 200, 20),  # TD-4 is not finished
+        }
+    )
+    ledger["refs"] = {
+        f"r TD-{n}": {"first_claimed": "2026-10-17T01:00:00Z", "done_at": "2026-10-17T09:00:00Z"} for n in (1, 2, 3)
+    }
+    got = seats.reading(ledger, "day", NOW, team="t", weights=W)
+    one, two = sorted(got["seats"], key=lambda s: s["seat"])
+    assert one["finished"] == {"entries": 3, "sum": 12.0, "median": 4.0, "refs": ["TD-2", "TD-1", "TD-3"]}
+    assert two["finished"] == {"entries": 1, "sum": 1.0, "median": 1.0, "refs": ["TD-2"]}
+    assert one["tokens"] == {"input": 150, "output": 15, "cache_read": 14, "cache_write": 6}
+    assert two["tokens"] == {"input": 200, "output": 20, "cache_read": 7, "cache_write": 3}
+    by_record = {s["records"][0]: s for s in seats.reading(ledger, "day", NOW, by="record", weights=W)["seats"]}
+    assert by_record["a1"]["finished"]["refs"] == ["TD-2", "TD-1"] and by_record["a2"]["finished"]["entries"] == 1
+    assert by_record["a2"]["tokens"]["input"] == 50
+    top = {s["seat"]: s for s in seats.reading(ledger, "day", NOW, by="record", weights=W)["top"]}
+    assert top["grinder-1"]["finished"]["entries"] == 3 and top["grinder-1"]["tokens"]["input"] == 150
+    quiet = _ledger(d2026_10_17={"a1": _day(1.0)})
+    assert seats.reading(quiet, "day", NOW, weights=W)["seats"][0]["finished"] == {
+        "entries": 0, "sum": 0.0, "median": 0.0, "refs": []
+    }  # fmt: skip
+
+
 def test_an_entry_claimed_before_the_ledger_began_reads_partial():
     ledger: dict = {"began": "2026-10-17T08:00:00Z"}
     seats.done(ledger, "r", "TD-9", "2026-10-15T08:00:00Z", "2026-10-17T11:00:00Z")

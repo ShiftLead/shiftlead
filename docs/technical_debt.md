@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
-| TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
@@ -1500,26 +1499,6 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says how a Gemini reader is run, on which profile, how its verdict is recorded and accepted, and how the trial is judged, and the build entry is filed.
 
 **Related:** TD-112 (the adapter contract and its neutrality), TD-784, TD-785, TD-786 (the adapter's build), TD-035 (start hooks for an adapter without them).
-
----
-
-## TD-865: The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-2, building TD-832)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/seats.py` (`reading`, `_entries`, `_add_row`, `_blank`); `src/shiftlead/ui/spend.py` (`spend_view`'s By seat `per`, `_weights_title`); `tests/test_seats.py`, `tests/test_ui_spend.py`
-
-**Why:** design §4.5 screen 13 *On one team* gives each seat of By seat its **per finished entry** (*3 · median ≈$4.10*, its entries under the hover), and §4.5a *Spend page: seat name, entry id* gives a seat's hover *the tokens by kind and the weights it was weighed at*. The reading TD-830 and TD-859 built carries neither: `entries[].by_role` and `finished` are per role (the role that spent most), and a seat carries its figure, turns, `between` and the context marks, not `input`/`output`/`cache_read`/`cache_write`. TD-832's page draws a role's count on its one seat, or on the subtotal of a role of two, and the hover without tokens.
-
-**Fix:** in `reading`: each seat's `finished` (`entries`, `median`, the `refs` it spent on among the period's entries) from the rows' `refs` of its records, and its tokens by kind summed from the rows' models; then `spend_view` draws each seat's own `per` and its hover's tokens. Tests: a team of two grinders whose entries differ reads each its own count and median; a seat's hover names its four kinds.
-
-**Done when** By seat's *per finished entry* is each seat's own and a seat's hover lists its tokens by kind.
-
-**Related:** TD-832, TD-830, TD-859.
 
 ---
 

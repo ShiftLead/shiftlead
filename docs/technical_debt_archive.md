@@ -16316,3 +16316,19 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-859 (built #2067).
 
 **Resolved:** 2026-10-17 (grinder-ao-1). `tests/test_seats.py::test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` now begins a ledger on a Monday (its week whole, its month partial) and on the 1st (its month whole, its week partial); the `<=` revert fails it.
+
+## TD-865: The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-2, building TD-832)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2090 (2026-10-17, grinder-ao-1)
+**Location:** `src/sessionorc/seats.py` (`reading`, `_entries`, `_add_row`, `_blank`); `src/shiftlead/ui/spend.py` (`spend_view`'s By seat `per`, `_weights_title`); `tests/test_seats.py`, `tests/test_ui_spend.py`
+
+**Why:** design §4.5 screen 13 *On one team* gives each seat of By seat its **per finished entry** (*3 · median ≈$4.10*, its entries under the hover), and §4.5a *Spend page: seat name, entry id* gives a seat's hover *the tokens by kind and the weights it was weighed at*. The reading TD-830 and TD-859 built carries neither: `entries[].by_role` and `finished` are per role (the role that spent most), and a seat carries its figure, turns, `between` and the context marks, not `input`/`output`/`cache_read`/`cache_write`. TD-832's page draws a role's count on its one seat, or on the subtotal of a role of two, and the hover without tokens.
+
+**Related:** TD-832, TD-830, TD-859.
+
+**Resolved:** 2026-10-17 (grinder-ao-1, PR #2090). Design §4.4 *Spend per seat* (the readings' paragraph: *per seat … its own*) carries the rule. `seats.reading` gives each seat (and each record under `by: record`, and each of `top`) its own `finished` — the count, sum and median of its figure on each finished entry it spent on, and their `refs` — and its `tokens` by kind (`_entries`' per-seat spend, `_finished`, `_add_tokens`); `spend_view` draws By seat's *per finished entry* from it, the role's count staying on the subtotal, and `_weights_title` opens a seat's hover with its tokens. Design §4.4 *Spend per seat* says so; `tests/test_seats.py::test_each_seat_reads_its_own_finished_entries_and_its_tokens_by_kind`, `tests/test_ui_spend.py`; screenshot `docs/mockups/reviews/2026-10-17-td865-by-seat.png`.
