@@ -16181,3 +16181,61 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-818 (spend per finished entry), TD-772 (the Queue trial's idle-while-work reading), TD-749 (a lane split that idled a grinder, archived), TD-118 (where a team-run-day spends tokens, archived).
 
 **Resolved:** 2026-10-17 (built by TD-834, #2055 and #2060, and TD-835, #2082; archived by the designer). Design §4.4 *Team shape*, §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape* and §4.7 `ao team shape` carry the rule: the home samples each running team's members and queues once a minute into `shape.json`, and the Spend page's Shape view and `ao team shape` draw it with the six suggestion rules.
+
+## TD-856: The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Built #2077, #2079 (2026-10-18, by TD-862). Was: Designed (2026-10-17, PR #2061) — the card's pick is *Working tree* (the default) · the newest ten first-parent commits by git's own names (*HEAD* the newest, *HEAD~1* …) · *Session*; a commit lists the files it changed against its first parent; ↑ ↓ step the pick, not the lines; read by `git_files` on the record's host, on a pick; a deletion and a path gone from the tree are text; not kept across a load. Built by TD-862.
+**Blocked by:** TD-862
+**Location:** design §4.5a row *Focus side panel, **Git** card — changed files* (and *Focus side panel, Session card — recent files*, which already lists the session's committed paths), §4.2 *The record's `files`*, §4.5 item 4; `src/sessionorc/gitinfo.py` (`git_info` — the porcelain, at most twenty; `changed_files` — the diff from the merge base), `src/sessionorc/modes.py` (where a new read is served, if it needs the record's host), `src/shiftlead/ui/app.py` (the Focus view, `git_root`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw)
+
+**Why:**
+- Paul (2026-10-17, through Add entry): *In the Git card of the focus terminal we show (and importantly link) the currently modified files. Lets add a picker to choose to show those files that have been edited in previous commits (e.g. HEAD~1, HEAD~2, plus one to show all for the session) and also add arrows for navigating them up or down. Medium priority.*
+- The card's lines are `GitInfo.files`, the porcelain alone (§4.5a *changed files*), so the moment a worker commits, the files it just changed leave the card and their links with them — and an agent commits often, so the card is most often empty when the person wants to open what was just done. The Session card's *recent files* holds committed paths, but mixed, capped at twenty and with no way to ask *what did this commit touch*.
+
+**Fix:** design it first. What the round settles:
+1. **The pick**: *Working tree* (today's list, the default) · *HEAD~1* · *HEAD~2* · … · *Session* (every path since the base, as `changed_files` reads it). Whether *HEAD~n* lists the files that one commit changed (`git show --name-status HEAD~n`) or everything from it to the tree; the drafter's lean is the one commit, since *Session* already covers the cumulative read. How far back it goes, and what a pick shows for a commit: its short sha and subject.
+2. **The arrows**: the drafter reads Paul's *arrows for navigating them up or down* as stepping the pick — ↑ one commit newer, ↓ one commit older, *Working tree* at the top — rather than moving through the file list; the round confirms the reading.
+3. **The links**: a committed path is linked as the tree's are (§4.5a *changed files*, the editor's file form), and a path the commit deleted, or one gone from the tree since, is text with its hover, as a deletion is today.
+4. **Where it is read**: on the record's host with the status read, never parsed from the screen; whether the pick is kept per session or resets on load; how *Session* relates to the Session card's *recent files* (one read, or the card's list replaced).
+5. The §4.5a rows for the pick and the arrows, then the build entry, named in `Blocked by:`.
+
+**Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
+
+**Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
+
+
+**Resolved:** 2026-10-18 (built by TD-862, #2077, #2079). Design §4.2 *The Git card's pick* and §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* carry the rule.
+
+## TD-862: Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-856's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2077, #2079 (2026-10-18, grinder-ao-1).
+**Location:** design §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* (and *changed files*, now the pick's Working tree), §4.2 *The Git card's pick*, §4.5 item 4, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`); mockup `docs/mockups/reviews/2026-10-17-td856-git-pick.png` (`gen.py` `focus_git_pick`); `src/sessionorc/gitinfo.py` (`changed_files`, beside which the commit and session reads go), `src/sessionorc/agent.py` (`rpc_paths`, the shape of a record-host read), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/shiftlead/ui/app.py` (the Focus view; a route the page asks, as the transcript's is), `src/shiftlead/ui/templates/focus.html` (`#gitcard`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw); `tests/test_ui_focus_git_files.py`, `tests/test_recent_files.py`, `tests/test_paths_rpc.py`, `tests/test_link.py`
+
+**Why:** TD-856: the Git card lists the porcelain alone, so the moment a worker commits, the files it changed leave the card and their links with them.
+
+**Fix:**
+- **The read.** `git_files {id, pick}` on the record's host, as §4.2 *The Git card's pick* says: `commits` (the newest ten of `git log --first-parent -n 10`, each `{ref, sha, subject, at, author}`, `ref` `HEAD` … `HEAD~9`); `files` for `tree`, a sha of the ten (`git diff --name-status -M -z <sha>^1 <sha>`, the empty tree for a root commit), or `session` (`changed_files` at a limit of a hundred with each path's code — the porcelain's for a dirty one, else the base's letter — `more` the count past it); `gone: true` on a path not in the tree now; a sha outside the ten and an unknown `pick` refused in words. `NODE_READS` gains it; ungated.
+- **The card.** One line under `#gitcard`'s summary: **↑**, **↓**, and a select — *Working tree*, the ten as *HEAD · 1a2b3c4 · subject* (forty characters, whole on hover), *Session*. *Working tree* draws `git.files` from the record as today. A commit draws its naming line (short sha, subject, age; full subject and author on hover) and its lines; Session its lines and *n more*. The lines' links by `AO.gitFiles`' form; `D` and `gone` as text with the §4.5a hovers. ↑ ↓ step the select and are disabled at its ends.
+- **When it reads.** The commits on load and when the record's `git.oid` changes; a commit's lines on its pick; Session's on its pick and when the oid or the porcelain changes. The pick holds a sha: relabelled on a new commit, back to *Working tree* when the sha leaves the ten. A failed read: *could not read: <why>*, the pick kept. Not kept across a load; absent on *not a git directory*.
+
+**Tests:**
+- `git_files` in a scratch repo: `commits` names `HEAD` first and stops at ten; a commit's `files` are its own (an `A`, an `M`, a `D`, an `R` with the new path), a root commit's against the empty tree; `session` carries the porcelain's code for a dirty path (`M`, `??`) and the base's letter otherwise, caps at a hundred with `more`; `gone` on a path deleted after the commit; an old sha and `pick: "x"` refused;
+- `NODE_READS` holds `git_files`, and a node's record's pick goes through `read`;
+- the card draws the pick with *Working tree* selected and ↑ disabled; a pick of *HEAD~1* draws its naming line and links its paths, a `D` and a `gone` path as text with their hovers; ↓ on *Session* is disabled;
+- a new commit relabels a held pick and keeps its lines; a sha gone from the ten returns the pick to *Working tree*.
+
+**Done when** the Focus Git card of a live worker that has just committed lists that commit's files on *HEAD*, steps to *HEAD~1* with ↓, and shows the session's whole change on *Session*, each path opening in the editor.
+
+**Related:** TD-856 (the design), TD-627 / TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line), TD-501 (`paths`, the read's model).
+
+**Resolved:** 2026-10-18 (grinder-ao-1, #2077, #2079). The `git_files` read — `gitinfo.pick_files`, `rpc_git_files`, in `NODE_READS` and `identity.READS` (#2077, `tests/test_git_files.py`); the card's pick line, `AO.gitPick` and `GET /api/sessions/{sid}/git_files` (#2079, `tests/test_ui_focus_git_pick.py`), checked on a scratch home: screenshots `docs/mockups/reviews/2026-10-17-td862-*.png`.
