@@ -181,5 +181,13 @@ def test_settings_refused_by_the_agent_still_draws_its_files_with_the_words(tmp_
             return {"list": [], "host": {"name": "kmaster"}}.get(method, {})
 
     monkeypatch.setattr(ui, "LocalClient", Refuses)
+    seen = []
+
+    async def chip(call, info=None):
+        seen.append(info)
+        return None
+
+    monkeypatch.setattr(ui, "chip_build", chip)
     r = TestClient(ui.create_app()).get("/settings")
     assert r.status_code == 200 and "settings.yml: not a mapping" in r.text
+    assert seen == [{"name": "kmaster"}]  # the build chip still has the `host` that answered

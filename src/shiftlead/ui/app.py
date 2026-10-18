@@ -3642,7 +3642,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 readings = first[4]
         # the chip's own reads, handed over where they answered (a refusal: the chip reads it again)
         chip_reads = {
-            k: None if isinstance(r, HTTPException) else r for k, r in (("usage", first[1]), ("gate", first[5]))
+            k: None if isinstance(r, HTTPException) else r
+            for k, r in (("usage", first[1]), ("gate", first[5]), ("host", first[2]))
         }
         profiles, default, org, local = (local_files[k] for k in ("profiles", "default", "org", "local"))
         notes: list[str] = [why] if why else []
@@ -3697,8 +3698,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Settings",
                 "agent_down": agent_down,
                 "volatile": local.volatile,
-                "usage": {} if agent_down else await chip_usage(call, fleet or None, **chip_reads),
-                "build_chip": None if agent_down else await chip_build(call, info),
+                "usage": {}
+                if agent_down
+                else await chip_usage(call, fleet or None, usage=chip_reads["usage"], gate=chip_reads["gate"]),
+                "build_chip": None if agent_down else await chip_build(call, chip_reads["host"]),
             },
         )
 
