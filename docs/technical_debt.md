@@ -64,7 +64,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Building — slice 1 #2014 |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
+| TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Designed — built by TD-879, TD-880, TD-881, TD-882 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
@@ -77,6 +77,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
+| TD-879 | Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request | Medium | Open |
+| TD-880 | Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable | Medium | Open |
+| TD-881 | Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget | Medium | Open |
+| TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
 
 ---
 
@@ -1271,7 +1275,8 @@ The other cases:
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open. TD-829 (#2065) adds `data-` attributes to each Queue card and completed line for the in-browser picks: an estimated ~235 KB (~12%) on the live Queue's 1,927,082 bytes (209 cards, 829 completed lines, 2026-10-17), most of it `data-find` (each id written three ways, and each title).
+**Status:** Designed (2026-10-17, PR #2105; design §4.5 *Page loads*, §6 *This repo's smoke*). Measured: the Queue 2.5 s to its first byte and 2.3 MB of uncompressed HTML, the other pages 0.08–0.52 s; the host agent's reads at most 38 ms; the Queue's 2 s is `board_choices()` (14.6 ms) once per attached mail row. Budget: first byte 500 ms (Org, Inbox, Repo, Queue) / 200 ms (Settings, Spend, Transcript), HTML 150 KB on the wire, DOM ready 1 s. Built by TD-879 (each fact once per request), TD-880 (gzip, immutable static), TD-881 (`Server-Timing`, the smoke tells a miss), TD-882 (only what is shown at load).
+**Blocked by:** TD-879, TD-880, TD-881, TD-882
 **Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
 
 **Why:** Paul, 2026-10-16: *we need analysis done on our page loads — they all seem to take a long time (org, repo, inbox, queue).* Measured the same evening on kmaster's plain port (time to first byte, size): Org 0.43–0.55 s, 284 KB; Inbox 0.27–0.29 s, 847 KB; Repo (shiftlead) 0.57–0.73 s, 750 KB; Settings 0.15–0.22 s, 82 KB; Queue 2.37–2.66 s, 1.87 MB. A page is sent uncompressed with `Accept-Encoding: gzip` (the Queue's 1,873,503 bytes either way), and the person reaches the UI over the tailnet through `tailscale serve`, so the transfer, the parse of a large DOM and the page's scripts add to every number above, and none of that is measured.
@@ -1600,5 +1605,107 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** each of the three removals above fails a test.
 
 **Related:** TD-862, TD-856.
+
+---
+
+## TD-879: Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Each fact once per request*); `src/shiftlead/ui/app.py` (`queue_page`: the `queue_mail.html` lambda passing `board_choices()` per row; `person_inbox`'s `boards_of`; the Inbox and Repo routes), `src/shiftlead/ui/inbox.py` (`board_choices`); `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`
+
+**Why:** TD-805 measured the Queue at 2.5 s to its first byte against 358 ms rebuilt offline with no person inbox; `board_choices()` costs 14.6 ms (seven repos' boards resolved on disk) and the Queue's row render calls it once per attached row.
+
+**Fix:** `queue_page` reads `board_choices()` once and passes the list to every row's render. The same pass over the Inbox, Repo and Org routes and `person_inbox`: a per-request fact read inside a per-row loop or lambda is read once before it.
+
+**Tests:**
+- a Queue with five attached rows calls `board_choices` once (patched and counted);
+- the Inbox route and `person_inbox` call it at most once per request.
+
+**Done when** the live Queue's first byte is under 500 ms (the smoke's line, or `curl -w %{time_starttransfer}`), with its rows unchanged.
+
+**Related:** TD-805 (the design), TD-771 (the Queue page), TD-828 (rows on cards).
+
+---
+
+## TD-880: Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Compressed*, *Cached*); `src/shiftlead/ui/app.py` (`gzip_ok`, `app.mount("/static", StaticFiles(…))`, the page routes' `TemplateResponse`s), the templates' `?v=` hash on `app.js` and `app.css`; `tests/` for the UI routes
+
+**Why:** TD-805: nothing is sent compressed — the Queue's 2.29 MB of HTML is 370 KB gzipped, the Inbox's 718 KB is 79 KB, `app.js`'s 399 KB is 126 KB — and the static files carry no `Cache-Control`, so a load revalidates or refetches 495 KB of script and style though their URLs carry a hash.
+
+**Fix:** a response of 1 KB or more goes gzipped (level 5, as the counts' JSON is) to a request whose `Accept-Encoding` takes it (`gzip_ok`), with `Vary: Accept-Encoding` — pages, `part=1` fragments and static files; the pushed event stream and the terminal's websocket are left as they are. A body is compressed on a worker thread, as `json_body` compresses the counts (TD-611), never on the loop that also serves Focus's keystrokes. A static request carrying `?v=` is answered `Cache-Control: public, max-age=31536000, immutable`; without it, `no-cache` and its ETag.
+
+**Tests:**
+- a page and a fragment come back `Content-Encoding: gzip` with `Accept-Encoding: gzip` and plain without, and `gzip;q=0` is plain;
+- `/static/app.js?v=x` carries the immutable header and `/static/app.js` `no-cache`;
+- the event stream is not compressed;
+- a large page's compression runs off the loop (a Focus write answered while it runs, or the call patched and its thread checked).
+
+**Done when** the live Queue sends under 400 KB of HTML on the wire and a second load of any page fetches no script or stylesheet (devtools, or the smoke's line).
+
+**Related:** TD-805, TD-572 (the light stream), TD-616 (the counts' JSON, already gzipped).
+
+---
+
+## TD-881: Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Measured on every load*), §6 *This repo's smoke*; `src/shiftlead/ui/app.py` (the page routes, `agent_call`/`call`, the person-inbox helpers), `scripts/smoke.py` (the load line, the note); `tests/test_smoke.py`
+
+**Why:** TD-805 could split the server's time only by rebuilding a page offline: nothing records where a live page's time goes, and the smoke prints first byte and size with no budget.
+
+**Fix:**
+- **The header.** Each page route (`/`, `/inbox`, `/queue`, `/repo/<repo>`, `/settings`, `/spend`, `/transcript/<id>`) times each RPC by name (summed per name), the person inbox (`person_inbox` with `person_states`), the board and ledger reads, and the render, and answers `Server-Timing: rpc_list;dur=31, inbox;dur=…, render;dur=…, total;dur=…`. The last twenty per route are kept in memory, never on disk.
+- **The smoke.** Each page is loaded twice, the first printed *cold*, the second judged; each load is one line merging the HTTP half's numbers with the browser half's DOM ready and the header's steps; a page over §4.5's budget — first byte, HTML on the wire, DOM ready — is a line on the promote's note naming the page and its longest step. It fails nothing.
+
+**Tests:**
+- a page route answers a `Server-Timing` naming each RPC it made and `total`;
+- the smoke, against a stub page over the budget, writes the note's line and exits as a pass; one under writes none.
+
+**Done when** a promote's note names a page over budget with its longest step, and the live Queue's header shows where its time goes.
+
+**Related:** TD-805, TD-812 (the smoke), TD-804 (a promote's smoke).
+
+---
+
+## TD-882: Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-805's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-880
+**Location:** design §4.5 *Page loads* (*Only what is shown*), §4.5 screen 12 (the Queue's *Recently completed* and its window), the Repo page; `src/shiftlead/ui/templates/queue_part.html` (`q.completed.lines`), `src/shiftlead/ui/queue.py` (`queue_view`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the window picker, TD-829's in-browser picks), the Repo page's template and its folds; `tests/test_ui_queue_picks.py`
+
+**Why:** TD-805: the Queue sends 829 completed lines across every window and 18,487 DOM nodes; even gzipped it is 370 KB against the 150 KB budget. The Repo page sends 825 KB and 11,219 nodes, 517 KB of it rows drawn folded (past the fourth of a group).
+
+**Fix:** at load the Queue sends the completed lines of the picked window only (the day, unless the URL or the browser's kept pick says another); a pick of another window fetches that window's lines by `part=1` once and keeps them, so a pick back answers at once. The Repo page sends a group's first four rows and the count of the rest, and the rest on the group's first unfold — and on an anchor or a find that names a row not yet sent (the ledger row's **Open**, `/repo/<name>#TD-156`, §4.5 screen 6), which fetches the group's rows before it scrolls. Blocked by TD-880 so the size measured after is the compressed one.
+
+**Tests:**
+- the Queue at load holds the day's completed lines alone and the week's after its pick;
+- a Repo group holds its first four rows until opened;
+- `/repo/shiftlead#TD-n` for a row past the fourth fetches its group and lands on the row.
+
+**Done when** the live Queue and Repo pages each send under 150 KB of HTML on the wire at load.
+
+**Related:** TD-805, TD-829 (the Queue's picks in the browser), TD-816.
 
 ---
