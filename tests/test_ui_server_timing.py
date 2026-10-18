@@ -242,3 +242,38 @@ def test_the_repo_page_reads_at_once_names_its_steps_and_reads_each_once(tmp_pat
     assert len(reads) == 1  # the definitions, once: the page's and its flows'
     steps = _steps(r.headers["server-timing"])
     assert {"files", "flows", "views", "groups", "lists", "render"} <= set(steps)
+
+
+@pytest.mark.parametrize(
+    ("refused", "status"), [("list", 503), ("host", 200), ("queue", 200), ("usage", 200), ("gate", 200)]
+)
+def test_the_repo_page_fails_and_stands_on_the_reads_it_did_before(tmp_path, monkeypatch, refused, status):
+    """TD-893: gathered, the Repo page's reads keep their old weight — a refused fleet is the page's error,
+    the home, the cards and the chip's reads cost only their own part, and none is read a second time."""
+    from test_ui_repo_page import fake, reading
+
+    from sessionorc.client import AgentError, AgentUnavailable
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    root = str(tmp_path / "samscrape")
+    calls: list[str] = []
+
+    class Refuses(fake({root: reading(root)}, [])):
+        async def call(self, method, **kw):
+            calls.append(method)
+            if method == refused:
+                raise AgentUnavailable("down") if refused == "list" else AgentError("no such method")
+            return await super().call(method, **kw)
+
+    monkeypatch.setattr(ui, "LocalClient", Refuses)
+    c = TestClient(ui.create_app())
+    calls.clear()
+    r = c.get("/repo/samscrape")
+    assert r.status_code == status
+    if refused in ("usage", "gate"):
+        assert calls.count(refused) == 1  # a refused read is not made again by the chip
+    calls.clear()
+    assert c.get("/repo/samscrape?part=1").status_code == status
+    assert "usage" not in calls and "gate" not in calls  # the part has no top bar

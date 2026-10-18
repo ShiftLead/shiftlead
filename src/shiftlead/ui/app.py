@@ -1672,7 +1672,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 return org_here()[0]
 
         # Every read that waits on no other, at once (§4.5 *Page loads*, TD-893): the RPCs, the board, and
-        # the definitions on a worker thread, read once for the page and its flows
+        # the definitions on a worker thread, read fresh once for the page and its flows (the board's and the
+        # pills' are the cached `defs`)
         first = await asyncio.gather(
             call("list"),
             call("host"),
@@ -1729,7 +1730,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return_exceptions=True,
         )
         # an older home or a failed read: the asks still say who waits
-        entries = [[] if isinstance(x, Exception) else x.get("entries") or [] for x in mail]
+        entries = [x.get("entries") or [] if isinstance(x, dict) else [] for x in mail]
         reads = [(str(m.get("name") or m["id"]), entries[2 * k], entries[2 * k + 1]) for k, m in enumerate(readers)]
         standing = pr_standing(reads, now)
         rel = (r.get("ledger") or {}).get("path") or ""
@@ -1780,8 +1781,12 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
             ctx["win"] = send_folds(lists, completed, repo_window(request.query_params), opened)
         if not part:  # the page's top bar, from the reads above; the part is the page's body alone
-            usage, gate = (None if isinstance(x, Exception) else x for x in first[6:8])
-            ctx["usage"] = await chip_usage(call, sessions, usage=usage, gate=gate)
+            usage, gate = first[6:8]  # read once: a refused `usage` is no chip, a refused `gate` no lines
+            ctx["usage"] = (
+                {}
+                if isinstance(usage, Exception)
+                else await chip_usage(call, sessions, usage=usage, gate={} if isinstance(gate, Exception) else gate)
+            )
             ctx["build_chip"] = await chip_build(call, info or None)
         return templates.TemplateResponse(request, "repo_part.html" if part else "repo.html", ctx)
 
