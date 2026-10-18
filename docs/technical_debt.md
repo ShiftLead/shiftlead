@@ -67,10 +67,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833, TD-859 |
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
-| TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 |
+| TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
-| TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
@@ -1444,31 +1443,6 @@ The other cases:
 **Done when** an unattended designer holding only designs that wait on steers is told at its bound, and its next run starts holding those claims, unnudged until their replies land.
 
 **Related:** TD-820 (the design), TD-190 (rule 5), TD-706 (`_carry`), TD-245 (`_replay`), TD-814 (the review phase), TD-837.
-
-## TD-837: Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (TD-820's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.8 *A designer's context*, §6 rule 5; `src/shiftlead/briefs/designer.md` (the shipped template; a repo's own part under `docs/briefs/` is the repo's and is not edited here)
-
-**Why:** TD-820: within a design, the reads that grow the designer's context are large replies read whole, and review transcripts.
-
-**Fix:**
-- **Reviews and large replies.** Add one paragraph to the designer template, in §4.8's words:
-  - Every review round runs as a fresh subagent whose final message is its verdict and findings.
-  - A large reply (`ao repo --json`, a whole section file, a skill's reference) is read by the slice the step needs: filtered through `jq` or a script, or a `grep -n` and then a range.
-- **Waiting designs.** A design whose PR waits on a steer or a reader is a waiting claim. At the bound's line, the run pushes, ledgers and restarts. The next run reads its carried claims first (`ao status --json`, its own `progress`) and its open PRs (`gh pr list`), and finishes each. A run holding only waiting claims, with nothing to pick, declares `ao progress none` beside them and ends its turn; the reply or the steer's lapse wakes it.
-- **Tests:** the template carries the paragraph (the briefs test that reads it).
-
-**Done when** the shipped designer brief says how a design keeps its reads small and what a waiting design is at the bound.
-
-**Related:** TD-820, TD-836.
-
----
 
 ## TD-846: Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first
 
