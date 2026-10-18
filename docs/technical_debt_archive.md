@@ -16132,7 +16132,7 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Added:** 2026-10-17 (TD-820's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done (2026-10-17, grinder-ao-2)
+**Status:** Done #2084 (2026-10-17, grinder-ao-2)
 **Location:** design §4.8 *A designer's context*, §6 rule 5; `src/shiftlead/briefs/designer.md` (the shipped template; a repo's own part under `docs/briefs/` is the repo's and is not edited here)
 
 **Why:** TD-820: within a design, the reads that grow the designer's context are large replies read whole, and review transcripts.
@@ -16148,4 +16148,4 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 
 **Related:** TD-820, TD-836.
 
-**Resolved:** 2026-10-17 (grinder-ao-2). `src/shiftlead/briefs/designer.md` gains *Keep what a design reads small* above *Out of work*: reviews as fresh subagents returning their verdict, large replies read by the slice, a design waiting on a steer or a reader as a waiting claim, and a run of only waiting claims declaring `none`. `test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design` in `tests/test_cli.py`.
+**Resolved:** 2026-10-17 (grinder-ao-2, #2084). `src/shiftlead/briefs/designer.md` gains *Keep what a design reads small* above *Out of work*: reviews as fresh subagents returning their verdict, large replies read by the slice, a design waiting on a steer or a reader as a waiting claim, and a run of only waiting claims declaring `none`. `test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design` in `tests/test_cli.py`.
