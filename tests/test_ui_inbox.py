@@ -3685,7 +3685,7 @@ def test_a_mail_row_draws_its_subject_first_and_the_find_matches_it():
     assert html.index('class="subj"') < html.index('class="body md"')
     assert "branch for the fix" in row_find(given)
     older = rows("fyi", [entry("m-2", "note", text="merged #517. one gap left")])
-    assert '<div class="subj" title="merged #517.">merged #517.</div>' in older
+    assert '<div class="subj">merged #517.</div>' in older
     css = (UI / "static" / "app.css").read_text()
     assert ".inboxpage .mailrow .subj {" in css and "text-overflow: ellipsis" in css.split(".mailrow .subj {")[1]
 
