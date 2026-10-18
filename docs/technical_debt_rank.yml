@@ -1,6 +1,10 @@
 # The rank: one `TD-NNN: <key>` line per entry, sorted by key (ledgerboard SPEC, The rank).
 # Written by a tool; read only through ledgerboard's rank().
 TD-805: 09
+TD-879: 09
+TD-880: 09
+TD-881: 09
+TD-882: 09
 TD-748: 0i
 TD-769: 0i
 TD-770: 0i
