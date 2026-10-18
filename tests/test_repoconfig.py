@@ -525,3 +525,26 @@ def test_the_worktree_setup_is_a_command(tmp_path):
     for text in ("worktree_setup: ''\n", "worktree_setup: [a]\n", "worktree_setup: 3\n"):
         with pytest.raises(ValueError, match="must be a command"):
             repoconfig.load_text(text, tmp_path)
+
+
+def test_a_text_is_parsed_once_and_each_reader_gets_its_own_copy(tmp_path, monkeypatch):
+    """TD-896: a team's plan loads its repo's file once per member; the YAML is parsed once per text,
+    and what one load's caller changes never reaches the next."""
+    text = "ledger: docs/debt.md\nunattended:\n  workers: 2\n  extra: [a]\n"
+    (tmp_path / repoconfig.FILE).write_text(text)
+    parses = []
+    real = repoconfig.yaml.safe_load
+    monkeypatch.setattr(repoconfig.yaml, "safe_load", lambda t: parses.append(t) or real(t))
+    repoconfig._parsed.cache_clear()
+    first = repoconfig.load(tmp_path)
+    first.unattended["extra"].append("b")
+    second = repoconfig.load(tmp_path)
+    assert parses == [text]
+    assert second.unattended == {"workers": 2, "extra": ["a"]}
+    (tmp_path / repoconfig.FILE).write_text(text.replace("2", "3"))
+    assert repoconfig.load(tmp_path).unattended["workers"] == 3  # a changed file is parsed again
+    assert len(parses) == 2
+    with pytest.raises(ValueError, match="not valid YAML"):
+        repoconfig.load_text("a: [", tmp_path)
+    with pytest.raises(ValueError, match="not valid YAML"):  # a failure is not remembered as a parse
+        repoconfig.load_text("a: [", tmp_path)

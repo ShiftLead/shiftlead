@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Built, live check #2140 — blocked by TD-896 |
-| TD-896 | The Repo page's steady load is 365 ms of a 500 ms budget: `flows` and `board` leave no room for a slow seat inbox read | Medium | Open |
+| TD-896 | The Repo page's steady load is 365 ms of a 500 ms budget: `flows` and `board` leave no room for a slow seat inbox read | Medium | Built (#2145) — live check |
 
 ---
 
@@ -1531,9 +1531,9 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** debt
 **Added:** 2026-10-18 (grinder-ao-1, reading TD-893 live)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** design §4.5 *Page loads*; `src/shiftlead/ui/app.py` (`repo_page`, `flow_views`' `read`, `board_view` → `board_all`)
+**Kind:** live-check #2145
+**Status:** Built (2026-10-18, #2145): most of `flows` was `teams.plan` loading the repo's `.shiftlead.yml` once per member (25 loads over this host's four teams) at ~11 ms a pure-Python YAML parse; `repoconfig.parse_yaml` now parses a text once and hands each caller a copy, the file still read on every use. Offline, the four teams' plans went from 148 ms to 55 ms. **Live check** once #2145 is live (`ao promote status`), read-only: thirty warm headless GETs of the live `/repo/shiftlead`, each first byte and its `Server-Timing`. A steady load under 300 ms and all thirty under 500 ms: archive this and TD-893 with that read. Over: what is left is the Fix's other two steps, `board` and the seats' inbox reads started once the seats are known, as a new entry this one is `**Blocked by:**`.
+**Location:** design §4.5 *Page loads*; `src/shiftlead/repoconfig.py` (`parse_yaml`); `src/shiftlead/ui/app.py` (`repo_page`, `flow_views`' `read`, `board_view` → `board_all`)
 
 **Why:** TD-893's live read (2026-10-18, #2140 live): thirty warm loads of `/repo/shiftlead`, five over 500 ms. With every step named, a steady load is ~365 ms, and its two longest serial steps are `flows` (~115 ms: `flow_views` reads every team's `teamrun.flow_view` one after another, each with its files and its RPCs) and `board` (~88 ms, the longest read of the first gather, so the gather waits on it). The seats' inbox reads come after `groups`, in series with all of it, and when one is slow (`rpc_inbox` 515–977 ms summed on three of the five) the load crosses 500 ms; the other two were the whole host slower. 365 ms leaves 135 ms for a slow read or a busy host.
 
