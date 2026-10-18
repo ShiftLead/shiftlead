@@ -235,6 +235,23 @@
   // The folded Focus's terminal height: from its top to the bar (and the page's foot under it), never
   // under the 360px floor. `top` is the terminal's top in the document, `below` what stands under it.
   AO.termFill = (viewport, top, below) => Math.max(360, Math.floor(viewport - top - below));
+  // The grid tmux is told (TD-794): one `{resize}` per gesture, the last grid once the box has been still
+  // for `wait` ms, and none when it is the grid tmux already has. A drag of the panel's edge or a put away
+  // fires the observer once a frame, and each resize makes the tool repaint over lines tmux keeps.
+  // `send` answers whether the grid went (the socket open); `mark` records a grid sent another way.
+  // The timers are wrapped: a browser's `setTimeout` called as a method of another object throws.
+  AO.resizeSender = function (send, wait = 150, timers = { set: (f, ms) => setTimeout(f, ms), clear: (id) => clearTimeout(id) }) {
+    let timer = null, last = "";
+    const fn = (cols, rows) => {
+      timers.clear(timer);
+      timer = timers.set(() => {
+        timer = null;
+        if (`${cols}x${rows}` !== last && send([cols, rows])) last = `${cols}x${rows}`;
+      }, wait);
+    };
+    fn.mark = (cols, rows) => { timers.clear(timer); timer = null; last = `${cols}x${rows}`; };
+    return fn;
+  };
   // The bar's wiring, its elements handed in so it runs under node (TD-500). Opening unfolds the overlay
   // and focuses the box; folding hides it, keeps the draft, redraws the bar and gives the terminal the
   // focus. Neither touches the terminal's box: a resize would make the tool repaint (TD-474).
@@ -4937,6 +4954,7 @@
     AO.termFont(term, fit);
     AO.terms.push({ term, fit });
     let ws, delay = 500, paneGone = false;
+    const sendGrid = AO.resizeSender((grid) => !!(ws && ws.readyState === 1) && (ws.send(JSON.stringify({ resize: grid })), true));
     // The terminal mark's state (`AO.termMark`, above), redrawn each second and on each change
     const mk = { retryAt: null, clients: 0, window: null, grid: null, open: false, state: s.state, lastByte: null };
     const markEl = $("#ftermmark");
@@ -4971,7 +4989,9 @@
       ws.binaryType = "arraybuffer";
       // the grid as it is now, not as it was at the dial: a refit while connecting sends nothing (TD-288)
       ws.onopen = () => {
-        ws.send(JSON.stringify({ resize: [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows] }));
+        const grid = [term.cols > 0 ? term.cols : cols, term.rows > 0 ? term.rows : rows];
+        ws.send(JSON.stringify({ resize: grid }));
+        sendGrid.mark(...grid);
         mk.open = true; mk.lastByte = Date.now(); tlog("open");
         if (pathLinks) pathLinks.clear();  // a re-attach asks the host again (TD-501)
       };
@@ -5104,8 +5124,8 @@
     $("#tpaste").addEventListener("click", pasteClip);
     // tmux is told the grid whatever changed it: the pane's box (the observer) or the person's
     // face and size from Settings (`AO.setTermLook`, which refits) — TD-288: the second resized the
-    // grid here and left the pane drawing at the old width
-    term.onResize(({ cols, rows }) => { ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [cols, rows] })); });
+    // grid here and left the pane drawing at the old width; one send per gesture (`AO.resizeSender`, TD-794)
+    term.onResize(({ cols, rows }) => sendGrid(cols, rows));
     new ResizeObserver(() => fit.fit()).observe($("#term"));
     term.focus();
 
