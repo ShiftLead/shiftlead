@@ -921,14 +921,15 @@ class Readings:
         rows, note = await self.board_all()
         return [r for r in rows if r.get("due_now", True)], note
 
-    async def board_view(self) -> tuple[dict[str, Any], str]:
+    async def board_view(self, choices: list[dict[str, str]] | None = None) -> tuple[dict[str, Any], str]:
         """The board's horizon (§4.5 screen 6, TD-220) over every open row, sorted by the person's
         `inbox.board_show`, and the note: `due` is `board_items`' rows, `ahead` *Board, coming up*,
         `hidden` the *not shown* fold, and `line` the words that say the mode — None when no board
-        was read (a reading that failed says so in its note instead)."""
+        was read (a reading that failed says so in its note instead). `choices` the request's own
+        `board_choices()`, read once by a route that passes it (§4.5 *Page loads*, TD-879)."""
         rows, note = await self.board_all()
         h = board_horizon(rows, uiconf.board_show())
-        h["line"] = board_line(h) if rows or (not note and board_choices()) else None
+        h["line"] = board_line(h) if rows or (not note and (board_choices() if choices is None else choices)) else None
         return h, note
 
     async def person_states(self, fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1042,7 +1043,9 @@ class Readings:
             self.waits_cache.update(at=now, waits=waits_of(got.get("entries") or []))
         return self.waits_cache["waits"] or {}
 
-    async def person_inbox(self, fleet: list[dict[str, Any]], watching: bool = False) -> dict[str, Any]:
+    async def person_inbox(
+        self, fleet: list[dict[str, Any]], watching: bool = False, choices: list[dict[str, str]] | None = None
+    ) -> dict[str, Any]:
         """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
         caller and no id — **a person's read, which sets no `read_at`**, because a person is not
         the session. That is what lets the Inbox page poll it every few seconds without marking
@@ -1058,7 +1061,7 @@ class Readings:
         records = {o.get("id"): o for o in fleet}
         # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board is the sender's
         # repo's, when this host knows that repo and it carries one; else the person picks
-        boards_of = {c["root"]: c["board"] for c in board_choices()}
+        boards_of = {c["root"]: c["board"] for c in (board_choices() if choices is None else choices)}
 
         def board_of(sid: Any) -> str:
             repo = str((records.get(sid) or {}).get("repo") or "")
@@ -1150,12 +1153,16 @@ class Readings:
     async def _counts_now(self, watching: bool) -> dict[str, Any]:
         try:
             fleet = await self.call("list")
-            got, states = await self.person_inbox(fleet, watching=watching), await self.person_states(fleet)
+            choices = board_choices()  # once for the recount (§4.5 *Page loads*, TD-879)
+            got, states = (
+                await self.person_inbox(fleet, watching=watching, choices=choices),
+                await self.person_states(fleet),
+            )
         except HTTPException as e:
             if e.status_code != 503:
                 raise
             return {**COUNTS_DOWN, "why": str(e.detail)}
-        hz, _ = await self.board_view()
+        hz, _ = await self.board_view(choices)
         hz = with_standings(hz, fleet)
         build = await chip_build(self.call)
         sections = await asyncio.to_thread(
@@ -3298,8 +3305,9 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
             index = card_index(got)
             with contextlib.suppress(HTTPException):
                 fleet = await call("list")
-                inbox, states = await h.person_inbox(fleet), await h.person_states(fleet)
-                hz = with_standings((await h.board_view())[0], fleet)
+                choices = board_choices()  # once for the request, never once a row (§4.5 *Page loads*, TD-879)
+                inbox, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
+                hz = with_standings((await h.board_view(choices))[0], fleet)
                 sections = inbox_sections(
                     inbox["entries"],
                     states=states,
@@ -3318,7 +3326,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 origin = page_origin(request)
                 mail = attach(
                     sections,
-                    lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=board_choices())),
+                    lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
                     later,
                 )
         # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
@@ -3809,9 +3817,10 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         waiting on a person*. From step 3 the due board items join **Needs you** too."""
         repos_omit(REPOS_OMIT_INBOX)
         agent_down, fleet = False, []
+        choices = board_choices()  # once for the request (§4.5 *Page loads*, TD-879)
         try:
             fleet = await call("list")  # person_view's one list, kept for the usage chip (TD-287)
-            got, states = await h.person_inbox(fleet), await h.person_states(fleet)
+            got, states = await h.person_inbox(fleet, choices=choices), await h.person_states(fleet)
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -3821,7 +3830,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         hz, board_note = (
             ({"due": [], "ahead": [], "hidden": [], "waiting": [], "line": None}, "")
             if agent_down
-            else await board_view()
+            else await board_view(choices)
         )
         hz = with_standings(hz, fleet)
         cards = {} if agent_down else await h.queue_cards()
@@ -3854,7 +3863,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "board_note": board_note,
                 "horizon": hz,
                 "ledger": lf,
-                "board_choices": board_choices(),
+                "board_choices": choices,
                 "person_needs": sections["count"],
                 "person_queue_n": sections["queue_n"],
                 "on_queue": sections["queue_n"],
@@ -3980,7 +3989,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             return json_answer(json_body(await h.counts.read(watching, request.query_params.get("since")), gz), gz)
         try:
             fleet = await call("list")  # person_view's one list, kept for the board's *waiting on* (TD-305)
-            got, states = await h.person_inbox(fleet, watching=watching), await h.person_states(fleet)
+            choices = board_choices()  # once for the request (§4.5 *Page loads*, TD-879)
+            got, states = await h.person_inbox(fleet, watching=watching, choices=choices), await h.person_states(fleet)
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -4003,7 +4013,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "agent_down": True,
                 "why": str(e.detail),
             }
-        hz, board_note = await board_view()
+        hz, board_note = await board_view(choices)
         hz = with_standings(hz, fleet)
         build = await chip_build(call)
         lf = await ledger_view(fleet)
