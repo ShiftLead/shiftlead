@@ -1276,7 +1276,7 @@ The other cases:
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed (2026-10-17, PR #PRNUM; design §4.5 *Page loads*, §6 *This repo's smoke*). Measured: the Queue 2.5 s to its first byte and 2.3 MB of uncompressed HTML, the other pages 0.08–0.52 s; the host agent's reads at most 38 ms; the Queue's 2 s is `board_choices()` (14.6 ms) once per attached mail row. Budget: first byte 500 ms (Org, Inbox, Repo, Queue) / 200 ms (Settings, Spend, Transcript), HTML 150 KB on the wire, DOM ready 1 s. Built by TD-879 (each fact once per request), TD-880 (gzip, immutable static), TD-881 (`Server-Timing`, the smoke tells a miss), TD-882 (only what is shown at load).
+**Status:** Designed (2026-10-17, PR #2105; design §4.5 *Page loads*, §6 *This repo's smoke*). Measured: the Queue 2.5 s to its first byte and 2.3 MB of uncompressed HTML, the other pages 0.08–0.52 s; the host agent's reads at most 38 ms; the Queue's 2 s is `board_choices()` (14.6 ms) once per attached mail row. Budget: first byte 500 ms (Org, Inbox, Repo, Queue) / 200 ms (Settings, Spend, Transcript), HTML 150 KB on the wire, DOM ready 1 s. Built by TD-879 (each fact once per request), TD-880 (gzip, immutable static), TD-881 (`Server-Timing`, the smoke tells a miss), TD-882 (only what is shown at load).
 **Blocked by:** TD-879, TD-880, TD-881, TD-882
 **Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
 
