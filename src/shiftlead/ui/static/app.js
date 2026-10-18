@@ -3964,6 +3964,7 @@
         }
       } catch (err) { /* the next poll tries again */ } finally {
         busy = false; inflight = "";
+        if (!read) $$("[data-unsent][disabled]", lists).forEach((b) => (b.disabled = false));  // press again
         if (read && loaded() !== win) short = win;
         if (again) { again = false; setTimeout(reread, 0); }
       }
