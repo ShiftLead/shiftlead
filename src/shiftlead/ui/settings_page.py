@@ -238,6 +238,89 @@ def usage_cards(
     return list(groups.values())
 
 
+WEIGHT_KINDS = ("input", "output", "cache_read", "cache_write")  # `settings.WEIGHT_KINDS`, in the card's order
+
+
+def _price(v: Any) -> str:
+    """A price as its field shows it, every digit kept so a Save writes it back unchanged: `4`, `0.25`; ""
+    for none."""
+    if not _is_num(v):
+        return ""
+    text = repr(float(v))
+    return text[:-2] if text.endswith(".0") else text
+
+
+def weights_card(weights: Mapping[str, Any] | None) -> dict[str, Any]:
+    """§4.5a *Settings page: Usage* **weights** (TD-818, built by TD-832): the weights the seat pass reads
+    (`settings`' `spend.weights`, the design's default under what the person set), a row per model prefix
+    with its four prices, and the *as of* date. `default` marks a row the design ships at its own prices."""
+    from sessionorc.seats import WEIGHTS  # the default lives with the ledger that reads it
+
+    got = dict(weights or WEIGHTS)
+    rows = []
+    for key, w in got.items():
+        if key == "as_of" or not isinstance(w, Mapping):
+            continue
+        shipped = WEIGHTS.get(key)
+        rows.append(
+            {
+                "model": str(key),
+                **{k: _price(w.get(k)) for k in WEIGHT_KINDS},
+                "default": isinstance(shipped, Mapping)
+                and {k: float(v) for k, v in shipped.items()} == {k: float(v) for k, v in w.items()},
+                "shipped": isinstance(shipped, Mapping),
+            }
+        )
+    return {"as_of": str(got.get("as_of") or ""), "rows": rows}
+
+
+def weights_body(rows: Any, as_of: Any = "") -> dict[str, Any]:
+    """The card's rows as `set_settings`' `spend` (§5 `spend.weights`): each row that is not the design's own
+    at its own prices — a new model, or a shipped one repriced — and `as_of` where it is not the default's;
+    `{}` when nothing differs, so the design's default holds. A row removed that the design ships comes back
+    at its default, since the person's keys replace the default's one by one and never drop one. An empty
+    price is left out (that kind then weighs at the row's input); a row with none, a model named twice or a
+    price that is not a number is refused, in words the card shows."""
+    from sessionorc.seats import WEIGHTS
+
+    if not isinstance(rows, list):
+        raise ValueError("weights: send {rows: [{model, input, output, cache_read, cache_write}], as_of}")
+    out: dict[str, Any] = {}
+    seen: set[str] = set()
+    for r in rows:
+        model = str((r or {}).get("model") or "").strip() if isinstance(r, Mapping) else ""
+        if not model:
+            raise ValueError("a weights row needs its model prefix, claude-opus or claude-opus-5")
+        if model in seen:
+            raise ValueError(f"{model} is named twice: one row per model prefix")
+        seen.add(model)
+        prices: dict[str, float] = {}
+        for k in WEIGHT_KINDS:
+            text = str(r.get(k) if r.get(k) is not None else "").strip().lstrip("$")
+            if not text:
+                continue
+            try:
+                v = float(text)
+            except ValueError:
+                raise ValueError(f"{model} {k.replace('_', ' ')}: $ per million tokens, not {text!r}") from None
+            if not math.isfinite(v) or v < 0:
+                raise ValueError(f"{model} {k.replace('_', ' ')}: $ per million tokens, at or above 0, not {text}")
+            prices[k] = v
+        if "input" not in prices:  # a kind left out weighs at the input, so the input is the one a row needs
+            raise ValueError(f"{model}: give it at least its input price")
+        shipped = WEIGHTS.get(model)
+        if isinstance(shipped, Mapping) and {k: float(v) for k, v in shipped.items()} == prices:
+            continue
+        out[model] = prices
+    day = str(as_of or "").strip()
+    if day and day != WEIGHTS["as_of"]:
+        try:
+            out = {"as_of": datetime.fromisoformat(day).date().isoformat(), **out}
+        except ValueError:
+            raise ValueError(f"as of is a date, 2026-10-17, not {day!r}") from None
+    return {"weights": out} if out else {}
+
+
 def balance_card(
     name: str,
     bal: Any,

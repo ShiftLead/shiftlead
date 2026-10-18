@@ -3449,6 +3449,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # **settle** (§4.5a *Settings page: settle*, TD-710): the install's map as the field writes it
                 "settle": settle_mod.text_of(got.get("settle")),
                 "settle_default": settle_mod.text_of(settle_mod.DEFAULT),
+                # **weights** (§4.5a *Settings page: Usage*, TD-832): the prices the seat pass weighs at
+                "weights": setmod.weights_card((got.get("spend") or {}).get("weights")),
                 "profiles_file": str(profiles_mod.profiles_file()),
                 "teams": setmod.team_cards(
                     org.teams,
@@ -3530,6 +3532,18 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         except ValueError as e:
             raise HTTPException(400, str(e)) from None
         return answer(await call("set_settings", settle=settle))
+
+    @app.post("/api/settings/spend")
+    async def settings_spend(request: Request):
+        """§4.5a *Settings page: Usage* → **weights** **Save** (TD-818, built by TD-832): `{rows: [{model,
+        input, output, cache_read, cache_write}], as_of}`, the card whole — refused in place when a row is not
+        one — to `set_settings {spend}`, the rows that differ from the design's default and nothing else."""
+        body = await body_of(request)
+        try:
+            spend = setmod.weights_body(body.get("rows"), body.get("as_of"))
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from None
+        return answer(await call("set_settings", spend=spend))
 
     @app.post("/api/settings/max_age")
     async def settings_max_age(request: Request):

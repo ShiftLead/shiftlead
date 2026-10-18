@@ -5788,6 +5788,8 @@
         return ["you", { open_in, file_link, terminal, attach, composer, inbox: { board_show: AO.boardShow(f.elements.board_show.value, f.elements.board_next.value, f.elements.board_days.value) } }];
       },
       // **Telegram** (§4.5a **You**, §4.10; TD-319): the three fields whole, an empty one cleared by the route
+      // **weights** (§4.5a *Settings page: Usage*, TD-832): the rows whole; the route sends what differs from the default
+      spend: (f) => ["spend", { as_of: f.elements.as_of.value.trim(), rows: $$(".setwrows .setweight", f).map((r) => Object.fromEntries($$("input", r).map((i) => [i.name, i.value.trim()]))) }],
       notify: (f) => ["notify", { telegram: { on: f.elements.tg_on.checked, secrets: f.elements.tg_secrets.value.trim(), link: f.elements.tg_link.value.trim() } }],
     };
     // **Save** and **Cancel** (§4.5a *Settings page*, TD-286): Save is pressable, and Cancel shown, only
@@ -5811,6 +5813,17 @@
       $$(".setline", f).forEach((out) => { if (!out.classList.contains("warn")) out.dataset.was = out.textContent; });
       f.dataset.drawn = state(f); settle(f);
     };
+    // **weights**' **+ model** and **×** (TD-832): rows come and go, so Cancel puts back the rows as drawn
+    const wrows = $("#setweights .setwrows", page);
+    if (wrows) {
+      wrows.dataset.drawn = wrows.innerHTML;
+      const wf = wrows.closest("form");
+      $(".setwadd", wf).addEventListener("click", () => {
+        wrows.append($("#setwrow", wf).content.cloneNode(true));
+        $$(".setweight", wrows).at(-1).querySelector("input").focus(); settle(wf);
+      });
+      wf.addEventListener("click", (e) => { const x = e.target.closest(".setwx"); if (x) { x.closest(".setweight").remove(); settle(wf); } });
+    }
     $$("form.setcard", page).forEach((f) => {
       f.dataset.drawn = state(f); settle(f);
       const said = $(".setsaid", f); if (said) said.dataset.was = said.textContent;
@@ -5830,6 +5843,7 @@
         if (f.elements.open_in && $("#settemplate")) $("#settemplate").classList.toggle("hidden", f.elements.open_in.value !== "template");
         if (f.elements.open_in && $("#setfilelink")) $("#setfilelink").classList.toggle("hidden", f.elements.open_in.value === "none");
         if (f.elements.folder_first) f.elements.wait.disabled = !f.elements.folder_first.checked;
+        if (f.id === "setweights") wrows.innerHTML = wrows.dataset.drawn;
         settle(f);
       });
     });
@@ -5839,6 +5853,9 @@
       const [section, body] = forms[f.dataset.section](f);
       try {
         const got = await post(section, body);
+        // the weights the home now reads, drawn again: a row put back at its default, the defaults marked
+        // — unless another card holds edits not yet saved, which a reload would throw away
+        if (section === "spend" && !$$("form.setcard", page).some((o) => o !== f && o.dataset.drawn !== state(o))) { location.reload(); return; }
         drawn(f);
         say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
         // **flow** writes and nothing more (§4.5a, TD-356): the toast says whether Apply is needed

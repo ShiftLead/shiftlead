@@ -88,6 +88,34 @@
     {% else %}
       <div class="note">No profiles.</div>
     {% endfor %}
+    {#- **weights** (§4.5a *Settings page: Usage*, §5 `spend.weights`; TD-818, built by TD-832): the prices the
+        seat pass weighs a turn with no cost of its own at, a row per model prefix (longest wins), **+ model**
+        and a row's **×**, written whole through set_settings — the rows that differ from the design's own -#}
+    <form class="card pad setcard" data-section="spend" id="setweights">
+      <div class="row gap wrap"><span class="h2">weights</span><span class="note">$ per million tokens, by model prefix</span><span class="grow"></span><a class="note" href="/spend" title="the Spend page: which teams and seats spent the quota, weighed at these prices">by seat →</a></div>
+      <div class="setweights">
+        <div class="setweight sethead note"><span>model</span><span>input</span><span>output</span><span>cache read</span><span>cache write</span><span></span></div>
+        <div class="setwrows">{% for w in weights.rows %}
+        <div class="setweight">
+          <input class="input setin mono" name="model" value="{{ w.model }}" placeholder="claude-opus" aria-label="model prefix" autocomplete="off" spellcheck="false"{% if w.shipped %} readonly{% endif %}>
+          {%- for k, label in (("input", "input"), ("output", "output"), ("cache_read", "cache read"), ("cache_write", "cache write")) %}
+          <input class="input setin setprice" name="{{ k }}" value="{{ w[k] }}" placeholder="—" inputmode="decimal" aria-label="{{ w.model or 'model' }} {{ label }}, $ per million tokens" autocomplete="off">
+          {%- endfor %}
+          <button class="btn sm ghost setwx" type="button" title="{{ 'back to its default price on Save: the design ships this row' if w.shipped else 'remove this row' }}" aria-label="{{ ('put ' ~ w.model ~ ' back at its default price on Save') if w.shipped else ('remove ' ~ (w.model or 'this row')) }}">×</button>
+        </div>{% endfor %}</div>
+        <template id="setwrow">{% with w = {"model": "", "input": "", "output": "", "cache_read": "", "cache_write": "", "shipped": False, "default": False} %}<div class="setweight">
+          <input class="input setin mono" name="model" value="{{ w.model }}" placeholder="claude-opus" aria-label="model prefix" autocomplete="off" spellcheck="false"{% if w.shipped %} readonly{% endif %}>
+          {%- for k, label in (("input", "input"), ("output", "output"), ("cache_read", "cache read"), ("cache_write", "cache write")) %}
+          <input class="input setin setprice" name="{{ k }}" value="{{ w[k] }}" placeholder="—" inputmode="decimal" aria-label="{{ w.model or 'model' }} {{ label }}, $ per million tokens" autocomplete="off">
+          {%- endfor %}
+          <button class="btn sm ghost setwx" type="button" title="{{ 'back to its default price on Save: the design ships this row' if w.shipped else 'remove this row' }}" aria-label="{{ ('put ' ~ w.model ~ ' back at its default price on Save') if w.shipped else ('remove ' ~ (w.model or 'this row')) }}">×</button>
+        </div>{% endwith %}</template>
+      </div>
+      <div class="row gap wrap"><button class="btn sm ghost setwadd" type="button" title="a row for a model the defaults do not name, or a longer prefix of one">+ model</button>
+        <label class="row gap"><span class="setlabel">as of</span><input class="input setin setnum mono" name="as_of" value="{{ weights.as_of }}" placeholder="2026-10-17" style="width: 8.5em" autocomplete="off"></label></div>
+      <div class="note">The figure is API-equivalent: what these turns would cost at these prices, not what was billed. A change weighs only turns read from then on — a figure already written is not weighed again.</div>
+      {{ saverow("a model with no row is drawn unweighed · a price left empty weighs at the row's input") }}
+    </form>
   </section>
 
   {# **Teams** (§4.5a *Settings page: Teams*) #}
