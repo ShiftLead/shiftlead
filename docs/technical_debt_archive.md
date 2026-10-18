@@ -16422,3 +16422,26 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-628, TD-862.
 
 **Resolved:** 2026-10-18 (grinder-ao-1, PR #2099). `gitinfo.git_info` reads `git status --porcelain=v2 --branch -z` and walks its NUL-separated fields, skipping a rename's source field, so `GitInfo.files` keeps its `<code> <path>` lines with the path unquoted (design §4.2 *The Git card's pick*: `tree` is those lines). `tests/test_gitinfo.py::test_git_info_keeps_a_path_git_would_quote_whole` holds an untracked `naïve file.txt` and a `git mv` to a name with a tab.
+
+## TD-874: `test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole` fails now and then: the reading it compares is replaced under it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-2, met on PR #2086's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `tests/test_ui_repos_omit.py` (the test named); `src/sessionorc/agent_tick.py` `_repo_view`, and whatever re-reads `agent._repos[root]` while the test runs
+
+**Why:** On PR #2086 (which touches neither file), `test (3.12)` failed at `assert "completed" not in want and "recent" not in want["ledger"]` with `TypeError: argument of type 'NoneType' is not iterable` (run 39089116279). The same head passed on 3.13, and passed in two local full runs. The test writes `agent._repos[root] = _reading(root)` for a `tmp_path` root and reads `agent._repo_view(root)` after its broadcasts. `want["ledger"]` being `None` means that, between the write and the read, something replaced the hand-written reading with a real read of `tmp_path`, which has no ledger: likely the agent's own repo re-read.
+
+**Fix:**
+- Find what re-reads `_repos[root]` in the test's agent fixture.
+- Either stop that re-read for the test's root, or take `want` from the reading the test wrote rather than from `_repo_view` after the broadcasts.
+- **Tests:** the test passes when a re-read of the root is forced between the broadcasts and the read.
+
+**Done when** the test cannot fail on a re-read of its root.
+
+**Related:** PR #2086 (where it was met).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2098). The test parks the ticks before writing its reading, broadcasts the view it takes once, and compares against that view. The root is overwritten with a bare reading before the comparison, so a re-read cannot fail it.

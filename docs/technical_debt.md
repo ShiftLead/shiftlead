@@ -74,7 +74,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
-| TD-874 | `test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole` fails now and then: the reading it compares is replaced under it | Low | Open |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
 | TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
@@ -1527,29 +1526,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** a page test of `/` and `/repo/<name>` with a seats reading shows the team's `spendfig`; `weights_body` raises on `inf` and `nan`; each fails when its line is reverted.
 
 **Related:** TD-832.
-
----
-
-## TD-874: `test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole` fails now and then: the reading it compares is replaced under it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-2, met on PR #2086's CI)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_ui_repos_omit.py` (the test named); `src/sessionorc/agent_tick.py` `_repo_view`, and whatever re-reads `agent._repos[root]` while the test runs
-
-**Why:** On PR #2086 (which touches neither file), `test (3.12)` failed at `assert "completed" not in want and "recent" not in want["ledger"]` with `TypeError: argument of type 'NoneType' is not iterable` (run 39089116279). The same head passed on 3.13, and passed in two local full runs. The test writes `agent._repos[root] = _reading(root)` for a `tmp_path` root and reads `agent._repo_view(root)` after its broadcasts. `want["ledger"]` being `None` means that, between the write and the read, something replaced the hand-written reading with a real read of `tmp_path`, which has no ledger: likely the agent's own repo re-read.
-
-**Fix:**
-- Find what re-reads `_repos[root]` in the test's agent fixture.
-- Either stop that re-read for the test's root, or take `want` from the reading the test wrote rather than from `_repo_view` after the broadcasts.
-- **Tests:** the test passes when a re-read of the root is forced between the broadcasts and the read.
-
-**Done when** the test cannot fail on a re-read of its root.
-
-**Related:** PR #2086 (where it was met).
 
 ---
 

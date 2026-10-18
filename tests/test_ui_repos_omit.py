@@ -226,7 +226,9 @@ async def test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one
     import asyncio
 
     root = str(tmp_path)
+    await park_ticks(agent)  # no tick re-reads or drops the hand-written root under the test (TD-874)
     agent._repos[root] = _reading(root)
+    view = agent._repo_view(root)  # what every event carries, taken once: a later re-read cannot move it
     omit = ["ledger.recent", "ledger.entries.detail", "completed"]
     got: dict[str, list[dict]] = {"some": [], "whole": []}
 
@@ -242,7 +244,7 @@ async def test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one
             if all(got.values()):
                 break
             await asyncio.sleep(0.05)
-        await agent._broadcast({"event": "repos", "root": root, "repo": agent._repo_view(root)})
+        await agent._broadcast({"event": "repos", "root": root, "repo": view})
         await agent._broadcast({"event": "repos", "root": "/gone", "repo": None})
         for _ in range(50):
             if all(len(v) == 3 for v in got.values()):
@@ -252,10 +254,11 @@ async def test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-    want = reports.omitted(agent._repo_view(root), omit)
+    agent._repos[root] = {"root": root, "ledger": None}  # as a re-read of the bare root leaves it: unread below
+    want = reports.omitted(view, omit)
     assert "completed" not in want and "recent" not in want["ledger"]
     assert [e["repo"] for e in got["some"]] == [want, want, None]
-    assert [e["repo"] for e in got["whole"]] == [agent._repo_view(root), agent._repo_view(root), None]
+    assert [e["repo"] for e in got["whole"]] == [view, view, None]
     assert not agent._sub_omit  # a subscription gone takes its omit with it
 
 
