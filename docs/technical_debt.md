@@ -75,6 +75,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Open |
 | TD-892 | Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles | Low | Open |
 | TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Open |
+| TD-894 | #2136's `AO.wholeOnHover` (set a `title` only on a clipped line, never over one) has no test that runs it: gutting it leaves every test passing | Low | Open |
+| TD-895 | #2135's Settings `agent_down` branch (a refused 503) and its `asyncio.to_thread` file read leave the Settings tests passing when removed | Low | Open |
 
 ---
 
@@ -1557,5 +1559,45 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** ten warm loads of the live `/repo/shiftlead` each read under 500 ms to the first byte, and a promote's note no longer names the Repo page.
 
 **Related:** TD-884, TD-805, TD-881.
+
+---
+
+## TD-894: #2136's `AO.wholeOnHover` has no test that runs it: gutting it leaves every test passing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test audit of #2129–#2137, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (`AO.wholeOnHover`, the `mouseover` listener); `tests/test_ui_queue_cards.py` (`test_no_subject_or_answer_draws_a_title_repeating_its_text`)
+
+**Why:** TD-890's *Resolved:* says the `subj`, `msgsubj` and answer label draw no `title` and `AO.wholeOnHover` sets it on hover "when the line is clipped", and `test_no_subject_or_answer_draws_a_title_repeating_its_text` says the script "sets the title on a line that is in fact clipped". The test asserts only that the strings `AO.wholeOnHover` and the selector `.mailrow .subj, .msgsubj, .btn.answer .alabel` are in `app.js` (`tests/test_ui_queue_cards.py:296`). Probe on `origin/main` (e1dec8d6): in `app.js` replace `if (!el || el.title || !(el.scrollWidth > el.clientWidth)) return;` with `if (!el) return;` (every hovered line gets a title, clipped or not, and an existing title is overwritten) and run `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_queue_cards.py tests/test_ui_inbox.py`: 137 passed. The mutation was restored. TD-889 and TD-794 already run `app.js` under node (`tests/test_ui_term_resize.py`); this helper, the only thing now giving the clipped line its whole text on hover, is not run.
+
+**Fix:** run `AO.wholeOnHover` under node as `tests/test_ui_term_resize.py` runs `AO.resizeSender`: an element with `scrollWidth > clientWidth` gets `title` = its trimmed text; one that fits gets none; one that already has a `title` keeps it; `null` does nothing. Drop the string-presence assertion it replaces.
+
+**Done when** each of the three guards (`!el`, `el.title`, `scrollWidth > clientWidth`) fails a test when removed.
+
+**Related:** TD-890, TD-888.
+
+---
+
+## TD-895: #2135's Settings `agent_down` branch and `asyncio.to_thread` file read each leave the Settings tests passing when removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test audit of #2129–#2137, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (the Settings route's `asyncio.gather` and its refusal loop, `settings_files`); `tests/test_ui_settings.py`, `tests/test_ui_server_timing.py`
+
+**Why:** #2135 rewrote the Settings route's reads. Its docstring says the file reads run "on a worker thread beside the RPCs" and its test `test_settings_reads_each_rpc_once_all_at_once_and_times_its_files` asserts only that `files` is a `Server-Timing` step. Probes on `origin/main` (e1dec8d6), each restored: (1) `asyncio.to_thread(settings_files)` → `asyncio.sleep(0, settings_files())` (the YAML loads then hold the loop, the reason for the thread): `tests/test_ui_settings.py` and `tests/test_ui_server_timing.py` 38 passed. (2) in the rewritten refusal loop, `agent_down = True` (a 503) → `agent_down = False`: those two files 38 passed, and `pytest tests -k "settings or agent_down or unreachable or down"` 124 passed, so a Settings page with the host agent down is drawn as if it were up (usage and build chips read, no down banner) with no test failing. Only the non-503 refusal is under a test (`test_settings_refused_by_the_agent_still_draws_its_files_with_the_words`). The other mutations tried (`gate`/`usage`/`host` handed to the chips, the `flows` step) do fail a test.
+
+**Fix:** a test with a `call` that raises a 503 `AgentError` on `settings` and asserts `agent_down` is on the page (the banner, no usage chip, no build chip); a test that `settings_files` runs off the loop's thread (record `threading.get_ident()` in a patched `profiles_mod.load` and compare it with the loop's).
+
+**Done when** both probes above fail a test.
+
+**Related:** TD-884, TD-889.
 
 ---
