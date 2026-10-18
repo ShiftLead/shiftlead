@@ -4658,10 +4658,12 @@
   // record as *changed files* is. A failed read keeps the pick and says so in place of the lines. Nothing
   // is kept across a load. `read(pick)` answers the route's JSON or rejects with why.
   AO.gitPick = function (els, read) {
-    const st = { commits: [], pick: "tree", answer: null, oid: null, porcelain: null, v: null, editor: null, root: "", asked: 0 };
+    const st = { commits: [], pick: "tree", answer: null, oid: null, porcelain: null, v: null, editor: null, root: "", asked: 0,
+      options: null };
     const paint = () => {
       const { sel, up, down, line, files } = els;
-      sel.innerHTML = AO.gitPickOptions(st.commits, st.pick);
+      const options = AO.gitPickOptions(st.commits, st.pick);
+      if (options !== st.options) { sel.innerHTML = options; st.options = options; }  // an open select stays open
       sel.value = st.pick;
       const all = AO.gitPickEntries(st.commits), at = all.indexOf(st.pick);
       up.disabled = at <= 0; down.disabled = at >= all.length - 1;
@@ -4682,7 +4684,13 @@
         paint();
       }, (why) => {
         if (n !== st.asked) return;
-        if (pick !== "tree") st.answer = { error: String((why && why.message) || why).replace(/^git_files: /, "") };
+        const error = String((why && why.message) || why).replace(/^git_files: /, "");
+        // a held sha the host no longer counts among the ten: back to Working tree, the commits read again
+        if (pick !== "tree" && pick !== "session" && /not among the last ten commits/.test(error)) {
+          st.pick = "tree"; st.answer = null; paint();
+          return ask("tree");
+        }
+        if (pick !== "tree") st.answer = { error };
         paint();
       });
     };

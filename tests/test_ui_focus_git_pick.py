@@ -90,9 +90,11 @@ let card;
   answers.push({ commits: commits(0), files: answer.files });
   card.update(v("o2", ["M a.py"]), editor, "/w/wt"); await tick();
   out.relabelled = snap();
-  // the sha leaves the ten: back to Working tree, drawn from the record
+  // the sha leaves the ten: the host refuses it, and the card goes back to Working tree, drawn from the
+  // record, with the commits read again
+  answers.push(new Error("git_files: not among the last ten commits"));
   answers.push({ commits: commits(5), files: [] });
-  card.update(v("o3", ["M a.py"]), editor, "/w/wt"); await tick();
+  card.update(v("o3", ["M a.py"]), editor, "/w/wt"); await tick(); await tick();
   out.gone = snap();
   // Session, at the bottom: ↓ disabled; read again when the porcelain changes; a failed read said
   els.sel.value = "session";
@@ -183,6 +185,7 @@ def test_a_new_commit_relabels_a_held_pick_and_a_sha_gone_from_the_ten_returns_t
     assert "HEAD~2 · " + S(2)[:7] in rel["sel"] and "deleted by this commit" in rel["files"]
     gone = got["gone"]
     assert gone["pick"] == "tree" and gone["lineHidden"] is True and "a.py" in gone["files"] and gone["up"] is True
+    assert gone["asked"][-2:] == [S(2), "tree"] and S(7) in gone["sel"] and S(2) not in gone["sel"]
 
 
 @pytest.mark.unit
