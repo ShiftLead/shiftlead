@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
-| TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
 | TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
@@ -1503,26 +1502,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** on kmaster, after the person runs the printed line once, `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and the permission step, and TD-785's capture can run.
 
 **Related:** TD-871 (the design, amended 2026-10-17 on gemini-support's review), TD-785 (blocked by this), TD-112, TD-786.
-
----
-
-## TD-878: The Git card's pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, auditing #2079 (TD-862 (2)))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/static/app.js` (`AO.gitPick`: `ask`, `paint`); `tests/test_ui_focus_git_pick.py`
-
-**Why:** `ask` numbers each read (`const n = ++st.asked`) and returns early when `n !== st.asked`, with the comment *a later pick's answer is the one drawn*; it also keeps an answer only `if (st.pick === pick && pick !== "tree")`; and `paint` rewrites the select's options only when they changed, *an open select stays open*. Each removed in turn (`if (n !== st.asked) return;` deleted from the success handler; `st.pick === pick &&` dropped; `if (options !== st.options) {…}` replaced by `sel.innerHTML = options;`), `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_focus_git_pick.py` reads `9 passed`: the probe's `read` answers in order, so no test has an earlier pick's answer arrive after a later pick's, or a pick change while a read is out, and none watches the select's markup across a paint. The same module does fail for the cut at forty, the `D` text, the oid move and the porcelain re-read.
-
-**Fix:** In `tests/test_ui_focus_git_pick.py` give the probe a `read` whose promises the test settles itself: pick a commit then Session, settle the commit's answer last, and assert Session's lines stay drawn; and assert a second `update` with unchanged commits leaves `sel.innerHTML` as it was (the same string object written once).
-
-**Done when** each of the three removals above fails a test.
-
-**Related:** TD-862, TD-856.
 
 ---
 
