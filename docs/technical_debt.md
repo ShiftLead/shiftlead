@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
-| TD-897 | #2145's `parse_yaml` is read by three callers and one test: reverting `flowdefs.parse` or `_defined_block` to `yaml.safe_load` leaves every test passing | Low | Open |
 | TD-898 | #2139's lazy-fold script (`AO.fillFold`) has no test that runs it: its tests read `app.js` as text | Low | Open |
 
 ---
@@ -1504,24 +1503,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 
 
-
-## TD-897: #2145's `parse_yaml` is read by three callers and one test: reverting `flowdefs.parse` or `_defined_block` to `yaml.safe_load` leaves every test passing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (test audit of #2139–#2148, test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open.
-**Location:** `src/shiftlead/flowdefs.py` (`parse`); `src/shiftlead/repoconfig.py` (`_defined_block`, `parse_yaml`); `tests/test_repoconfig.py` (`test_a_text_is_parsed_once_and_each_reader_gets_its_own_copy`)
-
-**Why:** #2145 (TD-896) moved three `yaml.safe_load(text)` calls to `repoconfig.parse_yaml` — `load_text`, `_defined_block` and `flowdefs.parse` — because a team's plan parsed its repo file once per member and its flows' files again. The one test it added counts parses through `repoconfig.load` alone. Probe on `origin/main` (3e9dd5e60), each restored after: in `flowdefs.py` put back `data = yaml.safe_load(text)`, then in `repoconfig.py`'s `_defined_block` put it back, and run `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_flows.py tests/test_repoconfig.py tests/test_cli_roles.py tests/test_role*.py`: 114 passed both times. The flow files and role definitions are the "its flows' files again" half of the cost TD-896 names, and nothing would show them parsed per call again.
-
-**Fix:** extend the parse-count test (or add one beside it) to load a flow's `flow.yml` through `flowdefs.parse` twice and a role definition through `_defined_block` twice, each with `yaml.safe_load` counted, and assert one parse and an unshared copy for each.
-
-**Done when** putting `yaml.safe_load` back in either of the two call sites fails a test.
-
-**Related:** TD-896.
 
 ## TD-898: #2139's lazy-fold script (`AO.fillFold`) has no test that runs it: its tests read `app.js` as text
 
