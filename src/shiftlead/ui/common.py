@@ -36,12 +36,22 @@ from shiftlead.cli import stop_time as clistop
 
 from . import help as helpmod
 from . import render as rendermod
-from . import uiconf
+from . import timing, uiconf
 from .icons import role_svg
 
 HERE = Path(__file__).parent
 log = logging.getLogger("uvicorn.error")  # the logger uvicorn already shows on the console
-templates = Jinja2Templates(directory=str(HERE / "templates"))
+
+
+class _Templates(Jinja2Templates):
+    """The pages' templates, each page's render timed as its `render` step (§4.5 *Page loads*, TD-881)."""
+
+    def TemplateResponse(self, *a: Any, **k: Any) -> Any:  # noqa: N802 — Starlette's name
+        with timing.step("render"):
+            return super().TemplateResponse(*a, **k)
+
+
+templates = _Templates(directory=str(HERE / "templates"))
 # The role badge's picture (design §4.8 *Role presets*, TD-074): the markup lives in one place and
 # the template asks for it by name, so no config file ever carries an SVG.
 templates.env.globals["role_svg"] = role_svg

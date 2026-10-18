@@ -50,7 +50,7 @@ from . import cards as cards_mod
 from . import help as helpmod
 from . import inbox as inbox_mod
 from . import settings_page as setmod
-from . import uiconf
+from . import timing, uiconf
 from .cards import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     BRANCH_SHOWN,  # noqa: F401
     COUNT_ORDER,  # noqa: F401
@@ -138,6 +138,7 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _reserve_why,  # noqa: F401
     _short_age,  # noqa: F401
     _str_list,  # noqa: F401
+    _Templates,  # noqa: F401
     _usage_hover,  # noqa: F401
     _usage_line,  # noqa: F401
     _usage_profiles,  # noqa: F401
@@ -812,8 +813,9 @@ def refill(held: dict[str, Any], new: Mapping[str, Any]) -> None:
 async def agent_call(method: str, **params: Any) -> Any:
     """One host-agent RPC as the page makes it: down is a 503, a refusal a 400."""
     try:
-        async with LocalClient() as c:
-            return await c.call(method, **params)
+        with timing.step(f"rpc_{method}", nests=False):  # a page's `Server-Timing` (§4.5 *Page loads*, TD-881)
+            async with LocalClient() as c:
+                return await c.call(method, **params)
     except AgentUnavailable as e:
         raise HTTPException(503, f"host agent unreachable: {e}") from e
     except AgentError as e:
@@ -971,6 +973,7 @@ class Readings:
             got = dict((await self.call("host")).get("pulls") or {})
         refill(inbox_mod.PULLS, got)
 
+    @timing.timed("board")
     async def board_all(self) -> tuple[list[dict[str, Any]], str]:
         """Every open board row of this host's repos and the note beside them (TD-069 step 3), from the
         host agent's `boards` reading on the `repos` RPC (§4.4 *Each reading has one owner*, *The
@@ -1006,6 +1009,7 @@ class Readings:
         h["line"] = board_line(h) if rows or (not note and (board_choices() if choices is None else choices)) else None
         return h, note
 
+    @timing.timed("inbox")
     async def person_states(self, fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
         fleet the request already read. Every host the home knows, exactly as the Org shows them —
@@ -1117,6 +1121,7 @@ class Readings:
             self.waits_cache.update(at=now, waits=waits_of(got.get("entries") or []))
         return self.waits_cache["waits"] or {}
 
+    @timing.timed("inbox")
     async def person_inbox(
         self, fleet: list[dict[str, Any]], watching: bool = False, choices: list[dict[str, str]] | None = None
     ) -> dict[str, Any]:
@@ -1291,6 +1296,20 @@ def create_app() -> FastAPI:
             except Exception:  # noqa: BLE001 — a read that failed keeps the last answer; it never costs the page
                 log.debug("the settings read failed; the last person: stands", exc_info=True)
         return await call_next(request)
+
+    @app.middleware("http")
+    async def server_timing(request: Request, call_next: Any) -> Any:
+        """Each page route's `Server-Timing` (§4.5 *Page loads*, *Measured on every load*; TD-881): its RPCs by
+        name, the person inbox, the board and ledger reads, the render and the total, the person's settings
+        read included — the outermost of the page's middleware, so the total is the whole request's. The
+        last twenty per route are kept in memory (`timing.RECENT`)."""
+        key = timing.route_key(request.url.path, bool(request.query_params.get("part")))
+        if key is None or request.method != "GET":
+            return await call_next(request)
+        steps, t0 = timing.begin(), time.perf_counter()
+        response = await call_next(request)
+        response.headers["Server-Timing"] = timing.finish(steps, key, (time.perf_counter() - t0) * 1000)
+        return response
 
     async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The definitions' rows for a delta's headers, with what a team with no record holds (TD-781)."""
@@ -3399,11 +3418,12 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 in_inbox = sections["count"] - sections.get("queue_n", 0)
                 one = templates.get_template("queue_mail.html")
                 origin = page_origin(request)
-                mail = attach(
-                    sections,
-                    lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
-                    later,
-                )
+                with timing.step("render"):  # each attached row drawn by the Inbox's own renderer
+                    mail = attach(
+                        sections,
+                        lambda e, sec: Markup(one.render(e=e, section=sec, origin=origin, board_choices=choices)),
+                        later,
+                    )
         # the filter row (§4.5 screen 12 *Filters*, §4.5a *Queue page: filters, find*): carried in the URL,
         # what it hides marked, never dropped — a move's neighbours are the whole Up next order
         picks = queue_picks(request.query_params)
@@ -3872,6 +3892,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     call, person_view, inbox_html = h.call, h.person_view, h.inbox_html
     board_view = h.board_view
 
+    @timing.timed("ledger")
     async def ledger_view(fleet: list[dict[str, Any]]) -> dict[str, Any]:
         """The ledger's rows of *Later* (§4.5 screen 6, TD-368, TD-565) from the home's repo facts and the
         definitions' team per repo; empty when either cannot be read — nothing is then drawn."""

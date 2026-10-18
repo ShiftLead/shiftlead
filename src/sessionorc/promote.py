@@ -43,6 +43,8 @@ GH_TIMEOUT = 30.0
 KEYS = ("run", "check")
 OPTIONAL = ("smoke",)  # run once `check` reads the commit (§6 *The smoke*, TD-804)
 SMOKE_MARK = "── smoke ──"
+SMOKE_TOLD = "smoke passed; "  # a passing smoke's last line, what it told after it, rides the note (TD-881)
+TOLD_CAP = 1000  # the most of it a note carries
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX_RE = re.compile(r"^[0-9a-f]{7,40}$")  # a rollback's commit: its hex in full or a prefix of seven or more
 # a check run's conclusions that are not a pass; `neutral` and `skipped` are
@@ -655,9 +657,10 @@ def _conclude(
     return None, None
 
 
-def _passed(repo: str, r: dict[str, Any], intent: dict[str, Any], took: float | None = None) -> str:
-    """A run concluded — on `check`'s reading, or its smoke's pass (`took`, its seconds): a plain
-    promote's hold ended, the intent and the smoke's result cleared, and the note."""
+def _passed(repo: str, r: dict[str, Any], intent: dict[str, Any], took: float | None = None, told: str = "") -> str:
+    """A run concluded — on `check`'s reading, or its smoke's pass (`took`, its seconds, and `told`, what
+    its last line told beside the pass): a plain promote's hold ended, the intent and the smoke's result
+    cleared, and the note."""
     if intent.get("kind") != "rollback":
         clear(repo, "held")
     clear(repo, "inflight")
@@ -665,7 +668,7 @@ def _passed(repo: str, r: dict[str, Any], intent: dict[str, Any], took: float | 
     behind = ahead(r["root"], intent.get("sha"), r.get("main")) if intent.get("kind") == "rollback" else None
     note = note_text(repo, intent, behind)
     if took is not None:
-        return f"{note} · smoke passed in {round(took)} s"
+        return f"{note} · smoke passed in {round(took)} s" + (f"; {told}" if told else "")
     return f"{note} · {intent['smoke_note']}" if intent.get("smoke_note") else note
 
 
@@ -699,7 +702,9 @@ def _judge_smoke(
     code = res.get("exit")
     if code == 0:
         took = _age(intent.get("smoke_at"), _when(res.get("at")) or now)
-        return None, _passed(repo, r, intent, took if took is not None else 0.0)
+        last = _last_line(intent, TOLD_CAP + len(SMOKE_TOLD))  # what it told: a page over budget, a reach refused
+        told = last[len(SMOKE_TOLD) :] if last.startswith(SMOKE_TOLD) else ""
+        return None, _passed(repo, r, intent, took if took is not None else 0.0, told)
     line = _last_line(intent) or f"it exited {code}"
     return _smoke_failed(repo, r, intent, f"smoke failed on {sha7}: {line}", code, run)
 
@@ -736,13 +741,14 @@ def _log_line(intent: dict[str, Any], line: str) -> None:
         out.write(line + "\n")
 
 
-def _last_line(intent: dict[str, Any]) -> str:
-    """The smoke's last non-empty line in the run's log, after `── smoke ──`; "" when it said nothing."""
+def _last_line(intent: dict[str, Any], cap: int = 200) -> str:
+    """The smoke's last non-empty line in the run's log, after `── smoke ──`, its first `cap` characters;
+    "" when it said nothing."""
     lines = tail(intent.get("log"), 200)
     if SMOKE_MARK in lines:
         lines = lines[len(lines) - lines[::-1].index(SMOKE_MARK) :]
     said = [ln.strip() for ln in lines if ln.strip()]
-    return said[-1][:200] if said else ""
+    return said[-1][:cap] if said else ""
 
 
 def _concluded(repo: str, intent: dict[str, Any], main: str | None, now: datetime) -> None:

@@ -1217,7 +1217,9 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       fails rewrites the standing hold, and a smoke rollback that cannot start leaves the hold beside
       the failure.
     - The note waits for the smoke: *promoted `<repo>` `<sha7>` — n commits · smoke passed in
-      48 s*.
+      48 s*. A smoke whose last line is *smoke passed; …* has what follows on the note after it, `; `
+      apart — what it told beside the pass (this repo's: a page over its budget, a reach refused, the
+      browser half skipped).
     - Meanwhile the row reads *checking `<sha7>` live · started <t>* under FYI with its press
       disabled, and `ao promote status` uses the same words.
     - The nodes are not held back. `run` wrote its wheel before the home restarted, so a node that
