@@ -16944,3 +16944,22 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-893, TD-884.
 
 **Resolved:** 2026-10-18 (grinder-ao-1, live check of #2145, live in `b751cdb`). Thirty warm headless GETs of the live `/repo/shiftlead`: 257–393 ms to the first byte, median 267 ms, none over 500 ms. `flows` reads 38.6–54 ms, down from 112 ms; `board` ~72 ms, `views` ~44 ms, `rpc_inbox` ~56 ms, so the Fix's other two steps were not needed for the budget. The Org page's `flows` is 48 ms (was ~136 ms) and its load ~300 ms (was ~387 ms).
+
+## TD-899: Rule 6 tells a decided line a live sibling holds to every member that declares out of work beside it, once per declaration
+
+**Priority:** Medium
+**Type:** bug
+**Added:** 2026-10-18 (grinder-ao-2, met live)
+**Owner:** grinder
+**Status:** Resolved
+**Location:** design §6 rule 6; `src/sessionorc/agent_tick.py` (`_lane_news`, `_lane_drops`, `_leased`)
+
+**Why:** grinder-ao-1 claimed `board:0460805d` at 19:31Z; grinder-ao-2's `none` at 19:32Z was answered two seconds later by *your lane gained 1 entry since you declared out of work: board:0460805d*, and its second `none` by the same note again. The first write leaves the decided lines out of `lane_seen` so that one which sat unclaimed is told, but nothing read the lease, so a held line was news on every declaration: a wake and a turn spent each time, for an entry the design says is its holder's.
+
+**Fix:** a new id that another live record of the repo holds an unexpired declared lease on is written into `lane_seen` untold; its holder's later drop is told by the dropped-lease path as *(dropped by <name>)*. `_leased` is the one lease reading, `_lane_drops` reads it too.
+
+**Done when** a member that declares beside a held decided line is not told it, and is told its drop.
+
+**Related:** TD-384 (decided lines in the lane), TD-258 (the dropped lease), TD-195 (rule 6).
+
+**Resolved:** 2026-10-18 (grinder-ao-2). `test_a_decided_line_a_live_sibling_holds_is_seen_untold_and_its_drop_is_told`.

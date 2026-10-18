@@ -510,6 +510,45 @@ async def test_a_decided_board_line_is_told_at_once_to_the_free_pick_lane_and_cl
             await person.call("kill", id=sid)
 
 
+async def test_a_decided_line_a_live_sibling_holds_is_seen_untold_and_its_drop_is_told(agent, tmp_path):
+    """TD-899 (design §6 rule 6): a decided line, never in the first `lane_seen`, that a live sibling of
+    the repo already holds is written into it untold — so a second `none` beside it is not answered by
+    a note naming it — and the sibling's later drop is told once as a dropped lease. A lease past its
+    twelve hours, or held in another repo, holds nothing."""
+    from sessionorc import workorders
+
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    held, stale, far_held = (
+        workorders.entry({"id": f"board:{k}", "title": k, "decided": {"text": "go"}}) for k in ("aa", "bb", "cc")
+    )
+    async with LocalClient() as person:
+        led = [_e("TD-001")]
+        sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], led)
+        rec = agent.sessions[sid]
+        sib = await _finished(agent, person, tmp_path, "grinder-2", ["free-pick"], led, out_of_work=None)
+        other = tmp_path / "elsewhere"
+        other.mkdir()
+        far = await _finished(agent, person, other, "far", ["free-pick"], led, out_of_work=None)
+        old = (now - timedelta(hours=13)).isoformat().replace("+00:00", "Z")
+        agent.sessions[sib].progress = [ProgressEntry(ref="board:aa"), ProgressEntry(ref="board:bb", at=old)]
+        agent.sessions[far].progress = [ProgressEntry(ref="board:cc")]
+        agent._repos[str(tmp_path)]["work_orders"] = {"orders": [held, stale, far_held]}
+        await agent._keep_running(now)
+        assert rec.lane_seen["ids"] == ["TD-001", "board:aa", "board:bb", "board:cc"]
+        notes = _notes(agent, sid)
+        assert len(notes) == 1 and "gained 2 entries" in notes[0] and "board:bb, board:cc —" in notes[0]
+        assert "board:aa" not in notes[0], "the held line is its holder's"
+        await agent._lane_news(rec, now + timedelta(minutes=1))
+        assert len(_notes(agent, sid)) == 1
+        later = (datetime.now(UTC) + timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+        agent.sessions[sib].progress = [ProgressEntry(ref="board:aa", status="dropped", why="no", at=later)]
+        await agent._lane_news(rec, now + timedelta(minutes=2))
+        assert len(_notes(agent, sid)) == 2 and "board:aa (dropped by grinder-2)" in _notes(agent, sid)[1]
+        for s in (sid, sib, far):
+            await person.call("kill", id=s)
+
+
 async def test_an_entry_still_settling_is_told_only_once_it_settles(agent, tmp_path):
     """TD-710, §4.4 *A new entry settles before it is pickable*: the home marks an entry `settling` (or
     `held`) in the reading, and rule 6 reads the mark as no lane's, so the news waits for it to settle."""
