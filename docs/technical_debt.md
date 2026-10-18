@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
-| TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Built (#2139) — a live check of the Queue's size once live |
 | TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Built, live check #2140 — blocked by TD-896 |
 | TD-896 | The Repo page's steady load is 365 ms of a 500 ms budget: `flows` and `board` leave no room for a slow seat inbox read | Medium | Open |
 
@@ -1504,23 +1503,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-891: Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (TD-888's design, the designer)
-**Owner:** grinder
-**Kind:** live-check #2139
-**Status:** Built 2026-10-18 (grinder-ao-2, #2139): a fold a Queue card draws closed is sent empty (`data-lazy`) and read on its first open by `GET /api/fold?key=`, the row renderer's own `fold_body` macro, the bodies kept by key and refilled after a re-read; `tests/test_ui_queue_cards.py` holds the route to the Inbox's fold for each kind. Left: the live read — once #2139 and #2136 are live (`ao promote status`), one gzipped headless GET of the live `/queue`, its size on the wire recorded here (under 120 KB)
-**Location:** design §4.5 *Page loads* (*Only what is shown*: *A row's folded details on a Queue card*), §4.5a *Inbox row: details*; `src/shiftlead/ui/templates/inbox_row.html` (the three `details class="fold"` blocks: a message's `s.rest`, a ledger row's detail, a board line's), `src/shiftlead/ui/app.py` (a new `/api/fold` route; the message page's one-entry read, `inbox_entry_page`), `src/shiftlead/ui/static/app.js` (the fold memory, `foldsOpen`/`foldsShut`, and the swap after a re-read); `tests/test_ui_queue_cards.py`, a new route test
-
-**Why:** TD-888: the closed folds of the live Queue's mail rows are 20 KB of its 141 KB gzipped (ledger rows 14 KB, board lines 5 KB, notes 2 KB) and none is shown at load; with TD-890 alone the page is still some 129 KB, over TD-888's 120 KB.
-
-**Fix:** each fold's body becomes one macro the row and the route both call. On the Queue a fold drawn closed is sent as its `<summary>` alone with an empty body; its first open fetches `GET /api/fold?key=<data-fold>`, which reads the one source the key names — a person-inbox entry as `inbox_entry_page` reads it, a board line from its board file, a ledger row from its repo's ledger (each the home's cached read, never the whole Queue view) — and answers the macro's HTML, under 200 ms to its first byte (`Server-Timing` as every route). The browser keeps each body by key while the page lives; after a re-read swaps the lists in, a fold in `foldsOpen` is filled from what it kept and read again. A fold drawn open (`fold_open`, an entry with `Answers:`, a press's detail) is sent whole; the Inbox and the message page send every fold whole. A key that names nothing answers 404 and the fold says *gone — reload*.
-
-**Done when** a Queue render's closed folds carry no body and its open ones do, `/api/fold` answers each of the three kinds with the same HTML the Inbox draws in that fold (a test per kind), a re-read keeps an opened fold's body, and the live Queue — after TD-890 and this are promoted — reads under 120 KB on the wire at load (a gzipped GET, read once the build is live, recorded here).
-
----
 
 ## TD-893: The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step
 
