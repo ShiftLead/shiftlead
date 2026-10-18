@@ -48,6 +48,23 @@ def test_git_info_keeps_a_path_git_would_quote_whole(tmp_path):
     assert info.dirty == 2
 
 
+def test_git_info_skips_a_rename_source_that_reads_as_an_entry(tmp_path):
+    """A rename's source is a field of its own under -z (TD-883): one named `? old.txt` is not read as untracked."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "? old.txt").write_text("x" * 100)
+    run("git", "add", ".", cwd=repo)
+    run("git", "commit", "-q", "-m", "init", cwd=repo)
+    run("git", "mv", "? old.txt", "new.txt", cwd=repo)
+    info = git_info(repo)
+    assert info is not None
+    assert info.files == ["R new.txt"]
+    assert info.dirty == 1
+
+
 def test_git_info_ahead_of_upstream(tmp_path):
     origin = tmp_path / "origin.git"
     run("git", "init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)

@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | In progress (slice 1 #2119) |
-| TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 | TD-885 | #2109's `_Gzip` and `_Static` guards (a ranged request, a non-200, an already-encoded body, a chunked body, an empty `?v=`) each leave `tests/test_ui_gzip.py` passing when removed | Low | Open |
 | TD-886 | #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed | Low | Open |
@@ -1531,26 +1530,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-
-## TD-883: `git_info` skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, auditing #2099 (TD-869))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/gitinfo.py` (`git_info`, the `elif line.startswith("2 ")` arm); `tests/test_gitinfo.py`
-
-**Why:** With the `            i += 1` that follows `files.append(f"{parts[1].replace('.', '')} {parts[9]}")` deleted in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gitinfo.py tests/test_git_files.py` still reads `22 passed`. The line is what keeps a rename's source, now a field of its own under `-z`, from being read as an entry: without it the source is parsed as a line, and it only matters when the old name starts with `# `, `1 `, `2 `, `? ` or `u ` (probe: `? old.txt` renamed to `new.txt` reads `['R new.txt', '?? old.txt']`, dirty 2). `test_git_info_keeps_a_path_git_would_quote_whole` renames `old.txt`, which none of the arms match, so the source falls through silently; its docstring says *a rename's source is no entry*.
-
-**Fix:** In `tests/test_gitinfo.py` rename a file whose old name begins with `? ` (say `? old.txt`) and assert `info.files` holds the new path alone and `info.dirty` counts one.
-
-**Done when** deleting the `i += 1` fails a test.
-
-**Related:** TD-869.
-
----
 
 ## TD-884: The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads
 
