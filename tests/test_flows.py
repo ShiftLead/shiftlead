@@ -32,19 +32,18 @@ def repo_flow(root: Path, name: str, stages: list[dict], briefs: dict[str, str] 
     return d
 
 
-def test_a_flow_file_is_parsed_once_and_each_reader_gets_its_own_copy(tmp_path, monkeypatch):
+def test_a_flow_file_is_parsed_once_per_text(tmp_path, monkeypatch):
     """TD-897 (TD-896's other half): a team's plan reads every flow's `flow.yml` once per member; its
-    YAML is parsed once per text, and what one reading's caller changes never reaches the next."""
+    YAML is parsed once per text, through `repoconfig.parse_yaml` (whose copy its own test holds)."""
     text = "stages:\n  - {name: find, role: hunter, lane: [free], brief: find.md}\n"
     parses = []
     real = repoconfig.yaml.safe_load
     monkeypatch.setattr(repoconfig.yaml, "safe_load", lambda t: parses.append(t) or real(t))
     repoconfig._parsed.cache_clear()
     first = flowdefs.parse("hunt", "repo", tmp_path, text, tmp_path)
-    first.stages[0].lane.append("more")
     second = flowdefs.parse("hunt", "repo", tmp_path, text, tmp_path)
     assert parses == [text]
-    assert second.stages[0].lane == ["free"]
+    assert first.stages[0].lane == second.stages[0].lane == ["free"]
 
 
 # ── kind and held ────────────────────────────────────────────────────────────────────────────────

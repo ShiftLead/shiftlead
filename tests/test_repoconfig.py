@@ -527,10 +527,9 @@ def test_the_worktree_setup_is_a_command(tmp_path):
             repoconfig.load_text(text, tmp_path)
 
 
-def test_a_role_definition_is_parsed_once_and_each_reader_gets_its_own_copy(tmp_path, monkeypatch):
+def test_a_role_definition_is_parsed_once_per_text(tmp_path, monkeypatch):
     """TD-897 (TD-896's other half): a role directory's `role.yml` is read for every member that takes
-    the role; its YAML is parsed once per text, and what one resolve's caller changes never reaches
-    the next."""
+    the role; its YAML is parsed once per text, through `parse_yaml` (whose copy the test below holds)."""
     yml = "profile: repo-prof\ngrants: [control]\n"
     define(tmp_path / ".shiftlead" / "roles", "lead", yml)
     cfg = repoconfig.load(tmp_path)
@@ -539,10 +538,9 @@ def test_a_role_definition_is_parsed_once_and_each_reader_gets_its_own_copy(tmp_
     monkeypatch.setattr(repoconfig.yaml, "safe_load", lambda t: parses.append(t) or real(t))
     repoconfig._parsed.cache_clear()
     first = repoconfig.resolve_role(cfg, "lead")
-    first.grants.append("merge")
     second = repoconfig.resolve_role(cfg, "lead")
     assert parses == [yml]
-    assert second.grants == ["control"]
+    assert first.grants == second.grants == ["control"]
 
 
 def test_a_text_is_parsed_once_and_each_reader_gets_its_own_copy(tmp_path, monkeypatch):

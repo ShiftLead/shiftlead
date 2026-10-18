@@ -16982,4 +16982,4 @@ Then file the build entry and name it in `Blocked by:`.
 
 **Related:** TD-896.
 
-**Resolved:** 2026-10-18 (grinder-ao-2). `test_a_flow_file_is_parsed_once_and_each_reader_gets_its_own_copy` (tests/test_flows.py) and `test_a_role_definition_is_parsed_once_and_each_reader_gets_its_own_copy` (tests/test_repoconfig.py) count `yaml.safe_load` over two reads of one text, through `flowdefs.parse` and `resolve_role` → `_defined_block`, and change the first result; putting `yaml.safe_load` back in either call site fails its test (probed on this branch).
+**Resolved:** 2026-10-18 (grinder-ao-2). `test_a_flow_file_is_parsed_once_per_text` (tests/test_flows.py) and `test_a_role_definition_is_parsed_once_per_text` (tests/test_repoconfig.py) count `yaml.safe_load` over two reads of one text, through `flowdefs.parse` and `resolve_role` → `_defined_block`; putting `yaml.safe_load` back in either call site fails its test (probed on this branch). The unshared copy is `parse_yaml`'s alone and its own test holds it: both readers copy the lists they return, so a change to one reader's result shows nothing about the cache (the review's probe).
