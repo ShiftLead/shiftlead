@@ -1568,6 +1568,7 @@ The other cases:
 **Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** grinder
 **Kind:** live-check #2051
+**Waits:** until 2026-10-24 — a week of runs on the new briefs since #2051 went live; read the transcripts from then
 **Status:** Built (2026-10-17, #2051): §4.10, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it. Live check, once #2051 is live (`ao promote status`) and a week of runs has started on the new briefs (2026-10-24): read the members' transcripts (`ao transcript <id>`, read-only) for a foreground wait loop — `sleep`, `tail -f /dev/null`, `timeout N` between `ao status` reads; none holds it, one found is a new entry.
 **Location:** design §4.10 *Waiting on mail is ending the turn*, §4.2 *Working on its own*; `src/shiftlead/skill.md` (*Mail*: *Waiting on mail is ending the turn*); every role preset's first paragraph in `src/shiftlead/briefs/` (`grinder.md`, `designer.md`, `hunter.md`, `auditor.md`, `manager.md`, `manager_on_call.md`, `techlead.md`, and the `.stage.md` variants where they carry the line)
 
