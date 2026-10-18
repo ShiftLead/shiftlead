@@ -16886,3 +16886,21 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a Queue render's open cards carry no `data-find`, a find typed in the browser hides and shows the same cards a load with `?find=` does (the parity test, for an id, a bare number and words), and the picks' tests pass.
 
 **Resolved:** 2026-10-18 (grinder-ao-2, #2142). A card sends no `data-find`; `AO.qFindText` builds its find text from each `data-qid` and `.qtitle` of its header and rows by `_find_text`'s rule, once per card drawn (at load, and for the cards a re-read swaps in); the server keeps `find` for a URL's find and `find_miss`, and a completed line keeps its `data-find`. `test_a_cards_find_text_built_in_the_browser_is_the_servers` holds the browser's text to the server's for every card of a rendered `/queue`, and the picks' parity test now builds each card's find in node (an id, a bare number and words among its finds); on a scratch home a typed find hid and showed the same cards a `?find=` load did.
+
+## TD-891: Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-888's design, the designer)
+**Owner:** grinder
+**Kind:** live-check #2139
+**Status:** Resolved
+**Location:** design §4.5 *Page loads* (*Only what is shown*: *A row's folded details on a Queue card*), §4.5a *Inbox row: details*; `src/shiftlead/ui/templates/inbox_row.html` (the three `details class="fold"` blocks: a message's `s.rest`, a ledger row's detail, a board line's), `src/shiftlead/ui/app.py` (a new `/api/fold` route; the message page's one-entry read, `inbox_entry_page`), `src/shiftlead/ui/static/app.js` (the fold memory, `foldsOpen`/`foldsShut`, and the swap after a re-read); `tests/test_ui_queue_cards.py`, a new route test
+
+**Why:** TD-888: the closed folds of the live Queue's mail rows are 20 KB of its 141 KB gzipped (ledger rows 14 KB, board lines 5 KB, notes 2 KB) and none is shown at load; with TD-890 alone the page is still some 129 KB, over TD-888's 120 KB.
+
+**Fix:** each fold's body becomes one macro the row and the route both call. On the Queue a fold drawn closed is sent as its `<summary>` alone with an empty body; its first open fetches `GET /api/fold?key=<data-fold>`, which reads the one source the key names — a person-inbox entry as `inbox_entry_page` reads it, a board line from its board file, a ledger row from its repo's ledger (each the home's cached read, never the whole Queue view) — and answers the macro's HTML, under 200 ms to its first byte (`Server-Timing` as every route). The browser keeps each body by key while the page lives; after a re-read swaps the lists in, a fold in `foldsOpen` is filled from what it kept and read again. A fold drawn open (`fold_open`, an entry with `Answers:`, a press's detail) is sent whole; the Inbox and the message page send every fold whole. A key that names nothing answers 404 and the fold says *gone — reload*.
+
+**Done when** a Queue render's closed folds carry no body and its open ones do, `/api/fold` answers each of the three kinds with the same HTML the Inbox draws in that fold (a test per kind), a re-read keeps an opened fold's body, and the live Queue — after TD-890 and this are promoted — reads under 120 KB on the wire at load (a gzipped GET, read once the build is live, recorded here).
+
+**Resolved:** 2026-10-18 (grinder-ao-1, live check of #2139, live in `0f60b2b` with #2136). Four gzipped headless GETs of the live `/queue` each read 114,173–114,178 bytes on the wire, under 120 KB (TD-888 measured 141 KB before TD-890 and this); the page draws 66 folds `data-lazy`, and `GET /api/fold?key=board:/home/kmaster/samscrape:39` answered 200 with the fold's 1,189-byte body in 128 ms to its first byte.
