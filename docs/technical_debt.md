@@ -77,6 +77,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
 | TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
+| TD-885 | #2109's `_Gzip` and `_Static` guards (a ranged request, a non-200, an already-encoded body, a chunked body, an empty `?v=`) each leave `tests/test_ui_gzip.py` passing when removed | Low | Open |
+| TD-886 | #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed | Low | Open |
+| TD-887 | #2110/#2113's Gemini layer code: the symlink bound, the atomic write, the same-bytes skip, the unreadable and OSError readings and every setup-note fallback leave the suite passing when removed | Medium | Open |
 
 ---
 
@@ -1611,3 +1614,62 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
+## TD-885: #2109's `_Gzip` and `_Static` guards each leave `tests/test_ui_gzip.py` passing when removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2109 (TD-880))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`_Gzip.__call__`, `_Static.get_response`); `tests/test_ui_gzip.py
+
+**Why:** With each of these reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_gzip.py` still reads `6 passed`: (a) `or ranged` dropped from the pass-through test, so a `Range` request is gzipped and its partial body corrupted; (b) `message.get("status") != 200 or` dropped, so a 304 or 404 is gzipped; (c) `or b"content-encoding" in headers` dropped (`test_a_body_under_a_kilobyte_and_an_encoded_one_are_sent_as_they_are` is a 40-byte gzip, under `GZIP_MIN`, so it passes either way and never reaches the guard); (d) `if message.get("more_body"): return` removed, so a body sent in chunks is compressed per chunk; (e) `k == "v" and v` reduced to `k == "v"`, so `?v=` marks a file immutable for a year.
+
+**Fix:** In `tests/test_ui_gzip.py` add a route sending `ui.Response(b"x"*5000)` with a `Range` header expecting no `content-encoding`; a 404 and a 304 (the existing ETag request, assert no `content-encoding`); an already-gzipped body of at least `GZIP_MIN` bytes (random bytes) expecting it unchanged; a `StreamingResponse` of two chunks decoding whole; and `/static/app.js?v=` expecting `no-cache`.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-880, TD-805.
+
+---
+
+## TD-886: #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2111 (TD-881))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/timing.py` (`KEPT`, `step`); `src/shiftlead/ui/app.py` (`server_timing`); `scripts/smoke.py` (`main`, `fetch`); `tests/test_ui_server_timing.py`, `tests/test_smoke.py
+
+**Why:** With each changed alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_smoke.py tests/test_ui_server_timing.py tests/test_promote.py` still reads `89 passed`: (a) `KEPT = 20` → `2000` (the keep-twenty bound is read by nothing); (b) `step`'s `nests and name in steps["open"]` dropped, so a board read inside the state rows' own is counted twice; (c) `server_timing`'s `request.method != "GET"` dropped, so a POST is recorded as a load; (d) `over = [... for got in loads[1::2]` → `loads[0::2]`, so the budget judges the cold load, not the second the design names; (e) `fetch` ignoring the `Server-Timing` of an `HTTPError`, so a failing page's longest step is lost.
+
+**Fix:** In `tests/test_ui_server_timing.py` make 25 loads of one route and assert `len(timing.RECENT[key]) == 20`; nest two `step("board")` and assert one reading; POST a page route and assert no header; in `tests/test_smoke.py` make the cold load slow and the second fast (`behave` gives a delay for the first only) and assert nothing over budget told; give a 500 page a `Server-Timing` and assert the line carries its steps.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-881, TD-805.
+
+---
+
+## TD-887: #2110/#2113's Gemini layer code: the symlink bound, the atomic write, the same-bytes skip, the unreadable and OSError readings and every setup-note fallback leave the suite passing when removed
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2110 (TD-875 1) and #2113 (TD-875 2))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`insecure`, `write_layer`, `machine_reading`, `setup_note`); `src/sessionorc/agent_tick.py` (`_setup_notes`); `src/sessionorc/containers.py` (`write_layers`); `tests/test_gemini_adapter.py`, `tests/test_gemini_setup.py
+
+**Why:** With each reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gemini_adapter.py tests/test_gemini_setup.py` still reads `32 passed`: the `"insecure": "is not root-owned"` word in `setup_note` (an insecure layer then gets the *names no hook command* wording); `if seen > 40:` raised to 4,000,000 (a symlink loop then spins forever on a root-owned machine); `write_layer`'s temp-file-and-`os.replace` replaced by `write_text` (its comment says an overlapping launch reads it mid-write); `if not same:` made `if True:` (the rewrite on every launch); `machine_reading`'s `OSError` arm returning `ok`, and its unreadable-JSON arm raising; `setup_note`'s `except (OSError, …): return None`; `[:12]` of the digest emptied (every wanted copy then shares one key per reading); `_setup_notes`'s `except Exception` (a broken adapter holds up the tick) and its `(OSError, ValueError)` store read; `write_layers`'s `except Exception` (a broken adapter takes the node's build down); and `seen = "none"` (no `profiles.yml`).
+
+**Fix:** In those two modules: a symlink loop (`a`→`b`→`a`) read `loops`; a `MACHINE_LAYER` holding invalid JSON read `unresolved: unreadable`; an unreadable `MACHINE_LAYER` (mode 000, or a directory) read `missing`; an insecure layer's note text carrying `is not root-owned`; `write_layer` with `os.replace` patched to raise leaving the old copy whole; two launches with the same bytes keeping the file's mtime; the wanted copy changed with the reading the same giving a second note; an adapter whose `setup_note`/`machine_layers` raises, with the others still read; a corrupt `setup_notes.json`; and no `profiles.yml`.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-871, TD-875.
+
+---
