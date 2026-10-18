@@ -60,9 +60,32 @@ def test_the_repo_page_unfolds_the_list_its_hash_names():
     # on the first draw, and when a link on the page itself changes the hash
     assert body.index("showHash();") < body.index("setInterval(reread")
     assert 'window.addEventListener("hashchange", showHash)' in body
-    # the unfolding is the *+n more* press's own, so a re-read keeps it (`data-unfolded`)
-    assert "unfolded.forEach((k) => unfold(k))" in body
+    # the unfolding is the *+n more* press's own, so a re-read keeps it (`opened`, sent whole by `open`)
+    assert "opened.forEach((k) => unfold(k, true))" in body
+    # a row past its list's fold was not sent (TD-882): the lists' read asks for it by its id, once, then lands
+    assert show.index("sought.add(id); want = id; return reread();") < show.index("box.contains(row)")
+    assert 'if (ask.length) q.set("open", ask.join(","));' in body
+    assert 'if (asked && want === asked) { want = ""; showHash(); }' in body
     # …and the template gives each row the id the link names and the list the fold is keyed on
     part = (UI / "templates" / "repo_part.html").read_text()
     assert 'id="{{ e.id }}" data-list="{{ l.key }}"' in part
     assert 'href="/repo/{{ e.repo }}#{{ i }}"' in (UI / "templates" / "inbox_row.html").read_text()
+
+
+def test_an_anchor_to_a_row_past_the_fold_fetches_its_list(tmp_path, monkeypatch):
+    """TD-882, §4.5 *Page loads*: `/repo/<name>#TD-n` for a row past the fourth of its list — not sent at
+    load — is read by the lists' `open=TD-n`, which sends that list whole, and the row is there to land on."""
+    from test_ui_repo_page import client, fake, reading
+
+    root = str(tmp_path / "samscrape")
+    r = reading(root)
+    r["ledger"]["entries"] = [
+        {"id": f"TD-{700 + i}", "title": f"open {i}", "for_page": "pickable", "priority": "medium", "owner": "grinder"}
+        for i in range(6)
+    ]
+    c = client(monkeypatch, tmp_path, fake({root: r}, []))
+    assert 'id="TD-705"' not in c.get("/repo/samscrape").text
+    part = c.get("/repo/samscrape?part=1&open=TD-705").text
+    assert 'id="TD-705" data-list="pickable"' in part and 'data-unfold="pickable">+2 more' in part
+    # an id in no list opens nothing
+    assert 'id="TD-705"' not in c.get("/repo/samscrape?part=1&open=TD-999").text

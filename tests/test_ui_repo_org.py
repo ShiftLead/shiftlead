@@ -235,7 +235,7 @@ def test_the_debt_heading_says_what_needs_a_team_and_what_is_stale_and_the_row_i
     seat = rec(
         "techlead-sam", root, team="sam-grind", state="idle", role="techlead", seat={"trigger": "asks", "tags": True}
     )
-    html = client(monkeypatch, tmp_path, fake({root: r}, [seat])).get("/repo/samscrape").text
+    html = client(monkeypatch, tmp_path, fake({root: r}, [seat])).get("/repo/samscrape?open=pickable").text
     debt = html[html.index('<section class="rsec" id="debt">') : html.index('id="completed"')]
     head = debt[: debt.index('class="rlist"')]
     assert 'needs a team: <a href="#TD-320">TD-320</a>, <a href="#TD-321">TD-321</a> — handed to techlead-sam' in head
@@ -257,7 +257,7 @@ def test_the_debt_heading_says_what_needs_a_team_and_what_is_stale_and_the_row_i
     assert "the ledger leaves out sam-db" in head and "the ledger leaves out sam-grind" in head
     # a reading with no `Team` vocabulary read (an older home) draws neither
     del r["ledger"]["declared_teams"]
-    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape?open=pickable").text
     assert 'class="meta teamnote' not in html and "· needs a team</span>" in html
 
 
