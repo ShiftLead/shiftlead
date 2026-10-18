@@ -69,7 +69,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 |
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
-| TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
@@ -1410,31 +1409,6 @@ The other cases:
 **Done when** `ao spend` prints what the Spend page draws, and `ao status -v` shows each record's figure.
 
 **Related:** TD-818, TD-830.
-
-## TD-835: Build TD-819 (2): the Spend page's Shape view and `ao team shape`
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-819's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-834, TD-832
-**Location:** design §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape*, §4.7 `ao team shape`; mockup `docs/mockups/SpendShape.dc.html` (`reviews/2026-10-17-td819-shape.png`); `src/shiftlead/ui/app.py` (`/spend?view=shape`, `/api/shape`), the Spend page's template and `app.js`, `src/shiftlead/ui/help.py`, `src/shiftlead/cli.py`
-
-**Why:** TD-819: Paul asked whether *a different shape for a team would be more efficient*. That needs the reading where he looks at the team's spend, and from a terminal.
-
-**Fix:**
-- The **Spend · Shape** pick on the Spend page, carried in the URL. The Shape view is drawn as the mockup, per team: suggestions, or *nothing to suggest*, or *too little to read yet*; members by role, as the bar of hours by class with its percents, the hover its seats, and spend per finished entry; queues per flow stage.
-- `ao team shape <team> [--window day|week]` prints §4.7's lines; `--json` gives the RPC's reply.
-- §4.5a's row gets its help text in `ui/help.py`.
-- **Tests:** the view draws the RPC's reply (each suggestion, too little, a role's bar, a queue row); the URL carries the pick; the CLI lines; the doc-bound §4.5a tests.
-
-**Done when** the Spend page's Shape view and `ao team shape` show a running team's shares, queues and suggestions. A screenshot under `docs/mockups/reviews/` is named in the PR.
-
-**Related:** TD-819, TD-834, TD-832 (the page it joins).
-
----
 
 ## TD-836: Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims
 

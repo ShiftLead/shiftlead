@@ -16099,3 +16099,28 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-863 (built #2069), TD-854 (the design).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2081). Two tests in `tests/test_finished.py`: `test_a_derived_or_scraped_claim_of_a_held_pr_blocks_nothing` and `test_a_dead_members_held_ask_blocks_nothing_and_its_declaration_counts`; each of the entry's two reverts fails one.
+
+## TD-835: Build TD-819 (2): the Spend page's Shape view and `ao team shape`
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-819's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2082 (2026-10-17, grinder-ao-2)
+**Blocked by:** TD-834, TD-832
+**Location:** design §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape*, §4.7 `ao team shape`; mockup `docs/mockups/SpendShape.dc.html` (`reviews/2026-10-17-td819-shape.png`); `src/shiftlead/ui/app.py` (`/spend?view=shape`, `/api/shape`), the Spend page's template and `app.js`, `src/shiftlead/ui/help.py`, `src/shiftlead/cli.py`
+
+**Why:** TD-819: Paul asked whether *a different shape for a team would be more efficient*. That needs the reading where he looks at the team's spend, and from a terminal.
+
+**Fix:**
+- The **Spend · Shape** pick on the Spend page, carried in the URL. The Shape view is drawn as the mockup, per team: suggestions, or *nothing to suggest*, or *too little to read yet*; members by role, as the bar of hours by class with its percents, the hover its seats, and spend per finished entry; queues per flow stage.
+- `ao team shape <team> [--window day|week]` prints §4.7's lines; `--json` gives the RPC's reply.
+- §4.5a's row gets its help text in `ui/help.py`.
+- **Tests:** the view draws the RPC's reply (each suggestion, too little, a role's bar, a queue row); the URL carries the pick; the CLI lines; the doc-bound §4.5a tests.
+
+**Done when** the Spend page's Shape view and `ao team shape` show a running team's shares, queues and suggestions. A screenshot under `docs/mockups/reviews/` is named in the PR.
+
+**Related:** TD-819, TD-834, TD-832 (the page it joins).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2082). The Spend page's **Spend · Shape** (`view=shape`, `ui/spend.py` `shape_view`, `templates/shape_part.html`), `/api/shape`, and `ao team shape` (`cli.py` `cmd_team_shape`, `shape_lines`); the help paragraph in `help.py` and §4.5a's list. Screenshots `docs/mockups/reviews/2026-10-17-td835-shape*.png`.
