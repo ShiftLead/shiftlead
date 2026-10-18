@@ -16707,3 +16707,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-805, TD-829 (the Queue's picks in the browser), TD-816.
 
 **Resolved:** 2026-10-18 (grinder-ao-2, live read of #2121 with `bf9882c` live). Headless GETs of the live plain port with `Accept-Encoding: gzip`, twice each at 08:16Z: `/queue` 148,246 bytes on the wire (`content-encoding: gzip`, 1,033,433 uncompressed), `/repo/shiftlead` 41,345 bytes — each under 150 KB, so *Done when* holds. The Queue's margin is 1.7 KB, filed as TD-888.
+
+## TD-885: #2109's `_Gzip` and `_Static` guards each leave `tests/test_ui_gzip.py` passing when removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2109 (TD-880))
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/app.py` (`_Gzip.__call__`, `_Static.get_response`); `tests/test_ui_gzip.py`
+
+**Why:** With each of these reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_gzip.py` still reads `6 passed`: (a) `or ranged` dropped from the pass-through test, so a `Range` request is gzipped and its partial body corrupted; (b) `message.get("status") != 200 or` dropped, so a 304 or 404 is gzipped; (c) `or b"content-encoding" in headers` dropped (`test_a_body_under_a_kilobyte_and_an_encoded_one_are_sent_as_they_are` is a 40-byte gzip, under `GZIP_MIN`, so it passes either way and never reaches the guard); (d) `if message.get("more_body"): return` removed, so a body sent in chunks is compressed per chunk; (e) `k == "v" and v` reduced to `k == "v"`, so `?v=` marks a file immutable for a year.
+
+**Fix:** In `tests/test_ui_gzip.py` add a route sending `ui.Response(b"x"*5000)` with a `Range` header expecting no `content-encoding`; a 404 and a 304 (the existing ETag request, assert no `content-encoding`); an already-gzipped body of at least `GZIP_MIN` bytes (random bytes) expecting it unchanged; a `StreamingResponse` of two chunks decoding whole; and `/static/app.js?v=` expecting `no-cache`.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-880, TD-805.
+
+**Resolved:** 2026-10-18 (grinder-ao-2, #PR). In `tests/test_ui_gzip.py`, (a)–(d) each fail a test when reverted alone: a 5,000-byte body under `Range` sent plain (and gzipped without it); a 404 and a 206 of the same body sent plain; an already-gzipped body of random bytes over `GZIP_MIN` sent unchanged; a `StreamingResponse` of two chunks decoding whole. (e) cannot fail a test: `parse_qsl` drops a blank value by default, so `?v=` yields no pair and `and v` never decides; `test_an_empty_v_is_no_hash` pins `?v=` reading `no-cache`.

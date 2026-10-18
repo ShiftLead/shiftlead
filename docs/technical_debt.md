@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
-| TD-885 | #2109's `_Gzip` and `_Static` guards (a ranged request, a non-200, an already-encoded body, a chunked body, an empty `?v=`) each leave `tests/test_ui_gzip.py` passing when removed | Low | Open |
 | TD-886 | #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed | Low | Open |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Open |
 
@@ -1521,26 +1520,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** ten warm loads of the live `/settings` each read under 200 ms to the first byte, and a promote's note no longer names Settings.
 
 **Related:** TD-805, TD-881.
-
----
-
-## TD-885: #2109's `_Gzip` and `_Static` guards each leave `tests/test_ui_gzip.py` passing when removed
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2109 (TD-880))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`_Gzip.__call__`, `_Static.get_response`); `tests/test_ui_gzip.py`
-
-**Why:** With each of these reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_gzip.py` still reads `6 passed`: (a) `or ranged` dropped from the pass-through test, so a `Range` request is gzipped and its partial body corrupted; (b) `message.get("status") != 200 or` dropped, so a 304 or 404 is gzipped; (c) `or b"content-encoding" in headers` dropped (`test_a_body_under_a_kilobyte_and_an_encoded_one_are_sent_as_they_are` is a 40-byte gzip, under `GZIP_MIN`, so it passes either way and never reaches the guard); (d) `if message.get("more_body"): return` removed, so a body sent in chunks is compressed per chunk; (e) `k == "v" and v` reduced to `k == "v"`, so `?v=` marks a file immutable for a year.
-
-**Fix:** In `tests/test_ui_gzip.py` add a route sending `ui.Response(b"x"*5000)` with a `Range` header expecting no `content-encoding`; a 404 and a 304 (the existing ETag request, assert no `content-encoding`); an already-gzipped body of at least `GZIP_MIN` bytes (random bytes) expecting it unchanged; a `StreamingResponse` of two chunks decoding whole; and `/static/app.js?v=` expecting `no-cache`.
-
-**Done when** each reversion above fails a test.
-
-**Related:** TD-880, TD-805.
 
 ---
 
