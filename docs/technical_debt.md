@@ -64,7 +64,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-785 | Build TD-112 (2): the Gemini CLI adapter, launch and state — the profile's home, the layer, trust, `--session-id`, hooks to state, the title check, `permission_channel`, the kill guard, composer and title | Medium | Building — slice 1 #2014 |
 | TD-786 | Build TD-112 (3): the Gemini CLI adapter's reads — transcript, context, links, model, start context, mail, background, usage and spend; the full conformance suite live | Medium | Open |
 | TD-794 | The Focus terminal shows a reply's lines cut off mid-word, and a block of it twice: a resize makes Claude Code repaint over lines tmux has already kept | Low | Open |
-| TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Designed — built by TD-879, TD-880, TD-881, TD-882 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
@@ -1261,28 +1260,6 @@ The other cases:
 **Related:** TD-022 (scrollback through tmux), TD-474 / TD-480 (*resized by another client*, the terminal mark), TD-288 (Settings' face and size refit the grid), TD-491 (the folded composer: *a resize would make the tool repaint*).
 
 ---
-
-## TD-805: Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup
-
-**Priority:** Medium
-**Type:** debt
-**Added:** 2026-10-16 (Paul, in an interactive session)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-17, PR #2105; design §4.5 *Page loads*, §6 *This repo's smoke*). Measured: the Queue 2.5 s to its first byte and 2.3 MB of uncompressed HTML, the other pages 0.08–0.52 s; the host agent's reads at most 38 ms; the Queue's 2 s is `board_choices()` (14.6 ms) once per attached mail row. Budget: first byte 500 ms (Org, Inbox, Repo, Queue) / 200 ms (Settings, Spend, Transcript), HTML 150 KB on the wire, DOM ready 1 s. Built by TD-879 (each fact once per request), TD-880 (gzip, immutable static), TD-881 (`Server-Timing`, the smoke tells a miss), TD-882 (only what is shown at load).
-**Blocked by:** TD-879, TD-880, TD-881, TD-882
-**Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
-
-**Why:** Paul, 2026-10-16: *we need analysis done on our page loads — they all seem to take a long time (org, repo, inbox, queue).* Measured the same evening on kmaster's plain port (time to first byte, size): Org 0.43–0.55 s, 284 KB; Inbox 0.27–0.29 s, 847 KB; Repo (shiftlead) 0.57–0.73 s, 750 KB; Settings 0.15–0.22 s, 82 KB; Queue 2.37–2.66 s, 1.87 MB. A page is sent uncompressed with `Accept-Encoding: gzip` (the Queue's 1,873,503 bytes either way), and the person reaches the UI over the tailnet through `tailscale serve`, so the transfer, the parse of a large DOM and the page's scripts add to every number above, and none of that is measured.
-
-**Fix:**
-1. Measure each page end to end from a browser through the route the person uses: first byte, transfer, DOM ready, the page's scripts done, the stream up; and the server's time split by the RPCs each route makes (`list`, `queue`, `person_inbox`, `board_view`, …) and the render.
-2. Say where each page's time goes and the size of each fix: compressing pages, markup that need not be sent at load (completed cards, archived rows, folded sections), RPCs read twice or that could be cached between loads, render work on the UI's one loop that holds every other request and Focus keystroke while it runs.
-3. Set a budget per page, and file one build entry per page (or per shared cause) that misses it, each named in `Blocked by:`.
-
-**Done when** each page's load is measured and broken down, a budget is set, and the build entries are filed and named in `Blocked by:`.
-
-**Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
 
 ## TD-820: The designer runs far past its context bound inside one design: nearly a quarter of its requests read over 300k tokens and its median is 209k, against the grinders' 151k
 
