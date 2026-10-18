@@ -73,7 +73,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Built (#2139) — a live check of the Queue's size once live |
-| TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Open |
+| TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Built, live check #2140 — blocked by TD-896 |
+| TD-896 | The Repo page's steady load is 365 ms of a 500 ms budget: `flows` and `board` leave no room for a slow seat inbox read | Medium | Open |
 
 ---
 
@@ -1528,7 +1529,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-18 (grinder-ao-1, reading TD-884 live)
 **Owner:** grinder
 **Kind:** live-check #2140
-**Status:** Built (2026-10-18, #2140): `repo_page` makes its reads that wait on none of each other at once (`list`, `host`, the person inbox, the definitions on a worker thread, the board, `queue`, the chip's `usage` and `gate`), reads the definitions once for itself and `flow_views`, makes every seat's two inbox reads at once, hands its chips its own reads, and names its steps `files`, `flows`, `views`, `groups`, `lists`. On a scratch home with this repo's ledger, board and teams a warm load went from 62–66 ms to 45–57 ms. **Live check** once #2140 is live (`ao promote status`), read-only: ten warm headless GETs of the live `/repo/shiftlead`, each first byte and its `Server-Timing`; under 500 ms each and no promote note naming the Repo page — archive it; over, a step names where the time goes — a new entry for that step, this one `**Blocked by:**` it.
+**Status:** Built (2026-10-18, #2140): `repo_page` makes its reads that wait on none of each other at once (`list`, `host`, the person inbox, the definitions on a worker thread, the board, `queue`, the chip's `usage` and `gate`), reads the definitions once for itself and `flow_views`, makes every seat's two inbox reads at once, hands its chips its own reads, and names its steps `files`, `flows`, `views`, `groups`, `lists`. On a scratch home with this repo's ledger, board and teams a warm load went from 62–66 ms to 45–57 ms. **Live check** once #2140 is live (`ao promote status`), read-only: ten warm headless GETs of the live `/repo/shiftlead`, each first byte and its `Server-Timing`; under 500 ms each and no promote note naming the Repo page — archive it; over, a step names where the time goes — a new entry for that step, this one `**Blocked by:**` it. **Read 2026-10-18 05:45 MDT** (grinder-ao-1, #2140 live in `0f60b2b`): it does not hold. Thirty warm headless GETs of the live `/repo/shiftlead`: 25 at 362–475 ms to the first byte, five at 535–613 ms. Every step is named now — `total` is the named serial path, no 250–400 ms gap — and a steady load reads `rpc_repos` ~21, `files` ~30, `board` ~88, `flows` ~115, `views` ~45, `groups` ~20, `rpc_inbox` ~55–80, `lists` ~11, `render` ~15 (ms). Of the five over: three carry an `rpc_inbox` of 515–977 ms (the seats' reads, summed over reads made at once), two read every step 30–50% slower. TD-896 is the cure.
+**Blocked by:** TD-896
 **Location:** design §4.5 *Page loads* (the 500 ms budget of Org, Inbox, Repo, Queue; *Measured on every load*); `src/shiftlead/ui/app.py` (`repo_page`, its untimed reads and the order of its `call`s)
 
 **Why:** The promote of `232c389`'s smoke told *repo over budget: first byte 0.51 s over 0.5 s — longest step rpc_repos 56 ms*. Eight warm headless GETs of the live `/repo/shiftlead` on 2026-10-18 read 0.44–0.66 s to the first byte, three of them over 500 ms; their `Server-Timing` steps sum to some 200 ms (`rpc_list` ~50, `board` ~52, `rpc_inbox` 19–153, `rpc_repos` ~21, `render` ~15), and `total` is 441–658 ms, so 250–400 ms of every load is the route's own work no step names. The longest *named* step the note gives is therefore not where the time goes. TD-884 found the same shape on the Settings page and #2135 cured it there.
@@ -1538,5 +1540,25 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** ten warm loads of the live `/repo/shiftlead` each read under 500 ms to the first byte, and a promote's note no longer names the Repo page.
 
 **Related:** TD-884, TD-805, TD-881.
+
+---
+
+## TD-896: The Repo page's steady load is 365 ms of a 500 ms budget: `flows` (~115 ms) and `board` (~88 ms) leave no room for a slow seat inbox read
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, reading TD-893 live)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open.
+**Location:** design §4.5 *Page loads*; `src/shiftlead/ui/app.py` (`repo_page`, `flow_views`' `read`, `board_view` → `board_all`)
+
+**Why:** TD-893's live read (2026-10-18, #2140 live): thirty warm loads of `/repo/shiftlead`, five over 500 ms. With every step named, a steady load is ~365 ms, and its two longest serial steps are `flows` (~115 ms: `flow_views` reads every team's `teamrun.flow_view` one after another, each with its files and its RPCs) and `board` (~88 ms, the longest read of the first gather, so the gather waits on it). The seats' inbox reads come after `groups`, in series with all of it, and when one is slow (`rpc_inbox` 515–977 ms summed on three of the five) the load crosses 500 ms; the other two were the whole host slower. 365 ms leaves 135 ms for a slow read or a busy host.
+
+**Fix:** take the serial path down by what does not wait: read each team's `flow_view` at once (a thread each, or one gather), or start `flow_views` in the first gather — it waits only on `list` and the org file; find what `board` spends 88 ms on (every registered repo's board parsed per load?) and read it once per change, as the Repo page reads the definitions; and start the seats' inbox reads as soon as the seats are known (`seats_of` and the records), beside `views` and `groups`, not after them. Measure on a scratch home with this repo's ledger, board and teams, as #2140 did.
+
+**Done when** a steady warm load of the live `/repo/shiftlead` is under 300 ms to the first byte and thirty warm loads each read under 500 ms; then TD-893 is archived with that read.
+
+**Related:** TD-893, TD-884.
 
 ---
