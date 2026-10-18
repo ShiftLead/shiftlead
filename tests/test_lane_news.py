@@ -441,6 +441,23 @@ async def test_a_live_check_live_at_the_declaration_is_told_to_nobody(agent, tmp
         await person.call("kill", id=sid)
 
 
+async def test_parking_the_ticks_lands_a_detached_pass_still_in_flight(agent):
+    """TD-858: the case above failed once in a full run, its note unsent, when a promote reading the
+    fixture's first tick started landed after the test had set `_promotes`, and put back a reading
+    without its live commit. `park_ticks` lets such a pass land first, so what the test sets stands."""
+    import asyncio
+
+    async def late() -> None:
+        await asyncio.sleep(0.2)  # a reading's thread, slow on a loaded machine
+        agent._promotes = {}
+
+    agent._late_task = asyncio.create_task(late())  # beside the first tick's own `_promote_task`
+    await park_ticks(agent)
+    agent._promotes["repo"] = {"live": "abc"}
+    await asyncio.sleep(0.4)
+    assert agent._promotes == {"repo": {"live": "abc"}}
+
+
 async def test_a_decided_board_line_is_told_at_once_to_the_free_pick_lane_and_claimed_as_a_lease(agent, tmp_path):
     """TD-384 (design §6 rule 6, §4.9a): a work order, `board:<key>`, is in every `free-pick` lane
     whatever its `owner:` words; one already there when the member declared is told on the first

@@ -324,6 +324,9 @@ async def derived(agent, check, timeout: float = 10.0):
 # -- the in-process agent -----------------------------------------------------------------------
 
 
+PASS_DRAIN = 30.0  # seconds `park_ticks` waits for a tick's detached passes to land
+
+
 async def park_ticks(agent) -> None:
     """Stop the fixture's tick loop for the rest of the test, so a test that must own the clock
     **owns** it: every tick after this is one the test takes by hand with `await agent.tick()`.
@@ -340,6 +343,17 @@ async def park_ticks(agent) -> None:
     t.cancel()
     with contextlib.suppress(asyncio.CancelledError):
         await t
+    # a tick's detached passes (`_promote_task`, `_repos_task`, …) outlive it: one still in flight lands
+    # after the test has set the state it replaces — a late promote reading put back `_promotes` without
+    # the test's live commit, and a lane note went unsent (TD-858; TD-752 and TD-753 awaited them by hand)
+    # — so each is finished here, and one that has not finished in PASS_DRAIN is cancelled
+    passes = [t for k, t in vars(agent).items() if k.endswith("_task") and isinstance(t, asyncio.Task) and not t.done()]
+    if passes:
+        _, late = await asyncio.wait(passes, timeout=PASS_DRAIN)
+        for task in late:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await task
 
 
 @pytest.fixture

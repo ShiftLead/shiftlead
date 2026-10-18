@@ -78,7 +78,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
 | TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
-| TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
 
@@ -1671,26 +1670,6 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** the design says what the pick and the arrows list and where it is read, and the build entry is filed.
 
 **Related:** TD-627, TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line).
-
----
-
-## TD-858: `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-2, met in TD-838's full local run)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/test_lane_news.py` (the `[after]` case, its last assertion at line ~440); `src/sessionorc/agent_tick.py` `_lane_news`
-
-**Why:** 2026-10-17, on `td838-permission-prompts-all` (which touches no `sessionorc` logic), `pdm run test -q -x` stopped on `assert len(notes) == 1 and "gained 1 entry since you declared out of work: TD-002" in notes[0]` with `notes == []`. The test file then passed three times alone, and CI passed the same commit on 3.12 and 3.13. So something in the case depends on timing or on state the full suite leaves behind. Candidates: `now` is `datetime.now(UTC)` while `out_of_work.at` and `last.json`'s `at` are fixed 2026-09-27 times, and the git commit is dated too. Or `_lane_news` reads the promote's `last.json` and the repo's ledger through a cache that an earlier test's home warmed.
-
-**Fix:** reproduce under the full suite (`pdm run test -q -p no:randomly` up to the file, or `--lf` after a failing run), find what the note waits on, and make the test hold it. No change to the rule unless the cause is in `_lane_news`.
-
-**Done when** the cause is named in this entry's Resolved, and the case passes ten full-suite runs in a row (or its fixture no longer depends on what it was found to depend on).
-
-**Related:** TD-411 (`lane_seen` and the live check that goes live after a `none`).
 
 ---
 
