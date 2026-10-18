@@ -149,13 +149,38 @@ def tmux(r: dict[str, Any]) -> list[dict[str, Any]]:
     return [_row("tmux", OK, f"tmux — server {pid} since {since}, not under systemd ({r.get('cgroup')})", tmux=r)]
 
 
+# A Gemini layer's reading and its line (design §4.7 *hooks*, §4.3 *The second adapter*, TD-871)
+GEMINI_LAYER = {
+    "missing": (LACKING, "Gemini layer not installed"),
+    "insecure": (LACKING, "Gemini layer not root-owned"),
+    "unresolved": (LACKING, "Gemini layer names no hook command that resolves"),
+    "stale": (WARNING, "Gemini layer stale"),
+}
+
+
+def gemini_layer(machine: dict[str, Any]) -> list[dict[str, Any]]:
+    """The machine's Gemini layer against the wanted copy: nothing when it is the same, else a line naming
+    what is wrong and the line that installs it — printed, never run."""
+    if (got := GEMINI_LAYER.get(str(machine.get("state")))) is None:
+        return []
+    verdict, words = got
+    why = f" ({machine['why']})" if machine.get("why") and machine.get("state") == "insecure" else ""
+    return [_row("hooks", verdict, f"hooks — {words}{why}: {machine.get('install')}", layer=machine)]
+
+
 def hooks(r: dict[str, Any], now: datetime) -> list[dict[str, Any]]:
     """Each profile's layers name a hook command that resolves; each live agent session is fed by
     hooks; the queue holds nothing the tick should have applied."""
     out: list[dict[str, Any]] = []
     cure = "(the next launch rewrites it; `shiftlead-hook` must be on PATH or beside the interpreter)"
+    seen: set[str] = set()
     for p in r.get("layers") or []:
         for layer in p.get("layers") or []:
+            if (machine := layer.get("gemini")) is not None:
+                if layer.get("path") not in seen:  # one file for every Gemini profile: one line
+                    seen.add(str(layer.get("path")))
+                    out += gemini_layer(machine)
+                continue
             name = Path(str(layer.get("path"))).name
             if layer.get("error"):
                 text = f"hooks — layer {name} unreadable: {layer['error']} {cure}"

@@ -4,7 +4,9 @@ the launch and its settings layer, the profile's home and credentials.
 Hooks reach a launched session through `GEMINI_CLI_SYSTEM_SETTINGS_PATH`, the tool's highest-precedence
 settings file, whose `hooks` concatenate with the person's rather than replace them — so nothing in the
 person's own `settings.json` is edited and hand-started sessions are untouched. Its hooks run
-`shiftlead-hook --adapter gemini`, which finds its session from `SHIFTLEAD_SESSION`.
+`shiftlead-hook --adapter gemini`, which finds its session from `SHIFTLEAD_SESSION`. The tool reads that
+file only when root owns it, so it is the machine's layer, `MACHINE_LAYER`, installed by the person once
+with the line `ao doctor` prints from the wanted copy ShiftLead writes (TD-871, TD-875).
 
 Not yet registered under the `shiftlead.adapters` entry points: the conformance suite tests every
 registered agent adapter against fixtures captured from the real tool, which TD-785's later slice records.
@@ -17,6 +19,8 @@ import logging
 import os
 import shlex
 import shutil
+import stat
+import sys
 import uuid
 from pathlib import Path
 
@@ -26,7 +30,7 @@ from sessionorc.models import Confidence, Pending, State
 from sessionorc.screen import Match
 from sessionorc.tmux import PaneInfo
 from shiftlead import profiles as profiles_mod
-from shiftlead.adapters.claude_code import _resolves, hook_command
+from shiftlead.adapters.claude_code import _resolves
 from shiftlead.profiles import Profile
 
 log = logging.getLogger("shiftlead.adapters.gemini")
@@ -65,9 +69,26 @@ def home(profile: Profile) -> Path:
     return profile.config_dir or Path(os.environ.get("GEMINI_CLI_HOME") or "~").expanduser()
 
 
-def layer_file(profile: Profile, unattended: bool = False) -> Path:
-    suffix = "+unattended" if unattended else ""
-    return paths.home() / "gemini-settings" / f"{profile.name}{suffix}.json"
+# The machine's layer (design §4.3 `launch`, TD-871): the tool reads a system settings file only when root
+# owns it and every directory above it, so the person installs it once with `INSTALL_LINE`; nothing here
+# calls `sudo`.
+MACHINE_LAYER = Path("/etc/shiftlead/gemini-settings.json")
+INSTALL_LINE = (
+    "sudo install -d -o root -g root -m 0755 /etc/shiftlead && sudo install -o root -g root -m 0644 "
+    "~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json"
+)
+REFUSED = "the Gemini layer is not installed — run the line `ao doctor` prints"
+
+
+def wanted_file() -> Path:
+    """The wanted copy: what `MACHINE_LAYER` should hold, one file for every profile and launch shape."""
+    return paths.home() / "gemini-settings" / "layer.json"
+
+
+def hook_path() -> str:
+    """`bin/shiftlead-hook` beside the host agent's own interpreter, never a `PATH` lookup, so the installed
+    file does not move with a unit's `PATH` and a promote keeps it (design §4.3 *The file is kept stable*)."""
+    return str(Path(sys.executable).parent / "shiftlead-hook")
 
 
 def layer_settings(hook_cmd: str = "shiftlead-hook") -> dict:
@@ -78,36 +99,90 @@ def layer_settings(hook_cmd: str = "shiftlead-hook") -> dict:
     return {"hooks": {ev: [{"hooks": [dict(hook)]}] for ev in HOOK_EVENTS}, **json.loads(json.dumps(LAYER_SETTINGS))}
 
 
-def write_layer(profile: Profile, unattended: bool = False) -> Path:
-    """Write the layer for this launch, one file per profile and launch shape, so concurrent launches
-    never overwrite each other's choice."""
-    p = layer_file(profile, unattended)
+def write_layer() -> Path:
+    """Write the wanted copy, the same bytes for every profile and launch, and remove the per-profile
+    layers earlier builds wrote beside it (`<profile>[+unattended].json`), which the tool never read."""
+    p = wanted_file()
     p.parent.mkdir(parents=True, exist_ok=True)
-    cmd = hook_command()
-    if cmd is None:
-        log.warning(
-            "shiftlead-hook not on PATH (%s); hooks for profile %s may never fire", os.environ.get("PATH"), profile.name
-        )
-        cmd = "shiftlead-hook"
-    p.write_text(json.dumps(layer_settings(cmd), indent=1), encoding="utf-8")
+    text = json.dumps(layer_settings(hook_path()), indent=1)
+    try:
+        same = p.read_text(encoding="utf-8") == text
+    except OSError:
+        same = False
+    if not same:
+        p.write_text(text, encoding="utf-8")
+    for old in p.parent.glob("*.json"):
+        if old != p:
+            old.unlink(missing_ok=True)
     return p
 
 
-def layer_reading(profile: Profile) -> list[dict]:
-    """Each layer written for `profile` and the commands it names, with whether each resolves (`ao
-    doctor`'s hooks check, design §4.7) — the shape Claude Code's adapter reports."""
-    out: list[dict] = []
-    for p in sorted((paths.home() / "gemini-settings").glob(f"{profile.name}*.json")):
-        if p.stem != profile.name and not p.stem.startswith(f"{profile.name}+"):
-            continue  # another profile whose name begins with this one's
-        try:
-            doc = json.loads(p.read_text(encoding="utf-8"))
-            cmds = [str(h.get("command", "")) for g in doc.get("hooks", {}).values() for e in g for h in e["hooks"]]
-        except (OSError, ValueError, AttributeError, TypeError, KeyError) as e:
-            out.append({"path": str(p), "error": str(e) or type(e).__name__, "commands": []})
+def _lstat(p: Path) -> os.stat_result:
+    return os.lstat(p)  # patched in tests, where no file is root's
+
+
+def insecure(path: Path) -> str | None:
+    """Why the tool would skip `path` as a system settings file, or None: root must own the file and every
+    directory above it to `/`, symlinks on the way followed, and none may be writable by group or others —
+    the tool's own test (0.64.0's `isFileAndDirectorySecureSync`)."""
+    seen = 0
+    p = Path(os.path.abspath(path))
+    while True:
+        st = _lstat(p)
+        if stat.S_ISLNK(st.st_mode):
+            seen += 1
+            if seen > 40:
+                return f"{p} loops"
+            target = Path(os.readlink(p))
+            p = Path(os.path.normpath(p.parent / target))
             continue
-        out.append({"path": str(p), "commands": [{"command": c, "resolves": _resolves(c)} for c in sorted(set(cmds))]})
-    return out
+        if st.st_uid != 0:
+            return f"{p} is not root-owned"
+        if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            return f"{p} is writable by group or others"
+        if p.parent == p:
+            return None
+        p = p.parent
+
+
+def _commands(doc: dict) -> list[str]:
+    return sorted({str(h.get("command", "")) for g in doc.get("hooks", {}).values() for e in g for h in e["hooks"]})
+
+
+def machine_reading() -> dict:
+    """The installed layer against the wanted copy: `state` is `ok`, `stale` (it differs, and launches),
+    or one that refuses a launch — `missing`, `insecure`, `unresolved` (no hook command it names
+    resolves) — with `why`, the commands it names and whether each resolves (design §4.3, §4.7)."""
+    wanted = write_layer()
+    out: dict = {"path": str(MACHINE_LAYER), "wanted": str(wanted), "install": INSTALL_LINE, "commands": []}
+    try:
+        text = MACHINE_LAYER.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return out | {"state": "missing", "why": "not installed"}
+    except OSError as e:
+        return out | {"state": "missing", "why": str(e) or type(e).__name__}
+    try:
+        why = insecure(MACHINE_LAYER)
+    except OSError as e:
+        why = str(e) or type(e).__name__
+    if why:
+        return out | {"state": "insecure", "why": why}
+    try:
+        cmds = _commands(json.loads(text))
+    except (ValueError, AttributeError, TypeError, KeyError) as e:
+        return out | {"state": "unresolved", "why": f"unreadable: {str(e) or type(e).__name__}"}
+    out["commands"] = [{"command": c, "resolves": _resolves(c)} for c in cmds]
+    if not any(c["resolves"] for c in out["commands"]):
+        return out | {"state": "unresolved", "why": "names no hook command that resolves"}
+    same = json.loads(text) == json.loads(wanted.read_text(encoding="utf-8"))
+    return out | ({"state": "ok", "why": ""} if same else {"state": "stale", "why": "differs from the wanted copy"})
+
+
+def layer_reading(profile: Profile | None = None) -> list[dict]:
+    """The machine's layer read against the wanted copy (`ao doctor`'s hooks check, design §4.7): one
+    file for every Gemini profile, in the shape Claude Code's adapter reports, with `gemini` the reading."""
+    r = machine_reading()
+    return [{"path": r["path"], "commands": r["commands"], "gemini": r}]
 
 
 def title_state(pane_title: str) -> State | None:
@@ -155,8 +230,12 @@ class GeminiAdapter:
         if unattended:
             args = prof.unattended_args or YOLO
             argv += args if prof.permission_prompts == "skip" else _without_yolo(args)
+        layer = machine_reading()
+        if layer["state"] in ("missing", "insecure", "unresolved"):
+            # a session with no hooks never leaves its launch state (design §4.3 *A launch reads…*)
+            raise ValueError(f"{REFUSED} ({MACHINE_LAYER}: {layer['why']})")
         env = {
-            "GEMINI_CLI_SYSTEM_SETTINGS_PATH": str(write_layer(prof, unattended)),
+            "GEMINI_CLI_SYSTEM_SETTINGS_PATH": str(MACHINE_LAYER),
             # the tool's per-process trust, read before its trust file: an untrusted folder runs no hook
             # at all and downgrades yolo to `default`, so trust is the state feed's precondition; nothing
             # is written to the person's `trustedFolders.json` (design §4.3 `quirks`)
@@ -205,7 +284,7 @@ class GeminiAdapter:
     def doctor_profiles(self) -> list[dict]:
         """What `ao doctor` reads of each Gemini profile (design §4.7, §4.3): its home, its credential, a
         metered key, a `GOOGLE_API_KEY` in the host agent's environment (a precaution's note, since the
-        launch clears it), and its layers with whether `shiftlead-hook --adapter gemini` resolves."""
+        launch clears it), and the machine's layer read against the wanted copy (`layer_reading`)."""
         try:
             profs, _ = profiles_mod.load()
         except (OSError, ValueError, TypeError, AttributeError) as e:

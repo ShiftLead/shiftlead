@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import io
 import json
+import os
+import stat
 import sys
 import uuid
 from pathlib import Path
@@ -29,7 +31,25 @@ def home(tmp_path, monkeypatch):
         "  asks: {adapter: gemini, permission_prompts: ask}\n"
         "  close: {adapter: gemini, permission_prompts: all}\n"
     )
+    machine = tmp_path / "etc" / "gemini-settings.json"
+    monkeypatch.setattr(gemini, "MACHINE_LAYER", machine)
+    monkeypatch.setattr(gemini, "_lstat", rooted())
+    machine.parent.mkdir()
+    machine.write_text(gemini.write_layer().read_text())  # installed: the person ran the line
     return tmp_path
+
+
+def rooted(mine: str | None = None, writable: str | None = None):
+    """An `lstat` that reads every path root-owned and 0755 but the one named `mine` (the user's) and
+    the one named `writable` (group-writable): the tool's test, run on a test's files."""
+
+    def lstat(p):
+        st = os.lstat(p)
+        uid = os.getuid() if mine is not None and str(p) == mine else 0
+        mode = stat.S_IFMT(st.st_mode) | 0o755 | (stat.S_IWGRP if writable is not None and str(p) == writable else 0)
+        return os.stat_result((mode, st.st_ino, st.st_dev, st.st_nlink, uid, 0, st.st_size, 0, 0, 0))
+
+    return lstat
 
 
 def test_launch_argv_and_env(home):
@@ -43,6 +63,7 @@ def test_launch_argv_and_env(home):
     assert env["GEMINI_FORCE_FILE_STORAGE"] == "true" and env["GOOGLE_API_KEY"] == ""
     assert env["CLI_TITLE"] == "t1" and "GEMINI_CLI_HOME" not in env  # no config_dir: the tool's own `~`
     assert not (home / ".gemini").exists()
+    assert env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"] == str(gemini.MACHINE_LAYER)
     layer = json.loads(Path(env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"]).read_text())
     assert set(layer["hooks"]) == set(gemini.HOOK_EVENTS)
     cmd = layer["hooks"]["BeforeTool"][0]["hooks"][0]
@@ -63,7 +84,7 @@ def test_a_resume_an_unattended_launch_and_ask(home):
     assert g.adapter_id == "abc-123" and g.argv[1:3] == ["--resume", "abc-123"] and "--session-id" not in g.argv
     assert g.argv[-2:] == ["--approval-mode", "yolo"]  # `permission_prompts: skip`, the default
     assert g.env["GEMINI_CLI_HOME"] == str(home / "g") and "CLI_TITLE" not in g.env
-    assert g.env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"].endswith("grind+unattended.json")
+    assert g.env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"] == str(gemini.MACHINE_LAYER)  # one layer for every shape
     a = ad.launch(profile="asks", resume=None, prompt=None, unattended=True, cwd=home)
     assert "yolo" not in a.argv  # under `ask` the tool asks
     c = ad.launch(profile="close", resume=None, prompt=None, unattended=True, cwd=home)
@@ -215,13 +236,100 @@ def test_a_metered_profile_its_extra_args_its_key_and_the_precautions_note(home,
     assert row["key"] is True and "GOOGLE_API_KEY" in row["note"]
 
 
-def test_a_profiles_layers_leave_out_another_profile_whose_name_begins_with_its_own(home):
-    from shiftlead import profiles
+def test_one_wanted_copy_whatever_the_profile_naming_the_hook_beside_the_interpreter(home, monkeypatch, tmp_path):
+    """TD-875: `write_layer` writes one file for every profile and launch, removes the per-profile layers
+    earlier builds wrote, and names `shiftlead-hook` beside the interpreter, whatever `PATH` finds first."""
+    sets = home / "home" / "gemini-settings"
+    (sets / "grind+unattended.json").write_text("{}")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / "shiftlead-hook").write_text("#!/bin/sh\n")
+    (elsewhere / "shiftlead-hook").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{elsewhere}{os.pathsep}{os.environ['PATH']}")
+    p = gemini.write_layer()
+    assert p == sets / "layer.json" and sorted(x.name for x in sets.iterdir()) == ["layer.json"]
+    cmd = json.loads(p.read_text())["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    assert cmd == f"{Path(sys.executable).parent / 'shiftlead-hook'} --adapter gemini"
+    ad = GeminiAdapter(binary="gemini")
+    for prof, unattended in (("gem", False), ("grind", True), ("asks", True)):
+        ad.launch(profile=prof, resume=None, prompt=None, unattended=unattended, cwd=home)
+        assert (
+            sorted(x.name for x in sets.iterdir()) == ["layer.json"]
+            and p.read_text() == gemini.MACHINE_LAYER.read_text()
+        )
 
-    prof = profiles.get("grind")
-    mine = [gemini.write_layer(prof), gemini.write_layer(prof, unattended=True)]
-    (home / "home" / "gemini-settings" / "grind2.json").write_text("{}")  # another profile's, `grind2`
-    assert [r["path"] for r in gemini.layer_reading(prof)] == sorted(str(p) for p in mine)
+
+@pytest.mark.parametrize(
+    ("case", "why"),
+    [
+        ("missing", "not installed"),
+        ("mine", "is not root-owned"),
+        ("writable", "is writable by group or others"),
+        ("dir", "etc is not root-owned"),
+        ("unresolved", "names no hook command that resolves"),
+    ],
+)
+def test_a_launch_is_refused_without_a_layer_the_tool_would_read(home, monkeypatch, case, why):
+    """A missing layer, one the user owns, one group-writable, one under a directory not root's, and one
+    naming no hook that resolves: the launch is refused in words naming `ao doctor`, and doctor reads lacking."""
+    from shiftlead import doctor
+
+    machine = gemini.MACHINE_LAYER
+    if case == "missing":
+        machine.unlink()
+    elif case == "mine":
+        monkeypatch.setattr(gemini, "_lstat", rooted(mine=str(machine)))
+    elif case == "writable":
+        monkeypatch.setattr(gemini, "_lstat", rooted(writable=str(machine)))
+    elif case == "dir":
+        monkeypatch.setattr(gemini, "_lstat", rooted(mine=str(machine.parent)))
+    else:
+        doc = json.loads(machine.read_text())
+        for g in doc["hooks"].values():
+            g[0]["hooks"][0]["command"] = "/nowhere/shiftlead-hook --adapter gemini"
+        machine.write_text(json.dumps(doc))
+    with pytest.raises(ValueError, match="the Gemini layer is not installed — run the line `ao doctor` prints") as e:
+        GeminiAdapter(binary="gemini").launch(profile="gem", resume=None, prompt=None, unattended=False, cwd=home)
+    assert why in str(e.value)
+    rows = doctor.hooks(
+        {"layers": [{"profile": r["profile"], "layers": r["layers"]} for r in GeminiAdapter().doctor_profiles()]}, None
+    )
+    (row,) = rows  # one line for the one file, though four profiles name it
+    assert row["verdict"] == "lacking" and row["text"].endswith(gemini.INSTALL_LINE)
+    words = {"missing": "not installed", "unresolved": "names no hook command that resolves"}.get(
+        case, "not root-owned"
+    )
+    assert f"hooks — Gemini layer {words}" in row["text"]
+
+
+def test_a_layer_differing_in_a_setting_launches_and_doctor_reads_it_stale(home):
+    from shiftlead import doctor
+
+    def lines():
+        return doctor.hooks(
+            {"layers": [{"profile": r["profile"], "layers": r["layers"]} for r in GeminiAdapter().doctor_profiles()]},
+            None,
+        )
+
+    assert [r["verdict"] for r in lines() if "Gemini" in r["text"]] == []  # the same bytes: ok
+    doc = json.loads(gemini.MACHINE_LAYER.read_text())
+    doc["ui"]["hideTips"] = False
+    gemini.MACHINE_LAYER.write_text(json.dumps(doc))
+    spec = GeminiAdapter(binary="gemini").launch(profile="gem", resume=None, prompt=None, unattended=False, cwd=home)
+    assert spec.env["GEMINI_CLI_SYSTEM_SETTINGS_PATH"] == str(gemini.MACHINE_LAYER)
+    (row,) = [r for r in lines() if "Gemini" in r["text"]]
+    assert row["verdict"] == "warning" and row["text"] == f"hooks — Gemini layer stale: {gemini.INSTALL_LINE}"
+
+
+def test_the_tools_test_follows_a_symlink_to_where_it_points(tmp_path, monkeypatch):
+    real = tmp_path / "real.json"
+    real.write_text("{}")
+    link = tmp_path / "link.json"
+    link.symlink_to(real)
+    monkeypatch.setattr(gemini, "_lstat", rooted(mine=str(real)))
+    assert gemini.insecure(link) == f"{real} is not root-owned"
+    monkeypatch.setattr(gemini, "_lstat", rooted())
+    assert gemini.insecure(link) is None
 
 
 def test_the_hook_entry_dispatches_on_the_adapter_flag(monkeypatch):

@@ -89,6 +89,16 @@ python3 -m virtualenv ~/.local/share/shiftlead-venv          # (pipx works the s
 ~/.local/share/shiftlead-venv/bin/pip install --upgrade '/path/to/shiftlead[ui]' && ~/.local/share/shiftlead-venv/bin/ao service install
 ```
 
+**A machine with a Gemini profile** (an `adapter: gemini` entry in `profiles.yml`) needs one more line,
+run once by you with `sudo`. Gemini CLI reads its hooks only from a settings file that root owns, so
+ShiftLead writes the file it wants to `~/.shiftlead/gemini-settings/layer.json` and you install it.
+Until you do, a Gemini launch is refused (design §4.3 *The second adapter*). `ao doctor hooks` prints
+the same line, and prints it again whenever the installed copy is stale:
+
+```bash
+sudo install -d -o root -g root -m 0755 /etc/shiftlead && sudo install -o root -g root -m 0644 ~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json
+```
+
 ### Reach it from your phone
 
 Never a bare public port (design §4.5). The UI listens on two loopback ports: the **plain port**
