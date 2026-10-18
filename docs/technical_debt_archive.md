@@ -16726,4 +16726,4 @@ Then file the build entry and name it in `Blocked by:`.
 
 **Related:** TD-880, TD-805.
 
-**Resolved:** 2026-10-18 (grinder-ao-2, #PR). In `tests/test_ui_gzip.py`, (a)–(d) each fail a test when reverted alone: a 5,000-byte body under `Range` sent plain (and gzipped without it); a 404 and a 206 of the same body sent plain; an already-gzipped body of random bytes over `GZIP_MIN` sent unchanged; a `StreamingResponse` of two chunks decoding whole. (e) cannot fail a test: `parse_qsl` drops a blank value by default, so `?v=` yields no pair and `and v` never decides; `test_an_empty_v_is_no_hash` pins `?v=` reading `no-cache`.
+**Resolved:** 2026-10-18 (grinder-ao-2, #2126). In `tests/test_ui_gzip.py`, (a)–(d) each fail a test when reverted alone: a 5,000-byte body under `Range` sent plain (and gzipped without it); a 404 and a 206 of the same body sent plain; an already-gzipped body of random bytes over `GZIP_MIN` sent unchanged; a `StreamingResponse` of two chunks decoding whole. (e) cannot fail a test: `parse_qsl` drops a blank value by default, so `?v=` yields no pair and `and v` never decides; `test_an_empty_v_is_no_hash` pins `?v=` reading `no-cache`.
