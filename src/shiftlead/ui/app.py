@@ -3368,19 +3368,29 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         record — over the current day or week."""
         from sessionorc.shape import SHAPE_MIN_HOURS
 
-        agent_down, why, readings, teams = False, "", [], set()
+        agent_down, why, readings, teams, failed = False, "", [], set(), []
         try:
-            for t in (await spend_reading({**picks, "team": ""})).get("teams") or []:
-                teams.add(str(t.get("team")))
+            with contextlib.suppress(HTTPException):  # an older home with no seat ledger still has its records
+                for t in (await spend_reading({**picks, "team": ""})).get("teams") or []:
+                    teams.add(str(t.get("team")))
             teams |= {str(r["team"]) for r in await call("list") if r.get("team")}
             teams -= {SPEND_INTERACTIVE, SPEND_OUTSIDE}
             for t in [picks["team"]] if picks["team"] else sorted(teams):
-                readings.append(await call("shape", team=t, window=picks["window"]))
+                try:
+                    readings.append(await call("shape", team=t, window=picks["window"]))
+                except HTTPException as e:
+                    if e.status_code == 503:
+                        raise
+                    failed.append(f"{t}: {e.detail}")  # one team's failure leaves the others drawn
         except HTTPException as e:
             agent_down = e.status_code == 503
             why = "" if agent_down else f"the home did not serve the team's shape: {e.detail}"
+        if failed and not why:
+            why = "the home did not serve the team's shape: " + "; ".join(failed)
         ctx = {
-            "v": {"served": False} if why else shape_view(readings, picks, sorted(teams), SHAPE_MIN_HOURS),
+            "v": shape_view(readings, picks, sorted(teams), SHAPE_MIN_HOURS)
+            if readings or not why
+            else {"served": False},
             "picks": picks,
             "why": why,
             "agent_down": agent_down,

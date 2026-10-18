@@ -166,9 +166,25 @@ def test_the_page_draws_a_block_per_team_on_all_and_the_picked_team_alone(tmp_pa
     assert c.get("/api/shape?team=ao-grind&window=week").json()["window"] == "week"
 
 
-def test_an_older_home_without_the_shape_reading_is_said(tmp_path, monkeypatch):
+def test_an_older_home_without_the_shape_reading_is_said_with_a_way_back(tmp_path, monkeypatch):
     html = client(monkeypatch, tmp_path, fake([], no_shape=True)).get("/spend?view=shape&team=ao-grind").text
-    assert "the home did not serve the team&#39;s shape: unknown method: shape" in html
+    assert "the home did not serve the team&#39;s shape: ao-grind: unknown method: shape" in html
+    assert '<a href="/spend">Spend →</a>' in html
+    assert spend_picks({"view": "shape", "team": "interactive"})["team"] == ""  # as on Spend: All
+
+
+def test_one_teams_failed_reading_leaves_the_others_drawn(tmp_path, monkeypatch):
+    calls: list = []
+    Fake = fake(calls)
+
+    class OneFails(Fake):
+        async def call(self, method, **kw):
+            if method == "shape" and kw["team"] == "dc-grind":
+                raise AgentError("dc-grind broke")
+            return await super().call(method, **kw)
+
+    html = client(monkeypatch, tmp_path, OneFails).get("/spend?view=shape").text
+    assert html.count('class="shteam"') == 1 and "dc-grind: dc-grind broke" in html
 
 
 def test_ao_team_shape_prints_the_lines_and_json_the_reply(monkeypatch, capsys):

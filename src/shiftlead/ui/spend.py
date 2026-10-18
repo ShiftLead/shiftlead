@@ -42,13 +42,14 @@ def spend_picks(params: Mapping[str, str]) -> dict[str, Any]:
     window = str(params.get("window") or "day")
     window = window if window in WINDOWS else "day"
     team = str(params.get("team") or "")
+    team = "" if team in (INTERACTIVE, OUTSIDE) else team
     if view == "shape":
         return {"view": view, "window": "week" if window == "month" else window, "at": "", "team": team, "top": False}
     return {
         "view": view,
         "window": window,
         "at": str(params.get("at") or ""),
-        "team": "" if team in (INTERACTIVE, OUTSIDE) else team,
+        "team": team,
         "top": params.get("top") == "all",
     }
 
