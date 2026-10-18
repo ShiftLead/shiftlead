@@ -323,6 +323,30 @@ def test_the_page_draws_the_question_on_its_card_and_the_inbox_does_not(tmp_path
     assert c.get("/api/person/inbox?counts=1").json()["queue_n"] == 2
 
 
+def test_each_request_reads_the_board_choices_once_however_many_rows(tmp_path, monkeypatch):
+    """§4.5 *Page loads* (*Each fact once per request*, TD-879): the Queue's attached rows share one
+    `board_choices()`, as do the Inbox page and its poll."""
+    from shiftlead.ui import app as ui
+
+    entries = [mail(f"m{i}", f"TD-{tid}: question {i}?") for i, tid in enumerate((20, 21, 30, 20, 21))]
+    c = client(monkeypatch, tmp_path, fake(queue(), entries))
+    calls = []
+    real = ui.board_choices
+
+    def counted(*a, **k):
+        calls.append(1)
+        return real(*a, **k)
+
+    monkeypatch.setattr(ui, "board_choices", counted)
+    html = c.get("/queue").text
+    assert all(f"question {i}?" in html for i in range(5))
+    assert len(calls) == 1
+    for url in ("/inbox", "/api/person/inbox"):
+        calls.clear()
+        assert c.get(url).status_code == 200
+        assert len(calls) <= 1, url
+
+
 def test_with_nothing_on_the_queue_the_number_links_to_the_inbox(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(queue(), [mail("m2", "about nothing")]))
     inbox = c.get("/inbox").text
