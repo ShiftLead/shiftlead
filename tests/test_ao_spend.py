@@ -81,6 +81,26 @@ def test_by_team_then_each_teams_seats_then_interactive_then_outside():
     )
 
 
+def test_by_team_marks_each_team_against_the_previous_period_to_date():
+    """§4.7 `ao spend` (TD-876): the By team line's change against the previous period to date — ▲ where this
+    period's is the larger, ▼ where smaller, — where the previous spent nothing."""
+    led = ledger()
+    led["began"] = "2026-10-05T00:00:00Z"
+    led["days"]["2026-10-06"] = {"g1": _row(100.0, 50, "grinder-ao-1")}  # last week, by Saturday: ≈$100
+    led["days"]["2026-10-07"] = {"c1": _row(80.0, 50, "dc-grinder", team="dc-grind")}  # ≈$80
+    by_team = {ln.split(" · ")[0].strip(): ln for ln in cli.spend_lines(got("week", led=led), None, TODAY)[1:5]}
+    assert by_team["ao-grind"].startswith("  ao-grind · ≈$158 · 72% · ▲ 58% · 1,663 turns")
+    assert by_team["dc-grind"].startswith("  dc-grind · ≈$50.00 · 23% · ▼ 38% · 150 turns")
+    assert by_team["interactive sessions"].startswith("  interactive sessions · ≈$9.45 · 4% · — · 147 turns")
+
+
+def test_a_reading_with_no_outside_turns_prints_no_outside_line():
+    led = ledger()
+    del led["days"]["2026-10-17"]["outside"]
+    lines = cli.spend_lines(got(led=led), None, TODAY)
+    assert lines[-1].startswith("  ao-paul ·") and not any("outside shiftlead" in ln for ln in lines)
+
+
 def test_a_teams_head_line_then_its_block_alone_and_interactive_the_same():
     lines = cli.spend_lines(got(team="ao-grind"), "ao-grind", TODAY)
     assert lines[0] == "ao-grind · ≈$138 today (so far) · yesterday ≈$20.00 · this week ≈$158 · October ≈$158"

@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | In progress (slice 1 #2110) |
-| TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
 | TD-879 | Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request | Medium | Built (#2108) — live check |
@@ -1504,26 +1503,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** on kmaster, after the person runs the printed line once, `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and the permission step, and TD-785's capture can run.
 
 **Related:** TD-871 (the design, amended 2026-10-17 on gemini-support's review), TD-785 (blocked by this), TD-112, TD-786.
-
----
-
-## TD-876: `ao spend`'s By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, auditing #2086 (TD-831))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/cli.py` (`spend_lines`); `tests/test_ao_spend.py`
-
-**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ao_spend.py` still reads `9 passed` with (a) `if "to_date" in (p := t.get("previous") or {}):` replaced by `if False:` — the whole `▲ n%` / `▼ n%` / `—` column of the By team line, which design §4.7 shows as *ao-grind · ≈$426 · 82% · ▲ 51% ·…*; the test asserts `by_team.startswith("  ao-grind · ≈$138 · 87% · 1,563 turns …")` and never a marker, and no assertion in the file contains `▲`, `▼` or `—` — and (b) `if int(outside.get("turns") or 0):` replaced by `if True:`, so *outside shiftlead* would print on a reading with none (the ledger has outside turns in every case, and the empty ledger's test reads only `lines[0]`). The other reverts tried (the `most` seat, the block order, the entries sort, the `unknown` profile) each fail a test.
-
-**Fix:** In `tests/test_ao_spend.py` give the By team line a previous period to compare: assert `▲ n%` where this period's figure to date is the larger, `▼ n%` where smaller, and `—` where the previous was zero; and assert that a ledger with no outside turns prints no *outside shiftlead* line.
-
-**Done when** each of the two reverts above fails a test.
-
-**Related:** TD-831, TD-818.
 
 ---
 
