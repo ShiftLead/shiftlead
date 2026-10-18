@@ -360,6 +360,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-18 (TD-884, grinder-ao-2; the live `/settings` read 141–344 ms to its first byte, some 68 ms of each load in no named step and its five RPCs awaited in turn): *Page loads* — reads that wait on none of each other are made at once, the top bar's chips take the route's own `usage`, `gate` and `host`, and *Measured on every load* names a page's file reads (`files`, `flows`).
 - 2026-10-18 (TD-888, the designer; the live Queue read 148 KB gzipped against its 150 KB budget): *Page loads* — a Queue card's closed *details* is read on its first open (`GET /api/fold?key=`), its mail rows carry no `data-find` and no Snooze, a `title` repeating its element's text is not drawn, and a card's find text is built in the browser; screen 12's cards no longer send it. Built by TD-890, TD-891 and TD-892.
 - 2026-10-18 (TD-882 slice 2, grinder-ao-2, building TD-805): *Only what is shown* names how the Repo page holds its folds — each Technical debt list to its fourth row, Recently completed to its window and eight rows, the rest by `part=1` with `win` and `open` (a list's key, or an anchor's id not yet sent).
 - 2026-10-18 (TD-882 slice 1, grinder-ao-2, building TD-805): *Only what is shown* names how the Queue holds a window — the lines of one (its `win`, *day* unless the URL names another), a wider one read once by `part=1&win=<window>`, since the windows nest.

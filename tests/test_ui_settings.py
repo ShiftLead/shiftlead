@@ -553,7 +553,7 @@ def test_every_page_draws_the_usage_chip(client, subprocess_agent, monkeypatch):
 
     reading = {"paul": {"windows": [{"label": "week", "pct": 42, "resets": None}], "fetched": "x", "profiles": []}}
 
-    async def chip(call, sessions=None):
+    async def chip(call, sessions=None, **reads):
         return reading
 
     monkeypatch.setattr(appmod, "chip_usage", chip)
