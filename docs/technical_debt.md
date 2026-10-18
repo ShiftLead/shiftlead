@@ -73,6 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Open — needs a design |
+| TD-889 | #2121's Repo-page read loop in `app.js` (`again`, `short`, the `data-unsent` press and its re-enable) leaves the suite passing when changed | Low | Open |
 
 ---
 
@@ -1518,3 +1519,23 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Related:** TD-805, TD-882.
 
 ---
+
+---
+
+## TD-889: #2121's Repo-page read loop in `app.js` (`again`, `short`, the `data-unsent` press and its re-enable) leaves the suite passing when changed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2121 (TD-882 (2)))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (`AO.repo`: `reread`, `unfold`, `loading`); `tests/test_ui_repo_hash.py`, `tests/test_ui_repo_completed.py`
+
+**Why:** With each changed alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_repo_hash.py tests/test_ui_repo_completed.py tests/test_ui_repo_page.py tests/test_ui_repo_org.py tests/test_ui_queue_picks.py tests/test_ui_queue.py` still reads `77 passed`: (a) `if (busy) { if (String(q) !== inflight) again = true; return; }` → `if (busy) return;`, so a read for other rows (an anchor asked while a poll is out) is dropped; (b) `if (read && loaded() !== win) short = win;` deleted, so an older home that answers without the wider window is asked again on every apply; (c) `$$("[data-unsent][disabled]", lists).forEach((b) => (b.disabled = false));` deleted, so a failed read leaves *+n more* disabled for good; (d) the `data-unsent` branch of `unfold` deleted, so the press unfolds nothing and reads nothing. The only tests of this JS read source text (`test_ui_repo_hash.py` asserts `sought.add(id); want = id; return reread();`, `q.set("open", …)` and `opened.forEach((k) => unfold(k, true))`; deleting the `sought` line is the one change it catches). The Queue's twin of (b) is asserted by substring (`tests/test_ui_queue_picks.py`), the Repo page's is not; no test runs the Repo reread, as `test_a_wider_window_is_read_once…` runs `qWinFetch` under node.
+
+**Fix:** Run `AO.repo`'s `reread`/`unfold` under the node probe `tests/test_ui_queue_picks.py` uses (a fake `fetch` and `document`): two rereads for different rows while one is out end in two fetches; a read without the wider window is not asked twice; a failed fetch re-enables `[data-unsent]` buttons; pressing a `data-unsent` button fetches `open=<key>`.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-882, TD-886.
