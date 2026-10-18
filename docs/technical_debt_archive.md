@@ -16661,3 +16661,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-869.
 
 **Resolved:** 2026-10-18 (grinder-ao-1, #2120). `test_git_info_skips_a_rename_source_that_reads_as_an_entry` renames `? old.txt` to `new.txt` and asserts `info.files == ['R new.txt']` and `info.dirty == 1`; with the `i += 1` deleted it fails (`1 failed, 9 passed`).
+
+## TD-887: #2110/#2113's Gemini layer code: the symlink bound, the atomic write, the same-bytes skip, the unreadable and OSError readings and every setup-note fallback leave the suite passing when removed
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2110 (TD-875 1) and #2113 (TD-875 2))
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`insecure`, `write_layer`, `machine_reading`, `setup_note`); `src/sessionorc/agent_tick.py` (`_setup_notes`); `src/sessionorc/containers.py` (`write_layers`); `tests/test_gemini_adapter.py`, `tests/test_gemini_setup.py`
+
+**Why:** With each reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gemini_adapter.py tests/test_gemini_setup.py` still reads `32 passed`: the `"insecure": "is not root-owned"` word in `setup_note` (an insecure layer then gets the *names no hook command* wording); `if seen > 40:` raised to 4,000,000 (a symlink loop then spins forever on a root-owned machine); `write_layer`'s temp-file-and-`os.replace` replaced by `write_text` (its comment says an overlapping launch reads it mid-write); `if not same:` made `if True:` (the rewrite on every launch); `machine_reading`'s `OSError` arm returning `ok`, and its unreadable-JSON arm raising; `setup_note`'s `except (OSError, …): return None`; `[:12]` of the digest emptied (every wanted copy then shares one key per reading); `_setup_notes`'s `except Exception` (a broken adapter holds up the tick) and its `(OSError, ValueError)` store read; `write_layers`'s `except Exception` (a broken adapter takes the node's build down); and `seen = "none"` (no `profiles.yml`).
+
+**Fix:** In those two modules: a symlink loop (`a`→`b`→`a`) read `loops`; a `MACHINE_LAYER` holding invalid JSON read `unresolved: unreadable`; an unreadable `MACHINE_LAYER` (mode 000, or a directory) read `missing`; an insecure layer's note text carrying `is not root-owned`; `write_layer` with `os.replace` patched to raise leaving the old copy whole; two launches with the same bytes keeping the file's mtime; the wanted copy changed with the reading the same giving a second note; an adapter whose `setup_note`/`machine_layers` raises, with the others still read; a corrupt `setup_notes.json`; and no `profiles.yml`.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-871, TD-875.
+
+**Resolved:** 2026-10-18 (grinder-ao-2, #2123). `tests/test_gemini_guards.py`: each reversion the Why lists, applied alone, fails a test — an insecure layer's note words, a symlink loop bounded (the counting `lstat` fails past 100 calls), `os.replace` raising leaving the old copy, the same bytes keeping the mtime, a directory at the layer reading `missing`, invalid JSON `unresolved: unreadable`, an undeclared default giving no note, a changed wanted copy noted again under the same reading, a broken adapter and a corrupt `setup_notes.json` holding up no note, a broken adapter's node layer left out, and no `profiles.yml` raising nothing.
