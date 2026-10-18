@@ -3681,7 +3681,7 @@ def test_a_mail_row_draws_its_subject_first_and_the_find_matches_it():
 
     given = entry("m-1", "ask", text="Which branch? The fix is ready.", subject="branch for the fix")
     html = rows("needs", [given])
-    assert '<div class="subj" title="branch for the fix">branch for the fix</div>' in html
+    assert '<div class="subj">branch for the fix</div>' in html
     assert html.index('class="subj"') < html.index('class="body md"')
     assert "branch for the fix" in row_find(given)
     older = rows("fyi", [entry("m-2", "note", text="merged #517. one gap left")])
@@ -3698,5 +3698,5 @@ def test_the_message_page_heads_with_the_subject_and_its_tab_says_it(client, tmp
     ask = send(sid, text="merge #9?\n\nthe reading", kind="ask", subject="merge the font fix")
     html = client.get(f"/inbox/{ask['id']}").text
     assert "<title>merge the font fix · Inbox · ShiftLead</title>" in html
-    assert '<span class="h1 msgsubj" title="merge the font fix">merge the font fix</span>' in html
+    assert '<span class="h1 msgsubj">merge the font fix</span>' in html
     assert ".msgpage .msgentry > .mailrow > .subj { display: none; }" in (UI / "static" / "app.css").read_text()
