@@ -1623,8 +1623,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-17 (TD-805's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2111
+**Status:** Built #2111 (2026-10-17, grinder-ao-1): the header, the twenty kept, the smoke's two loads and its budget line, and a passing smoke's told part on the note, each tested and the header read on a scratch home. Left is the live half: once #2111 is live (`ao promote status`), read the live Queue's `Server-Timing` (a headless GET of `/queue`, its header) and the next promote's note for a page over budget with its longest step.
 **Location:** design §4.5 *Page loads* (*Measured on every load*), §6 *This repo's smoke*; `src/shiftlead/ui/app.py` (the page routes, `agent_call`/`call`, the person-inbox helpers), `scripts/smoke.py` (the load line, the note); `tests/test_smoke.py`
 
 **Why:** TD-805 could split the server's time only by rebuilding a page offline: nothing records where a live page's time goes, and the smoke prints first byte and size with no budget.
