@@ -1269,15 +1269,17 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     - A page fails on any of: a status other than 200; a body that does not end its `</html>`;
       a load past `PAGE_BOUND`; an uncaught script error; or a page whose `load` never fires.
       `PAGE_BOUND` is the smoke's own 20 seconds, a constant of the script and not a page budget:
-      the budgets are TD-805's.
+      the budgets are §4.5 *Page loads*' (TD-805), read beside it and told, never failed.
     - Where `settings.yml` has a `reach:`, it loads the Org and the Queue once more through
       `reach.url`, the route the person uses. Those loads are told and fail nothing: whether the
       home's own request carries an identity the route allows is the route's business, not the
       build's. A refusal is written in the log and on the note.
     - It reads `ao status --json`, `ao repo --json` and `ao promote status --json`, each of which
       must exit 0 with JSON. It never runs `ao inbox`, since reading marks entries read (§4.10).
-    - Each load prints one line to the log, so every promote also measures the pages TD-805 asks
-      about: the page, its status, time to first byte, total time and size.
+    - Each load prints one line to the log, so every promote also measures the pages: the page, its
+      status, time to first byte, total time, size, DOM ready and the page's `Server-Timing` steps.
+      A page over §4.5 *Page loads*' budget is a line on the promote's note naming the page and its
+      longest step; it fails nothing.
     - The browser half (script errors, `load`) needs Playwright and its Chromium headless shell.
       They live in `~/.local/share/shiftlead-smoke/`, a venv of their own that
       `scripts/smoke.py --setup` makes once, at a person's hand, and never inside the live venv.
