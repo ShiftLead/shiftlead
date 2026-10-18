@@ -71,7 +71,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
-| TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
+| TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | In progress (slice 1 #2110) |
 | TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
@@ -1479,7 +1479,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-17 (TD-871's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** In progress (grinder-ao-2). Slice 1 #2110 (2026-10-17): the layer, the launch's check, `ao doctor` hooks and README's step. Left: slice 2, the host agent's note and the container node (`src/sessionorc/`); slice 3, the walk and `--capture` (`scripts/conformance.py`).
 **Location:** design §4.3 *The second adapter: Gemini CLI* (`launch`: the machine's layer) and *The conformance suite* (the walk's permission step and doorbell, `--capture`), §4.7 `ao doctor` (*hooks*); `src/shiftlead/adapters/gemini/__init__.py` (`layer_file`, `write_layer`, `layer_reading`, `launch`'s env, `doctor_profiles`), `scripts/conformance.py` (`Walk.permission`, `Walk.doorbell`, the capture), `src/sessionorc/containers.py` (`dockerfile_text`), the host agent's start and its profile reload (the note), `README.md` (the install steps); `tests/test_gemini_adapter.py`, `tests/test_doctor.py`, `tests/test_cli_doctor.py`, `tests/test_conformance_walk.py`
 
 **Why:** TD-871: Gemini CLI 0.64.0 skips a system settings file root does not own, so the per-launch layer under `~/.shiftlead/gemini-settings/` is never read and no hook reaches a Gemini session. Paul chose a root-owned layer the person installs once per machine (m-1868eab7648f).
