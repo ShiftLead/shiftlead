@@ -82,6 +82,8 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Open |
+| TD-872 | #2077's `pick_files` has three guards no test fails without: Working tree's twenty-line cap, the porcelain's rename source, and `--first-parent` | Low | Open |
+| TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
 
 ---
 
@@ -1754,5 +1756,45 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the design names where a Gemini launch's hooks come from, a launch with it delivers `SessionStart` to the record on kmaster, and TD-785's capture is unblocked.
 
 **Related:** TD-112, TD-785, TD-786.
+
+---
+
+## TD-872: `pick_files`' Working-tree cap, its porcelain rename skip and its `--first-parent` each leave `tests/test_git_files.py` passing when removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2077 (TD-862 (1)))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/gitinfo.py` (`pick_files`, `_porcelain`); `tests/test_git_files.py`
+
+**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_git_files.py` still reports `10 passed` with (a) `[:GIT_PICK_TREE]` deleted from the `tree` branch (no test holds more than two dirty paths, so the twenty-line cap §4.2 states is unpinned; `test_session_caps_at_a_hundred_with_more` covers Session only), (b) `i += 1  # the source follows the path` in `_porcelain` replaced by `pass` (no test stages a rename, so the rename's source path would surface as a bogus extra entry in Working tree and Session), and (c) `"--first-parent", ` deleted from the `git log` call (every test's history is linear, so a merge commit's second-parent commits would enter the ten). The spec at TD-856 names all three.
+
+**Fix:** add the case to the PR's test module.
+
+**Done when** a test with 25 dirty paths gets twenty from `tree`; a staged `git mv` gives one entry with the new path in `tree` and `session`; a history with a merged side branch lists only the first-parent line, and each fails when its line above is reverted.
+
+**Related:** TD-856, TD-862.
+
+---
+
+## TD-873: No test fails when the Org or Repo page drops the team spend figure, or when the weights card accepts `inf`/`nan`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2074 (TD-832 (2)) and #2078 (TD-832 (3)))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/app.py` (`org` and `repo_page`, their `team_groups(..., await h.team_spend())` argument); `src/shiftlead/ui/settings_page.py` (`weights_body`'s `math.isfinite`); `tests/test_ui_spend.py`
+
+**Why:** On `origin/main`, replacing `{} if agent_down else await h.team_spend(),` in `org`, or the `await h.team_spend(),` argument in `repo_page`, with `{}` leaves the whole suite green (`3566 passed, 1 skipped`, both runs): the one test builds `team_groups` and `Readings.team_spend` apart and never loads either page, so a team card could lose its figure on both pages unseen. Likewise `if not math.isfinite(v) or v < 0:` reduced to `if v < 0:` leaves `tests/test_ui_spend.py` at `13 passed`: no test sends `inf` or `nan`, which `float()` parses and `v < 0` does not refuse, so a Save would write an infinite price into `spend.weights`.
+
+**Fix:** add the case to the PR's test module.
+
+**Done when** a page test of `/` and `/repo/<name>` with a seats reading shows the team's `spendfig`; `weights_body` raises on `inf` and `nan`; each fails when its line is reverted.
+
+**Related:** TD-832.
 
 ---
