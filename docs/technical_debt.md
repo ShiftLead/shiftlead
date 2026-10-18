@@ -83,6 +83,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-866 | Rule 9's held-ask wait has two guards no test pins: a derived or scraped claim is not read, and a dead member's held ask blocks nothing | Medium | Open |
 | TD-867 | `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
+| TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 
 ---
 
@@ -1677,7 +1678,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (TD-856's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 (the `git_files` read: `gitinfo.pick_files`, `rpc_git_files`, `NODE_READS`, `identity.READS`) by #2077. Slice 2 is the card: the page's route, `#gitcard`'s pick line, `AO.gitFiles`' redraw and the card's tests.
 **Location:** design §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* (and *changed files*, now the pick's Working tree), §4.2 *The Git card's pick*, §4.5 item 4, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`); mockup `docs/mockups/reviews/2026-10-17-td856-git-pick.png` (`gen.py` `focus_git_pick`); `src/sessionorc/gitinfo.py` (`changed_files`, beside which the commit and session reads go), `src/sessionorc/agent.py` (`rpc_paths`, the shape of a record-host read), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/shiftlead/ui/app.py` (the Focus view; a route the page asks, as the transcript's is), `src/shiftlead/ui/templates/focus.html` (`#gitcard`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw); `tests/test_ui_focus_git_files.py`, `tests/test_recent_files.py`, `tests/test_paths_rpc.py`, `tests/test_link.py`
 
 **Why:** TD-856: the Git card lists the porcelain alone, so the moment a worker commits, the files it changed leave the card and their links with them.
@@ -1779,5 +1780,25 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a shortened `PASS_DRAIN` fails a test.
 
 **Related:** TD-858 (built #2073).
+
+---
+
+## TD-869: `GitInfo.files` reads the porcelain without `-z`, so a path git quotes — a non-ASCII name, a tab, a quote — reaches the Git card quoted and its link opens nothing
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-1, building TD-862; found by its review)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/gitinfo.py` (`git_info`, its `git status --porcelain=v2 --branch` read); `tests/test_gitinfo.py`; the readers of `git.files` (`src/shiftlead/ui/static/app.js` `AO.gitFiles`, the cards' dirty lines)
+
+**Why:** `git_info` runs `git status --porcelain=v2` without `-z`, so under git's default `core.quotePath` a path with a non-ASCII byte or a special character comes C-quoted: an untracked `naïve.txt` is `?? "na\303\257ve.txt"` in `GitInfo.files`, and the Focus Git card's *changed files* (§4.5a, TD-628) links that quoted string, which names no file. TD-862's `git_files` read builds its Working tree from `--porcelain=v1 -z` (`gitinfo._porcelain`) and is unaffected.
+
+**Fix:** read the porcelain with `-z` (`--porcelain=v2 --branch -z`: entries are NUL-terminated, and a rename's source is the next field rather than after a tab) and keep `GitInfo.files`' line form (`<code> <path>`), so its readers do not change.
+
+**Done when** a test holds an untracked `naïve file.txt` and a renamed path with a tab as unquoted lines of `GitInfo.files`, and the existing `git_info` tests pass.
+
+**Related:** TD-628, TD-862.
 
 ---

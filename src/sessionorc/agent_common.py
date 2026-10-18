@@ -187,8 +187,9 @@ HOME_EDITS = frozenset({"set_mode", "set_stop", "set_start", "set_grants", "set_
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
-# A transcript is on its host too (TD-165), and so is the file a pane names (`paths`, TD-501).
-NODE_READS = frozenset({"tail", "explain", "log_tail", "transcript", "paths"})
+# A transcript is on its host too (TD-165), and so is the file a pane names (`paths`, TD-501), and
+# the Git card's pick (`git_files`, TD-856).
+NODE_READS = frozenset({"tail", "explain", "log_tail", "transcript", "paths", "git_files"})
 TRANSCRIPT_TURNS_MAX = 500  # prompts one transcript read may ask for: a page is twenty
 PATHS_RUNS_MAX = 8  # runs one `paths` read may ask about: one row of a pane (§4.6 *A path in the pane is a link*)
 PATHS_RUN_CHARS = 512  # and the length of each
