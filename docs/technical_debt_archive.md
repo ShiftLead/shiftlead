@@ -16080,6 +16080,8 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2072, #2074, #2078). `/spend` and the usage chip's press (#2072); the team card's **spend** figure, today's `seats` row linking to `/spend?team=<t>` (#2074); the Settings page's **weights** card, writing to `spend.weights` through `set_settings` only the rows that differ from the default (#2078). Screenshots `docs/mockups/reviews/2026-10-17-td832-*.png`. The per-entry figure per seat and a seat's tokens by kind wait on the reading (TD-865).
 
+**Look:** 2026-10-17, steer m-97180dbfbe98 to Paul, which went with its default *Works*: on a shipped model row, the weights card's × puts the row back at its default price. §4.5a's row says so since #2088.
+
 ## TD-866: Rule 9's held-ask wait has two guards no test pins: a derived or scraped claim is not read, and a dead member's held ask blocks nothing
 
 **Priority:** Medium
