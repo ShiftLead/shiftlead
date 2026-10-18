@@ -16904,3 +16904,43 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a Queue render's closed folds carry no body and its open ones do, `/api/fold` answers each of the three kinds with the same HTML the Inbox draws in that fold (a test per kind), a re-read keeps an opened fold's body, and the live Queue — after TD-890 and this are promoted — reads under 120 KB on the wire at load (a gzipped GET, read once the build is live, recorded here).
 
 **Resolved:** 2026-10-18 (grinder-ao-1, live check of #2139, live in `0f60b2b` with #2136). Four gzipped headless GETs of the live `/queue` each read 114,173–114,178 bytes on the wire, under 120 KB (TD-888 measured 141 KB before TD-890 and this); the page draws 66 folds `data-lazy`, and `GET /api/fold?key=board:/home/kmaster/samscrape:39` answered 200 with the fold's 1,189-byte body in 128 ms to its first byte.
+
+## TD-893: The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, reading TD-884 live)
+**Owner:** grinder
+**Kind:** live-check #2140
+**Status:** Resolved
+**Location:** design §4.5 *Page loads* (the 500 ms budget of Org, Inbox, Repo, Queue; *Measured on every load*); `src/shiftlead/ui/app.py` (`repo_page`, its untimed reads and the order of its `call`s)
+
+**Why:** The promote of `232c389`'s smoke told *repo over budget: first byte 0.51 s over 0.5 s — longest step rpc_repos 56 ms*. Eight warm headless GETs of the live `/repo/shiftlead` on 2026-10-18 read 0.44–0.66 s to the first byte, three of them over 500 ms; their `Server-Timing` steps sum to some 200 ms (`rpc_list` ~50, `board` ~52, `rpc_inbox` 19–153, `rpc_repos` ~21, `render` ~15), and `total` is 441–658 ms, so 250–400 ms of every load is the route's own work no step names. The longest *named* step the note gives is therefore not where the time goes. TD-884 found the same shape on the Settings page and #2135 cured it there.
+
+**Fix:** as #2135 did for Settings: time `repo_page`'s file and ledger reads as steps (the ledger, the board's detail, the team flows, the registry), so the header shows where the 250–400 ms goes; make the RPCs at once and the file reads on a worker thread beside them; read once what the page reads twice.
+
+**Done when** ten warm loads of the live `/repo/shiftlead` each read under 500 ms to the first byte, and a promote's note no longer names the Repo page.
+
+**Related:** TD-884, TD-805, TD-881.
+
+**Resolved:** 2026-10-18 (grinder-ao-1, by TD-896's #2145, live in `b751cdb`). Thirty warm headless GETs of the live `/repo/shiftlead`: 257–393 ms to the first byte, median 267 ms, none over 500 ms (before #2145: five of thirty over, 535–613 ms). Every step is named (#2140) and `flows` is 39 ms, down from ~112 ms.
+
+## TD-896: The Repo page's steady load is 365 ms of a 500 ms budget: `flows` (~115 ms) and `board` (~88 ms) leave no room for a slow seat inbox read
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, reading TD-893 live)
+**Owner:** grinder
+**Kind:** live-check #2145
+**Status:** Resolved
+**Location:** design §4.5 *Page loads*; `src/shiftlead/repoconfig.py` (`parse_yaml`); `src/shiftlead/ui/app.py` (`repo_page`, `flow_views`' `read`, `board_view` → `board_all`)
+
+**Why:** TD-893's live read (2026-10-18, #2140 live): thirty warm loads of `/repo/shiftlead`, five over 500 ms. With every step named, a steady load is ~365 ms, and its two longest serial steps are `flows` (~115 ms: `flow_views` reads every team's `teamrun.flow_view` one after another, each with its files and its RPCs) and `board` (~88 ms, the longest read of the first gather, so the gather waits on it). The seats' inbox reads come after `groups`, in series with all of it, and when one is slow (`rpc_inbox` 515–977 ms summed on three of the five) the load crosses 500 ms; the other two were the whole host slower. 365 ms leaves 135 ms for a slow read or a busy host.
+
+**Fix:** take the serial path down by what does not wait: read each team's `flow_view` at once (a thread each, or one gather), or start `flow_views` in the first gather — it waits only on `list` and the org file; find what `board` spends 88 ms on (every registered repo's board parsed per load?) and read it once per change, as the Repo page reads the definitions; and start the seats' inbox reads as soon as the seats are known (`seats_of` and the records), beside `views` and `groups`, not after them. Measure on a scratch home with this repo's ledger, board and teams, as #2140 did.
+
+**Done when** a steady warm load of the live `/repo/shiftlead` is under 300 ms to the first byte and thirty warm loads each read under 500 ms; then TD-893 is archived with that read.
+
+**Related:** TD-893, TD-884.
+
+**Resolved:** 2026-10-18 (grinder-ao-1, live check of #2145, live in `b751cdb`). Thirty warm headless GETs of the live `/repo/shiftlead`: 257–393 ms to the first byte, median 267 ms, none over 500 ms. `flows` reads 38.6–54 ms, down from 112 ms; `board` ~72 ms, `views` ~44 ms, `rpc_inbox` ~56 ms, so the Fix's other two steps were not needed for the budget. The Org page's `flows` is 48 ms (was ~136 ms) and its load ~300 ms (was ~387 ms).
