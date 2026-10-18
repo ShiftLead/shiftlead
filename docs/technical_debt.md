@@ -77,7 +77,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
-| TD-879 | Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request | Medium | Open |
+| TD-879 | Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request | Medium | Built (#2108) — live check |
 | TD-880 | Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable | Medium | Open |
 | TD-881 | Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget | Medium | Open |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
@@ -1614,8 +1614,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** debt
 **Added:** 2026-10-17 (TD-805's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2108
+**Status:** Built #2108 (2026-10-18, grinder-ao-1) — a live check once #2108 is live (`ao promote status`): read the live Queue's first byte, `curl -s -o /dev/null -w %{time_starttransfer} http://127.0.0.1:<the UI's port>/queue` (a headless GET, a few reads), under 500 ms with its rows as before; the scratch home read 375 ms with every attached row drawn (#2108's UI check)
 **Location:** design §4.5 *Page loads* (*Each fact once per request*); `src/shiftlead/ui/app.py` (`queue_page`: the `queue_mail.html` lambda passing `board_choices()` per row; `person_inbox`'s `boards_of`; the Inbox and Repo routes), `src/shiftlead/ui/inbox.py` (`board_choices`); `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`
 
 **Why:** TD-805 measured the Queue at 2.5 s to its first byte against 358 ms rebuilt offline with no person inbox; `board_choices()` costs 14.6 ms (seven repos' boards resolved on disk) and the Queue's row render calls it once per attached row.
