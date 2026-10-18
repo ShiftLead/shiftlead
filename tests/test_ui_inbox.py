@@ -1469,7 +1469,7 @@ def test_the_answers_are_a_group_of_their_own_apart_from_the_rows_controls():
     for i, a in enumerate(("merge it", "hold it")):
         assert f'data-act="answer" data-id="person" data-msg="m-1" data-index="{i}"' in html
         assert f"&ldquo;{a}&rdquo;" in html  # in quotation marks, so the words read as the sender's
-        assert f'title="{a}"' in html  # cut with an ellipsis in CSS, whole on hover
+        assert f'title="{a}"' not in html  # cut with an ellipsis in CSS, whole on hover by the script (TD-890)
     assert "<button" in html and "<a " not in html.split('class="row gap wrap sugg"')[1].split("</div>")[0]
     css = (UI / "static" / "app.css").read_text()
     assert ".inboxpage .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis;" in css

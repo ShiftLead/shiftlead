@@ -41,10 +41,11 @@
    `data-find` on the row still holds the whole text. #}
 {# §4.5a **subject** (§4.10 *A subject on every entry*, TD-566): every row's first text line — the
    entry's headline, bold, one line clipped with an ellipsis and whole on hover — with the first
-   paragraph under it. Display only. #}
+   paragraph under it. Display only. No `title`: the script sets it on hover when the line is clipped
+   (§4.5 *Page loads*, TD-890). #}
 {% macro subj(e) -%}
 {%- set t = row_subject(e) %}
-{%- if t %}<div class="subj" title="{{ t }}">{{ t }}</div>{% endif %}
+{%- if t %}<div class="subj">{{ t }}</div>{% endif %}
 {%- endmacro %}
 
 {% macro body(e) -%}
@@ -106,7 +107,7 @@
   {%- set pair = look_pair(e) %}
   {%- for a in opts %}
   {%- set form = pair and loop.index0 == 1 %}
-  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
+  <button class="btn sm answer" {% if form %}data-act="reply" data-id="person" data-msg="{{ e.id }}" data-from="{{ e['from'] }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}" data-begun="Not right: " title="say what is off: your words go back to {{ by }} as a reply"{% else %}data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}"{% endif %}>{% if pair %}<span class="alabel">{{ 'Not right…' if form else 'Works' }}</span>{% else %}<span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}{% endif %}</button>
   {%- endfor %}
 </div>
 {%- endif %}
@@ -115,6 +116,7 @@
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
    sender is never told (§4.10 *Snooze*). A `steer` has Pause instead and is offered no Snooze. #}
 {% macro snooze_btn(e) -%}
+{%- if not on_queue %}
 <details class="more"><summary class="btn sm ghost" title="set it aside until later">Snooze</summary>
   <div class="menu">
     {%- if e.snoozed_until or e.snoozed_for %}
@@ -125,6 +127,7 @@
     <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="pick">a date and time…</button>
   </div>
 </details>
+{%- endif %}
 {%- endmacro %}
 
 {# ── design §4.10 *Outcomes* (§4.5a **Inbox section: Waiting on them**; TD-079 step 2) ─────────
@@ -493,6 +496,7 @@
    question and `limited` are never offered one: something is waiting on the tool's own clock. #}
 {% macro state_snooze(e) -%}
 {%- if e.row in ('stalled', 'unpushed', 'restart', 'idle_open') or e.mark == 'cadence' %}
+{%- if not on_queue %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
     {%- if e.snoozed_until %}
@@ -503,6 +507,7 @@
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="pick">a date and time…</button>
   </div>
 </details>
+{%- endif %}
 {%- endif %}
 {%- endmacro %}
 
@@ -746,7 +751,7 @@
 {#- a live look's default is its Works button, *Go with it: Works* (§4.5a) -#}
 {%- set gwi = e.default and e.answers and not e.decided and not e.pair and not waits %}
 <div class="row gap wrap mfoot">
-  {%- if waits %}
+  {%- if waits or on_queue %}{# a waiting line, or the Queue, has no Snooze (screen 12) #}
   <span class="st">on the board — Reply writes on its line and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
   {%- else %}
   <span class="st">on the board — Reply writes on its line, Snooze moves its <code>Due:</code> date and Done checks it off, each one edit landed on {{ e.repo_name or e.repo }}'s origin by shiftlead's own pull request</span>
@@ -758,6 +763,7 @@
       steer row's words and place; the one press records the default — the same `decide`. -#}
   {%- if gwi %}<button class="btn sm ghost" data-act="board" data-id="person" data-board-act="decide" data-answer="{{ e.default }}" data-answers='{{ e.answers|tojson }}' data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" title="{{ help_title('board-go-with-it') }}" data-confirm="Go with it? &ldquo;{{ e.default }}&rdquo; is written on {{ e.repo_name or e.repo }}'s board as your decision.">Go with it</button>{% endif %}
   {%- if not waits %}
+  {%- if not on_queue %}
   <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
     <div class="menu">
       <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">+1 day</button>
@@ -765,6 +771,7 @@
       <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-due="{{ e.due or '' }}" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}">a date…</button>
     </div>
   </details>
+  {%- endif %}
   {%- endif %}
   <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-key="{{ e.key or '' }}" data-line="{{ e.line }}" data-confirm="Check this item off {{ e.repo_name or e.repo }}'s board? It lands on origin by shiftlead's own pull request.">Done</button>
 </div>
@@ -808,6 +815,7 @@
   <button class="btn sm primary" data-act="promote" data-id="person" data-repo="{{ e.repo }}"{% if e.inflight %} disabled title="a promote is in flight"{% else %} title="{{ help_title('promote') }}"{% endif %}>Promote</button>
   {%- endif %}
   {%- if not e.inflight %}
+  {%- if not on_queue %}
   <details class="more"><summary class="btn sm ghost" title="{{ help_title('promote-snooze') }}">Snooze ▾</summary>
     <div class="menu">
       {%- if e.snoozed_until %}
@@ -818,6 +826,7 @@
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="promote" data-when="pick">pick a date…</button>
     </div>
   </details>
+  {%- endif %}
   {%- endif %}
   {%- if e.failed or e.held %}<button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ e.repo }}" data-held="{{ '1' if e.held else '' }}" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}
 </div>
@@ -840,6 +849,7 @@
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
+  {%- if not on_queue %}
   <details class="more"><summary class="btn sm ghost" title="set this row aside until a day you pick; the PR is untouched">Snooze ▾</summary>
     <div class="menu">
       {%- if e.snoozed_until %}
@@ -850,6 +860,7 @@
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="red_pr" data-when="pick">pick a date…</button>
     </div>
   </details>
+  {%- endif %}
   {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="the pull request, on its forge">Open</a>{% endif %}
 </div>
 {%- endmacro %}
@@ -872,6 +883,7 @@
 <div class="row gap wrap mfoot">
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
+  {%- if not on_queue %}
   <details class="more"><summary class="btn sm ghost" title="{{ help_title('ci-snooze') }}">Snooze ▾</summary>
     <div class="menu">
       {%- if e.snoozed_until %}
@@ -882,6 +894,7 @@
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="ci_not_run" data-when="pick">pick a date…</button>
     </div>
   </details>
+  {%- endif %}
   <button class="btn sm" data-act="ci_rerun" data-id="person" data-owner="{{ e.owner }}" title="{{ help_title('ci-rerun') }}">Re-run</button>
   {%- if e.url %}<a class="btn sm primary" href="{{ e.url }}" target="_blank" rel="noopener" title="{{ help_title('ci-open') }}">Open</a>{% endif %}
 </div>
@@ -918,6 +931,7 @@
   {%- if section == 'snoozed' %}{{ snoozed_says(e) }}{% endif %}
   <span class="grow"></span>
   <button class="btn sm primary" data-act="work_start" data-id="person" data-team="{{ e.team }}"{% if e.running %} data-running="1"{% endif %} title="{{ help_title('work-start') }}">Start</button>
+  {%- if not on_queue %}
   <details class="more"><summary class="btn sm ghost" title="{{ help_title('work-snooze') }}">Snooze ▾</summary>
     <div class="menu">
       {%- if e.snoozed_until %}
@@ -928,6 +942,7 @@
       <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="pick">pick a date…</button>
     </div>
   </details>
+  {%- endif %}
   {%- if e.row == 'work' %}
   <button class="btn sm ghost" data-act="clear_work" data-id="person" data-team="{{ e.team }}" title="{{ help_title('work-dismiss') }}">Dismiss</button>
   {%- endif %}
@@ -1011,22 +1026,22 @@
     carries its line's text once, as `data-text`, and its buttons read it from the row (TD-738) -#}
 {% macro row(e, section, origin_first=False) -%}
 {%- if e.row == 'board' %}
-<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}" data-find="{{ row_find(e, section) }}" data-text="{{ e.text }}">
+<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-teams="{{ (e.teams or []) | join(' ') }}" data-repo="{{ e.repo_name or '' }}" data-repo-label="{{ e.repo }}"{% if not on_queue %} data-find="{{ row_find(e, section) }}"{% endif %} data-text="{{ e.text }}">
 {{ board(e, section, origin_first) }}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'ledger' %}
-<div class="mailrow ledgerrow" tabindex="0" data-msg="{{ e.row_id }}" data-at="{{ e.at or '' }}" data-kind="ledger" data-rkind="ledger" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+<div class="mailrow ledgerrow" tabindex="0" data-msg="{{ e.row_id }}" data-at="{{ e.at or '' }}" data-kind="ledger" data-rkind="ledger" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {{ ledger(e, section) }}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row == 'trail' %}
-<div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-rkind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+<div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-rkind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {{ trail(e, section) }}
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- elif e.row %}
-<div class="mailrow staterow" tabindex="0"{% if e.row == 'promote' %} id="promote-{{ e.repo }}"{% endif %} data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+<div class="mailrow staterow" tabindex="0"{% if e.row == 'promote' %} id="promote-{{ e.repo }}"{% endif %} data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {%- if e.row == 'promote' %}{{ promote_row(e, section) }}
 {%- elif e.row in ('work', 'lanes') %}{{ work_row(e, section) }}
 {%- elif e.row == 'red_pr' %}{{ red_pr_row(e, section) }}
@@ -1035,7 +1050,7 @@
 <div class="st rowerr" role="alert" hidden></div>
 </div>
 {%- else %}
-<div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+<div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}"{% if not on_queue %} data-find="{{ row_find(e, section) }}"{% endif %}>
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if e.handed_row %}{{ handed(e, section) }}

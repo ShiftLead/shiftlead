@@ -605,6 +605,17 @@
   }, true);
   const placeOpen = () => $$("details.more[open]").forEach(placeMenu);
   document.addEventListener("scroll", placeOpen, true);
+
+  // ---- whole on hover (§4.5a **subject**, *suggested answers*; §4.5 *Page loads*, TD-890) ----
+  // A line clipped with an ellipsis is whole on hover, and the page sends no `title` repeating its text:
+  // the title is set here, on the first hover, and only on a line that is in fact clipped.
+  AO.wholeOnHover = (el) => {
+    if (!el || el.title || !(el.scrollWidth > el.clientWidth)) return;
+    el.title = el.textContent.trim();
+  };
+  document.addEventListener("mouseover", (ev) => {
+    AO.wholeOnHover(ev.target.closest?.(".mailrow .subj, .msgsubj, .btn.answer .alabel"));
+  });
   window.addEventListener?.("resize", placeOpen);  // `?.`: the node probes have no real window
 
   // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
