@@ -30,6 +30,24 @@ def test_git_info_paths_with_spaces_and_renames(tmp_path):
     assert info.dirty == 3
 
 
+def test_git_info_keeps_a_path_git_would_quote_whole(tmp_path):
+    """Read with -z (TD-869): a non-ASCII name and a tab come unquoted, and a rename's source is no entry."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "old.txt").write_text("x" * 100)
+    run("git", "add", ".", cwd=repo)
+    run("git", "commit", "-q", "-m", "init", cwd=repo)
+    run("git", "mv", "old.txt", "tab\there.txt", cwd=repo)
+    (repo / "naïve file.txt").write_text("u")
+    info = git_info(repo)
+    assert info is not None
+    assert sorted(info.files) == ["?? naïve file.txt", "R tab\there.txt"]
+    assert info.dirty == 2
+
+
 def test_git_info_ahead_of_upstream(tmp_path):
     origin = tmp_path / "origin.git"
     run("git", "init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)

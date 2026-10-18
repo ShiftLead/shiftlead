@@ -71,7 +71,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
-| TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
@@ -1461,26 +1460,6 @@ The other cases:
 **Done when** a shortened `PASS_DRAIN` fails a test.
 
 **Related:** TD-858 (built #2073).
-
----
-
-## TD-869: `GitInfo.files` reads the porcelain without `-z`, so a path git quotes — a non-ASCII name, a tab, a quote — reaches the Git card quoted and its link opens nothing
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (grinder-ao-1, building TD-862; found by its review)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/gitinfo.py` (`git_info`, its `git status --porcelain=v2 --branch` read); `tests/test_gitinfo.py`; the readers of `git.files` (`src/shiftlead/ui/static/app.js` `AO.gitFiles`, the cards' dirty lines)
-
-**Why:** `git_info` runs `git status --porcelain=v2` without `-z`, so under git's default `core.quotePath` a path with a non-ASCII byte or a special character comes C-quoted: an untracked `naïve.txt` is `?? "na\303\257ve.txt"` in `GitInfo.files`, and the Focus Git card's *changed files* (§4.5a, TD-628) links that quoted string, which names no file. TD-862's `git_files` read builds its Working tree from `--porcelain=v1 -z` (`gitinfo._porcelain`) and is unaffected.
-
-**Fix:** read the porcelain with `-z` (`--porcelain=v2 --branch -z`: entries are NUL-terminated, and a rename's source is the next field rather than after a tab) and keep `GitInfo.files`' line form (`<code> <path>`), so its readers do not change.
-
-**Done when** a test holds an untracked `naïve file.txt` and a renamed path with a tab as unquoted lines of `GitInfo.files`, and the existing `git_info` tests pass.
-
-**Related:** TD-628, TD-862.
 
 ---
 

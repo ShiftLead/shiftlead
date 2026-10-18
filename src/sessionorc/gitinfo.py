@@ -144,7 +144,7 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
 def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
     try:
         cp = subprocess.run(
-            ["git", "-C", str(directory), "status", "--porcelain=v2", "--branch", "--untracked-files=normal"],
+            ["git", "-C", str(directory), "status", "--porcelain=v2", "--branch", "-z", "--untracked-files=normal"],
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -154,7 +154,11 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
     if cp.returncode != 0:
         return None
     branch, upstream, ahead, behind, files, oid = "?", None, 0, 0, [], ""
-    for line in cp.stdout.splitlines():
+    # -z: each entry ends in NUL and no path is C-quoted (TD-869); a rename's source is the next field
+    fields, i = cp.stdout.split("\0"), 0
+    while i < len(fields):
+        line = fields[i]
+        i += 1
         if line.startswith("# branch.oid "):
             oid = line.split(" ", 2)[2]
             oid = "" if oid == "(initial)" else oid
@@ -166,13 +170,14 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
             parts = line.split()
             ahead, behind = int(parts[2].lstrip("+")), int(parts[3].lstrip("-"))
         elif line.startswith("1 "):
-            # 1 XY sub mH mI mW hH hI path   — path may contain spaces (v2 without -z is unquoted)
+            # 1 XY sub mH mI mW hH hI path   — the path may contain spaces
             parts = line.split(" ", 8)
             files.append(f"{parts[1].replace('.', '')} {parts[8]}")
         elif line.startswith("2 "):
-            # 2 XY sub mH mI mW hH hI Xscore path<TAB>origPath
+            # 2 XY sub mH mI mW hH hI Xscore path, then origPath as a field of its own
             parts = line.split(" ", 9)
-            files.append(f"{parts[1].replace('.', '')} {parts[9].split(chr(9))[0]}")
+            files.append(f"{parts[1].replace('.', '')} {parts[9]}")
+            i += 1
         elif line.startswith("? "):
             files.append(f"?? {line[2:]}")
         elif line.startswith("u "):
