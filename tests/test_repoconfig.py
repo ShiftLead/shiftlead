@@ -306,11 +306,14 @@ def test_techlead_placeholder_names_the_seat_or_says_none():
 
 def test_entry_rules_are_written_once_and_read_both_ways():
     """TD-219 slice 1, design §4.9 *Add an entry to the ledger*: `entry.md` holds what a new ledger
-    entry needs, with `{repo}`, `{type}` and `{ledger}` slots. The session way fills them from the form;
+    entry needs, with `{repo}`, `{type}`, `{priority}` and `{ledger}` slots. The session way fills them from the form;
     the techlead's brief takes the same text through `{entry}`, the slots said in words since the repo
     and type ride on the handed message — and no other preset carries it."""
-    filled = repoconfig.entry_text("shiftlead", "feature", "docs/technical_debt.md")
-    assert "ledger of shiftlead: docs/technical_debt.md, with Type feature" in filled
+    filled = repoconfig.entry_text("shiftlead", "feature", "high", "docs/technical_debt.md")
+    assert "ledger of shiftlead: docs/technical_debt.md, with Type feature and Priority high" in filled
+    # the priority is the pick's (TD-851): written, and no longer among what the person is asked
+    assert "`**Priority:** high`" in filled and "Never ask the person a priority" in filled
+    assert "do not settle: which of two readings" in filled and "settle: a priority" not in filled
     assert "`**Type:** feature`" in filled and "open PR" in filled and "Summary row" in filled
     assert not any(slot in filled for slot in repoconfig.ENTRY_SLOTS)
     # the Team rule (§4.4 *An entry names its team*, TD-763): who writes it, and a `tag` fill's one PR

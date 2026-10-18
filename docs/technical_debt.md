@@ -69,8 +69,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
-| TD-851 | The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default | Low | Designed — built by TD-855 |
-| TD-855 | Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority` | Low | Open |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
@@ -1414,64 +1412,6 @@ The other cases:
 **Done when** the design, `ao --skill` and every role preset say a member never waits in its own turn and what wakes it; a live check is a week of member transcripts (`ao transcript`) with no foreground wait loop.
 
 **Related:** TD-153 (the *nothing unread* line), TD-734, TD-761 (*Working on its own*).
-
----
-
-## TD-851: The Add entry form asks no priority, so the techlead it hands the entry to must guess one or ask the person: give the form a Priority pick, Medium by default
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
-**Owner:** designer
-**Kind:** design-first
-**Status:** Designed (2026-10-17, PR #2050) — the form asks Priority beside Type, *Medium* selected; the words win where they name another; a look's *Not right* reaches no `entry_add` and carries none. Built by TD-855.
-**Blocked by:** TD-855
-**Location:** design §4.5a rows *Repo page, team card: Repo facet — Add entry…* and *Add entry form — Hand to the techlead*, §4.9 *Add an entry to the ledger*, §4.10 *An entry handed to a seat*, §4.7 *Entries* (`ao td add`); `src/shiftlead/ui/templates/base.html` and `src/shiftlead/ui/static/app.js` (the form), `src/shiftlead/ui/app.py` (`/api/entry/hand`), `src/shiftlead/ui/repo.py` (`entry_plan`), `src/sessionorc/agent_inbox.py` (the `entry` envelope); `src/shiftlead/cli.py` (`ao td add`, `entry_add`); `src/shiftlead/briefs/entry.md` (*asking the person only for … a priority*)
-
-**Why:**
-- Paul (2026-10-17, through Add entry): *add a priority selector, defaulted to Medium on the Add entry form so the techlead (who receives the entry) does not have to guess at the priority.*
-- §4.5a's **Add entry…** row says today *Nothing else is asked: the number, the header lines, the locations and the priority are the drafter's to find or to ask*, and `entry.md` names a priority first among what the drafter asks the person. So a priority the words do not carry costs either a guess the person may overrule or an `ask` and a second seat fill — while the person knows it at the moment they write the words. Paul has taken to writing it as the first words of **What** (*Medium Priority.*, *Low priority.*), which the drafter must spot.
-
-**Fix:** design it first — a reversal of §4.5a's *nothing else is asked* for the priority:
-1. The form gains **Priority** — *High* · *Medium* · *Low*, *Medium* selected — beside **Type**; the envelope becomes `entry: {repo, type, team, priority}`; `ao td add` gains `--priority high|medium|low` (Medium when absent).
-2. `entry.md` writes `**Priority:** {priority}` as it writes Type, and drops a priority from what it asks the person — unless the words name another, which the drafter follows and says so in its outcome. The design says which wins.
-3. A *Not right* handed from a look (§4.5a's *Works / Not right…* row) carries Medium.
-Then file the build entry and name it in `Blocked by:`.
-
-**Done when** the design says the form asks a priority and how it reaches the entry, and the build entry is filed.
-
-**Related:** TD-180 (Add entry), TD-630 (the form's Attach), TD-730 (the form's Team pick).
-
----
-
-## TD-855: Build TD-851: the Add entry form's Priority pick, carried as `entry.priority` to the drafter, and `ao td add --priority`
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-17 (TD-851's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5a *Repo page, team card: Repo facet — Add entry…*, *Add entry form — Hand to the techlead*, *Open a session*; §4.9 *Add an entry to the ledger*; §4.10 *An entry handed to a seat*; §4.7 *Entries*; mockup `docs/mockups/reviews/2026-10-17-td851-entry-priority.png` (`gen.py` `add_entry`); `src/shiftlead/ui/templates/base.html` and `src/shiftlead/ui/static/app.js` (the form), `src/shiftlead/ui/app.py` (`/api/entry/hand`, `/api/entry/session`'s `start_context`), `src/shiftlead/repoconfig.py` (`entry_text`, `ENTRY_SLOTS`, `HANDED_ENTRY` and the brief's `entry_text(*(HANDED_ENTRY[slot] …))`), `src/sessionorc/agent_inbox.py` (`rpc_entry_add`, the `entry` mark), `src/shiftlead/cli.py` (`ao td add`), `src/shiftlead/briefs/entry.md`, `src/shiftlead/briefs/techlead.md` (the handed-entry paragraph); `tests/test_handed_entry.py`, `tests/test_ui_entry.py`, `tests/test_entry_team.py`, `tests/test_repoconfig.py` (the slot tests)
-
-**Why:** TD-851: the form asks no priority, so the drafter guesses one or asks the person, though the person knows it as they write.
-
-**Fix:**
-- **The form.** **Priority** — *High* · *Medium* · *Low*, *Medium* selected — beside **Type**, drawn as Type is. `/api/entry/hand` takes `priority` and passes it on.
-- **The envelope.** `entry_add` takes `priority` (`high` · `medium` · `low`, `medium` when absent, anything else refused in words as an unknown type is) and marks the ask `entry: {repo, type, team, priority}`. `ao td add` gains `--priority high|medium|low`, *medium* when absent.
-- **The drafter.** `entry.md` takes `{priority}` beside `{type}`: the entry's `**Priority:**` and its Summary row's priority are the pick's, unless the words name another in so many words, which the drafter follows and says so in its outcome. Its first line no longer lists a priority among what it asks the person. `techlead.md`'s handed-entry paragraph names `entry.priority`. **Open a session**'s start context is the same `entry.md` filled, so it names the priority too (`entry_text` gains it: `ENTRY_SLOTS` gains `{priority}`, and `HANDED_ENTRY` its text for the techlead brief, *the `priority` its `entry` carries*).
-- **A look's *Not right*** is untouched: it reaches no `entry_add`.
-
-**Tests:**
-- the form draws Priority with *Medium* selected, and a press sends the pick;
-- `entry_add` marks `entry.priority`, defaults it to `medium`, and refuses `urgent`;
-- `ao td add --priority low` carries `low`, and with no flag `medium`;
-- the start context of **Open a session** names the picked priority;
-- `entry.md`, filled, names the priority and no longer asks one.
-
-**Done when** the form, `ao td add` and the envelope carry the priority as the design says, the drafter's brief writes it, and the tests above pass.
-
-**Related:** TD-851 (the design), TD-180 (Add entry), TD-730 (the form's Team pick).
 
 ---
 

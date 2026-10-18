@@ -624,6 +624,8 @@ NO_NESTING = (
 TEAM_KEYS = ("repo", "manager", "techlead", "anchor", "seats", "members", "host", "entries", "flows")
 # the ledger's `Type:` values (cadence §2.11), each a key `entries:` may carry (§4.9, TD-219)
 ENTRY_TYPES = ("debt", "feature")
+# the ledger's `Priority:` values, the Add entry form's **Priority** pick (§4.9, TD-851)
+ENTRY_PRIORITIES = ("high", "medium", "low")
 TECHLEAD_KEYS = ("name", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
 # `anchor:` on a team is retired (design §4.9b *No anchor seat*, §4.9 *A definition written before

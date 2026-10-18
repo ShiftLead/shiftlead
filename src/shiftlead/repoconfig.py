@@ -147,10 +147,11 @@ ORG_ROLES_SUB = "roles"
 ROLE_FILE = "role.yml"
 ROLE_TEMPLATE = "template.md"
 ROLE_TEMPLATE_ON_CALL = "template_on_call.md"
-ENTRY_SLOTS = ("{repo}", "{type}", "{ledger}")
+ENTRY_SLOTS = ("{repo}", "{type}", "{priority}", "{ledger}")
 HANDED_ENTRY = {
     "{repo}": "the repo its `entry` names",
     "{type}": "the `type` its `entry` carries",
+    "{priority}": "the `priority` its `entry` carries",
     "{ledger}": "that repo's ledger file (`.shiftlead.yml`'s `ledger:`, `docs/technical_debt.md` by default)",
 }
 
@@ -235,10 +236,10 @@ def work_text(id_: str, repo: str, ledger: str, why: str) -> str:
     return text.strip()
 
 
-def entry_text(repo: str, type_: str, ledger: str) -> str:
-    """`entry.md` with its three slots filled: the rules a drafter of a new ledger entry follows."""
+def entry_text(repo: str, type_: str, priority: str, ledger: str) -> str:
+    """`entry.md` with its four slots filled: the rules a drafter of a new ledger entry follows."""
     text = resources.files("shiftlead").joinpath("briefs", ENTRY_TEMPLATE).read_text(encoding="utf-8")
-    for slot, value in zip(ENTRY_SLOTS, (repo, type_, ledger), strict=True):
+    for slot, value in zip(ENTRY_SLOTS, (repo, type_, priority, ledger), strict=True):
         text = text.replace(slot, value)
     return text.strip()
 

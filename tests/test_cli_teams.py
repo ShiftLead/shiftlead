@@ -2061,6 +2061,7 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
             "text": "a picker for the lane",
             "teams": [{"team": "ao-grind", "seat": "ao-shiftlead-techlead-ao"}],
             "team": "",
+            "priority": "medium",  # the form's **Priority** pick, *medium* when absent (TD-851)
         }
     ]
     out = capsys.readouterr().out.splitlines()
@@ -2069,6 +2070,7 @@ def test_td_add_hands_the_words_to_the_repos_techlead_seat(world, capsys, monkey
     monkeypatch.setattr(sys, "stdin", io.StringIO("  the parser drops\na trailing line\n"))
     assert cli.main(["--json", "td", "add", "--repo", "shiftlead"]) == 0
     assert handed[1]["text"] == "the parser drops\na trailing line" and handed[1]["type"] == "debt"
+    assert handed[1]["priority"] == "medium"
     assert json.loads(capsys.readouterr().out)["id"] == "m-1"
     # a repo is named as the registry spells it — a symlinked checkout by its link — or by a path
     (tmp_path / "link").symlink_to(tmp_path / "shiftlead")
@@ -2102,6 +2104,18 @@ def test_td_add_team_hands_to_that_teams_seat_and_a_blank_one_takes_the_ledgers_
     assert capsys.readouterr().out.startswith("m-1 handed to techlead-ao ")
     assert cli.main(["td", "add", "--repo", "shiftlead", "--team", "ops", "words"]) == 1
     assert "ops does not service shiftlead: its teams are ao-db, ao-grind" in capsys.readouterr().err
+    assert len(handed) == 2
+
+
+def test_td_add_priority_carries_the_pick_and_medium_without_it(world, capsys, monkeypatch):
+    """`ao td add --priority` is the form's **Priority** pick (§4.7 *Entries*, TD-851): carried to
+    `entry_add`, *medium* with no flag, and a word outside the ledger's three refused by the parser."""
+    _tmp, handed = _td_world(world, monkeypatch)
+    assert cli.main(["td", "add", "--repo", "shiftlead", "--priority", "low", "words"]) == 0
+    assert cli.main(["td", "add", "--repo", "shiftlead", "words"]) == 0
+    assert [h["priority"] for h in handed] == ["low", "medium"]
+    with pytest.raises(SystemExit):
+        cli.main(["td", "add", "--repo", "shiftlead", "--priority", "urgent", "words"])
     assert len(handed) == 2
 
 

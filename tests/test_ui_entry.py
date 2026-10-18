@@ -122,7 +122,7 @@ def test_a_repo_no_team_services_starts_plain_with_no_badge(tmp_path, monkeypatc
     from shiftlead import repoconfig
 
     assert r.json()["text"] == ""
-    assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "docs/technical_debt.md")
+    assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "medium", "docs/technical_debt.md")
 
 
 def test_a_bad_type_or_an_unknown_repo_is_refused_and_nothing_starts(tmp_path, monkeypatch):
@@ -421,3 +421,39 @@ def test_the_form_draws_the_name_box_beside_open_a_session_and_sends_what_it_hol
     assert "if (!named) nameBox.value = v.default" in js and 'nameBox.placeholder = v.default || "";' in js
     assert re.search(r"/api/entry/plan\?repo=.*\$\{q\}", js) and "name: typed() })" in js
     assert '$("#entrygo").disabled = !!v.name_why;' in js
+
+
+def test_the_form_draws_priority_beside_type_with_medium_selected_and_both_ways_send_the_pick(tmp_path, monkeypatch):
+    """§4.5a **Add entry…** (TD-851, built by TD-855): **Priority** — High · Medium · Low — beside Type, drawn
+    as Type is with *Medium* selected and set again at each opening; **Hand to the techlead** carries the pick
+    to `entry_add` as `entry.priority`, and **Open a session** names it in its start context."""
+    from shiftlead import repoconfig
+    from shiftlead.ui import app as ui
+
+    root = Path(ui.__file__).parent
+    html = (root / "templates" / "base.html").read_text()
+    pick = html[html.index('aria-label="Priority"') : html.index("</div>", html.index('aria-label="Priority"'))]
+    assert html.index('aria-label="Type"') < html.index('aria-label="Priority"') < html.index('id="entryhand"')
+    assert re.findall(r'name="entrypriority" value="(\w+)"( checked)?', pick) == [
+        ("high", ""),
+        ("medium", " checked"),
+        ("low", ""),
+    ]
+    js = (root / "static" / "app.js").read_text()
+    assert 'dlg.querySelector("input[name=entrypriority][value=medium]").checked = true;' in js
+    assert js.count("type: type(), priority: priority(),") == 2  # the hand and the session
+    world(tmp_path)
+    handed: list[dict] = []
+    created: list[dict] = []
+    c = client(monkeypatch, tmp_path, fake([], handed=handed, created=created))
+    r = c.post("/api/entry/hand", json={"repo": "samscrape", "type": "debt", "priority": "low", "words": "w"})
+    assert r.status_code == 200, r.text
+    assert c.post("/api/entry/hand", json={"repo": "samscrape", "type": "debt", "words": "w"}).status_code == 200
+    assert [kw["priority"] for kw in handed] == ["low", ""]  # absent: the host agent's *medium*
+    r = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "priority": "High", "words": ""})
+    assert r.status_code == 200, r.text
+    (kw,) = created
+    assert kw["start_context"] == repoconfig.entry_text("samscrape", "debt", "high", "docs/technical_debt.md")
+    assert "with Type debt and Priority high" in kw["start_context"]
+    bad = c.post("/api/entry/session", json={"repo": "samscrape", "type": "debt", "priority": "urgent"})
+    assert bad.status_code == 400 and "not 'urgent'" in bad.json()["detail"] and len(created) == 1
