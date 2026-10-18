@@ -287,13 +287,12 @@ def test_a_queue_cards_mail_rows_send_no_find_text_and_no_snooze(tmp_path, monke
 
 def test_no_subject_or_answer_draws_a_title_repeating_its_text(tmp_path, monkeypatch):
     """A `title` equal to its element's text is not drawn (TD-888): the subject line and an answer's label
-    are whole on hover by the script, which sets the title on a line that is in fact clipped."""
+    are whole on hover by the script, which sets the title on a line that is in fact clipped (run under node by
+    `test_ui_whole_on_hover.py`, TD-894)."""
     queue, inbox = _lean_rows(tmp_path, monkeypatch)
     for html in (queue, inbox):
         assert '<div class="subj">merge PR 9?</div>' in html
         assert 'title="merge PR 9?"' not in html and 'title="merge it"' not in html
-    js = JS.read_text()
-    assert "AO.wholeOnHover" in js and ".mailrow .subj, .msgsubj, .btn.answer .alabel" in js
     assert 'class="h1 msgsubj">' in (TEMPLATES / "inbox_entry.html").read_text()
 
 
