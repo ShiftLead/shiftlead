@@ -16601,3 +16601,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-805, TD-812 (the smoke), TD-804 (a promote's smoke).
 
 **Resolved:** 2026-10-18 (grinder-ao-1, read live in `3b265ae`). The live `/queue` answers `Server-Timing: rpc_queue;dur=19.2, rpc_list;dur=28.7, rpc_inbox;dur=20.0, inbox;dur=100.6, rpc_repos;dur=16.3, rpc_doing_log;dur=2.1, rpc_host;dur=3.6, board;dur=59.0, ledger;dur=3.4, render;dur=100.6, rpc_usage;dur=1.4, rpc_gate;dur=14.9, total;dur=434.8`. The promote of `3b265ae`'s note (the person inbox, read on a headless GET of `/inbox`) reads *smoke passed in 7 s; Queue over budget: 364 KB of HTML over 150 KB — longest step render 126 ms; Settings over budget: first byte 0.33 s over 0.2 s — longest step rpc_repos 148 ms; reach refused /: status 403; …*. Settings' miss is TD-884.
+
+## TD-877: The Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2082 (TD-835))
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/cli.py` (`shape_lines`); `src/shiftlead/ui/spend.py` (`_role_bar`, `_role_title`); `tests/test_ui_shape.py`
+
+**Why:** `_role_bar` sums `HELD = ("limited", "paused")` into one *limited / paused* segment and `shape_lines` ends each role with `limited {limited + paused}`. Reverted to `limited` alone — `if held := float(shares.get("limited") or 0.0):` in `_role_bar`, and `float(shares.get('paused') or 0)` dropped from `shape_lines` — `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_shape.py tests/test_ui_spend.py tests/test_ao_spend.py tests/test_cli.py` still passes (`29 passed` for the bar alone, `116 passed` for the CLI line): `paused` appears in `tests/test_ui_shape.py` only in the segment's label (its fixtures carry `"limited": 60` minutes and no `paused`), so a role whose hours were paused by the usage gate would show them nowhere and no test would say so.
+
+**Fix:** In `tests/test_ui_shape.py` give one role's shares a `paused` value beside `limited` and assert the bar's segment, its words (*limited / paused n%*) and `ao team shape`'s `limited n%` carry their sum.
+
+**Done when** both reverts above fail a test.
+
+**Related:** TD-835, TD-819.
+
+**Resolved:** 2026-10-18 (grinder-ao-2, #2116). `test_a_paused_share_is_counted_with_limited_on_the_bar_its_words_and_ao_team_shape` gives grinder-ao-2 `paused: 60` beside `limited: 60` and asserts the hatched segment (`w` 9.6), *limited / paused 10%*, the hover's *paused 1.0 h* and `ao team shape`'s `limited 10%`; each of the two reverts fails it.
