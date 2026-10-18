@@ -78,6 +78,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
 | TD-874 | `test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole` fails now and then: the reading it compares is replaced under it | Low | Open |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
+| TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
+| TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
+| TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
 
 ---
 
@@ -1624,5 +1627,65 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** on kmaster, after the person runs the printed line once, `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and the permission step, and TD-785's capture can run.
 
 **Related:** TD-871 (the design, amended 2026-10-17 on gemini-support's review), TD-785 (blocked by this), TD-112, TD-786.
+
+---
+
+## TD-876: `ao spend`'s By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2086 (TD-831))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/cli.py` (`spend_lines`); `tests/test_ao_spend.py`
+
+**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ao_spend.py` still reads `9 passed` with (a) `if "to_date" in (p := t.get("previous") or {}):` replaced by `if False:` — the whole `▲ n%` / `▼ n%` / `—` column of the By team line, which design §4.7 shows as *ao-grind · ≈$426 · 82% · ▲ 51% ·…*; the test asserts `by_team.startswith("  ao-grind · ≈$138 · 87% · 1,563 turns …")` and never a marker, and no assertion in the file contains `▲`, `▼` or `—` — and (b) `if int(outside.get("turns") or 0):` replaced by `if True:`, so *outside shiftlead* would print on a reading with none (the ledger has outside turns in every case, and the empty ledger's test reads only `lines[0]`). The other reverts tried (the `most` seat, the block order, the entries sort, the `unknown` profile) each fail a test.
+
+**Fix:** In `tests/test_ao_spend.py` give the By team line a previous period to compare: assert `▲ n%` where this period's figure to date is the larger, `▼ n%` where smaller, and `—` where the previous was zero; and assert that a ledger with no outside turns prints no *outside shiftlead* line.
+
+**Done when** each of the two reverts above fails a test.
+
+**Related:** TD-831, TD-818.
+
+---
+
+## TD-877: The Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2082 (TD-835))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/cli.py` (`shape_lines`); `src/shiftlead/ui/spend.py` (`_role_bar`, `_role_title`); `tests/test_ui_shape.py`
+
+**Why:** `_role_bar` sums `HELD = ("limited", "paused")` into one *limited / paused* segment and `shape_lines` ends each role with `limited {limited + paused}`. Reverted to `limited` alone — `if held := float(shares.get("limited") or 0.0):` in `_role_bar`, and `float(shares.get('paused') or 0)` dropped from `shape_lines` — `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_shape.py tests/test_ui_spend.py tests/test_ao_spend.py tests/test_cli.py` still passes (`29 passed` for the bar alone, `116 passed` for the CLI line): `paused` appears in `tests/test_ui_shape.py` only in the segment's label (its fixtures carry `"limited": 60` minutes and no `paused`), so a role whose hours were paused by the usage gate would show them nowhere and no test would say so.
+
+**Fix:** In `tests/test_ui_shape.py` give one role's shares a `paused` value beside `limited` and assert the bar's segment, its words (*limited / paused n%*) and `ao team shape`'s `limited n%` carry their sum.
+
+**Done when** both reverts above fail a test.
+
+**Related:** TD-835, TD-819.
+
+---
+
+## TD-878: The Git card's pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2079 (TD-862 (2)))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/static/app.js` (`AO.gitPick`: `ask`, `paint`); `tests/test_ui_focus_git_pick.py`
+
+**Why:** `ask` numbers each read (`const n = ++st.asked`) and returns early when `n !== st.asked`, with the comment *a later pick's answer is the one drawn*; it also keeps an answer only `if (st.pick === pick && pick !== "tree")`; and `paint` rewrites the select's options only when they changed, *an open select stays open*. Each removed in turn (`if (n !== st.asked) return;` deleted from the success handler; `st.pick === pick &&` dropped; `if (options !== st.options) {…}` replaced by `sel.innerHTML = options;`), `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_focus_git_pick.py` reads `9 passed`: the probe's `read` answers in order, so no test has an earlier pick's answer arrive after a later pick's, or a pick change while a read is out, and none watches the select's markup across a paint. The same module does fail for the cut at forty, the `D` text, the oid move and the porcelain re-read.
+
+**Fix:** In `tests/test_ui_focus_git_pick.py` give the probe a `read` whose promises the test settles itself: pick a commit then Session, settle the commit's answer last, and assert Session's lines stay drawn; and assert a second `update` with unchanged commits leaves `sel.innerHTML` as it was (the same string object written once).
+
+**Done when** each of the three removals above fails a test.
+
+**Related:** TD-862, TD-856.
 
 ---
