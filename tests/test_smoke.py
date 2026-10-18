@@ -3,6 +3,7 @@ server and a stub `ao`, never the live UI."""
 
 from __future__ import annotations
 
+import gzip
 import importlib.util
 import json
 import sys
@@ -20,6 +21,8 @@ pytestmark = pytest.mark.unit
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "smoke.py"
 PAGE = b"<!doctype html><html><body>ok</body></html>\n"
+BIG = b"<!doctype html><html><body>" + b"<p>row</p>" * 20_000 + b"</body></html>\n"  # ~195 KB, ~1 KB gzipped
+TIMING = "rpc_list;dur=12, inbox;dur=210.4, render;dur=250.5, total;dur=480"
 
 
 def _load():
@@ -34,9 +37,10 @@ sm = _load()
 
 @pytest.fixture
 def stub():
-    """A UI that answers every page, and `behave[route]` to break one: an int is its status, `cut` a body
-    with no `</html>`, `short` a body cut short of its Content-Length, a float seconds of delay. `seen` is
-    every route asked."""
+    """A UI that answers every page with `TIMING` as its `Server-Timing`, and `behave[route]` to break one: an
+    int is its status, `cut` a body with no `</html>`, `short` a body cut short of its Content-Length, a float
+    seconds of delay, `big` a page past the budget's 150 KB sent plain, `gzip` the same page gzipped to a
+    request that takes it, `badgzip` that gzip with its deflate stream broken. `seen` is every route asked."""
     behave: dict[str, object] = {}
     seen: list[str] = []
 
@@ -46,8 +50,14 @@ def stub():
             b = behave.get(self.path)
             if isinstance(b, float):
                 time.sleep(b)
-            body = PAGE[:20] if b == "cut" else PAGE
+            body = PAGE[:20] if b == "cut" else BIG if b in ("big", "gzip") else PAGE
+            zipped = b in ("gzip", "badgzip") and "gzip" in (self.headers.get("Accept-Encoding") or "")
+            body = gzip.compress(body) if zipped else body
+            body = body[:10] + b"\xff" * 8 + body[18:] if b == "badgzip" else body  # a deflate stream that breaks
             self.send_response(b if isinstance(b, int) else 200)
+            self.send_header("Server-Timing", TIMING)
+            if zipped:
+                self.send_header("Content-Encoding", "gzip")
             self.send_header("Content-Length", str(len(body) + (100 if b == "short" else 0)))
             self.end_headers()
             self.wfile.write(body)
@@ -116,8 +126,12 @@ def test_a_healthy_ui_passes_with_a_line_per_load_and_the_browser_half_skipped(t
     port, _, seen = stub
     code, lines = _run(tmp_path, port, capsys)
     assert code == 0 and lines[-1] == f"smoke passed; {sm.SKIPPED}"
-    assert sorted(seen) == sorted(r for _, r in sm.PAGES)
-    assert any(ln.startswith("Inbox /inbox · 200 · first byte ") and ln.endswith(f"{len(PAGE)} bytes") for ln in lines)
+    assert sorted(seen) == sorted(r for _, r in sm.PAGES for _ in range(2))  # each page twice: cold, then judged
+    inbox = [ln for ln in lines if ln.startswith("Inbox /inbox · ")]
+    steps = "rpc_list 12 ms, inbox 210 ms, render 250 ms, total 480 ms"  # the page's `Server-Timing`, in its order
+    assert inbox[0].startswith("Inbox /inbox · cold · 200 · first byte ")
+    assert inbox[1].startswith("Inbox /inbox · 200 · first byte ")
+    assert all(ln.endswith(f"· {len(PAGE)} bytes · {steps}") for ln in inbox) and len(inbox) == 2
     assert (tmp_path / "ao.log").read_text().splitlines() == ["status --json", "repo --json", "promote status --json"]
 
 
@@ -128,6 +142,7 @@ def test_a_healthy_ui_passes_with_a_line_per_load_and_the_browser_half_skipped(t
         ("cut", "smoke failed: Queue /queue: the body does not end its </html> (20 bytes)"),
         (0.8, "smoke failed: Queue /queue: no answer within 0.5 s"),
         ("short", "smoke failed: Queue /queue: IncompleteRead"),
+        ("badgzip", "smoke failed: Queue /queue: its gzipped body does not read: "),
     ],
 )
 def test_each_page_failure_is_the_last_line(tmp_path, stub, capsys, behave, why):
@@ -135,6 +150,33 @@ def test_each_page_failure_is_the_last_line(tmp_path, stub, capsys, behave, why)
     b["/queue"] = behave
     code, lines = _run(tmp_path, port, capsys, bound=0.5)
     assert code == 1 and lines[-1].startswith(why)
+
+
+def test_a_page_over_its_budget_is_told_with_its_longest_step_and_fails_nothing(tmp_path, stub, capsys):
+    """§4.5 *Page loads*' budget, told on the last line — the promote's note (§6 *This repo's smoke*, TD-881):
+    first byte by page, the HTML on the wire, and the judged load alone."""
+    port, b, _ = stub
+    b.update({"/settings": 0.25, "/inbox": "big", "/queue": "gzip"})
+    code, lines = _run(tmp_path, port, capsys)
+    assert code == 0 and lines[-1].startswith("smoke passed; Inbox over budget: 195 KB of HTML over 150 KB")
+    told = lines[-1].split("; ")
+    assert told[1] == "Inbox over budget: 195 KB of HTML over 150 KB — longest step render 250 ms"
+    assert told[2].startswith("Settings over budget: first byte 0.2") and told[2].endswith(
+        " s over 0.2 s — longest step render 250 ms"
+    )
+    assert told[3:] == [sm.SKIPPED]  # the Queue, gzipped on the wire, is under; so is every other page
+    queue = [ln for ln in lines if ln.startswith("Queue /queue · ")]
+    assert all(f"· {len(gzip.compress(BIG))} bytes ·" in ln for ln in queue)  # what the wire carried
+    b.clear()
+    code, lines = _run(tmp_path, port, capsys)
+    assert code == 0 and lines[-1] == f"smoke passed; {sm.SKIPPED}"  # every page under: nothing told
+
+
+def test_the_budget_is_the_designs():
+    assert sm.BUDGET == {"/": 0.5, "/inbox": 0.5, "/queue": 0.5, "/repo/shiftlead": 0.5, "/settings": 0.2}
+    assert set(sm.BUDGET) == {r for _, r in sm.PAGES}
+    assert sm.WIRE_BUDGET == 150 * 1024 and sm.DOM_BUDGET == 1.0
+    assert sm.steps_of("a;dur=1.5, b;desc=x, c;desc=y;dur=3") == [("a", 1.5), ("c", 3.0)]
 
 
 def test_a_ui_that_never_answers_fails_and_an_ao_read_that_fails_names_it(tmp_path, stub, capsys):
@@ -219,6 +261,13 @@ def test_the_browser_half_runs_under_the_smoke_venv_and_a_script_error_fails(tmp
     # a venv that cannot start a browser is the venv's fault, not the build's: skipped, failing nothing
     code, lines = _run(tmp_path, port, capsys, venv=_venv(tmp_path / "d", [], code=sm.UNAVAILABLE))
     assert code == 0 and lines[-1] == "smoke passed; browser half skipped: the smoke venv cannot start a browser"
+    # each load's line carries the browser half's DOM ready, and the judged one is held to the budget
+    dom = [{**r, "dom": [1500, 1200] if r["route"] == "/queue" else [400, 300]} for r in ok]
+    code, lines = _run(tmp_path, port, capsys, venv=_venv(tmp_path / "e", dom))
+    queue = [ln for ln in lines if ln.startswith("Queue /queue · ")]
+    assert "· DOM ready 1.50 s ·" in queue[0] and "· DOM ready 1.20 s ·" in queue[1]
+    over = "Queue over budget: DOM ready 1.20 s over 1 s — longest step render 250 ms"
+    assert code == 0 and lines[-1] == f"smoke passed; {over}"
 
 
 def test_the_shiftlead_yml_names_the_smoke():
@@ -270,7 +319,7 @@ class _Page:
     """A fake Playwright page: `script` fires its `pageerror` during the load, `never` raises from `goto`."""
 
     def __init__(self, behave: dict[str, str], error: type):
-        self.behave, self.error, self.handlers = behave, error, {}
+        self.behave, self.error, self.handlers, self.loads = behave, error, {}, 0
 
     def on(self, event, fn):
         self.handlers[event] = fn
@@ -282,6 +331,11 @@ class _Page:
             self.handlers["pageerror"](RuntimeError("TypeError: x is undefined\n    at app.js:1"))
         if b == "never":
             raise self.error("Timeout 500ms exceeded.\n=== logs ===")
+        self.loads += 1
+
+    def evaluate(self, script):
+        assert script == sm.DOM_READY
+        return 300 if self.loads == 1 else 120  # the second load, its static files cached, is quicker
 
     def close(self):
         pass
@@ -331,6 +385,7 @@ def test_browse_reports_a_script_error_and_a_load_that_never_fired(monkeypatch, 
     assert rows["/inbox"]["error"] == "script error: TypeError: x is undefined"
     assert rows["/queue"]["error"] == "load never fired within 0.5 s: Timeout 500ms exceeded."
     assert rows["/"]["error"] is None and rows["/settings"]["error"] is None
+    assert rows["/"]["dom"] == [300, 120] and rows["/queue"]["dom"] == []  # each page loaded twice, in one page
     assert log == ["browser closed", "stopped"]
 
 

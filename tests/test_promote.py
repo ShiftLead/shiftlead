@@ -1180,3 +1180,26 @@ def test_an_agent_restarted_mid_smoke_reads_its_result(checkout):
     (d / "smoke.json").write_text(json.dumps({"sha": main, "exit": 0, "at": (at + timedelta(seconds=48)).isoformat()}))
     readings, notes, _ = promote.survey([str(checkout)], readings, False, {}, at)
     assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s"]
+
+
+def test_what_a_passing_smoke_told_rides_the_note(checkout):
+    """A passing smoke's last line past *smoke passed* — a page over its budget, a reach refused (§6 *This
+    repo's smoke*, TD-881) — is on the note, after the pass; a last line that is no pass adds nothing."""
+    _smoke_block(checkout)
+    main = _merge(checkout, "b")
+    d = promote.repo_dir("repo")
+    d.mkdir(parents=True)
+    log = d / f"{main}.log"
+    told = "Queue over budget: first byte 2.50 s over 0.5 s — longest step inbox 2100 ms; " + "x" * 300
+    at = datetime.now(UTC)
+    for last, note in ((f"smoke passed; {told}", f"; {told}"), ("all well", "")):
+        log.write_text(f"── smoke ──\nQueue /queue · 200\n{last}\n")
+        intent = {"sha": main, "at": at.isoformat(), "pid": 999999999, "log": str(log), "by": "auto", "ahead": 1}
+        intent |= {"smoke": "x", "phase": "smoke", "smoke_pid": 999999999, "smoke_started": "0"}
+        intent["smoke_at"] = at.isoformat()
+        (d / "inflight.json").write_text(json.dumps(intent))
+        (checkout.parent / "live").write_text(main + "\n")
+        result = {"sha": main, "exit": 0, "at": (at + timedelta(seconds=48)).isoformat()}
+        (d / "smoke.json").write_text(json.dumps(result))
+        _, notes, _ = promote.survey([str(checkout)], {}, False, {}, at)
+        assert notes == [f"promoted `repo` `{main[:7]}` — 1 commit · smoke passed in 48 s{note}"]
