@@ -16247,7 +16247,7 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Added:** 2026-10-17 (TD-818's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Done (2026-10-17, grinder-ao-2)
+**Status:** Done #2086 (2026-10-17, grinder-ao-2)
 **Blocked by:** TD-830, TD-859
 **Location:** design §4.7 `ao spend` and `ao status -v`, §4.4 *Spend per seat*; `src/shiftlead/cli.py`
 
@@ -16262,4 +16262,4 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 
 **Related:** TD-818, TD-830.
 
-**Resolved:** 2026-10-17 (grinder-ao-2). `ao spend` (`cli.cmd_spend`, `spend_lines`, `entry_lines`) prints the `seats` reading in §4.7's words, reusing the Spend page's formatters in `shiftlead.ui.spend`. `ao status -v` prints each record's `spend … today · … week · past 200k n%` line from `seats` `by: record` (`record_spend`, `record_spend_line`), and `-v --json` carries the `spend` object; §4.7 now says it is `-v` alone that asks. Tests: `tests/test_ao_spend.py`.
+**Resolved:** 2026-10-17 (grinder-ao-2, #2086). `ao spend` (`cli.cmd_spend`, `spend_lines`, `entry_lines`) prints the `seats` reading in §4.7's words, reusing the Spend page's formatters in `shiftlead.ui.spend`. `ao status -v` prints each record's `spend … today · … week · past 200k n%` line from `seats` `by: record` (`record_spend`, `record_spend_line`), and `-v --json` carries the `spend` object; §4.7 now says it is `-v` alone that asks. Tests: `tests/test_ao_spend.py`.
