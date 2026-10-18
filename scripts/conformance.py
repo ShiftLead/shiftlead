@@ -176,6 +176,7 @@ class Walk:
     ):
         self.adapter, self.profile, self.work, self.call, self.out = adapter, profile, work, call, out
         self.snap = snap  # under `--capture`: (step, session id) → its pane and title saved
+        self.current = ""
         self.id = ""
         self.adapter_id = ""
         self.results: list[tuple[str, bool, str]] = []
@@ -183,7 +184,13 @@ class Walk:
     def get(self) -> dict[str, Any]:
         return self.call("get", id=self.id)
 
+    def shot(self, name: str) -> None:
+        if self.snap is not None and self.id:
+            with contextlib.suppress(Exception):  # a capture that fails never fails the step
+                self.snap(name, self.id)
+
     def step(self, name: str, fn: Callable[[], str]) -> bool:
+        self.current = name
         try:
             said, ok = fn(), True
         except StepFailed as e:
@@ -192,9 +199,7 @@ class Walk:
             said, ok = f"{type(e).__name__}: {e}", False
         self.results.append((name, ok, said))
         self.out(f"{'ok  ' if ok else 'FAIL'}  {name}: {said}")
-        if self.snap is not None and self.id:
-            with contextlib.suppress(Exception):  # a capture that fails never fails the step
-                self.snap(name, self.id)
+        self.shot(name)
         return ok
 
     def allow(self, rec: dict[str, Any]) -> str:
@@ -203,6 +208,7 @@ class Walk:
         *Allow once*, by the `keys` RPC (a person's own caller, as `ao keys` is), then the state read
         leaving `needs-you`. How it was allowed, in words."""
         pending = rec.get("pending") or {}
+        self.shot(f"{self.current} needs-you")  # the dialog itself, before it is answered
         if rec.get("permission_channel") is False:
             self.call("keys", id=self.id, keys=["Enter"])
             left = poll(self.get, lambda r: r.get("state") != "needs-you", TURN_WAIT)
@@ -356,6 +362,8 @@ def save_pane(capture: Path, sock: str, n: int, step: str, sid: str) -> Path:
     tmux = ["tmux", "-L", sock]
     target = f"={sid}:"
     pane = subprocess.run([*tmux, "capture-pane", "-e", "-p", "-t", target], capture_output=True, text=True, timeout=5)
+    if pane.returncode:  # the session is gone: no file that looks like a fixture
+        raise OSError(f"capture-pane -t {target}: {pane.stderr.strip()}")
     title = subprocess.run(
         [*tmux, "display-message", "-p", "-t", target, "#{pane_title}"], capture_output=True, text=True, timeout=5
     )

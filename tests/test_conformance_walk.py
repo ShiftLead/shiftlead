@@ -342,13 +342,42 @@ def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
     fake = FakeAgent(tmp_path)
     walk = cw.Walk("claude-code", "conformance", tmp_path, fake, out=lambda _s: None, snap=lambda *a: snaps.append(a))
     assert walk.run()
-    assert [n for n, _id in snaps] == [n for n, _ok, _s in walk.results]
+    steps = [n for n, _ok, _s in walk.results]
+    assert [n for n, _id in snaps] == [
+        *steps[:3],
+        "a permission needs-you",
+        *steps[3:4],
+        "a doorbell needs-you",
+        *steps[4:],
+    ]
     assert snaps[0] == ("launch", "ao-walk-1") and snaps[-1] == ("the transcript", "ao-walk-2")
+    seen = []  # the dialog is snapped while it is up, before the press answers it
+    dialog = FakeAgent(tmp_path, channel=False)
+    real = dialog.__call__
+
+    def watched(method, **p):
+        if method == "keys":
+            assert seen[-1].endswith("needs-you")
+        return real(method, **p)
+
+    assert cw.Walk("gemini-cli", "c", tmp_path, watched, out=lambda _s: None, snap=lambda n, _i: seen.append(n)).run()
 
     def boom(*_a):
         raise OSError("no tmux")
 
     assert cw.Walk("claude-code", "conformance", tmp_path, FakeAgent(tmp_path), out=lambda _s: None, snap=boom).run()
+
+    monkeypatch.setattr(cw, "TURN_WAIT", 0.0)
+    failed = []  # a failed step is snapped too
+    walk = cw.Walk(
+        "c",
+        "c",
+        tmp_path,
+        FakeAgent(tmp_path, permission=False),
+        out=lambda _s: None,
+        snap=lambda n, _i: failed.append(n),
+    )
+    assert not walk.run() and failed[-1] == "a permission"
 
     calls = []
 
@@ -364,6 +393,12 @@ def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
     assert got.read_text(encoding="utf-8") == "title: ◇ Ready (walk)\n\x1b[2mType your message\x1b[0m\n"
     assert calls[0] == ["tmux", "-L", "ao-walk", "capture-pane", "-e", "-p", "-t", "=ao-walk-1:"]
     assert calls[1][-3:] == ["-t", "=ao-walk-1:", "#{pane_title}"]
+    monkeypatch.setattr(
+        cw.subprocess, "run", lambda cmd, **kw: cw.subprocess.CompletedProcess(cmd, 1, "", "no session")
+    )
+    with pytest.raises(OSError, match="no session"):
+        cw.save_pane(capture, "ao-walk", 5, "a resume", "ao-gone")
+    assert not (capture / "panes" / "5-a-resume.txt").exists()
     dest = tmp_path / "dest"
     out = cw.save_capture(capture, dest, "ao-walk")
     assert dest / "panes" / "4-a-permission.txt" in out
