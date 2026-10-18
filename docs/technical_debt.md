@@ -69,7 +69,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-819 | Whether a team's shape is right cannot be read: nothing records how long members waited for work, or work for members | Medium | Designed — built by TD-834, TD-835 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 |
 | TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
-| TD-832 | Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card | Medium | Open |
 | TD-835 | Build TD-819 (2): the Spend page's Shape view and `ao team shape` | Medium | Open |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-837 | Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs | Low | Open |
@@ -1409,41 +1408,6 @@ The other cases:
 **Done when** `ao spend` prints what the Spend page draws, and `ao status -v` shows each record's figure.
 
 **Related:** TD-818, TD-830.
-
-## TD-832: Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card
-
-**Priority:** Medium
-**Type:** feature
-**Added:** 2026-10-17 (TD-818's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Slice 1 (#2072): `/spend` and `/api/spend` (`ui/spend.py`, `spend.html`, `spend_part.html`, `AO.spend`) — the head, Day · Week · Month, the team chips and ‹ ›, the Over time chart, By team, Top sessions, a team's line, By seat with its role subtotals, Finished entries — the usage chip's press, and the help text of the three. Slice 2 (the PR of this branch): the team card's **spend** figure — today's `seats` row by team, read at most once a minute (`Readings.team_spend`, `SPEND_TTL`), drawn by `spend.team_figure` in `group_head.html` on the page and every delta; the design's help list holds no line for it, so its hover is its only text. Left: slice 3, the Settings page's **weights** card. Two parts of the page wait on the reading (TD-865): *per finished entry* is drawn per role (on a role's one seat, or its subtotal), and a seat's hover holds no tokens by kind. Narrow, the turns and past-context columns are hidden rather than folded under the row.
-**Blocked by:** TD-830, TD-859
-**Location:** design §4.5 screen 13 *Spend* and screen 1 (the team header), §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, *Org top bar: usage chip*; mockups `docs/mockups/Spend.dc.html` and `SpendTeam.dc.html` (`reviews/2026-10-17-td818-spend-all.png`, `…-spend-team.png`); `src/shiftlead/ui/app.py` (`/spend`, `/api/spend`), templates and `app.js`, `src/shiftlead/ui/settings_page.py`, `src/shiftlead/ui/help.py` (bound by `tests/test_help.py`)
-
-**Why:** TD-818: Paul asked to *see which ones use the most tokens, and make adjustments if there are surprises*. That needs a page, and a figure where he already looks.
-
-**Fix:**
-- **`/spend`**, drawn as the two mockups (amended 2026-10-17 with Paul's additions):
-  - the head names the period and what the figure is; **Day · Week · Month**, the team chips and **‹ ›**, carried in the URL (`window`, `at`, `team`, `top`);
-  - **Over time**: the `series` as stacked bars — by team (with *interactive sessions* and *outside shiftlead*) on All, by role on a team — the picked bar outlined, a press picking its period, bars before `begins` dashed, *partial* in a hover; **‹** disabled at the period holding `begins`, **›** at the current;
-  - **On All**: **By team** from `teams` (a team's name opens its view) and **Top sessions** from `top`, eight rows and *all →*;
-  - **On a team**: its line from its `teams` row (the period, the previous, the week and month so far, per §4.5's words by window), then **By seat**, with role subtotals where a team holds two of a role, and **Finished entries**, for the period, as #2015 drew them.
-  - `/api/spend` passes `window`, `at` and `team` to `seats`.
-  - Links go to Focus or the Transcript, and to the Queue card. A figure's hover gives tokens by kind and the weights used. Narrow below 720 px.
-  - **Shape** keeps **Day · Week**; a month picked opens it on the week.
-- **The usage chip** opens `/spend` on a press, every chip and every page alike.
-- **The team card's header** gains the **spend** figure: today's figure, a link to `/spend?team=<t>`, with its hover. It is absent while the team spent nothing today.
-- **Settings**: the **weights** card under Usage, with Save and Cancel as every card, and the heading's *by seat →* link.
-- §4.5a's new rows (the Spend page's three, the weights card, the team card's figure) and the usage chip's press get their help text in `ui/help.py`, as the build entry's wording.
-- **Tests:** the page draws the RPC's reply (seat rows, subtotals, outside, entries, *partial*, *unweighed*, *spend unknown*; the chart's bars and their stacks, the dashed bars before `begins`; By team's change and *spent most*; Top sessions' eight and *all*); a bar's press and **‹ ›** pick the period; the URL carries the picks; the usage chip links to `/spend`; the header figure and its absence; the weights card writes `spend.weights` through `set_settings`; the doc-bound §4.5a tests.
-
-**Done when** a team card's figure opens a Spend page showing each seat's share and per-entry figure, and the weights are editable on the Settings page. A screenshot under `docs/mockups/reviews/` is named in the PR.
-
-**Related:** TD-818, TD-830, TD-819 (team shape reads this page's numbers).
-
-
----
 
 ## TD-835: Build TD-819 (2): the Spend page's Shape view and `ao team shape`
 

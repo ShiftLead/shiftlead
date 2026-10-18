@@ -16045,3 +16045,37 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-411 (`lane_seen` and the live check that goes live after a `none`).
 
 **Resolved:** 2026-10-17 (grinder-ao-1, #2073). The cause: `park_ticks` cancelled the tick loop but not the passes a tick detaches as tasks of their own. The fixture's first tick starts a full `_refresh_promotes`, and on a loaded machine its thread could land after the test set `agent._promotes["repo"]`, assigning `{}` (no repos registered). With no live commit, `_ledger_then` read TD-002 as the checkout's own entry, seen and untold. `park_ticks` now lets every `*_task` still in flight land, up to `PASS_DRAIN` (30 s), and cancels any later one. That is what TD-752 and TD-753 did by hand in two tests, so the fixture no longer depends on the timing. `test_parking_the_ticks_lands_a_detached_pass_still_in_flight` fails without it.
+
+## TD-832: Build TD-818 (3): the Spend page, the team card's spend figure, the Settings page's weights card
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2072, #2074, #2078 (2026-10-17, grinder-ao-2). Was: Slice 1 (#2072): `/spend` and `/api/spend` (`ui/spend.py`, `spend.html`, `spend_part.html`, `AO.spend`) — the head, Day · Week · Month, the team chips and ‹ ›, the Over time chart, By team, Top sessions, a team's line, By seat with its role subtotals, Finished entries — the usage chip's press, and the help text of the three. Slice 2 (#2074): the team card's **spend** figure — today's `seats` row by team, read at most once a minute (`Readings.team_spend`, `SPEND_TTL`), drawn by `spend.team_figure` in `group_head.html` on the page and every delta; the design's help list holds no line for it, so its hover is its only text. Left: slice 3, the Settings page's **weights** card. Two parts of the page wait on the reading (TD-865): *per finished entry* is drawn per role (on a role's one seat, or its subtotal), and a seat's hover holds no tokens by kind. Narrow, the turns and past-context columns are hidden rather than folded under the row.
+**Blocked by:** TD-830, TD-859
+**Location:** design §4.5 screen 13 *Spend* and screen 1 (the team header), §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, *Org top bar: usage chip*; mockups `docs/mockups/Spend.dc.html` and `SpendTeam.dc.html` (`reviews/2026-10-17-td818-spend-all.png`, `…-spend-team.png`); `src/shiftlead/ui/app.py` (`/spend`, `/api/spend`), templates and `app.js`, `src/shiftlead/ui/settings_page.py`, `src/shiftlead/ui/help.py` (bound by `tests/test_help.py`)
+
+**Why:** TD-818: Paul asked to *see which ones use the most tokens, and make adjustments if there are surprises*. That needs a page, and a figure where he already looks.
+
+**Fix:**
+- **`/spend`**, drawn as the two mockups (amended 2026-10-17 with Paul's additions):
+  - the head names the period and what the figure is; **Day · Week · Month**, the team chips and **‹ ›**, carried in the URL (`window`, `at`, `team`, `top`);
+  - **Over time**: the `series` as stacked bars — by team (with *interactive sessions* and *outside shiftlead*) on All, by role on a team — the picked bar outlined, a press picking its period, bars before `begins` dashed, *partial* in a hover; **‹** disabled at the period holding `begins`, **›** at the current;
+  - **On All**: **By team** from `teams` (a team's name opens its view) and **Top sessions** from `top`, eight rows and *all →*;
+  - **On a team**: its line from its `teams` row (the period, the previous, the week and month so far, per §4.5's words by window), then **By seat**, with role subtotals where a team holds two of a role, and **Finished entries**, for the period, as #2015 drew them.
+  - `/api/spend` passes `window`, `at` and `team` to `seats`.
+  - Links go to Focus or the Transcript, and to the Queue card. A figure's hover gives tokens by kind and the weights used. Narrow below 720 px.
+  - **Shape** keeps **Day · Week**; a month picked opens it on the week.
+- **The usage chip** opens `/spend` on a press, every chip and every page alike.
+- **The team card's header** gains the **spend** figure: today's figure, a link to `/spend?team=<t>`, with its hover. It is absent while the team spent nothing today.
+- **Settings**: the **weights** card under Usage, with Save and Cancel as every card, and the heading's *by seat →* link.
+- §4.5a's new rows (the Spend page's three, the weights card, the team card's figure) and the usage chip's press get their help text in `ui/help.py`, as the build entry's wording.
+- **Tests:** the page draws the RPC's reply (seat rows, subtotals, outside, entries, *partial*, *unweighed*, *spend unknown*; the chart's bars and their stacks, the dashed bars before `begins`; By team's change and *spent most*; Top sessions' eight and *all*); a bar's press and **‹ ›** pick the period; the URL carries the picks; the usage chip links to `/spend`; the header figure and its absence; the weights card writes `spend.weights` through `set_settings`; the doc-bound §4.5a tests.
+
+**Done when** a team card's figure opens a Spend page showing each seat's share and per-entry figure, and the weights are editable on the Settings page. A screenshot under `docs/mockups/reviews/` is named in the PR.
+
+**Related:** TD-818, TD-830, TD-819 (team shape reads this page's numbers).
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2072, #2074, #2078). `/spend` and the usage chip's press (#2072); the team card's **spend** figure, today's `seats` row linking to `/spend?team=<t>` (#2074); the Settings page's **weights** card, writing to `spend.weights` through `set_settings` only the rows that differ from the default (#2078). Screenshots `docs/mockups/reviews/2026-10-17-td832-*.png`. The per-entry figure per seat and a seat's tokens by kind wait on the reading (TD-865).
