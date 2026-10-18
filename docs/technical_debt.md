@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
-| TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
 | TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
@@ -1501,26 +1500,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** on kmaster, after the person runs the printed line once, `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and the permission step, and TD-785's capture can run.
 
 **Related:** TD-871 (the design, amended 2026-10-17 on gemini-support's review), TD-785 (blocked by this), TD-112, TD-786.
-
----
-
-## TD-877: The Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1, auditing #2082 (TD-835))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/cli.py` (`shape_lines`); `src/shiftlead/ui/spend.py` (`_role_bar`, `_role_title`); `tests/test_ui_shape.py`
-
-**Why:** `_role_bar` sums `HELD = ("limited", "paused")` into one *limited / paused* segment and `shape_lines` ends each role with `limited {limited + paused}`. Reverted to `limited` alone — `if held := float(shares.get("limited") or 0.0):` in `_role_bar`, and `float(shares.get('paused') or 0)` dropped from `shape_lines` — `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_shape.py tests/test_ui_spend.py tests/test_ao_spend.py tests/test_cli.py` still passes (`29 passed` for the bar alone, `116 passed` for the CLI line): `paused` appears in `tests/test_ui_shape.py` only in the segment's label (its fixtures carry `"limited": 60` minutes and no `paused`), so a role whose hours were paused by the usage gate would show them nowhere and no test would say so.
-
-**Fix:** In `tests/test_ui_shape.py` give one role's shares a `paused` value beside `limited` and assert the bar's segment, its words (*limited / paused n%*) and `ao team shape`'s `limited n%` carry their sum.
-
-**Done when** both reverts above fail a test.
-
-**Related:** TD-835, TD-819.
 
 ---
 

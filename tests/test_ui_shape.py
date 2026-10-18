@@ -207,3 +207,21 @@ def test_ao_team_shape_prints_the_lines_and_json_the_reply(monkeypatch, capsys):
     lines = cli.shape_lines(reading(too_little=True), MIN)
     assert lines[0] == "too little to read yet: 2.9 live hours of the 8 a reading needs"
     assert cli.shape_lines(reading() | {"suggestions": []}, MIN)[0] == "nothing to suggest"
+
+
+def test_a_paused_share_is_counted_with_limited_on_the_bar_its_words_and_ao_team_shape(monkeypatch, capsys):
+    """TD-877: hours the usage gate paused join *limited* in the one hatched segment, its words and the CLI's
+    `limited n%`; dropped from either sum, a role's paused hours would show nowhere."""
+    d = doc()
+    d["days"][NOW.date().isoformat()]["ao-grind"]["records"]["g2"]["minutes"]["paused"] = 60
+    got = shape_mod.reading(d, "ao-grind", "day", NOW, {}) | {"unit": "≈$"}
+    grinder = shape_view([got], spend_picks({"view": "shape", "team": "ao-grind"}), ["ao-grind"], MIN)["teams"][0][
+        "roles"
+    ][1]
+    assert grinder["segs"][-1] == {"w": 9.6, "colour": "hatch", "word": "limited / paused"}  # the two hours, not one
+    assert grinder["words"].endswith(" · limited / paused 10%")
+    assert "grinder-ao-2: on its claim 4.0 h · starved 5.0 h · limited 1.0 h · paused 1.0 h" in grinder["title"]
+    monkeypatch.setattr(cli, "call_sync", lambda method, **kw: got if method == "shape" else {})
+    assert cli.cmd_team_shape(argparse.Namespace(name="ao-grind", window="day", json=False)) == 0
+    line = next(x for x in capsys.readouterr().out.splitlines() if x.startswith("  grinder ·"))
+    assert line.endswith(" · limited 10%")
