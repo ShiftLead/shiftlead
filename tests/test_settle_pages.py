@@ -118,7 +118,7 @@ def test_the_repo_page_draws_hold_and_release_and_the_press_reaches_td_hold(tmp_
             return await super().call(method, **kw)
 
     c = client(monkeypatch, tmp_path, Fake)
-    html = c.get("/repo/samscrape").text
+    html = c.get("/repo/samscrape?open=pickable").text  # every row: past the fold too (TD-882)
     row = html[html.index('id="TD-301"') : html.index("</div>", html.index('id="TD-301"'))]
     assert "· settles in 7m</span>" in row and ">Hold</button>" in row
     assert 'data-tdhold="TD-301" data-repo="samscrape"' in row
