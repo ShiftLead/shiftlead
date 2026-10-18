@@ -77,10 +77,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
-| TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Open |
+| TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-872 | #2077's `pick_files` has three guards no test fails without: Working tree's twenty-line cap, the porcelain's rename source, and `--first-parent` | Low | Open |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
 | TD-874 | `test_a_subscriber_with_an_omit_is_sent_repos_events_without_it_and_one_without_whole` fails now and then: the reading it compares is replaced under it | Low | Open |
+| TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
 
 ---
 
@@ -1191,7 +1192,7 @@ The other cases:
 **Owner:** grinder
 **Kind:** build
 **Status:** Building — slice 1 #2014 (2026-10-17, grinder-ao-2): `confidence: title` read through `Session.told`, `permission_channel` on the view and every reader, `decide` and `ao allow`/`ao deny` refusing a tool without one, the kill guard at `shiftlead/kill_guard.py`. Slice 2 #2021 (2026-10-17): `shiftlead/adapters/gemini/` — the launch (binary, `--session-id`/`--resume`, `--model`, yolo under `skip`, the env and trust), the settings layer, `credentials_ok`, `doctor_profiles`, `title_state` (the glyph map), and the hook module (each event to its state, a confirmation as `needs-you` with no waiting call, the kill guard's exit 2); `shiftlead-hook --adapter gemini` dispatches to it. The entry point is not registered yet: the conformance suite tests every registered agent adapter against captured fixtures. Slice 3 #2024 (2026-10-17): the title verdict in the tick — `state_in_title` on the adapter, `explain(tail, title=…)` mapping the glyph, `_title_verdict` in `agent_tick._observe` (once `hook_seen_at`, past one tick since the last hook, `✋`'s text by the state it replaces, equal states no event, `stalled?` ended by `◇`/`✋` alone, nothing held), `ao explain` showing the title and `ao explain --file --title`. `ao doctor --probe` needs nothing more: its scratch launch is a `create` with the row's adapter, so it goes through that adapter's `launch` (read 2026-10-17). `SessionStart`'s and `BeforeAgent`'s `additionalContext` (`start_context`, mail, the repo's start hooks) are TD-786's Fix, left to it. Next, each needing fixtures captured from a real Gemini session (never written by hand, §4.3 *The conformance suite*): composer/title, the fixtures with the entry point, and the live walk — the Gemini profile for them asked of the techlead 2026-10-17 (m-322900fd26e2), passed up to Paul, who answered *Wait: Paul will set aside a separate profile home* — a signed-in `gemini-conformance` home (m-cad4683629b5); read 2026-10-17: no such home or profile yet (outcome `blocked`, m-8470dada41bc). Once it exists, the block below goes and the fixtures are captured from it. **Unblocked 2026-10-17 (Paul, in session `gemini-support`):** the home is `~/.gemini-conformance`, signed in with Paul's free-tier AI Studio key (`selectedType: gemini-api-key`, the same as his own `~/.gemini`), and `~/.shiftlead/profiles.yml` names it `gemini-conformance: {adapter: gemini, account: paul-gemini, config_dir: ~/.gemini-conformance}`; `credentials_ok` reads True and `doctor_profiles` lists it. The fixtures, the entry point and the live walk run on it: `pdm run conformance gemini --profile gemini-conformance`. Its quota is the free tier's, so the walk runs few turns and a refusal for quota is the tier, not the adapter. The techlead's note on merging #2024: a title `◇` over a hook-written `limited` would read `idle` by the letter of §4.3 — weigh it once Gemini's `limited` is built (TD-786's `usage`). **Blocked 2026-10-17 (grinder-ao-2):** the walk on `gemini-conformance` found the tool skips the launch layer — `GEMINI_CLI_SYSTEM_SETTINGS_PATH` is read only from a root-owned file — so no hook reaches the session and nothing can be captured until the design says where the hooks come from (TD-871).
-**Blocked by:** TD-871
+**Blocked by:** TD-875
 **Location:** design §4.3 *The second adapter: Gemini CLI*, §4.2 *A title the tool writes its state into*, §4.2a, §4.5a **Allow / Deny**, §4.9b, §6 rule 3; new `src/shiftlead/adapters/gemini/` (`__init__.py`, `hook.py`); `src/sessionorc/agent_serve.py` (`_view`'s `permission_channel`); `src/sessionorc/agent_tick.py` (the `title` confidence, the screen-rule call with the title); `src/sessionorc/agent_hook.py` and the `decide` RPC; `src/shiftlead/hook_entry.py` (dispatch by an argv flag, `shiftlead-hook --adapter gemini`, as `--statusline` is read: a Gemini payload names no adapter and shares event names with Claude Code's; the adapter imported inside the `try`); `src/shiftlead/adapters/claude_code/guard.py` moved to `src/shiftlead/kill_guard.py`, both adapters importing it; `src/shiftlead/profiles.py` (`adapter: gemini`, its `config_dir`); the card's and Focus's Allow / Deny (`src/shiftlead/ui/templates/`, gated on `permission_channel`); `tests/conformance/fixtures/gemini/`
 
 **Why:** TD-112: the second adapter, so the product's one-view claim is tested by a second tool.
@@ -1611,7 +1612,8 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (grinder-ao-2, TD-785's live walk on `gemini-conformance`)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — waits on the designer's ask m-9604f86b5c60 to the techlead (2026-10-17): which road a Gemini launch's hooks take — a root-owned layer installed once per machine (the designer's recommendation: the tool's own mechanism, one static file, read only by a launch naming it, and no write into a home the person signed in with), a profile home set aside for ShiftLead, or a ShiftLead extension. The walk's permission step is designed with the answer.
+**Status:** Designed (2026-10-17, PR #PRNUM; Paul's answer m-1868eab7648f to the ask m-9604f86b5c60) — the layer is the machine's, `/etc/shiftlead/gemini-settings.json`, installed once by the person with the `sudo install` line `ao doctor` prints from the wanted copy ShiftLead writes; a launch is refused without it, a stale one launches and doctor says so; the conformance walk answers a channel-less adapter's permission in the terminal and captures each step's pane. Built by TD-875.
+**Blocked by:** TD-875
 **Location:** design §4.3 *The second adapter: Gemini CLI* (`launch`, the layer) and *The conformance suite* (the walk's permission step); `src/shiftlead/adapters/gemini/__init__.py` (`write_layer`, `layer_file`, `launch`'s env); `scripts/conformance.py` (`Walk.permission`, `Walk.doorbell`)
 
 **Why:** The design hands every Gemini launch its hooks as a per-launch settings layer named by `GEMINI_CLI_SYSTEM_SETTINGS_PATH`, written under `~/.shiftlead/gemini-settings/`. Gemini CLI 0.64.0 loads a system settings file (and the system defaults file, `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`) only when the file and its directory are owned by root and not writable by group or others (`loadSystemFile` → `isFileAndDirectorySecureSync`, `checkPosixStatsSecurity`, in the bundle's `chunk-FLKY6NH5.js`); otherwise it shows *⚠ Security Warning: Skipping system settings file '…': Parent directory '…' is insecure: Directory '…' is not owned by root (uid 0)* and runs with no layer at all. The host agent runs as the person, so no file it writes can pass: a Gemini session launched by ShiftLead runs no hook, sits at its launch state, and its first prompt waits for a `SessionStart` that never comes. Read 2026-10-17 (grinder-ao-2): `pdm run conformance gemini --profile gemini-conformance --capture` (with `gemini` registered on a scratch branch) launched and passed *launch*, then failed *first hook* — *no hook-confirmed idle within 120s*, the title `◇  Ready (conformance-walk)`; a hand launch on a private tmux server showed the warning above. The same layer, put as a scratch directory's **workspace** settings (`<dir>/.gemini/settings.json`), is read: `SessionStart` reached the hook with `session_id`, `transcript_path` and `source: startup`, and the title read `◇  Ready (gt)` — so the layer's content is right (its `hooksConfig: {notifications: false}` leaves hooks on) and only its path is refused. The tool has no other per-process settings path: `--extensions` names extensions installed in the home, and the user settings are `<GEMINI_CLI_HOME>/.gemini/settings.json`.
@@ -1689,5 +1691,35 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the test cannot fail on a re-read of its root.
 
 **Related:** PR #2086 (where it was met).
+
+---
+
+## TD-875: Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (TD-871's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.3 *The second adapter: Gemini CLI* (`launch`: the machine's layer) and *The conformance suite* (the walk's permission step and doorbell, `--capture`), §4.7 `ao doctor` (*hooks*); `src/shiftlead/adapters/gemini/__init__.py` (`layer_file`, `write_layer`, `layer_reading`, `launch`'s env, `doctor_profiles`), `scripts/conformance.py` (`Walk.permission`, `Walk.doorbell`, the capture); `tests/test_gemini_adapter.py`, `tests/test_doctor.py`, `tests/test_cli_doctor.py`, `tests/test_conformance_walk.py`
+
+**Why:** TD-871: Gemini CLI 0.64.0 skips a system settings file root does not own, so the per-launch layer under `~/.shiftlead/gemini-settings/` is never read and no hook reaches a Gemini session. Paul chose a root-owned layer the person installs once per machine (m-1868eab7648f).
+
+**Fix:**
+- **The layer.** `MACHINE_LAYER = /etc/shiftlead/gemini-settings.json`. `write_layer` writes the wanted copy, `~/.shiftlead/gemini-settings/layer.json` — `layer_settings(hook_command())`, one file for every profile and launch shape — and the per-profile files go. `launch` sets `GEMINI_CLI_SYSTEM_SETTINGS_PATH` to `MACHINE_LAYER`.
+- **The launch's check.** Before the argv: `MACHINE_LAYER` missing, not secure by the tool's own test (root owns the file and its directory, neither group- nor other-writable), or naming no hook command that resolves → the launch is refused in words, *the Gemini layer is not installed — run the line `ao doctor` prints*. Differing from the wanted copy otherwise → it launches.
+- **`ao doctor` hooks.** For a Gemini profile, the machine's layer against the wanted copy: *lacking* (not installed, not root-owned, no hook command that resolves) or *warning* (*stale*), each with the line `sudo install -D -o root -g root -m 0644 ~/.shiftlead/gemini-settings/layer.json /etc/shiftlead/gemini-settings.json`. Printed, never run; nothing in ShiftLead calls `sudo`.
+- **The walk.** For an adapter with `permission_channel = False`: once the record reads `needs-you`, `keys` presses Enter (the dialog's first choice, *Allow once*) and the walk waits for the state to leave `needs-you`; the doorbell's read of `ao inbox` is allowed the same way. Under `--capture`, each step's pane (`capture-pane -e`) and title are saved beside the hooks.
+
+**Tests:**
+- `write_layer` writes one wanted copy whatever the profile; `launch`'s env names `MACHINE_LAYER` (patched to a temp path);
+- a launch is refused for a missing layer, one owned by the user or group-writable (the check patched to read a stat), and one naming an unresolvable hook; a layer differing only in a setting launches;
+- `ao doctor` reads *lacking* with the sudo line for each of the three, *warning: stale* for a differing one, *ok* for the same bytes;
+- the walk, against a fake host agent: a channel-less adapter's permission is answered by a `keys` Enter and a channel adapter's by `allow`; `--capture` writes a pane and a title per step.
+
+**Done when** on kmaster, after the person runs the printed line once, `pdm run conformance gemini --profile gemini-conformance --capture` passes *first hook* and the permission step, and TD-785's capture can run.
+
+**Related:** TD-871 (the design), TD-785 (blocked by this), TD-112, TD-786.
 
 ---
