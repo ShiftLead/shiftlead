@@ -1,8 +1,10 @@
 """TD-829, design §4.5 screen 12 *Filters* and §4.5a *Queue page: filters, find*: a pick answers in the browser.
 Each card, completed line and *other work* line carries what the picks read as `data-` attributes, and
 `app.js`'s `AO.qPicks`, `AO.qQuery` and `AO.qPass` read the URL, write it and hide what `ui.queue`'s
-`queue_picks`, `picks_query` and `apply_picks` do on the server — run in node against the same reading. A bare
-`/queue` takes the remembered picks (`ao.qpicks`) and window (`ao.qwin`) in `base.html`'s head."""
+`queue_picks`, `picks_query` and `apply_picks` do on the server — run in node against the same reading. A card
+sends no `data-find`: `AO.qFindText` builds it from the ids and titles the card draws, by `_find_text`'s rule
+(§4.5 *Page loads*: *Nothing the page does not read*, TD-892). A bare `/queue` takes the remembered picks
+(`ao.qpicks`) and window (`ao.qwin`) in `base.html`'s head."""
 
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ import pathlib
 import shutil
 import subprocess
 import tempfile
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -43,7 +46,8 @@ const cases = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
 console.log(JSON.stringify(cases.map((c) => {
   const p = AO.qPicks(c.search);
   return { picks: p, query: AO.qQuery(p, c.change || {}), filtered: AO.qFiltered(p),
-    off: c.items.map((it) => !AO.qPass(it, p, c.teams)) };
+    off: c.items.map((it) => !AO.qPass(it.rows ? { ...it, find: AO.qFindText(it.rows) } : it, p, c.teams)),
+    finds: (c.cards || []).map(AO.qFindText) };
 })));
 """
 
@@ -65,6 +69,8 @@ SEARCHES = [
     "?find=keep%20%20back",
     "?find=db%23TD-5",
     "?find=TD-3",
+    "?find=21",
+    "?find=Queue%27s",
     "?team=a&team=b,a&find=queue",
     "?filter=needs-you&filter=steering&find=a&find=TD-20",
 ]
@@ -73,7 +79,7 @@ SEARCHES = [
 def _items(view: dict) -> list[dict]:
     cards = [
         {"kind": "card", "status": c.get("status") or "", "kinds": c.get("kinds") or [], "repos": c.get("repos") or []}
-        | {"find": c.get("find") or ""}
+        | {"rows": [{"qid": r["qid"], "title": r["title"]} for r in [c["top"], *c["rows"]]]}  # built in the browser
         for c in [*view["in_progress"], *view["up_next"]]
     ]
     lines = [{"kind": "line", "repos": [ln["repo"]], "find": ln["find"]} for ln in view["completed"]["lines"]]
@@ -114,6 +120,51 @@ def test_a_pick_in_the_browser_hides_what_the_servers_apply_picks_hides():
     assert any(0 < sum(js["off"]) < len(js["off"]) for js in got)
 
 
+class _Cards(HTMLParser):
+    """What `AO.qCardRows` reads off the drawn page: each card's header and rows, by `data-qid`, each with the
+    text of its `.qtitle`."""
+
+    def __init__(self):
+        super().__init__()
+        self.cards: list[list[dict]] = []
+        self.title = 0  # the depth inside a `.qtitle` being read
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        cls = (a.get("class") or "").split()
+        if "qcard" in cls:
+            self.cards.append([])
+        elif ("qhead" in cls or "qrow" in cls) and "data-qid" in a:
+            self.cards[-1].append({"qid": a["data-qid"], "title": None})
+        elif "qtitle" in cls and self.cards and self.cards[-1] and self.cards[-1][-1]["title"] is None:
+            self.cards[-1][-1]["title"], self.title = "", 1
+        elif self.title:
+            self.title += 1
+
+    def handle_endtag(self, tag):
+        self.title = max(self.title - 1, 0)
+
+    def handle_data(self, data):
+        if self.title:
+            self.cards[-1][-1]["title"] += data
+
+
+def test_a_cards_find_text_built_in_the_browser_is_the_servers(tmp_path, monkeypatch):
+    q = queue(repo2=True)
+    q["cards"][1]["rows"][0]["title"] = "Build the Queue's <find> & ÄÖ — TD-7 too"  # escaped, cased, an id in it
+    page = client(monkeypatch, tmp_path, fake(q, []))
+    parsed = _Cards()
+    parsed.feed(page.get("/queue").text)
+    view = queue_view(q, NOW)
+    cards = [*view["in_progress"], *view["up_next"]]
+    assert [[r["qid"] for r in rows] for rows in parsed.cards] == [
+        [r["qid"] for r in [c["top"], *c["rows"]]] for c in cards
+    ]
+    (got,) = _node([{"search": "", "items": [], "teams": {}, "cards": parsed.cards}])
+    assert got["finds"] == [c["find"] for c in cards]
+    assert "build the queue's <find> & äö — td-7 too" in got["finds"][1]
+
+
 def test_the_url_after_a_press_is_the_servers_link_for_it_and_loads_the_same_picks():
     presses = [
         ("", {"filter": "needs-you"}),
@@ -139,7 +190,8 @@ def test_each_card_and_line_carries_what_the_picks_read(tmp_path, monkeypatch):
     html = c.get("/queue").text
     card = 'data-card="s#TD-30" data-ids="s#TD-30" data-up="1" data-status="needs you" data-kinds="held-person"'
     assert card + ' data-repos="s"' in html
-    assert 'data-find="s#td-30 s#td-030 td-030 keep this one back"' in html
+    # a card sends no find text (TD-892); a completed line keeps its own, its entries' titles being folded
+    assert 'data-find="s#td-30' not in html and html.count("data-find=") == html.count('class="qdline')
     assert 'data-n="2" data-repo="s" data-find="' in html and 'class="qother" data-other="1"' in html
     # the empty window's line says the window it is in, as the heading does
     assert '>nothing closed<span class="qwinword" data-wv="4h" hidden> in the last 4 hours</span>' in html

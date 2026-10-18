@@ -3648,6 +3648,21 @@
     const at = (w) => AO.Q_WINDOWS.indexOf(w);
     return at(want) > at(loaded || "day") ? want : "";
   };
+  // a card's find text, built here from its rows' ids and titles rather than sent (§4.5 *Page loads*: *Nothing
+  // the page does not read*, TD-892): `_find_text`'s rule — each id whole and bare, every word lower-cased.
+  // `rows`: [{qid, title}], the card's header first; `qCardRows` reads them off a drawn card
+  AO.qFindText = (rows) => {
+    const bits = [];
+    (rows || []).forEach((r) => {
+      const q = String(r.qid || "");
+      bits.push(q);
+      AO.qRefs(q).forEach((ref) => bits.push(ref, ref.replace(/^.*#/, "")));
+      bits.push(String(r.title || ""));
+    });
+    return bits.join(" ").toLowerCase();
+  };
+  AO.qCardRows = (card) => $$(".qhead[data-qid], .qrows > .qrow[data-qid]", card)
+    .map((el) => ({ qid: el.dataset.qid, title: ($(".qtitle", el) || {}).textContent || "" }));
   AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.repo.length || picks.kind.length || picks.find.split(/\s+/).filter(Boolean).length);
   // `item`: {kind: "card" | "line" | "other", status, kinds, repos, find}; `teams`: a team's name → its repo
   AO.qPass = (item, picks, teams) => {
@@ -3741,10 +3756,13 @@
     try { teams = JSON.parse((filters && filters.dataset.teams) || "{}") || {}; } catch (err) { teams = {}; }
     const remember = () => store.set("qpicks", AO.qQuery({ ...picks, find: "" }).slice("/queue".length));
     if (picks.filter || picks.team.length || picks.repo.length || picks.kind.length) remember();
+    // each card's find text, built once per card drawn: at load, and for the cards a re-read swaps in (TD-892)
+    const finds = new WeakMap();
+    const cardFind = (el) => { if (!finds.has(el)) finds.set(el, AO.qFindText(AO.qCardRows(el))); return finds.get(el); };
     function applyPicks() {
       const filtered = AO.qFiltered(picks);
       const card = (el) => ({ kind: "card", status: el.dataset.status || "", kinds: (el.dataset.kinds || "").split(" ").filter(Boolean),
-        repos: (el.dataset.repos || "").split(" ").filter(Boolean), find: el.dataset.find || "" });
+        repos: (el.dataset.repos || "").split(" ").filter(Boolean), find: cardFind(el) });
       $$(".qgroup .qcard", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass(card(el), picks, teams)));
       $$(".qdline", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "line", repos: [el.dataset.repo || ""], find: el.dataset.find || "" }, picks, teams)));
       $$(".qother", lists).forEach((el) => el.classList.toggle("qoff", !AO.qPass({ kind: "other" }, picks, teams)));

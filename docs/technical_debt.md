@@ -73,7 +73,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Built (#2139) — a live check of the Queue's size once live |
-| TD-892 | Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles | Low | Open |
 | TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Open |
 
 ---
@@ -1519,24 +1518,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** each fold's body becomes one macro the row and the route both call. On the Queue a fold drawn closed is sent as its `<summary>` alone with an empty body; its first open fetches `GET /api/fold?key=<data-fold>`, which reads the one source the key names — a person-inbox entry as `inbox_entry_page` reads it, a board line from its board file, a ledger row from its repo's ledger (each the home's cached read, never the whole Queue view) — and answers the macro's HTML, under 200 ms to its first byte (`Server-Timing` as every route). The browser keeps each body by key while the page lives; after a re-read swaps the lists in, a fold in `foldsOpen` is filled from what it kept and read again. A fold drawn open (`fold_open`, an entry with `Answers:`, a press's detail) is sent whole; the Inbox and the message page send every fold whole. A key that names nothing answers 404 and the fold says *gone — reload*.
 
 **Done when** a Queue render's closed folds carry no body and its open ones do, `/api/fold` answers each of the three kinds with the same HTML the Inbox draws in that fold (a test per kind), a re-read keeps an opened fold's body, and the live Queue — after TD-890 and this are promoted — reads under 120 KB on the wire at load (a gzipped GET, read once the build is live, recorded here).
-
----
-
-## TD-892: Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (TD-888's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** design §4.5 *Page loads* (*Nothing the page does not read*), §4.5 screen 12 (*A pick answers in the browser*); `src/shiftlead/ui/templates/queue_card.html` (`data-find`), `src/shiftlead/ui/queue.py` (`_find_text`, `_finds`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the Queue's picks, `AO.qPass`); `tests/test_ui_queue_picks.py`
-
-**Why:** TD-888: the open cards' `data-find` is 5 KB of the live Queue's 141 KB gzipped (77 KB raw over 201 cards), each a copy of ids and titles the card already draws. It is the margin that keeps the page under 120 KB as cards are added.
-
-**Fix:** an open card is sent without `data-find`; at load and after each re-read the page writes each card's find text from its `data-ids` and the `.qtitle`s it draws, by `_find_text`'s rule (each id whole and bare, every word lower-cased), into memory or the attribute, before the picks are applied. The server keeps `_find_text` for a URL's find on a load and for `find_miss`. A completed line keeps its `data-find` (its entries' titles are hidden in its folded body until it opens). A test feeds the same cards to `_find_text` and to the browser's builder and holds the two to one answer, as `rail_counts` is held.
-
-**Done when** a Queue render's open cards carry no `data-find`, a find typed in the browser hides and shows the same cards a load with `?find=` does (the parity test, for an id, a bare number and words), and the picks' tests pass.
 
 ---
 

@@ -16868,3 +16868,21 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-884, TD-889.
 
 **Resolved:** 2026-10-18 (grinder-ao-1, #2143). `tests/test_ui_server_timing.py` gains two tests. `test_settings_with_the_agent_down_draws_the_banner_and_reads_no_chip`: a `settings` that raises `AgentUnavailable` (a 503) draws the *host agent unreachable* banner unhidden, and neither chip is read. `test_settings_reads_its_files_off_the_loops_thread`: the patched `profiles_mod.load` runs on a thread other than the one the page's RPCs answer on. Each probe fails one of them: `agent_down = True` → `False`, and `asyncio.to_thread(settings_files)` → `asyncio.sleep(0, settings_files())`.
+
+## TD-892: Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-888's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** design §4.5 *Page loads* (*Nothing the page does not read*), §4.5 screen 12 (*A pick answers in the browser*); `src/shiftlead/ui/templates/queue_card.html` (`data-find`), `src/shiftlead/ui/queue.py` (`_find_text`, `_finds`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the Queue's picks, `AO.qPass`); `tests/test_ui_queue_picks.py`
+
+**Why:** TD-888: the open cards' `data-find` is 5 KB of the live Queue's 141 KB gzipped (77 KB raw over 201 cards), each a copy of ids and titles the card already draws. It is the margin that keeps the page under 120 KB as cards are added.
+
+**Fix:** an open card is sent without `data-find`; at load and after each re-read the page writes each card's find text from its `data-ids` and the `.qtitle`s it draws, by `_find_text`'s rule (each id whole and bare, every word lower-cased), into memory or the attribute, before the picks are applied. The server keeps `_find_text` for a URL's find on a load and for `find_miss`. A completed line keeps its `data-find` (its entries' titles are hidden in its folded body until it opens). A test feeds the same cards to `_find_text` and to the browser's builder and holds the two to one answer, as `rail_counts` is held.
+
+**Done when** a Queue render's open cards carry no `data-find`, a find typed in the browser hides and shows the same cards a load with `?find=` does (the parity test, for an id, a bare number and words), and the picks' tests pass.
+
+**Resolved:** 2026-10-18 (grinder-ao-2, #2142). A card sends no `data-find`; `AO.qFindText` builds its find text from each `data-qid` and `.qtitle` of its header and rows by `_find_text`'s rule, once per card drawn (at load, and for the cards a re-read swaps in); the server keeps `find` for a URL's find and `find_miss`, and a completed line keeps its `data-find`. `test_a_cards_find_text_built_in_the_browser_is_the_servers` holds the browser's text to the server's for every card of a rendered `/queue`, and the picks' parity test now builds each card's find in node (an id, a bare number and words among its finds); on a scratch home a typed find hid and showed the same cards a `?find=` load did.
