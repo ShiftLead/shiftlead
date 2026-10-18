@@ -730,6 +730,9 @@ class _Gzip:
                     start = message
                 return
             if message["type"] != "http.response.body" or start is None:
+                if start is not None:  # a `pathsend` or another body form: the start goes first, as it was
+                    await send(start)
+                    passing = True
                 await send(message)
                 return
             chunks.append(message.get("body", b""))

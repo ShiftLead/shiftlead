@@ -114,3 +114,24 @@ def test_the_event_stream_is_not_compressed(tmp_path, monkeypatch):
 
     asyncio.run(ui._Gzip(inner)({"type": "websocket", "headers": [(b"accept-encoding", b"gzip")]}, None, send))
     assert seen == ["websocket"] and sent == [{"type": "websocket.accept"}]
+
+
+def test_a_pathsend_goes_after_its_start_as_it_was():
+    """A server with the `pathsend` extension gets a `FileResponse`'s start before its pathsend, never
+    the pathsend alone (the held start is let go first)."""
+    from shiftlead.ui import app as ui
+
+    start = {"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"text/javascript")]}
+
+    async def inner(scope, receive, send):
+        await send(start)
+        await send({"type": "http.response.pathsend", "path": "/x.js"})
+
+    sent: list[dict] = []
+
+    async def send(m):
+        sent.append(m)
+
+    scope = {"type": "http", "method": "GET", "path": "/", "headers": [(b"accept-encoding", b"gzip")]}
+    asyncio.run(ui._Gzip(inner)(scope, None, send))
+    assert [m["type"] for m in sent] == ["http.response.start", "http.response.pathsend"] and sent[0] is start
