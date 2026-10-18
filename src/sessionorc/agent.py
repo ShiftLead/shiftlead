@@ -783,6 +783,7 @@ class HostAgent(
         self._promote_task: asyncio.Task[None] | None = None
         self._promote_lock = asyncio.Lock()
         self._setup_seen: object = None  # `profiles.yml`'s mtime the setup notes last read (§4.3, TD-875)
+        self._setup_read_at = float("-inf")  # monotonic: the setup notes' last read
         self._pulls: dict[str, dict[str, Any]] = {}  # the pull's readings by repo (design §6 *Pull*)
         # per team, the last fifty `ao doing` calls and each doer's newest five (design §4.8 *the doing log*)
         self.doing_log = DoingLogStore()

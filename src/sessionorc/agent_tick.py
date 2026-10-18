@@ -175,6 +175,9 @@ def _orders(r: dict[str, Any] | None) -> list[Any]:
     return [*((r.get("work_orders") or {}).get("orders") or []), *((r.get("pr_orders") or {}).get("orders") or [])]
 
 
+SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
+
+
 class TickMixin:
     # -- reconcile -------------------------------------------------------------------------------
     #
@@ -185,7 +188,8 @@ class TickMixin:
 
     async def _setup_notes(self) -> None:
         """What a machine needs a person for before an adapter's sessions can run (design §4.3 *The person
-        meets the step at setup*, TD-875): on the first tick and whenever `profiles.yml` changes, each
+        meets the step at setup*, TD-875): on the first tick, whenever `profiles.yml` changes, and hourly
+        (what the note is about lives outside the home, so its undoing is seen without a restart), each
         adapter's `setup_note` (§4.3's optional method) is read, and a note it gives goes to the person
         **once per key** — kept in `setup_notes.json`, so a restart does not repeat it; a key of None
         (all is as wanted) forgets the adapter's, so a step undone later is said again."""
@@ -194,9 +198,9 @@ class TickMixin:
             seen: object = p.stat().st_mtime_ns
         except OSError:
             seen = "none"
-        if seen == self._setup_seen:
+        if seen == self._setup_seen and time.monotonic() - self._setup_read_at < SETUP_EVERY:
             return
-        self._setup_seen = seen
+        self._setup_seen, self._setup_read_at = seen, time.monotonic()
 
         def read() -> list[tuple[str, dict[str, Any]]]:
             out = []

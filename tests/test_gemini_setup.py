@@ -12,7 +12,7 @@ import pytest
 from conftest import kill_private_server, private_socket_name
 from test_gemini_adapter import rooted
 
-from sessionorc import adapters, containers
+from sessionorc import adapters, agent_tick, containers
 from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 from shiftlead.adapters import gemini
@@ -91,6 +91,24 @@ async def test_no_gemini_profile_no_note_and_a_profile_gained_is_read_on_the_nex
         touch(profiles)
         await a._setup_notes()
         assert len([e for e in a.person_inbox if "Gemini layer" in e.text]) == 1
+    finally:
+        kill_private_server(a.tmux)
+
+
+async def test_one_agent_reads_again_on_a_profiles_change_or_an_hour_on_and_not_between(home):
+    """The throttle: a second read with `profiles.yml` unchanged inside the hour reads nothing, so an
+    install meanwhile is not seen; an hour on, it is, and the key is forgotten for a later undoing."""
+    store = home / "home" / "setup_notes.json"
+    a = HostAgent(tmux=Tmux(socket_name=private_socket_name()))
+    try:
+        await a._setup_notes()
+        assert list(json.loads(store.read_text())) == ["gemini"]
+        gemini.MACHINE_LAYER.write_text(gemini.wanted_file().read_text())  # installed
+        await a._setup_notes()
+        assert list(json.loads(store.read_text())) == ["gemini"]  # not read: nothing changed it knows of
+        a._setup_read_at -= agent_tick.SETUP_EVERY
+        await a._setup_notes()
+        assert json.loads(store.read_text()) == {}  # read: ok, forgotten
     finally:
         kill_private_server(a.tmux)
 
