@@ -423,15 +423,9 @@ def test_a_queue_card_sends_a_closed_fold_empty_and_an_open_one_whole(tmp_path, 
     assert "data-lazy" not in inbox and "the <em>rest</em>, folded." in inbox
 
 
-def test_the_browser_reads_a_lazy_fold_once_keeps_it_by_key_and_refills_it_after_a_reread():
+def test_a_reread_queue_reopens_its_folds_and_fills_each_open_one():
+    # `AO.fillFold` itself runs under node in test_ui_fill_fold.py (TD-898); this is its wiring
     js = JS.read_text()
-    fill = js[
-        js.index("AO.fillFold = async function") : js.index(
-            'document.addEventListener?.("toggle", (ev) => {\n    const d = ev.target;\n    if (d && d.matches && d.matches("details.fold[data-lazy][open]")'
-        )
-    ]
-    assert "/api/fold?key=${encodeURIComponent(key)}" in fill and "foldBodies.set(key, html)" in fill
-    assert "if (foldBodies.has(key)) put(foldBodies.get(key));" in fill and "gone — reload" in fill
     reopen = js[js.index("AO.reopenFolds = function") : js.index("AO.fillFold = async function")]
     assert "AO.fillFold(d)" in reopen
     q = js[js.index("AO.queue = function") :]
