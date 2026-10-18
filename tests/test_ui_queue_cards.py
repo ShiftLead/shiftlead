@@ -304,5 +304,18 @@ def test_every_snooze_in_the_row_renderer_is_the_inboxs_alone():
     menus = [m.start() for m in re.finditer(r"<summary[^>]*>Snooze", src)]
     assert len(menus) == 7
     for at in menus:
-        assert src[:at].rstrip().rsplit("\n", 2)[-2].strip() == "{%- if not on_queue %}", src[at - 200 : at]
-    assert "{% set on_queue = true %}" in (TEMPLATES / "queue_mail.html").read_text()
+        assert src[:at].rstrip().rsplit("\n", 2)[-2].strip() == "{%- if not drawn_on_queue %}", src[at - 200 : at]
+    assert "{% set drawn_on_queue = true %}" in (TEMPLATES / "queue_mail.html").read_text()
+
+
+def test_the_inbox_pages_own_queue_count_leaves_its_rows_whole(tmp_path, monkeypatch):
+    """The Inbox page's context carries `on_queue`, its rail's *+ n on the Queue* count: the renderer's
+    flag is a name no page defines, so an Inbox with entries on the Queue keeps its rows' find text and
+    Snooze (#2136's review)."""
+    from test_ui_inbox import entry
+
+    from shiftlead.ui.app import templates
+
+    host_rows = [entry("m-1", "ask", text="merge PR 9?")]
+    html = templates.get_template("inbox_rows.html").render(rows=host_rows, section="needs", on_queue=3)
+    assert "data-find=" in html and 'data-act="snooze"' in html

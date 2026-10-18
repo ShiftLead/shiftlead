@@ -2,4 +2,4 @@
    the person*; TD-771): the Inbox's own row renderer, never a copy, so its controls, RPCs and confirms
    are the Inbox's. Imported with context so a row's text knows the page's `origin` (TD-138), and the
    renderer that it draws for the Queue: no `data-find` on a row and no Snooze (§4.5 *Page loads*, TD-890). #}
-{% set on_queue = true %}{% import "inbox_row.html" as r with context %}{{ r.row(e, section) }}
+{% set drawn_on_queue = true %}{% import "inbox_row.html" as r with context %}{{ r.row(e, section) }}
