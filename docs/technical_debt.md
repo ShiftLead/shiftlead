@@ -76,7 +76,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
 | TD-878 | #2079's Git pick ignores a stale `git_files` answer and a pick that moved on, and no test fails when either guard is removed | Low | Open |
 | TD-879 | Build TD-805 (1): the Queue calls `board_choices()` once per attached mail row — 2 s of its 2.5 s first byte; each fact read once per request | Medium | Built (#2108) — live check |
-| TD-880 | Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable | Medium | Open |
+| TD-880 | Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable | Medium | Built (#2109) — live check |
 | TD-881 | Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget | Medium | Open |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
 | TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
@@ -1597,8 +1597,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** debt
 **Added:** 2026-10-17 (TD-805's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2109
+**Status:** Built #2109 (2026-10-17, grinder-ao-2) — a live check once #2109 is live (`ao promote status`): read the live Queue's bytes on the wire, `curl -s -H 'Accept-Encoding: gzip' -o /dev/null -w %{size_download} http://127.0.0.1:<the UI's port>/queue` (a headless GET), under 400 KB; and `curl -sI 'http://127.0.0.1:<port>/static/app.js?v=x'` carrying `immutable`. The scratch home read the Queue 42,519 bytes plain, 8,213 gzipped, and a second load fetching no script or stylesheet (#2109's UI check)
 **Location:** design §4.5 *Page loads* (*Compressed*, *Cached*); `src/shiftlead/ui/app.py` (`gzip_ok`, `app.mount("/static", StaticFiles(…))`, the page routes' `TemplateResponse`s), the templates' `?v=` hash on `app.js` and `app.css`; `tests/` for the UI routes
 
 **Why:** TD-805: nothing is sent compressed — the Queue's 2.29 MB of HTML is 370 KB gzipped, the Inbox's 718 KB is 79 KB, `app.js`'s 399 KB is 126 KB — and the static files carry no `Cache-Control`, so a load revalidates or refetches 495 KB of script and style though their URLs carry a hash.

@@ -20,7 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
@@ -689,6 +689,80 @@ class _WsAttemptLog:
         await self.app(scope, receive, send)
 
 
+GZIP_MIN = 1024  # a body under 1 KB goes as it is (§4.5 *Page loads*, *Compressed*)
+PACKED = (b"image/", b"font/", b"application/zip", b"application/gzip")  # compressed already: as it is
+
+
+class _Gzip:
+    """A page, a `part=1` fragment and a static file go gzipped to a browser that takes it (design
+    §4.5 *Page loads*, TD-880), with `Vary: Accept-Encoding`. Starlette's own `GZipMiddleware`
+    compresses on the loop, which every Focus keystroke shares, so the body is held whole and
+    compressed on a worker thread, as `json_body` compresses the counts. Only http: the event
+    stream and the terminal are websockets and pass by. A response already encoded (the counts'
+    JSON), one compressed by its format (`PACKED`: a font, an image), not a 200, or under `GZIP_MIN`
+    is sent as it was."""
+
+    def __init__(self, app: Any):
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        request = Request(scope)
+        gz, ranged = gzip_ok(request), "range" in request.headers
+        start: dict[str, Any] | None = None
+        chunks: list[bytes] = []
+        passing = False
+
+        async def wrapped(message: dict[str, Any]) -> None:
+            nonlocal start, passing
+            if passing:
+                await send(message)
+                return
+            if message["type"] == "http.response.start":
+                headers = {k.lower(): v for k, v in message.get("headers") or ()}
+                packed = headers.get(b"content-type", b"").startswith(PACKED)
+                if message.get("status") != 200 or b"content-encoding" in headers or ranged or packed:
+                    passing = True
+                    await send(message)
+                else:
+                    start = message
+                return
+            if message["type"] != "http.response.body" or start is None:
+                if start is not None:  # a `pathsend` or another body form: the start goes first, as it was
+                    await send(start)
+                    passing = True
+                await send(message)
+                return
+            chunks.append(message.get("body", b""))
+            if message.get("more_body"):
+                return
+            body = b"".join(chunks)
+            headers = [(k, v) for k, v in start.get("headers") or () if k.lower() != b"vary"]
+            headers.append((b"vary", b"Accept-Encoding"))
+            if gz and len(body) >= GZIP_MIN:
+                body = await asyncio.to_thread(gzip.compress, body, 5)
+                headers = [(k, v) for k, v in headers if k.lower() != b"content-length"]
+                headers += [(b"content-encoding", b"gzip"), (b"content-length", str(len(body)).encode())]
+            await send(start | {"headers": headers})
+            await send({"type": "http.response.body", "body": body, "more_body": False})
+
+        await self.app(scope, receive, wrapped)
+
+
+class _Static(StaticFiles):
+    """A static file whose URL carries its `?v=` hash (`static_url`) is kept a year and never
+    revalidated; one without it is revalidated on each load against its ETag (§4.5 *Page loads*,
+    *Cached*, TD-880)."""
+
+    async def get_response(self, path: str, scope: Any) -> Response:
+        response = await super().get_response(path, scope)
+        hashed = any(k == "v" and v for k, v in parse_qsl(scope.get("query_string", b"").decode("latin-1")))
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable" if hashed else "no-cache"
+        return response
+
+
 def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | None:
     """The groups as a delta carries them (§4.5a **team groups**): each header, summary and + card
     rendered, the client swapping them in place; `None` is the flat page."""
@@ -1182,8 +1256,9 @@ class Readings:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="shiftlead")
-    app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
+    app.mount("/static", _Static(directory=str(HERE / "static")), name="static")
     app.add_middleware(_WsAttemptLog)
+    app.add_middleware(_Gzip)
 
     rd = Readings()
     call = rd.call
