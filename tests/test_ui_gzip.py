@@ -135,3 +135,56 @@ def test_a_pathsend_goes_after_its_start_as_it_was():
     scope = {"type": "http", "method": "GET", "path": "/", "headers": [(b"accept-encoding", b"gzip")]}
     asyncio.run(ui._Gzip(inner)(scope, None, send))
     assert [m["type"] for m in sent] == ["http.response.start", "http.response.pathsend"] and sent[0] is start
+
+
+def test_a_ranged_request_a_non_200_and_an_encoded_body_over_a_kilobyte_go_as_they_are(tmp_path, monkeypatch):
+    """TD-885: each guard of `_Gzip`'s start under a body big enough to be compressed — a `Range`
+    request (a partial body gzipped is corrupt), a 404 and a 206, and a body already gzipped that is
+    not compressed again."""
+    import os
+
+    from shiftlead.ui import app as ui
+
+    c = client(monkeypatch, tmp_path)
+    big = b"x" * 5000
+    c.app.add_api_route("/big", lambda: ui.Response(big, media_type="text/plain"))
+    c.app.add_api_route("/gone", lambda: ui.Response(big, status_code=404, media_type="text/plain"))
+    c.app.add_api_route("/part", lambda: ui.Response(big, status_code=206, media_type="text/plain"))
+    packed = gzip.compress(os.urandom(4096))
+    assert len(packed) >= ui.GZIP_MIN
+    c.app.add_api_route(
+        "/enc", lambda: ui.Response(packed, media_type="text/plain", headers={"Content-Encoding": "gzip"})
+    )
+    h, body = raw(c, "/big", GZ)
+    assert h["content-encoding"] == "gzip"  # the same body unranged is compressed
+    h, body = raw(c, "/big", GZ | {"Range": "bytes=0-99"})
+    assert "content-encoding" not in h and body == big
+    for url, status in (("/gone", 404), ("/part", 206)):
+        with c.stream("GET", url, headers=GZ) as r:
+            assert r.status_code == status and "content-encoding" not in r.headers
+            assert b"".join(r.iter_raw()) == big
+    h, body = raw(c, "/enc", GZ)
+    assert h["content-encoding"] == "gzip" and body == packed  # not compressed twice
+
+
+def test_a_body_sent_in_chunks_is_compressed_whole(tmp_path, monkeypatch):
+    """TD-885: a streamed body is held until its last chunk and compressed once, not per chunk."""
+    from fastapi.responses import StreamingResponse
+
+    c = client(monkeypatch, tmp_path)
+
+    def chunks():
+        yield b"a" * 3000
+        yield b"b" * 3000
+
+    c.app.add_api_route("/chunks", lambda: StreamingResponse(chunks(), media_type="text/plain"))
+    h, body = raw(c, "/chunks", GZ)
+    assert h["content-encoding"] == "gzip" and gzip.decompress(body) == b"a" * 3000 + b"b" * 3000
+
+
+def test_an_empty_v_is_no_hash(tmp_path, monkeypatch):
+    """TD-885: `?v=` with nothing after it marks no file immutable (`parse_qsl` drops a blank value, so
+    `_Static` never sees the pair)."""
+    c = client(monkeypatch, tmp_path)
+    h, _ = raw(c, "/static/app.js?v=", GZ)
+    assert h["cache-control"] == "no-cache"
