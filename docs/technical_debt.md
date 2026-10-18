@@ -1788,7 +1788,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Status:** Open
 **Location:** `src/sessionorc/seats.py` (`_series`); `tests/test_seats.py`
 
-**Why:** #2067 (TD-859): `_series` sets `partial` under `if window != "day" and begins and a < begins <= b:`, and its docstring says *`partial` on the bucket holding `begins` when that is not its first day*. Reverted to `a <= begins <= b`, `pytest -q tests/test_seats.py` read `22 passed`: `test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` begins the ledger on a Tuesday and a Wednesday only, so a ledger that begins on a Monday or the 1st (a whole bucket) is never read.
+**Why:** #2067 (TD-859): `_series` sets `partial` under `if window != "day" and begins and a < begins <= b:`, and its docstring says *`partial` on the bucket holding `begins` when that is not its first day*. Reverted to `a <= begins <= b`, `pytest -q tests/test_seats.py` read `22 passed`: `test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` begins the ledger on a Wednesday only, so a ledger that begins on a Monday or the 1st (a whole bucket) is never read.
 
 **Fix:** Add to that test a ledger whose first day is a Monday and one whose first day is the 1st: the week and the month bucket holding it carry no `partial`.
 
