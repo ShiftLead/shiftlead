@@ -16124,3 +16124,28 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-819, TD-834, TD-832 (the page it joins).
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2082). The Spend page's **Spend · Shape** (`view=shape`, `ui/spend.py` `shape_view`, `templates/shape_part.html`), `/api/shape`, and `ao team shape` (`cli.py` `cmd_team_shape`, `shape_lines`); the help paragraph in `help.py` and §4.5a's list. Screenshots `docs/mockups/reviews/2026-10-17-td835-shape*.png`.
+
+## TD-837: Build TD-820 (2): the designer's brief keeps its reads small and names its waiting designs
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (TD-820's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done (2026-10-17, grinder-ao-2)
+**Location:** design §4.8 *A designer's context*, §6 rule 5; `src/shiftlead/briefs/designer.md` (the shipped template; a repo's own part under `docs/briefs/` is the repo's and is not edited here)
+
+**Why:** TD-820: within a design, the reads that grow the designer's context are large replies read whole, and review transcripts.
+
+**Fix:**
+- **Reviews and large replies.** Add one paragraph to the designer template, in §4.8's words:
+  - Every review round runs as a fresh subagent whose final message is its verdict and findings.
+  - A large reply (`ao repo --json`, a whole section file, a skill's reference) is read by the slice the step needs: filtered through `jq` or a script, or a `grep -n` and then a range.
+- **Waiting designs.** A design whose PR waits on a steer or a reader is a waiting claim. At the bound's line, the run pushes, ledgers and restarts. The next run reads its carried claims first (`ao status --json`, its own `progress`) and its open PRs (`gh pr list`), and finishes each. A run holding only waiting claims, with nothing to pick, declares `ao progress none` beside them and ends its turn; the reply or the steer's lapse wakes it.
+- **Tests:** the template carries the paragraph (the briefs test that reads it).
+
+**Done when** the shipped designer brief says how a design keeps its reads small and what a waiting design is at the bound.
+
+**Related:** TD-820, TD-836.
+
+**Resolved:** 2026-10-17 (grinder-ao-2). `src/shiftlead/briefs/designer.md` gains *Keep what a design reads small* above *Out of work*: reviews as fresh subagents returning their verdict, large replies read by the slice, a design waiting on a steer or a reader as a waiting claim, and a run of only waiting claims declaring `none`. `test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design` in `tests/test_cli.py`.
