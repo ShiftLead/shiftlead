@@ -67,7 +67,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-805 | Every page loads slowly from the person's browser (Org, Repo, Inbox, Queue): nothing measures a load end to end, and the Queue takes 2.4 s to its first byte and sends 1.9 MB of uncompressed markup | Medium | Open |
 | TD-818 | Nobody can see what each team member spends: the spend ledger reads metered profiles only | Medium | Designed — built by TD-830–TD-833, TD-859 |
 | TD-820 | The designer runs far past its context bound inside one design: 955 requests over 300k in a week | Medium | Designed — built by TD-836, TD-837 (done) |
-| TD-831 | Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v` | Low | Open |
 | TD-836 | Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims | Medium | Built (#2048) — live check |
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
@@ -1298,7 +1297,7 @@ The other cases:
 **Owner:** designer
 **Kind:** design-first
 **Status:** Designed 2026-10-17 (design §4.4 *Spend per seat*, §4.3 *Spend per turn*, §4.2a, §5 `spend.weights`, §4.5 screen 13 *Spend* and screen 1's team header, §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, §4.7 `ao spend` and `ao status -v`; mockup `Spend.dc.html`). Every profile's turns, a subscription's included, are read once a minute into a **seat ledger** (`seat_spend.json`), each turn charged to the record that spent it (by conversation, else by worktree, else *outside shiftlead*) and to the entry it was doing; a subscription's figure is API-equivalent at the person's weights (default: the API's list prices of 2026-10-17, written into §5; steer m-0a1223fad390 to Paul, raw tokens its alternative), never a bill and read by no gate; kept thirteen months; drawn on a Spend page, the team card's header, `ao spend` and `ao status -v`. **Amended** 2026-10-17 with Paul's additions (m-75b50493538d, from his session ao-paul): a **Month** window and a period picked on an **Over time** chart, **By team** and **Top sessions** on All, the person's own sessions as *interactive sessions*, the usage chip opening the page; the RPC's part is TD-859, the page's TD-832, `ao spend`'s TD-831.
-**Blocked by:** TD-830, TD-831, TD-832, TD-833, TD-859
+**Blocked by:** TD-830, TD-832, TD-833, TD-859
 **Location:** design §4.3 *Spend per turn* (TD-128: `spend()` is asked for a `metered` profile only), §4.2a (a subscription profile is read by its quota windows), §4.4 (the home's spend ledger), §4.5 screen 1 (the team card), §4.7 (`ao status -v`); `src/shiftlead/adapters/claude_code/transcript.py` (the reader), `src/shiftlead/profiles.py`
 
 **Why:**
@@ -1353,28 +1352,6 @@ The other cases:
 **Related:** TD-460 (the grinders' bound trial), TD-378 (the prompt cache, archived), TD-818 (spend per seat), rule 5.
 
 ---
-
-## TD-831: Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v`
-
-**Priority:** Low
-**Type:** feature
-**Added:** 2026-10-17 (TD-818's design, the designer)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Blocked by:** TD-830, TD-859
-**Location:** design §4.7 `ao spend` and `ao status -v`, §4.4 *Spend per seat*; `src/shiftlead/cli.py`
-
-**Why:** TD-818: the seat ledger's reading, from a terminal and from a session (a manager reads its team's spend without a page).
-
-**Fix:**
-- `ao spend [--team <t>] [--window day|week|month] [--at <date>] [--entries]` prints the `seats` RPC's reply for the period in §4.7's words (amended 2026-10-17): without `--team`, first the *By team* block from `teams`; then a block per team, a line per seat, then the *interactive sessions* seats, then *outside shiftlead* (one line; with `--team`, the team's head line from its `teams` row, then its block alone; `--team interactive` the same for the person's own sessions), and with `--entries` the finished entries. `--json` prints the RPC's reply. Read-only, open to a session.
-- `ao status -v` prints each record's `spend` line from `seats` with `by: record`, and `--json` carries the `spend` object (`{day, week, past_200k, past_300k, unit}`, the shares today's, or `unknown`).
-- **Tests:** the line formats for `≈$`, `$` and *unweighed*; `--entries`, with *· partial*; a session may call it; `status -v` prints the line, and its absence where the record spent nothing.
-
-**Done when** `ao spend` prints what the Spend page draws, and `ao status -v` shows each record's figure.
-
-**Related:** TD-818, TD-830.
 
 ## TD-836: Build TD-820 (1): rule 5 reads a waiting claim as not in progress, and the restart carries the waiting claims
 
