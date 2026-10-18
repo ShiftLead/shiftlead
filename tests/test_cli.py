@@ -1021,7 +1021,6 @@ def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     assert SHAPE not in designer.read_text(encoding="utf-8")
 
 
-
 def test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design():
     """TD-837 (design §4.8 *A designer's context*, §6 rule 5): a design's reviews and large replies are
     what grow the designer's context, and a design waiting on someone else is a waiting claim."""
@@ -1030,6 +1029,7 @@ def test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design():
     assert "`ao repo --json`" in text and "read by the slice the step needs" in text
     assert "is a waiting claim" in text and "reads its carried claims first" in text
     assert "only waiting claims, with nothing to pick, declares `ao progress none`" in text
+
 
 @pytest.mark.unit
 def test_the_shape_warning_counts_the_first_paragraph():
