@@ -1713,7 +1713,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (TD-856's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 (the `git_files` read: `gitinfo.pick_files`, `rpc_git_files`, `NODE_READS`, `identity.READS`) by #2077. Slice 2 is the card: the page's route, `#gitcard`'s pick line, `AO.gitFiles`' redraw and the card's tests.
 **Location:** design §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* (and *changed files*, now the pick's Working tree), §4.2 *The Git card's pick*, §4.5 item 4, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`); mockup `docs/mockups/reviews/2026-10-17-td856-git-pick.png` (`gen.py` `focus_git_pick`); `src/sessionorc/gitinfo.py` (`changed_files`, beside which the commit and session reads go), `src/sessionorc/agent.py` (`rpc_paths`, the shape of a record-host read), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/shiftlead/ui/app.py` (the Focus view; a route the page asks, as the transcript's is), `src/shiftlead/ui/templates/focus.html` (`#gitcard`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw); `tests/test_ui_focus_git_files.py`, `tests/test_recent_files.py`, `tests/test_paths_rpc.py`, `tests/test_link.py`
 
 **Why:** TD-856: the Git card lists the porcelain alone, so the moment a worker commits, the files it changed leave the card and their links with them.
