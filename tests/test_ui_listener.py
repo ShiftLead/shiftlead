@@ -7,6 +7,7 @@ runs `shiftlead-ui` itself on free ports and a temp home.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import socket
@@ -381,6 +382,26 @@ def _up(port: int, proc: subprocess.Popen, timeout: float = 20) -> bool:
     return False
 
 
+def _listening(pid: int) -> set[int]:
+    """The TCP ports process `pid` itself listens on, read from `/proc` (TD-870): its sockets' inodes
+    from `fd/`, matched against the LISTEN rows (state `0A`) of its `net/tcp` and `net/tcp6`. A connect
+    to a released port cannot say this, since any other process may have bound the port since."""
+    inodes = set()
+    for fd in Path(f"/proc/{pid}/fd").iterdir():
+        with contextlib.suppress(OSError):
+            link = os.readlink(fd)
+            if link.startswith("socket:["):
+                inodes.add(link[8:-1])
+    ports = set()
+    for table in ("tcp", "tcp6"):
+        with contextlib.suppress(OSError):
+            for row in Path(f"/proc/{pid}/net/{table}").read_text().splitlines()[1:]:
+                f = row.split()
+                if f[3] == "0A" and f[9] in inodes:
+                    ports.add(int(f[1].rsplit(":", 1)[1], 16))
+    return ports
+
+
 def _stop(proc: subprocess.Popen) -> str:
     if proc.poll() is None:
         proc.terminate()
@@ -397,6 +418,7 @@ def test_both_listeners_serve_and_one_sigterm_stops_both(home):
     proc = _ui(home, "--port", str(plain), "--route-port", str(route))
     try:
         assert _up(plain, proc) and _up(route, proc)
+        assert {plain, route} <= _listening(proc.pid)  # the helper reads both, so its *not* below means one
         status, h = _get(plain)
         assert status == 200 and h["x-shiftlead-listener"] == "plain"
         status, h = _get(route)
@@ -441,8 +463,9 @@ def test_route_port_0_and_a_node_run_no_route_listener(home):
     proc = _ui(home, "--port", str(plain), "--route-port", str(route))
     try:
         assert _up(plain, proc)
-        with pytest.raises(OSError), socket.create_connection(("127.0.0.1", route), timeout=0.5):
-            pass
+        # what the process listens on, not a connect to `route`: a parallel test may bind it once released
+        held = _listening(proc.pid)
+        assert plain in held and route not in held, held
     finally:
         out = _stop(proc)
     assert "no route listener: not the home" in out
