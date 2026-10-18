@@ -162,10 +162,16 @@
       <input type="file" id="entryattachfile" multiple hidden>
       <button type="button" class="btn sm ghost hidden" id="entryattachcancel" title="cancel this upload: nothing of it is kept" aria-label="cancel the upload">✕</button>
       <span class="note" id="entryattachnote">or paste a screenshot, or drop a file on the box — its path goes in at the cursor</span></div>
-    <div class="row gap wrap" role="radiogroup" aria-label="Type"><span class="field">Type</span>
+    <div class="row gap wrap"><div class="row gap wrap" role="radiogroup" aria-label="Type"><span class="field">Type</span>
       <label><input type="radio" name="entrytype" value="debt" checked> debt <span class="meta">something wrong now</span></label>
       <label><input type="radio" name="entrytype" value="feature"> feature <span class="meta">something new</span></label>
     </div>
+    {#- §4.5a *Add entry…* (TD-851, built by TD-855): **Priority** beside Type, drawn as Type is, *Medium* selected -#}
+    <div class="row gap wrap" role="radiogroup" aria-label="Priority" id="entrypriority"><span class="field">Priority</span>
+      <label><input type="radio" name="entrypriority" value="high"> High</label>
+      <label><input type="radio" name="entrypriority" value="medium" checked> Medium</label>
+      <label><input type="radio" name="entrypriority" value="low"> Low</label>
+    </div></div>
     {#- §4.5a *Add entry form: Hand to the techlead* (TD-740): where two or more teams service the repo, the
         optional **Team** pick — blank hands to the first with a techlead seat, a pick to that team's -#}
     <label class="row gap" id="entryteamrow" hidden><span class="field">Team</span><select class="input" id="entryteam" aria-label="Team" style="width: auto; flex: none;"></select><span class="meta">its techlead takes the entry</span></label>

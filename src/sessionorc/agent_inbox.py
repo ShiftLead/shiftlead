@@ -25,6 +25,7 @@ from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
+    ENTRY_PRIORITIES,
     ENTRY_TYPES,
     LEASE_TTL,
     RpcError,
@@ -376,11 +377,12 @@ class InboxMixin:
         teams: list[dict[str, str]] | None = None,
         draft: str = "",
         team: str = "",
+        priority: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """**Hand to the techlead** and `ao td add` (design §4.10 *An entry handed to a seat*, §4.9
         *Add an entry to the ledger*; TD-218 slice 2): the person's words as an `ask` from the
-        person to a techlead seat of the repo, carrying `entry: {repo, type, team}` and marked
+        person to a techlead seat of the repo, carrying `entry: {repo, type, team, priority}` and marked
         `handed`, with **no bound**: it never lapses, and ends by its outcome or the person's
         Dismiss alone. A person's own, refused to every session as `board_edit` is, and served at
         the home. The host agent does not read `org.yml`, so the caller hands it the teams that
@@ -388,10 +390,11 @@ class InboxMixin:
         else definition order), each `{team, seat}` — `seat` the id the team's techlead takes, or
         empty where the team defines none — as `board_reply`'s `refs` come from the reader. `team`,
         the form's **Team** pick or `--team` (TD-730, TD-764), hands to that team's seat and is
-        `entry.team`; blank, the first team with a seat takes it and `entry.team` is empty. Refused
-        in words: no such repo, no team services it, a picked team that does not, no techlead seat
-        to hand to, an unknown type, empty text. Returns `{id, to, team, repo, type, read_when}`,
-        `team` the team handed to.
+        `entry.team`; blank, the first team with a seat takes it and `entry.team` is empty. `priority`,
+        the form's **Priority** pick or `--priority` (TD-851), is `entry.priority`, `medium` when absent.
+        Refused in words: no such repo, no team services it, a picked team that does not, no techlead
+        seat to hand to, an unknown type or priority, empty text. Returns
+        `{id, to, team, repo, type, priority, read_when}`, `team` the team handed to.
         `draft`, where the form attached files (§4.4 *The Add entry form's draft*, TD-630): refused
         before the send unless it is this host's and unclaimed, then claimed for the ask
         (`claimed.json` `{by: hand:<its id>, at}`) and carried in the envelope beside `entry`."""
@@ -411,6 +414,9 @@ class InboxMixin:
         kind = str(type or "").strip().lower()
         if kind not in ENTRY_TYPES:
             raise RpcError(f"an entry is {' or '.join(ENTRY_TYPES)}, not {type!r} (cadence §2.11)")
+        rank = str(priority or "").strip().lower() or "medium"
+        if rank not in ENTRY_PRIORITIES:
+            raise RpcError(f"an entry's priority is {', '.join(ENTRY_PRIORITIES)}, not {priority!r} (design §4.10)")
         words = str(text or "").strip()
         if not words:
             raise RpcError("the entry has no words: say what it is — a title is enough")
@@ -438,7 +444,8 @@ class InboxMixin:
         # a seat closed and started again under its name is followed to the record that took it (review of #764)
         seat = next(iter(sent.get("delivered") or ()), seat)
         # the debt, the envelope's fields and no bound: an entry never lapses (§4.10)
-        self._mark(mid, handed=True, entry={"repo": name, "type": kind, "team": pick}, bound=None, draft=draft or None)
+        entry = {"repo": name, "type": kind, "team": pick, "priority": rank}
+        self._mark(mid, handed=True, entry=entry, bound=None, draft=draft or None)
         if folder is not None:  # the form's files are the ask's, kept `runs_keep_days` from now (§4.4, TD-630)
             try:
                 await asyncio.to_thread(agent_common.claim_draft, folder, f"hand:{mid}", datetime.now(UTC))
@@ -452,6 +459,7 @@ class InboxMixin:
             "team": team,
             "repo": name,
             "type": kind,
+            "priority": rank,
             "read_when": self._entry_read_when(seat),
         }
 
