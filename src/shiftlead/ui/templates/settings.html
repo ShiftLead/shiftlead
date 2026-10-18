@@ -101,14 +101,14 @@
           {%- for k, label in (("input", "input"), ("output", "output"), ("cache_read", "cache read"), ("cache_write", "cache write")) %}
           <input class="input setin setprice" name="{{ k }}" value="{{ w[k] }}" placeholder="—" inputmode="decimal" aria-label="{{ w.model or 'model' }} {{ label }}, $ per million tokens" autocomplete="off">
           {%- endfor %}
-          <button class="btn sm ghost setwx" type="button" title="{{ 'back to its default price on Save: the design ships this row' if w.shipped else 'remove this row' }}" aria-label="remove {{ w.model or 'this row' }}">×</button>
+          <button class="btn sm ghost setwx" type="button" title="{{ 'back to its default price on Save: the design ships this row' if w.shipped else 'remove this row' }}" aria-label="{{ ('put ' ~ w.model ~ ' back at its default price on Save') if w.shipped else ('remove ' ~ (w.model or 'this row')) }}">×</button>
         </div>{% endfor %}</div>
         <template id="setwrow">{% with w = {"model": "", "input": "", "output": "", "cache_read": "", "cache_write": "", "shipped": False, "default": False} %}<div class="setweight">
           <input class="input setin mono" name="model" value="{{ w.model }}" placeholder="claude-opus" aria-label="model prefix" autocomplete="off" spellcheck="false"{% if w.shipped %} readonly{% endif %}>
           {%- for k, label in (("input", "input"), ("output", "output"), ("cache_read", "cache read"), ("cache_write", "cache write")) %}
           <input class="input setin setprice" name="{{ k }}" value="{{ w[k] }}" placeholder="—" inputmode="decimal" aria-label="{{ w.model or 'model' }} {{ label }}, $ per million tokens" autocomplete="off">
           {%- endfor %}
-          <button class="btn sm ghost setwx" type="button" title="{{ 'back to its default price on Save: the design ships this row' if w.shipped else 'remove this row' }}" aria-label="remove {{ w.model or 'this row' }}">×</button>
+          <button class="btn sm ghost setwx" type="button" title="{{ 'back to its default price on Save: the design ships this row' if w.shipped else 'remove this row' }}" aria-label="{{ ('put ' ~ w.model ~ ' back at its default price on Save') if w.shipped else ('remove ' ~ (w.model or 'this row')) }}">×</button>
         </div>{% endwith %}</template>
       </div>
       <div class="row gap wrap"><button class="btn sm ghost setwadd" type="button" title="a row for a model the defaults do not name, or a longer prefix of one">+ model</button>

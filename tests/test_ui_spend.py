@@ -315,6 +315,7 @@ def test_the_weights_card_writes_spend_weights_through_set_settings(subprocess_a
         page = c.get("/settings").text
         assert 'id="setweights"' in page and 'value="claude-opus-5-5"' in page and 'href="/spend"' in page
         assert "API-equivalent" in page and 'name="as_of" value="2026-10-17"' in page
+        assert 'aria-label="put claude-opus back at its default price on Save"' in page
         rows = [{"model": "claude-opus", "input": "6", "output": "30", "cache_read": "", "cache_write": ""},
                 {"model": "mine", "input": "1", "output": "", "cache_read": "", "cache_write": ""}]  # fmt: skip
         assert c.post("/api/settings/spend", json={"rows": rows, "as_of": "2026-10-17"}).json()["ok"]
