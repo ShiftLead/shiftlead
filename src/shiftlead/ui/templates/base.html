@@ -32,8 +32,9 @@
      any one tool — with the rest, and the profiles sharing it, on hover. `app.js` re-sorts and
      collapses them to `+n` when they stop fitting; an account at or near a cap is never the one
      collapsed. A reading prints its age once it is old, and reads *unknown since* past three hours
-     (TD-233): `usage_chip`; `data-usage` is what `app.js` draws it again from as it ages. #}
-  <span class="mono dim" id="usagechip" title="subscription usage per account a live session is running under: the worst quota window the tool reports, the rest on hover">{% for name, u in (usage or {}).items() %}{% set c = usage_chip(name, u) %}{% if c %}<span data-account="{{ name }}" data-usage='{{ u|tojson }}' data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></span>
+     (TD-233): `usage_chip`; `data-usage` is what `app.js` draws it again from as it ages. A press
+     opens the Spend page on All (§4.5 screen 13, TD-832). #}
+  <a class="mono dim" id="usagechip" href="/spend" title="subscription usage per account a live session is running under: the worst quota window the tool reports, the rest on hover; press it for the Spend page">{% for name, u in (usage or {}).items() %}{% set c = usage_chip(name, u) %}{% if c %}<span data-account="{{ name }}" data-usage='{{ u|tojson }}' data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></a>
   {# design §4.5a Org top bar **build** chip (TD-539, TD-062): display only, on every page, always
      drawn — *live <MM-DD HH:MM>*, the live commit's time, `data-at` the instant `app.js` prints in
      the browser's zone, then `data-rest` (*· main +n*, *· promoting…*, *· held*, *· main unknown*).

@@ -80,6 +80,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-856 | The Focus Git card lists only the uncommitted changes: give it a pick of what to list — the tree, a recent commit (HEAD~1, HEAD~2), or the whole session — with up and down arrows to step it | Medium | Designed — built by TD-862 |
 | TD-858 | `test_lane_news.py::test_a_live_check_live_at_the_declaration_is_told_to_nobody[after]` failed once in a full local run and passed alone: the lane note after a second `none` was not sent | Low | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
+| TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
 
 ---
 
@@ -1414,7 +1415,7 @@ The other cases:
 **Added:** 2026-10-17 (TD-818's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Slice 1 (the PR of this branch): `/spend` and `/api/spend` (`ui/spend.py`, `spend.html`, `spend_part.html`, `AO.spend`) — the head, Day · Week · Month, the team chips and ‹ ›, the Over time chart, By team, Top sessions, a team's line, By seat with its role subtotals, Finished entries — the usage chip's press, and the help text of the three. Left: slice 2, the team card's **spend** figure; slice 3, the Settings page's **weights** card. Two parts of the page wait on the reading (TD-865): *per finished entry* is drawn per role (on a role's one seat, or its subtotal), and a seat's hover holds no tokens by kind. Narrow, the turns and past-context columns are hidden rather than folded under the row.
 **Blocked by:** TD-830, TD-859
 **Location:** design §4.5 screen 13 *Spend* and screen 1 (the team header), §4.5a *Spend page*, *team card: spend*, *Settings page: weights*, *Org top bar: usage chip*; mockups `docs/mockups/Spend.dc.html` and `SpendTeam.dc.html` (`reviews/2026-10-17-td818-spend-all.png`, `…-spend-team.png`); `src/shiftlead/ui/app.py` (`/spend`, `/api/spend`), templates and `app.js`, `src/shiftlead/ui/settings_page.py`, `src/shiftlead/ui/help.py` (bound by `tests/test_help.py`)
 
@@ -1725,3 +1726,22 @@ Then file the build entry and name it in `Blocked by:`.
 
 ---
 
+## TD-865: The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (grinder-ao-2, building TD-832)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/seats.py` (`reading`, `_entries`, `_add_row`, `_blank`); `src/shiftlead/ui/spend.py` (`spend_view`'s By seat `per`, `_weights_title`); `tests/test_seats.py`, `tests/test_ui_spend.py`
+
+**Why:** design §4.5 screen 13 *On one team* gives each seat of By seat its **per finished entry** (*3 · median ≈$4.10*, its entries under the hover), and §4.5a *Spend page: seat name, entry id* gives a seat's hover *the tokens by kind and the weights it was weighed at*. The reading TD-830 and TD-859 built carries neither: `entries[].by_role` and `finished` are per role (the role that spent most), and a seat carries its figure, turns, `between` and the context marks, not `input`/`output`/`cache_read`/`cache_write`. TD-832's page draws a role's count on its one seat, or on the subtotal of a role of two, and the hover without tokens.
+
+**Fix:** in `reading`: each seat's `finished` (`entries`, `median`, the `refs` it spent on among the period's entries) from the rows' `refs` of its records, and its tokens by kind summed from the rows' models; then `spend_view` draws each seat's own `per` and its hover's tokens. Tests: a team of two grinders whose entries differ reads each its own count and median; a seat's hover names its four kinds.
+
+**Done when** By seat's *per finished entry* is each seat's own and a seat's hover lists its tokens by kind.
+
+**Related:** TD-832, TD-830, TD-859.
+
+---
