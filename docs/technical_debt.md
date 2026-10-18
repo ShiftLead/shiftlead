@@ -1248,7 +1248,7 @@ The other cases:
 **Type:** debt
 **Added:** 2026-10-16 (Paul, through Add entry; drafted by ao-shiftlead-techlead-ao-1)
 **Owner:** grinder
-**Kind:** evaluation
+**Kind:** build
 **Status:** Open
 **Location:** design §4.6 *Attach behaviour with another client present* (`window-size latest`, and `window-size manual` plus a fixed `default-size` named as the fallback if the reflow upsets Claude Code's TUI), *Scrollback is tmux's, reached through tmux* (TD-022); §4.5 *The panel put away* (the terminal refits as a window resize does); `src/shiftlead/ui/static/app.js` (`new ResizeObserver(() => fit.fit())` and `term.onResize` → `{resize: [cols, rows]}`, ~L4536–L4537: one resize per observed frame, no debounce; `AO.setTermLook`, ~L70, refits on a face or size change); `src/shiftlead/ui/pty_bridge.py` (`resize`, ~L95, `setwinsize` on the attach's pty); `src/sessionorc/tmux.py` (the session options, `history-limit` ~L113)
 
@@ -1272,7 +1272,7 @@ The other cases:
 **Type:** debt
 **Added:** 2026-10-16 (Paul, in an interactive session)
 **Owner:** designer
-**Kind:** evaluation
+**Kind:** design-first
 **Status:** Open. TD-829 (#2065) adds `data-` attributes to each Queue card and completed line for the in-browser picks: an estimated ~235 KB (~12%) on the live Queue's 1,927,082 bytes (209 cards, 829 completed lines, 2026-10-17), most of it `data-find` (each id written three ways, and each title).
 **Location:** `src/shiftlead/ui/app.py` (the page routes: `/`, `/inbox`, `/queue` `queue_page`, `/repo/<repo>`; `gzip_ok`, used for the counts' JSON and not for pages), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/static/app.js` (`connectEvents`, the per-page scripts), the templates; design §4.5 (the pages)
 
