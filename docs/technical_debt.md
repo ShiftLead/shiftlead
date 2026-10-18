@@ -1769,11 +1769,11 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Status:** Open
 **Location:** `src/sessionorc/gitinfo.py` (`pick_files`, `_porcelain`); `tests/test_git_files.py`
 
-**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_git_files.py` still reports `10 passed` with (a) `[:GIT_PICK_TREE]` deleted from the `tree` branch (no test holds more than two dirty paths, so the twenty-line cap §4.2 states is unpinned; `test_session_caps_at_a_hundred_with_more` covers Session only), (b) `i += 1  # the source follows the path` in `_porcelain` replaced by `pass` (no test stages a rename, so the rename's source path would surface as a bogus extra entry in Working tree and Session), and (c) `"--first-parent", ` deleted from the `git log` call (every test's history is linear, so a merge commit's second-parent commits would enter the ten). The spec at TD-856 names all three.
+**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_git_files.py` still reports `10 passed` with (a) `[:GIT_PICK_TREE]` deleted from the `tree` branch (no test reads `tree` with more than two dirty paths, so the twenty-line cap §4.2 states is unpinned; `test_session_caps_at_a_hundred_with_more` covers Session only), (b) `i += 1  # the source follows the path` in `_porcelain` replaced by `pass` (the one `git mv` is committed before `pick_files` reads, so no test gives the porcelain a rename, and the rename's source path would surface as a bogus extra entry in Working tree and Session), and (c) `"--first-parent", ` deleted from the `git log` call (every test's history is linear, so a merge commit's second-parent commits would enter the ten). The spec at TD-856 names all three.
 
 **Fix:** add the case to the PR's test module.
 
-**Done when** a test with 25 dirty paths gets twenty from `tree`; a staged `git mv` gives one entry with the new path in `tree` and `session`; a history with a merged side branch lists only the first-parent line, and each fails when its line above is reverted.
+**Done when** a test with 25 dirty paths gets twenty from `tree` (Session's 105-path test does not read `tree`); an uncommitted staged `git mv` gives one entry with the new path in `tree` and `session`; a history with a merged side branch lists only the first-parent line, and each fails when its line above is reverted.
 
 **Related:** TD-856, TD-862.
 
