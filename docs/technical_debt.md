@@ -70,7 +70,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-846 | Compliance before shiftlead is sold: SOC 2 and ISO 27001 wait for a hosted or team edition; the EU Cyber Resilience Act and the supply-chain basics a buyer asks for come first | Low | Open — deferred until the monetisation decision picks a paid option |
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
-| TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
@@ -1440,26 +1439,6 @@ The other cases:
 **Done when** the design says how a Gemini reader is run, on which profile, how its verdict is recorded and accepted, and how the trial is judged, and the build entry is filed.
 
 **Related:** TD-112 (the adapter contract and its neutrality), TD-784, TD-785, TD-786 (the adapter's build), TD-035 (start hooks for an adapter without them).
-
----
-
-## TD-868: `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `tests/conftest.py` (`park_ticks`, `PASS_DRAIN`); `tests/test_lane_news.py`
-
-**Why:** #2073 (TD-858) says a pass not finished in `PASS_DRAIN` is cancelled. With `PASS_DRAIN = 0.01` instead of `30.0`, `pytest -q tests/test_lane_news.py` read `18 passed`: the one test the PR added has a 0.2 s task that either lands or is cancelled, and its last assertion, `agent._promotes == {"repo": {"live": "abc"}}`, holds in both cases (the task only resets `_promotes` to `{}` before the test sets it). Its `sleep(0.4)` is a wait in place of a condition, though a short one.
-
-**Fix:** Make the late task set a flag as its last step; with a `PASS_DRAIN` patched to a small value and the task sleeping past it, assert the task was cancelled (flag unset) and `park_ticks` returned; with the default, assert the flag is set. Replace the `sleep(0.4)` with a yield or the task's own completion.
-
-**Done when** a shortened `PASS_DRAIN` fails a test.
-
-**Related:** TD-858 (built #2073).
 
 ---
 
