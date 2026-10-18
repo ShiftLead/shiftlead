@@ -519,7 +519,9 @@ async def test_a_decided_line_a_live_sibling_holds_is_seen_untold_and_its_drop_i
 
     await park_ticks(agent)
     now = datetime.now(UTC)
-    held, stale = (workorders.entry({"id": f"board:{k}", "title": k, "decided": {"text": "go"}}) for k in ("aa", "bb"))
+    held, stale, far_held = (
+        workorders.entry({"id": f"board:{k}", "title": k, "decided": {"text": "go"}}) for k in ("aa", "bb", "cc")
+    )
     async with LocalClient() as person:
         led = [_e("TD-001")]
         sid = await _finished(agent, person, tmp_path, "w", ["free-pick"], led)
@@ -530,12 +532,12 @@ async def test_a_decided_line_a_live_sibling_holds_is_seen_untold_and_its_drop_i
         far = await _finished(agent, person, other, "far", ["free-pick"], led, out_of_work=None)
         old = (now - timedelta(hours=13)).isoformat().replace("+00:00", "Z")
         agent.sessions[sib].progress = [ProgressEntry(ref="board:aa"), ProgressEntry(ref="board:bb", at=old)]
-        agent.sessions[far].progress = [ProgressEntry(ref="board:bb")]
-        agent._repos[str(tmp_path)]["work_orders"] = {"orders": [held, stale]}
+        agent.sessions[far].progress = [ProgressEntry(ref="board:cc")]
+        agent._repos[str(tmp_path)]["work_orders"] = {"orders": [held, stale, far_held]}
         await agent._keep_running(now)
-        assert rec.lane_seen["ids"] == ["TD-001", "board:aa", "board:bb"]
+        assert rec.lane_seen["ids"] == ["TD-001", "board:aa", "board:bb", "board:cc"]
         notes = _notes(agent, sid)
-        assert len(notes) == 1 and "gained 1 entry" in notes[0] and "board:bb" in notes[0]
+        assert len(notes) == 1 and "gained 2 entries" in notes[0] and "board:bb, board:cc —" in notes[0]
         assert "board:aa" not in notes[0], "the held line is its holder's"
         await agent._lane_news(rec, now + timedelta(minutes=1))
         assert len(_notes(agent, sid)) == 1

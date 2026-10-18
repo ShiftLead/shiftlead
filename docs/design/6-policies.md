@@ -535,8 +535,8 @@ block. A policy is agent code and needs no grant; a session doing the same work 
      again; an id a live record has claimed since, its lease unexpired, is not told while that
      lease holds — the entry is its holder's, and a new id a live record of the repo holds such a lease on when
      the reading first finds it (a decided line its sibling claimed before the declaration, which the first
-     write leaves out) is written into `lane_seen` untold, so only its release is told, as a dropped lease
-     (TD-899); an entry that came off the board is *has become
+     write leaves out) is written into `lane_seen` untold, so only its release is told, as a dropped lease, and a
+     lease that lapses unreleased is not (TD-899); an entry that came off the board is *has become
      pickable*, above, already. **An exited or closed member is not written to**, and its
      `lane_seen` is kept all the same: what its lane gains while it is gone is rule 8's once its
      team has wound down. A finished member closed while the team runs on — by rule 9's pass, by
