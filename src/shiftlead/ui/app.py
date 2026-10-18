@@ -4043,8 +4043,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): one fold's body, read
         on its first open, by the row renderer's own macro — the one source its key names: a board line
         (`board:<root>:<line>`) from the home's board reading, a ledger row (`ledger:<repo>:<id>`) from its
-        repo's ledger reading, else a person-inbox entry or a row handed to a seat by its id, a person's read marking nothing. A
-        key that names nothing is a 404, which the fold says as *gone — reload*."""
+        repo's ledger reading, else a person-inbox entry or a row handed to a seat by its id, a person's
+        read marking nothing. A key that names nothing is a 404, which the fold says as *gone — reload*."""
         e: Any = None
         if key.startswith("board:"):
             kind = "board"
