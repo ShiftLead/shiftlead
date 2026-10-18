@@ -16149,3 +16149,35 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-820, TD-836.
 
 **Resolved:** 2026-10-17 (grinder-ao-2, #2084). `src/shiftlead/briefs/designer.md` gains *Keep what a design reads small* above *Out of work*: reviews as fresh subagents returning their verdict, large replies read by the slice, a design waiting on a steer or a reader as a waiting claim, and a run of only waiting claims declaring `none`. `test_the_designer_preset_keeps_its_reads_small_and_names_a_waiting_design` in `tests/test_cli.py`.
+
+## TD-819: Whether a team's shape is right — another designer, one grinder fewer — cannot be read: nothing records how long each member waited for work, or how long work waited for a member
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-16 (Paul, in an interactive session: *is there a way to tell if a different shape for a team would be more efficient (e.g. another designer, fewer grinders, etc)?*)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Built 2026-10-17 (TD-834 #2055, #2060; TD-835 #2082). Was: Designed 2026-10-17 (design §4.4 *Team shape*, §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape*, §4.7 `ao team shape`, glossary *starved*, *backed up*; mockup `SpendShape.dc.html`). The home samples each running team once a minute — each member's class and each flow stage's queue — into `shape.json`, kept thirteen months; the Spend page's Shape view and `ao team shape` draw it per role and per queue beside the spend per finished entry, with six fixed rules that suggest a change of members and never make one.
+**Location:** design §4.9c (flows: design → build → review), §4.2 (the state feed), §4.4 (records, `doing.jsonl`), §4.5 screen 1 (the team card, TDs in motion); `~/.shiftlead/sessions/` (current state only), `~/.shiftlead/events/` (empty), `doing.jsonl`
+
+**Why:**
+- A team is a pipeline: filed → design-first → designed → build → review → merge. A shape is right when no stage starves the next and no member idles with work waiting. Two readings answer it: a member's **starved time** (idle, out of work, while it is on the team) and each handoff's **queue depth and age** (design-first entries waiting for the designer, pickable builds waiting for a grinder, PRs waiting for the techlead or a merge).
+- Neither can be read. A session record holds its current state and nothing before it, the events directory is empty, and `doing.jsonl` has a member's progress lines but not its idle stretches. TD-772 will read *idle while its lane held pickable work* from the doing log by hand for one trial; that reading is one stage's, and it is written once.
+- Throughput alone does not decide it. shiftlead merged 1,071 PRs from 2026-10-02 to 10-16 (GitHub's search count), and the median open time over the 1,000 the list returns was about 14 minutes, so merging is not the bottleneck. Which stage is cannot be read from that number.
+
+**Fix:** design first.
+- Keep each session's state changes (working, idle, waiting on whom, out of work, limited) as a timeline per record, held as long as TD-818's readings are.
+- Sample each handoff's queue on the tick: depth and the oldest item's age.
+- From the two, draw per team and per role over a day and a week:
+  - starved time (a member idle while nothing in its lane is pickable);
+  - blocked time (waiting on a person, a review or CI);
+  - each queue's depth and age;
+  - beside TD-818's spend per finished entry.
+- Say what the reading suggests, never acts on: *grinders starved 40% of the week while design-first waited 0: one grinder fewer, or a second designer*; *pickable builds aged 6 h with both grinders busy: one grinder more*. The team's shape stays the person's to change (`.shiftlead.yml`, Members…).
+- Usage-window waits (`limited`) are counted apart: a shape cannot fix the account's quota.
+
+**Done when** the design says what is recorded, what is drawn per role and team, and the wording of a shape suggestion, and the build entries are filed and named in `Blocked by:`.
+
+**Related:** TD-818 (spend per finished entry), TD-772 (the Queue trial's idle-while-work reading), TD-749 (a lane split that idled a grinder, archived), TD-118 (where a team-run-day spends tokens, archived).
+
+**Resolved:** 2026-10-17 (built by TD-834, #2055 and #2060, and TD-835, #2082; archived by the designer). Design §4.4 *Team shape*, §4.5 screen 13 *Shape*, §4.5a *Spend page: Spend · Shape* and §4.7 `ao team shape` carry the rule: the home samples each running team's members and queues once a minute into `shape.json`, and the Spend page's Shape view and `ao team shape` draw it with the six suggestion rules.
