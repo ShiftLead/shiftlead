@@ -1650,13 +1650,13 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2086 (TD-831))
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2086 (TD-831))
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
 **Location:** `src/shiftlead/cli.py` (`spend_lines`); `tests/test_ao_spend.py`
 
-**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ao_spend.py` still reads `9 passed` with (a) `if "to_date" in (p := t.get("previous") or {}):` replaced by `if False:` — the whole `▲ n%` / `▼ n%` / `—` column of the By team line, which design §4.7 shows as *ao-grind · ≈$426 · 82% · ▲ 51% ·…*; the test asserts `by_team.startswith("  ao-grind · ≈$138 · 87% · 1,563 turns …")` and never a marker, and nothing in the file contains `▲`, `▼` or `—` — and (b) `if int(outside.get("turns") or 0):` replaced by `if True:`, so *outside shiftlead* would print on a reading with none (the ledger has outside turns in every case, and the empty ledger's test reads only `lines[0]`). The other reverts tried (the `most` seat, the block order, the entries sort, the `unknown` profile) each fail a test.
+**Why:** Reverted one at a time in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ao_spend.py` still reads `9 passed` with (a) `if "to_date" in (p := t.get("previous") or {}):` replaced by `if False:` — the whole `▲ n%` / `▼ n%` / `—` column of the By team line, which design §4.7 shows as *ao-grind · ≈$426 · 82% · ▲ 51% ·…*; the test asserts `by_team.startswith("  ao-grind · ≈$138 · 87% · 1,563 turns …")` and never a marker, and no assertion in the file contains `▲`, `▼` or `—` — and (b) `if int(outside.get("turns") or 0):` replaced by `if True:`, so *outside shiftlead* would print on a reading with none (the ledger has outside turns in every case, and the empty ledger's test reads only `lines[0]`). The other reverts tried (the `most` seat, the block order, the entries sort, the `unknown` profile) each fail a test.
 
 **Fix:** In `tests/test_ao_spend.py` give the By team line a previous period to compare: assert `▲ n%` where this period's figure to date is the larger, `▼ n%` where smaller, and `—` where the previous was zero; and assert that a ledger with no outside turns prints no *outside shiftlead* line.
 
@@ -1670,7 +1670,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2082 (TD-835))
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2082 (TD-835))
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
@@ -1690,7 +1690,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2079 (TD-862 (2)))
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2079 (TD-862 (2)))
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
