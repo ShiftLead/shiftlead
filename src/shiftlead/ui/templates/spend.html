@@ -6,7 +6,7 @@
    entry cost — the home's `seats` reading shaped by `ui.spend.spend_view`. The picks are links carried in
    the URL; the page's script answers a press by re-reading `spend_part.html` (`part=1`) in place. #}
 <div class="page spendpage" id="spendpage">
-<div id="spendbody">{% include "spend_part.html" %}</div>
+<div id="spendbody">{% include part or "spend_part.html" %}</div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.spend();</script>{% endblock %}

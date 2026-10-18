@@ -496,6 +496,18 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "spend-view",
+        "Spend · Shape",
+        "Spend page",
+        (
+            "Turns the Spend page to the team's shape over the current day or week: per team its suggestions, its"
+            " members by role as hours by class, and its queues, one per stage of its flow. Press it when a "
+            "team's spend or its waiting makes you ask whether a different shape — more of one role, fewer of "
+            "another — would do better. It only suggests: nothing on it changes the team, and a change of members"
+            " is yours, through Members… on the team card."
+        ),
+    ),
+    Help(
         "spend-picks",
         "Day · Week · Month",
         "Spend page",
@@ -600,7 +612,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
-    ("spend", "Spend", ("usage-chip", "spend-picks", "spend-bar")),
+    ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )
 
 

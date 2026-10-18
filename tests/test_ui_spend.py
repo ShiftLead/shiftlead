@@ -105,8 +105,9 @@ def client(monkeypatch, tmp_path, Fake):
 
 
 def test_the_picks_are_read_from_the_url_and_written_back_short():
-    assert spend_picks({}) == {"window": "day", "at": "", "team": "", "top": False}
+    assert spend_picks({}) == {"view": "spend", "window": "day", "at": "", "team": "", "top": False}
     assert spend_picks({"window": "year", "team": "interactive", "top": "all"}) == {
+        "view": "spend",
         "window": "day",
         "at": "",
         "team": "",

@@ -2199,6 +2199,67 @@ def cmd_team_balance(args: argparse.Namespace) -> int:
     return emit(args, {"team": name, "balance": bal or None, "now": now, "mark": mark}, prose)
 
 
+# a role's classes as `ao team shape` words them (design §4.7), in the Shape view's order; limited (with
+# paused) always last, as the line ends
+SHAPE_WORDS = (
+    ("working", "working"),
+    ("on_claim", "on its claim"),
+    ("waiting:person", "waiting you"),
+    ("waiting:review", "review"),
+    ("idle_with_work", "idle with work"),
+    ("starved", "starved"),
+    ("free", "free"),
+)
+
+
+def shape_lines(got: dict[str, Any], min_hours: float) -> list[str]:
+    """`ao team shape`'s lines (design §4.7): the suggestions, one a line (or *nothing to suggest*, or *too
+    little to read yet*); a line per role; a line per queue, a review stage's ending *· past bound n%*."""
+
+    def pct(x: Any) -> str:
+        return f"{round(float(x or 0) * 100)}%"
+
+    if got.get("too_little"):
+        live = float(got.get("live_hours") or 0)
+        out = [f"too little to read yet: {live:.1f} live hours of the {min_hours:g} a reading needs"]
+    else:
+        out = [str(x.get("text") or "") for x in got.get("suggestions") or []] or ["nothing to suggest"]
+    for r in got.get("roles") or []:
+        shares = r.get("shares") or {}
+        n = len(r.get("seats") or [])
+        parts = [str(r.get("role")), f"{n} seat" + ("" if n == 1 else "s"), f"{float(r.get('live_hours') or 0):.1f} h"]
+        parts += [f"{word} {pct(shares[c])}" for c, word in SHAPE_WORDS if shares.get(c)]
+        parts.append(f"limited {pct(float(shares.get('limited') or 0) + float(shares.get('paused') or 0))}")
+        out.append(" · ".join(parts))
+    for q in got.get("queues") or []:
+        oldest = round(float(q.get("oldest_hours") or 0))
+        line = (
+            f"{q.get('stage')} · mean {float(q.get('mean_depth') or 0):.1f} · max {int(q.get('max_depth') or 0)}"
+            f" · oldest {oldest}h · non-empty {pct(q.get('nonempty'))} · backed up {pct(q.get('backed_up'))}"
+            f" · unstaffed {pct(q.get('unstaffed'))}"
+        )
+        if q.get("kind") == "review":
+            line += f" · past bound {pct(q.get('past_bound'))}"
+        out.append(line)
+    return out
+
+
+def cmd_team_shape(args: argparse.Namespace) -> int:
+    """`ao team shape <team> [--window day|week]` (design §4.7, §4.4 *Team shape*, TD-835): the team's shape
+    as the Spend page's Shape view draws it, from the home's `shape` RPC. Read-only, open to a session;
+    `--json` the RPC's reply."""
+    from sessionorc.shape import SHAPE_MIN_HOURS
+
+    got = call_sync("shape", team=args.name, window=args.window)
+
+    def prose() -> None:
+        print(f"{args.name} · {'today' if args.window == 'day' else 'this week'}")
+        for line in shape_lines(got, SHAPE_MIN_HOURS):
+            print(f"  {line}")
+
+    return emit(args, got, prose)
+
+
 # Where every other configured value lives and when it is re-read (design §4.7 `ao settings --where`,
 # §5): the Settings page's *i* marks, in text. Paths under the shiftlead home are the home's.
 WHERE = (
@@ -4136,6 +4197,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("--review", choices=("on", "off"), help="the reader's queue past its bound")
     q.add_argument("--clear", action="store_true", help="remove every line: the rule is off for the team")
     q.set_defaults(fn=cmd_team_balance)
+
+    q = add_team("shape", help="the team's shape: its suggestions, its members by role and its queues (§4.4)")
+    q.add_argument("name")
+    q.add_argument("--window", choices=("day", "week"), default="day", help="the current day (default) or week")
+    q.set_defaults(fn=cmd_team_shape)
 
     q = add_team("stop", help="wrap the members up, then the lead (--now kills instead of asking)")
     q.add_argument("name")

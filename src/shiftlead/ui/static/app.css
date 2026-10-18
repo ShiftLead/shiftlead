@@ -951,10 +951,23 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
 .spendpage td.up { color: #c2410c; } .spendpage td.down { color: #15803d; }
 .spendpage .sprole { border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; font-family: var(--mono, monospace); font-size: var(--t-cap); }
 .spendpage .spsubtotal td { background: var(--hover); font-weight: 600; }
+/* the Shape view (§4.5 screen 13 *Shape*, TD-835) */
+.spendpage .shsuggest { background: var(--card); border: 1px solid var(--line); border-left: 3px solid #2563eb; border-radius: 6px; padding: 10px 14px; margin-top: 8px; }
+.spendpage .shsuggest p { margin: 2px 0; }
+.spendpage .shroles { padding: 4px 14px 10px; }
+.spendpage .shrole { display: grid; grid-template-columns: 170px 70px 1fr 150px; gap: 8px 14px; align-items: start; padding: 10px 0; border-bottom: 1px solid var(--line2); font-size: var(--t-small); }
+.spendpage .shhours { text-align: right; }
+.spendpage .shbarbox { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.spendpage .shbar { display: flex; height: 10px; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: var(--card); }
+.spendpage .shbar i { display: block; height: 100%; }
+.spendpage .shroles .splegend { margin-top: 10px; }
+.spendpage .spkey.shfree { border: 1px solid var(--border); }
 @media (max-width: 720px) {
   .spendpage .spbar .sptotal { display: none; }
   .spendpage .spbars { gap: 1px; }
   .spendpage .spfold { display: none; }
   .spendpage .spnav { margin-left: 0; }
   .spendpage .splegend .spright { margin-left: 0; }
+  .spendpage .shrole { grid-template-columns: 1fr auto; }
+  .spendpage .shbarbox, .spendpage .shfin { grid-column: 1 / -1; }
 }
