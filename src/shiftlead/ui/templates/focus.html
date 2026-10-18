@@ -238,6 +238,15 @@
     </details>{% endif %}
     <details class="card pad side" data-side="git" id="gitcard" open>
       <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
+      {# §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): what the lines list — Working tree
+         (the pushed record's porcelain), one of the newest ten commits, or Session — read through the
+         `git_files` route on a pick; drawn while the card has a git directory. #}
+      <div class="row gap gitpick{% if not s.git %} hidden{% endif %}" id="gitpick">
+        <button class="btn sm" type="button" id="gitup" title="newer" aria-label="newer" disabled>↑</button>
+        <button class="btn sm" type="button" id="gitdown" title="older" aria-label="older">↓</button>
+        <select class="input" id="gitpicksel" aria-label="what the Git card lists"><option value="tree" selected>Working tree</option><option value="session">Session</option></select>
+      </div>
+      <div class="mono small muted gitpickline hidden" id="gitpickline"></div>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
     </details>
     {# design §4.5a Focus side panel **Reports** (TD-143's design, built by TD-150): grouped by state —

@@ -4607,6 +4607,109 @@
       return `<div>${esc(code)} <a class="editor" href="${esc(AO.fileUrl(file, full))}"${folder} data-label="${esc(editor.label || "the editor")}" title="${esc(full)}">${esc(p)}</a></div>`;
     }).join("");
   };
+  // The Git card's **pick** (§4.5a *Focus side panel, Git card: the pick · ↑ · ↓*, §4.2 *The Git card's
+  // pick*, TD-856, built by TD-862): the select's entries in order — `tree`, the ten commits' shas, `session`
+  // — and its options, each commit *HEAD · 1a2b3c4 · subject* cut at forty, whole on hover.
+  AO.gitPickEntries = (commits) => ["tree", ...(commits || []).map((c) => c.sha), "session"];
+  AO.gitPickOptions = function (commits, pick) {
+    const opt = (value, text, title) =>
+      `<option value="${esc(value)}"${value === pick ? " selected" : ""}${title ? ` title="${esc(title)}"` : ""}>${esc(text)}</option>`;
+    return opt("tree", "Working tree") + (commits || []).map((c) => {
+      const subject = String(c.subject || ""), cut = subject.length > 40 ? `${subject.slice(0, 40)}…` : subject;
+      return opt(c.sha, `${c.ref} · ${String(c.sha).slice(0, 7)} · ${cut}`, subject);
+    }).join("") + opt("session", "Session");
+  };
+  // A held pick after the commits were read again: a sha still among the ten keeps its lines (relabelled by
+  // the options), one gone — a rebase, an amend, ten commits more — goes back to Working tree.
+  AO.gitPickHeld = (commits, pick) => (AO.gitPickEntries(commits).includes(pick) ? pick : "tree");
+  // ↑ newer, ↓ older, each stopping at its end: what is listed steps, never a line in the list.
+  AO.gitPickStep = function (commits, pick, by) {
+    const all = AO.gitPickEntries(commits), at = Math.max(0, all.indexOf(pick));
+    return all[Math.min(all.length - 1, Math.max(0, at + by))];
+  };
+  // A commit's naming line: short sha, subject and age, the full subject and the author on hover.
+  AO.gitPickNaming = function (c) {
+    if (!c) return "";
+    const title = `${c.subject || ""}${c.author ? ` — ${c.author}` : ""}`;
+    return `<span title="${esc(title)}">${esc(String(c.sha).slice(0, 7))} · ${esc(c.subject || "")}${c.at ? ` · ${esc(fmtAge(c.at))} ago` : ""}</span>`;
+  };
+  // A commit's or Session's lines, `{code, path, gone}` from the read: git's letter and the path, a link by
+  // *changed files*' form where that row draws one; text where there is nothing to open — a `D` and a path
+  // the read marks `gone` — with why on hover; Session's *n more* past the hundred.
+  AO.gitPickLines = function (answer, pick, editor, root) {
+    const files = (answer && answer.files) || [];
+    const more = pick === "session" && answer && answer.more ? `<div class="muted">${answer.more} more</div>` : "";
+    if (!files.length) return (more || '<div class="muted">nothing</div>');
+    const file = editor && editor.file;
+    const folder = editor && editor.url && editor.first !== false
+      ? ` data-folder="${esc(editor.url)}"${typeof editor.wait === "number" ? ` data-wait="${editor.wait}"` : ""}` : "";
+    const top = String(root || "").replace(/\/+$/, "");
+    return files.map((f) => {
+      const code = String(f.code || ""), p = String(f.path || "");
+      const why = code === "D" ? (pick === "session" ? "deleted since the base" : "deleted by this commit")
+        : f.gone ? "not in the worktree now" : "";
+      if (!file || !top || why) return `<div>${esc(code)} <span${why ? ` title="${esc(why)}"` : ""}>${esc(p)}</span></div>`;
+      const full = `${top}/${p}`;
+      return `<div>${esc(code)} <a class="editor" href="${esc(AO.fileUrl(file, full))}"${folder} data-label="${esc(editor.label || "the editor")}" title="${esc(full)}">${esc(p)}</a></div>`;
+    }).join("") + more;
+  };
+  // The card's glue: the commits read on load and again when `git.oid` moves; a commit's lines on its pick;
+  // Session's on its pick and again when the oid or the porcelain changes; Working tree drawn from the
+  // record as *changed files* is. A failed read keeps the pick and says so in place of the lines. Nothing
+  // is kept across a load. `read(pick)` answers the route's JSON or rejects with why.
+  AO.gitPick = function (els, read) {
+    const st = { commits: [], pick: "tree", answer: null, oid: null, porcelain: null, v: null, editor: null, root: "", asked: 0 };
+    const paint = () => {
+      const { sel, up, down, line, files } = els;
+      sel.innerHTML = AO.gitPickOptions(st.commits, st.pick);
+      sel.value = st.pick;
+      const all = AO.gitPickEntries(st.commits), at = all.indexOf(st.pick);
+      up.disabled = at <= 0; down.disabled = at >= all.length - 1;
+      const commit = st.commits.find((c) => c.sha === st.pick);
+      line.innerHTML = commit ? AO.gitPickNaming(commit) : "";
+      line.classList.toggle("hidden", !commit);
+      if (st.pick === "tree") { if (st.v) files.innerHTML = AO.gitFiles(st.v, st.editor, st.root); return; }
+      if (st.answer && st.answer.error) files.innerHTML = `<div class="muted">could not read: ${esc(st.answer.error)}</div>`;
+      else if (st.answer) files.innerHTML = AO.gitPickLines(st.answer, st.pick, st.editor, st.root);
+    };
+    const ask = (pick) => {
+      const n = ++st.asked;
+      return read(pick).then((a) => {
+        if (n !== st.asked) return;  // a later pick's answer is the one drawn
+        st.commits = a.commits || [];
+        st.pick = AO.gitPickHeld(st.commits, st.pick);
+        if (st.pick === pick && pick !== "tree") st.answer = a;
+        paint();
+      }, (why) => {
+        if (n !== st.asked) return;
+        if (pick !== "tree") st.answer = { error: String((why && why.message) || why).replace(/^git_files: /, "") };
+        paint();
+      });
+    };
+    const choose = (pick) => {
+      if (pick === st.pick) return;
+      st.pick = pick; st.answer = null;
+      if (pick !== "tree") els.files.innerHTML = '<div class="muted">reading…</div>';
+      paint();
+      ask(pick);
+    };
+    els.sel.addEventListener("change", () => choose(els.sel.value));
+    els.up.addEventListener("click", () => choose(AO.gitPickStep(st.commits, st.pick, -1)));
+    els.down.addEventListener("click", () => choose(AO.gitPickStep(st.commits, st.pick, 1)));
+    return {
+      state: st,
+      update(v, editor, root) {
+        st.v = v; st.editor = editor; st.root = root;
+        const oid = (v.git && v.git.oid) || "", porcelain = JSON.stringify((v.git && v.git.files) || []);
+        const moved = st.oid !== null && oid !== st.oid, first = st.oid === null;
+        const changed = st.porcelain !== null && porcelain !== st.porcelain;
+        st.oid = oid; st.porcelain = porcelain;
+        paint();
+        if (first || moved) ask(st.pick);
+        else if (st.pick === "session" && changed) ask("session");
+      },
+    };
+  };
   // …painted into the Session card's row and its term from the view and each delta: shown with
   // the work's first change, hidden while it has none
   AO.paintRecent = function (v, editor, row, dt) {
@@ -4714,6 +4817,12 @@
   };
   AO.focus = function (s, popped) {
     const id = s.id;
+    // §4.5a *Git card: the pick · ↑ · ↓* (TD-856, built by TD-862): read through the page's `git_files` route
+    const gitPick = $("#gitpicksel") ? AO.gitPick(
+      { sel: $("#gitpicksel"), up: $("#gitup"), down: $("#gitdown"), line: $("#gitpickline"), files: $("#gitfiles") },
+      (pick) => fetch(`/api/sessions/${encodeURIComponent(id)}/git_files?pick=${encodeURIComponent(pick)}`)
+        .then((r) => r.json().then((j) => (r.ok && !j.error ? j : Promise.reject(new Error(j.error || j.detail || r.status))))),
+    ) : null;
     document.title = AO.focusTitle(s);
     // §4.5a **Reports** (TD-150): the heading's **i** mark opens its paragraph in place, as the
     // Inbox's do; it sits in the panel's `<summary>`, so the press must not also fold the panel
@@ -5220,8 +5329,11 @@
         $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         // §4.5a *Git card: changed files* (TD-628): each path a link by the recent files' form, joined
         // to the worktree's top level the page was served (`s.git_root`), the same on load and each delta
-        $("#gitfiles").innerHTML = AO.gitFiles(v, s.editor, s.git_root);
+        // …under the pick (TD-862): Working tree draws them; a commit or Session reads `git_files`
+        if (gitPick) gitPick.update(v, s.editor, s.git_root);
+        else $("#gitfiles").innerHTML = AO.gitFiles(v, s.editor, s.git_root);
       }
+      const gp = $("#gitpick"); if (gp) gp.classList.toggle("hidden", !v.git);
       // the person's `file_link` read again with each view (§4.5a *Settings page: You, file link*: *read by the
       // next file link, no reload*; TD-536) — in place, since the pane's link provider holds this object
       if (s.editor && v.editor) { s.editor.first = v.editor.first; s.editor.wait = v.editor.wait; }
