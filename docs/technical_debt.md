@@ -72,7 +72,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
-| TD-886 | #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed | Low | Open |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Open — needs a design |
 
 ---
@@ -1497,26 +1496,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** ten warm loads of the live `/settings` each read under 200 ms to the first byte, and a promote's note no longer names Settings.
 
 **Related:** TD-805, TD-881.
-
----
-
-## TD-886: #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2111 (TD-881))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/timing.py` (`KEPT`, `step`); `src/shiftlead/ui/app.py` (`server_timing`); `scripts/smoke.py` (`main`, `fetch`); `tests/test_ui_server_timing.py`, `tests/test_smoke.py`
-
-**Why:** With each changed alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_smoke.py tests/test_ui_server_timing.py tests/test_promote.py` still reads `89 passed`: (a) `KEPT = 20` → `2000` (the keep-twenty bound is read by nothing); (b) `step`'s `nests and name in steps["open"]` dropped, so a board read inside the state rows' own is counted twice; (c) `server_timing`'s `request.method != "GET"` dropped, so a POST is recorded as a load; (d) `over = [... for got in loads[1::2]` → `loads[0::2]`, so the budget judges the cold load, not the second the design names; (e) `fetch` ignoring the `Server-Timing` of an `HTTPError`, so a failing page's longest step is lost.
-
-**Fix:** In `tests/test_ui_server_timing.py` make 25 loads of one route and assert `len(timing.RECENT[key]) == 20`; nest two `step("board")` and assert one reading; POST a page route and assert no header; in `tests/test_smoke.py` make the cold load slow and the second fast (`behave` gives a delay for the first only) and assert nothing over budget told; give a 500 page a `Server-Timing` and assert the line carries its steps.
-
-**Done when** each reversion above fails a test.
-
-**Related:** TD-881, TD-805.
 
 ---
 

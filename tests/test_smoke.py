@@ -39,8 +39,9 @@ sm = _load()
 def stub():
     """A UI that answers every page with `TIMING` as its `Server-Timing`, and `behave[route]` to break one: an
     int is its status, `cut` a body with no `</html>`, `short` a body cut short of its Content-Length, a float
-    seconds of delay, `big` a page past the budget's 150 KB sent plain, `gzip` the same page gzipped to a
-    request that takes it, `badgzip` that gzip with its deflate stream broken. `seen` is every route asked."""
+    seconds of delay, `coldslow` 0.25 s of delay on the route's first load alone, `big` a page past the budget's
+    150 KB sent plain, `gzip` the same page gzipped to a request that takes it, `badgzip` that gzip with its
+    deflate stream broken. `seen` is every route asked."""
     behave: dict[str, object] = {}
     seen: list[str] = []
 
@@ -50,6 +51,8 @@ def stub():
             b = behave.get(self.path)
             if isinstance(b, float):
                 time.sleep(b)
+            if b == "coldslow" and seen.count(self.path) == 1:
+                time.sleep(0.25)
             body = PAGE[:20] if b == "cut" else BIG if b in ("big", "gzip") else PAGE
             zipped = b in ("gzip", "badgzip") and "gzip" in (self.headers.get("Accept-Encoding") or "")
             body = gzip.compress(body) if zipped else body
@@ -170,6 +173,27 @@ def test_a_page_over_its_budget_is_told_with_its_longest_step_and_fails_nothing(
     b.clear()
     code, lines = _run(tmp_path, port, capsys)
     assert code == 0 and lines[-1] == f"smoke passed; {sm.SKIPPED}"  # every page under: nothing told
+
+
+def test_the_budget_judges_the_second_load_not_the_cold_one(tmp_path, stub, capsys):
+    """Each page is loaded twice and the second judged (§6 *This repo's smoke*, TD-886): a slow cold load tells
+    nothing."""
+    port, b, _ = stub
+    b["/settings"] = "coldslow"
+    code, lines = _run(tmp_path, port, capsys)
+    settings = [ln for ln in lines if ln.startswith("Settings /settings · ")]
+    assert settings[0].startswith("Settings /settings · cold · 200 · first byte ")
+    assert float(settings[0].split("first byte ")[1].split(" s")[0]) >= 0.2  # the cold load was over its budget
+    assert code == 0 and lines[-1] == f"smoke passed; {sm.SKIPPED}"
+
+
+def test_a_failing_page_keeps_its_steps_on_its_line(tmp_path, stub, capsys):
+    """A page answering 500 still says where its time went: its `Server-Timing` is read off the error (TD-886)."""
+    port, b, _ = stub
+    b["/queue"] = 500
+    code, lines = _run(tmp_path, port, capsys)
+    queue = [ln for ln in lines if ln.startswith("Queue /queue · ")]
+    assert code == 1 and queue and queue[0].endswith("rpc_list 12 ms, inbox 210 ms, render 250 ms, total 480 ms")
 
 
 def test_the_budget_is_the_designs():

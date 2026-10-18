@@ -4,6 +4,8 @@ in memory, and no header on a route that is no page."""
 
 from __future__ import annotations
 
+import types
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -61,7 +63,7 @@ def test_the_last_twenty_are_kept_per_route_and_a_fragment_apart(tmp_path, monke
     for _ in range(timing.KEPT + 3):
         c.get("/settings")
     c.get("/queue?part=1")
-    assert len(timing.RECENT["/settings"]) == timing.KEPT and "total" in timing.RECENT["/settings"][-1]
+    assert len(timing.RECENT["/settings"]) == 20 and "total" in timing.RECENT["/settings"][-1]
     assert list(timing.RECENT) == ["/settings", "/queue?part=1"]
 
 
@@ -71,6 +73,12 @@ def test_a_page_that_answers_an_error_still_says_where_its_time_went(tmp_path, m
     r = c.get("/repo/nowhere")  # a repo this home does not know: refused, and timed
     assert r.status_code == 404 and list(_steps(r.headers["server-timing"]))[-1] == "total"
     assert set(timing.RECENT) == {"/repo/{name}"} and "rpc_repos" in timing.RECENT["/repo/{name}"][-1]
+
+
+def test_a_page_route_asked_by_anything_but_a_get_is_no_load(tmp_path, monkeypatch):
+    c = _client(monkeypatch, tmp_path, [])
+    r = c.post("/queue")
+    assert "server-timing" not in r.headers and timing.RECENT == {}
 
 
 def test_a_route_that_is_no_page_carries_none(tmp_path, monkeypatch):
@@ -91,3 +99,15 @@ def test_a_step_outside_a_page_request_adds_to_nothing_and_a_nested_one_counts_o
         pass
     timing._STEPS.set(None)  # this test's own figures end with it
     assert set(steps["ms"]) == {"inbox", "rpc_x"} and not steps["open"]
+
+
+def test_a_nested_step_is_timed_by_the_outer_alone(monkeypatch):
+    """Each clock read is a second on: the outer step reads two of them, so its one second is the figure, and
+    an inner one counted too would make it four (TD-886)."""
+    clock = iter(range(100))
+    monkeypatch.setattr(timing, "time", types.SimpleNamespace(perf_counter=lambda: next(clock)))
+    steps = timing.begin()
+    with timing.step("board"), timing.step("board"):
+        pass
+    timing._STEPS.set(None)
+    assert steps["ms"] == {"board": 1000.0}
