@@ -1622,7 +1622,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`_Gzip.__call__`, `_Static.get_response`); `tests/test_ui_gzip.py
+**Location:** `src/shiftlead/ui/app.py` (`_Gzip.__call__`, `_Static.get_response`); `tests/test_ui_gzip.py`
 
 **Why:** With each of these reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_ui_gzip.py` still reads `6 passed`: (a) `or ranged` dropped from the pass-through test, so a `Range` request is gzipped and its partial body corrupted; (b) `message.get("status") != 200 or` dropped, so a 304 or 404 is gzipped; (c) `or b"content-encoding" in headers` dropped (`test_a_body_under_a_kilobyte_and_an_encoded_one_are_sent_as_they_are` is a 40-byte gzip, under `GZIP_MIN`, so it passes either way and never reaches the guard); (d) `if message.get("more_body"): return` removed, so a body sent in chunks is compressed per chunk; (e) `k == "v" and v` reduced to `k == "v"`, so `?v=` marks a file immutable for a year.
 
@@ -1642,7 +1642,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/shiftlead/ui/timing.py` (`KEPT`, `step`); `src/shiftlead/ui/app.py` (`server_timing`); `scripts/smoke.py` (`main`, `fetch`); `tests/test_ui_server_timing.py`, `tests/test_smoke.py
+**Location:** `src/shiftlead/ui/timing.py` (`KEPT`, `step`); `src/shiftlead/ui/app.py` (`server_timing`); `scripts/smoke.py` (`main`, `fetch`); `tests/test_ui_server_timing.py`, `tests/test_smoke.py`
 
 **Why:** With each changed alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_smoke.py tests/test_ui_server_timing.py tests/test_promote.py` still reads `89 passed`: (a) `KEPT = 20` → `2000` (the keep-twenty bound is read by nothing); (b) `step`'s `nests and name in steps["open"]` dropped, so a board read inside the state rows' own is counted twice; (c) `server_timing`'s `request.method != "GET"` dropped, so a POST is recorded as a load; (d) `over = [... for got in loads[1::2]` → `loads[0::2]`, so the budget judges the cold load, not the second the design names; (e) `fetch` ignoring the `Server-Timing` of an `HTTPError`, so a failing page's longest step is lost.
 
@@ -1662,7 +1662,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
-**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`insecure`, `write_layer`, `machine_reading`, `setup_note`); `src/sessionorc/agent_tick.py` (`_setup_notes`); `src/sessionorc/containers.py` (`write_layers`); `tests/test_gemini_adapter.py`, `tests/test_gemini_setup.py
+**Location:** `src/shiftlead/adapters/gemini/__init__.py` (`insecure`, `write_layer`, `machine_reading`, `setup_note`); `src/sessionorc/agent_tick.py` (`_setup_notes`); `src/sessionorc/containers.py` (`write_layers`); `tests/test_gemini_adapter.py`, `tests/test_gemini_setup.py`
 
 **Why:** With each reverted alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gemini_adapter.py tests/test_gemini_setup.py` still reads `32 passed`: the `"insecure": "is not root-owned"` word in `setup_note` (an insecure layer then gets the *names no hook command* wording); `if seen > 40:` raised to 4,000,000 (a symlink loop then spins forever on a root-owned machine); `write_layer`'s temp-file-and-`os.replace` replaced by `write_text` (its comment says an overlapping launch reads it mid-write); `if not same:` made `if True:` (the rewrite on every launch); `machine_reading`'s `OSError` arm returning `ok`, and its unreadable-JSON arm raising; `setup_note`'s `except (OSError, …): return None`; `[:12]` of the digest emptied (every wanted copy then shares one key per reading); `_setup_notes`'s `except Exception` (a broken adapter holds up the tick) and its `(OSError, ValueError)` store read; `write_layers`'s `except Exception` (a broken adapter takes the node's build down); and `seen = "none"` (no `profiles.yml`).
 
