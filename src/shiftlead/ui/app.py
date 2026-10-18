@@ -371,6 +371,8 @@ from .queue import (
     picks_query,
     queue_picks,
     queue_view,
+    queue_window,
+    send_window,
     split_later,
 )
 from .repo import (  # re-exported: routes, templates and tests read these from the app (TD-196)
@@ -3430,7 +3432,10 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         teams: dict[str, str] = {}
         with contextlib.suppress(Exception):
             teams = {n: t.repo for n, t in (await h.defs()).teams.items() if t.repo}
-        view = apply_picks(queue_view(got, datetime.now(UTC), mail), picks, teams)
+        # Recently completed sends the picked window's lines alone (§4.5 *Page loads*, TD-882)
+        view = send_window(
+            apply_picks(queue_view(got, datetime.now(UTC), mail), picks, teams), queue_window(request.query_params)
+        )
         ctx = {
             "q": view,
             "picks": picks,

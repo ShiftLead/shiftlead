@@ -161,3 +161,52 @@ def test_a_bare_queue_restores_the_remembered_picks_and_window_before_the_first_
     assert head.index("ao.qpicks") < head.index("app.css")  # before the stylesheet, as the theme's read is
     css = c.get("/static/app.css").text
     assert "html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }" in css
+
+
+WINDOW_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [] });
+global.window = {};
+global.document = { documentElement: el(), body: el(), addEventListener: noop, createElement: el,
+  querySelector: () => null, querySelectorAll: () => [] };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const W = ["4h", "day", "week", "month"];
+console.log(JSON.stringify(W.map((loaded) => W.map((want) => window.AO.qWinFetch(loaded, want)))));
+"""
+
+
+def test_a_wider_window_is_read_once_and_a_narrower_answers_from_what_is_held(tmp_path, monkeypatch):
+    """TD-882, §4.5 *Page loads* (*only what is shown*): the windows nest, so the page holding a window's lines
+    answers a narrower pick at once and reads a wider one by the lists' `part=1&win=` read, which keeps it."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the Queue's window pick is JavaScript, and nothing else runs it")
+    probe = tmp_path / "win.js"
+    probe.write_text(WINDOW_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == [
+        ["", "day", "week", "month"],  # 4h held
+        ["", "", "week", "month"],  # day held: the load's
+        ["", "", "", "month"],
+        ["", "", "", ""],
+    ]
+    js = (UI / "static" / "app.js").read_text()
+    qjs = js[js.index("AO.queue = function") : js.index("AO.repo = function")]
+    # the lists' read asks for the window held, or the wider one picked; the head's hold lifts once it is drawn
+    assert 'q.set("win", win)' in qjs
+    assert 'const win = AO.qWinFetch(loaded(), store.get("qwin", "day")) || loaded();' in qjs
+    # a read that fell short of its window is the poll's to repeat
+    assert "if (read && AO.qWinFetch(loaded(), win) === win) short = win;" in qjs
+    assert "if (loading()) reread(); else delete document.documentElement.dataset.qpend;" in qjs
+    assert "if (read && loading() && loading() !== win) setTimeout(reread, 0);" in qjs
+    part = client(monkeypatch, tmp_path, fake(queue())).get("/queue?part=1&win=month").text
+    assert 'data-loaded="month"' in part and part.count('class="qdline') == 4

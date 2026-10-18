@@ -3583,6 +3583,14 @@
     if (p.find) parts.push(`find=${encodeURIComponent(p.find)}`);
     return "/queue" + (parts.length ? "?" + parts.join("&") : "");
   };
+  // Recently completed's windows nest (§4.5 *Page loads*: *only what is shown*, TD-882): the page holds the
+  // lines of the window it was sent (`data-loaded`), so a narrower pick answers at once and a wider one is the
+  // window to read — "" when nothing is to be read
+  AO.Q_WINDOWS = ["4h", "day", "week", "month"];
+  AO.qWinFetch = (loaded, want) => {
+    const at = (w) => AO.Q_WINDOWS.indexOf(w);
+    return at(want) > at(loaded || "day") ? want : "";
+  };
   AO.qFiltered = (picks) => !!(picks.filter || picks.team.length || picks.repo.length || picks.kind.length || picks.find.split(/\s+/).filter(Boolean).length);
   // `item`: {kind: "card" | "line" | "other", status, kinds, repos, find}; `teams`: a team's name → its repo
   AO.qPass = (item, picks, teams) => {
@@ -3704,7 +3712,6 @@
         a.setAttribute("aria-pressed", on ? "true" : "false");
         a.setAttribute("href", k === "all" ? "/queue" : AO.qQuery(picks, { [k]: v }));
       });
-      delete document.documentElement.dataset.qpend;  // `base.html`'s head held the lists back until now
     }
     function setPicks(next, push) {
       picks = next;
@@ -3717,6 +3724,11 @@
       return $$(".qgroup .qcard", lists).some((el) => AO.qRefs((el.dataset.ids || "").split(" ").join(" "))
         .some((r) => r === ref || r.replace(/^.*#/, "") === ref));
     }
+    // the window of Recently completed's lines the page holds, and the wider one picked, if any (TD-882)
+    const loaded = () => ($("#qcompleted", lists) || { dataset: {} }).dataset.loaded || "day";
+    // a window a read answered without (an older home) is not asked again on every apply, only by the poll
+    let short = "";
+    const loading = () => { const w = AO.qWinFetch(loaded(), store.get("qwin", "day")); return w === short ? "" : w; };
     function apply() {
       qc.applyFolds();
       applyPicks();
@@ -3727,6 +3739,9 @@
       $$(".qdline", box).forEach((el) => { el.hidden = !(el.dataset.w || "").split(" ").includes(win); if (!el.hidden) shown++; });
       const none = $(".qdnone", box); if (none) none.hidden = shown > 0;
       applyGroups();  // after the window hides its lines, so a find opens only a group it found something in
+      // a window wider than the lines sent is read once, by the lists' read (TD-882); `base.html`'s head held
+      // the lists back until the remembered window is drawn, never *day* first
+      if (loading()) reread(); else delete document.documentElement.dataset.qpend;
     }
     function openLine(line) {
       const body = $(".qdbody", line), head = $(".qdhead", line); if (!body) return;
@@ -3820,10 +3835,14 @@
     let busy = false;
     async function reread() {
       if (busy || box.querySelector(".qcard.dragging")) return; busy = true;
+      let read = false;
+      // the lines of the window held, or of the picked one where it is wider (TD-882)
+      const win = AO.qWinFetch(loaded(), store.get("qwin", "day")) || loaded();
       try {
-        const q = new URLSearchParams(location.search); q.set("part", "1");
+        const q = new URLSearchParams(location.search); q.set("part", "1"); q.set("win", win);
         const res = await fetch(`/queue?${q}`);
         if (res.ok) {
+          read = true;
           const opened = $$(".qdline .qdbody:not([hidden])", lists).map((el) => el.closest(".qdline").dataset.key);
           lists.innerHTML = await res.text();
           // the filter row stands outside the lists, so typed find words and its focus survive: its numbers follow
@@ -3838,7 +3857,12 @@
           apply();
           wire();
         }
-      } catch (err) { /* the next poll tries again */ } finally { busy = false; }
+      } catch (err) { /* the next poll tries again */ } finally {
+        busy = false;
+        // a wider window picked while this read was out: read once more, never again for the same window
+        if (read && AO.qWinFetch(loaded(), win) === win) short = win;
+        if (read && loading() && loading() !== win) setTimeout(reread, 0);
+      }
     }
     apply();
     wire();

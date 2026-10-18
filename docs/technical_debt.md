@@ -72,7 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
-| TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
+| TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | In progress (slice 1 #2119) |
 | TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 | TD-885 | #2109's `_Gzip` and `_Static` guards (a ranged request, a non-200, an already-encoded body, a chunked body, an empty `?v=`) each leave `tests/test_ui_gzip.py` passing when removed | Low | Open |
@@ -1512,7 +1512,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-17 (TD-805's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** In progress (grinder-ao-2). Slice 1 #2119 (2026-10-18): the Queue sends the picked window's completed lines alone (`queue_window`, `send_window`, `data-loaded`), a wider pick read once by `part=1&win=` (`AO.qWinFetch`). Left: slice 2, the Repo page's folded groups — the first four rows at load, the rest on the first unfold or an anchor to a row not yet sent.
 **Blocked by:** TD-880
 **Location:** design §4.5 *Page loads* (*Only what is shown*), §4.5 screen 12 (the Queue's *Recently completed* and its window), the Repo page; `src/shiftlead/ui/templates/queue_part.html` (`q.completed.lines`), `src/shiftlead/ui/queue.py` (`queue_view`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the window picker, TD-829's in-browser picks), the Repo page's template and its folds; `tests/test_ui_queue_picks.py`
 
