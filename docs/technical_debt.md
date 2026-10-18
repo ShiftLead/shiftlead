@@ -1612,7 +1612,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (grinder-ao-2, TD-785's live walk on `gemini-conformance`)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed (2026-10-17, PR #PRNUM; Paul's answer m-1868eab7648f to the ask m-9604f86b5c60) — the layer is the machine's, `/etc/shiftlead/gemini-settings.json`, installed once by the person with the `sudo install` line `ao doctor` prints from the wanted copy ShiftLead writes; a launch is refused without it, a stale one launches and doctor says so; the conformance walk answers a channel-less adapter's permission in the terminal and captures each step's pane. Built by TD-875.
+**Status:** Designed (2026-10-17, PR #2094; Paul's answer m-1868eab7648f to the ask m-9604f86b5c60) — the layer is the machine's, `/etc/shiftlead/gemini-settings.json`, installed once by the person with the `sudo install` line `ao doctor` prints from the wanted copy ShiftLead writes; a launch is refused without it, a stale one launches and doctor says so; the conformance walk answers a channel-less adapter's permission in the terminal and captures each step's pane. Built by TD-875.
 **Blocked by:** TD-875
 **Location:** design §4.3 *The second adapter: Gemini CLI* (`launch`, the layer) and *The conformance suite* (the walk's permission step); `src/shiftlead/adapters/gemini/__init__.py` (`write_layer`, `layer_file`, `launch`'s env); `scripts/conformance.py` (`Walk.permission`, `Walk.doorbell`)
 
