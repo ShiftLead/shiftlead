@@ -47,6 +47,7 @@ from sessionorc import (
     work,
 )
 from sessionorc import balance as balance_mod
+from sessionorc import ledger as ledger_mod
 from sessionorc import seats as seats_mod
 from sessionorc import settings as settings_mod
 from sessionorc import settle as settle_mod
@@ -220,7 +221,7 @@ from sessionorc.agent_spend import SpendMixin
 from sessionorc.agent_sync import SyncMixin
 from sessionorc.agent_tick import TickMixin
 from sessionorc.agent_wake import WakeMixin
-from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, work_left
+from sessionorc.gitinfo import GitPickError, WorktreeError, ensure_worktree, git_info, pick_files, work_left
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     GRANTS,
@@ -2676,6 +2677,24 @@ class HostAgent(
         if long := [r for r in runs if len(r) > PATHS_RUN_CHARS]:
             raise RpcError(f"paths: a run of {len(long[0])} characters, past the {PATHS_RUN_CHARS} one may be")
         return {"paths": await asyncio.to_thread(_resolve_paths, runs, Path(s.dir))}
+
+    async def rpc_git_files(self, id: str, pick: str = "tree") -> dict[str, Any]:
+        """The Focus Git card's pick (design §4.2 *The Git card's pick*, TD-856): the record's newest ten
+        commits on `HEAD`'s first-parent line and the files of `pick` — `tree`, a sha of the ten, or
+        `session` — read from git in `dir` on this host, on a pick and never on the tick. Served here, on
+        the record's host — a node's record reaches its node through `read` (`NODE_READS`). A read: never
+        gated (§9 invariant 11)."""
+        s = self._get(id)
+        if not isinstance(pick, str):
+            raise RpcError(f"git_files: pick is tree, session or a sha, not {pick!r} (design §4.2)")
+
+        def read() -> dict[str, Any]:
+            return pick_files(s.dir, ledger_mod.default_ref(s.dir, timeout=5.0), pick)
+
+        try:
+            return await asyncio.to_thread(read)
+        except GitPickError as e:
+            raise RpcError(f"git_files: {e}") from None
 
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads

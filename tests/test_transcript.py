@@ -203,7 +203,14 @@ class TranscriptStub:
 async def test_the_rpc_reads_by_record_or_by_row_and_refuses_what_has_none(agent, tmp_path, monkeypatch):
     from sessionorc.agent import NODE_READS
 
-    assert {"tail", "explain", "log_tail", "transcript", "paths"} == NODE_READS  # a node's record reads through `read`
+    assert {
+        "tail",
+        "explain",
+        "log_tail",
+        "transcript",
+        "paths",
+        "git_files",
+    } == NODE_READS  # a node's record reads through `read`
     adapters.load_all()
     monkeypatch.setitem(adapters._REGISTRY, "tstub", TranscriptStub())
     async with LocalClient() as person:

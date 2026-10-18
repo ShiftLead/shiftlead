@@ -252,6 +252,117 @@ def changed_files(directory: Path | str, base_ref: str | None, limit: int, timeo
     return [f for _, f in out[:limit]]
 
 
+GIT_PICK_COMMITS = 10  # the Git card's pick: the newest commits on HEAD's first-parent line (§4.2)
+GIT_PICK_SESSION = 100  # and Session's paths, *n more* past it
+GIT_PICK_TREE = 20  # Working tree: the porcelain's lines, as `GitInfo.files` keeps them
+
+
+class GitPickError(ValueError):
+    """A `git_files` pick that cannot be answered, in words the card shows (§4.2 *The Git card's pick*)."""
+
+
+def pick_files(directory: Path | str, base_ref: str | None, pick: str, timeout: float = 5.0) -> dict[str, Any]:
+    """The Git card's pick (design §4.2 *The Git card's pick*, TD-856): `commits`, the newest ten on
+    `HEAD`'s first-parent line, each `{ref, sha, subject, at, author}`, `ref` git's own `HEAD` … `HEAD~9`;
+    and `files` by `pick`, each `{code, path}` repo-relative with `gone: true` on one not in the tree now —
+    `tree` the porcelain's lines (at most twenty), a sha of the ten the paths that commit changed against
+    its first parent (the empty tree for a root commit), `session` `changed_files` at a hundred with each
+    path's code (the porcelain's for one it holds, else its letter against the base) and `more`, the count
+    past it. A sha outside the ten and any other pick raise `GitPickError`. Runs git and stat and nothing
+    else; nothing is kept."""
+    top = toplevel(directory, timeout=timeout)
+    if not top:
+        raise GitPickError("not a git directory")
+    log_out = _git(
+        top, "log", "--first-parent", "-z", f"-n{GIT_PICK_COMMITS}", "--format=%H%x01%s%x01%ct%x01%an", timeout=timeout
+    )
+    if log_out is None and _git(top, "rev-parse", "--verify", "-q", "HEAD", timeout=timeout) is not None:
+        raise GitPickError("git log failed")
+    commits = []
+    for i, rec in enumerate(r for r in (log_out or "").split("\0") if r.strip()):
+        sha, subject, ct, author = (rec.lstrip("\n").split("\x01") + ["", "", ""])[:4]
+        at = _iso(int(ct)) if ct.isdigit() else ""
+        commits.append(
+            {"ref": "HEAD" if i == 0 else f"HEAD~{i}", "sha": sha, "subject": subject, "at": at, "author": author}
+        )
+    out: dict[str, Any] = {"commits": commits}
+    if pick == "tree":
+        info = git_info(top, timeout=timeout)
+        if info is None:
+            raise GitPickError("git status failed")
+        files = [dict(zip(("code", "path"), line.split(" ", 1), strict=True)) for line in info.files[:GIT_PICK_TREE]]
+    elif pick == "session":
+        files, out["more"] = _session_files(top, base_ref, timeout)
+    elif isinstance(pick, str) and pick and any(c["sha"] == pick for c in commits):
+        files = _commit_files(top, pick, timeout)
+    elif isinstance(pick, str) and re.fullmatch(r"[0-9a-f]{4,64}", pick):
+        raise GitPickError("not among the last ten commits")
+    else:
+        raise GitPickError(f"pick is tree, session or a sha of the last ten commits, not {pick!r}")
+    for f in files:
+        if not os.path.lexists(os.path.join(top, f["path"])):
+            f["gone"] = True
+    out["files"] = files
+    return out
+
+
+def _name_status(raw: str) -> list[dict[str, Any]]:
+    """`git diff --name-status -z`'s fields as `{code, path}`, a rename or copy by its new path."""
+    fields, files, i = raw.split("\0"), [], 0
+    while i < len(fields):
+        status = fields[i]
+        if not status:
+            i += 1
+            continue
+        if status[0] in "RC":
+            files.append({"code": status[0], "path": fields[i + 2] if i + 2 < len(fields) else ""})
+            i += 3
+        else:
+            files.append({"code": status[0], "path": fields[i + 1] if i + 1 < len(fields) else ""})
+            i += 2
+    return [f for f in files if f["path"]]
+
+
+def _commit_files(top: str, sha: str, timeout: float) -> list[dict[str, Any]]:
+    parents = _git(top, "rev-list", "--parents", "-n1", sha, timeout=timeout)
+    if parents is None:
+        raise GitPickError(f"could not read {sha[:7]}")
+    if len(parents.split()) > 1:
+        base = f"{sha}^1"
+    else:  # a root commit: against the empty tree
+        base = (_git(top, "hash-object", "-t", "tree", "/dev/null", timeout=timeout) or "").strip()
+    raw = _git(top, "diff", "--name-status", "-M", "-z", base, sha, timeout=timeout) if base else None
+    if raw is None:
+        raise GitPickError(f"git diff failed on {sha[:7]}")
+    return _name_status(raw)
+
+
+def _session_files(top: str, base_ref: str | None, timeout: float) -> tuple[list[dict[str, Any]], int]:
+    every = changed_files(top, base_ref, limit=1 << 30, timeout=timeout)
+    if every is None:
+        raise GitPickError("git read failed")
+    status = _git(top, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=timeout) or ""
+    codes: dict[str, str] = {}
+    fields, i = status.split("\0"), 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        codes[entry[3:]] = entry[:2].replace(" ", "")
+        if "R" in entry[:2] or "C" in entry[:2]:
+            i += 1
+    base = (_git(top, "merge-base", "HEAD", base_ref, timeout=timeout) or "").strip() if base_ref else ""
+    if base and (raw := _git(top, "diff", "--name-status", "-z", base, timeout=timeout)) is not None:
+        for f in _name_status(raw):
+            codes.setdefault(f["path"], f["code"])
+    files = []
+    for f in every[:GIT_PICK_SESSION]:
+        rel = os.path.relpath(f["path"], top)
+        files.append({"code": codes.get(rel, "M"), "path": rel})
+    return files, max(0, len(every) - GIT_PICK_SESSION)
+
+
 def _iso(ts: float) -> str:
     return datetime.fromtimestamp(ts, UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 

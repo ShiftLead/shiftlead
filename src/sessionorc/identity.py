@@ -46,6 +46,7 @@ READS = frozenset(
         "explain",
         "transcript",
         "paths",
+        "git_files",
         "occupancy",
         "name_check",
         "recent_dirs",
