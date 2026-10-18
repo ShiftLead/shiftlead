@@ -16848,3 +16848,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-890, TD-888.
 
 **Resolved:** 2026-10-18 (grinder-ao-1, #2141). `tests/test_ui_whole_on_hover.py` runs `AO.wholeOnHover` under node, as `test_ui_term_resize.py` runs the resize: a clipped line gets its trimmed text, a line that fits (narrower or even) none, a line with a title keeps it, `null` does nothing; and a hover dispatched to the document's `mouseover` listener reaches the rule with the three lines' selector. Removing `!el`, `el.title` or `scrollWidth > clientWidth`, the `trim()`, or a selector each fails a test; the string-presence assertion in `test_ui_queue_cards.py` is dropped.
+
+## TD-895: #2135's Settings `agent_down` branch and `asyncio.to_thread` file read each leave the Settings tests passing when removed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test audit of #2129–#2137, test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Resolved
+**Location:** `src/shiftlead/ui/app.py` (the Settings route's `asyncio.gather` and its refusal loop, `settings_files`); `tests/test_ui_settings.py`, `tests/test_ui_server_timing.py`
+
+**Why:** #2135 rewrote the Settings route's reads. Its docstring says the file reads run "on a worker thread beside the RPCs" and its test `test_settings_reads_each_rpc_once_all_at_once_and_times_its_files` asserts only that `files` is a `Server-Timing` step. Probes on `origin/main` (e1dec8d6), each restored: (1) `asyncio.to_thread(settings_files)` → `asyncio.sleep(0, settings_files())` (the YAML loads then hold the loop, the reason for the thread): `tests/test_ui_settings.py` and `tests/test_ui_server_timing.py` 38 passed. (2) in the rewritten refusal loop, `agent_down = True` (a 503) → `agent_down = False`: those two files 38 passed, and `pytest tests -k "settings or agent_down or unreachable or down"` 124 passed, so a Settings page with the host agent down is drawn as if it were up (usage and build chips read, no down banner) with no test failing. Only the non-503 refusal is under a test (`test_settings_refused_by_the_agent_still_draws_its_files_with_the_words`). The other mutations tried (`gate`/`usage`/`host` handed to the chips, the `flows` step) do fail a test.
+
+**Fix:** a test with a `call` that raises a 503 `AgentError` on `settings` and asserts `agent_down` is on the page (the banner, no usage chip, no build chip); a test that `settings_files` runs off the loop's thread (record `threading.get_ident()` in a patched `profiles_mod.load` and compare it with the loop's).
+
+**Done when** both probes above fail a test.
+
+**Related:** TD-884, TD-889.
+
+**Resolved:** 2026-10-18 (grinder-ao-1, #2143). `tests/test_ui_server_timing.py` gains two tests. `test_settings_with_the_agent_down_draws_the_banner_and_reads_no_chip`: a `settings` that raises `AgentUnavailable` (a 503) draws the *host agent unreachable* banner unhidden, and neither chip is read. `test_settings_reads_its_files_off_the_loops_thread`: the patched `profiles_mod.load` runs on a thread other than the one the page's RPCs answer on. Each probe fails one of them: `agent_down = True` → `False`, and `asyncio.to_thread(settings_files)` → `asyncio.sleep(0, settings_files())`.

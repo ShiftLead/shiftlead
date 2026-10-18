@@ -277,3 +277,80 @@ def test_the_repo_page_fails_and_stands_on_the_reads_it_did_before(tmp_path, mon
     calls.clear()
     assert c.get("/repo/samscrape?part=1").status_code == status
     assert "usage" not in calls and "gate" not in calls  # the part has no top bar
+
+
+def test_settings_with_the_agent_down_draws_the_banner_and_reads_no_chip(tmp_path, monkeypatch):
+    """A `settings` read the host agent cannot answer (a 503) is the page's *host agent unreachable* banner,
+    and the top bar's chips are not read, gathered as the reads are (TD-884, TD-895)."""
+    from sessionorc.client import AgentUnavailable
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    class Down:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "settings":
+                raise AgentUnavailable("no socket")
+            return {"list": [], "host": {"name": "kmaster"}}.get(method, {})
+
+    chips: list[str] = []
+
+    async def build(call, info=None):
+        chips.append("build")
+
+    async def usage(call, *a, **k):
+        chips.append("usage")
+        return {}
+
+    monkeypatch.setattr(ui, "LocalClient", Down)
+    monkeypatch.setattr(ui, "chip_build", build)
+    monkeypatch.setattr(ui, "chip_usage", usage)
+    r = TestClient(ui.create_app()).get("/settings")
+    assert r.status_code == 200
+    assert '<div class="warn" id="agentdown">' in r.text  # drawn, not hidden
+    assert chips == []
+
+
+def test_settings_reads_its_files_off_the_loops_thread(tmp_path, monkeypatch):
+    """The Settings page's file reads (`settings_files`: the profiles, the org, `hosts.yml`) run on a worker
+    thread, so a YAML load does not hold the loop the page's RPCs answer on (TD-884, TD-895)."""
+    import threading
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    where: dict[str, int] = {}
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            where["loop"] = threading.get_ident()
+            return {"list": [], "host": {"name": "kmaster"}}.get(method, {})
+
+    load = ui.profiles_mod.load
+
+    def recorded():
+        where["files"] = threading.get_ident()
+        return load()
+
+    monkeypatch.setattr(ui, "LocalClient", Fake)
+    monkeypatch.setattr(ui.profiles_mod, "load", recorded)
+    assert TestClient(ui.create_app()).get("/settings").status_code == 200
+    assert {"loop", "files"} <= set(where) and where["files"] != where["loop"]
