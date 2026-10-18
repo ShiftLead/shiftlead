@@ -29,6 +29,7 @@ PAGE_ROUTES = (
     (re.compile(r"/spend"), "/spend"),
     (re.compile(r"/repo/[^/]+"), "/repo/{name}"),
     (re.compile(r"/transcript/[^/]+"), "/transcript/{sid}"),
+    (re.compile(r"/api/fold"), "/api/fold"),  # a Queue card's fold, read on its first open (TD-891)
 )
 
 _STEPS: ContextVar[dict[str, Any] | None] = ContextVar("server_timing", default=None)

@@ -1,0 +1,3 @@
+{# `GET /api/fold?key=` (design §4.5 *Page loads*, TD-891): one fold's body, by the row renderer's own macro.
+   Imported with context so the body's links know the page's `origin` (TD-138). #}
+{% import "inbox_row.html" as r with context %}{{ r.fold_body(kind, e) }}

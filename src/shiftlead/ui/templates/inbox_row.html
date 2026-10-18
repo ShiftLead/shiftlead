@@ -48,12 +48,28 @@
 {%- if t %}<div class="subj">{{ t }}</div>{% endif %}
 {%- endmacro %}
 
+{# design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): a fold's body, one macro the
+   row and `GET /api/fold` both draw — a message's `rest`, a board line's rest and detail block, a ledger
+   row's detail. On a Queue card a fold drawn closed is sent as its summary alone (`data-lazy`), its body
+   read on its first open; drawn open, and on every other page, it is sent whole. #}
+{% macro fold_body(kind, e, rest=none) -%}
+{%- if kind == 'mail' %}<div class="body md">{{ rest if rest is not none else shaped(e.text, origin).rest }}</div>
+{%- elif kind == 'board' %}
+{%- if e.rest %}<div class="body md">{{ md(e.rest, origin) }}</div>{% endif %}
+{%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
+{%- else %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}
+{%- endmacro %}
+{% macro fold(key, is_open, kind, e, rest=none) -%}
+<details class="fold" data-fold="{{ key }}"{% if is_open %} open{% endif %}
+{%- if drawn_on_queue and not is_open %} data-lazy="1"><summary>details</summary></details>
+{%- else %}><summary>details</summary>{{ fold_body(kind, e, rest) }}</details>{% endif %}
+{%- endmacro %}
 {% macro body(e) -%}
 {{ subj(e) }}
 {%- set s = shaped(e.text, origin) %}
 <div class="body md">{{ s.lead }}</div>
 {%- if s.rest %}
-<details class="fold" data-fold="{{ e.id }}"{% if fold_open %} open{% endif %}><summary>details</summary><div class="body md">{{ s.rest }}</div></details>
+{{ fold(e.id, fold_open, 'mail', e, s.rest) }}
 {%- endif %}
 {{ shots(e) }}
 {%- endmacro %}
@@ -707,9 +723,7 @@
     the page keeps the person's press either way (`foldsOpen`, `foldsShut`). -#}
 {%- if e.rest or e.detail %}
 {%- set press = (e.answers and not e.decided) or e.pair %}
-<details class="fold" data-fold="{{ e.id }}"{% if fold_open or (e.detail and press) %} open{% endif %}><summary>details</summary>
-{%- if e.rest %}<div class="body md">{{ md(e.rest, origin) }}</div>{% endif %}
-{%- if e.detail %}<div class="body md detailblock">{{ md(e.detail, origin) }}</div>{% endif %}</details>
+{{ fold(e.id, fold_open or (e.detail and press), 'board', e) }}
 {%- endif %}
 {%- for r in e.replies %}
 <div class="st boardreply">{{ r.by }}, {{ r.date }}: {{ md(r.text, origin, inline=True) }}</div>
@@ -977,7 +991,7 @@
 </div>
 <div class="body"><b class="mono">{{ e.id }}</b> {{ e.title }}</div>
 {%- if e.detail %}
-<details class="fold" data-fold="{{ e.row_id }}"{% if fold_open or e.answers %} open{% endif %}><summary>details</summary><div class="body md detailblock">{{ md(e.detail, origin) }}</div></details>
+{{ fold(e.row_id, fold_open or e.answers, 'ledger', e) }}
 {%- endif %}
 {%- if e.answers %}
 <div class="row gap wrap sugg" role="group" aria-label="this entry's answers">
