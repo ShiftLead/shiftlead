@@ -13,7 +13,7 @@ import pytest
 from sessionorc import identity
 from sessionorc.agent_common import NODE_READS
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.gitinfo import GIT_PICK_SESSION, GitPickError, pick_files
+from sessionorc.gitinfo import GIT_PICK_SESSION, GIT_PICK_TREE, GitPickError, pick_files
 
 
 def run(*args, cwd):
@@ -88,6 +88,23 @@ def test_a_commits_files_are_its_own_and_a_root_commits_are_against_the_empty_tr
     ]
 
 
+def test_the_commits_are_the_first_parent_line_without_a_merged_branchs_own(tmp_path):
+    repo = cloned(tmp_path)
+    run("git", "checkout", "-q", "-b", "side", cwd=repo)
+    (repo / "side.txt").write_text("s")
+    run("git", "add", ".", cwd=repo)
+    side = commit(repo, "on the side", 1_700_000_100)
+    run("git", "checkout", "-q", "work", cwd=repo)
+    (repo / "w.txt").write_text("w")
+    run("git", "add", ".", cwd=repo)
+    commit(repo, "on work", 1_700_000_200)
+    env = {**os.environ, "GIT_COMMITTER_DATE": "@1700000300 +0000", "GIT_AUTHOR_DATE": "@1700000300 +0000"}
+    subprocess.run(["git", "merge", "-q", "--no-ff", "-m", "merge side", "side"], cwd=repo, check=True, env=env)
+    got = pick_files(repo, "origin/main", "tree")
+    assert [c["subject"] for c in got["commits"]] == ["merge side", "on work", "base"]
+    assert side not in [c["sha"] for c in got["commits"]]
+
+
 def test_a_path_deleted_after_the_commit_is_gone(tmp_path):
     repo = cloned(tmp_path)
     (repo / "x.txt").write_text("x")
@@ -118,6 +135,22 @@ def test_a_path_git_would_quote_comes_whole(tmp_path):
     (repo / "naïve file.txt").write_text("n")
     for pick in ("tree", "session"):
         assert pick_files(repo, "origin/main", pick)["files"] == [{"code": "??", "path": "naïve file.txt"}]
+
+
+def test_a_staged_rename_is_one_entry_by_its_new_path(tmp_path):
+    repo = cloned(tmp_path)
+    run("git", "mv", "ren.txt", "moved.txt", cwd=repo)
+    assert pick_files(repo, "origin/main", "tree")["files"] == [{"code": "R", "path": "moved.txt"}]
+    assert [f["path"] for f in pick_files(repo, "origin/main", "session")["files"] if not f.get("gone")] == [
+        "moved.txt"
+    ]
+
+
+def test_tree_caps_at_twenty(tmp_path):
+    repo = cloned(tmp_path)
+    for i in range(GIT_PICK_TREE + 5):
+        (repo / f"f{i:03}.txt").write_text(str(i))
+    assert len(pick_files(repo, "origin/main", "tree")["files"]) == GIT_PICK_TREE == 20
 
 
 def test_session_caps_at_a_hundred_with_more(tmp_path):
