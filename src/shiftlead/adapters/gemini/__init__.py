@@ -14,6 +14,7 @@ registered agent adapter against fixtures captured from the real tool, which TD-
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -99,12 +100,17 @@ def layer_settings(hook_cmd: str = "shiftlead-hook") -> dict:
     return {"hooks": {ev: [{"hooks": [dict(hook)]}] for ev in HOOK_EVENTS}, **json.loads(json.dumps(LAYER_SETTINGS))}
 
 
+def layer_text(hook: str) -> str:
+    """The layer's bytes for a hook at `hook`: the wanted copy's here, a container node's with its own."""
+    return json.dumps(layer_settings(hook), indent=1)
+
+
 def write_layer() -> Path:
     """Write the wanted copy, the same bytes for every profile and launch, and remove the per-profile
     layers earlier builds wrote beside it (`<profile>[+unattended].json`), which the tool never read."""
     p = wanted_file()
     p.parent.mkdir(parents=True, exist_ok=True)
-    text = json.dumps(layer_settings(hook_path()), indent=1)
+    text = layer_text(hook_path())
     try:
         same = p.read_text(encoding="utf-8") == text
     except OSError:
@@ -310,6 +316,38 @@ class GeminiAdapter:
                 row["note"] = "GOOGLE_API_KEY is set in the host agent's environment; each launch clears it"
             out.append(row)
         return out
+
+    def setup_note(self) -> dict | None:
+        """What the host agent tells the person at its start and when `profiles.yml` changes (design §4.3
+        *The person meets the step at setup*): None with no Gemini profile; `key` None when the machine's
+        layer is the wanted copy; else `key` — the wanted copy's hash and the reading — and the note's
+        `text`, which the host agent sends once per key."""
+        try:
+            profs, _ = profiles_mod.load()
+        except (OSError, ValueError, TypeError, AttributeError):
+            return None
+        if not any(p.adapter == self.name for p in profs.values()):
+            return None
+        r = machine_reading()
+        if r["state"] == "ok":
+            return {"key": None}
+        digest = hashlib.sha256(Path(r["wanted"]).read_bytes()).hexdigest()[:12]
+        words = {"missing": "is not installed", "insecure": "is not root-owned", "stale": "is stale"}.get(
+            r["state"], "names no hook command that resolves"
+        )
+        refused = "" if r["state"] == "stale" else " and is refused"
+        text = (
+            f"The Gemini layer {words}, so a Gemini session gets no hooks{refused}. "
+            f"Run this once on this machine:\n\n{INSTALL_LINE}\n\n"
+            f"Gemini CLI reads its hooks only from a settings file root owns ({MACHINE_LAYER}: {r['why']}); "
+            "ShiftLead writes the file it wants and never runs sudo (design §4.3)."
+        )
+        return {"key": f"{digest}:{r['state']}", "text": text}
+
+    def machine_layers(self, hook: str) -> list[tuple[str, str]]:
+        """The machine layer a container node's root stage installs (design §4.3 *A container node needs
+        no sudo*): where it goes and its bytes, naming the node's own hook."""
+        return [(str(MACHINE_LAYER), layer_text(hook))]
 
     def account_for(self, profile: str) -> str | None:
         try:
