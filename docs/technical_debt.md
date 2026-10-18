@@ -81,6 +81,9 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-862 | Build TD-856: the Focus Git card's pick — Working tree, one of the last ten commits, Session — its ↑ ↓, and the `git_files` read | Medium | Open |
 | TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
+| TD-866 | Rule 9's held-ask wait has two guards no test pins: a derived or scraped claim is not read, and a dead member's held ask blocks nothing | Medium | Open |
+| TD-867 | `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day | Low | Open |
+| TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 
 ---
 
@@ -1752,5 +1755,65 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** By seat's *per finished entry* is each seat's own and a seat's hover lists its tokens by kind.
 
 **Related:** TD-832, TD-830, TD-859.
+
+---
+
+## TD-866: Rule 9's held-ask wait has two guards no test pins: a derived or scraped claim is not read, and a dead member's held ask blocks nothing
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/work.py` (`held_asks`, `finished`); `tests/test_finished.py`, `tests/test_finished_tick.py`
+
+**Why:** #2069 (TD-863) added two conditions that no test fails without. Reverted one at a time in a clean worktree on `origin/main`, `pytest -q tests/test_finished.py tests/test_finished_tick.py` still read `33 passed`: (a) `held_asks`' `if _f(e, "status") == "claimed" and _f(e, "source") == "declared"` became `if _f(e, "status") == "claimed"`, so a derived or scraped claim counts as one the member waits on, which §6 rule 9 (*declared* claims) does not say; (b) `finished`' `if live and (held := readers.get(...))` became `if (held := ...)`, so a dead member whose PR has a held ask reads *waiting on* instead of falling to its `out_of_work`/restart reading. `test_a_done_claim_or_a_held_ask_for_a_pr_the_member_does_not_claim_blocks_nothing` has a `done` claim and a foreign PR but no non-declared claim and no dead member.
+
+**Fix:** In `test_finished.py`: a member whose only claim of the held PR is `source="derived"` (and one `scraped`) blocks nothing; a member in `exited` with `out_of_work` declared, beside a held ask for its claimed PR, reads as `said` and not as waiting.
+
+**Done when** each of the two reverts above fails a test.
+
+**Related:** TD-863 (built #2069), TD-854 (the design).
+
+---
+
+## TD-867: `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/seats.py` (`_series`); `tests/test_seats.py`
+
+**Why:** #2067 (TD-859): `_series` sets `partial` under `if window != "day" and begins and a < begins <= b:`, and its docstring says *`partial` on the bucket holding `begins` when that is not its first day*. Reverted to `a <= begins <= b`, `pytest -q tests/test_seats.py` read `22 passed`: `test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` begins the ledger on a Wednesday only, so a ledger that begins on a Monday or the 1st (a whole bucket) is never read.
+
+**Fix:** Add to that test a ledger whose first day is a Monday and one whose first day is the 1st: the week and the month bucket holding it carry no `partial`.
+
+**Done when** the `<=` revert fails a test.
+
+**Related:** TD-859 (built #2067).
+
+---
+
+## TD-868: `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-17 (test-audit-ao-1)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/conftest.py` (`park_ticks`, `PASS_DRAIN`); `tests/test_lane_news.py`
+
+**Why:** #2073 (TD-858) says a pass not finished in `PASS_DRAIN` is cancelled. With `PASS_DRAIN = 0.01` instead of `30.0`, `pytest -q tests/test_lane_news.py` read `18 passed`: the one test the PR added has a 0.2 s task that either lands or is cancelled, and its last assertion, `agent._promotes == {"repo": {"live": "abc"}}`, holds in both cases (the task only resets `_promotes` to `{}` before the test sets it). Its `sleep(0.4)` is a wait in place of a condition, though a short one.
+
+**Fix:** Make the late task set a flag as its last step; with a `PASS_DRAIN` patched to a small value and the task sleeping past it, assert the task was cancelled (flag unset) and `park_ticks` returned; with the default, assert the flag is set. Replace the `sleep(0.4)` with a yield or the task's own completion.
+
+**Done when** a shortened `PASS_DRAIN` fails a test.
+
+**Related:** TD-858 (built #2073).
 
 ---
