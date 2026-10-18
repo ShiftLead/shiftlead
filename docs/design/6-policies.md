@@ -1279,8 +1279,10 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       build's. A refusal is written in the log and on the note.
     - It reads `ao status --json`, `ao repo --json` and `ao promote status --json`, each of which
       must exit 0 with JSON. It never runs `ao inbox`, since reading marks entries read (§4.10).
-    - Each load prints one line to the log, so every promote also measures the pages: the page, its
-      status, time to first byte, total time, size, DOM ready and the page's `Server-Timing` steps.
+    - Each page is loaded twice and the second load judged against the budget, the first printed as
+      *cold*. Each load prints one line to the log, so every promote also measures the pages: the
+      page, its status, time to first byte, total time, size, DOM ready and the page's `Server-Timing`
+      steps — the HTTP half's numbers and the browser half's DOM ready on the one line.
       A page over §4.5 *Page loads*' budget is a line on the promote's note naming the page and its
       longest step; it fails nothing.
     - The browser half (script errors, `load`) needs Playwright and its Chromium headless shell.

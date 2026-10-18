@@ -1665,12 +1665,13 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Why:** TD-805: nothing is sent compressed — the Queue's 2.29 MB of HTML is 370 KB gzipped, the Inbox's 718 KB is 79 KB, `app.js`'s 399 KB is 126 KB — and the static files carry no `Cache-Control`, so a load revalidates or refetches 495 KB of script and style though their URLs carry a hash.
 
-**Fix:** a response of 1 KB or more goes gzipped (level 5, as the counts' JSON is) to a request whose `Accept-Encoding` takes it (`gzip_ok`), with `Vary: Accept-Encoding` — pages, `part=1` fragments and static files; the pushed event stream and the terminal's websocket are left as they are. A static request carrying `?v=` is answered `Cache-Control: public, max-age=31536000, immutable`; without it, `no-cache` and its ETag.
+**Fix:** a response of 1 KB or more goes gzipped (level 5, as the counts' JSON is) to a request whose `Accept-Encoding` takes it (`gzip_ok`), with `Vary: Accept-Encoding` — pages, `part=1` fragments and static files; the pushed event stream and the terminal's websocket are left as they are. A body is compressed on a worker thread, as `json_body` compresses the counts (TD-611), never on the loop that also serves Focus's keystrokes. A static request carrying `?v=` is answered `Cache-Control: public, max-age=31536000, immutable`; without it, `no-cache` and its ETag.
 
 **Tests:**
 - a page and a fragment come back `Content-Encoding: gzip` with `Accept-Encoding: gzip` and plain without, and `gzip;q=0` is plain;
 - `/static/app.js?v=x` carries the immutable header and `/static/app.js` `no-cache`;
-- the event stream is not compressed.
+- the event stream is not compressed;
+- a large page's compression runs off the loop (a Focus write answered while it runs, or the call patched and its thread checked).
 
 **Done when** the live Queue sends under 400 KB of HTML on the wire and a second load of any page fetches no script or stylesheet (devtools, or the smoke's line).
 
@@ -1692,7 +1693,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Fix:**
 - **The header.** Each page route (`/`, `/inbox`, `/queue`, `/repo/<repo>`, `/settings`, `/spend`, `/transcript/<id>`) times each RPC by name (summed per name), the person inbox (`person_inbox` with `person_states`), the board and ledger reads, and the render, and answers `Server-Timing: rpc_list;dur=31, inbox;dur=…, render;dur=…, total;dur=…`. The last twenty per route are kept in memory, never on disk.
-- **The smoke.** Each load line gains DOM ready (the browser half) and the header's steps; a page over §4.5's budget — first byte, HTML on the wire, DOM ready — is a line on the promote's note naming the page and its longest step. It fails nothing.
+- **The smoke.** Each page is loaded twice, the first printed *cold*, the second judged; each load is one line merging the HTTP half's numbers with the browser half's DOM ready and the header's steps; a page over §4.5's budget — first byte, HTML on the wire, DOM ready — is a line on the promote's note naming the page and its longest step. It fails nothing.
 
 **Tests:**
 - a page route answers a `Server-Timing` naming each RPC it made and `total`;
@@ -1715,13 +1716,14 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Blocked by:** TD-880
 **Location:** design §4.5 *Page loads* (*Only what is shown*), §4.5 screen 12 (the Queue's *Recently completed* and its window), the Repo page; `src/shiftlead/ui/templates/queue_part.html` (`q.completed.lines`), `src/shiftlead/ui/queue.py` (`queue_view`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the window picker, TD-829's in-browser picks), the Repo page's template and its folds; `tests/test_ui_queue_picks.py`
 
-**Why:** TD-805: the Queue sends 829 completed lines across every window and 18,487 DOM nodes; even gzipped it is 370 KB against the 150 KB budget. The Repo page sends 825 KB and 11,219 nodes, most of it in groups drawn folded.
+**Why:** TD-805: the Queue sends 829 completed lines across every window and 18,487 DOM nodes; even gzipped it is 370 KB against the 150 KB budget. The Repo page sends 825 KB and 11,219 nodes, 517 KB of it rows drawn folded (past the fourth of a group).
 
-**Fix:** at load the Queue sends the completed lines of the picked window only (the day, unless the URL or the browser's kept pick says another); a pick of another window fetches that window's lines by `part=1` once and keeps them, so a pick back answers at once. The Repo page sends a folded group's heading and count, and its rows on its first unfold. Blocked by TD-880 so the size measured after is the compressed one.
+**Fix:** at load the Queue sends the completed lines of the picked window only (the day, unless the URL or the browser's kept pick says another); a pick of another window fetches that window's lines by `part=1` once and keeps them, so a pick back answers at once. The Repo page sends a group's first four rows and the count of the rest, and the rest on the group's first unfold — and on an anchor or a find that names a row not yet sent (the ledger row's **Open**, `/repo/<name>#TD-156`, §4.5 screen 6), which fetches the group's rows before it scrolls. Blocked by TD-880 so the size measured after is the compressed one.
 
 **Tests:**
 - the Queue at load holds the day's completed lines alone and the week's after its pick;
-- a Repo group drawn folded holds no rows until opened.
+- a Repo group holds its first four rows until opened;
+- `/repo/shiftlead#TD-n` for a row past the fourth fetches its group and lands on the row.
 
 **Done when** the live Queue and Repo pages each send under 150 KB of HTML on the wire at load.
 
