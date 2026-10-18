@@ -5854,7 +5854,8 @@
       try {
         const got = await post(section, body);
         // the weights the home now reads, drawn again: a row put back at its default, the defaults marked
-        if (section === "spend") { location.reload(); return; }
+        // — unless another card holds edits not yet saved, which a reload would throw away
+        if (section === "spend" && !$$("form.setcard", page).some((o) => o !== f && o.dataset.drawn !== state(o))) { location.reload(); return; }
         drawn(f);
         say(f, page.dataset.setAt ? `saved at ${page.dataset.setAt} · applies on the next tick` : "saved · applies on the next tick");
         // **flow** writes and nothing more (§4.5a, TD-356): the toast says whether Apply is needed

@@ -280,6 +280,8 @@ def test_the_weights_card_draws_the_read_weights_and_saves_only_what_differs_fro
                                          "cache_write": "20", "default": True, "shipped": True}  # fmt: skip
     assert not rows["claude-opus"]["default"] and rows["claude-opus"]["cache_read"] == ""
     assert not rows["my-model"]["shipped"] and weights_card(None)["rows"][0]["default"]
+    assert weights_card({"x": {"input": 0.1234567, "output": 12345678}})["rows"][0]["input"] == "0.1234567"
+    assert weights_card({"x": {"output": 12345678}})["rows"][0]["output"] == "12345678"
     same = [
         {k: r[k] for k in ("model", "input", "output", "cache_read", "cache_write")} for r in weights_card(W)["rows"]
     ]
@@ -296,6 +298,7 @@ def test_the_weights_card_draws_the_read_weights_and_saves_only_what_differs_fro
         ([{"model": "a", "input": "cheap"}], "a input: $ per million tokens, not 'cheap'"),
         ([{"model": "a", "output": "-1"}], "at or above 0"),
         ([{"model": "a"}], "a: give it at least its input price"),
+        ([{"model": "a", "output": "1"}], "a: give it at least its input price"),
         (None, "send {rows"),
     ):
         with pytest.raises(ValueError, match=re.escape(words)):

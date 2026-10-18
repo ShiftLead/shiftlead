@@ -242,8 +242,12 @@ WEIGHT_KINDS = ("input", "output", "cache_read", "cache_write")  # `settings.WEI
 
 
 def _price(v: Any) -> str:
-    """A price as its field shows it: `4`, `0.25`; "" for none."""
-    return f"{float(v):g}" if _is_num(v) else ""
+    """A price as its field shows it, every digit kept so a Save writes it back unchanged: `4`, `0.25`; ""
+    for none."""
+    if not _is_num(v):
+        return ""
+    text = repr(float(v))
+    return text[:-2] if text.endswith(".0") else text
 
 
 def weights_card(weights: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -302,7 +306,7 @@ def weights_body(rows: Any, as_of: Any = "") -> dict[str, Any]:
             if not math.isfinite(v) or v < 0:
                 raise ValueError(f"{model} {k.replace('_', ' ')}: $ per million tokens, at or above 0, not {text}")
             prices[k] = v
-        if not prices:
+        if "input" not in prices:  # a kind left out weighs at the input, so the input is the one a row needs
             raise ValueError(f"{model}: give it at least its input price")
         shipped = WEIGHTS.get(model)
         if isinstance(shipped, Mapping) and {k: float(v) for k, v in shipped.items()} == prices:
