@@ -81,6 +81,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-880 | Build TD-805 (2): pages, fragments and static files sent gzipped; hashed static files cached immutable | Medium | Open |
 | TD-881 | Build TD-805 (3): a `Server-Timing` header on every page route, the last twenty kept, and the smoke telling a page over its budget | Medium | Open |
 | TD-882 | Build TD-805 (4): only what is shown at load — the Queue's completed lines of a window not picked, the Repo page's folded groups — fetched when opened | Medium | Open |
+| TD-883 | `git_info`'s `-z` loop skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it | Low | Open |
 
 ---
 
@@ -1707,5 +1708,26 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the live Queue and Repo pages each send under 150 KB of HTML on the wire at load.
 
 **Related:** TD-805, TD-829 (the Queue's picks in the browser), TD-816.
+
+---
+
+
+## TD-883: `git_info` skips a rename's source field with `i += 1`, and `tests/test_gitinfo.py` passes without it
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2099 (TD-869))
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/sessionorc/gitinfo.py` (`git_info`, the `elif line.startswith("2 ")` arm); `tests/test_gitinfo.py`
+
+**Why:** With the `            i += 1` that follows `files.append(f"{parts[1].replace('.', '')} {parts[9]}")` deleted in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_gitinfo.py tests/test_git_files.py` still reads `22 passed`. The line is what keeps a rename's source, now a field of its own under `-z`, from being read as an entry: without it the source is parsed as a line, and it only matters when the old name starts with `# `, `1 `, `2 `, `? ` or `u ` (probe: `? old.txt` renamed to `new.txt` reads `['R new.txt', '?? old.txt']`, dirty 2). `test_git_info_keeps_a_path_git_would_quote_whole` renames `old.txt`, which none of the arms match, so the source falls through silently; its docstring says *a rename's source is no entry*.
+
+**Fix:** In `tests/test_gitinfo.py` rename a file whose old name begins with `? ` (say `? old.txt`) and assert `info.files` holds the new path alone and `info.dirty` counts one.
+
+**Done when** deleting the `i += 1` fails a test.
+
+**Related:** TD-869.
 
 ---
