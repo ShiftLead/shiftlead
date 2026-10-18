@@ -3256,6 +3256,7 @@
     const err = $("#entryerr");
     const say = (m) => { err.textContent = m || ""; err.hidden = !m; };
     const type = () => (dlg.querySelector("input[name=entrytype]:checked") || {}).value || "debt";
+    const priority = () => (dlg.querySelector("input[name=entrypriority]:checked") || {}).value || "medium";
     let asked = 0;  // a later Type press or keystroke wins over an earlier answer that arrives after it
     // §4.5a *Add entry form: Name* (TD-677): untouched, the box follows the plan's default; typed in, it is
     // the person's, sent with every read; emptied, the default is its placeholder and the press takes it
@@ -3317,7 +3318,7 @@
       busy = true; handState();
       let r, got;
       try {
-        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft(), team: picked() }) });
+        r = await fetch("/api/entry/hand", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), priority: priority(), words: $("#entrywhat").value, draft: draft(), team: picked() }) });
         got = await r.json();
       } catch (e) { busy = false; handState(); return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { busy = false; handState(); return say(got.detail || "refused"); }
@@ -3331,12 +3332,13 @@
     // checked as typed, debounced as New session's name field is (§4.5a *New session: name field → holder*)
     nameBox.oninput = () => { named = true; clearTimeout(nameBox._t); nameBox._t = setTimeout(plan, 250); };
     dlg.querySelector("input[name=entrytype][value=debt]").checked = true;
+    dlg.querySelector("input[name=entrypriority][value=medium]").checked = true;  // each opening starts at Medium
     dlg.querySelectorAll("input[name=entrytype]").forEach((x) => { x.onchange = plan; });
     $("#entrygo").onclick = async () => {
       $("#entrygo").disabled = true;
       let r, got;
       try {
-        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), words: $("#entrywhat").value, draft: draft(), name: typed() }) });
+        r = await fetch("/api/entry/session", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ repo, type: type(), priority: priority(), words: $("#entrywhat").value, draft: draft(), name: typed() }) });
         got = await r.json();
       } catch (e) { $("#entrygo").disabled = false; return say(`the page could not ask: ${e.message}`); }
       if (!r.ok) { $("#entrygo").disabled = false; return say(got.detail || "refused"); }

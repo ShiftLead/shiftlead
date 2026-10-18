@@ -2500,9 +2500,10 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/entry/hand")
     async def api_entry_hand(request: Request):
-        """§4.5a Add entry form → **Hand to the techlead** (TD-219 slice 4): `{repo, type, words, team}`
+        """§4.5a Add entry form → **Hand to the techlead** (TD-219 slice 4): `{repo, type, priority, words, team}`
         goes to `entry_add` (TD-218) as the person's `ask` to the techlead seat of the team the **Team**
-        pick names (TD-740), carried as `entry.team` (TD-764), else the repo's first servicing team with a
+        pick names (TD-740), carried as `entry.team` (TD-764) beside the **Priority** pick as `entry.priority`
+        (TD-851), else the repo's first servicing team with a
         seat in the ledger's `Team` order, marked `handed`, with no
         bound; the host agent refuses in words what the page disables (no team, no seat, no words).
         Answers `{id, to, name, text, href}`: the toast's words, *handed to techlead-ao-1 · m-…*, and the
@@ -2520,6 +2521,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             text=str(body.get("words") or ""),
             teams=[{"team": t["team"], "seat": t["seat"]} for t in plan["teams"]],
             team=plan["picked"],  # `entry.team`: the pick, empty when blank (§4.10, TD-764)
+            priority=str(body.get("priority") or ""),  # `entry.priority`, `medium` when absent (TD-851)
             **_draft_of(body),
         )
         name = plan["hand"]["name"] if got.get("to") == plan["hand"]["to"] else got.get("to")
@@ -2535,7 +2537,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/entry/session")
     async def api_entry_session(request: Request):
-        """§4.5a Add entry form → **Open a session** (TD-219 slice 3): `{repo, type, words, name}` starts
+        """§4.5a Add entry form → **Open a session** (TD-219 slice 3): `{repo, type, priority, words, name}` starts
         an **interactive** session in a new worktree of the repo, named what the **Name** box holds
         (`name`, else the plan's `entry-<n>`; a name not free is refused 409 in the box's words, TD-677),
         in its team as a person's own session is (§4.9 *A person in the team*) with the role `entries:`
@@ -2550,6 +2552,9 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if not isinstance(body, dict):
             raise HTTPException(400, "send {repo, type, words}")
         repo, type_, name = (str(body.get(k) or "") for k in ("repo", "type", "name"))
+        priority = str(body.get("priority") or "").strip().lower() or "medium"  # the **Priority** pick (TD-851)
+        if priority not in orgmod.ENTRY_PRIORITIES:
+            raise HTTPException(400, f"an entry's priority is {', '.join(orgmod.ENTRY_PRIORITIES)}, not {priority!r}")
         plan = await entry_plan(repo, type_ or "debt", name)
         if plan["name_why"]:  # taken between the check and the press: refused, never replaced by another
             raise HTTPException(409, plan["name_why"])
@@ -2583,7 +2588,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ledger=cfg.ledger,
             controllers=[plan["manager"]] if plan["manager"] else [],
             team=team,  # the badge, as the New session form's Team pick sets it; none without a team
-            start_context=repoconfig.entry_text(plan["repo"], plan["type"], plan["ledger"]),
+            start_context=repoconfig.entry_text(plan["repo"], plan["type"], priority, plan["ledger"]),
             **_draft_of(body),
         )
         text = str(body.get("words") or "").strip()  # the composer is the person's (§4.5a **Open a session**)

@@ -107,6 +107,8 @@ TRAIL_KEEP = 100  # attention-trail entries kept, newest first (design §4.10, T
 TRAIL_FLOOR = timedelta(seconds=5)  # a row this short leaves no trail unless a person ended it
 # An entry handed to a seat is debt or a feature (cadence §2.11; design §4.10, TD-218)
 ENTRY_TYPES = ("debt", "feature")
+# …and its priority, the Add entry form's **Priority** pick, `medium` when absent (design §4.10, TD-851)
+ENTRY_PRIORITIES = ("high", "medium", "low")
 # A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
 # long it is given to finish after the ask. It is a grace, not a deadline the session can see — a
 # session that settles sooner is killed sooner, and one that is still working when it runs out is

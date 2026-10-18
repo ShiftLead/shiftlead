@@ -210,14 +210,21 @@ async def test_entry_add_hands_the_words_to_the_seat_with_no_bound(agent, tmp_pa
         rec = agent.sessions[sid]
         e = next(e for e in rec.inbox if e.id == got["id"])
         assert e.kind == "ask" and e.from_ == PERSON and e.text == "the parser drops a trailing line"
-        assert e.handed and e.entry == {"repo": "shiftlead", "type": "debt", "team": ""} and e.bound is None
+        assert e.handed and e.bound is None
+        assert e.entry == {"repo": "shiftlead", "type": "debt", "team": "", "priority": "medium"}
         assert e.handed_entry and rec.asks_waiting() == 1
         # three days on, past any `ask`'s default bound, the sweep leaves it standing
         await agent._sweep_mail(datetime.now(UTC) + timedelta(days=3))
         assert e.open and e.expired_at is None
         # by path as well as by name — `ao td add` hands the checkout it runs in
-        again = await person.call("entry_add", repo=str(repo), type="feature", text="a second", teams=teams)
+        again = await person.call(
+            "entry_add", repo=str(repo), type="feature", text="a second", teams=teams, priority=" Low "
+        )
         assert again["repo"] == "shiftlead" and again["type"] == "feature"
+        # the form's **Priority** pick rides as `entry.priority` (TD-851)
+        assert (
+            again["priority"] == "low" and next(e for e in rec.inbox if e.id == again["id"]).entry["priority"] == "low"
+        )
         # a seat on call — its record exited — reads *fills this seat*, with no bound after it
         rec.state, rec.pane, rec.exit_code = "exited", True, 0
         agent.store.save(rec)
@@ -241,7 +248,7 @@ async def test_entry_add_carries_the_team_pick_and_a_blank_one_takes_the_first_s
         got = await person.call("entry_add", repo="shiftlead", type="debt", text="picked", teams=teams, team="AO-grind")
         assert (got["to"], got["team"]) == (sid, "ao-grind")
         e = next(e for e in agent.sessions[sid].inbox if e.id == got["id"])
-        assert e.entry == {"repo": "shiftlead", "type": "debt", "team": "ao-grind"}  # the definition's spelling
+        assert e.entry == {"repo": "shiftlead", "type": "debt", "team": "ao-grind", "priority": "medium"}
         # blank: db comes first but has no seat, so the first team with one takes it, and no team is carried
         blank = await person.call("entry_add", repo="shiftlead", type="debt", text="blank", teams=teams)
         assert (blank["to"], blank["team"]) == (sid, "ao-grind")
@@ -268,6 +275,8 @@ async def test_entry_add_is_refused_in_words(agent, tmp_path):
             await person.call("entry_add", **{**ok, "repo": "samscrape"})
         with pytest.raises(AgentError, match="debt or feature, not 'chore'"):
             await person.call("entry_add", **{**ok, "type": "chore"})
+        with pytest.raises(AgentError, match="priority is high, medium, low, not 'urgent'"):
+            await person.call("entry_add", **{**ok, "priority": "urgent"})
         with pytest.raises(AgentError, match="has no words"):
             await person.call("entry_add", **{**ok, "text": "   "})
         with pytest.raises(AgentError, match="no team services shiftlead"):
