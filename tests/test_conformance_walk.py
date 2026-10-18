@@ -134,8 +134,9 @@ def test_the_hook_captures_each_payload_as_handed_it(tmp_path, monkeypatch):
 class FakeAgent:
     """A host agent the walk drives: each call moves one record the way the real tool's hooks would."""
 
-    def __init__(self, work: Path, *, permission: bool = True, lag: int = 0, late_end: int = 0):
+    def __init__(self, work: Path, *, permission: bool = True, lag: int = 0, late_end: int = 0, channel: bool = True):
         self.work, self.permission, self.lag, self.late_end = work, permission, lag, late_end
+        self.channel = channel  # False: a tool with no permission channel (Gemini CLI), answered by an Enter
         self.ending = 0
         self.pending_after: dict | None = None
         self.rec: dict = {}
@@ -152,6 +153,8 @@ class FakeAgent:
             n = len([c for c in self.calls if c == "create"])
             self.rec = {"id": f"ao-walk-{n}", "adapter_id": p.get("resume") or "tool-1", "state": "working"}
             self._settle(unread=0, wakes=[], sends=[])
+            if not self.channel:
+                self.rec["permission_channel"] = False
             return dict(self.rec)
         if method == "get":
             if self.ending:
@@ -179,7 +182,11 @@ class FakeAgent:
                 pending = {"kind": "permission", "text": "Bash: touch …", "tool_use_id": "t-1"}
                 self.pending_after = {"state": "needs-you", "pending": pending}
             return None
+        if method == "keys":
+            assert not self.channel and p["keys"] == ["Enter"] and self.rec.get("state") == "needs-you"
+            method, p = "decide", {"tool_use_id": self.rec["pending"]["tool_use_id"]}
         if method == "decide":
+            assert self.channel or self.calls[-1] == "keys", "decide on a tool with no permission channel"
             if p["tool_use_id"] == "t-1":
                 (self.work / "conformance-permission.txt").touch()
                 self._settle()
@@ -296,3 +303,68 @@ def test_save_capture_copies_the_payloads_and_writes_the_pane_titles(tmp_path, m
     empty.mkdir()
     assert [p.name for p in cw.save_capture(empty, dest2, "ao-walk")] == ["titles.json"]
     assert sorted(p.name for p in dest2.iterdir()) == ["titles.json"]
+
+
+def test_a_tool_with_no_permission_channel_is_answered_by_an_enter_in_its_terminal(tmp_path):
+    """TD-875: for `permission_channel = False` the walk, as the person, presses Enter (*Allow once*) by the
+    `keys` RPC, for the permission step and the doorbell's `ao inbox` alike, and never calls `decide`."""
+    cw = _load()
+    fake, said = FakeAgent(tmp_path, channel=False), []
+    walk = cw.Walk("gemini-cli", "conformance", tmp_path, fake, out=said.append)
+    assert walk.run(), walk.results
+    assert fake.calls.count("keys") == 2 and "decide" not in fake.calls
+    assert "allowed in the terminal (Enter: Allow once)" in said[3]
+    assert "allowed: Bash: ao inbox" in said[4]
+    channel = FakeAgent(tmp_path)
+    assert cw.Walk("claude-code", "conformance", tmp_path, channel, out=lambda _s: None).run()
+    assert channel.calls.count("decide") == 2 and "keys" not in channel.calls
+
+
+def test_an_enter_that_leaves_the_dialog_up_fails_the_step(tmp_path, monkeypatch):
+    cw = _load()
+    monkeypatch.setattr(cw, "TURN_WAIT", 0.0)
+    fake, said = FakeAgent(tmp_path, channel=False), []
+    real = fake.__call__
+
+    def stuck(method, **p):
+        return None if method == "keys" else real(method, **p)
+
+    walk = cw.Walk("gemini-cli", "conformance", tmp_path, stuck, out=said.append)
+    assert not walk.run()
+    assert said[-1].startswith("FAIL  a permission: Enter pressed on Bash: touch …, and it still reads state needs-you")
+
+
+def test_capture_saves_each_steps_pane_and_title(tmp_path, monkeypatch):
+    """TD-875: under `--capture` every step, held or failed, snaps the session's pane (`capture-pane -e`)
+    and the title the tool set, into `panes/<n>-<step>.txt`, which `save_capture` copies beside the hooks."""
+    cw = _load()
+    snaps = []
+    fake = FakeAgent(tmp_path)
+    walk = cw.Walk("claude-code", "conformance", tmp_path, fake, out=lambda _s: None, snap=lambda *a: snaps.append(a))
+    assert walk.run()
+    assert [n for n, _id in snaps] == [n for n, _ok, _s in walk.results]
+    assert snaps[0] == ("launch", "ao-walk-1") and snaps[-1] == ("the transcript", "ao-walk-2")
+
+    def boom(*_a):
+        raise OSError("no tmux")
+
+    assert cw.Walk("claude-code", "conformance", tmp_path, FakeAgent(tmp_path), out=lambda _s: None, snap=boom).run()
+
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        out = "\x1b[2mType your message\x1b[0m\n" if "capture-pane" in cmd else "◇ Ready (walk)\n"
+        return cw.subprocess.CompletedProcess(cmd, 0, stdout=out, stderr="")
+
+    monkeypatch.setattr(cw.subprocess, "run", run)
+    capture = tmp_path / "capture"
+    got = cw.save_pane(capture, "ao-walk", 4, "a permission", "ao-walk-1")
+    assert got == capture / "panes" / "4-a-permission.txt"
+    assert got.read_text(encoding="utf-8") == "title: ◇ Ready (walk)\n\x1b[2mType your message\x1b[0m\n"
+    assert calls[0] == ["tmux", "-L", "ao-walk", "capture-pane", "-e", "-p", "-t", "=ao-walk-1:"]
+    assert calls[1][-3:] == ["-t", "=ao-walk-1:", "#{pane_title}"]
+    dest = tmp_path / "dest"
+    out = cw.save_capture(capture, dest, "ao-walk")
+    assert dest / "panes" / "4-a-permission.txt" in out
+    assert (dest / "panes" / "4-a-permission.txt").read_text(encoding="utf-8") == got.read_text(encoding="utf-8")

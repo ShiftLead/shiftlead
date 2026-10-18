@@ -5,9 +5,10 @@
 
 Walks the life a session has with the real tool: a launch with the id the adapter chose, the first
 hook, a short prompt (`working` → `idle`), a `send` the composer confirms, a permission seen as
-`needs-you`, a doorbell ringing for a mail the walk sends as the person, a resume with the same id,
-and the transcript read back. Each step prints `ok` or `FAIL` with what it read; the exit is 0 only
-when every step held.
+`needs-you` and allowed (through the hook channel, or for a tool with none by an Enter the walk presses in
+its terminal, acting as the person), a doorbell ringing for a mail the walk sends as the person, a
+resume with the same id, and the transcript read back. Each step prints `ok` or `FAIL` with what it
+read; the exit is 0 only when every step held.
 
 **Two homes.** A scratch `SHIFTLEAD_HOME` under a short path (a unix socket's path is capped), where the
 walk starts its own host agent on a private tmux socket and stops it by the pid it holds, never by a
@@ -21,14 +22,16 @@ It spends a few requests of the profile it names, so it refuses to run in CI (`C
 profile names (that is the person's own tool home).
 
 `--capture` writes what the tool handed the adapter's hook — the hook payloads and the status line's —
-under `tests/conformance/fixtures/<adapter>/captured/`, with the pane titles the tool set: the fixtures
-the offline suite reads once they are named in its manifest.
+under `tests/conformance/fixtures/<adapter>/captured/`, with the pane titles the tool set and each step's
+pane and title (`panes/<n>-<step>.txt`, `capture-pane -e`): the fixtures the offline suite reads once they
+are named in its manifest.
 """
 
 from __future__ import annotations
 
 import argparse
 import contextlib
+import itertools
 import json
 import os
 import shutil
@@ -162,8 +165,17 @@ def describe(rec: dict[str, Any]) -> str:
 class Walk:
     """The steps, in order, against a host agent already up on the scratch home."""
 
-    def __init__(self, adapter: str, profile: str, work: Path, call: Callable[..., Any], out=print):
+    def __init__(
+        self,
+        adapter: str,
+        profile: str,
+        work: Path,
+        call: Callable[..., Any],
+        out=print,
+        snap: Callable[[str, str], None] | None = None,
+    ):
         self.adapter, self.profile, self.work, self.call, self.out = adapter, profile, work, call, out
+        self.snap = snap  # under `--capture`: (step, session id) → its pane and title saved
         self.id = ""
         self.adapter_id = ""
         self.results: list[tuple[str, bool, str]] = []
@@ -180,7 +192,27 @@ class Walk:
             said, ok = f"{type(e).__name__}: {e}", False
         self.results.append((name, ok, said))
         self.out(f"{'ok  ' if ok else 'FAIL'}  {name}: {said}")
+        if self.snap is not None and self.id:
+            with contextlib.suppress(Exception):  # a capture that fails never fails the step
+                self.snap(name, self.id)
         return ok
+
+    def allow(self, rec: dict[str, Any]) -> str:
+        """Allow the permission `rec` waits on, as its person: through the hook channel, or — for a tool
+        with none (§4.3 `permission_channel`, TD-871) — an Enter on the dialog's first choice, the tool's
+        *Allow once*, by the `keys` RPC (a person's own caller, as `ao keys` is), then the state read
+        leaving `needs-you`. How it was allowed, in words."""
+        pending = rec.get("pending") or {}
+        if rec.get("permission_channel") is False:
+            self.call("keys", id=self.id, keys=["Enter"])
+            left = poll(self.get, lambda r: r.get("state") != "needs-you", TURN_WAIT)
+            if left.get("state") == "needs-you":
+                raise StepFailed(f"Enter pressed on {pending.get('text')}, and it still reads {describe(left)}")
+            return "allowed in the terminal (Enter: Allow once)"
+        if pending.get("tool_use_id"):
+            self.call("decide", id=self.id, tool_use_id=pending["tool_use_id"], behavior="allow")
+            return "allowed through the hook channel"
+        raise StepFailed(f"needs-you, {pending.get('text')}; no tool_use_id, and the tool has a permission channel")
 
     def launch(self) -> str:
         rec = self.call(
@@ -223,12 +255,7 @@ class Walk:
         pending = rec.get("pending") or {}
         if rec.get("state") != "needs-you" or pending.get("kind") != "permission":
             raise StepFailed(f"no permission was seen: {describe(rec)}")
-        said = f"needs-you, {pending.get('text')}"
-        if pending.get("tool_use_id"):  # the hook channel answers it (`permission_channel`); else the terminal does
-            self.call("decide", id=self.id, tool_use_id=pending["tool_use_id"], behavior="allow")
-            said += "; allowed through the hook channel"
-        else:
-            raise StepFailed(f"{said}; no tool_use_id, so nothing but the terminal answers it")
+        said = f"needs-you, {pending.get('text')}; {self.allow(rec)}"
         rec = poll(self.get, lambda r: by_hook(r, "idle"), TURN_WAIT)
         if not by_hook(rec, "idle"):
             raise StepFailed(f"{said}; then {describe(rec)}, not idle by hook")
@@ -243,9 +270,9 @@ class Walk:
         while time.monotonic() < end:
             rec = self.get()
             pending = rec.get("pending") or {}
-            if rec.get("state") == "needs-you" and pending.get("kind") == "permission" and pending.get("tool_use_id"):
+            if rec.get("state") == "needs-you" and pending.get("kind") == "permission":
                 # the tool asks to run `ao inbox` under `permission_prompts: all`: the walk is its person
-                self.call("decide", id=self.id, tool_use_id=pending["tool_use_id"], behavior="allow")
+                self.allow(rec)
                 allowed.append(pending.get("text", ""))
             elif by_hook(rec, "idle") and (rec.get("wakes") or []) and not rec.get("unread"):
                 tail = f" (allowed: {'; '.join(allowed)})" if allowed else ""
@@ -310,12 +337,31 @@ def save_capture(capture: Path, dest: Path, sock: str) -> list[Path]:
     for f in sorted(capture.glob("*.jsonl")):
         shutil.copy2(f, dest / f.name)
         out.append(dest / f.name)
+    for f in sorted(capture.glob("panes/*.txt")):
+        (dest / "panes").mkdir(exist_ok=True)
+        shutil.copy2(f, dest / "panes" / f.name)
+        out.append(dest / "panes" / f.name)
     with contextlib.suppress(OSError, subprocess.SubprocessError):
         titles = subprocess.run(
             ["tmux", "-L", sock, "list-panes", "-a", "-F", "#{pane_title}"], capture_output=True, text=True, timeout=5
         ).stdout.splitlines()
         (dest / "titles.json").write_text(json.dumps(titles, indent=1) + "\n", encoding="utf-8")
         out.append(dest / "titles.json")
+    return out
+
+
+def save_pane(capture: Path, sock: str, n: int, step: str, sid: str) -> Path:
+    """One step's pane (`capture-pane -e`, so a dim placeholder tells from typed text) and the title the
+    tool set (a title-fed tool's state is in it, §4.2), as `panes/<n>-<step>.txt` under the capture."""
+    tmux = ["tmux", "-L", sock]
+    target = f"={sid}:"
+    pane = subprocess.run([*tmux, "capture-pane", "-e", "-p", "-t", target], capture_output=True, text=True, timeout=5)
+    title = subprocess.run(
+        [*tmux, "display-message", "-p", "-t", target, "#{pane_title}"], capture_output=True, text=True, timeout=5
+    )
+    out = capture / "panes" / f"{n}-{step.replace(' ', '-')}.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(f"title: {title.stdout.strip()}\n{pane.stdout}", encoding="utf-8")
     return out
 
 
@@ -368,7 +414,14 @@ def main(argv: list[str] | None = None) -> int:
         from sessionorc.client import call_sync
 
         print(f"conformance: walking {args.adapter} on profile {args.profile} (SHIFTLEAD_HOME={home}, tmux -L {sock})")
-        walk = Walk(args.adapter, args.profile, work, lambda m, **p: call_sync(m, **p))
+        snap = None
+        if capture is not None:
+            snaps = itertools.count(1)
+
+            def snap(step: str, sid: str) -> None:
+                save_pane(capture, sock, next(snaps), step, sid)
+
+        walk = Walk(args.adapter, args.profile, work, lambda m, **p: call_sync(m, **p), snap=snap)
         ok = walk.run()
         if capture is not None:
             dest = ROOT / "tests" / "conformance" / "fixtures" / args.adapter / "captured"
