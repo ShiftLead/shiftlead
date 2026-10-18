@@ -408,6 +408,8 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
     repo_doing,
     repo_items,
     repo_line,  # noqa: F401
+    repo_window,
+    send_folds,
     settle_mark,  # noqa: F401
     strip_group,  # noqa: F401
     team_groups,
@@ -1653,7 +1655,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         strip, by the Org's own layout and partials (`repo_items`) — then the lists behind the
         numbers: Open PRs, Technical debt, Recently completed, Waiting on you, Doing. A registered repo
         no team services has a page too, its line alone above the lists. `part=1` is the page's own
-        refresh: the lists without the chrome or the cards, which the Org's deltas keep."""
+        refresh: the lists without the chrome or the cards, which the Org's deltas keep. A folded list goes
+        to its fold and Recently completed to its window (`win`, *day*), the rest by `part=1` with `win` and
+        `open`, the lists unfolded and an anchor's id (§4.5 *Page loads*: *only what is shown*, TD-882)."""
         repos_omit(REPOS_OMIT_PAGE)
         now = datetime.now(UTC)
         repos, doing = await repo_facts()
@@ -1731,7 +1735,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # the board's decided lines, the lanes' work orders, above the cards (§4.5a *Repo page: decided lines*)
             "orders": [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
             # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
-            "completed": completed_rows(r, sessions, now),
+            "completed": (completed := completed_rows(r, sessions, now)),
             # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
             "lanes": [
                 ln
@@ -1753,6 +1757,9 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "active": "",
             "part": bool(part),  # the re-read carries the title line and the seams, swapped in place
         }
+        # only what is shown (§4.5 *Page loads*, TD-882): the cards and the counts read the lists whole first
+        opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
+        ctx["win"] = send_folds(lists, completed, repo_window(request.query_params), opened)
         if not part:  # the page's top bar; the part is the page's body alone
             ctx["usage"] = await chip_usage(call)
             ctx["build_chip"] = await chip_build(call)

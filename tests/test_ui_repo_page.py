@@ -143,9 +143,12 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
         '"tag wait">passed by ui-reader-1 · waiting on techlead-1 · 40m<' in prs
         and '"tag done">passed by techlead-1<' in prs
     )
-    # Technical debt: four lists, held by, folded past four with +n more
+    # Technical debt: four lists, held by, folded past four with +n more — the rows past the fold not sent
+    # until the list is opened (§4.5 *Page loads*, TD-882)
     assert 'id="debt-pickable"' in html and "held by tdgrind-1" in html and "+2 more" in html
-    assert html.count('class="rrow folded"') == 2
+    assert html.count('class="rrow folded"') == 0 and 'data-unfold="pickable" data-unsent>+2 more' in html
+    opened = c.get("/repo/samscrape?part=1&open=pickable").text
+    assert opened.count('class="rrow folded"') == 2 and 'data-unfold="pickable">+2 more' in opened
     # a blocked row says what still blocks it, after its owner (TD-228); an unblocked one says nothing
     assert '· paul</span><span class="meta">· blocked by TD-200, decision (Paul)</span>' in html
     assert html.count("blocked by") == 1

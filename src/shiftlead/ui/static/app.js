@@ -3898,6 +3898,9 @@
     });
   };
 
+  // the Repo page's windows, narrowest first: the rows of one hold every narrower window's (TD-882)
+  AO.REPO_WINDOWS = ["day", "week", "month"];
+  AO.TD_ID = /^[A-Za-z]+-\d+$/;  // an entry's id, as a ledger row carries it
   AO.repo = function () {
     const box = $("#repopage"); if (!box) return;
     const repo = box.dataset.repo, whoKey = "doingwho:" + repo, teamKey = "doingteam:" + repo;
@@ -3911,6 +3914,8 @@
       // Recently completed follows the page's one window picker (§4.5 screen 11 item 3, TD-604)
       const win = store.get("win", "day");
       $$("#completed .wv", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
+      // a window wider than the one sent is read once, by the lists' read (§4.5 *Page loads*, TD-882)
+      if (loading()) reread();
       // a team pick and a doer pick AND (§4.5a *Repo page: doing filters*, TD-740); *all* is neither
       const who = store.get(whoKey, "");
       const picked = store.get(teamKey, ""), team = $$(".dchips .chip[data-team]", box).some((c) => c.dataset.team === picked) ? picked : "";
@@ -3920,14 +3925,32 @@
       });
       $$("#doing .drow", box).forEach((r) => (r.hidden = (!!who && r.dataset.who !== who) || (!!team && r.dataset.team !== team)));
     }
+    // Only what is shown (§4.5 *Page loads*, TD-882): a folded list's rows past its fold, and a Recently
+    // completed window wider than the one sent (`data-loaded`), come by the lists' read — `win` the window,
+    // `open` every list unfolded on this page view and an anchor's id not yet sent — and are kept by each read
+    const opened = new Set();
+    const sought = new Set();  // an anchor's id is asked for once: one in no list is not asked again
+    let want = "", short = "", again = false;
+    const loaded = () => ($("#completed", lists) || { dataset: {} }).dataset.loaded || "day";
+    const wider = (a, b) => (AO.REPO_WINDOWS.indexOf(b) > AO.REPO_WINDOWS.indexOf(a) ? b : a);
+    // the wider window picked, if any; one a read answered without (an older UI) is the poll's to ask again
+    const loading = () => { const w = wider(loaded(), store.get("win", "day")); return w === loaded() || w === short ? "" : w; };
     let busy = false;
+    let inflight = "";
     async function reread() {
-      if (busy) return; busy = true;
+      const win = wider(loaded(), store.get("win", "day")), asked = want;
+      const q = new URLSearchParams({ part: "1", win });
+      const ask = [...opened, ...(asked ? [asked] : [])];
+      if (ask.length) q.set("open", ask.join(","));
+      // a read already out for the same rows answers this one too; one for other rows is read after it
+      if (busy) { if (String(q) !== inflight) again = true; return; }
+      busy = true; inflight = String(q);
+      let read = false;
       try {
-        const res = await fetch(`/repo/${encodeURIComponent(repo)}?part=1`);
+        const res = await fetch(`/repo/${encodeURIComponent(repo)}?${q}`);
         if (res.ok) {
+          read = true;
           const kept = AO.denyWhys(lists), open = $$(".secinfo:not([hidden])", lists).map((el) => el.id);
-          const unfolded = $$("[data-unfolded]", lists).map((el) => el.dataset.unfolded);
           lists.innerHTML = await res.text();
           // the title line and the seams come with the lists (`part=1`): swapped in place, above the cards
           const head = $("#repohead", lists), was = $("#repohead", box);
@@ -3935,10 +3958,15 @@
           AO.restoreDenyWhys(lists, kept);
           AO.reopenFolds(lists);  // the board's *not shown* fold, opened for this page view (TD-220)
           open.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = false; });
-          unfolded.forEach((k) => unfold(k));
+          opened.forEach((k) => unfold(k, true));
           apply();
+          if (asked && want === asked) { want = ""; showHash(); }  // the anchor's row, now sent
         }
-      } finally { busy = false; }
+      } catch (err) { /* the next poll tries again */ } finally {
+        busy = false; inflight = "";
+        if (read && loaded() !== win) short = win;
+        if (again) { again = false; setTimeout(reread, 0); }
+      }
     }
     async function holdEntry(b) {
       const id = b.dataset.tdhold, release = !!b.dataset.release;
@@ -3957,9 +3985,13 @@
         w.settle(`${id}: ${err.message}`);
       }
     }
-    function unfold(key) {
+    function unfold(key, read) {
+      opened.add(key);
+      const b = $(`[data-unfold="${CSS.escape(key)}"]`, box);
+      // its rows come first; after a read that still lacks them (an older UI), the button stays to press again
+      if (b && b.dataset.unsent !== undefined) { if (!read) { b.disabled = true; reread(); } return; }
       $$(`.rrow.folded[data-list="${CSS.escape(key)}"]`, box).forEach((r) => r.classList.remove("folded"));
-      const b = $(`[data-unfold="${CSS.escape(key)}"]`, box); if (b) { b.hidden = true; b.dataset.unfolded = key; }
+      if (b) { b.hidden = true; b.dataset.unfolded = key; }
     }
     // The Technical debt cards (§4.5 screen 11 item 2, TD-770): the Queue's own, folded, opened and moved
     // as on the Queue page (`AO.qcards`)
@@ -3970,6 +4002,10 @@
     // cards, the card that holds the entry is opened first (§4.5a *Repo page: Technical debt cards*).
     function showHash() {
       const id = AO.hashId(location.hash), row = id && document.getElementById(id);
+      // a row past its list's fold was not sent: the lists' read fetches its list, then lands on it (TD-882)
+      if (!row && AO.TD_ID.test(id) && $("#debt .rlh", lists) && !sought.has(id)) {
+        sought.add(id); want = id; return reread();
+      }
       if (!row || !box.contains(row)) return;
       const card = row.closest(".qcard");
       if (card && card.classList.contains("folded")) toggleFold(card);

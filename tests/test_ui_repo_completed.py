@@ -37,7 +37,7 @@ def test_recently_completed_lists_the_windows_closed_entries_with_their_pr_and_a
         closed(404, 24 * 10, 1293),  # this month, not this week
     ]
     fleet = [rec("tdgrind-1", root, git={"branch": "td401"})]
-    html = client(monkeypatch, tmp_path, fake({root: r}, fleet)).get("/repo/samscrape").text
+    html = client(monkeypatch, tmp_path, fake({root: r}, fleet)).get("/repo/samscrape?win=month").text
     # after Technical debt, before Waiting on you (§4.5 screen 11)
     assert html.index('id="debt"') < html.index('id="completed"') < html.index('id="waiting"')
     day, week, month = section(html, "day"), section(html, "week"), section(html, "month")
@@ -59,7 +59,7 @@ def test_a_pr_the_month_reading_lacks_links_the_remote_and_an_empty_window_says_
     root = str(tmp_path / "samscrape")
     r = reading(root)
     r["completed"] = [closed(410, 40, 1300, url="", author="")]
-    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape?win=week").text
     assert 'href="https://github.com/eye/samscrape/pull/1300"' in section(html, "week")
     assert "nothing closed today" in section(html, "day")
 
@@ -68,10 +68,34 @@ def test_recently_completed_folds_past_eight_rows(tmp_path, monkeypatch):
     root = str(tmp_path / "samscrape")
     r = reading(root)
     r["completed"] = [closed(500 + n, 1 + n) for n in range(11)]
-    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
-    week = section(html, "week")
+    c = client(monkeypatch, tmp_path, fake({root: r}, []))
+    week = section(c.get("/repo/samscrape?win=week").text, "week")
+    # the rows past the fold are not sent (§4.5 *Page loads*, TD-882): the button reads them on its press
+    assert week.count('data-list="completed-week"') == 8 and "folded" not in week
+    assert 'data-unfold="completed-week" data-unsent>+3 more</button>' in week
+    week = section(c.get("/repo/samscrape?part=1&win=week&open=completed-week").text, "week")
     assert week.count('class="rrow folded" data-list="completed-week"') == 3
     assert 'data-unfold="completed-week">+3 more</button>' in week
+
+
+def test_the_page_sends_the_window_picked_and_the_narrower_ones_alone(tmp_path, monkeypatch):
+    """TD-882, §4.5 *Page loads* (*only what is shown*): at load the day's rows alone, a wider window's
+    count still on its heading and its rows read by `part=1&win=`, which carries every narrower window too."""
+    root = str(tmp_path / "samscrape")
+    r = reading(root)
+    r["completed"] = [closed(601, 2), closed(602, 30), closed(603, 24 * 10)]
+    c = client(monkeypatch, tmp_path, fake({root: r}, []))
+    html = c.get("/repo/samscrape").text
+    assert 'id="completed" data-loaded="day"' in html
+    day, week, month = section(html, "day"), section(html, "week"), section(html, "month")
+    assert "TD-601" in day and "2 this week" in week and "3 this month" in month
+    assert "TD-602" not in html and "TD-603" not in html
+    assert "reading this week…" in week and "nothing closed" not in week
+    part = c.get("/repo/samscrape?part=1&win=month").text
+    assert 'data-loaded="month"' in part and "TD-601" in section(part, "day")
+    assert "TD-602" in section(part, "week") and "TD-603" in section(part, "month")
+    # an unknown window reads as the day
+    assert 'data-loaded="day"' in c.get("/repo/samscrape?part=1&win=year").text
 
 
 def test_the_facets_closed_block_links_to_recently_completed_with_the_titles_on_hover(tmp_path, monkeypatch):

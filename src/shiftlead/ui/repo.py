@@ -292,6 +292,33 @@ def completed_rows(r: Mapping[str, Any], fleet: Collection[dict[str, Any]], now:
     return out
 
 
+def repo_window(params: Any) -> str:
+    """The window whose Recently completed rows the page sends (§4.5 *Page loads*: *only what is shown*,
+    TD-882): the URL's `win` (the facet's *closed* link carries one), else *day*; an unknown one reads as *day*."""
+    w = str(params.get("win") or "")
+    return w if w in WINDOWS else "day"
+
+
+def send_folds(
+    lists: list[dict[str, Any]], completed: dict[str, dict[str, Any]], win: str, opened: Collection[str]
+) -> str:
+    """What the page sends of its folded lists (§4.5 *Page loads*: *only what is shown*, TD-882): each
+    Technical debt list its rows up to the fold (`sent`), each Recently completed window up to `win` its
+    rows up to its fold, and a window wider than `win` none (`sent` None: not read); a list `opened` names
+    — its key (`pickable`, `completed-week`) or the id of a row in it, for an anchor to a row not yet sent —
+    goes whole. `rows` and `fold` stay whole, so every count and *+n more* still reads the whole list.
+    Returns the window loaded, for the page to know what a wider pick must read."""
+    keys = set(opened)
+    for ln in lists:
+        whole = ln["key"] in keys or any(e.get("id") in keys for e in ln["rows"])
+        ln["sent"] = ln["rows"] if whole else ln["rows"][:LEDGER_FOLD]
+    reach = WINDOWS.index(win)
+    for w, c in completed.items():
+        key = f"completed-{w}"
+        c["sent"] = None if WINDOWS.index(w) > reach else c["rows"] if key in keys else c["rows"][:COMPLETED_FOLD]
+    return win
+
+
 def pr_standing(seats: list[tuple[str, list[Any], list[Any]]], now: datetime) -> dict[int, dict[str, Any]]:
     """Each PR's standing with the team's readers (§4.5 screen 11, §4.9c *What is shown*): `seats`
     one `(name, inbox, sent)` per seat of the team, read as a person's read — `review.standing`,

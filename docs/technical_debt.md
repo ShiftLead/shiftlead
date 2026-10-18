@@ -1512,7 +1512,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-17 (TD-805's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** In progress (grinder-ao-2). Slice 1 #2119 (2026-10-18): the Queue sends the picked window's completed lines alone (`queue_window`, `send_window`, `data-loaded`), a wider pick read once by `part=1&win=` (`AO.qWinFetch`). Left: slice 2, the Repo page's folded groups — the first four rows at load, the rest on the first unfold or an anchor to a row not yet sent.
+**Status:** In progress (grinder-ao-2). Slice 1 #2119 (2026-10-18): the Queue sends the picked window's completed lines alone (`queue_window`, `send_window`, `data-loaded`), a wider pick read once by `part=1&win=` (`AO.qWinFetch`). Slice 2 (2026-10-18, PR pending): the Repo page sends each Technical debt list to its fourth row and Recently completed to its window (`win`, *day*) and eight rows (`send_folds`, `repo_window`, `data-unsent`, `data-loaded`); the rest by `part=1` with `win` and `open` (a list's key, or an anchor's id). Left: the live check of *Done when*.
 **Blocked by:** TD-880
 **Location:** design §4.5 *Page loads* (*Only what is shown*), §4.5 screen 12 (the Queue's *Recently completed* and its window), the Repo page; `src/shiftlead/ui/templates/queue_part.html` (`q.completed.lines`), `src/shiftlead/ui/queue.py` (`queue_view`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the window picker, TD-829's in-browser picks), the Repo page's template and its folds; `tests/test_ui_queue_picks.py`
 
