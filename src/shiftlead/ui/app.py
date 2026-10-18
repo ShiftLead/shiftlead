@@ -4043,7 +4043,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         """design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): one fold's body, read
         on its first open, by the row renderer's own macro — the one source its key names: a board line
         (`board:<root>:<line>`) from the home's board reading, a ledger row (`ledger:<repo>:<id>`) from its
-        repo's ledger reading, else a person-inbox entry by its id, a person's read that marks nothing. A
+        repo's ledger reading, else a person-inbox entry or a row handed to a seat by its id, a person's read marking nothing. A
         key that names nothing is a 404, which the fold says as *gone — reload*."""
         e: Any = None
         if key.startswith("board:"):
@@ -4058,7 +4058,8 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         elif key:
             kind = "mail"
             got = await call("inbox", id=PERSON)
-            e = next((x for x in got.get("entries") or () if x.get("id") == key), None)
+            # a row the person handed to a seat is the seat's entry, carried as `handed` (§4.10 *A look*)
+            e = next((x for x in [*(got.get("entries") or ()), *(got.get("handed") or ())] if x.get("id") == key), None)
         if e is None:
             raise HTTPException(404, f"{key or 'no key'}: gone — reload")
         with timing.step("render"):

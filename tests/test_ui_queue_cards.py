@@ -375,7 +375,7 @@ def _fold_fake(rs, mail, seen):
         async def call(self, method, **kw):
             seen.append(method)
             if method == "inbox":
-                return {"entries": [mail]}
+                return {"entries": [mail], "handed": [{"id": "m-h1", "text": "handed.\n\nwhat the seat reads."}]}
             return {"repos": rs, "list": [], "host": {"name": "kmaster"}}.get(method, {})
 
     return Fake
@@ -398,6 +398,9 @@ def test_the_fold_route_answers_each_kind_with_the_inboxs_own_fold_body(tmp_path
         assert r.status_code == 200, (key, r.text)
         assert r.text.strip() == _fold_body(inbox, key).strip() != ""
         assert "total" in r.headers["server-timing"]
+    # a row handed to a seat is read from `handed`, where the person's inbox carries it (#2139's review)
+    handed = c.get("/api/fold", params={"key": "m-h1"})
+    assert handed.status_code == 200 and "what the seat reads." in handed.text
     gone = c.get("/api/fold", params={"key": "m-nothing"})
     assert gone.status_code == 404 and "gone — reload" in gone.text
 
