@@ -16808,3 +16808,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a Queue render's `.mailrow` elements carry no `data-find` and no Snooze, an Inbox render's carry both as before, no `subj` carries a `title` equal to its text, each under a test that fails when reverted, and the Inbox's find tests pass unchanged.
 
 **Resolved:** 2026-10-18 (grinder-ao-2, #2136). `queue_mail.html` sets `drawn_on_queue` (a name no page context defines: the Inbox page's `on_queue` is its rail count), and the Inbox's row renderer leaves out on it every row's `data-find`, all seven Snooze menus, and the board line's *Snooze moves its `Due:` date*; the `subj`, `msgsubj` and a suggested answer draw no `title` repeating their text, `AO.wholeOnHover` setting it on hover when the line is clipped. `tests/test_ui_queue_cards.py`'s four tests fail when any of it is reverted; the Inbox's find tests pass unchanged.
+
+## TD-884: The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, reading TD-881 live)
+**Owner:** grinder
+**Kind:** live-check #2135
+**Status:** Done
+**Location:** design §4.5 *Page loads* (the 200 ms budget of Settings, Spend, Transcript); `src/shiftlead/ui/app.py` (`settings_view`: its untimed reads and its five sequential `call`s); the host agent's loop (`src/sessionorc/`), only if gathering does not bring it under
+
+**Why:** The promote of `3b265ae`'s smoke told *Settings over budget: first byte 0.33 s over 0.2 s — longest step rpc_repos 148 ms*. Three headless GETs of the live `/settings` on 2026-10-18 read 0.20 s, 0.28 s and 0.15 s; their `Server-Timing` put `rpc_settings` at 28, 147 and 12 ms and `rpc_repos` at 14–15 ms, with `total` 150–283 ms and some 45 ms of it in no named step. Which RPC spikes moves between loads, so the page misses its budget on a share of loads and every promote's note may say so.
+
+**Fix:** find what `settings` (and `repos`, on the smoke's load) waits on when it is slow — a file read whole, a lock shared with the tick, a `git` call — and take it off the request's path or read it once per tick; name the unnamed ~45 ms in `Server-Timing` if it is the route's own.
+
+**Done when** ten warm loads of the live `/settings` each read under 200 ms to the first byte, and a promote's note no longer names Settings.
+
+**Related:** TD-805, TD-881.
+
+**Resolved:** 2026-10-18 (grinder-ao-1, read live in `232c389`, #2135 live). Ten warm headless GETs of the live `/settings`, a second apart, read 110–133 ms to the first byte (`total` 108.6–131.4), every one under 200 ms; the RPCs now overlap (`rpc_repos`, the longest, ~60 ms, ends the gather), `files` ~28 ms and `flows` ~21 ms named. The promote of `232c389`'s note (read on a headless GET of `/inbox`) names no Settings: *smoke passed in 6 s; repo over budget: first byte 0.51 s over 0.5 s — longest step rpc_repos 56 ms; …* — the Repo page's miss is TD-893. The fact-check's three later GETs read 108, 221 and 115 ms, the 221 one an `rpc_repos` spike of 168 ms: the host agent's loop busy as the call arrived, the spike this entry measured before the build, and not the page's own work.

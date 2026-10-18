@@ -71,10 +71,10 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
-| TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Open |
 | TD-892 | Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles | Low | Open |
+| TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Open |
 
 ---
 
@@ -1481,26 +1481,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-## TD-884: The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (grinder-ao-1, reading TD-881 live)
-**Owner:** grinder
-**Kind:** live-check #2135
-**Status:** Open — measured 2026-10-18 (grinder-ao-1): twenty warm loads of the live `/settings`, a second apart, read `total` 141–344 ms (median 149, two over 200), with `rpc_settings` 9.5–63.5 ms (median 9.9), `rpc_usage` 2.3–104.8, `rpc_host` 2.5–45.6, `rpc_gate` 6.2–50.7, `rpc_list` ~28, `rpc_repos` ~16, `render` ~12. The spike lands on a different RPC each time, so it is the host agent's loop being busy when the call arrives, not `rpc_settings`' own work (a YAML load, `rpc_gate`, the permissions read, all synchronous). The steady cost is elsewhere: 66–81 ms of every load (median 68) is in no named step. That is `settings_view`'s own reads on the UI's loop (`profiles_mod.load()`, `org_here()`, `team_flows` on a thread, `local.repos()`, the `hosts` reads), and the five RPCs are awaited one after another (~65 ms summed); the header chips then call three more (`chip_usage` re-calls `usage` and `gate`, `chip_build` re-calls `host`, being passed no `info`). The fix is the page's: time those reads as steps, gather the RPCs, and hand the chips what the route already read. That is `src/shiftlead/ui/`, so the entry is grinder-ao-2's package (dropped by grinder-ao-1). Built 2026-10-18 (grinder-ao-2): `settings_view` makes its six RPCs at once, its file reads (`files`) on a worker thread beside them, the teams' flow rows timed as `flows`, and the chips take the route's `usage`, `gate` and `host`; a scratch home's warm `/settings` read 11–14 ms total, no longer the sum of its reads. Left: the live read — once #2135 is live (`ao promote status`), ten warm headless GETs of the live `/settings`, a second apart, each `total` under 200 ms, and the next promote's note naming no Settings
-**Location:** design §4.5 *Page loads* (the 200 ms budget of Settings, Spend, Transcript); `src/shiftlead/ui/app.py` (`settings_view`: its untimed reads and its five sequential `call`s); the host agent's loop (`src/sessionorc/`), only if gathering does not bring it under
-
-**Why:** The promote of `3b265ae`'s smoke told *Settings over budget: first byte 0.33 s over 0.2 s — longest step rpc_repos 148 ms*. Three headless GETs of the live `/settings` on 2026-10-18 read 0.20 s, 0.28 s and 0.15 s; their `Server-Timing` put `rpc_settings` at 28, 147 and 12 ms and `rpc_repos` at 14–15 ms, with `total` 150–283 ms and some 45 ms of it in no named step. Which RPC spikes moves between loads, so the page misses its budget on a share of loads and every promote's note may say so.
-
-**Fix:** find what `settings` (and `repos`, on the smoke's load) waits on when it is slow — a file read whole, a lock shared with the tick, a `git` call — and take it off the request's path or read it once per tick; name the unnamed ~45 ms in `Server-Timing` if it is the route's own.
-
-**Done when** ten warm loads of the live `/settings` each read under 200 ms to the first byte, and a promote's note no longer names Settings.
-
-**Related:** TD-805, TD-881.
-
----
-
 ## TD-888: The live Queue's HTML is 148 KB on the wire against its 150 KB budget: the open cards alone fill it, so a few more cards cross it
 
 **Priority:** Low
@@ -1557,5 +1537,25 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Fix:** an open card is sent without `data-find`; at load and after each re-read the page writes each card's find text from its `data-ids` and the `.qtitle`s it draws, by `_find_text`'s rule (each id whole and bare, every word lower-cased), into memory or the attribute, before the picks are applied. The server keeps `_find_text` for a URL's find on a load and for `find_miss`. A completed line keeps its `data-find` (its entries' titles are hidden in its folded body until it opens). A test feeds the same cards to `_find_text` and to the browser's builder and holds the two to one answer, as `rail_counts` is held.
 
 **Done when** a Queue render's open cards carry no `data-find`, a find typed in the browser hides and shows the same cards a load with `?find=` does (the parity test, for an id, a bare number and words), and the picks' tests pass.
+
+---
+
+## TD-893: The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step
+
+**Priority:** Medium
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, reading TD-884 live)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (the 500 ms budget of Org, Inbox, Repo, Queue; *Measured on every load*); `src/shiftlead/ui/app.py` (`repo_page`, its untimed reads and the order of its `call`s)
+
+**Why:** The promote of `232c389`'s smoke told *repo over budget: first byte 0.51 s over 0.5 s — longest step rpc_repos 56 ms*. Eight warm headless GETs of the live `/repo/shiftlead` on 2026-10-18 read 0.44–0.66 s to the first byte, three of them over 500 ms; their `Server-Timing` steps sum to some 200 ms (`rpc_list` ~50, `board` ~52, `rpc_inbox` 19–153, `rpc_repos` ~21, `render` ~15), and `total` is 441–658 ms, so 250–400 ms of every load is the route's own work no step names. The longest *named* step the note gives is therefore not where the time goes. TD-884 found the same shape on the Settings page and #2135 cured it there.
+
+**Fix:** as #2135 did for Settings: time `repo_page`'s file and ledger reads as steps (the ledger, the board's detail, the team flows, the registry), so the header shows where the 250–400 ms goes; make the RPCs at once and the file reads on a worker thread beside them; read once what the page reads twice.
+
+**Done when** ten warm loads of the live `/repo/shiftlead` each read under 500 ms to the first byte, and a promote's note no longer names the Repo page.
+
+**Related:** TD-884, TD-805, TD-881.
 
 ---
