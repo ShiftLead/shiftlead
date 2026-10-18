@@ -16750,3 +16750,23 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-572 (the light stream for Focus and Inbox), TD-616 (the counts keeper), TD-771 (the Queue page), TD-804 (a promote's smoke, which can hold the budget).
 
 **Resolved:** 2026-10-18 (built by TD-879, #2108; TD-880, #2109; TD-881, #2111, read live in #2114; TD-882, #2119 and #2121; archived by the designer). Design §4.5 *Page loads* and §6 *This repo's smoke* carry the rule. Read live: the Queue's first byte 0.40–0.44 s warm (was 2.5 s), 148 KB on the wire (was 2.3 MB), the Repo page 41 KB; every page answers a `Server-Timing` the smoke reads against the budget.
+
+## TD-886: #2111's timing and smoke code: `KEPT`, step nesting, GET-only, the judged load and a 4xx/5xx's `Server-Timing` each leave the suite passing when changed
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (test-audit-ao-1, auditing #2111 (TD-881))
+**Owner:** grinder
+**Kind:** build
+**Status:** Done
+**Location:** `src/shiftlead/ui/timing.py` (`KEPT`, `step`); `src/shiftlead/ui/app.py` (`server_timing`); `scripts/smoke.py` (`main`, `fetch`); `tests/test_ui_server_timing.py`, `tests/test_smoke.py`
+
+**Why:** With each changed alone in a worktree on `origin/main`, `PYTHONPATH=$PWD/src pdm run pytest -q tests/test_smoke.py tests/test_ui_server_timing.py tests/test_promote.py` still reads `89 passed`: (a) `KEPT = 20` → `2000` (the keep-twenty bound is read by nothing); (b) `step`'s `nests and name in steps["open"]` dropped, so a board read inside the state rows' own is counted twice; (c) `server_timing`'s `request.method != "GET"` dropped, so a POST is recorded as a load; (d) `over = [... for got in loads[1::2]` → `loads[0::2]`, so the budget judges the cold load, not the second the design names; (e) `fetch` ignoring the `Server-Timing` of an `HTTPError`, so a failing page's longest step is lost.
+
+**Fix:** In `tests/test_ui_server_timing.py` make 25 loads of one route and assert `len(timing.RECENT[key]) == 20`; nest two `step("board")` and assert one reading; POST a page route and assert no header; in `tests/test_smoke.py` make the cold load slow and the second fast (`behave` gives a delay for the first only) and assert nothing over budget told; give a 500 page a `Server-Timing` and assert the line carries its steps.
+
+**Done when** each reversion above fails a test.
+
+**Related:** TD-881, TD-805.
+
+**Resolved:** 2026-10-18 (grinder-ao-1, #2124). Five tests, each failing (`1 failed, 30 passed` over `tests/test_smoke.py tests/test_ui_server_timing.py`) when its reversion is made alone: (a) `test_the_last_twenty_are_kept_per_route_and_a_fragment_apart` asserts twenty, not `timing.KEPT`; (b) `test_a_nested_step_is_timed_by_the_outer_alone` reads two nested `step("board")` on a clock a second a read, one second; (c) `test_a_page_route_asked_by_anything_but_a_get_is_no_load` POSTs `/queue`: no header, nothing kept; (d) `test_the_budget_judges_the_second_load_not_the_cold_one` (the stub's `coldslow`) tells nothing; (e) `test_a_failing_page_keeps_its_steps_on_its_line` reads a 500's steps on its load line.
