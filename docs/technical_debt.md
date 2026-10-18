@@ -71,7 +71,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-865 | The `seats` reading has no per-seat finished entries and no tokens by kind, so the Spend page draws *per finished entry* per role and a seat's hover without its tokens | Low | Open |
-| TD-867 | `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
 | TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
@@ -1461,26 +1460,6 @@ The other cases:
 **Done when** By seat's *per finished entry* is each seat's own and a seat's hover lists its tokens by kind.
 
 **Related:** TD-832, TD-830, TD-859.
-
----
-
-## TD-867: `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-17 (test-audit-ao-1)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/sessionorc/seats.py` (`_series`); `tests/test_seats.py`
-
-**Why:** #2067 (TD-859): `_series` sets `partial` under `if window != "day" and begins and a < begins <= b:`, and its docstring says *`partial` on the bucket holding `begins` when that is not its first day*. Reverted to `a <= begins <= b`, `pytest -q tests/test_seats.py` read `22 passed`: `test_the_series_has_its_buckets_by_team_or_by_role_and_a_partial_bucket` begins the ledger on a Wednesday only, so a ledger that begins on a Monday or the 1st (a whole bucket) is never read.
-
-**Fix:** Add to that test a ledger whose first day is a Monday and one whose first day is the 1st: the week and the month bucket holding it carry no `partial`.
-
-**Done when** the `<=` revert fails a test.
-
-**Related:** TD-859 (built #2067).
 
 ---
 
