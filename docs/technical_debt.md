@@ -72,7 +72,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
-| TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Open |
+| TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Built (#2139) — a live check of the Queue's size once live |
 | TD-892 | Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles | Low | Open |
 | TD-893 | The Repo page's first byte is over its 500 ms budget on a share of loads: 250–400 ms of each load is in no named step | Medium | Open |
 | TD-894 | #2136's `AO.wholeOnHover` (set a `title` only on a clipped line, never over one) has no test that runs it: gutting it leaves every test passing | Low | Open |
@@ -1512,8 +1512,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** debt
 **Added:** 2026-10-18 (TD-888's design, the designer)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2139
+**Status:** Built 2026-10-18 (grinder-ao-2, #2139): a fold a Queue card draws closed is sent empty (`data-lazy`) and read on its first open by `GET /api/fold?key=`, the row renderer's own `fold_body` macro, the bodies kept by key and refilled after a re-read; `tests/test_ui_queue_cards.py` holds the route to the Inbox's fold for each kind. Left: the live read — once #2139 and #2136 are live (`ao promote status`), one gzipped headless GET of the live `/queue`, its size on the wire recorded here (under 120 KB)
 **Location:** design §4.5 *Page loads* (*Only what is shown*: *A row's folded details on a Queue card*), §4.5a *Inbox row: details*; `src/shiftlead/ui/templates/inbox_row.html` (the three `details class="fold"` blocks: a message's `s.rest`, a ledger row's detail, a board line's), `src/shiftlead/ui/app.py` (a new `/api/fold` route; the message page's one-entry read, `inbox_entry_page`), `src/shiftlead/ui/static/app.js` (the fold memory, `foldsOpen`/`foldsShut`, and the swap after a re-read); `tests/test_ui_queue_cards.py`, a new route test
 
 **Why:** TD-888: the closed folds of the live Queue's mail rows are 20 KB of its 141 KB gzipped (ledger rows 14 KB, board lines 5 KB, notes 2 KB) and none is shown at load; with TD-890 alone the page is still some 129 KB, over TD-888's 120 KB.
