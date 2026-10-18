@@ -1548,8 +1548,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** debt
 **Added:** 2026-10-18 (grinder-ao-1, reading TD-884 live)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2140
+**Status:** Built (2026-10-18, #2140): `repo_page` makes its reads that wait on none of each other at once (`list`, `host`, the person inbox, the definitions on a worker thread, the board, `queue`, the chip's `usage` and `gate`), reads the definitions once for itself and `flow_views`, makes every seat's two inbox reads at once, hands its chips its own reads, and names its steps `files`, `flows`, `views`, `groups`, `lists`. On a scratch home with this repo's ledger, board and teams a warm load went from 62–66 ms to 45–57 ms. **Live check** once #2140 is live (`ao promote status`), read-only: ten warm headless GETs of the live `/repo/shiftlead`, each first byte and its `Server-Timing`; under 500 ms each and no promote note naming the Repo page — archive it; over, a step names where the time goes — a new entry for that step, this one `**Blocked by:**` it.
 **Location:** design §4.5 *Page loads* (the 500 ms budget of Org, Inbox, Repo, Queue; *Measured on every load*); `src/shiftlead/ui/app.py` (`repo_page`, its untimed reads and the order of its `call`s)
 
 **Why:** The promote of `232c389`'s smoke told *repo over budget: first byte 0.51 s over 0.5 s — longest step rpc_repos 56 ms*. Eight warm headless GETs of the live `/repo/shiftlead` on 2026-10-18 read 0.44–0.66 s to the first byte, three of them over 500 ms; their `Server-Timing` steps sum to some 200 ms (`rpc_list` ~50, `board` ~52, `rpc_inbox` 19–153, `rpc_repos` ~21, `render` ~15), and `total` is 441–658 ms, so 250–400 ms of every load is the route's own work no step names. The longest *named* step the note gives is therefore not where the time goes. TD-884 found the same shape on the Settings page and #2135 cured it there.

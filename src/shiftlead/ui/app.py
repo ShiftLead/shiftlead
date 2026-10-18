@@ -1331,15 +1331,16 @@ def create_app() -> FastAPI:
         here = host_name()
 
         def read() -> dict[str, Any]:
-            o = org or org_here()[0]  # fresh, as the page's strip reads it: not the deltas' cached definitions
-            out: dict[str, Any] = {}
-            # every team: one with no `flows:` is read on its seats alone, and only while live (TD-399)
-            for n in o.teams:
-                try:  # one team that fails to read costs its own header the flow, not every team's
-                    out[n] = teamrun.flow_view(rpc, o, n, here, sessions)
-                except Exception:  # noqa: BLE001
-                    log.debug("team %s: its flows were not read", n, exc_info=True)
-            return out
+            with timing.step("flows"):  # each team's plan, its files and its RPCs: a page's step (TD-893)
+                o = org or org_here()[0]  # fresh, as the page's strip reads it: not the deltas' cached definitions
+                out: dict[str, Any] = {}
+                # every team: one with no `flows:` is read on its seats alone, and only while live (TD-399)
+                for n in o.teams:
+                    try:  # one team that fails to read costs its own header the flow, not every team's
+                        out[n] = teamrun.flow_view(rpc, o, n, here, sessions)
+                    except Exception:  # noqa: BLE001
+                        log.debug("team %s: its flows were not read", n, exc_info=True)
+                return out
 
         try:
             flow_cache["flows"] = await asyncio.to_thread(read)
@@ -1665,33 +1666,55 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         r = next((v for v in repos.values() if isinstance(v, dict) and v.get("name") == name), None)
         if r is None:
             raise HTTPException(404, f"no registered repo is named {name!r} — ao repo --all lists them")
-        sessions = await call("list")
-        icons = await role_icons(sessions)
-        seats = await seats_of(sessions)
-        waits = await h.person_waits()  # *waiting* (§4.2, TD-428)
-        vs = [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
-        info: dict[str, Any] = {}
-        with contextlib.suppress(Exception):  # an older agent or a node's link down: the headers lose their notes
-            info = dict(await call("host"))
+
+        def org_files() -> orgmod.Org:
+            with timing.step("files"):  # the org file and every registered repo's `teams:` (TD-893)
+                return org_here()[0]
+
+        # Every read that waits on no other, at once (§4.5 *Page loads*, TD-893): the RPCs, the board, and
+        # the definitions on a worker thread, read fresh once for the page and its flows (the board's and the
+        # pills' are the cached `defs`)
+        first = await asyncio.gather(
+            call("list"),
+            call("host"),
+            h.person_waits(),  # *waiting* (§4.2, TD-428)
+            asyncio.to_thread(org_files),
+            board_view(),
+            call("queue", omit=["completed"]),
+            *(() if part else (call("usage"), call("gate"))),  # the top bar's chip, handed to it below
+            return_exceptions=True,
+        )
+        for x in (first[0], first[2], first[3], first[4]):
+            if isinstance(x, BaseException):
+                raise x  # the fleet and what never refuses fail the page, as each did read in turn
+        sessions, waits, org, (board, _) = first[0], first[2], first[3], first[4]
+        # an older agent or a node's link down: the headers lose their notes, and the kind lists stand
+        info: dict[str, Any] = {} if isinstance(first[1], Exception) else dict(first[1])
+        queue: dict[str, Any] | None = None if isinstance(first[5], Exception) else first[5]
+        icons, seats, flows, spend, defs = await asyncio.gather(
+            role_icons(sessions), seats_of(sessions), flow_views(sessions, org), h.team_spend(), h.defs()
+        )
+        with timing.step("views"):
+            vs = [view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions]
         strip = teams_view(sessions, info.get("waiting") or {})
         await h.with_lanes(strip["teams"], sessions)  # what a team with no record holds (TD-781)
-        # the Org's own groups and layout (§4.9 *The Org page*), cut to this repo's items (TD-740)
-        groups = team_groups(
-            vs,
-            strip["teams"],
-            repos,
-            doing,
-            info.get("work") or {},
-            await flow_views(sessions),
-            info.get("balance"),
-            h.needs_cache["rows"],
-            await h.team_spend(),
-        )
-        # no team anywhere (the Org's flat page): the repo's sessions still stand under its line, as a strip
-        groups = groups if groups is not None else [{"team": NO_TEAM, "members": vs}]
-        items = repo_items(org_layout(groups, repos, (await h.defs()).projects.values(), vs, now), name)
+        with timing.step("groups"):
+            # the Org's own groups and layout (§4.9 *The Org page*), cut to this repo's items (TD-740)
+            groups = team_groups(
+                vs,
+                strip["teams"],
+                repos,
+                doing,
+                info.get("work") or {},
+                flows,
+                info.get("balance"),
+                h.needs_cache["rows"],
+                spend,
+            )
+            # no team anywhere (the Org's flat page): the repo's sessions still stand under its line, as a strip
+            groups = groups if groups is not None else [{"team": NO_TEAM, "members": vs}]
+            items = repo_items(org_layout(groups, repos, defs.projects.values(), vs, now), name)
         serving = [g for g in items if g["kind"] == "team"]
-        org, _ = await asyncio.to_thread(org_here)
         here_root = str(Path(str(r.get("root") or "")).resolve())
         named = repo_teams(org, host_name()).get(here_root, "")
         teams = list(dict.fromkeys([*(g["team"] for g in serving), *([named] if named else [])]))
@@ -1701,69 +1724,70 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # every seat's inbox and sent mail, read as a person's read (§4.9c *What is shown*): a seat by
         # the definitions or its record, running or not — a view's `seat` is only an empty one's
         seat_ids = {*seats, *(str(s.get("id")) for s in sessions if s.get("seat"))}
-        reads: list[tuple[str, list[Any], list[Any]]] = []
-        for m in members:
-            if m["id"] in seat_ids or str(m.get("role") or "") == "techlead":
-                inbox: list[Any] = []
-                sent: list[Any] = []  # an older home or a failed read: the asks still say who waits
-                with contextlib.suppress(Exception):
-                    inbox = (await call("inbox", id=m["id"])).get("entries") or []
-                with contextlib.suppress(Exception):
-                    sent = (await call("inbox", id=m["id"], sent=True)).get("entries") or []
-                reads.append((str(m.get("name") or m["id"]), inbox, sent))
+        readers = [m for m in members if m["id"] in seat_ids or str(m.get("role") or "") == "techlead"]
+        mail = await asyncio.gather(  # each seat's two reads, every seat at once
+            *(call("inbox", id=m["id"], **sent) for m in readers for sent in ({}, {"sent": True})),
+            return_exceptions=True,
+        )
+        # an older home or a failed read: the asks still say who waits
+        entries = [x.get("entries") or [] if isinstance(x, dict) else [] for x in mail]
+        reads = [(str(m.get("name") or m["id"]), entries[2 * k], entries[2 * k + 1]) for k, m in enumerate(readers)]
         standing = pr_standing(reads, now)
         rel = (r.get("ledger") or {}).get("path") or ""
         ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
         # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)
-        hz = with_standings(horizon_of((await board_view())[0], str(r.get("root") or "")), sessions, now)
+        hz = with_standings(horizon_of(board, str(r.get("root") or "")), sessions, now)
         boards = hz["due"]
-        # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
-        lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
-        lists = ledger_lists(r, motion, lanes, now)
-        queue: dict[str, Any] | None = None
-        with contextlib.suppress(Exception):  # an older home or a node's link down: the kind lists stand
-            queue = await call("queue", omit=["completed"])
-        ctx = {
-            "r": r,
-            "name": name,
-            "groups": items,  # the Org's items, drawn by its partials (TD-740)
-            "facet": facet,
-            "teams": teams,
-            "prs": pr_rows(r, members, standing, now, sessions, [g["members"] for g in serving]),
-            "lists": lists,
-            # the repo's Queue cards in rank order (§4.5 screen 11 item 2, TD-770); None: the kind lists
-            "cards": debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None,
-            # the board's decided lines, the lanes' work orders, above the cards (§4.5a *Repo page: decided lines*)
-            "orders": [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
-            # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
-            "completed": (completed := completed_rows(r, sessions, now)),
-            # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
-            "lanes": [
-                ln
-                for team, got in lanes.items()
-                if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
-            ],
-            # under them, *needs a team* and each stale-team note (§4.4 *An entry names its team*, TD-764)
-            "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
-            "boards": boards,
-            "horizon": hz,
-            "doing": (drows := repo_doing(serving))[0],
-            "chips": doing_chips(drows[0], [g["team"] for g in serving]),
-            "doer_w": drows[1],
-            # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first
-            "ledger_editor": editor_file_link(ledger_file) if ledger_file else None,
-            # the seams the repo leaves unset, and a ledger that is not there (§4.5a, TD-591)
-            "seams": missing_seams(r),
-            "host": host_name(),
-            "active": "",
-            "part": bool(part),  # the re-read carries the title line and the seams, swapped in place
-        }
-        # only what is shown (§4.5 *Page loads*, TD-882): the cards and the counts read the lists whole first
-        opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
-        ctx["win"] = send_folds(lists, completed, repo_window(request.query_params), opened)
-        if not part:  # the page's top bar; the part is the page's body alone
-            ctx["usage"] = await chip_usage(call)
-            ctx["build_chip"] = await chip_build(call)
+        with timing.step("lists"):  # the ledger's lists, the cards and the rows the page draws (TD-893)
+            # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
+            lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
+            lists = ledger_lists(r, motion, lanes, now)
+            ctx = {
+                "r": r,
+                "name": name,
+                "groups": items,  # the Org's items, drawn by its partials (TD-740)
+                "facet": facet,
+                "teams": teams,
+                "prs": pr_rows(r, members, standing, now, sessions, [g["members"] for g in serving]),
+                "lists": lists,
+                # the repo's Queue cards in rank order (§4.5 screen 11 item 2, TD-770); None: the kind lists
+                "cards": debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None,
+                # the board's decided lines, the lanes' work orders, above the cards (§4.5a *Repo page: decided lines*)
+                "orders": [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
+                # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
+                "completed": (completed := completed_rows(r, sessions, now)),
+                # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
+                "lanes": [
+                    ln
+                    for team, got in lanes.items()
+                    if (ln := lanes_line(team, got, teamrun.lane_kinds(r), entries_by_id(r)))
+                ],
+                # under them, *needs a team* and each stale-team note (§4.4 *An entry names its team*, TD-764)
+                "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
+                "boards": boards,
+                "horizon": hz,
+                "doing": (drows := repo_doing(serving))[0],
+                "chips": doing_chips(drows[0], [g["team"] for g in serving]),
+                "doer_w": drows[1],
+                # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first
+                "ledger_editor": editor_file_link(ledger_file) if ledger_file else None,
+                # the seams the repo leaves unset, and a ledger that is not there (§4.5a, TD-591)
+                "seams": missing_seams(r),
+                "host": host_name(),
+                "active": "",
+                "part": bool(part),  # the re-read carries the title line and the seams, swapped in place
+            }
+            # only what is shown (§4.5 *Page loads*, TD-882): the cards and the counts read the lists whole first
+            opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
+            ctx["win"] = send_folds(lists, completed, repo_window(request.query_params), opened)
+        if not part:  # the page's top bar, from the reads above; the part is the page's body alone
+            usage, gate = first[6:8]  # read once: a refused `usage` is no chip, a refused `gate` no lines
+            ctx["usage"] = (
+                {}
+                if isinstance(usage, Exception)
+                else await chip_usage(call, sessions, usage=usage, gate={} if isinstance(gate, Exception) else gate)
+            )
+            ctx["build_chip"] = await chip_build(call, info or None)
         return templates.TemplateResponse(request, "repo_part.html" if part else "repo.html", ctx)
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)

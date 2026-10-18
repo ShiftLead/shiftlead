@@ -191,3 +191,89 @@ def test_settings_refused_by_the_agent_still_draws_its_files_with_the_words(tmp_
     r = TestClient(ui.create_app()).get("/settings")
     assert r.status_code == 200 and "settings.yml: not a mapping" in r.text
     assert seen == [{"name": "kmaster"}]  # the build chip still has the `host` that answered
+
+
+def test_the_repo_page_reads_at_once_names_its_steps_and_reads_each_once(tmp_path, monkeypatch):
+    """TD-893: the Repo page's reads that wait on none of each other are made at once, every seat's two
+    inbox reads among them; the top bar's chips take the route's own `list`, `usage`, `gate` and `host`;
+    the definitions are read once, for the page and its flows; and its own work is in named steps
+    (`files`, `flows`, `views`, `groups`, `lists`), so nothing it waits on is in no step."""
+    import asyncio
+
+    from test_ui_repo_page import fake, reading, rec
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+    from shiftlead.ui import common
+
+    root = str(tmp_path / "samscrape")
+    fleet = [rec(f"techlead-{n}", root, role="techlead") for n in (1, 2)]
+    calls: list[str] = []
+    live = {"now": 0, "most": 0, "inbox": 0, "inbox_most": 0}
+
+    class Slow(fake({root: reading(root)}, fleet)):
+        async def call(self, method, **kw):
+            calls.append(method)
+            seat = method == "inbox" and kw.get("id") != "person"
+            live["now"] += 1
+            live["inbox"] += seat
+            live["most"] = max(live["most"], live["now"])
+            live["inbox_most"] = max(live["inbox_most"], live["inbox"])
+            await asyncio.sleep(0.02)
+            live["now"] -= 1
+            live["inbox"] -= seat
+            return await super().call(method, **kw)
+
+    reads = []
+    real = common.org_here
+    monkeypatch.setattr(ui, "org_here", lambda: reads.append(1) or real())
+    monkeypatch.setattr(ui, "LocalClient", Slow)
+    monkeypatch.setattr(timing, "RECENT", {})
+    c = TestClient(ui.create_app())
+    c.get("/repo/samscrape")  # the first load fills what is held between loads (the person inbox, the spend)
+    calls.clear()
+    reads.clear()
+    live["most"] = 0
+    r = c.get("/repo/samscrape")
+    assert r.status_code == 200
+    assert all(calls.count(m) == 1 for m in ("list", "host", "usage", "gate", "queue")), calls
+    assert calls.count("inbox") == 4 and live["inbox_most"] == 4  # two seats, two reads each, at once
+    assert live["most"] >= 5  # the fleet, the home, the cards, the chip's two: in flight together
+    assert len(reads) == 1  # the definitions, once: the page's and its flows'
+    steps = _steps(r.headers["server-timing"])
+    assert {"files", "flows", "views", "groups", "lists", "render"} <= set(steps)
+
+
+@pytest.mark.parametrize(
+    ("refused", "status"), [("list", 503), ("host", 200), ("queue", 200), ("usage", 200), ("gate", 200)]
+)
+def test_the_repo_page_fails_and_stands_on_the_reads_it_did_before(tmp_path, monkeypatch, refused, status):
+    """TD-893: gathered, the Repo page's reads keep their old weight — a refused fleet is the page's error,
+    the home, the cards and the chip's reads cost only their own part, and none is read a second time."""
+    from test_ui_repo_page import fake, reading
+
+    from sessionorc.client import AgentError, AgentUnavailable
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    root = str(tmp_path / "samscrape")
+    calls: list[str] = []
+
+    class Refuses(fake({root: reading(root)}, [])):
+        async def call(self, method, **kw):
+            calls.append(method)
+            if method == refused:
+                raise AgentUnavailable("down") if refused == "list" else AgentError("no such method")
+            return await super().call(method, **kw)
+
+    monkeypatch.setattr(ui, "LocalClient", Refuses)
+    c = TestClient(ui.create_app())
+    calls.clear()
+    r = c.get("/repo/samscrape")
+    assert r.status_code == status
+    if refused in ("usage", "gate"):
+        assert calls.count(refused) == 1  # a refused read is not made again by the chip
+    calls.clear()
+    assert c.get("/repo/samscrape?part=1").status_code == status
+    assert "usage" not in calls and "gate" not in calls  # the part has no top bar
