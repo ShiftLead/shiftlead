@@ -1,0 +1,56 @@
+{# The Spend page's Shape view (§4.5 screen 13 *Shape*, TD-819, built by TD-835; §4.5a *Spend page: Spend ·
+   Shape*; mockup `SpendShape.dc.html`): each team's `shape` reading — its suggestions, its members by role
+   and its queues — shaped by `ui.spend.shape_view`, re-read in place by a pick (`part=1`). Display only. #}
+{% if agent_down %}
+<p class="note">The host agent is not answering, so the team's shape cannot be read. <a href="/spend">Spend →</a></p>
+{% elif not v.served %}
+<span class="h1">Spend</span>
+<p class="note">{{ why or "The home did not serve the team's shape." }} <a href="/spend">Spend →</a></p>
+{% else %}
+<div class="sphead">
+  <span class="h1">Spend</span>
+  <span class="spsub">{{ v.period }} · the team's shape, sampled each minute</span>
+</div>
+<div class="sppicks">
+  <span class="seg" role="group" aria-label="view" title="{{ help_title('spend-view') }}">{% for w, label, href in v.views %}<a href="{{ href }}" data-spend aria-pressed="{{ 'true' if picks.view == w else 'false' }}">{{ label }}</a>{% endfor %}</span>
+  <span class="seg" role="group" aria-label="window" title="{{ help_title('spend-picks') }}">{% for w, label, href in v.windows %}<a href="{{ href }}" data-spend aria-pressed="{{ 'true' if picks.window == w else 'false' }}">{{ label }}</a>{% endfor %}</span>
+  <span class="spchips" role="group" aria-label="team">{% for t, label, href in v.chips %}<a class="qf" href="{{ href }}" data-spend aria-pressed="{{ 'true' if picks.team == t else 'false' }}">{{ label }}</a>{% endfor %}</span>
+</div>
+{% if why %}<p class="note">{{ why }}</p>{% endif %}
+{% for t in v.teams %}
+<div class="shteam">
+<div class="sprh"><span class="h2">{{ t.team }}</span></div>
+<div class="shsuggest">
+  {% if t.too_little %}<p class="dim">{{ t.too_little }}</p>
+  {% elif t.suggestions %}{% for line in t.suggestions %}<p>{{ line }}</p>{% endfor %}
+  {% else %}<p>nothing to suggest</p>{% endif %}
+  <p class="spsub">suggestions only: a change of members is yours (Members… on the team card)</p>
+</div>
+<div class="sprh"><span class="h2">Members by role</span> <span class="spsub">live hours {{ v.period }}, by class</span></div>
+<div class="sptable shroles">
+  {% for r in t.roles %}<div class="shrole">
+    <span class="shname"><b>{{ r.role }}</b> <span class="spsub">{{ r.seats }}</span></span>
+    <span class="shhours mono">{{ r.hours }}</span>
+    <span class="shbarbox" title="{{ r.title }}"><span class="shbar">{% for s in r.segs %}<i class="{% if s.colour == 'hatch' %}hatch{% endif %}" style="width: {{ s.w }}%;{% if s.colour != 'hatch' %} background: {{ s.colour }};{% endif %}" title="{{ s.word }}"></i>{% endfor %}</span><span class="spsub">{{ r.words }}</span></span>
+    <span class="shfin">{{ r.finished }}</span>
+  </div>{% else %}<p class="note">no member of {{ t.team }} was sampled {{ v.period }}</p>{% endfor %}
+  <div class="splegend">{% for word, colour in v.classes %}<span><i class="spkey{% if colour == 'hatch' %} hatch{% elif colour == '#ffffff' %} shfree{% endif %}"{% if colour != 'hatch' %} style="background: {{ colour }}"{% endif %}></i>{{ word }}</span>{% endfor %}</div>
+</div>
+<div class="sprh"><span class="h2">Queues</span> <span class="spsub">one per stage of the current flow</span></div>
+<div class="sptable"><table>
+  <thead><tr><th>stage</th><th>mean</th><th>largest</th><th>oldest</th><th>non-empty</th><th>backed up</th><th>unstaffed</th></tr></thead>
+  <tbody>
+  {% for q in t.queues %}<tr>
+    <td>{{ q.stage }}</td>
+    <td class="mono">{{ q.mean }}</td>
+    <td class="mono">{{ q.max }}</td>
+    <td class="mono">{{ q.oldest }}</td>
+    <td class="mono">{{ q.nonempty }}</td>
+    <td class="mono">{{ q.backed_up }}</td>
+    <td class="mono">{{ q.unstaffed }}{% if q.past_bound %} · past bound {{ q.past_bound }}{% endif %}</td>
+  </tr>{% else %}<tr><td colspan="7" class="note">no queue sampled {{ v.period }}</td></tr>{% endfor %}
+  </tbody>
+</table></div>
+</div>
+{% else %}<p class="note">no team has run {{ v.period }}</p>{% endfor %}
+{% endif %}

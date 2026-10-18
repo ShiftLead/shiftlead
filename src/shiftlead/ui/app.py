@@ -413,7 +413,7 @@ from .repo import (  # re-exported: routes, templates and tests read these from 
 )
 from .spend import INTERACTIVE as SPEND_INTERACTIVE
 from .spend import OUTSIDE as SPEND_OUTSIDE
-from .spend import SPEND_TTL, spend_picks, spend_view, titles_of
+from .spend import SPEND_TTL, shape_view, spend_picks, spend_view, titles_of
 from .transcript import TRANSCRIPT_TURNS, transcript_editor, transcript_paths, transcript_view
 
 # -- the Inbox's board reading, kept here: the suite patches both names on the app (TD-196) --------
@@ -3356,12 +3356,69 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         (§4.5a *Spend page: Day · Week · Month, the team chips, ‹ ›*)."""
         return await spend_reading(spend_picks(request.query_params))
 
+    @app.get("/api/shape")
+    async def shape_api(team: str, window: str = "day"):
+        """A team's `shape` reading, which the Spend page's Shape view draws (§4.5a *Spend page: Spend ·
+        Shape*, TD-835)."""
+        return await call("shape", team=team, window=window)
+
+    async def shape_page(request: Request, picks: dict[str, Any]):
+        """The Spend page's Shape view (§4.5 screen 13 *Shape*, TD-835): the `shape` reading of the picked
+        team, or of each team on All — the teams the seat ledger read in the window and the teams with a
+        record — over the current day or week."""
+        from sessionorc.shape import SHAPE_MIN_HOURS
+
+        agent_down, why, readings, teams, failed = False, "", [], set(), []
+        try:
+            with contextlib.suppress(HTTPException):  # an older home with no seat ledger still has its records
+                for t in (await spend_reading({**picks, "team": ""})).get("teams") or []:
+                    teams.add(str(t.get("team")))
+            teams |= {str(r["team"]) for r in await call("list") if r.get("team")}
+            teams -= {SPEND_INTERACTIVE, SPEND_OUTSIDE}
+            for t in [picks["team"]] if picks["team"] else sorted(teams):
+                try:
+                    readings.append(await call("shape", team=t, window=picks["window"]))
+                except HTTPException as e:
+                    if e.status_code == 503:
+                        raise
+                    failed.append(f"{t}: {e.detail}")  # one team's failure leaves the others drawn
+        except HTTPException as e:
+            agent_down = e.status_code == 503
+            why = "" if agent_down else f"the home did not serve the team's shape: {e.detail}"
+        if failed and not why:
+            why = "the home did not serve the team's shape: " + "; ".join(failed)
+        ctx = {
+            "v": shape_view(readings, picks, sorted(teams), SHAPE_MIN_HOURS)
+            if readings or not why
+            else {"served": False},
+            "picks": picks,
+            "why": why,
+            "agent_down": agent_down,
+        }
+        if request.query_params.get("part"):
+            return templates.TemplateResponse(request, "shape_part.html", ctx)
+        return templates.TemplateResponse(
+            request,
+            "spend.html",
+            {
+                **ctx,
+                "part": "shape_part.html",
+                "host": host_name(),
+                "active": "",
+                "volatile": hosts.local_host().volatile,
+                "usage": {} if agent_down else await chip_usage(call, await call("list")),
+                "build_chip": None if agent_down else await chip_build(call),
+            },
+        )
+
     @app.get("/spend", response_class=HTMLResponse)
     async def spend_page(request: Request):
         """design §4.5 screen 13 / §4.5a **Spend page** (TD-818, built by TD-832): the seat ledger's reading
         over one window, period and team, shaped by `ui.spend.spend_view`. `part=1` is the body alone,
-        which a pick re-reads in place."""
+        which a pick re-reads in place. `view=shape` is the Shape view (`shape_page`, TD-835)."""
         picks = spend_picks(request.query_params)
+        if picks["view"] == "shape":
+            return await shape_page(request, picks)
         agent_down, got, why = False, None, ""
         try:
             got = await spend_reading(picks)

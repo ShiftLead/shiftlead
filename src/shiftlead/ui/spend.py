@@ -33,15 +33,23 @@ MONTHS = ("January", "February", "March", "April", "May", "June", "July", "Augus
 
 
 def spend_picks(params: Mapping[str, str]) -> dict[str, Any]:
-    """The page's picks from its URL (§4.5a *Spend page: Day · Week · Month, the team chips, ‹ ›*):
-    `window` (*day* by default), `at` (the period's first day, absent for the current), `team` (absent
-    for All; `interactive` and `outside`, which `ao spend` reads, open All) and `top=all`."""
+    """The page's picks from its URL (§4.5a *Spend page: Day · Week · Month, the team chips, ‹ ›*,
+    *Spend · Shape*): `view` (*spend* by default, or `shape`), `window` (*day* by default), `at` (the
+    period's first day, absent for the current), `team` (absent for All; `interactive` and `outside`,
+    which `ao spend` reads, open All) and `top=all`. On Shape `at` and `top` drop, since it reads the
+    current period, and `window=month` reads as `week`."""
+    view = "shape" if params.get("view") == "shape" else "spend"
     window = str(params.get("window") or "day")
+    window = window if window in WINDOWS else "day"
     team = str(params.get("team") or "")
+    team = "" if team in (INTERACTIVE, OUTSIDE) else team
+    if view == "shape":
+        return {"view": view, "window": "week" if window == "month" else window, "at": "", "team": team, "top": False}
     return {
-        "window": window if window in WINDOWS else "day",
+        "view": view,
+        "window": window,
         "at": str(params.get("at") or ""),
-        "team": "" if team in (INTERACTIVE, OUTSIDE) else team,
+        "team": team,
         "top": params.get("top") == "all",
     }
 
@@ -52,6 +60,7 @@ def spend_query(picks: Mapping[str, Any], **change: Any) -> str:
     q = {
         k: v
         for k, v in (
+            ("view", "shape" if p.get("view") == "shape" else ""),
             ("team", p.get("team")),
             ("window", "" if p.get("window") == "day" else p.get("window")),
             ("at", p.get("at")),
@@ -303,6 +312,7 @@ def spend_view(
         "begins": begins,
         "back": spend_query(picks, at=prev.isoformat()) if can_back else "",
         "forward": "" if current else spend_query(picks, at="" if _first(window, today) == nxt else nxt),
+        "views": view_links(picks),
         "windows": [(w, WINDOW_LABEL[w], spend_query(picks, window=w, at="")) for w in WINDOWS],
         "chips": [("", "All", spend_query(picks, team=""))]
         + [(t, t, spend_query(picks, team=t)) for t in sorted({*(all_teams or []), *([team] if team else [])})],
@@ -472,3 +482,129 @@ def _team_line(t: Mapping[str, Any], window: str, start: date, current: bool, un
     if not (window == "month" and current):
         parts.append(f"{MONTHS[today.month - 1]} {money(t.get('month'), u)}")
     return " · ".join(parts)
+
+
+# -- Shape (§4.5 screen 13 *Shape*, TD-819, built by TD-835) ------------------------------------------
+
+SHAPE_WINDOWS = ("day", "week")
+# a role's bar, in the mockup's order, each class's word and colour; limited and paused hatched at its end
+SHAPE_CLASSES = (
+    ("working", "working", "#16a34a"),
+    ("on_claim", "on its claim", "#86efac"),
+    ("waiting:person", "waiting on you", "#d97706"),
+    ("waiting:review", "waiting on review", "#7c3aed"),
+    ("idle_with_work", "idle with work", "#2563eb"),
+    ("starved", "starved", GREY),
+    ("free", "free", "#ffffff"),
+)
+HELD = ("limited", "paused")  # one hatched segment: *limited / paused*
+
+
+def view_links(picks: Mapping[str, Any]) -> list[tuple[str, str, str]]:
+    """The head's **Spend · Shape** pick (§4.5a *Spend page: Spend · Shape*): Shape reads the current
+    period, so its link drops `at` and `top`, and a *Month* picked on Spend opens it on *Week*."""
+    window = "week" if picks.get("window") == "month" else picks.get("window")
+    return [
+        ("spend", "Spend", spend_query(picks, view="spend")),
+        ("shape", "Shape", spend_query(picks, view="shape", at="", top=False, window=window)),
+    ]
+
+
+def hours(h: Any) -> str:
+    """An age in hours as the Queues table draws it: *14h*, *1h10m*, *25m*; *—* for none."""
+    m = round(float(h or 0) * 60)
+    if not m:
+        return "—"
+    if m < 60:
+        return f"{m}m"
+    return f"{m // 60}h" + (f"{m % 60:02d}m" if m % 60 and m < 600 else "")
+
+
+def _role_bar(r: Mapping[str, Any]) -> tuple[list[dict[str, Any]], str]:
+    """A role's bar of hours by class and the percents under it, in `SHAPE_CLASSES`' order, limited and
+    paused one hatched segment at its end."""
+    shares = r.get("shares") or {}
+    segs, words = [], []
+    for c, word, colour in SHAPE_CLASSES:
+        if share := float(shares.get(c) or 0.0):
+            segs.append({"w": round(share * 100, 1), "colour": colour, "word": word})
+            words.append(f"{word} {pct(share)}")
+    if held := sum(float(shares.get(c) or 0.0) for c in HELD):
+        segs.append({"w": round(held * 100, 1), "colour": "hatch", "word": "limited / paused"})
+        words.append(f"limited / paused {pct(held)}")
+    return segs, " · ".join(words)
+
+
+def _role_title(r: Mapping[str, Any]) -> str:
+    """A role's bar's hover: its seats and their hours by class."""
+    word = {c: w for c, w, _ in SHAPE_CLASSES} | {c: c for c in HELD}
+    lines = []
+    for s in r.get("seats") or []:
+        h = s.get("hours") or {}
+        parts = [f"{word.get(c, c)} {h[c]:.1f} h" for c in (*(c for c, _, _ in SHAPE_CLASSES), *HELD) if h.get(c)]
+        lines.append(f"{s.get('name')}: " + (" · ".join(parts) or "no hours"))
+    return "\n".join(lines)
+
+
+def _queue_row(q: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "stage": f"{q.get('stage')} ({q.get('role')})" if q.get("role") else str(q.get("stage")),
+        "mean": f"{float(q.get('mean_depth') or 0):.1f}",
+        "max": int(q.get("max_depth") or 0),
+        "oldest": hours(q.get("oldest_hours")),
+        "nonempty": pct(q.get("nonempty")),
+        "backed_up": pct(q.get("backed_up")),
+        "unstaffed": pct(q.get("unstaffed")),
+        "past_bound": pct(q.get("past_bound")) if q.get("kind") == "review" else "",
+    }
+
+
+def shape_block(got: Mapping[str, Any], min_hours: float) -> dict[str, Any]:
+    """One team's `shape` reading for the Shape view: its suggestions (or *nothing to suggest*, or *too
+    little to read yet*), a row per role, a row per queue."""
+    unit = str(got.get("unit") or "≈$")
+    roles = []
+    for r in got.get("roles") or []:
+        segs, words = _role_bar(r)
+        n = len(r.get("seats") or [])
+        f = r.get("finished") or {}
+        entries = int(f.get("entries") or 0)
+        roles.append(
+            {
+                "role": r.get("role"),
+                "seats": f"{n} seat" + ("" if n == 1 else "s"),
+                "hours": f"{float(r.get('live_hours') or 0):.1f} h",
+                "segs": segs,
+                "words": words,
+                "title": _role_title(r),
+                "finished": f"{entries} · median {money(f.get('median'), unit)}" if entries else "—",
+            }
+        )
+    live = float(got.get("live_hours") or 0)
+    return {
+        "team": got.get("team"),
+        "suggestions": [str(x.get("text") or "") for x in got.get("suggestions") or []],
+        "too_little": f"too little to read yet: {live:.1f} live hours of the {min_hours:g} a reading needs"
+        if got.get("too_little")
+        else "",
+        "roles": roles,
+        "queues": [_queue_row(q) for q in got.get("queues") or []],
+    }
+
+
+def shape_view(
+    readings: list[Mapping[str, Any]], picks: Mapping[str, Any], all_teams: list[str], min_hours: float
+) -> dict[str, Any]:
+    """The `shape` readings shaped for `shape_part.html` (§4.5 screen 13 *Shape*): the head's picks — the
+    view, **Day · Week** over the current period, the team chips — and a block per team read."""
+    team = picks["team"]
+    return {
+        "served": True,
+        "period": {"day": "today", "week": "this week"}[picks["window"]],
+        "views": view_links(picks),
+        "windows": [(w, WINDOW_LABEL[w], spend_query(picks, window=w)) for w in SHAPE_WINDOWS],
+        "chips": [("", "All", spend_query(picks, team=""))]
+        + [(t, t, spend_query(picks, team=t)) for t in sorted({*all_teams, *([team] if team else [])})],
+        "classes": [(w, c) for _, w, c in SHAPE_CLASSES] + [("limited / paused", "hatch")],
+        "teams": [shape_block(g, min_hours) for g in readings],
+    }
