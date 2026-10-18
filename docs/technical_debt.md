@@ -1716,7 +1716,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 **Priority:** Low
 **Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2099 (TD-869))
+**Added:** 2026-10-17 (test-audit-ao-1, auditing #2099 (TD-869))
 **Owner:** grinder
 **Kind:** build
 **Status:** Open
