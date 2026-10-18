@@ -1932,16 +1932,18 @@ async def chip_build(call: Any, info: Any = None) -> dict[str, str] | None:
         return None
 
 
-async def chip_usage(call: Any, sessions: Any = None) -> dict[str, Any]:
+async def chip_usage(call: Any, sessions: Any = None, usage: Any = None, gate: Any = None) -> dict[str, Any]:
     """The top bar's **usage** chip on every page (§4.5a *Org top bar* **usage** chip, TD-287): the
     Org's reading — the accounts' windows, the gate's lines, one chip per account a live session's
-    profile names. Any failure is no chip, never a page that fails: the chip is display only."""
+    profile names. A page that already read `usage` and `gate` hands them over, and they are not read
+    again (TD-884). Any failure is no chip, never a page that fails: the chip is display only."""
     try:
         if sessions is None:
             sessions = await call("list")
-        usage = await call("usage")
+        if usage is None:
+            usage = await call("usage")
         with contextlib.suppress(Exception):  # an agent before TD-100 slice 1 has no `gate`: no lines
-            usage = with_lines(usage, await call("gate"))
+            usage = with_lines(usage, gate if gate is not None else await call("gate"))
         return usage_accounts(usage, sessions)
     except Exception:
         return {}
@@ -3599,29 +3601,53 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         agent_down, got, usage, info, why = False, {}, {}, {}, ""
         fleet: list[dict[str, Any]] = []
         readings: dict[str, Any] = {}
-        try:
-            got = await call("settings")
-            usage = await call("usage")
-            info = await call("host")
-        except HTTPException as e:
-            if e.status_code != 503:
-                why = str(e.detail)  # an agent that refuses the read: its words, the files still drawn
+
+        async def read(method: str, **params: Any) -> Any:
+            try:
+                return await call(method, **params)
+            except HTTPException as e:
+                return e
+
+        # Every read the page makes at once (§4.5 *Page loads*, TD-884): the RPCs, none waiting on
+        # another, and this host's files on a worker thread, so the loop is not held by a YAML load
+        first, local_files = await asyncio.gather(
+            asyncio.gather(
+                read("settings"),
+                read("usage"),
+                read("host"),
+                read("list"),
+                read("repos", omit=[*REPOS_OMIT_PAGE, "completed"]),  # numbers alone (TD-746)
+                read("gate"),  # the usage chip's lines, handed to it below
+            ),
+            asyncio.to_thread(settings_files),
+        )
+        for i, r in enumerate(first[:3]):
+            if isinstance(r, HTTPException):  # the first of the three refused is the page's, as read in turn
+                if r.status_code != 503:
+                    why = str(r.detail)  # an agent that refuses the read: its words, the files still drawn
+                else:
+                    agent_down = True
+                break
+            if i == 0:
+                got = r
+            elif i == 1:
+                usage = r
             else:
-                agent_down = True
+                info = r
         # **balance**'s numbers as they read now (§4.5a, §6 *Balance*): the fleet and the repo readings,
         # which an older agent or a down link may refuse — the settings are still drawn
-        with contextlib.suppress(HTTPException):
-            fleet = await call("list")
-            readings = await call("repos", omit=[*REPOS_OMIT_PAGE, "completed"])  # numbers alone (TD-746)
+        if not isinstance(first[3], HTTPException):
+            fleet = first[3]
+            if not isinstance(first[4], HTTPException):
+                readings = first[4]
+        # the chip's own reads, handed over where they answered (a refusal: the chip reads it again)
+        chip_reads = {
+            k: None if isinstance(r, HTTPException) else r
+            for k, r in (("usage", first[1]), ("gate", first[5]), ("host", first[2]))
+        }
+        profiles, default, org, local = (local_files[k] for k in ("profiles", "default", "org", "local"))
         notes: list[str] = [why] if why else []
-        try:
-            profiles, default = profiles_mod.load()
-        except ValueError as e:
-            profiles, default = {}, ""
-            notes.append(str(e))
-        org, org_notes = org_here()
-        notes += org_notes
-        local = hosts.local_host()
+        notes += local_files["notes"]
         node = (info or {}).get("mode") == "node"
         uiconf.set_read(got or None)
         term = setmod.you(got.get("person"))
@@ -3645,16 +3671,14 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     flows=await asyncio.to_thread(team_flows, org),
                     host=info,
                 ),
-                "repos": setmod.repo_cards(local.repos(), got.get("repos"), (info or {}).get("pulls"), readings),
+                "repos": setmod.repo_cards(local_files["repos"], got.get("repos"), (info or {}).get("pulls"), readings),
                 "you": term,
                 # **Telegram** (§4.5a **You**, §4.10; TD-319 slice 3): the last send is the home's alone
                 "telegram": setmod.telegram(
                     got.get("notify"), None if node else (info or {}).get("notify"), reach=got.get("reach")
                 ),
                 "browser_keys": setmod.BROWSER_KEYS,
-                "host_card": setmod.host_card(
-                    setmod.local_entry(hosts.hosts_file()), local, hosts.home_name(), hosts.nodes()
-                ),
+                "host_card": local_files["host_card"],
                 "profile_cards": setmod.profile_cards(profiles, default),
                 "org_cards": setmod.org_cards(org.teams),
                 "files": {
@@ -3674,10 +3698,37 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Settings",
                 "agent_down": agent_down,
                 "volatile": local.volatile,
-                "usage": {} if agent_down else await chip_usage(call, fleet or None),
-                "build_chip": None if agent_down else await chip_build(call),
+                "usage": {}
+                if agent_down
+                else await chip_usage(call, fleet or None, usage=chip_reads["usage"], gate=chip_reads["gate"]),
+                "build_chip": None if agent_down else await chip_build(call, chip_reads["host"]),
             },
         )
+
+    def settings_files() -> dict[str, Any]:
+        """The Settings page's reads of this host's own files (§4.5 *Page loads*, TD-884) — the profiles,
+        the org and every repo's `teams:`, `hosts.yml` and the repos registry — timed as `files`, on a
+        worker thread beside the page's RPCs. A malformed profiles file is a note, never a 500."""
+        with timing.step("files"):
+            notes: list[str] = []
+            try:
+                profiles, default = profiles_mod.load()
+            except ValueError as e:
+                profiles, default = {}, ""
+                notes.append(str(e))
+            org, org_notes = org_here()
+            local = hosts.local_host()
+            return {
+                "profiles": profiles,
+                "default": default,
+                "org": org,
+                "notes": notes + org_notes,
+                "local": local,
+                "repos": local.repos(),
+                "host_card": setmod.host_card(
+                    setmod.local_entry(hosts.hosts_file()), local, hosts.home_name(), hosts.nodes()
+                ),
+            }
 
     async def body_of(request: Request) -> dict[str, Any]:
         got = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
@@ -3746,7 +3797,8 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         if hosts.is_node():
             return {}
         here = host_name()
-        return {n: teams.flow_rows(org, t, t.host or here, here) for n, t in org.teams.items() if t.flows}
+        with timing.step("flows"):  # each team's repo read for its flow's rows (TD-884)
+            return {n: teams.flow_rows(org, t, t.host or here, here) for n, t in org.teams.items() if t.flows}
 
     @app.post("/api/settings/teams")
     async def settings_teams(request: Request):

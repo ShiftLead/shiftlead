@@ -111,3 +111,83 @@ def test_a_nested_step_is_timed_by_the_outer_alone(monkeypatch):
         pass
     timing._STEPS.set(None)
     assert steps["ms"] == {"board": 1000.0}
+
+
+def test_settings_reads_each_rpc_once_all_at_once_and_times_its_files(tmp_path, monkeypatch):
+    """TD-884: the Settings page's RPCs wait on none of each other, so they are made at once; the top bar's
+    chips take the route's own `usage`, `gate` and `host` rather than read them again; and the page's reads
+    of this host's files are a step of their own (`files`), on a worker thread beside the RPCs."""
+    import asyncio
+
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from shiftlead.ui import app as ui
+
+    calls: list[str] = []
+    live = {"now": 0, "most": 0}
+
+    class Slow:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append(method)
+            live["now"] += 1
+            live["most"] = max(live["most"], live["now"])
+            await asyncio.sleep(0.02)
+            live["now"] -= 1
+            return {"list": [], "host": {"name": "kmaster"}}.get(method, {})
+
+    monkeypatch.setattr(ui, "LocalClient", Slow)
+    monkeypatch.setattr(timing, "RECENT", {})
+    c = TestClient(ui.create_app())
+    c.get("/settings")  # the first load also reads the person's settings for every page (TD-174), held after
+    calls.clear()
+    live["most"] = 0
+    r = c.get("/settings")
+    assert r.status_code == 200
+    # each once (an empty fleet is the one read the usage chip makes again: no session to name an account)
+    assert sorted(m for m in calls if m != "list") == ["gate", "host", "repos", "settings", "usage"]
+    assert live["most"] == 6  # the six the route makes, all in flight at once
+    steps = _steps(r.headers["server-timing"])
+    assert "files" in steps and "flows" in steps
+
+
+def test_settings_refused_by_the_agent_still_draws_its_files_with_the_words(tmp_path, monkeypatch):
+    """A `settings` the host agent refuses, gathered with the rest, is still its words on the page
+    and the page still drawn (TD-884)."""
+    monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path / "home"))
+    from sessionorc.client import AgentError
+    from shiftlead.ui import app as ui
+
+    class Refuses:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "settings":
+                raise AgentError("settings.yml: not a mapping")
+            return {"list": [], "host": {"name": "kmaster"}}.get(method, {})
+
+    monkeypatch.setattr(ui, "LocalClient", Refuses)
+    seen = []
+
+    async def chip(call, info=None):
+        seen.append(info)
+        return None
+
+    monkeypatch.setattr(ui, "chip_build", chip)
+    r = TestClient(ui.create_app()).get("/settings")
+    assert r.status_code == 200 and "settings.yml: not a mapping" in r.text
+    assert seen == [{"name": "kmaster"}]  # the build chip still has the `host` that answered
