@@ -13,7 +13,7 @@ import re
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from importlib import resources
 from typing import Any
 
@@ -266,7 +266,14 @@ def cmd_status(args: argparse.Namespace) -> int:
         # design §4.4a: what this listing is, and *unreachable* only when the agent says so
         # (TD-084). stderr, so `--json` stays the records and nothing else.
         print(_node_status_line(), file=sys.stderr)
+    # each record's seat-ledger figure (design §4.7, TD-831): `-v` reads the `seats` reading by record
+    seat_spend: dict[str, dict[str, Any]] = {}
+    if args.verbose and sessions and not hosts.is_node():  # the ledger is the home's, and a node's link may be down
+        with contextlib.suppress(Exception):
+            seat_spend = record_spend(sessions, call_sync)
     if args.json:
+        if args.verbose:
+            sessions = [s | ({"spend": seat_spend[s["id"]]} if s["id"] in seat_spend else {}) for s in sessions]
         print(json.dumps(sessions, indent=1))
         return 0
     if args.verbose:
@@ -334,6 +341,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      context: {reading}{bound_text}")
             if line := spend_line(usage.get(s.get("profile") or "")):
                 print(f"{'':<{w}}      spend:  {line}")
+            if line := record_spend_line(seat_spend.get(s["id"])):
+                print(f"{'':<{w}}      {line}")
             if line := report_line(s, pr_marks(s, readings)):
                 print(f"{'':<{w}}      report: {line}")
             if line := slices_line(s):
@@ -2258,6 +2267,153 @@ def cmd_team_shape(args: argparse.Namespace) -> int:
             print(f"  {line}")
 
     return emit(args, got, prose)
+
+
+def spend_lines(got: dict[str, Any], team: str | None, today: date | None = None) -> list[str]:
+    """`ao spend`'s lines (design §4.7, §4.4 *Spend per seat*): the `seats` reading as the Spend page draws
+    it. Without `team`, a *By team* block, then a block per team, then *interactive sessions*, a line per
+    seat, then *outside shiftlead*; with `team`, the team's head line, then its block alone."""
+    from shiftlead.ui import spend
+
+    today = today or date.today()
+    unit = str(got.get("unit") or "≈$")
+    if not got.get("at"):
+        return ["nothing read: the home served no period"]
+    window, start = str(got.get("window") or "day"), date.fromisoformat(str(got.get("at"))[:10])
+    finished = got.get("finished") or {}
+
+    def seat_line(s: dict[str, Any], alone: bool) -> str:
+        parts = [spend._seat_name(s)] + ([str(s["role"])] if s.get("role") not in (None, "", spend.OTHER) else [])
+        parts += [spend.figure(s), spend.pct(s.get("share")), f"{int(s.get('turns') or 0):,} turns"]
+        per = finished.get(str(s.get("role") or "")) or {}
+        if alone and per.get("entries"):  # the reading counts finished entries per role, not per seat
+            parts.append(f"{per['entries']} done, median {spend.money(per.get('median'), unit)}")
+        parts.append(f"between {spend.money(s.get('between'), unit)}")
+        parts += [
+            f"past 200k {spend.pct(s.get('past_200k_share'))}",
+            f"past 300k {spend.pct(s.get('past_300k_share'))}",
+        ]
+        return " · ".join(parts)
+
+    # `finished` is per role across the reading's teams, so a seat carries it only where it is the reading's
+    # one seat of that role
+    roles = [str(s.get("role") or "") for s in got.get("seats") or []]
+
+    def block(t: str) -> list[str]:
+        mine = [s for s in got.get("seats") or [] if s.get("team") == t]
+        return [f"  {seat_line(s, roles.count(str(s.get('role') or '')) == 1)}" for s in mine]
+
+    out: list[str] = []
+    if team:
+        row = next((t for t in got.get("teams") or [] if t.get("team") == team), {})
+        head = spend._team_line(row, window, start, bool(got.get("current")), unit, today)
+        out.append(f"{spend.TEAM_WORD.get(team, team)} · {head}")
+        out += block(team)
+    else:
+        out.append(f"By team · {spend.period_label(window, start, today)} · {spend.figure(got.get('whole') or {})}")
+        for t in got.get("teams") or []:
+            name, u = str(t.get("team")), str(t.get("unit") or unit)
+            parts = [spend.TEAM_WORD.get(name, name), spend.figure(t), spend.pct(t.get("share"))]
+            if "to_date" in (p := t.get("previous") or {}):
+                was, now = float(p.get("to_date") or 0.0), float(t.get("figure") or 0.0)
+                parts.append(
+                    "—" if not was else ("▲ " if now >= was else "▼ ") + f"{round(abs(now - was) / was * 100)}%"
+                )
+            parts += [f"{int(t.get('turns') or 0):,} turns", f"week {spend.money(t.get('week'), u)}"]
+            parts.append(f"month {spend.money(t.get('month'), u)}")
+            if (most := t.get("most") or {}).get("seat"):
+                parts.append(f"most {most['seat']} {spend.pct(most.get('share'))}")
+            out.append(f"  {' · '.join(parts)}")
+        names = sorted({str(s.get("team")) for s in got.get("seats") or []} - {spend.INTERACTIVE})
+        for t in [*names, spend.INTERACTIVE]:
+            if lines := block(t):
+                out += [spend.TEAM_WORD.get(t, t), *lines]
+        outside = got.get("outside") or {}
+        if int(outside.get("turns") or 0):
+            out.append(
+                f"outside shiftlead · {spend.figure(outside)} · {spend.pct(outside.get('share'))}"
+                f" · {int(outside.get('turns') or 0):,} turns"
+            )
+    return out
+
+
+def entry_lines(got: dict[str, Any]) -> list[str]:
+    """`ao spend --entries` (design §4.7): a finished entry a line, its roles' figures and its sum, how long it
+    was held — *TD-821 · designer ≈$9.80 + grinder ≈$21.40 = ≈$31.20 · 3h10m* — and *· partial* where it was
+    first claimed before the ledger began."""
+    from shiftlead.ui import spend
+
+    unit = str(got.get("unit") or "≈$")
+    out = []
+    for e in sorted(got.get("entries") or [], key=lambda e: -float(e.get("figure") or 0.0)):
+        roles = sorted((e.get("by_role") or {}).items(), key=lambda kv: -kv[1])
+        line = f"{e.get('ref')} · " + " + ".join(f"{r} {spend.money(v, unit)}" for r, v in roles)
+        line += f" = {spend.money(e.get('figure'), unit)}" if len(roles) > 1 else ""
+        line += f" · {held}" if (held := spend._held(e)) else ""
+        out.append(line + (" · partial" if e.get("partial") else ""))
+    return out or ["no entry finished in the period"]
+
+
+def cmd_spend(args: argparse.Namespace) -> int:
+    """`ao spend [--team <t>] [--window day|week|month] [--at <date>] [--entries]` (design §4.7, §4.4 *Spend per
+    seat*, TD-831): the seat ledger's reading for the period, from the home's `seats` RPC. Read-only, open to
+    a session; `--json` the RPC's reply."""
+    got = call_sync("seats", window=args.window, team=args.team, at=args.at)
+
+    def prose() -> None:
+        for line in spend_lines(got, args.team):
+            print(line)
+        if args.entries:
+            print("Finished entries")
+            for line in entry_lines(got):
+                print(f"  {line}")
+
+    return emit(args, got, prose)
+
+
+def record_spend(sessions: list[dict[str, Any]], call: Callable[..., Any]) -> dict[str, dict[str, Any]]:
+    """Each record's seat-ledger figure for `ao status -v` (design §4.7, §4.4 *Spend per seat*, TD-831): the
+    `seats` reading `by: record` today and this week, as `{day, week, past_200k, past_300k, unit}`, the two
+    shares today's — or `{unknown: <why>}` where its profile's spend could not be read. A record that spent
+    nothing in the week has none."""
+    day, week = call("seats", window="day", by="record"), call("seats", window="week", by="record")
+    ids = {str(s.get("id")) for s in sessions}
+
+    def per(got: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        return {str(r): s for s in got.get("seats") or [] for r in s.get("records") or [] if str(r) in ids}
+
+    today, this_week = per(day), per(week)
+    unknown = {**(week.get("unknown") or {}), **(day.get("unknown") or {})}
+    out: dict[str, dict[str, Any]] = {}
+    for s in sessions:
+        rid, prof = str(s.get("id")), str(s.get("profile") or "")
+        if prof and prof in unknown:
+            out[rid] = {"unknown": str(unknown[prof])}
+        elif rid in this_week:
+            d, w = today.get(rid) or {}, this_week[rid]
+            out[rid] = {
+                "day": float(d.get("figure") or 0.0),
+                "week": float(w.get("figure") or 0.0),
+                "past_200k": float(d.get("past_200k_share") or 0.0),
+                "past_300k": float(d.get("past_300k_share") or 0.0),
+                "unit": str(d.get("unit") or w.get("unit") or "≈$"),
+            }
+    return out
+
+
+def record_spend_line(spend: dict[str, Any] | None) -> str:
+    """*spend ≈$12.40 today · ≈$61 week · past 200k 18%*, `$` for a metered profile, *spend unknown (why)*
+    where the adapter could not read it; "" where the record spent nothing (design §4.7)."""
+    if not spend:
+        return ""
+    if "unknown" in spend:
+        return f"spend unknown ({spend['unknown']})" if spend["unknown"] else "spend unknown"
+    from shiftlead.ui.spend import money, pct
+
+    u = spend["unit"]
+    return (
+        f"spend {money(spend['day'], u)} today · {money(spend['week'], u)} week · past 200k {pct(spend['past_200k'])}"
+    )
 
 
 # Where every other configured value lives and when it is re-read (design §4.7 `ao settings --where`,
@@ -4340,6 +4496,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("settings", help="the home's settings.yml, each key with what it makes today (design §5)")
     p.add_argument("--where", action="store_true", help="where every other configured value lives, and when it is read")
     p.set_defaults(fn=cmd_settings)
+
+    p = add("spend", help="the seat ledger's reading: spend per team, per seat and per finished entry (§4.4)")
+    p.add_argument("--team", help="one team's block (`interactive`: the person's own sessions)")
+    p.add_argument("--window", choices=("day", "week", "month"), default="day", help="the period (default: day)")
+    p.add_argument("--at", metavar="DATE", help="the period's first day, YYYY-MM-DD (default: the current one)")
+    p.add_argument("--entries", action="store_true", help="also the finished entries, one a line")
+    p.set_defaults(fn=cmd_spend)
 
     p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
     p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")

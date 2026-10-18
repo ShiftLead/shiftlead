@@ -16241,3 +16241,27 @@ The other #2048, #2045 and #2054 changes I reverted (the `asking_args` addition,
 **Related:** TD-856 (the design), TD-627 / TD-628 (the card's links), TD-538 (the record's `files`), TD-632 (a deletion's line), TD-501 (`paths`, the read's model).
 
 **Resolved:** 2026-10-18 (grinder-ao-1, #2077, #2079). The `git_files` read — `gitinfo.pick_files`, `rpc_git_files`, in `NODE_READS` and `identity.READS` (#2077, `tests/test_git_files.py`); the card's pick line, `AO.gitPick` and `GET /api/sessions/{sid}/git_files` (#2079, `tests/test_ui_focus_git_pick.py`), checked on a scratch home: screenshots `docs/mockups/reviews/2026-10-17-td862-*.png`.
+
+## TD-831: Build TD-818 (2): `ao spend`, and the seat figure on `ao status -v`
+
+**Priority:** Low
+**Type:** feature
+**Added:** 2026-10-17 (TD-818's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Done #2086 (2026-10-17, grinder-ao-2)
+**Blocked by:** TD-830, TD-859
+**Location:** design §4.7 `ao spend` and `ao status -v`, §4.4 *Spend per seat*; `src/shiftlead/cli.py`
+
+**Why:** TD-818: the seat ledger's reading, from a terminal and from a session (a manager reads its team's spend without a page).
+
+**Fix:**
+- `ao spend [--team <t>] [--window day|week|month] [--at <date>] [--entries]` prints the `seats` RPC's reply for the period in §4.7's words (amended 2026-10-17): without `--team`, first the *By team* block from `teams`; then a block per team, a line per seat, then the *interactive sessions* seats, then *outside shiftlead* (one line; with `--team`, the team's head line from its `teams` row, then its block alone; `--team interactive` the same for the person's own sessions), and with `--entries` the finished entries. `--json` prints the RPC's reply. Read-only, open to a session.
+- `ao status -v` prints each record's `spend` line from `seats` with `by: record`, and `--json` carries the `spend` object (`{day, week, past_200k, past_300k, unit}`, the shares today's, or `unknown`).
+- **Tests:** the line formats for `≈$`, `$` and *unweighed*; `--entries`, with *· partial*; a session may call it; `status -v` prints the line, and its absence where the record spent nothing.
+
+**Done when** `ao spend` prints what the Spend page draws, and `ao status -v` shows each record's figure.
+
+**Related:** TD-818, TD-830.
+
+**Resolved:** 2026-10-17 (grinder-ao-2, #2086). `ao spend` (`cli.cmd_spend`, `spend_lines`, `entry_lines`) prints the `seats` reading in §4.7's words, reusing the Spend page's formatters in `shiftlead.ui.spend`. `ao status -v` prints each record's `spend … today · … week · past 200k n%` line from `seats` `by: record` (`record_spend`, `record_spend_line`), and `-v --json` carries the `spend` object; §4.7 now says it is `-v` alone that asks. Tests: `tests/test_ao_spend.py`.

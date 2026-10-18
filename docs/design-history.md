@@ -860,6 +860,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-10-08 (TD-422, grinder-ao-2): *A URL in the pane is a link* built — `@xterm/addon-web-links` 0.11.0 vendored (its SHA-256 matched to the npm release), loaded in `AO.focus` beside the fit addon on every Focus, read-only and popped-out too; `AO.paneLink` is the handler: Ctrl or Cmd held, and `http:` or `https:` only, opened with `noopener`.
 
 ## 4.7 CLI
+- 2026-10-17 (TD-831, grinder-ao-2): `ao spend` and `ao status -v`'s seat-ledger line built. The record's `spend` object rides on `-v --json` alone, so a plain `ao status --json` asks the home nothing more. A record that spent nothing this week prints no line.
 - 2026-10-17 (TD-818 amended, the designer): `ao spend` gains `--window month`, `--at <date>`, a *By team* block first when no `--team`, then the interactive sessions' block, then *outside shiftlead*; `--team interactive` reads the person's own. Built by TD-831.
 - 2026-10-17 (TD-851, the designer): `ao td add` gains `--priority high|medium|low`, *medium* when absent, the form's **Priority** pick. Built by TD-855.
 - 2026-10-17 (TD-819, the designer; Paul, 2026-10-16: *is there a way to tell if a different shape for a team would be more efficient (e.g. another designer, fewer grinders, etc)?*): `ao team shape <team> [--window]`. Built by TD-835.
