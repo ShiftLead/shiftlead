@@ -145,6 +145,12 @@ class Adapter(Protocol):
     #                                                      only), layers: [{path, commands: [{command, resolves}]}
     #                                                      | {path, error}]}; or one {error} when the profiles
     #                                                      file does not parse
+    #   setup_note() -> dict | None                       what the machine needs a person for before this
+    #                                                      adapter's sessions run (design §4.3, TD-875): None
+    #                                                      with nothing to say; {key: None} all as wanted;
+    #                                                      {key, text} a note the host agent sends once per key
+    #   machine_layers(hook: str) -> list[tuple[str, str]] the root-owned files a container node's root stage
+    #                                                      installs: where each goes and its bytes, naming `hook`
     #   rule_matches(rule: str, tool: str, input, *, cwd: Path | None, deny: bool) -> bool
     #                                                      whether one of the person's `permissions:` rules,
     #                                                      in the tool's own syntax, covers a prompt (design

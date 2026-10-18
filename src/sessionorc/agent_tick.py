@@ -175,6 +175,9 @@ def _orders(r: dict[str, Any] | None) -> list[Any]:
     return [*((r.get("work_orders") or {}).get("orders") or []), *((r.get("pr_orders") or {}).get("orders") or [])]
 
 
+SETUP_EVERY = 3600.0  # seconds between the setup notes' reads with `profiles.yml` unchanged (TD-875)
+
+
 class TickMixin:
     # -- reconcile -------------------------------------------------------------------------------
     #
@@ -182,6 +185,54 @@ class TickMixin:
     # event loop, never in a thread. Only the tmux subprocess calls run in threads, and they
     # return plain data. So a tick's reconcile step and an RPC handler can never interleave
     # inside a check-then-act sequence — the loop runs them one at a time.
+
+    async def _setup_notes(self) -> None:
+        """What a machine needs a person for before an adapter's sessions can run (design §4.3 *The person
+        meets the step at setup*, TD-875): on the first tick, whenever `profiles.yml` changes, and hourly
+        (what the note is about lives outside the home, so its undoing is seen without a restart), each
+        adapter's `setup_note` (§4.3's optional method) is read, and a note it gives goes to the person
+        **once per key** — kept in `setup_notes.json`, so a restart does not repeat it; a key of None
+        (all is as wanted) forgets the adapter's, so a step undone later is said again."""
+        p = paths.home() / "profiles.yml"
+        try:
+            seen: object = p.stat().st_mtime_ns
+        except OSError:
+            seen = "none"
+        if seen == self._setup_seen and time.monotonic() - self._setup_read_at < SETUP_EVERY:
+            return
+        self._setup_seen, self._setup_read_at = seen, time.monotonic()
+
+        def read() -> list[tuple[str, dict[str, Any]]]:
+            out = []
+            for name in adapters.names():
+                fn = getattr(adapters.get(name), "setup_note", None)
+                if fn is None:
+                    continue
+                try:
+                    got = fn()
+                except Exception:  # noqa: BLE001 — one adapter's reading never holds up the tick
+                    log.exception("adapter %s: setup note failed", name)
+                    continue
+                if got is not None:
+                    out.append((name, got))
+            return out
+
+        notes = await asyncio.to_thread(read)
+        store = paths.home() / "setup_notes.json"
+        try:
+            sent: dict[str, str] = json.loads(store.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            sent = {}
+        before = dict(sent)
+        for name, got in notes:
+            key = got.get("key")
+            if key is None:
+                sent.pop(name, None)
+            elif sent.get(name) != key and got.get("text"):
+                self._system_note(PERSON, str(got["text"]))
+                sent[name] = str(key)
+        if sent != before:
+            store.write_text(json.dumps(sent, indent=1), encoding="utf-8")
 
     async def tick(self) -> None:
         snapshot_at = datetime.now(UTC)
@@ -247,6 +298,7 @@ class TickMixin:
             # node's pass sends its turns home (TD-833)
             self._seats_at = time.monotonic()
             self._seats_task = asyncio.create_task(self._refresh_seats())
+        await self._setup_notes()
         await self._team_stop_times(snapshot_at)
         await self._carry_controllers()
         await self._enforce_stop_times(snapshot_at)
