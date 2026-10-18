@@ -71,7 +71,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-850 | A member waiting on CI or a lane polls in its own turn — a foreground `timeout 180 tail -f /dev/null` between `ao status` reads — because no brief says what wakes it besides mail | Medium | Built (#2051) — live check |
 | TD-857 | Gemini's first job: the fact-check of a doc-only PR, read by a Gemini CLI session on the free tier instead of a Claude subagent, and its verdicts compared with Claude's | Medium | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
-| TD-873 | #2074's Org and Repo pages pass the team spend figure and #2078's weights card refuses a non-finite price, and no test fails when either is dropped | Low | Open |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Open |
 | TD-876 | #2086's `ao spend` By-team block draws a ▲/▼/— change marker and drops *outside shiftlead* when it has no turns, and no test fails when either is removed | Low | Open |
 | TD-877 | #2082's Shape view and `ao team shape` count *paused* hours with *limited*, and no test gives a role a `paused` share | Low | Open |
@@ -1470,26 +1469,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the design names where a Gemini launch's hooks come from, a launch with it delivers `SessionStart` to the record on kmaster, and TD-785's capture is unblocked.
 
 **Related:** TD-112, TD-785, TD-786.
-
----
-
-## TD-873: No test fails when the Org or Repo page drops the team spend figure, or when the weights card accepts `inf`/`nan`
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (test-audit-ao-1, auditing #2074 (TD-832 (2)) and #2078 (TD-832 (3)))
-**Owner:** grinder
-**Kind:** build
-**Status:** Open
-**Location:** `src/shiftlead/ui/app.py` (`org` and `repo_page`, their `team_groups(..., await h.team_spend())` argument); `src/shiftlead/ui/settings_page.py` (`weights_body`'s `math.isfinite`); `tests/test_ui_spend.py`
-
-**Why:** On `origin/main`, replacing `{} if agent_down else await h.team_spend(),` in `org`, or the `await h.team_spend(),` argument in `repo_page`, with `{}` leaves the whole suite green (`3566 passed, 1 skipped`, both runs): the one test builds `team_groups` and `Readings.team_spend` apart and never loads either page, so a team card could lose its figure on both pages unseen. Likewise `if not math.isfinite(v) or v < 0:` reduced to `if v < 0:` leaves `tests/test_ui_spend.py` at `13 passed`: no test sends `inf` or `nan`, which `float()` parses and `v < 0` does not refuse, so a Save would write an infinite price into `spend.weights`.
-
-**Fix:** add the case to the PR's test module.
-
-**Done when** a page test of `/` and `/repo/<name>` with a seats reading shows the team's `spendfig`; `weights_body` raises on `inf` and `nan`; each fails when its line is reverted.
-
-**Related:** TD-832.
 
 ---
 
