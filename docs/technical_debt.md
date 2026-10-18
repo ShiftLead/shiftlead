@@ -80,6 +80,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-867 | `seats._series` marks a bucket `partial` only when the ledger began inside it, and no test has the ledger begin on a bucket's first day | Low | Open |
 | TD-868 | `park_ticks`' drain of a tick's detached passes has a 30 s bound that no test pins | Low | Open |
 | TD-869 | `GitInfo.files` reads the porcelain without `-z`, so a path git quotes reaches the Git card quoted | Low | Open |
+| TD-870 | `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError* | Low | Open |
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Open |
 
 ---
@@ -1593,7 +1594,7 @@ Then file the build entry and name it in `Blocked by:`.
 **Added:** 2026-10-17 (TD-856's design, the designer)
 **Owner:** grinder
 **Kind:** build
-**Status:** Slice 1 (the `git_files` read: `gitinfo.pick_files`, `rpc_git_files`, `NODE_READS`, `identity.READS`) by #2077. Slice 2 is the card: the page's route, `#gitcard`'s pick line, `AO.gitFiles`' redraw and the card's tests.
+**Status:** Slice 1 (the `git_files` read: `gitinfo.pick_files`, `rpc_git_files`, `NODE_READS`, `identity.READS`) by #2077, held for the techlead (ask `m-25330e6df37e`, 2026-10-18). Slice 2 (the card: `GET /api/sessions/{sid}/git_files`, `#gitcard`'s pick line, `AO.gitPick`, `tests/test_ui_focus_git_pick.py`) is built and checked on a scratch home on branch `td862-git-pick`, stacked on #2077's commits: once #2077 merges, rebase it onto main, open its PR with the UI check (screenshots `docs/mockups/reviews/2026-10-17-td862-*.png`), and archive this entry with it.
 **Location:** design §4.5a *Focus side panel, Git card: the pick · ↑ · ↓* (and *changed files*, now the pick's Working tree), §4.2 *The Git card's pick*, §4.5 item 4, §4.4a *Reads of a pane, and of a transcript* (`NODE_READS`); mockup `docs/mockups/reviews/2026-10-17-td856-git-pick.png` (`gen.py` `focus_git_pick`); `src/sessionorc/gitinfo.py` (`changed_files`, beside which the commit and session reads go), `src/sessionorc/agent.py` (`rpc_paths`, the shape of a record-host read), `src/sessionorc/agent_common.py` (`NODE_READS`), `src/shiftlead/ui/app.py` (the Focus view; a route the page asks, as the transcript's is), `src/shiftlead/ui/templates/focus.html` (`#gitcard`), `src/shiftlead/ui/static/app.js` (`AO.gitFiles`, the Git card's redraw); `tests/test_ui_focus_git_files.py`, `tests/test_recent_files.py`, `tests/test_paths_rpc.py`, `tests/test_link.py`
 
 **Why:** TD-856: the Git card lists the porcelain alone, so the moment a worker commits, the files it changed leave the card and their links with them.
@@ -1695,6 +1696,26 @@ Then file the build entry and name it in `Blocked by:`.
 **Done when** a test holds an untracked `naïve file.txt` and a renamed path with a tab as unquoted lines of `GitInfo.files`, and the existing `git_info` tests pass.
 
 **Related:** TD-628, TD-862.
+
+---
+
+## TD-870: `test_route_port_0_and_a_node_run_no_route_listener` probes a `_free_port()` that a parallel test can bind, so it fails *DID NOT RAISE OSError*
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (grinder-ao-1, met on #2077's CI)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `tests/test_ui_listener.py` (`test_route_port_0_and_a_node_run_no_route_listener`, `_free_port`)
+
+**Why:** #2077's CI (run 39084062206, Python 3.12) failed this case, which the PR does not touch; 3.13 passed, and so did the rerun. The case takes a port from `_free_port()`, closes it, and asserts a connect to it raises because a node runs no route listener. Between the close and the connect, any other process can bind that port, a test under xdist included. The connect then succeeds, and the test reads that as a listener that should not be there.
+
+**Fix:** assert on what the UI process itself listens on rather than on a connect to a released port. For example, read the process's listening sockets (`/proc/<pid>/net/tcp` for its inodes, or `psutil.Process(pid).net_connections()` if it is a dependency) and assert `route` is not among them. Alternatively, keep the port bound by the test with `SO_REUSEADDR` off, so the UI's bind would fail loudly, and assert the UI's log line alone.
+
+**Done when** the case no longer depends on a released port staying free, and still fails if a node starts a route listener.
+
+**Related:** none.
 
 ---
 
