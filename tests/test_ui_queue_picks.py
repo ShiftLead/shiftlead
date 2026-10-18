@@ -202,7 +202,8 @@ def test_a_wider_window_is_read_once_and_a_narrower_answers_from_what_is_held(tm
     js = (UI / "static" / "app.js").read_text()
     qjs = js[js.index("AO.queue = function") : js.index("AO.repo = function")]
     # the lists' read asks for the window held, or the wider one picked; the head's hold lifts once it is drawn
-    assert 'q.set("win", win)' in qjs and "const win = loading() || loaded();" in qjs
+    assert 'q.set("win", win)' in qjs and 'const win = AO.qWinFetch(loaded(), store.get("qwin", "day")) || loaded();' in qjs
+    assert "if (read && AO.qWinFetch(loaded(), win) === win) short = win;" in qjs  # a read that fell short: the poll's
     assert "if (loading()) reread(); else delete document.documentElement.dataset.qpend;" in qjs
     assert "if (read && loading() && loading() !== win) setTimeout(reread, 0);" in qjs
     part = client(monkeypatch, tmp_path, fake(queue())).get("/queue?part=1&win=month").text

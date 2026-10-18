@@ -3726,7 +3726,9 @@
     }
     // the window of Recently completed's lines the page holds, and the wider one picked, if any (TD-882)
     const loaded = () => ($("#qcompleted", lists) || { dataset: {} }).dataset.loaded || "day";
-    const loading = () => AO.qWinFetch(loaded(), store.get("qwin", "day"));
+    // a window a read answered without (an older home) is not asked again on every apply, only by the poll
+    let short = "";
+    const loading = () => { const w = AO.qWinFetch(loaded(), store.get("qwin", "day")); return w === short ? "" : w; };
     function apply() {
       qc.applyFolds();
       applyPicks();
@@ -3835,7 +3837,7 @@
       if (busy || box.querySelector(".qcard.dragging")) return; busy = true;
       let read = false;
       // the lines of the window held, or of the picked one where it is wider (TD-882)
-      const win = loading() || loaded();
+      const win = AO.qWinFetch(loaded(), store.get("qwin", "day")) || loaded();
       try {
         const q = new URLSearchParams(location.search); q.set("part", "1"); q.set("win", win);
         const res = await fetch(`/queue?${q}`);
@@ -3858,6 +3860,7 @@
       } catch (err) { /* the next poll tries again */ } finally {
         busy = false;
         // a wider window picked while this read was out: read once more, never again for the same window
+        if (read && AO.qWinFetch(loaded(), win) === win) short = win;
         if (read && loading() && loading() !== win) setTimeout(reread, 0);
       }
     }
