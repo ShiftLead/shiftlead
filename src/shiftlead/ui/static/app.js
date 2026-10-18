@@ -1331,9 +1331,38 @@
   AO.reopenFolds = function (root) {
     (root ? $$("details.fold", root) : []).forEach((d) => {
       if (foldsShut.has(d.dataset.fold)) d.open = false;
-      else if (foldsOpen.has(d.dataset.fold)) d.open = true;
+      else if (foldsOpen.has(d.dataset.fold)) { d.open = true; AO.fillFold(d); }
     });
   };
+  // design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): a fold a Queue card draws
+  // closed comes as its summary alone (`data-lazy`); its first open reads its body, `GET /api/fold?key=`,
+  // the row renderer's own HTML. The bodies are kept by key while the page lives, so a fold a re-read swaps
+  // in is filled at once from what was kept and read again; a key that names nothing says so.
+  const foldBodies = new Map();
+  AO.fillFold = async function (d) {
+    if (!d || !d.dataset || !d.dataset.lazy || d.dataset.filled) return;
+    const key = d.dataset.fold, put = (html) => {
+      Array.from(d.children).forEach((c) => { if (c.tagName !== "SUMMARY") c.remove(); });
+      d.insertAdjacentHTML("beforeend", html);
+    };
+    d.dataset.filled = "1";
+    if (foldBodies.has(key)) put(foldBodies.get(key));
+    try {
+      const r = await fetch(`/api/fold?key=${encodeURIComponent(key)}`);
+      if (r.status === 404) { foldBodies.delete(key); put(`<div class="st">gone — reload</div>`); return; }
+      if (!r.ok) throw new Error(String(r.status));
+      const html = await r.text();
+      foldBodies.set(key, html);
+      put(html);
+    } catch (e) {
+      delete d.dataset.filled;  // the next open reads again
+      if (!foldBodies.has(key)) put(`<div class="st">could not be read — open it again</div>`);
+    }
+  };
+  document.addEventListener?.("toggle", (ev) => {
+    const d = ev.target;
+    if (d && d.matches && d.matches("details.fold[data-lazy][open]")) AO.fillFold(d);
+  }, true);
   // The Focus panel's entry, folded as the Inbox row is: both halves were rendered by the server's
   // closed-subset renderer (`api_inbox`, `shaped`) — escaped text and its own few tags — so nothing
   // here composes markup from what a session wrote. An entry from an older UI without them is the
@@ -3882,6 +3911,7 @@
             if (link) link.hidden = !Number(n.dataset.ininbox);
           }
           opened.forEach((k) => { const ln = k && $(`.qdline[data-key="${CSS.escape(k)}"]`, lists); if (ln) openLine(ln); });
+          AO.reopenFolds(lists);  // a row's *details* the person opened, filled from what was kept (TD-891)
           apply();
           wire();
         }

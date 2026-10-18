@@ -1474,6 +1474,7 @@ def create_app() -> FastAPI:
         person_inbox=person_inbox,
         board_items=board_items,
         board_view=board_view,
+        board_all=rd.board_all,  # every open board row, a Queue card's fold read by its key (TD-891)
         inbox_html=inbox_html,
         settings_at=settings_at,  # the person's settings read's clock: a write here resets it (TD-174)
         queue_cards=rd.queue_cards,  # where an Inbox row is drawn (§4.5 screen 6, TD-771)
@@ -4036,6 +4037,33 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "build_chip": None if agent_down else await chip_build(call),
             },
         )
+
+    @app.get("/api/fold", response_class=HTMLResponse)
+    async def api_fold(request: Request, key: str = ""):
+        """design §4.5 *Page loads* (*A row's folded details on a Queue card*, TD-891): one fold's body, read
+        on its first open, by the row renderer's own macro — the one source its key names: a board line
+        (`board:<root>:<line>`) from the home's board reading, a ledger row (`ledger:<repo>:<id>`) from its
+        repo's ledger reading, else a person-inbox entry by its id, a person's read that marks nothing. A
+        key that names nothing is a 404, which the fold says as *gone — reload*."""
+        e: Any = None
+        if key.startswith("board:"):
+            kind = "board"
+            e = next((r for r in (await h.board_all())[0] if r.get("id") == key), None)
+        elif key.startswith("ledger:"):
+            kind, fleet = "ledger", []
+            with contextlib.suppress(HTTPException):
+                fleet = await call("list")
+            rows = (r for g in (await h.ledger_view(fleet)).get("groups") or () for r in g.get("rows") or ())
+            e = next((r for r in rows if r.get("row_id") == key), None)
+        elif key:
+            kind = "mail"
+            got = await call("inbox", id=PERSON)
+            e = next((x for x in got.get("entries") or () if x.get("id") == key), None)
+        if e is None:
+            raise HTTPException(404, f"{key or 'no key'}: gone — reload")
+        with timing.step("render"):
+            html = templates.get_template("fold_body.html").render(kind=kind, e=e, origin=page_origin(request))
+        return HTMLResponse(html)
 
     @app.get("/inbox/{mid}", response_class=HTMLResponse)
     async def inbox_entry_page(request: Request, mid: str):

@@ -319,3 +319,118 @@ def test_the_inbox_pages_own_queue_count_leaves_its_rows_whole(tmp_path, monkeyp
     host_rows = [entry("m-1", "ask", text="merge PR 9?")]
     html = templates.get_template("inbox_rows.html").render(rows=host_rows, section="needs", on_queue=3)
     assert "data-find=" in html and 'data-act="snooze"' in html
+
+
+# -- TD-891 (TD-888's design, §4.5 *Page loads* *A row's folded details on a Queue card*): a fold a Queue card
+# draws closed is sent empty and read on its first open, `GET /api/fold?key=`, the Inbox's own fold body -----
+
+
+def _fold_body(html: str, key: str) -> str:
+    """What a fold of `key` holds after its summary, as the Inbox draws it."""
+    m = re.search(
+        rf'<details class="fold" data-fold="{re.escape(key)}"[^>]*><summary>details</summary>(.*?)</details>',
+        html,
+        re.S,
+    )
+    assert m, key
+    return m.group(1)
+
+
+def _fold_world(tmp_path, monkeypatch):
+    from test_ui_board import host, item, report
+    from test_ui_board import reading as boards_reading
+    from test_ui_inbox import entry
+
+    host(tmp_path, monkeypatch)
+    root = tmp_path / "samscrape"
+    line = {
+        **item(9, "pick a name. Due: 2026-09-20.\n\nthe rest of the line, *in* markdown.", "2026-09-20", "2d overdue"),
+        "detail": ["a detail block", "of two lines"],
+    }
+    rs = boards_reading(report(root, line))
+    led = {
+        "for_page": "for-you",
+        "priority": "medium",
+        "owner": "paul",
+        "id": "TD-60",
+        "title": "yours",
+        "detail": ["why it is yours", "", "and what to do"],
+    }
+    rs[str(root)]["ledger"] = {"path": "docs/technical_debt.md", "entries": [led]}
+    mail = entry("m-7", "note", text="the first paragraph.\n\nthe *rest*, folded.")
+    return rs, mail
+
+
+def _fold_fake(rs, mail, seen):
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            seen.append(method)
+            if method == "inbox":
+                return {"entries": [mail]}
+            return {"repos": rs, "list": [], "host": {"name": "kmaster"}}.get(method, {})
+
+    return Fake
+
+
+def test_the_fold_route_answers_each_kind_with_the_inboxs_own_fold_body(tmp_path, monkeypatch):
+    from shiftlead.ui import app as ui
+    from shiftlead.ui.app import board_reading, ledger_for_you, templates
+
+    rs, mail = _fold_world(tmp_path, monkeypatch)
+    seen: list[str] = []
+    monkeypatch.setattr(ui, "LocalClient", _fold_fake(rs, mail, seen))
+    c = TestClient(ui.create_app())
+    board = board_reading(rs)[0]
+    ledger = [r for g in ledger_for_you(rs, [], {})["groups"] for r in g["rows"]]
+    assert len(board) == 1 and len(ledger) == 1
+    inbox = templates.get_template("inbox_rows.html").render(rows=[mail, *board, *ledger], section="needs")
+    for key in (mail["id"], board[0]["id"], ledger[0]["row_id"]):
+        r = c.get("/api/fold", params={"key": key})
+        assert r.status_code == 200, (key, r.text)
+        assert r.text.strip() == _fold_body(inbox, key).strip() != ""
+        assert "total" in r.headers["server-timing"]
+    gone = c.get("/api/fold", params={"key": "m-nothing"})
+    assert gone.status_code == 404 and "gone — reload" in gone.text
+
+
+def test_a_queue_card_sends_a_closed_fold_empty_and_an_open_one_whole(tmp_path, monkeypatch):
+    from shiftlead.ui.app import board_reading, ledger_for_you, templates
+
+    rs, mail = _fold_world(tmp_path, monkeypatch)
+    board = board_reading(rs)[0]
+    ledger = [r for g in ledger_for_you(rs, [], {})["groups"] for r in g["rows"]]
+    one = templates.get_template("queue_mail.html")
+    for e, key in ((mail, mail["id"]), (board[0], board[0]["id"])):
+        html = one.render(e=e, section="needs")
+        assert f'data-fold="{key}" data-lazy="1"><summary>details</summary></details>' in html
+    # drawn open — an entry with answers to press — it is sent whole, as it is shown
+    held = {**ledger[0], "answers": ["yes", "no"]}
+    html = one.render(e=held, section="needs")
+    assert "data-lazy" not in html and "why it is yours" in html
+    # the Inbox sends every fold whole
+    inbox = templates.get_template("inbox_rows.html").render(rows=[mail, *board, *ledger], section="needs")
+    assert "data-lazy" not in inbox and "the <em>rest</em>, folded." in inbox
+
+
+def test_the_browser_reads_a_lazy_fold_once_keeps_it_by_key_and_refills_it_after_a_reread():
+    js = JS.read_text()
+    fill = js[
+        js.index("AO.fillFold = async function") : js.index(
+            'document.addEventListener?.("toggle", (ev) => {\n    const d = ev.target;\n    if (d && d.matches && d.matches("details.fold[data-lazy][open]")'
+        )
+    ]
+    assert "/api/fold?key=${encodeURIComponent(key)}" in fill and "foldBodies.set(key, html)" in fill
+    assert "if (foldBodies.has(key)) put(foldBodies.get(key));" in fill and "gone — reload" in fill
+    reopen = js[js.index("AO.reopenFolds = function") : js.index("AO.fillFold = async function")]
+    assert "AO.fillFold(d)" in reopen
+    q = js[js.index("AO.queue = function") :]
+    assert "AO.reopenFolds(lists);" in q[: q.index("wire();")]
