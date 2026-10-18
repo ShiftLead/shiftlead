@@ -18,7 +18,7 @@
    its name folds or opens the group, which the browser remembers (§4.5a *Queue page: group heading*, TD-828) #}
 {# the share is recounted in the browser on a pick (TD-829): `data-of` is the whole #}
 {% macro share(shown, of) %}<span class="qshare" data-of="{{ of }}">({% if q.filtered %}{{ shown }} of {% endif %}{{ of }})</span>{% endmacro %}
-<section class="rsec qgroup" id="qcompleted" data-group="completed">
+<section class="rsec qgroup" id="qcompleted" data-group="completed" data-loaded="{{ q.completed.loaded or 'month' }}">
   <div class="row gap rsh"><span class="h2 qghead" role="button" tabindex="0" aria-expanded="true" title="fold or open the group">Recently completed{% for w, label in labels.items() %}<span class="qwinword" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}> {{ share(q.shown_in.completed[w] if q.shown_in else q.completed.counts[w], q.completed.counts[w]) }}</span>{% endfor %}</span>
     <span class="qsub qgfoldword">folded</span>
     {% for w, label in labels.items() %}<span class="qsub qwinword" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>{{ words[w] }}</span>{% endfor %}
@@ -26,7 +26,7 @@
     <span class="qwins" role="group" aria-label="the window">{% for w, label in labels.items() %}<button type="button" class="qwin" data-win="{{ w }}" aria-pressed="{{ 'true' if w == 'day' else 'false' }}">{{ label }} ({{ q.completed.counts[w] }})</button>{% endfor %}</span>
   </div>
   <div class="rlist qdone">
-  {% for ln in q.completed.lines %}
+  {% for ln in (q.completed.sent if q.completed.sent is defined else q.completed.lines) %}
     <div class="qdline{% if ln.entries %} opens{% endif %}{% if ln.off %} qoff{% endif %}" data-n="{{ ln.n }}" data-repo="{{ ln.repo }}" data-find="{{ ln.find }}" data-key="{{ ln.kind }}:{{ ln.show }}" data-w="{{ ln.wins | join(' ') }}"{% if 'day' not in ln.wins %} hidden{% endif %}>
       <div class="qdhead"{% if ln.entries %} role="button" tabindex="0" aria-expanded="false" title="what was done"{% endif %}>
         <span class="qsub qage">{{ ln.age }}</span><span class="qid mono strong">{{ ln.show }}</span>{{ pbadge(ln.priority) }}<span class="qtitle">{{ ln.title }}</span>

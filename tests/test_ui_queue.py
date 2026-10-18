@@ -214,8 +214,15 @@ def test_the_window_picker_carries_each_windows_count(tmp_path, monkeypatch):
     assert [m for m in re.findall(r'data-win="(\w+)" aria-pressed="(\w+)">([^<]+)<', done)] == [
         ("4h", "false", "4 h (3)"), ("day", "true", "Day (3)"), ("week", "false", "Week (4)"), ("month", "false", "Month (5)")]  # fmt: skip
     assert "on TD-10's card" in done and "2 entries" in done and "built (#12)." in done
-    # a line outside *day* is drawn hidden until its window is picked
-    assert re.search(r'data-w="week month" hidden', done)
+    # only the day's lines are sent at load, every window's count with them (§4.5 *Page loads*, TD-882)
+    assert 'data-loaded="day"' in done and 'data-w="week month"' not in done
+    assert len(re.findall(r'class="qdline', done)) == 2  # three entries: one card holds two
+    # a wider window is sent on its pick, by the lists' read: its lines past the day drawn hidden until shown
+    part = client(monkeypatch, tmp_path, fake(queue())).get("/queue?part=1&win=week").text
+    week = part[part.index('id="qcompleted"') : part.index('id="qinprogress"')]
+    assert 'data-loaded="week"' in week and re.search(r'data-w="week month" hidden', week)
+    assert len(re.findall(r'class="qdline', week)) == 3 and "Month (5)" in week
+    assert 'data-loaded="day"' in client(monkeypatch, tmp_path, fake(queue())).get("/queue?win=year").text
 
 
 def test_the_queue_tab_follows_inbox_with_no_number(tmp_path, monkeypatch):

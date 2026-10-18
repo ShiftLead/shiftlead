@@ -440,6 +440,24 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
     }
 
 
+def queue_window(params: Any) -> str:
+    """The window whose completed lines the page sends (§4.5 *Page loads*: *only what is shown*, TD-882):
+    the URL's `win`, else *day*; an unknown one reads as *day*."""
+    w = str(params.get("win") or "")
+    return w if w in WINDOWS else "day"
+
+
+def send_window(view: dict[str, Any], win: str) -> dict[str, Any]:
+    """Recently completed's lines trimmed to those in `win` (`completed.sent`), and the window named
+    (`completed.loaded`), for the page to draw; `lines`, its counts and its shares stay whole, so every
+    window's button keeps its count. The windows nest, so the lines of a wider window hold a narrower's,
+    and the browser asks for a wider one by `part=1&win=` once (TD-882)."""
+    done = view.setdefault("completed", {"lines": [], "counts": {}})
+    done["sent"] = [ln for ln in done.get("lines") or () if win in ln["wins"]]
+    done["loaded"] = win
+    return view
+
+
 def queue_picks(params: Any) -> dict[str, Any]:
     """The filter row's picks from the URL (§4.5a *Queue page: filters, find*): `filter` (*All* when absent,
     `needs-you`, `steering`), `team`, `repo` and `kind` each a list, comma-separated or repeated, and
