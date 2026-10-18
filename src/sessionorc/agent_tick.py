@@ -1754,7 +1754,14 @@ class TickMixin:
             return
         if s.balance_refused and self._balance_of(s):
             return  # its claims are refused while its team is over its line (§6 *Balance*): told once it clears
+        # a new id a live sibling already holds is its holder's (TD-899): seen untold, so only its
+        # release is news, as a dropped lease — else every `none` beside a held decided line is told it
+        leased = self._leased(s, new)
         s.lane_seen = {**s.lane_seen, "at": now_iso(), "ids": [*s.lane_seen.get("ids", []), *new]}
+        new = [i for i in new if i not in leased]
+        if not (new or drops):
+            self._save(s)
+            return
         if drops:
             s.lane_seen["dropped"] = {**(s.lane_seen.get("dropped") or {}), **{i: at for i, _, at in drops}}
         told = [*new, *(f"{i} (dropped by {who})" for i, who, _ in drops)]
@@ -1825,23 +1832,41 @@ class TickMixin:
         # a kept instant that cannot be read is no memory of that id's drop, and the others stand
         since = {i: max(declared, instant(told.get(i)) or declared) for i in held}
         last: dict[str, tuple[datetime, str, str]] = {}
-        leased: set[str] = set()
-        now = datetime.now(UTC)
-        for r in (*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())):
-            if r is s or not r.repo or r.repo != s.repo:
-                continue
-            live = r.state not in ("exited", "closed", "scheduled")
+        leased = self._leased(s, held)  # taken again since: the lease's holder is who it is news to
+        for r in self._repo_peers(s):
             for e in r.progress:
-                if e.ref not in since:
+                if e.ref not in since or e.status != "dropped":
                     continue
                 at = instant(e.at)
-                if at is None:
-                    continue
-                if e.status == "claimed" and e.source == "declared" and live and now - at < LEASE_TTL:
-                    leased.add(e.ref)  # taken again since: the lease's holder is who it is news to
-                elif e.status == "dropped" and at > since[e.ref] and (e.ref not in last or at > last[e.ref][0]):
+                if at is not None and at > since[e.ref] and (e.ref not in last or at > last[e.ref][0]):
                     last[e.ref] = (at, r.name, e.at)
         return [(i, last[i][1], last[i][2]) for i in held if i in last and i not in leased]
+
+    def _repo_peers(self, s: Session) -> list[Session]:
+        """Every other record of `s`'s repo, here and on the nodes."""
+        every = (*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values()))
+        return [r for r in every if r is not s and r.repo and r.repo == s.repo]
+
+    def _leased(self, s: Session, ids: Collection[str]) -> set[str]:
+        """The `ids` another live record of `s`'s repo holds an unexpired declared lease on (design §4.8
+        *A claim is a lease*, `LEASE_TTL`). An instant that cannot be read holds nothing."""
+        if not ids:
+            return set()
+        now = datetime.now(UTC)
+        out: set[str] = set()
+        for r in self._repo_peers(s):
+            if r.state in ("exited", "closed", "scheduled"):
+                continue
+            for e in r.progress:
+                if e.ref not in ids or e.status != "claimed" or e.source != "declared":
+                    continue
+                try:
+                    at = _parse(str(e.at))
+                except ValueError:
+                    continue
+                if now - (at if at.tzinfo else at.replace(tzinfo=UTC)) < LEASE_TTL:
+                    out.add(e.ref)
+        return out
 
     async def _work_marks(self, now: datetime) -> None:
         """Rule 8 (design §6 *Work for a team that wound down*, TD-227): on every tick at the home,
