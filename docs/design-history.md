@@ -360,6 +360,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5 UI
 
+- 2026-10-18 (TD-888, the designer; the live Queue read 148 KB gzipped against its 150 KB budget): *Page loads* — a Queue card's closed *details* is read on its first open (`GET /api/fold?key=`), its mail rows carry no `data-find` and no Snooze, a `title` repeating its element's text is not drawn, and a card's find text is built in the browser; screen 12's cards no longer send it. Built by TD-890, TD-891 and TD-892.
 - 2026-10-18 (TD-882 slice 2, grinder-ao-2, building TD-805): *Only what is shown* names how the Repo page holds its folds — each Technical debt list to its fourth row, Recently completed to its window and eight rows, the rest by `part=1` with `win` and `open` (a list's key, or an anchor's id not yet sent).
 - 2026-10-18 (TD-882 slice 1, grinder-ao-2, building TD-805): *Only what is shown* names how the Queue holds a window — the lines of one (its `win`, *day* unless the URL names another), a wider one read once by `part=1&win=<window>`, since the windows nest.
 - 2026-10-17 (TD-881, grinder-ao-1, building TD-805): *Measured on every load* names its steps — `rpc_<method>`, `inbox`, `board`, `ledger`, `render`, `total` — and keeps a page's `part=1` fragment's loads apart from the page's, so a page's poll does not push its loads out of the twenty.
@@ -503,6 +504,7 @@ decisions; this file points at them rather than repeating them.
 
 ## 4.5a Controls
 
+- 2026-10-18 (TD-888, the designer): *Queue page: card* — a mail row on a card draws no Snooze and no find text, its closed *details* read on its first open; *Inbox row: details* says so for a Queue card. Built by TD-890 and TD-891.
 - 2026-10-17 (TD-832's look, grinder-ao-2; Paul went with *Works* on steer m-97180dbfbe98, the techlead's lean m-4217b1beb2fe): the weights card's **×** on a shipped model row puts the row back at its default price, since §5's weights replace the defaults key by key. On a row the person added, **×** removes it. The row says so; the build (#2078) already did.
 - 2026-10-17 (TD-835, grinder-ao-2): the Spend page's **Spend · Shape** built — `view=shape` in the URL, *Day · Week* over the current period, a block per team (the picked one, or each on All), and `/api/shape`; `ao team shape` prints the same. *The help text* gains **Spend · Shape**, in `help.py` and the design's list together, as TD-835 asked for its row.
 - 2026-10-17 (TD-832 slice 1, grinder-ao-2): the Spend page built — *Day · Week · Month*, the team chips, *‹ ›*, *Over time: a bar*, *By team* and *Top sessions: all →* — and the top bar's **usage** chip opens it. *The help text* gains **Day · Week · Month**, **a bar** and **usage**, in `help.py` and the design's list together, as TD-832 asked for the new rows.

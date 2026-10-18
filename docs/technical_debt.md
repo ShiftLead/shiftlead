@@ -72,8 +72,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-884 | The Settings page's first byte is at its 200 ms budget's edge: `rpc_settings` swings 12–147 ms between loads | Low | Open |
-| TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Open — needs a design |
+| TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-889 | #2121's Repo-page read loop in `app.js` (`again`, `short`, the `data-unsent` press and its re-enable) leaves the suite passing when changed | Low | Open |
+| TD-890 | Build TD-888 (1): a Queue card's mail rows send no `data-find`, no Snooze and no `title` repeating its text | Low | Open |
+| TD-891 | Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=` | Low | Open |
+| TD-892 | Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles | Low | Open |
 
 ---
 
@@ -1507,7 +1510,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-18 (grinder-ao-2, reading TD-882 live)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Open — needs a design: measured 2026-10-18 (grinder-ao-2), everything the Queue sends at load is already shown at load (§4.5 *Only what is shown* holds), so what is left to cut is what §4.5 screen 12 and §4.5a say each card draws. Gzipped shares of the 148 KB, each measured by stripping it from the live page: the cards' *Needs you* sections 68 KB (127 mail rows, drawn in the header so a folded card still shows them, each row the Inbox's whole renderer with its body); `data-find` 18 KB (88 KB raw on the mail rows, 40 KB on the cards, 19 KB on the completed lines — each row's whole text lowercased by the server, §4.5 screen 6 *Find*); `title` attributes 9 KB; the mail rows' rendered bodies 5 KB; whitespace 2 KB. Cards are drawn open (174 of 202 have no body to fold).
+**Status:** Designed (2026-10-18, the designer; design §4.5 *Page loads* — *Only what is shown*, *Nothing the page does not read* — screen 12, §4.5a *Queue page: card*, *Inbox row: details*): a Queue card's closed *details* read on its first open (TD-891), its mail rows sent with no `data-find`, Snooze or repeated `title` (TD-890), and a card's find text built in the browser (TD-892). Measured on the live Queue 2026-10-18 (141 KB gzipped): the mail rows' unopened folds 20 KB, their `data-find` 10 KB, Snooze 2 KB, the cards' `data-find` 5 KB — some 105 KB without them. Was: Open — needs a design: measured 2026-10-18 (grinder-ao-2), everything the Queue sends at load is already shown at load (§4.5 *Only what is shown* holds), so what is left to cut is what §4.5 screen 12 and §4.5a say each card draws. Gzipped shares of the 148 KB, each measured by stripping it from the live page: the cards' *Needs you* sections 68 KB (127 mail rows, drawn in the header so a folded card still shows them, each row the Inbox's whole renderer with its body); `data-find` 18 KB (88 KB raw on the mail rows, 40 KB on the cards, 19 KB on the completed lines — each row's whole text lowercased by the server, §4.5 screen 6 *Find*); `title` attributes 9 KB; the mail rows' rendered bodies 5 KB; whitespace 2 KB. Cards are drawn open (174 of 202 have no body to fold).
+**Blocked by:** TD-890, TD-891, TD-892
 **Location:** design §4.5 *Page loads* (*Only what is shown*, the 150 KB budget), §4.5 screen 12 (the Queue); `src/shiftlead/ui/templates/queue_card.html` (`section(c, 'needs')` in the header), `queue_row.html` (`section`), the Inbox's row renderer, `src/shiftlead/ui/queue.py`; design §4.5 screen 6 *Find* and §4.5a *Inbox page: find* (`data-find` from the server)
 
 **Why:** With TD-882 live, a gzipped GET of the live `/queue` on 2026-10-18 08:16Z read 148,246 bytes (1,033,433 uncompressed) with the picked window's completed lines alone; its markup is some 200 cards' heads (`qhead`, `qgrip`, `qplace`, 591 `qmove` controls, 487 `btn`). The budget's margin is 1.7 KB, so the Queue misses it as soon as a handful of cards are added, and a promote's smoke then names it.
@@ -1539,3 +1543,59 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** each reversion above fails a test.
 
 **Related:** TD-882, TD-886.
+
+---
+
+## TD-890: Build TD-888 (1): a Queue card's mail rows send no `data-find`, no Snooze and no `title` repeating its text
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-888's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Nothing the page does not read*), §4.5 screen 12 (*The Queue has no Snooze*), §4.5a *Queue page: card*; `src/shiftlead/ui/templates/queue_mail.html`, `src/shiftlead/ui/templates/inbox_row.html` (the rows' `data-find`, the Snooze menus, the board row's foot sentence, `subj`'s `title`), `src/shiftlead/ui/app.py` (`queue_page`'s mail render); `tests/test_ui_queue_cards.py`
+
+**Why:** TD-888: on the live Queue (2026-10-18, 141 KB gzipped) the 124 mail rows' `data-find` is 10 KB, though the Queue's find reads the card's ids and titles and never a row's; 37 board rows draw a Snooze the Queue does not have (2 KB); a row's subject repeats itself as its `title`.
+
+**Fix:** the Inbox's row renderer takes the page it draws for (one flag passed by `queue_mail.html`, never a copy of a macro): on the Queue it writes no `data-find` on a mail row, no Snooze menu on any kind, and the board row's foot sentence without *Snooze moves its `Due:` date*. On every page a `title` equal to its element's text is not drawn (the `subj` line first; grep the row templates for the rest). The Inbox's rows keep `data-find` and Snooze.
+
+**Done when** a Queue render's `.mailrow` elements carry no `data-find` and no Snooze, an Inbox render's carry both as before, no `subj` carries a `title` equal to its text, each under a test that fails when reverted, and the Inbox's find tests pass unchanged.
+
+---
+
+## TD-891: Build TD-888 (2): a Queue card's closed *details* read on its first open, `GET /api/fold?key=`
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-888's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Only what is shown*: *A row's folded details on a Queue card*), §4.5a *Inbox row: details*; `src/shiftlead/ui/templates/inbox_row.html` (the three `details class="fold"` blocks: a message's `s.rest`, a ledger row's detail, a board line's), `src/shiftlead/ui/app.py` (a new `/api/fold` route; the message page's one-entry read, `inbox_entry_page`), `src/shiftlead/ui/static/app.js` (the fold memory, `foldsOpen`/`foldsShut`, and the swap after a re-read); `tests/test_ui_queue_cards.py`, a new route test
+
+**Why:** TD-888: the closed folds of the live Queue's mail rows are 20 KB of its 141 KB gzipped (ledger rows 14 KB, board lines 5 KB, notes 2 KB) and none is shown at load; with TD-890 alone the page is still some 129 KB, over TD-888's 120 KB.
+
+**Fix:** each fold's body becomes one macro the row and the route both call. On the Queue a fold drawn closed is sent as its `<summary>` alone with an empty body; its first open fetches `GET /api/fold?key=<data-fold>`, which reads the one source the key names — a person-inbox entry as `inbox_entry_page` reads it, a board line from its board file, a ledger row from its repo's ledger (each the home's cached read, never the whole Queue view) — and answers the macro's HTML, under 200 ms to its first byte (`Server-Timing` as every route). The browser keeps each body by key while the page lives; after a re-read swaps the lists in, a fold in `foldsOpen` is filled from what it kept and read again. A fold drawn open (`fold_open`, an entry with `Answers:`, a press's detail) is sent whole; the Inbox and the message page send every fold whole. A key that names nothing answers 404 and the fold says *gone — reload*.
+
+**Done when** a Queue render's closed folds carry no body and its open ones do, `/api/fold` answers each of the three kinds with the same HTML the Inbox draws in that fold (a test per kind), a re-read keeps an opened fold's body, and the live Queue — after TD-890 and this are promoted — reads under 120 KB on the wire at load (a gzipped GET, read once the build is live, recorded here).
+
+---
+
+## TD-892: Build TD-888 (3): a Queue card's find text built in the browser from its ids and titles
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-888's design, the designer)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** design §4.5 *Page loads* (*Nothing the page does not read*), §4.5 screen 12 (*A pick answers in the browser*); `src/shiftlead/ui/templates/queue_card.html` (`data-find`), `src/shiftlead/ui/queue.py` (`_find_text`, `_finds`, `apply_picks`), `src/shiftlead/ui/static/app.js` (the Queue's picks, `AO.qPass`); `tests/test_ui_queue_picks.py`
+
+**Why:** TD-888: the open cards' `data-find` is 5 KB of the live Queue's 141 KB gzipped (77 KB raw over 201 cards), each a copy of ids and titles the card already draws. It is the margin that keeps the page under 120 KB as cards are added.
+
+**Fix:** an open card is sent without `data-find`; at load and after each re-read the page writes each card's find text from its `data-ids` and the `.qtitle`s it draws, by `_find_text`'s rule (each id whole and bare, every word lower-cased), into memory or the attribute, before the picks are applied. The server keeps `_find_text` for a URL's find on a load and for `find_miss`. A completed line keeps its `data-find` (its entries' titles are not drawn until it opens). A test feeds the same cards to `_find_text` and to the browser's builder and holds the two to one answer, as `rail_counts` is held.
+
+**Done when** a Queue render's open cards carry no `data-find`, a find typed in the browser hides and shows the same cards a load with `?find=` does (the parity test, for an id, a bare number and words), and the picks' tests pass.
+
+---
