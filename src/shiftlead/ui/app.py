@@ -144,17 +144,21 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_profiles,  # noqa: F401
     build_chip,  # noqa: F401
     checkout_of,  # noqa: F401
+    close_state,  # noqa: F401
     editor_file,  # noqa: F401
     editor_file_link,
     editor_link,  # noqa: F401
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
+    live_divider,  # noqa: F401
+    live_unknown,  # noqa: F401
     log,  # noqa: F401
     md,  # noqa: F401
     node_banner,  # noqa: F401
     node_org_note,  # noqa: F401
     org_here,  # noqa: F401
     page_origin,  # noqa: F401
+    promote_reading,  # noqa: F401
     repos_of,  # noqa: F401
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
