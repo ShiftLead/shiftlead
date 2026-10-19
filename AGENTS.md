@@ -171,6 +171,7 @@ header belong to dev-cadence: edit them there, never here.
 | What Grok Bot, Muse and Hermes Agent suggest shiftlead learn, what each lesson would touch, and the open question on each (for discussion) | [docs/decisions/2026-10-13-agent-product-lessons.md](docs/decisions/2026-10-13-agent-product-lessons.md) |
 | How shiftlead could make money without standing in the person's path, and the questions that decide it (for discussion) | [docs/decisions/2026-10-13-monetisation.md](docs/decisions/2026-10-13-monetisation.md) |
 | Why the person's view becomes a Queue of ranked effort cards beside a smaller Inbox, and how the rank is stored and read | [docs/decisions/2026-10-15-queue.md](docs/decisions/2026-10-15-queue.md) |
+| How a Queue card asks for the person's attention (Decide, Do, Read), what they do about it (Answer, Start session, ⋯), the Waiting group, and the one-sentence writing rule | [docs/decisions/2026-10-19-queue-card.md](docs/decisions/2026-10-19-queue-card.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | [docs/cadence.md](docs/cadence.md) |
 | Known issues and deferred work | [docs/technical_debt.md](docs/technical_debt.md) |
