@@ -552,6 +552,28 @@ HELP: tuple[Help, ...] = (
             "It is not a control: a card moves by its grip or ⤒ ↑ ↓, and an In progress card has no number."
         ),
     ),
+    Help(
+        "live-divider",
+        "live divider",
+        "Repo page: Merged",
+        (
+            "Draws one line across this list at the commit that is live: the closes above it, under not yet "
+            "live, are merged on main but not yet in the running copy, and the ones below it are. Read it "
+            "when you want to know whether a fix you saw merge is what runs now. It promotes nothing — the "
+            "Inbox's promote row does — and while live cannot be read the list draws no line and says why."
+        ),
+    ),
+    Help(
+        "live-mark",
+        "live mark",
+        "Queue page: Recently completed",
+        (
+            "Marks each completed line not yet live while the commit that closed it is merged on main but not"
+            " in the running copy, and live once it is. Read it before you try a fix you saw close, to know "
+            "whether you will meet the old code or the new. It speaks of the close and not the code, and says"
+            " nothing in a repo that does not promote or while live cannot be read."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -623,7 +645,8 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "held-missed",
         ),
     ),
-    ("queue", "Queue", ("up-next-number",)),
+    ("repo", "Repo page", ("live-divider",)),
+    ("queue", "Queue", ("up-next-number", "live-mark")),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )

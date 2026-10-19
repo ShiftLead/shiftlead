@@ -408,6 +408,7 @@ def reading(
             "lined": False,
             "archived": True,
             "closed": _closed(a["fields"], closed_at.get(q)),
+            "sha": (closed_at.get(q) or {}).get("sha"),  # the closing commit, the page's live mark (TD-904)
             "resolved": _resolved_text(a["fields"]),
         }
 
@@ -630,8 +631,8 @@ def _completed(
     """The completed cards (§4.4 *Completed cards*): the archive's components across repos none of
     whose members an open entry names and whose own `Blocked by:` names no open id, dated by the
     latest `Resolved:` date of its members, its PR from that line, else *What closed*. `entries` are its
-    members as the page opens the card — `qid`, `id`, `title`, `priority`, `closed` (`_closed`), `pr` and
-    `resolved`, the `Resolved:` text — newest first, and `at` the newest `closed`."""
+    members as the page opens the card — `qid`, `id`, `title`, `priority`, `closed` (`_closed`), `pr`, `sha`
+    (the closing commit, TD-904) and `resolved`, the `Resolved:` text — newest first, and `at` the newest `closed`."""
     named_by_open: set[str] = set()
     for e in open_.values():
         named_by_open.update(qid(e["repo"], b) for b in e.get("blocked_ids") or [])
@@ -678,6 +679,7 @@ def _completed(
                     "priority": (a.get("priority") or "").lower(),
                     "closed": _closed(a["fields"], closed_at.get(q)),
                     "pr": _resolved_pr(a["fields"]) or (closed_at.get(q) or {}).get("pr"),
+                    "sha": (closed_at.get(q) or {}).get("sha"),
                     "resolved": _resolved_text(a["fields"]),
                 }
             )

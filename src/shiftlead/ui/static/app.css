@@ -979,3 +979,10 @@ html[data-qpend] #queuelists, html[data-qpend] #qfilters { visibility: hidden; }
   .spendpage .shrole { grid-template-columns: 1fr auto; }
   .spendpage .shbarbox, .spendpage .shfin { grid-column: 1 / -1; }
 }
+/* the Merged column's live divider (§4.5a *Repo page, Merged: live divider*, TD-904): one line between
+   the closes not yet live and those that are */
+.repopage .rrow.livediv { border-top: 2px solid var(--strong); color: var(--strong); font-size: var(--t-small); padding: 5px 14px; align-items: center; }
+.repopage .rrow.livediv:first-child { border-top: 0; border-bottom: 2px solid var(--strong); }
+.repopage .rrow.livewords { font-size: var(--t-small); padding: 5px 14px; }
+.queuepage .qlive { font-size: var(--t-small); color: var(--muted); white-space: nowrap; }
+.queuepage .qlive.notlive { color: var(--warn-fg); }

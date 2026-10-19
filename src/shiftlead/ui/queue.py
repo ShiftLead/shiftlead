@@ -18,7 +18,7 @@ from urllib.parse import quote
 from sessionorc.queue import TD_REF, card_index  # noqa: F401 — the page's names for the home's
 from sessionorc.queue import refs as _refs
 
-from .common import _age, _instant
+from .common import _age, _instant, close_state, promote_reading
 
 # Recently completed's window picker (§4.5 screen 12, §4.5a *Queue page, Recently completed*): its
 # words, in order, and how far back each reaches; *day* is drawn first (26–69 entries close in a day)
@@ -302,7 +302,9 @@ def _mail_status(status: str, secs: Mapping[str, Any]) -> str:
     return "steer" if "steering" in secs else status
 
 
-def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def queue_view(
+    queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str, Any] | None = None, promotes: Any = None
+) -> dict[str, Any]:
     """The page's groups from the `queue` reading (§4.5 screen 12 *Groups*):
 
     - `completed`: `{lines, counts}` — one line per completed card (its age, the top entry's id, Priority
@@ -316,7 +318,9 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
     - `n`: the header's counts — cards, in progress, up next, and those whose status is *needs you*.
 
     `mail` is what is attached to each card (`attach`): its `sections`, *Needs you* drawn in the header and
-    the rest in the body, raising the card's status to *needs you* or *steer*."""
+    the rest in the body, raising the card's status to *needs you* or *steer*. `promotes` is the `host`
+    reading's: each completed line's `live` is its close's promote state, *not yet live* or *live* by the
+    newest close it holds, "" where its repo promotes nothing or live is unknown (§4.5 screen 12, TD-904)."""
     q = queue or {}
     cards = [c for c in q.get("cards") or [] if isinstance(c, Mapping) and c.get("top")]
     repos = {str(r) for c in cards for r in c.get("repos") or ()}
@@ -349,6 +353,13 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
     in_progress = [c for c in shaped if c.get("group") == "in_progress"]
     up_next = [c for c in shaped if c.get("group") == "up_next"]
 
+    readings: dict[str, Any] = {}
+
+    def live(repo: str, sha: Any) -> str:
+        if repo not in readings:
+            readings[repo] = promote_reading(promotes, name=repo)
+        return close_state(readings[repo], sha)
+
     lines: list[dict[str, Any]] = []
     for c in q.get("completed") or []:
         if not isinstance(c, Mapping):
@@ -379,6 +390,7 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
                     if e.get("resolved") or len(ents) > 1
                 ],
                 "wins": _wins(c.get("at") or c.get("closed"), at, now),
+                "live": live(str(c.get("id") or "").partition("#")[0], (ents[0] if ents else {}).get("sha")),
             }
         )
     for c in in_progress + up_next:
@@ -411,6 +423,7 @@ def queue_view(queue: Mapping[str, Any] | None, now: datetime, mail: Mapping[str
                     if r.get("resolved")
                     else [],
                     "wins": _wins(r.get("closed"), at, now),
+                    "live": live(str(r.get("repo") or str(r.get("qid") or "").partition("#")[0]), r.get("sha")),
                 }
             )
     lines = [ln for ln in lines if ln["wins"]]
