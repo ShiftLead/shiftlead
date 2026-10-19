@@ -72,11 +72,12 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
-| TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-901, TD-902, TD-903, TD-904 |
+| TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-901, TD-902, TD-903, TD-904, TD-905 |
 | TD-901 | Build TD-900 (1): the Queue numbers Up next per repo; a Repo page move's neighbours are the repo's own | Medium | Open |
 | TD-902 | Build TD-900 (2): the Org page is named Sessions — tab, title, help, keys, the design's words | Low | Open |
 | TD-903 | Build TD-900 (3): the Repo page's board — one column per stage of the team's flow | Medium | Open — blocked by TD-901 |
 | TD-904 | Build TD-900 (4): the live divider on Merged and the Queue's live / not yet live mark | Medium | Open |
+| TD-905 | Build TD-900 (5): the ledger row's controls, once — Done on every open row, Back to design, Hold with words | Medium | Open — blocked by TD-903 |
 
 ---
 
@@ -1512,8 +1513,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-18 (Paul, in an interactive session with the anchor)
 **Owner:** designer
 **Kind:** design-first
-**Status:** Designed (2026-10-18, Paul with the anchor session, in chat; the render Paul reviewed is `docs/mockups/reviews/2026-10-18-repo-stage-board.png`): §4.5 screen 1 (*Sessions*), screen 11 (*the board*, its columns, Review, Merged and the live divider), screen 12 (*Up next* per repo, the live mark on Recently completed); §4.4 *The Queue* (the reading's `places`) and *A move lands* (the Repo page's neighbours); §4.5a *Repo page: Technical debt cards* (now the board), *Repo page, Merged: live divider*, *Queue page, Recently completed: live mark*, *Queue page, Up next: the number*, the grip row; the glossary; design-history §4.4, §4.5, §4.5a. The builds are TD-901 (numbers per repo, first), TD-902 (the rename), TD-903 (the board, after TD-901) and TD-904 (the divider and the mark, beside TD-903).
-**Blocked by:** TD-901, TD-902, TD-903, TD-904
+**Status:** Designed (2026-10-18, Paul with the anchor session, in chat; the render Paul reviewed is `docs/mockups/reviews/2026-10-18-repo-stage-board.png`): §4.5 screen 1 (*Sessions*), screen 11 (*the board*, its columns, Review, Merged and the live divider), screen 12 (*Up next* per repo, the live mark on Recently completed); §4.4 *The Queue* (the reading's `places`) and *A move lands* (the Repo page's neighbours); §4.5a *Repo page: Technical debt cards* (now the board), *Repo page, Merged: live divider*, *Queue page, Recently completed: live mark*, *Queue page, Up next: the number*, the grip row; the glossary; design-history §4.4, §4.5, §4.5a. The builds are TD-901 (numbers per repo, first), TD-902 (the rename), TD-903 (the board, after TD-901), TD-904 (the divider and the mark, beside TD-903) and TD-905 (the ledger row's controls — Done on every row, Back to design, Hold with words — after TD-903). Amended the same day: For you is the card status *waits on the person* (§4.4 *The card's status*), and every control on a row is the Queue row partial's, drawn once on every page (§4.5 screen 12 *any open row*).
+**Blocked by:** TD-901, TD-902, TD-903, TD-904, TD-905
 **Location:** design §4.5 screens 1, 11, 12; §4.4 *The Queue*; §4.5a; `docs/mockups/reviews/2026-10-18-repo-stage-board.png` and `-live.png`
 
 **Why:** Paul, 2026-10-18: the Org page's name felt off — it is where the person sees what is running and starts interactions, so *Sessions*; and with the Queue built, the Repo page's Technical debt section was the Queue's cards drawn again in Queue order, its Open PRs and Recently completed lists beside them. *Redundant information isn't necessarily bad if it gives another perspective*: the Queue's axis is rank across repos, the Sessions page's is people by place, and nothing drew one repo **by stage** — the balance the page was designed to show (TD-176, §10). Two more asks fit the same page: the Queue's Up next numbers per repo (*ao-grind would have 1, 2, 3 and samscrape its own 1, 2, 3 … that is actually more truthful*), and *something to show the PR most recently promoted*, which on the board is a line across the Merged column, since one promote makes every PR merged before it live at once, and on the Queue a mark on each completed line. Checked before designing: no open PR touches the Queue or the Repo page; TD-888's three builds merged 2026-10-18; TD-772 (the Queue's two-week trial, until 2026-10-30) reads back lane behaviour and is not touched — the number's definition changes, the rank and the lanes' pick order do not.
@@ -1604,5 +1605,26 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the live Repo page's Merged column shows the line at the live commit after a promote, the Queue's lines carry the mark, and a test per state (live, not yet live, held, no block).
 
 **Related:** TD-900, TD-903, TD-539 (the build chip's reading), TD-226 (the rollback and its hold).
+
+---
+
+## TD-905: Build TD-900 (5): the ledger row's controls, once — Done on every open row, Back to design, Hold with words — on the Queue card, the Repo page's board and the Inbox's ledger row
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-903
+**Location:** `src/shiftlead/ui/templates/queue_row.html` and the Inbox's ledger-row renderer (the one place a row's controls live), `src/shiftlead/ui/static/app.js` (the Reply road's fixed words beside *done* and *go ahead*; the words box), `src/shiftlead/ui/app.py` (`board_reply`), `td_hold` (`why` on the record, `src/sessionorc/`), `ao td hold --why` (`src/shiftlead/cli.py` or where `td hold` lives), the session that reads a decided board line and edits the ledger (the words *back to design* → `Kind: design-first`, `Owner: designer`, a Status line); `tests/test_ui_queue.py`, `tests/test_ui_repo_page.py`, `tests/test_settle.py`, the board-road tests
+
+**Why:** TD-900: design §4.5 screen 12 *any open row*, §4.5a *Queue card: what needs the person* and *Repo page: Hold / Release on an entry*, §4.4 *Hold* (`why`), §4.7 `ao td hold --why`. Paul, 2026-10-18: *add a Back to design option on the Queue page*; and the controls must not say the same thing two ways — Stop was Hold on a claimed entry, Close was Done, Needs me was Hold with a reason, so only Back to design is new, and every one is defined once on the row partial.
+
+**Fix:** (1) **Done** on every open ledger row, the same road and words, the session's archive step unchanged; (2) **Back to design** on a `build`, `live-check` or `evaluation` row: a one-line words box, the Reply road with *back to design — <words>*, the reading session's edit (`Kind: design-first`, `Owner: designer`, Status line with the words, the holder told to drop it first as `td_hold`'s `told` does), the row reading *waiting on them*; (3) **Hold…** with an optional line, `td_hold {why}`, `held: {at, by, why}` on the record, drawn *held (person) — <why>* wherever the mark is, `ao td hold --why`; (4) nothing Repo-page-only: a test that the board's row and the Queue card's row are one partial.
+
+**Done when** the live Queue's card rows and the live board's rows both show Done, Back to design and Hold…, a Back to design press lands the Kind change by PR, and a hold's words are on the record and the row.
+
+**Related:** TD-900, TD-903, TD-770, TD-731, TD-707.
 
 ---
