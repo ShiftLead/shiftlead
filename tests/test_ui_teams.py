@@ -1,4 +1,4 @@
-"""The Org page's **Teams** strip and New session's **Project** picker (design §4.5a, §4.9), with
+"""The Sessions page's **Teams** strip and New session's **Project** picker (design §4.5a, §4.9), with
 the RPC mocked the way `test_cli_teams.py` mocks it — no agent, no tmux, no session ever created.
 
 The strip's Start and Stop are `shiftlead.teamrun`'s, the very sequence `ao team start|stop` runs;
@@ -66,12 +66,12 @@ class Fleet:
             }
             self.sessions.append(rec)
             return rec
-        if method == "host":  # the Org page's node line (design §4.4a): this fake is a home
+        if method == "host":  # the Sessions page's node line (design §4.4a): this fake is a home
             return {
                 "host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {},
                 "waiting": self.waiting,
             }  # fmt: skip
-        if method == "inbox":  # the Org top bar's person inbox count (design §4.5a)
+        if method == "inbox":  # the Sessions top bar's person inbox count (design §4.5a)
             return {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0}
         if method == "identity":  # the teams line's identity note (design §4.8a, TD-077 step 2)
             return {"host": HOST, "mode": "off", "detached_check": False, "tally": {}, "alarms": [], "sessions": {}}
@@ -159,7 +159,7 @@ def badged(name, team, project="ao", state="working", unattended=True):
     }  # fmt: skip
 
 
-# ── the strip's contents (design §4.5a Org **Teams** strip) ───────────────────────────────────
+# ── the strip's contents (design §4.5a Sessions **Teams** strip) ───────────────────────────────────
 
 
 def test_an_old_key_is_refused_by_name_with_its_fix(world):
@@ -363,7 +363,7 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
     assert "It first closes grind-1, orc-ao" in head  # the confirm names what the Start closes
     # a concluded team is live: it keeps its place among the live ones, in definition order — before
-    # a badge no definition holds (§4.9 *The Org page*, TD-725)
+    # a badge no definition holds (§4.9 *The Sessions page*, TD-725)
     assert html.index('data-team="ao-grind"') < html.index('data-team="adhoc"')
     # every declaration out of work: the header says so
     fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "out_of_work": out}

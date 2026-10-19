@@ -82,7 +82,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   person's to turn on and is off by default. A restart re-creates a session the person or
   `ao team start` already chose to run — same name, directory, worktree, profile, brief, lane,
   role, badges and `controllers` — and supersedes its record in place (§4.1), so nothing appears on
-  the Org that a person did not put there. It replays the session's **launch record**: at every
+  the Sessions page that a person did not put there. It replays the session's **launch record**: at every
   create whose record carries `supervised` — attended or not, so a *Resume with changes…* that
   leaves *Unattended* off still writes one and a later Hand back replays the person's latest
   choices — the host agent writes `launch/<id>.json` under its home — the adapter, the profile, the
@@ -1273,7 +1273,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       after the agent. The address is read from the installed unit's `ExecStart` (`--bind` and
       `--port` in `shiftlead-ui.service`): loopback when `--bind` is absent or `0.0.0.0`, and
       `DEFAULT_PORT` when the unit is absent or names no port.
-    - It loads the Org (`/`), the Inbox (`/inbox`), the Queue (`/queue`), the Repo
+    - It loads the Sessions page (`/`), the Inbox (`/inbox`), the Queue (`/queue`), the Repo
       (`/repo/shiftlead`) and Settings (`/settings`). **It loads no Focus**: opening one is the
       person's *seen* (§4.2), and its attach sizes the pane (§4.6). Both are the person's acts.
     - A page fails on any of: a status other than 200; a body that does not end its `</html>`;
@@ -1283,7 +1283,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
       failed smoke puts back what was live, and a slow page is not a broken one, so rolling back a
       working build over a budget would cost more than the slowness (the reach loads are told for the
       same reason).
-    - Where `settings.yml` has a `reach:`, it loads the Org and the Queue once more through
+    - Where `settings.yml` has a `reach:`, it loads the Sessions page and the Queue once more through
       `reach.url`, the route the person uses. Those loads are told and fail nothing: whether the
       home's own request carries an identity the route allows is the route's business, not the
       build's. A refusal is written in the log and on the note.

@@ -156,7 +156,7 @@ def test_the_focus_header_offers_transcript_only_with_a_tool_session_id(tmp_path
 
     def focus(**rec):
         v = view({**REC, "state": "idle", **rec})
-        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Sessions")
 
     html = focus()
     button = re.search(
@@ -190,7 +190,7 @@ def test_the_focus_header_offers_the_transcript_file_in_the_editor(tmp_path, mon
 
     def focus(**rec):
         v = view({**REC, "host": "kmaster", "state": "idle", **rec})
-        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Sessions")
 
     def link(html):
         m = re.search(r'<a class="editor btn sm link[^"]*" id="ftranscript_editor"[^>]*>', html)

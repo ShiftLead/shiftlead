@@ -13,7 +13,7 @@
   no env-var overrides). A field the *agent* acts on (`runs_keep_days`) is read on the session host
   from its own file's `local` entry, so every session host carries its own copy. `local.name`, `home:` and `local.identity`
   are read by the host agent **once, at its start**, and by the UI on every request, so a hand edit
-  of one leaves the two disagreeing until the agent restarts: the Org page then says so in one line
+  of one leaves the two disagreeing until the agent restarts: the Sessions page then says so in one line
   under the node banner — *hosts.yml changed: name kmaster → box — restart pending* — naming each
   value that moved, the agent's (from its `host` and `identity` answers) against the file's.
   A node's `link:`
@@ -90,7 +90,7 @@ reach:                                        # §4.5b *The setting*: the person
   last settings a node was sent stay in force until its next dial; `set_settings` at a node is
   forwarded while the link is up and refused offline in the words the home-owned edits use.
   **`ui.yml` is retired**: its one key, `open_in:`, lives under `person:`; a `ui.yml` still on disk
-  is not read: the agent's `settings` read names it (`migrate`), and the Org's teams line — the
+  is not read: the agent's `settings` read names it (`migrate`), and the Sessions page's teams line — the
   Settings page too, once built — says *migrate: ui.yml is no longer read*. The UI reads
   `person:` through that read, at most every five seconds, before it serves a request, and keeps the
   last answer when a read fails. What `person.open_in` takes is what `ui.yml` took, the editor button of the card and of the

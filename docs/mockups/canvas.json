@@ -2,7 +2,7 @@
   "artboards": [
     {
       "file": "Main.dc.html",
-      "title": "Org \u2014 desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)",
+      "title": "Sessions \u2014 desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)",
       "x": 0,
       "y": 0,
       "w": 1440,
@@ -130,7 +130,7 @@
     },
     {
       "file": "Phone.dc.html",
-      "title": "Org \u2014 phone",
+      "title": "Sessions \u2014 phone",
       "x": 1540,
       "y": 0,
       "w": 390,
@@ -226,7 +226,7 @@
     },
     {
       "file": "MainDark.dc.html",
-      "title": "Org \u2014 dark",
+      "title": "Sessions \u2014 dark",
       "x": 3120,
       "y": 2420,
       "w": 1440,
@@ -234,7 +234,7 @@
     },
     {
       "file": "OrgTeamFirst.dc.html",
-      "title": "Org \u2014 team-first (the design, 2026-09-26; checked in from the canvas)",
+      "title": "Sessions \u2014 team-first (the design, 2026-09-26; checked in from the canvas)",
       "x": 3120,
       "y": 4080,
       "w": 1440,

@@ -1,4 +1,4 @@
-"""TD-176 slice 3, design §4.5 screen 1 *The Org, team-first*: a live team's card carries a summary
+"""TD-176 slice 3, design §4.5 screen 1 *The Sessions page, team-first*: a live team's card carries a summary
 of three facets — Repo, TDs in motion, Answer needed / Doing — and its members are compact cards."""
 
 from __future__ import annotations
@@ -372,7 +372,7 @@ def test_compact_in_marks_every_team_member_and_no_team_none():
     assert ui.compact_in({**v, "team": ""}, [member("x")]).get("compact") is None
 
 
-# -- the Org rollup (TD-176 slice 4, §4.5a *Org: rollup*) --------------------------------------------
+# -- the Org rollup (TD-176 slice 4, §4.5a *Sessions: rollup*) --------------------------------------------
 
 
 def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
@@ -414,7 +414,7 @@ def test_the_rollup_sums_the_live_teams_and_counts_a_shared_repo_once():
 
 
 def test_with_no_team_live_the_rollup_is_needs_you_alone():
-    """§4.5a *Org: rollup* (TD-406): with no team live there is nothing to sum, and the Inbox's count
+    """§4.5a *Sessions: rollup* (TD-406): with no team live there is nothing to sum, and the Inbox's count
     and its overdue still need a place — the Needs you facet alone, *in the Inbox*, no team rows."""
     html = ui.templates.get_template("rollup.html").render(ro=ui.rollup([]), person_needs=7, person_overdue=2)
     assert 'class="rollup quiet"' in html and "Needs you" in html
@@ -430,7 +430,7 @@ def _live(team: str, *ms: dict) -> list[dict]:
 
 
 def test_the_rollup_with_zero_one_and_two_live_teams():
-    """§4.5a *Org: rollup* (TD-418, built by TD-428 slice 2): no team live — Needs you alone (TD-406);
+    """§4.5a *Sessions: rollup* (TD-418, built by TD-428 slice 2): no team live — Needs you alone (TD-406);
     one — Agents and Needs you, that team's own facets saying the rest; two — all four. Agents' blurb is
     an *i* (a tooltip, nothing to press) and nothing is written under the pills; *answer needed* is
     drawn above 0 only."""
@@ -495,7 +495,7 @@ def test_a_stopped_team_draws_only_the_facets_that_hold_something():
     assert g["summary"]["drawn"] == []
     page = ui.templates.get_template("org.html").render(
         sessions=g["members"], groups=[g], counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
-        strip={"teams": [{"name": "grind"}], "source": "", "notes": []}, host="h", active="Org",
+        strip={"teams": [{"name": "grind"}], "source": "", "notes": []}, host="h", active="Sessions",
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
     assert 'class="tsum"' not in page
@@ -516,7 +516,7 @@ def test_an_answer_or_an_ask_alone_draws_the_face_facet():
 
 
 def test_the_facets_heads_and_bars_are_one_height_and_the_summary_is_sized_by_what_it_holds():
-    """§4.5a *Org: rollup*, *team card: summary* and *Repo facet* (TD-418): every facet head one height
+    """§4.5a *Sessions: rollup*, *team card: summary* and *Repo facet* (TD-418): every facet head one height
     (the window picker's), the bars and blocks one height so they line up, a label that never wraps
     with the selector dropping to its own line at the right, the summary in 1.15 : 0.85 : 1.2, and
     Doing's head the word alone."""
@@ -543,7 +543,7 @@ def test_every_card_carries_the_word_the_state_filter_matches():
 
 
 def test_the_rollup_counts_the_board_items_past_their_date_beside_in_the_inbox():
-    """§4.5 screen 1 and §4.5a *Org: rollup* (TD-178): *n in the Inbox · m overdue* — the Needs you
+    """§4.5 screen 1 and §4.5a *Sessions: rollup* (TD-178): *n in the Inbox · m overdue* — the Needs you
     board items whose `Due:` date has passed, never one due today; nothing overdue draws no count."""
     from datetime import UTC, datetime, timedelta
 

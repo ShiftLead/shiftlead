@@ -29,7 +29,7 @@ def _focus(monkeypatch, tmp_path, composer=None, **rec):
     from shiftlead.ui.app import templates, view
 
     v = view({**BASE, "dir": str(tmp_path), **rec})
-    ctx = {"s": {**v, "grants_all": [], "ready": []}, "host": "h", "active": "Org", "popped": False}
+    ctx = {"s": {**v, "grants_all": [], "ready": []}, "host": "h", "active": "Sessions", "popped": False}
     if composer:
         ctx["composer"] = composer
     return templates.get_template("focus.html").render(**ctx)

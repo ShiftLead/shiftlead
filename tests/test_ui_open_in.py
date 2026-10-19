@@ -108,7 +108,7 @@ def test_the_org_page_names_a_refused_value(home, monkeypatch):
     write(home, "open_in: cursor\n")
     html = templates.get_template("org.html").render(
         sessions=[], groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
-        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
+        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Sessions",
         agent_down=False, volatile=False, usage={}, editor_note=uiconf.open_in().error,
     )  # fmt: skip
     assert 'id="editornote"' in html and "open_in refused" in html
@@ -123,7 +123,7 @@ def test_the_card_and_focus_draw_the_persons_label_escaped_and_none_draws_nothin
     write(home, "open_in: {label: 'Zed <x>', url: 'zed://ssh/{remote}{path}'}\n")
     card = templates.get_template("card.html").render(s=view(rec))
     assert 'class="btn sm link editor"' in card and "‹› Zed &lt;x&gt;</a>" in card
-    focus = templates.get_template("focus.html").render(s={**view(rec), "grants_all": []}, host="h", active="Org")
+    focus = templates.get_template("focus.html").render(s={**view(rec), "grants_all": []}, host="h", active="Sessions")
     assert "‹› Zed &lt;x&gt;</a>" in focus
     write(home, "open_in: none\n")
     assert (
@@ -147,7 +147,7 @@ def test_a_failed_read_keeps_the_last_and_a_retired_ui_yml_is_named(home):
 
     html = templates.get_template("org.html").render(
         sessions=[], groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
-        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
+        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Sessions",
         agent_down=False, volatile=False, usage={}, editor_note="", migrate_note=uiconf.migrate_note(),
     )  # fmt: skip
     assert 'id="migratenote"' in html and "ui.yml is no longer read" in html

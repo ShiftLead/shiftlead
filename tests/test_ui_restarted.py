@@ -106,7 +106,7 @@ def test_the_card_and_the_focus_draw_the_chip_and_a_seat_never(tmp_path, monkeyp
         and ">restarted · brief</span>" in r4
     )
     focus = templates.get_template("focus.html").render(
-        s={**v, "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions", popped=False
     )
     chip = focus[focus.index('id="frestarted"') - 40 :]
     chip = chip[: chip.index("</span>")]
@@ -119,7 +119,7 @@ def test_the_card_and_the_focus_draw_the_chip_and_a_seat_never(tmp_path, monkeyp
         assert 'class="badge restarted"' not in templates.get_template("card.html").render(s=sv)
     plain = view({**base, "restarts": []})
     focus = templates.get_template("focus.html").render(
-        s={**plain, "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+        s={**plain, "grants_all": [], "ready": []}, host="h", active="Sessions", popped=False
     )
     assert 'class="badge restarted hidden" id="frestarted" data-until=""' in focus
 

@@ -1,4 +1,4 @@
-"""The Org page's team groups (design §4.5a **team groups** / **team badge**, §4.9): the pure
+"""The Sessions page's team groups (design §4.5a **team groups** / **team badge**, §4.9): the pure
 grouping function, and one render of the page template over its output."""
 
 from __future__ import annotations
@@ -169,7 +169,7 @@ def test_a_team_with_no_lead_and_the_needs_you_count():
 def test_unbadged_sessions_form_the_no_team_group_last():
     views = [sess("ao-x", "x"), sess("ao-orc", "orc", team="t", caps=["control"])]
     groups = team_groups(views)
-    # in no registered repo here, so *No repo* (§4.9 *The Org page*, TD-725): `org_layout` splits it by repo
+    # in no registered repo here, so *No repo* (§4.9 *The Sessions page*, TD-725): `org_layout` splits it by repo
     assert [g["label"] for g in groups] == ["t", "No repo"]
     assert groups[-1]["team"] == "" and groups[-1]["manager"] is None
 
@@ -222,7 +222,7 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
         counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
         strip={"teams": [], "source": "", "notes": []},  # the Teams strip: its own tests are in test_ui_teams.py
         host="kmaster",
-        active="Org",
+        active="Sessions",
         agent_down=False,
         volatile=False,
         usage={},
@@ -252,7 +252,7 @@ def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
 
 
 def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(monkeypatch, tmp_path):
-    """design §4.5a Org top bar **Inbox** (TD-069 step 1, 2026-09-19): the control is a link to
+    """design §4.5a Sessions top bar **Inbox** (TD-069 step 1, 2026-09-19): the control is a link to
     `/inbox` — the dialog it opened until then is retired — and its number, the **Needs you**
     section, shows at one and not at zero. Its hover text says what it counts and that it is not
     the Org's needs-you count."""
@@ -267,7 +267,7 @@ def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(mo
             counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
             strip={"teams": [], "source": "", "notes": []},
             host="kmaster",
-            active="Org",
+            active="Sessions",
             agent_down=False,
             volatile=False,
             usage={},
@@ -279,7 +279,7 @@ def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(mo
         assert 'id="personinbox"' in html and 'href="/inbox"' in html
         assert 'id="personbox"' not in html and 'id="personlist"' not in html  # the dialog is gone
         # §4.5a, TD-069 step 2: the two counts say precisely how they differ, not merely that they do
-        assert "the session states the Org counts too" in html and "the states alone" in html
+        assert "the session states the Sessions page counts too" in html and "the states alone" in html
     assert 'class="badge needs hidden" id="personneeds"></span>' in zero
     assert 'class="badge needs" id="personneeds">1</span>' in one
 
@@ -321,7 +321,7 @@ def test_focus_offers_close_only_when_the_checklist_passes(monkeypatch, tmp_path
 
     def focus(**rec):
         v = view({**base, **rec}, [])
-        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+        return templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Sessions")
 
     def tag(html, ident):
         return re.search(rf'<[a-z]+ [^>]*id="{ident}"[^>]*>', html, re.S).group(0)
@@ -396,7 +396,7 @@ def test_the_teams_line_says_the_identity_mode_unless_the_host_enforces_it(tmp_p
     def page(note):
         return templates.get_template("org.html").render(
             sessions=[], groups=None, strip={"teams": [{"name": "t"}], "source": "x", "notes": [], "elsewhere": ""},
-            counts={}, host="kmaster", active="Org", agent_down=False, volatile=False, usage={},
+            counts={}, host="kmaster", active="Sessions", agent_down=False, volatile=False, usage={},
             person_needs=0, node_banner="", identity_note=note,
         )  # fmt: skip
 
@@ -423,7 +423,7 @@ def test_the_org_says_restart_pending_when_hosts_yml_moved_under_the_agent(tmp_p
 
     html = templates.get_template("org.html").render(
         sessions=[], groups=None, strip={"teams": [{"name": "t"}], "source": "x", "notes": [], "elsewhere": ""},
-        counts={}, host="box", active="Org", agent_down=False, volatile=False, usage={},
+        counts={}, host="box", active="Sessions", agent_down=False, volatile=False, usage={},
         person_needs=0, node_banner="", identity_note="", restart_note=note,
     )  # fmt: skip
     assert 'id="restartnote"' in html and "restart pending" in html
@@ -453,7 +453,7 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     }
     html = templates.get_template("org.html").render(
         sessions=[], groups=None, strip={"teams": [], "source": "", "notes": [], "elsewhere": ""},
-        counts={}, host="kmaster", active="Org", agent_down=False, volatile=False, usage=usage,
+        counts={}, host="kmaster", active="Sessions", agent_down=False, volatile=False, usage=usage,
         person_needs=0, node_banner="", identity_note="",
     )  # fmt: skip
     assert "grind · week 88%" in html and "5h 19%" not in html.split("grind · week 88%")[1].split("</span>")[0]
@@ -782,7 +782,7 @@ def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path,
             "tail": ["…"], "created": "2026-09-21T00:00:00Z"}  # fmt: skip
     card, focus = templates.get_template("card.html"), templates.get_template("focus.html")
     assert view(base)["brief_changed"] is None and "brief changed" not in card.render(s=view(base))
-    hidden = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org")
+    hidden = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Sessions")
     assert 'class="badge bc hidden" id="fbc"' in hidden
 
     bc = {"at": "2026-09-26T20:02:00Z", "paths": ["/r/docs/briefs/manager-ao-1.md", "/v/briefs/manager.md"]}
@@ -790,7 +790,7 @@ def test_the_brief_changed_chip_names_the_files_and_is_never_pressable(tmp_path,
     assert v["brief_changed"]["text"] == "brief changed"
     assert "manager-ao-1.md, manager.md · changed 2026-09-2" in v["brief_changed"]["full"]
     pages = [("card", card.render(s=v))]
-    pages.append(("focus", focus.render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")))
+    pages.append(("focus", focus.render(s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions")))
     for where, html in pages:
         assert "brief changed" in html and "manager-ao-1.md" in html, where
         if where == "focus":
@@ -834,7 +834,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     v = view({**base, "restart_wanted": said})
     assert v["restart_wanted"]["why"].startswith("TD-090") and v["restart_wanted"]["early"] is False
     pages = [("card", card.render(s=v))]
-    pages.append(("focus", focus.render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")))
+    pages.append(("focus", focus.render(s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions")))
     for where, html in pages:
         assert "restart wanted" in html, where
         assert "TD-090 is half done" in html, where  # the why is the hover: a card cannot hold it
@@ -845,7 +845,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     early = view({**base, "restart_wanted": {**said, "early": True}})
     assert early["restart_wanted"]["early"] is True
     pages = [("card", card.render(s=early))]
-    pages.append(("focus", focus.render(s={**early, "grants_all": [], "ready": []}, host="h", active="Org")))
+    pages.append(("focus", focus.render(s={**early, "grants_all": [], "ready": []}, host="h", active="Sessions")))
     for where, html in pages:
         assert "restart wanted · early" in html, where
         assert "a controller does not act on it" in html, where  # the hover says why it is different
@@ -862,7 +862,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     again = view({**base, "restart_wanted": {**said, "early": True, "repeat": {"ref": "TD-229"}, "decided": words}})
     assert again["restart_wanted"]["repeat"] == "TD-229" and early["restart_wanted"]["repeat"] == ""
     pages = [("card", card.render(s=again))]
-    pages.append(("focus", focus.render(s={**again, "grants_all": [], "ready": []}, host="h", active="Org")))
+    pages.append(("focus", focus.render(s={**again, "grants_all": [], "ready": []}, host="h", active="Sessions")))
     for where, html in pages:
         assert "restart wanted · repeats TD-229" in html and "· early" not in html, where
         assert f"{words}, so a controller does not act on it" in html, where
@@ -874,7 +874,7 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     # render keeps them current: Focus re-renders its header in place rather than being replaced
     # whole like a card, so a chip drawn only at load would go stale the moment a watched session
     # declared a restart or claimed again (review of PR #323) — the `#fsuspended` shape
-    plain = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org")
+    plain = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Sessions")
     assert 'id="frw"' in plain and 'id="foow"' in plain
     assert "badge rw hidden" in plain and "badge oow hidden" in plain  # present, not shown
     js = (pathlib.Path(__file__).parents[1] / "src/shiftlead/ui/static/app.js").read_text()
@@ -1075,7 +1075,9 @@ def test_ready_to_close_on_focus_says_close_session_as_the_header_does(tmp_path,
     from shiftlead.ui.app import templates, view
 
     s = view(_card(state="idle", created="2026-09-21T00:00:00Z"))
-    html = templates.get_template("focus.html").render(s={**s, "grants_all": [], "ready": []}, host="h", active="Org")
+    html = templates.get_template("focus.html").render(
+        s={**s, "grants_all": [], "ready": []}, host="h", active="Sessions"
+    )
     btn = html.split('id="closebtn"')[1].split("</button>")[0]
     assert btn.endswith(">Close session") and 'title="Kills the session' in btn
 
@@ -1153,7 +1155,7 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
 
 def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count():
     """Design §4.5 *The card's anatomy* (TD-095): the header carries the host its sessions share —
-    *mixed* where they do not; the repo is its heading's (§4.9 *The Org page*, TD-725) — and the
+    *mixed* where they do not; the repo is its heading's (§4.9 *The Sessions page*, TD-725) — and the
     counts by state in the grid's order, *needs you* being its ringed mark instead; *No repo* is
     headed by its count and nothing else."""
     from shiftlead.ui.app import group_place, state_counts, team_groups, templates
@@ -1204,7 +1206,7 @@ def test_within_one_urgency_the_persons_own_sort_first_and_the_card_says_it_is_m
     assert "(!!b.dataset.mine - !!a.dataset.mine)" in js  # the page's re-sort keeps the same key
     html = templates.get_template("org.html").render(
         sessions=vs, groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
-        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
+        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Sessions",
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
     assert 'id="mine"' not in html and 'id="showcmd"' not in html  # the words replaced them (TD-428)
@@ -1350,13 +1352,13 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
     # …and the Focus header shows it regardless, hidden (not absent) when there is none
     focus = templates.get_template("focus.html")
     html = focus.render(
-        s={**q, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Org"
+        s={**q, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Sessions"
     )
     assert 'id="fgated"' in html and g["text"] in html
     plain = view(_card())
     assert plain["gated"] is None
     html = focus.render(
-        s={**plain, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Org"
+        s={**plain, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Sessions"
     )
     assert 'class="badge gated hidden" id="fgated"' in html
 
@@ -1527,7 +1529,7 @@ def test_a_defined_team_ends_its_grid_in_the_plus_card_and_no_team_has_none(monk
         counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
         strip={"teams": [], "source": "", "notes": []},
         host="kmaster",
-        active="Org",
+        active="Sessions",
         agent_down=False,
         volatile=False,
         usage={},
@@ -1745,7 +1747,7 @@ def test_a_shell_past_shell_wait_still_fails_ready_to_close_and_offers_close_on_
     card = templates.get_template("card.html").render(s=v)
     close = re.search(r'<button data-act="close"[^>]*>', card).group(0)
     assert "disabled" not in close and 'data-confirm="Close kills: python -m http.server 8000 · running 3h 2m"' in close
-    focus = templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Org")
+    focus = templates.get_template("focus.html").render(s={**v, "grants_all": []}, host="h", active="Sessions")
     menu = re.search(r'<button id="fclosemenu"[^>]*>', focus, re.S).group(0)
     assert "disabled" not in menu and "Close kills: python -m http.server" in menu
     # a team member: no Close offered over the shell

@@ -1412,7 +1412,7 @@
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
   };
 
-  // design §4.5a Org top bar **Inbox** (§4.5 screen 6, TD-069 step 1). The control is a link to
+  // design §4.5a Sessions top bar **Inbox** (§4.5 screen 6, TD-069 step 1). The control is a link to
   // `/inbox`, and its number is that page's **Needs you** section — computed server-side in one
   // place (`inbox_sections`), so the top bar and the page cannot disagree. No session record holds
   // the person inbox, so nothing on the pushed stream carries it: this polls the same route the
@@ -1530,7 +1530,7 @@
       const to = e.currentTarget.dataset.href;
       if (to) { e.preventDefault(); e.stopPropagation(); location.href = to; }
     });
-    // the Org page and the Inbox page render the count server-side; every other page reads it at
+    // the Sessions page and the Inbox page render the count server-side; every other page reads it at
     // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.
     // The Org reads it at load too: its number is server-rendered, but the team headers' *answered
     // for you* marks are counted in the browser (§4.9b) and would otherwise wait a whole poll.
@@ -2058,7 +2058,7 @@
       sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
     });
     // a repo's line, and a project's heading, hide when the filter hides everything under them
-    // (§4.9 *The Org page*, TD-725), and show again with the first match
+    // (§4.9 *The Sessions page*, TD-725), and show again with the first match
     $$("#groups .rline").forEach((line) => {
       line.hidden = filtering && !sections().some((s) => s.dataset.repo === line.dataset.repo && !s.hidden);
     });
@@ -2084,7 +2084,7 @@
     let at = 0;  // where the next element goes among `#groups`' children: headings and lines count too
     const lines = $$("#groups .phead, #groups .rline"), kept = [];
     wanted.forEach((g) => {
-      // a project heading or a repo's line (§4.9 *The Org page*, TD-725): swapped whole, in the server's order
+      // a project heading or a repo's line (§4.9 *The Sessions page*, TD-725): swapped whole, in the server's order
       if (g.kind === "heading" || g.kind === "repo") {
         const tpl = document.createElement("template"); tpl.innerHTML = g.html.trim();
         const fresh = tpl.content.firstElementChild, old = lines.find((l) => l.dataset.key === g.key);
@@ -2261,7 +2261,7 @@
         b.setAttribute("aria-expanded", folded ? "false" : "true");
         b.setAttribute("aria-controls", body.map((el) => el.id).join(" "));
       }
-      // a folded team's header is a stop in the ring in place of its cards (§4.5a *Org: keys*)
+      // a folded team's header is a stop in the ring in place of its cards (§4.5a *Sessions: keys*)
       if (head) { if (b) head.tabIndex = folded ? 0 : -1; else head.removeAttribute("tabindex"); }
     });
     // a header re-rendered for a delta must not re-arm a request in flight
@@ -2285,7 +2285,7 @@
   }
   function syncSummaries() {
     AO.showDoingAges(); // the Doing rows just swapped in: their tooltips in the reader's clock (TD-232)
-    // the rollup's window picker is the same one value (§4.5a *Org: rollup*), and its *in the
+    // the rollup's window picker is the same one value (§4.5a *Sessions: rollup*), and its *in the
     // Inbox* is the top bar's count
     const ro = $("#rollup .rollup");
     if (ro) {
@@ -5736,7 +5736,7 @@
   // button whose label is one of those words; `move`, `g`, `focus` and `help` are the few keys
   // that press nothing: moving the ring, the team jump, the filter box, and this list.
   AO.KEYS = [
-    { keys: ["1"], page: "all", control: "Org", sel: '.topbar .tab[href="/"]' },
+    { keys: ["1"], page: "all", control: "Sessions", sel: '.topbar .tab[href="/"]' },
     { keys: ["2"], page: "all", control: "Inbox", sel: "#personinbox" },
     { keys: ["n"], page: "all", control: "New session", sel: '.topbar a[href="/new"]' },
     { keys: ["/"], page: "all", control: "the filter box (Esc leaves it)", sel: "#filter, #ifilter", focus: true },
@@ -5780,7 +5780,7 @@
     // — an `ask`'s suggested answers, a board item's answers — in the order written (TD-254, TD-255).
     // `1` and `2` are the page's on any row without them: `AO.keyAnswers` is where they yield.
     { keys: ["g"], page: "inbox", ring: true, control: "Go with it", sel: "button", text: ["Go with it", "Go with it: Works"] },
-    { keys: ["1", "2", "3", "4"], page: "inbox", ring: true, control: "its answers, in the order written (a row without any: 1 Org, 2 Inbox)", sel: ".btn.answer", nth: true },
+    { keys: ["1", "2", "3", "4"], page: "inbox", ring: true, control: "its answers, in the order written (a row without any: 1 Sessions, 2 Inbox)", sel: ".btn.answer", nth: true },
   ];
   AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/inbox/") ? "msg" : path.startsWith("/focus/") ? "focus" : "other");
   // the message page's one row is its entry: its keys press that row's controls, never a thread's

@@ -1247,7 +1247,7 @@ def state_counts(members: list[dict[str, Any]]) -> list[str]:
 
 def group_place(members: list[dict[str, Any]]) -> str:
     """Where a team's sessions are, said once in its header so no card has to (TD-095): the host
-    they share, or *mixed* when they do not — the repo is the heading's (§4.9 *The Org page*,
+    they share, or *mixed* when they do not — the repo is the heading's (§4.9 *The Sessions page*,
     TD-725). Empty for a group with no sessions."""
     places = {str(m.get("host") or "") for m in members}
     return "" if not places else places.pop() if len(places) == 1 else "mixed"

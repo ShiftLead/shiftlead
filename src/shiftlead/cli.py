@@ -914,7 +914,7 @@ def cmd_org(args: argparse.Namespace) -> int:
 
 def cmd_team_start(args: argparse.Namespace) -> int:
     """`ao team start <name>` (design §4.9): the sequence itself lives in `shiftlead.teamrun`, which
-    the Org page's **Teams** strip runs too, so the two cannot drift — every check before any
+    the Sessions page's **Teams** strip runs too, so the two cannot drift — every check before any
     create, the lead first, then each member with `controllers: [lead id]`. A live name holder
     refuses the whole start, so there is never half a team; an exited or closed holder is
     superseded, which makes this the restart too. What is left here is the terminal's half: the
@@ -994,7 +994,7 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
     """`ao team stop <name>` (design §4.9): the wrap-up prompt — the one the card's **Wrap up**
     sends, `shiftlead.teams.WRAPUP_PROMPT` — to each member, wait for each to go idle or the window
     to pass, then the lead. `--now` kills instead of asking. Both halves are `shiftlead.teamrun`'s,
-    shared with the Org page's strip; here they run in a row, because a terminal may wait."""
+    shared with the Sessions page's strip; here they run in a row, because a terminal may wait."""
     try:
         org = _org_here()
         # A lead stopping its own team is the wind-down of §4.9a: same sequence, never typed at.
@@ -1620,7 +1620,7 @@ def _pr_standing(members: list[dict[str, Any]]) -> dict[str, str]:
 
 
 def _org_order(names: set[str], members: list[dict[str, Any]]) -> list[str]:
-    """A repo's teams in the Org page's order (`ui.repo.org_layout`, TD-790): the teams with a live
+    """A repo's teams in the Sessions page's order (`ui.repo.org_layout`, TD-790): the teams with a live
     crew first, then the rest, each in the org file's definition order, and a badge no definition
     holds last, by name. An org that cannot be read orders them by name alone."""
     try:

@@ -20,7 +20,7 @@
 9. **Framework, not a Claude tool**: the core knows sessions, hosts, repos, and adapters. Claude
    Code is the first adapter; Gemini CLI, Codex CLI, and on-prem harnesses are later adapters.
    Share with other devs once it proves useful.
-10. **Phone triage**: the Org view works on a phone over a private network or an authenticated
+10. **Phone triage**: the Sessions page works on a phone over a private network or an authenticated
     tunnel (§4.5) — state, pending question, one-tap answers — so a blocked session can be
     unblocked from anywhere. The embedded terminal is a desktop feature.
 11. **Ready to close, decided by the person**: a per-repo checklist (PR merged, branch pushed,

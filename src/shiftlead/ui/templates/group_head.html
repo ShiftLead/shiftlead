@@ -1,4 +1,4 @@
-{# One team group's header (design §4.5a Org **team groups**, §4.9; §4.5 *The card's anatomy*,
+{# One team group's header (design §4.5a Sessions **team groups**, §4.9; §4.5 *The card's anatomy*,
    TD-095), **one row** (TD-418, built by TD-428): the team, the host its sessions share (*mixed*
    where they do not; the repo is its heading's, TD-725), the flow chip, the team's marks, its controls, the fold with the
    session count, the *i* mark, and the counts by state only while folded — and **not** its manager's name, state or line, which
@@ -10,7 +10,7 @@
    Start, and folds the cards. A **concluded** team — live, every live session idle and declared
    (TD-099) — is drawn the same way (`g.stopped`), reading *concluded <t> ago*, and its Start's
    confirm names the sessions it closes first. #}
-{#- a repo's no-team strip is headed *n sessions, no team* and nothing else (§4.9 *The Org page*, TD-725) #}
+{#- a repo's no-team strip is headed *n sessions, no team* and nothing else (§4.9 *The Sessions page*, TD-725) #}
 {% if g.kind == 'strip' %}<span class="meta">{{ g.label }}</span>
 {% else %}<span class="h2"{% if g.source %} title="defined in {{ g.source }}"{% endif %}>{{ g.label }}</span>{% endif %}
 {% if not g.team %}{% if g.kind != 'strip' %}<span class="meta">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</span>{% endif %}
@@ -20,7 +20,7 @@
 {% if g.manager and g.manager_elsewhere %}<span class="meta" title="the manager carries a different team badge, so its card is in that group (design §4.9)">{{ g.manager.role_label or 'Manager' }} <a class="name" href="/focus/{{ g.manager.id }}">{{ g.manager.name }}</a> elsewhere</span>
 {% elif not g.manager and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
 {% elif not g.members and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech Lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
-{#- no project on the header: the team sits under its repo's heading (§4.9 *The Org page*, TD-725) #}
+{#- no project on the header: the team sits under its repo's heading (§4.9 *The Sessions page*, TD-725) #}
 {% endif %}
 {#- design §4.5a *team groups* (§4.9c, TD-309; TD-418): the **flow chip** — the flow the team runs, its
     strip (its stages in order and the person last, as the brief's `{flow}` lines read) the chip's

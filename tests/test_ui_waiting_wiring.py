@@ -1,7 +1,7 @@
 """TD-481 (PR #1354, §4.2 *Waiting*, TD-428 slice 4): the *waiting* pill is composed by `view`, and
 every surface that builds its own views must hand `view` the repo reading and the person-inbox waits —
 the events stream's group heads and rollup (`heads`), the Inbox's state rows (`person_states`) and the
-Repo page — or that surface reads *idle* while the Org card reads *waiting*. The Org page itself and
+Repo page — or that surface reads *idle* while the Org card reads *waiting*. The Sessions page itself and
 `/api/sessions` are pinned too (TD-499)."""
 
 from __future__ import annotations
@@ -150,7 +150,7 @@ def test_the_repo_page_builds_its_views_with_the_reading_and_the_waits(tmp_path,
 
 
 def test_the_org_pages_cards_read_waiting(tmp_path, monkeypatch):
-    """The Org page, the surface the others are measured against (TD-499): g1's card waits on the reader holding
+    """The Sessions page, the surface the others are measured against (TD-499): g1's card waits on the reader holding
     its claim's open PR (`repos`), g3's on its ask to the person (`waits`)."""
     html = client(monkeypatch, tmp_path).get("/").text
     for sid in ("g1", "g3"):
@@ -160,7 +160,7 @@ def test_the_org_pages_cards_read_waiting(tmp_path, monkeypatch):
 
 
 def test_api_sessions_reads_waiting(tmp_path, monkeypatch):
-    """`/api/sessions`, the JSON the page's script reads, builds its views as the Org page does (TD-499)."""
+    """`/api/sessions`, the JSON the page's script reads, builds its views as the Sessions page does (TD-499)."""
     got = {s["id"]: s for s in client(monkeypatch, tmp_path).get("/api/sessions").json()}
     assert got["g1"]["pill_word"] == got["g3"]["pill_word"] == "waiting"
     assert got["g2"]["pill_word"] != "waiting"

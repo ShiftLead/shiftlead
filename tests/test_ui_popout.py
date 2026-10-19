@@ -28,7 +28,7 @@ def _focus(monkeypatch, tmp_path, popped, **rec):
 
     v = view({**BASE, "dir": str(tmp_path), **rec})
     return templates.get_template("focus.html").render(
-        s={**v, "grants_all": [], "ready": []}, host="h", active="Org", popped=popped
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions", popped=popped
     )
 
 

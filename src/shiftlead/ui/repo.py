@@ -641,7 +641,7 @@ def team_groups(
     needs: Collection[dict[str, Any]] = (),
     spend: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]] | None:
-    """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
+    """Design §4.5a Sessions **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
     (`teamrun.rows`). `None` when no session carries a badge and nothing is defined — the page then
     renders the flat grid, with no header anywhere. A team with nothing live keeps its group
@@ -653,7 +653,7 @@ def team_groups(
     has no manager card and its header says so. Within a group the manager comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
     per group in Pinned mode. In this list: the teams with something live, the sessions with no
-    badge (*No repo*'s label: `org_layout` splits them by repo for the Org page, TD-725), then the
+    badge (*No repo*'s label: `org_layout` splits them by repo for the Sessions page, TD-725), then the
     teams with nothing live. Each team group carries its `repo` (the definition's) and its `order`
     (the definition's place), which `org_layout` orders a repo's teams by.
 
@@ -681,7 +681,7 @@ def team_groups(
     `spend` is today's `seats` row by team (`Readings.team_spend`): the header's **spend** figure (§4.5a
     *team card: spend*, TD-832), absent while the team spent nothing today."""
     defs = {str(r["name"]): r for r in rows}
-    order = {name: i for i, name in enumerate(defs)}  # definition order, within a repo (§4.9 *The Org page*)
+    order = {name: i for i, name in enumerate(defs)}  # definition order, within a repo (§4.9 *The Sessions page*)
     by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
         by_team.setdefault(str(v.get("team") or NO_TEAM), []).append(v)
@@ -727,7 +727,7 @@ def team_groups(
         waiting = prs_waiting(members) if team != NO_TEAM else None
         # `needs`: the Inbox's *Needs you* rows, whose open asks from a member are its *asked you* line (TD-354)
         # the team's repo is its definition's `repo:`; a badge no definition holds, where its records sit
-        # (§4.9 *The Org page*, TD-725) — the heading `org_layout` draws it under
+        # (§4.9 *The Sessions page*, TD-725) — the heading `org_layout` draws it under
         repo_name = str(row.get("repo") or "") if team != NO_TEAM else ""
         if team != NO_TEAM and not repo_name:
             repo_name = str((team_repo(members, repos or {}) or {}).get("name") or "")
@@ -844,7 +844,7 @@ TEAM_KEY, STRIP, REPO_LINE, HEADING, NO_REPO = "team:", "strip:", "repo:", "head
 
 
 def strip_group(key: str, label: str, members: list[dict[str, Any]], repo: str, project: str) -> dict[str, Any]:
-    """A section of sessions with no team: a repo's no-team strip, or *No repo* (§4.9 *The Org page*).
+    """A section of sessions with no team: a repo's no-team strip, or *No repo* (§4.9 *The Sessions page*).
     Not a card: no header but its words, no summary, no controls, never folded."""
     members = sorted(members, key=card_order)
     return {
@@ -870,7 +870,7 @@ def repo_line(
     fleet: list[dict[str, Any]],
     now: datetime,
 ) -> dict[str, Any] | None:
-    """The **Repo facet** a repo's line draws (§4.5a *team card: Repo facet*, §4.9 *The Org page*,
+    """The **Repo facet** a repo's line draws (§4.5a *team card: Repo facet*, §4.9 *The Sessions page*,
     TD-725): the repo's numbers, once, whatever teams service it. Its lanes *i* carries one line per
     team on the repo; its bars' hovers are the first such team's. None where this host reads no repo of
     that name: the line is then its name alone."""
@@ -889,7 +889,7 @@ def org_layout(
     fleet: Collection[dict[str, Any]] = (),
     now: datetime | None = None,
 ) -> list[dict[str, Any]] | None:
-    """The Org page down from the rollup (§4.9 *The Org page*, §4.5a *team groups*, TD-725), from
+    """The Sessions page down from the rollup (§4.9 *The Sessions page*, §4.5a *team groups*, TD-725), from
     `team_groups`' groups: **project → repo → team**. The headings are in the org file's order — each
     project, its `title` else its name, with its repos in its list's order — then the repos no project
     lists, in the registry's order (`repos`, the home's readings), then any team's repo neither names.

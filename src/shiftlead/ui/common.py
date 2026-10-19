@@ -614,7 +614,7 @@ def node_org_note() -> str:
 
 
 def node_banner(info: dict[str, Any] | None) -> str:
-    """The Org page's line on a node (design §4.4a "When a host cannot reach home"): whether its
+    """The Sessions page's line on a node (design §4.4a "When a host cannot reach home"): whether its
     link to the home is up, from the `host` RPC, and when it is not, what that means here."""
     if not info or info.get("mode") != "node":
         return ""
@@ -751,7 +751,7 @@ def repos_of(host: str) -> list[str]:
 
 
 def org_here() -> tuple[orgmod.Org, list[str]]:
-    """The definitions the Org page acts on (design §4.9 *The org is an aggregate*, TD-229):
+    """The definitions the Sessions page acts on (design §4.9 *The org is an aggregate*, TD-229):
     `~/.shiftlead/org.yml`, plus the `teams:` of every repo in this host's registry, by the one
     function `ao team` reads too. The org file wins a name collision, and a name two repos define
     is refused in both, a note; so is a team whose landing cannot be told. Read on every use and cached

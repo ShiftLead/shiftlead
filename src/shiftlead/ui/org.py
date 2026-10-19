@@ -1,4 +1,4 @@
-"""The team-first Org (design §4.5 screen 1 *The Org, team-first*): a team's summary, its repo facet,
+"""The team-first Org (design §4.5 screen 1 *The Sessions page, team-first*): a team's summary, its repo facet,
 the TDs in motion, the answer blocks, the doing rows, the rollup and the compact line. Moved out of
 `shiftlead.ui.app` unchanged (TD-196) and re-exported from it, so a route, a template or a test reads
 each name from the app as before.
@@ -22,7 +22,7 @@ from .cards import DEAD, terminal_only
 from .common import _age, _instant, _short_age, templates
 from .inbox import NEEDS_YOU_ROWS, PERSON_ASK_KINDS, _entry_open, state_kind
 
-# -- the team-first Org (design §4.5 screen 1 *The Org, team-first*, TD-176 slice 3) ---------------
+# -- the team-first Org (design §4.5 screen 1 *The Sessions page, team-first*, TD-176 slice 3) ---------------
 
 PHASES = ("add", "design", "grind", "review")
 # The events stream's groups (§4.5a *team groups*, TD-572): a delta that changes one of these fields on
@@ -515,7 +515,7 @@ def team_summary(
     needed / Doing — the facet opening on *answer* while any member waits on one. A team with nothing
     live has one too (TD-192): its claims as the members' last records hold them, and Doing, since
     nobody can be waiting. `repo` is the definition's (§4.9 *Teams*, TD-725): its reading is the
-    team's, else the one its members sit in (`team_repo`, a badge no definition holds). The Org page
+    team's, else the one its members sit in (`team_repo`, a badge no definition holds). The Sessions page
     draws the Repo facet on the repo's line (`org_layout`); the Repo page and the rollup read it here."""
     now = now or datetime.now(UTC)
     r = repo_named(repo, repos or {}) if repo else None
@@ -572,7 +572,7 @@ ROLLUP_STATES = (
 
 
 def rollup(groups: list[dict[str, Any]] | None) -> dict[str, Any]:
-    """The Org **rollup** (§4.5a *Org: rollup*, TD-176 slice 4): sums over every live team — the
+    """The Org **rollup** (§4.5a *Sessions: rollup*, TD-176 slice 4): sums over every live team — the
     Agents pills by state, TDs in motion by phase (each phase's link the Repo page of the team
     holding the most of it), PRs in motion per window over the teams' repos (a repo two teams share
     counted once), and Needs you's *answer needed* and *asked you*. When no team is live there is

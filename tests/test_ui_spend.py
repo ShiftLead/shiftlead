@@ -1,4 +1,4 @@
-"""TD-832 slice 1, design §4.5 screen 13 *Spend* and §4.5a *Spend page*, *Org top bar: usage chip*: the page
+"""TD-832 slice 1, design §4.5 screen 13 *Spend* and §4.5a *Spend page*, *Sessions top bar: usage chip*: the page
 draws the home's `seats` reading — the head and its picks carried in the URL, the Over time chart by team or
 by role with the picked bar outlined and the bars before the ledger began dashed, By team and Top sessions on
 All, a team's line, By seat with its role subtotals and Finished entries on one team — and the usage chip

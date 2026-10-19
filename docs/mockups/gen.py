@@ -224,10 +224,10 @@ def head(title):
 
 TAIL = "</x-dc>\n</body>\n</html>\n"
 
-def topbar(active="Org", narrow=False):
+def topbar(active="Sessions", narrow=False):
     # a tab exists only for a built page (TD-123); an unbuilt screen's own mockup draws its tab, active
     inbox = active if active.startswith("Inbox") else "Inbox 4 · 2"
-    live = ["Org", inbox, "Queue"] + ([] if active in ("Org", inbox, "Queue") else [active])
+    live = ["Sessions", inbox, "Queue"] + ([] if active in ("Sessions", inbox, "Queue") else [active])
     tabs = "".join(f'<span class="tab{" on" if t == active or (t == inbox and active.startswith("Inbox")) else ""}">{t}</span>' for t in live)
     return f'''<div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
@@ -504,7 +504,7 @@ def team_desktop(team_first=False):
             ordered.append((host, repo, r))
     ordered.sort(key=key)
 
-    # design §4.5a Org **team groups** (§4.9), redrawn to §4.5 *The card's anatomy* (TD-095): the
+    # design §4.5a Sessions **team groups** (§4.9), redrawn to §4.5 *The card's anatomy* (TD-095): the
     # header carries the team, the host / repo its sessions share, the counts by state, its marks and
     # its controls — not its manager, whose card is the first in the group. *No team* is headed by
     # its count and nothing else.
@@ -612,11 +612,11 @@ def team_desktop(team_first=False):
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
                               pill("working"), pill("waiting"), pill("idle", "idle · unseen", unseen=True), pill("idle"), pill("exited"),
                               pill("done")])  # an on-call seat sorts as the `exited` / `closed` it is (TD-097)
-    return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+    return head("Sessions") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
-    <span style="font-size: 16px; font-weight: 600;">Org</span>
+    <span style="font-size: 16px; font-weight: 600;">Sessions</span>
     <span class="muted">15 sessions · 1 team · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
     <span style="flex-grow: 1;"></span>
     <span class="input" style="width: 200px; height: 28px; color: #9ca3af;">filter…</span>
@@ -680,7 +680,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
     tail, which broke over three lines on Paul's screen with the buttons split between two."""
     vs = f'<span class="badge toggle on" title="a selection in the pane copies itself — yours everywhere (design §4.5a, TD-164); Ctrl+C with a selection and Copy work either way">copy on select</span><span class="btn sm link" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span><span class="btn sm link" title="the transcript file in VS Code — the same file-open link as every file link (design §4.5a Focus header, TD-578)">‹› VS Code</span>' if editor else ""
     return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <a href="#" class="muted">← Org</a>
+      <a href="#" class="muted">← Sessions</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
       {state}{identity}
     </div>
@@ -779,7 +779,7 @@ def focus():
 <span class="q">  ⏳ waiting for permission (shiftlead hook · answer above, or the terminal dialog appears in 9m 12s)</span>
 <span class="d">▌</span>'''
     return head("Focus") + f'''<div style="width: 1440px; min-height: 1280px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     {focus_head("tdgrind-1", pill("needs"),
@@ -839,7 +839,7 @@ Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
 
 <span class="p">&gt;</span> <span class="d">▌</span>'''
     return head("Focus — ready to close") + f'''<div style="width: 1440px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     {focus_head("designer-ao-1", pill("idle"),
@@ -896,7 +896,7 @@ def focus_orchestrator():
   <span class="g">review ✓ · squash ✓ · CI ✓ · ledger ✓ · worktree ✓ · pushed ✓</span>
 <span class="d">▌</span>'''
     return head("Focus — orchestrator") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     {focus_head("orc-1", pill("idle"), '''<span class="badge">stops 06:00</span><span class="badge" title="the terminal mark (§4.6 Reconnect contract, TD-474): the terminal socket dropped and retries on its own — reload if it stays; drawn after a three-second grace">reconnecting…</span>''',
@@ -941,7 +941,7 @@ def new_session():
     its reason. The form before it is in git history and in the design round's review shots."""
     lk = 'style="color: #2563eb;"'
     return head("New session") + f'''<div style="width: 720px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org", narrow=True)}
+{topbar("Sessions", narrow=True)}
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
@@ -1034,9 +1034,9 @@ def direction_b():
         c("dev-cadence/attention-fix", "working", "vps · 1m · gemini"),
     ])
     return head("Alt") + f'''<div style="width: 1100px; min-height: 620px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
-  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">Org</span><span class="muted">card grid with live tail — alternate to the table</span></div>
+  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">Sessions</span><span class="muted">card grid with live tail — alternate to the table</span></div>
   <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">{cards}</div>
   <div class="note">Trade-off: you see the last lines of every session at once, but fewer sessions fit per screen and host/repo grouping is weaker. The table (Main) scales to 20+ sessions; this scales to ~9.</div>
 </div>
@@ -1091,7 +1091,7 @@ def message_dialogs():
     ]
     grid = "".join(f'<div>{b}</div>' for b in boards)
     return head("Message") + f'''<div style="width: 1440px; min-height: 1060px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   {page_head("Message — when it is read", "the composer on six addressees: the sentence under the kind selector, from the record, changing with the kind", "")}
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 40px; justify-items: center;">{grid}</div>
@@ -1140,7 +1140,7 @@ def transcript():
         tool("Bash", "ao progress done TD-026 --pr 548 --json", "result · 6 lines"),
     ])
     return head("Transcript") + f'''<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 1100px; align-self: center; width: 100%;">
   <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
     <a href="#" class="muted">&larr; Focus</a>
@@ -1169,7 +1169,7 @@ HELP = [('Start', 'team card', "Runs the team again from its definition: every c
 
 def help_page():
     """Screen 10 (TD-157): every control's paragraph, by screen — what the *i* marks point at."""
-    by_screen = [("Org — team card", ["Start", "Wind down", "Stop now", "the fold", "Forget all", "Forget", "Close", "Message…", "Switch profile…"]),
+    by_screen = [("Sessions — team card", ["Start", "Wind down", "Stop now", "the fold", "Forget all", "Forget", "Close", "Message…", "Switch profile…"]),
                  ("Focus", ["Wrap up", "Kill", "Close", "Message…"]),
                  ("Focus — the exited banner", ["Resume", "Forget"])]
     text = {n: (w, p) for n, w, p in HELP}
@@ -1181,7 +1181,7 @@ def help_page():
             first, rest = p.split(". ", 1)
             body += f'<div style="padding: 6px 0 6px 14px; border-left: 2px solid #e3e6ea; margin-bottom: 8px;"><div><b>{n}</b> <span class="meta">{w}</span></div><div style="font-size: 14px; line-height: 1.5;">{first}. {rest}</div></div>'
     return head("Help") + f'''<div style="width: 1440px; min-height: 1500px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 6px; max-width: 900px; align-self: center; width: 100%;">
   {page_head("Help", "every control with a paragraph, by screen — the same text as the i marks and the tooltips", "")}
   <div class="card" style="padding: 8px 16px 14px;">{body}</div>
@@ -1200,7 +1200,7 @@ def add_entry():
              "board and could not find them. There should be a setting for it, and the page should say "
              "which it is showing.")
     return head("Add entry") + f'''<div style="width: 1440px; min-height: 860px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
   <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 12px;">
     <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Add an entry to the ledger</span><span class="meta mono" style="font-size: 12px;">shiftlead · docs/technical_debt.md</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
@@ -1275,7 +1275,7 @@ def members_dialog():
         row("designer", "designer-ao-1", "design-first", 0, "ao-shiftlead-designer-ao-1", "idle"),
     ])
     return head("Members") + f'''<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; align-items: center;">
   <div class="card" style="width: 760px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
     <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">Members of ao-grind</span><span class="meta mono" style="font-size: 12px;">~/.shiftlead/org.yml · teams.ao-grind.members</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Close</span></div>
@@ -1339,7 +1339,7 @@ def resumable():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   {page_head("Resumable", "31 transcripts · 2 hosts · 3 active now", right)}
   <div class="card"><table><thead><tr><th>Session</th><th>Where</th><th>Start → last</th><th>Started / ended</th><th>Board</th><th></th></tr></thead><tbody>{groups}</tbody></table></div>
-  <div class="note"><b>Resume</b> opens New session with host, repo, and worktree prefilled and Start = Resume; a reaped worktree is recreated from the recorded branch. <b>Switch to</b> jumps to the running card in the Org (same session: the name and the adapter id travel together from birth). A session started by hand shows only its id until you <b>Adopt</b> it (attach, give it a name), which is how it enters the Org. The index is generated on demand from each adapter's transcripts (Claude: the JSONL under ~/.claude/projects, same as list_sessions.py), so crashed and disconnected sessions appear too. Closed sessions are filed here after their day on the Org.</div>
+  <div class="note"><b>Resume</b> opens New session with host, repo, and worktree prefilled and Start = Resume; a reaped worktree is recreated from the recorded branch. <b>Switch to</b> jumps to the running card on the Sessions page (same session: the name and the adapter id travel together from birth). A session started by hand shows only its id until you <b>Adopt</b> it (attach, give it a name), which is how it enters the Sessions page. The index is generated on demand from each adapter's transcripts (Claude: the JSONL under ~/.claude/projects, same as list_sessions.py), so crashed and disconnected sessions appear too. Closed sessions are filed here after their day on the Sessions page.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1411,10 +1411,10 @@ def commands():
   {page_head("Commands", "5 commands in 2 repos · 1 running", '<span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span>')}
   {groups}
   <div style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Org unless "show command runs" is on</span></div>
+    <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Sessions page unless "show command runs" is on</span></div>
     <div class="card"><table><tbody>{rows}</tbody></table></div>
   </div>
-  <div class="note">Buttons come from each repo's checked-in <span class="mono">.shiftlead.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Org and out of the urgency sort. The attention report's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
+  <div class="note">Buttons come from each repo's checked-in <span class="mono">.shiftlead.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Sessions page and out of the urgency sort. The attention report's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1759,7 +1759,7 @@ def inbox_phone():
   {isec("Needs you", "2 of 5")}
   {"".join(cards)}
   <div class="muted" style="padding: 4px 2px 0; font-size: 12px;">Steering · Waiting on them · FYI are not picked — <a href="#">Filters ▾</a> or <a href="#">Clear filters</a>.</div>
-  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Narrow</b> (below 720 px, TD-129): the rail is not drawn; a chip row of the teams from the rail's own Teams list, with their <i>Needs you</i> counts, the picked ones first so a pick never scrolls out of sight, behind one pinned <b>Filters ▾</b> chip carrying the number of picks that opens a full-screen sheet holding the three groups as the same toggles, the find box, <b>Clear filters</b> and <b>Done</b> — the filter screen in practice, not a page of its own, since the picks are the list's URL. The chips and the sheet are the rail's toggles drawn twice from one list. The URL is the desktop's for the same picks. One column; controls 44 px high as the phone's Org cards. A long entry's text is cut with <i>whole entry →</i>, which is the message page — there is no pane at any width.</div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Narrow</b> (below 720 px, TD-129): the rail is not drawn; a chip row of the teams from the rail's own Teams list, with their <i>Needs you</i> counts, the picked ones first so a pick never scrolls out of sight, behind one pinned <b>Filters ▾</b> chip carrying the number of picks that opens a full-screen sheet holding the three groups as the same toggles, the find box, <b>Clear filters</b> and <b>Done</b> — the filter screen in practice, not a page of its own, since the picks are the list's URL. The chips and the sheet are the rail's toggles drawn twice from one list. The URL is the desktop's for the same picks. One column; controls 44 px high as the phone's Sessions cards. A long entry's text is cut with <i>whole entry →</i>, which is the message page — there is no pane at any width.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1779,7 +1779,7 @@ def type_scale():
     trs = "".join(f'<tr><td class="mono" style="font-size: 12.5px; color: #374151; white-space: nowrap; padding: 12px 16px 12px 0; vertical-align: top;">{t}</td><td style="font-size: 12px; color: #6b7280; white-space: nowrap; padding: 12px 16px 12px 0; vertical-align: top;">{px}<br><span style="font-size: 11px;">{face}</span></td><td style="{st} padding: 12px 0; border-bottom: 1px solid #eceef1;">{sample}</td></tr>' for t, px, face, sample, st in rows)
     before = '<span style="font-size: 13px;">13 px body</span> · <span style="font-size: 12px;">12 px mail body</span> · <span style="font-size: 11px;">11 px small print</span> · <span style="font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600;">10 px pill</span>'
     return head("Type scale") + f'''<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 20px 28px 28px; max-width: 1100px;">
   <div style="font-size: 16px; font-weight: 600;">Type scale</div>
   <div class="muted" style="font-size: 12px; margin-top: 4px;">six tokens on <span class="mono">:root</span>, theme-independent; no rule outside the token block names a pixel size (design §4.5 <i>Type scale</i>, TD-130)</div>
@@ -1851,7 +1851,7 @@ def repo_facet_board():
             'was there at the declaration is the person\'s to read here. <span class="mono">ao repo</span>\'s first line carries the same split: '
             '<span class="mono">24 pickable (ao-grind 0 · anchor 20, dev-cadence 4), 10 design-first (ao-grind 1)</span>; on the later reading, <span class="mono">21 pickable (ao-grind 3 · anchor 14, dev-cadence 4)</span>. Build: TD-361.</div>')
     return head("Repo facet") + f'''<div style="width: 1440px; min-height: 520px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 14px;">
   <div style="display: flex; gap: 20px; align-items: flex-start;">{boards}</div>
   {note}
@@ -2246,7 +2246,7 @@ def spend_page(view="all"):
                  "finished entries for the picked week, as TD-818 first drew them (the rows here are its day figures, not this week's). The week of 28 Sep holds only the ledger's first two days, so its bar's hover says partial. Built by TD-832 and TD-859.")
     note = f'<div class="note" style="margin-top: 18px;">Design notes, not page text. {notes} Figures illustrative.</div>'
     return head("Spend") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
   <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Spend</span>
     <span class="meta" style="font-size: 12px;">{period} · ≈ API-equivalent at your weights (as of 2026-10-17) — not a bill; a subscription's bound is its quota</span></div>
@@ -2308,7 +2308,7 @@ def spend_shape_page():
     note = ('<div class="note" style="margin-top: 16px;">Design notes, not page text. The home samples once a minute; a role\'s bar hover lists its seats '
             'and their hours by class. The rules are fixed in the code, so one week always reads the same. Figures illustrative. Built by TD-835.</div>')
     return head("Spend") + f'''<div style="width: 1440px; min-height: 900px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Org")}
+{topbar("Sessions")}
 <div style="width: 1100px; margin: 0 auto; padding: 16px 0 24px;">
   <div style="display: flex; gap: 10px; align-items: baseline;"><span style="font-size: 22px; font-weight: 600;">Spend</span>
     <span class="meta" style="font-size: 12px;">this week · the team's shape, sampled each minute</span></div>
@@ -2408,7 +2408,7 @@ for n, s in files.items():
 # a bug waiting for the next screen to change size.
 LAYOUT = [
     # (file, title, column)
-    ("Main.dc.html", "Org — desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)", 0),
+    ("Main.dc.html", "Sessions — desktop (full cards; the team card and rollup are OrgTeamFirst, 2026-09-26)", 0),
     ("Inbox.dc.html", "Inbox", 0),
     ("InboxRail.dc.html", "Inbox — filtered", 0),
     ("InboxMessage.dc.html", "Inbox — message", 0),
@@ -2424,7 +2424,7 @@ LAYOUT = [
     ("Help.dc.html", "Help", 0),
     ("Transcript.dc.html", "Transcript", 0),
     ("Message.dc.html", "Message — when it is read", 0),
-    ("Phone.dc.html", "Org — phone", 1),
+    ("Phone.dc.html", "Sessions — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("InboxPress.dc.html", "Inbox — a control answers the press (TD-338)", 1),
     ("NewSession.dc.html", "New session", 1),
@@ -2436,8 +2436,8 @@ LAYOUT = [
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
-    ("MainDark.dc.html", "Org — dark", 2),
-    ("OrgTeamFirst.dc.html", "Org — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
+    ("MainDark.dc.html", "Sessions — dark", 2),
+    ("OrgTeamFirst.dc.html", "Sessions — team-first (the design, 2026-09-26; checked in from the canvas)", 2),
     ("RepoFacet.dc.html", "Team card — Repo facet: the lanes line (TD-357, 2026-10-06)", 2),
     ("Type.dc.html", "Type scale", 2),
     ("TypeDark.dc.html", "Type scale — dark", 2),
