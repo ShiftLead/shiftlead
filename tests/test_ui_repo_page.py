@@ -134,8 +134,8 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
     c = client(monkeypatch, tmp_path, fake({root: reading(root)}, fleet, doing, inbox))
     html = c.get("/repo/samscrape").text
     assert 'class="tsum"' in html and "Technical debt (7 open)" in html  # the team's facets
-    # Open PRs: newest last, the author the member whose branch it is, draft, the standing
-    prs = html[html.index('id="prs"') : html.index('id="debt"')]
+    # Review (the board's, TD-903): newest last, the author the member whose branch it is, draft, the standing
+    prs = html[html.index('id="prs"') : html.index('id="completed"')]
     assert prs.index("#805") < prs.index("#811")
     assert 'href="/focus/tdgrind-1">tdgrind-1</a>' in prs and ">draft<" in prs
     # each reader named, its answer's verdict said (§4.9c *What is shown*, TD-315 slice 5b)
@@ -143,20 +143,18 @@ def test_the_repo_page_draws_the_facets_and_the_four_lists(tmp_path, monkeypatch
         '"tag wait">passed by ui-reader-1 · waiting on techlead-1 · 40m<' in prs
         and '"tag done">passed by techlead-1<' in prs
     )
-    # Technical debt: four lists, held by, folded past four with +n more — the rows past the fold not sent
-    # until the list is opened (§4.5 *Page loads*, TD-882)
-    assert 'id="debt-pickable"' in html and "held by tdgrind-1" in html and "+2 more" in html
-    assert html.count('class="rrow folded"') == 0 and 'data-unfold="pickable" data-unsent>+2 more' in html
-    opened = c.get("/repo/samscrape?part=1&open=pickable").text
-    assert opened.count('class="rrow folded"') == 2 and 'data-unfold="pickable">+2 more' in opened
-    # a blocked row says what still blocks it, after its owner (TD-228); an unblocked one says nothing
-    assert '· paul</span><span class="meta">· blocked by TD-200, decision (Paul)</span>' in html
-    assert html.count("blocked by") == 1
+    # the board (TD-903): the claimed row first in Build with its holder's doing line, the five queued after
+    # it; TD-283 waits on the person, so it is For you's, drawn as the Inbox's ledger row
+    build = html[html.index('id="col-build"') : html.index('id="prs"')]
+    assert "held by tdgrind-1" in build and build.index("TD-301") < build.index("TD-310")
+    assert '<div class="meta bdoing">tdgrind-1 · pushing the branch</div>' in build
+    foryou = html[html.index('id="col-foryou"') : html.index('id="col-design"')]
+    assert 'id="TD-283"' in foryou and "ledger · yours" in foryou and "TD-283" not in build
     # Doing: the chips and the rows
     assert 'data-who="tdgrind-1"' in html and "all (2)" in html and "pushing the branch" in html
     # the part is the same content without the chrome, for the page's re-read
     part = c.get("/repo/samscrape?part=1").text
-    assert "<html" not in part and "Open PRs" in part
+    assert "<html" not in part and 'id="board"' in part and "Review" in part
 
 
 def test_a_repo_no_team_services_has_its_repo_facet_alone_and_an_unknown_one_is_404(tmp_path, monkeypatch):
@@ -214,11 +212,15 @@ def test_a_live_check_row_says_whether_its_build_is_live(tmp_path, monkeypatch):
         {"id": "TD-320", "title": "check the lane", "for_page": "live-check", "priority": "high", "owner": "grinder", "kind": "live-check", "built": [1051], "live": "yes"},
         {"id": "TD-321", "title": "check the slices", "for_page": "live-check", "priority": "low", "owner": "grinder", "kind": "live-check", "built": [1060, 1061], "live": "no"},
     ]  # fmt: skip
-    html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
+    c = client(monkeypatch, tmp_path, fake({root: r}, []))
+    # eight queued in Build: seven sent, the eighth (TD-321, Low) by the column's read (TD-903)
+    assert "+1 more up next" in c.get("/repo/samscrape").text
+    html = c.get("/repo/samscrape?open=build:queued").text
     row = html[html.index('id="TD-320"') :]
     assert row[: row.index("</div>")].count("· live check #1051</span>") == 1
-    assert 'data-list="live-check"' in html[html.index('id="TD-320"') - 200 : html.index('id="TD-320"') + 100]
-    assert 'id="debt-live-check">live check · 2</div>' in html
+    # both in Build, the column whose lane takes free-pick, its heading saying the kinds (TD-903)
+    build = html[html.index('id="col-build"') : html.index('id="prs"')]
+    assert 'id="TD-320"' in build and 'id="TD-321"' in build and "build · live check" in build
     row = html[html.index('id="TD-321"') :]
     assert "· waits for its build to be live #1060 #1061</span>" in row[: row.index("</div>")]
     row = html[html.index('id="TD-301"') :]
@@ -367,7 +369,8 @@ def test_the_missing_seams_draw_under_the_title_and_a_missing_ledger_in_place_of
     html = client(monkeypatch, tmp_path, fake({root: r}, [])).get("/repo/samscrape").text
     seams = html[html.index('id="seams"') : html.index('id="groups"')]
     assert re.findall(r'class="seamline">([^<]*)<', seams) == ["no gate: a person merges", "no worktree setup"]
-    debt = html[html.index('id="debt"') : html.index('id="completed"')]
+    # the ledger's part of the board is the warning; Review and Merged stand (TD-903)
+    debt = html[html.index('id="debt"') : html.index('id="prs"')]
     assert 'id="noledger"' in debt and "no ledger at docs/technical_debt.md — <code>ao repo init</code>" in debt
     assert "Technical debt" not in debt and "TD-301" not in debt
     r["seams"] = {**r["seams"], "ledger": {"path": "docs/technical_debt.md", "state": "ok", "major": 1, "entries": 7, "why": None}, "gate": {"state": "set", "value": "make gate"}, "worktree_setup": {"state": "set", "value": "x"}}  # fmt: skip

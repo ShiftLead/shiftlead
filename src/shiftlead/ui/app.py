@@ -49,8 +49,8 @@ from shiftlead.cli import stop_time as clistop
 from . import cards as cards_mod
 from . import help as helpmod
 from . import inbox as inbox_mod
+from . import repo_board, timing, uiconf
 from . import settings_page as setmod
-from . import timing, uiconf
 from .cards import (  # re-exported: routes, templates and tests read these from the app (TD-196)
     BRANCH_SHOWN,  # noqa: F401
     COUNT_ORDER,  # noqa: F401
@@ -1742,10 +1742,42 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # (3) Waiting on you: the Inbox's horizon cut to the repo — due rows, coming up, the fold, the line (TD-220)
         hz = with_standings(horizon_of(board, str(r.get("root") or "")), sessions, now)
         boards = hz["due"]
+        # the board's columns are the servicing teams' flows' stages, read off the loop (§4.5 screen 11, TD-903)
+        flows_here = await asyncio.to_thread(repo_board.team_stages, org, teams, str(r.get("root") or ""))
         with timing.step("lists"):  # the ledger's lists, the cards and the rows the page draws (TD-893)
             # the teams' lanes over the ledger and the board's work orders (§4.4 *In a team's lanes*, TD-384)
             lanes = teamrun.repo_lanes(teamrun.lane_entries(r), str(r.get("root") or ""), sessions)
             lists = ledger_lists(r, motion, lanes, now)
+            # only what is shown (§4.5 *Page loads*, TD-882): the lists unfolded, and an anchor's id not yet sent
+            opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
+            cards = debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None
+            drows = repo_doing(serving)
+            newest: dict[str, str] = {}
+            for d in drows[0]:  # newest first: each doer's first is its newest kept line
+                newest.setdefault(str(d.get("name") or ""), str(d.get("text") or ""))
+            bd = repo_board.board(
+                cards,
+                lists,
+                flows_here,
+                members,
+                name,
+                opened,
+                newest,
+                [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
+            )
+            # For you's rows are the Inbox's ledger rows, and a due board line naming one is drawn in its place
+            # and not again under Waiting on you (§4.5 screen 11 *For you*)
+            fy = ledger_for_you({str(r.get("root") or ""): r}, sessions, {here_root: named} if named else None, now)
+            fy_rows = {str(x.get("id") or ""): x for x in ledger_rows(fy)}
+            fy_ids = {str(x["id"]) for g in bd["foryou"]["groups"] for x in g["rows"]} | {
+                str(x["id"]) for x in bd["foryou"]["claimed"]
+            }
+            fy_boards: dict[str, list[dict[str, Any]]] = {}
+            for b in boards:
+                if hit := next((i for i in b.get("refs") or () if i in fy_ids), None):
+                    fy_boards.setdefault(hit, []).append(b)
+            placed = {id(b) for bs in fy_boards.values() for b in bs}
+            boards = [b for b in boards if id(b) not in placed]
             ctx = {
                 "r": r,
                 "name": name,
@@ -1754,10 +1786,11 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "teams": teams,
                 "prs": pr_rows(r, members, standing, now, sessions, [g["members"] for g in serving]),
                 "lists": lists,
-                # the repo's Queue cards in rank order (§4.5 screen 11 item 2, TD-770); None: the kind lists
-                "cards": debt_cards(queue, name, lists) if (r.get("ledger") or {}).get("entries") is not None else None,
-                # the board's decided lines, the lanes' work orders, above the cards (§4.5a *Repo page: decided lines*)
-                "orders": [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
+                # the board: For you, the flows' worker stages, Review, Merged (§4.5 screen 11, TD-903)
+                "bd": bd,
+                "fy_rows": fy_rows,
+                "fy_boards": fy_boards,
+                "board_teams": len(teams),
                 # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
                 "completed": (completed := completed_rows(r, sessions, now, info.get("promotes"))),
                 # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
@@ -1770,7 +1803,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "team_notes": team_notes(r, [t["team"] for t in entry_teams(org, here_root, host_name())], sessions),
                 "boards": boards,
                 "horizon": hz,
-                "doing": (drows := repo_doing(serving))[0],
+                "doing": drows[0],
                 "chips": doing_chips(drows[0], [g["team"] for g in serving]),
                 "doer_w": drows[1],
                 # a file link (§4.6, TD-689): the file form with `:1`, the repo's checkout opened first
@@ -1781,8 +1814,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "",
                 "part": bool(part),  # the re-read carries the title line and the seams, swapped in place
             }
-            # only what is shown (§4.5 *Page loads*, TD-882): the cards and the counts read the lists whole first
-            opened = [k for k in str(request.query_params.get("open") or "").split(",") if k]
+            # only what is shown (§4.5 *Page loads*, TD-882): the counts read the lists whole first
             ctx["win"] = send_folds(lists, completed, repo_window(request.query_params), opened)
         if not part:  # the page's top bar, from the reads above; the part is the page's body alone
             usage, gate = first[6:8]  # read once: a refused `usage` is no chip, a refused `gate` no lines

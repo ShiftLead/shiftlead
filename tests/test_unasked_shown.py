@@ -133,7 +133,7 @@ def page(monkeypatch, tmp_path, fleet, inbox=None):
     fleet = [{**s, "kind": "agent", "team": "grind", "repo": root, "dir": root, "unattended": True} for s in fleet]
     monkeypatch.setattr(ui, "LocalClient", fake({root: reading(root)}, fleet, inbox))
     html = TestClient(ui.create_app()).get("/repo/samscrape").text
-    return html[html.index('id="prs"') : html.index('id="debt"')]
+    return html[html.index('id="prs"') : html.index('id="completed"')]
 
 
 def test_the_repo_page_tags_a_held_pr_nobody_asked_with_its_age_and_reader(tmp_path, monkeypatch):

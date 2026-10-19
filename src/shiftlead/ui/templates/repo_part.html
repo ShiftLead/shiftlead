@@ -1,36 +1,58 @@
 {% import "inbox_row.html" as ir with context %}
-{% import "queue_card.html" as qc %}
 {# a decided board line, a work order of the lanes (§4.5a *Repo page: decided lines*, TD-384) #}
 {% macro order_row(e, key, folded) %}
     <div class="rrow{% if folded %} folded{% endif %}" id="{{ e.id }}" data-list="{{ key }}" data-order><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
       <span class="meta">decided {{ e.decided.text if e.decided else '' }}{% if e.decided and e.decided.date %} · {{ e.decided.date }}{% endif %} ·</span>{% if e.held or e.pickable_by is not none %}<span class="meta">{% if e.held %}held by {{ e.held }}{% elif e.pickable_by %}pickable by {{ e.pickable_by | join(', ') }}{% else %}in no team's lanes{% endif %} ·</span>{% endif %}<a class="meta" href="/inbox?repo={{ e.repo_name }}&kind=board" title="the line on the board, in the Inbox">board →</a></div>
 {% endmacro %}
 {% if part %}{% include "repo_head.html" %}{% endif %}
-{# (1) Open PRs — every open PR on the remote, newest last; a PR is GitHub's: no control #}
-<section class="rsec" id="prs">
-  <div class="row gap rsh"><span class="h2">Open PRs</span> <span class="meta">{{ prs | length }} · newest last</span>
-    <button class="imark" type="button" aria-expanded="false" aria-controls="info-prs" title="About this list">i</button></div>
-  <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ facet.read ~ ' ago' if facet else '' }}); the standing is each review seat's mail — <i>waiting on</i> the seat while its ask is open, then <i>passed by</i>, <i>findings from</i> or <i>merged by</i> it, as its answer's verdict says; <i>unasked</i> is a green PR that touches the repo's held paths and no review seat has been asked to read — its author posts its review, then asks the reader it names</div>
-  <div class="rlist">
-  {% for p in prs %}
+{% from "queue_row.html" import row as qrow %}
+{# a PR's row (§4.5 screen 11 *Review*): the list's row as it was; a PR is GitHub's: no control #}
+{% macro pr_row(p) %}
     <div class="rrow"><a class="mono strong" href="{{ p.url }}" target="_blank" rel="noopener">#{{ p.number }}</a><span class="rtitle">{{ p.title }}</span><span class="grow"></span>
       {% if p.author %}<a class="mono" href="/focus/{{ p.author.id }}">{{ p.author.name }}</a>{% else %}<span class="mono meta">{{ p.login }}</span>{% endif %}<span class="meta">· {{ p.age }}</span>
       {% if p.draft %}<span class="tag">draft</span>{% endif %}{% if p.red %}<span class="tag red" title="{{ p.red.failing | join(', ') if p.red.failing else 'conflicting with its base' if p.red.word == 'conflicting' else 'a check failed' }}">{{ p.red.word }} {{ p.red.age }}{% if p.red.whose %} · {{ p.red.whose }}{% endif %}</span>{% endif %}{% if p.not_run %}<span class="tag notrun" title="{{ p.not_run.reason }}">CI never ran</span>{% endif %}{% if p.standing %}<span class="tag {{ p.standing.cls }}">{{ p.standing.word }}</span>{% elif p.unasked %}<span class="tag wait" title="{{ p.unasked.title }}">{{ p.unasked.word }}</span>{% endif %}</div>
-  {% else %}
-    <div class="rrow meta">{% if r.prs and r.prs.open is not none %}no open PRs{% else %}could not look{% if r.prs and r.prs.error %} — {{ r.prs.error }}{% endif %}{% endif %}</div>
+{% endmacro %}
+{# a column's heading (§4.5 screen 11 *A column's heading*): its name, its count, its kinds, and who is on it per team #}
+{% macro col_head(name, n, kinds, people, extra='') %}
+  <div class="bhead"><span class="bname">{{ name }}</span> <span class="meta bcount">{{ n }}</span>{% if kinds %} <span class="meta bkinds">{{ kinds | join(' · ') }}</span>{% endif %}{{ extra }}</div>
+  {% if people %}<div class="bpeople">{% for p in people %}<div class="meta{% if p.none %} unstaffed{% endif %}"{% if p.team and board_teams > 1 %} title="{{ p.team }}"{% endif %}>{% if board_teams > 1 %}<span class="bteam">{{ p.team }}:</span> {% endif %}{{ p.text }}</div>{% endfor %}</div>{% endif %}
+{% endmacro %}
+{# a ledger row of the board: For you's are the Inbox's ledger rows (a board line naming the entry in its
+   place), the rest the Queue card's own row partial — one partial, never a copy (§4.5 screen 11 *A row*) #}
+{% macro brow(r, col) %}{% if col == 'foryou' and (fy_boards.get(r.id) or fy_rows.get(r.id)) %}<div class="brow" id="{{ r.anchor }}" data-qid="{{ r.qid }}">{% for b in fy_boards.get(r.id) or [] %}{{ ir.row(b, 'needs') }}{% else %}{{ ir.row(fy_rows[r.id], 'later') }}{% endfor %}</div>{% else %}{{ qrow(r, name) }}{% endif %}{% endmacro %}
+{# one column of the board's ledger columns: claimed, then queued by card, then blocked, folded #}
+{% macro col(c) %}
+<div class="bcol" id="col-{{ c.key }}" data-col="{{ c.key }}">
+  {{ col_head(c.name, c.n, c.kinds, c.people) }}
+  {% for r in c.claimed %}<div class="bclaim">{{ brow(r, c.key) }}<div class="meta bdoing">{{ r.holders | join(', ') }}{% if r.doing %} · {{ r.doing }}{% endif %}</div></div>{% endfor %}
+  {% for e in c.orders %}{{ order_row(dict(e, repo_name=name), c.key, false) }}{% endfor %}
+  {% if c.groups %}<div class="qcards bcards" data-upnext='{{ bd.upnext | tojson }}' data-scope="{{ name }}">
+  {% for g in c.groups %}
+    <div class="qcard bcard{% if g.up %} g-up_next{% endif %}" data-card="{{ g.card }}" data-ids="{{ g.ids | join(' ') }}"{% if g.up %} data-up="1"{% endif %}>
+      {% if bd.numbered %}<div class="bgut">{% if g.up %}<span class="qgrip" draggable="true" title="moves {{ g.rows[0].show }}'s card">⋮⋮</span><span class="qplace" title="{{ help_title('up-next-number') }}">{{ g.place or '' }}</span><span class="qmoves"><button type="button" class="qmove" data-move="top" title="moves {{ g.rows[0].show }}'s card to the top of this repo's Up next" aria-label="to the top">⤒</button><button type="button" class="qmove" data-move="up" title="moves {{ g.rows[0].show }}'s card up one" aria-label="up one">↑</button><button type="button" class="qmove" data-move="down" title="moves {{ g.rows[0].show }}'s card down one" aria-label="down one">↓</button></span>{% endif %}</div>{% endif %}
+      <div class="brows">{% for r in g.rows %}{{ brow(r, c.key) }}{% endfor %}</div>
+    </div>
   {% endfor %}
-  </div>
-</section>
+  </div>{% endif %}
+  {% if c.more %}<button class="rrow meta mono more" type="button" data-unfold="{{ c.key }}:queued" data-unsent>+{{ c.more }} more up next</button>{% endif %}
+  {% if c.n_blocked %}{% if c.blocked %}<div class="bblocked"><div class="meta bfoldh">{{ c.n_blocked }} blocked</div>{% for r in c.blocked %}{{ brow(r, c.key) }}{% endfor %}</div>
+  {% else %}<button class="rrow meta mono more" type="button" data-unfold="{{ c.key }}:blocked" data-unsent>{{ c.n_blocked }} blocked</button>{% endif %}{% endif %}
+  {% if not c.n %}<div class="meta bempty">nothing here</div>{% endif %}
+  {{ caller() if caller else '' }}
+</div>
+{% endmacro %}
 
-{# (2) Technical debt — the repo's Queue cards in rank order (TD-770), else (no Queue reading) the open entries in seven lists, one per kind; an entry is edited in its file.
-   A ledger that is not there, or does not parse, is one warning line in its place (§4.5a *missing seams*) #}
-{% if seams and seams.ledger %}
-<section class="rsec" id="debt"><div class="warn" id="noledger">{{ seams.ledger.text }}{% if seams.ledger.cure %} <code>{{ seams.ledger.cure }}</code>{% endif %}</div></section>
-{% else %}
+{# The board (§4.5 screen 11 *the board*, §4.5a *Repo page: Technical debt cards*; TD-900, built by TD-903): one
+   repo by stage — For you, one column per worker stage of the servicing teams' flows, Review, Merged — under
+   the Technical debt heading as it was. An entry is edited in its file. #}
 <section class="rsec" id="debt">
+  {#- a ledger that is not there, or does not parse, is one warning line in place of the ledger's part: its
+     heading and its columns (§4.5a *Repo page: missing seams*); Review and Merged stand #}
+  {% if seams and seams.ledger %}<div class="warn" id="noledger">{{ seams.ledger.text }}{% if seams.ledger.cure %} <code>{{ seams.ledger.cure }}</code>{% endif %}</div>
+  {% else %}
   <div class="row gap rsh"><span class="h2">Technical debt</span>
     <span class="meta">{% for l in lists %}{{ l.rows | length }} {{ l.label }}{{ ' · ' if not loop.last }}{% endfor %}</span>
-    <button class="imark" type="button" aria-expanded="false" aria-controls="info-debt" title="About this list">i</button>
+    <button class="imark" type="button" aria-expanded="false" aria-controls="info-debt" title="{{ help_title('board') }}">i</button>
     <span class="grow"></span>
     {% if ledger_editor %}{% from "file_link.html" import file_link %}{{ file_link(ledger_editor, "‹› Open ledger", "open the ledger in " ~ ledger_editor.label ~ ", at line 1", "btn sm ghost") }}{% endif %}
     {% if r.ledger %}<button class="btn sm ghost" type="button" data-addentry="{{ name }}" title="write what you have; a session drafts the entry (design §4.9)">Add entry…</button>{% endif %}</div>
@@ -38,45 +60,30 @@
   {# what needs a team, and a team the ledger and the definitions disagree on (§4.4 *An entry names its team*, TD-764) #}
   {% if team_notes and team_notes.needs %}<div class="meta teamnote">needs a team: {% for i in team_notes.needs.ids %}<a href="#{{ i }}">{{ i }}</a>{{ ', ' if not loop.last }}{% endfor %}{% if team_notes.needs.to %} — {{ team_notes.needs.to }}{% endif %}</div>{% endif %}
   {% for s in (team_notes.stale if team_notes else []) %}<div class="meta teamnote stale">{{ s.text }}{% if s.ids %}: {% for i in s.ids %}<a href="#{{ i }}">{{ i }}</a>{{ ', ' if not loop.last }}{% endfor %}{% endif %}</div>{% endfor %}
-  <div class="secinfo meta" id="info-debt" hidden>the open entries of {{ r.ledger.path if r.ledger else 'the ledger' }}, read when the file changes, and first among the pickable the board's decided lines, <i>board:</i>; drawn as the Queue's cards — an entry and everything its <i>Blocked by:</i> joins — in the order you rank them: drag a card by its grip, or ⤒ ↑ ↓, on a card nobody is working yet; <i>held by</i> is a member's claim; <i>settles in 7m</i> is a new entry no lane takes yet, which <b>Hold</b> keeps from them until you <b>Release</b> it</div>
+  <div class="secinfo meta" id="info-debt" hidden>{{ help_text('board') }}</div>
+  {% if r.ledger and r.ledger.entries is none %}<div class="meta">the ledger: could not look — {{ r.ledger.error or 'not read yet' }}</div>{% endif %}
   <div class="qwhy meta" id="qwhy" hidden></div>
-  {% if cards %}{# the repo's Queue cards, in rank order (§4.5 screen 11 item 2, TD-770) #}
-  {% if orders %}<div class="rlist">{% for e in orders %}{{ order_row(dict(e, repo_name=name), 'orders', false) }}{% endfor %}</div>{% endif %}
-  <div class="qcards" id="qcards" data-upnext='{{ cards.upnext | tojson }}' data-scope="{{ name }}">
-  {% for c in cards.cards %}{{ qc.card(c, name) }}{% endfor %}
-  </div>
-  {% else %}
-  <div class="rlist">
-  {% if r.ledger and r.ledger.entries is none %}<div class="rrow meta">could not look — {{ r.ledger.error or 'not read yet' }}</div>{% endif %}
-  {% for l in lists %}{% if l.rows %}
-    <div class="rlh" id="debt-{{ l.key }}">{{ l.label }} · {{ l.rows | length }}</div>
-    {% for e in l.sent %}
-    {% if e.work_order %}{{ order_row(dict(e, repo_name=name), l.key, loop.index > 4) }}
-    {% else %}
-    <div class="rrow{% if loop.index > 4 %} folded{% endif %}" id="{{ e.id }}" data-list="{{ l.key }}"><span class="mono strong">{{ e.id }}</span><span class="rtitle">{{ e.title }}</span><span class="grow"></span>
-      {% if e.held %}<span class="meta">held by {{ e.held }} ·</span>{% endif %}<span class="meta p-{{ e.priority }}">{{ e.priority | capitalize }}</span><span class="meta">· {{ e.owner or '—' }}</span>{% if e.needs_team %}<span class="meta needsteam">· needs a team</span>{% endif %}{% if e.settle %}<span class="meta settle">· {{ e.settle }}</span>{% endif %}{% if e.wait %}<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>{% endif %}{% if e.settle_mark %}{# the home's settle clock (§4.5a *Repo page: Hold / Release on an entry*, TD-710, TD-736) #}<button class="btn sm ghost" type="button" data-tdhold="{{ e.id }}" data-repo="{{ name }}"{% if e.settle_mark == 'held' %} data-release="1" title="make it pickable now: a lane may take it at once (design §4.4)">Release{% else %} title="keep every lane off it until you release it (design §4.4)">Hold{% endif %}</button>{% endif %}{% for d in e.builds_of %}<span class="meta">· builds <a href="#{{ d }}">{{ d }}</a></span>{% endfor %}{% if e.kind == 'live-check' %}<span class="meta">· {{ 'live check' if e.live == 'yes' else 'waits for its build to be live' }}{% for n in e.built or [] %} #{{ n }}{% endfor %}</span>{% endif %}{% if e.blocked_by %}<span class="meta">· blocked by {{ e.blocked_by | join(', ') }}</span>{% endif %}{% if e.flag %}<span class="meta flag">· {{ e.flag }}</span>{% endif %}</div>
-    {% if e.builds %}{# a design's builds and their states (§4.5a *Repo page: its builds line*, TD-693) #}
-    <div class="rrow buildsline{% if loop.index > 4 %} folded{% endif %}" data-list="{{ l.key }}"><span class="meta">{% if e.builds.done %}every build archived — archive this entry{% else %}builds:{% for b in e.builds.builds %}{% if not loop.first %} ·{% endif %} {% if b.row %}<a href="#{{ b.row }}">{{ b.id }}</a>{% else %}{{ b.id }}{% endif %} <span class="bstate">{% if b.state == 'archived' %}archived{% elif b.state == 'review' %}in review {% if b.url %}<a href="{{ b.url }}" target="_blank" rel="noopener">#{{ b.pr }}</a>{% else %}#{{ b.pr }}{% endif %}{% elif b.state == 'held' %}held by {{ b.held }}{% else %}open{% endif %}{% if b.blocked_by %}, blocked by {{ b.blocked_by | join(', ') }}{% endif %}</span>{% endfor %}{% endif %}</span></div>
-    {% endif %}
-    {% endif %}
-    {% endfor %}
-    {% if l.fold %}<button class="rrow meta mono more" type="button" data-unfold="{{ l.key }}"{% if l.sent | length < l.rows | length %} data-unsent{% endif %}>+{{ l.fold }} more</button>{% endif %}
-  {% endif %}{% endfor %}
-  </div>
   {% endif %}
-</section>
-{% endif %}
-
-{# (3) Recently completed — the window's closed entries, newest first, each with the PR that closed it and
-   who opened that PR (§4.5 screen 11, TD-604); one list per window, the page's one picker shows one #}
-<section class="rsec" id="completed" data-loaded="{{ win }}">
+  <div class="board" id="board" data-scope="{{ name }}" style="--bcols: {{ bd.stages | length + 3 }}">
+    {% if not (seams and seams.ledger) %}
+    {% call col(bd.foryou) %}{% if bd.fold %}<details class="bfold"><summary class="meta">no lane takes these ({{ bd.fold | length }})</summary>{% for r, words in bd.fold %}{{ qrow(r, name) }}{% if words and not r.ext.flag %}<div class="meta bflag">{{ words }}</div>{% endif %}{% endfor %}</details>{% endif %}{% endcall %}
+    {% for c in bd.stages %}{{ col(c) }}{% endfor %}
+    {% endif %}
+    {# Review: the open PRs, each the old list's row with its standing (§4.5 screen 11 *Review*) #}
+    <div class="bcol" id="prs" data-col="review">
+      {%- set prinfo %} <button class="imark" type="button" aria-expanded="false" aria-controls="info-prs" title="About this column">i</button>{% endset %}
+      {{ col_head('Review', prs | length, ['open PRs'], bd.review_people, prinfo) }}
+      <div class="secinfo meta" id="info-prs" hidden>the remote's open PRs, read by the home every five minutes ({{ 'could not look: ' ~ r.prs.error if r.prs and r.prs.error else 'read ' ~ facet.read ~ ' ago' if facet else '' }}); the standing is each review seat's mail — <i>waiting on</i> the seat while its ask is open, then <i>passed by</i>, <i>findings from</i> or <i>merged by</i> it, as its answer's verdict says; <i>unasked</i> is a green PR that touches the repo's held paths and no review seat has been asked to read — its author posts its review, then asks the reader it names</div>
+      {% for p in prs %}{{ pr_row(p) }}{% else %}<div class="meta bempty">{% if r.prs and r.prs.open is not none %}Nothing in review{% else %}could not look{% if r.prs and r.prs.error %} — {{ r.prs.error }}{% endif %}{% endif %}</div>{% endfor %}
+    </div>
+    {# Merged: the window's closes, newest first, the live divider (§4.5 screen 11 *Merged*, TD-604, TD-904) #}
+    <div class="bcol" id="completed" data-loaded="{{ win }}" data-col="merged">
   {% for w, c in completed.items() %}
   <div class="wv" data-wv="{{ w }}"{% if w != 'day' %} hidden{% endif %}>
   {%- set d = c.divider or {} %}
-  <div class="row gap rsh"><span class="h2">Recently completed</span> <span class="meta">{{ c.rows | length }} {{ c.word }} · newest first</span>{% if d.unknown %} <span class="meta" title="{{ help_title('live-divider') }}">· live unknown — {{ d.unknown }}</span>{% endif %}
-    <button class="imark" type="button" aria-expanded="false" aria-controls="info-completed-{{ w }}" title="About this list">i</button></div>
-  <div class="secinfo meta" id="info-completed-{{ w }}" hidden>entries the ledger closed in the window (day · week · month, the page's one picker): the first commit whose ledger no longer holds the entry, the PR whose squash merge took it out, and who opened that PR — <i>no PR</i> where the closing commit names none</div>
-  <div class="rlist">
+  <div class="bhead"><span class="bname">Merged</span> <span class="meta bcount">{{ c.rows | length }} {{ c.word }}</span>
+    <span class="seg bwin">{% for x in ('day', 'week', 'month') %}<button type="button" data-win="{{ x }}" aria-pressed="{{ 'true' if x == w else 'false' }}">{{ x }}</button>{% endfor %}</span></div>
+  {% if d.unknown %}<div class="meta" title="{{ help_title('live-divider') }}">live unknown — {{ d.unknown }}</div>{% endif %}
   {% if c.sent is none %}<div class="rrow meta">reading {{ c.word }}…</div>{% endif %}
   {#- §4.5a *Repo page, Merged: live divider* (TD-904): the closes not yet live above one line, the rest below it #}
   {%- macro livediv(d, w, folded) %}<div class="rrow livediv{% if folded %} folded{% endif %}" data-list="completed-{{ w }}" title="{{ help_title('live-divider') }}"><span class="mono">{{ d.text }}</span>{% if d.held %}<span class="meta">· held: {{ d.held }}</span><span class="grow"></span><button class="btn sm ghost" data-act="clear_promote" data-id="person" data-repo="{{ d.repo }}" data-held="1" title="{{ help_title('promote-dismiss') }}">Dismiss</button>{% endif %}</div>{% endmacro %}
@@ -92,10 +99,12 @@
   {%- if d.text and d.n and d.n >= c.rows | length and c.sent is not none and c.sent | length == c.rows | length %}{{ livediv(d, w, d.n > 8) }}{% endif %}
   {% if c.fold and c.sent is not none %}<button class="rrow meta mono more" type="button" data-unfold="completed-{{ w }}"{% if c.sent | length < c.rows | length %} data-unsent{% endif %}>+{{ c.fold }} more</button>{% endif %}
   </div>
-  </div>
   {% endfor %}
+    </div>
+  </div>
 </section>
 
+<div class="rpanels">
 {# (4) Waiting on you — the Inbox's own board rows, filtered to the repo: acting here is acting on the board #}
 <section class="rsec" id="waiting">
   <div class="row gap rsh"><a class="h2" href="/inbox?repo={{ name }}&kind=board" title="the Inbox, filtered to this repo’s board items">Waiting on you</a> <span class="meta">{{ boards | length }} due</span>
@@ -120,3 +129,4 @@
   {% else %}<div class="rrow meta">{{ 'no team services this repo' if not teams else 'no ao doing calls yet' }}</div>{% endfor %}
   </div>
 </section>
+</div>

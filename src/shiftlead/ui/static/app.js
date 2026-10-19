@@ -3554,24 +3554,27 @@
       if (folded.has(card.dataset.card)) folded.delete(card.dataset.card); else folded.add(card.dataset.card);
       store.set(foldKey, [...folded]); applyFolds();
     }
-    function upnext() { const q = $("#qcards", box); try { return JSON.parse(q.dataset.upnext || "[]"); } catch (e) { return []; } }
-    function placeCards(order) {  // the page's Up next cards in `order`, after its In progress ones
-      const q = $("#qcards", box); if (!q) return;
+    // the cards' box: the Queue's one `#qcards`, or on the Repo page's board the column the card is in (TD-903)
+    const boxOf = (card) => (card && card.closest(".qcards")) || $("#qcards", box);
+    function upnext(q) { try { return JSON.parse((q && q.dataset.upnext) || "[]"); } catch (e) { return []; } }
+    function placeCards(order, q) {  // the box's Up next cards in `order`, after its In progress ones
+      if (!q) return;
       const ups = $$(".qcard[data-up]", q), at = (c) => order.indexOf(c.dataset.card);
       const anchor = ups.length ? ups[0].previousElementSibling : null;
       let after = anchor;
       ups.sort((a, b) => at(a) - at(b)).forEach((c) => { if (after) after.after(c); else q.prepend(c); after = c; });
-      q.dataset.upnext = JSON.stringify(order);
+      $$(".qcards", box).forEach((x) => (x.dataset.upnext = JSON.stringify(order)));  // every column's whole order
     }
     async function moveCard(card, how) {
-      // on a Repo page the neighbours are the repo's own (`data-scope`, TD-901): the Up next cards it draws
-      const q = $("#qcards", box), scope = (q && q.dataset.scope) || "", before = upnext();
-      const drawn = new Set($$(".qcard[data-up]", box).map((c) => c.dataset.card));
+      // on a Repo page the neighbours are the repo's own (`data-scope`, TD-901) in the card's column (TD-903):
+      // the Up next cards that column draws
+      const q = boxOf(card), scope = (q && q.dataset.scope) || "", before = upnext(q);
+      const drawn = new Set($$(".qcard[data-up]", q).map((c) => c.dataset.card));
       const own = scope ? before.filter((x) => drawn.has(x)) : null;
       const m = scope ? AO.rankMoveScoped(before, own, card.dataset.card, how) : AO.rankMove(before, card.dataset.card, how);
       if (!m) return;
       const why = $("#qwhy", box); if (why) why.hidden = true;
-      placeCards(m.order);
+      placeCards(m.order, q);
       try {
         const r = await fetch("/api/rank/move", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -3579,7 +3582,7 @@
         });
         if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
       } catch (err) {
-        placeCards(before);
+        placeCards(before, q);
         if (why) { why.textContent = `${card.dataset.card.replace(/^.*#/, "")} stays where it was: ${err.message}`; why.hidden = false; }
       }
     }
@@ -3591,7 +3594,7 @@
     });
     const dropOf = (e) => {
       const c = dragged && e.target.closest && e.target.closest(".qcard[data-up]");
-      if (!c || c === dragged) return null;
+      if (!c || c === dragged || c.closest(".qcards") !== dragged.closest(".qcards")) return null;  // its own column
       const box2 = c.getBoundingClientRect();
       return { card: c, before: e.clientY < box2.top + box2.height / 2 };
     };
@@ -4018,6 +4021,7 @@
       // Recently completed follows the page's one window picker (§4.5 screen 11 item 3, TD-604)
       const win = store.get("win", "day");
       $$("#completed .wv", box).forEach((el) => (el.hidden = el.dataset.wv !== win));
+      $$("#completed .bwin button", box).forEach((b) => b.setAttribute("aria-pressed", b.dataset.win === win ? "true" : "false"));
       // a window wider than the one sent is read once, by the lists' read (§4.5 *Page loads*, TD-882)
       if (loading()) reread();
       // a team pick and a doer pick AND (§4.5a *Repo page: doing filters*, TD-740); *all* is neither
@@ -4108,14 +4112,15 @@
     function showHash() {
       const id = AO.hashId(location.hash), row = id && document.getElementById(id);
       // a row past its list's fold was not sent: the lists' read fetches its list, then lands on it (TD-882)
-      if (!row && AO.TD_ID.test(id) && $("#debt .rlh", lists) && !sought.has(id)) {
+      if (!row && AO.TD_ID.test(id) && $("#board", lists) && !sought.has(id)) {
         sought.add(id); want = id; return reread();
       }
       if (!row || !box.contains(row)) return;
       const card = row.closest(".qcard");
       if (card && card.classList.contains("folded")) toggleFold(card);
-      else if (!card && !row.dataset.list) return;
-      else if (!card && row.classList.contains("folded")) unfold(row.dataset.list);
+      else if (!card && !row.dataset.list && !row.closest("#board")) return;
+      else if (!card && row.dataset.list && row.classList.contains("folded")) unfold(row.dataset.list);
+      const fold = row.closest("details.bfold"); if (fold) fold.open = true;  // For you's *no lane takes these*
       row.scrollIntoView({ block: "center" });
     }
     // the cards' own presses, as on the Org (TD-740); a card's team badge opens the Org filtered to that team
@@ -4127,6 +4132,9 @@
     box.addEventListener("click", (e) => {
       // a facet's selector: `wireGroups` picked it; the window picker moves Recently completed too
       if (e.target.closest(".tsum .seg[data-pick] button")) return apply();
+      // Merged's own picker, the page's one window (§4.5 screen 11 *Merged*, TD-903)
+      const wb = e.target.closest("#completed .bwin button[data-win]");
+      if (wb) { store.set("win", wb.dataset.win); return apply(); }
       const chip = e.target.closest(".dchips .chip");
       if (chip && chip.dataset.team !== undefined) { store.set(teamKey, store.get(teamKey, "") === chip.dataset.team ? "" : chip.dataset.team); return apply(); }
       if (chip) { store.set(whoKey, chip.dataset.who); if (!chip.dataset.who) store.set(teamKey, ""); return apply(); }

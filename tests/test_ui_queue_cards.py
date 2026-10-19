@@ -119,76 +119,88 @@ def repos(tmp_path) -> dict:
     return {s: reading("samscrape", s, entries()), d: reading("db", d, [{"id": "TD-5", "title": "a db entry", "for_page": "pickable", "priority": "medium", "owner": "grinder"}, {"id": "TD-7", "title": "the cross-repo top", "for_page": "pickable", "priority": "medium", "owner": "grinder"}])}  # fmt: skip
 
 
-def cards_of(html: str) -> dict[str, str]:
-    """Each drawn card's markup, by its id, in page order."""
-    q = html[html.index('id="qcards"') :]
-    q = q[: q.index("</section>")]
-    parts = re.split(r'(?=<div class="qcard )', q)[1:]
+def column(html: str, key: str) -> str:
+    """One column of the board (§4.5 screen 11, TD-903), its markup to the next column's."""
+    at = html.index(f'data-col="{key}"')
+    return html[at : html.index('class="bcol"', at)]
+
+
+def cards_of(html: str, key: str = "build") -> dict[str, str]:
+    """Each card group drawn in a column of the board, by its card's id, in page order."""
+    parts = re.split(r'(?=<div class="qcard bcard)', column(html, key))[1:]
     return {re.search(r'data-card="([^"]+)"', p).group(1): p for p in parts}
 
 
-def test_the_repo_page_draws_its_cards_in_rank_order(tmp_path, monkeypatch):
+def test_the_board_draws_a_columns_rows_by_card_in_rank_order(tmp_path, monkeypatch):
+    """§4.5 screen 11 *A row* (TD-903): each column's queued rows in the Queue's order, the rows of one card
+    together; a card whose entries are in two columns is in both, each with its own rows."""
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), queue()))
     html = c.get("/repo/samscrape").text
-    drawn = cards_of(html)
-    # this repo's cards, in the reading's order (In progress first); db's own card is not drawn here,
-    # the card spanning both is, and an entry no card holds yet is a card of its own at the end
-    assert list(drawn) == ["samscrape#TD-10", "samscrape#TD-20", "samscrape#TD-30", "db#TD-7", "samscrape#TD-50"]
+    # Build: the In progress card first, the design's build, then an entry filed since the reading; db's own
+    # card is not drawn here, and samscrape's half of the spanning card is blocked, folded at the foot
+    assert list(cards_of(html)) == ["samscrape#TD-10", "samscrape#TD-20", "samscrape#TD-50"]
+    assert 'data-unfold="build:blocked" data-unsent>1 blocked' in column(html, "build")
+    assert list(cards_of(html, "design")) == ["samscrape#TD-20"]
+    assert list(cards_of(html, "foryou")) == ["samscrape#TD-30"]  # the person's hold waits on them
     assert 'id="debt-pickable"' not in html  # the kind lists are gone; the count line stays
-    assert "not on the Queue yet" in drawn["samscrape#TD-50"]
-    # the whole Up next order rides on the cards, every repo's, for a move's neighbours
+    # the whole Up next order rides on each column, every repo's, for a move's neighbours
     up = re.search(r"data-upnext='([^']*)'", html).group(1)
     assert json.loads(up) == ["samscrape#TD-20", "samscrape#TD-30", "db#TD-5", "db#TD-7"]
 
 
-def test_a_two_entry_card_draws_its_header_and_indented_rows(tmp_path, monkeypatch):
+def test_a_card_in_two_columns_draws_its_rows_with_the_queue_cards_row(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), queue()))
-    d = cards_of(c.get("/repo/samscrape").text)["samscrape#TD-20"]
-    head = d[d.index('class="qhead"') : d.index('class="qrows"')]
-    # the header is the top entry: its id (the `#TD-20` link's target), badge, title, place, count, status
-    assert 'id="TD-20"' in head and ">TD-20<" in head and "qpri qp-high" in head and "the queue&#39;s design" in head
-    assert '<span class="qplace">1</span>' in head and "3 entries" in head and "s-ready" in head
-    rows = d[d.index('class="qrows"') :]
-    # a row a level down, its two parents said, and the archived row done with its PR
-    assert '<div class="qrow" style="--qd: 1" id="TD-21"' in rows and "also after TD-30" in rows
-    assert 'class="qrow archived"' in rows and "done #77" in rows and 'id="TD-19"' not in rows
+    html = c.get("/repo/samscrape").text
+    design, build = cards_of(html, "design")["samscrape#TD-20"], cards_of(html)["samscrape#TD-20"]
+    # the row is the Queue card's row partial: its id (the `#TD-20` link's target), badge, title (TD-903)
+    assert '<div class="qrow" style="--qd: 1" id="TD-20"' in design and "qpri qp-high" in design
+    assert "the queue&#39;s design" in design and 'id="TD-21"' not in design
+    assert 'id="TD-21"' in build and "also after TD-30" in build and 'id="TD-20"' not in build
+    assert 'id="TD-19"' not in html  # an archived member is the Queue's, not the board's
 
 
-def test_only_an_up_next_card_moves(tmp_path, monkeypatch):
+def test_only_an_up_next_cards_first_row_in_a_column_moves(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), queue()))
-    d = cards_of(c.get("/repo/samscrape").text)
-    working = d["samscrape#TD-10"]
+    html = c.get("/repo/samscrape").text
+    d = cards_of(html)
+    working = d["samscrape#TD-10"]  # In progress: no number and no grip
     assert "draggable" not in working and "data-move" not in working and "data-up" not in working
-    assert "0/1 done" in working and "grinder-1" in working  # the In progress count and the holder's pill
-    held = d["samscrape#TD-30"]  # a card the person holds is in Up next, and moves
-    assert 'draggable="true"' in held and held.count("data-move=") == 3 and "Needs you" in held
+    assert "grinder-1" in working  # the holder's pill
+    held = cards_of(html, "foryou")["samscrape#TD-30"]  # a card the person holds is in Up next, and moves
+    assert 'draggable="true"' in held and held.count("data-move=") == 3 and "moves TD-30's card" in held
     assert "data-move" not in d["samscrape#TD-50"]  # not on the Queue yet: nothing to move
+    # one card's grip in each column it has a row in
+    assert cards_of(html, "design")["samscrape#TD-20"].count("data-move=") == 3
+    assert d["samscrape#TD-20"].count("data-move=") == 3
 
 
 def test_a_row_keeps_what_the_ledger_row_carried(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), queue()))
-    d = cards_of(c.get("/repo/samscrape").text)
-    build = d["samscrape#TD-20"]
+    html = c.get("/repo/samscrape").text
+    build = cards_of(html)["samscrape#TD-20"]
     assert "· grinder" in build and "needs a team" in build and 'data-tdhold="TD-21"' in build
-    assert "· designer" in build  # the top entry's owner, in the header
-    held = d["samscrape#TD-30"]
-    assert 'data-tdhold="TD-30" data-repo="samscrape" data-release="1"' in held
-    # another repo's top entry is written with its repo, and carries none of this ledger's words
-    cross = d["db#TD-7"]
-    assert ">db#TD-7<" in cross and 'id="TD-7"' not in cross and 'id="TD-40"' in cross
+    assert "· designer" in cards_of(html, "design")["samscrape#TD-20"]  # the design entry's owner
+    # For you's row is the Inbox's ledger row: a held entry's Release is the Inbox's
+    held = cards_of(html, "foryou")["samscrape#TD-30"]
+    assert 'data-act="ledger_release" data-id="person" data-repo="samscrape" data-ref="TD-30"' in held
 
 
 def test_a_card_spanning_two_repos_is_drawn_on_both_pages(tmp_path, monkeypatch):
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), queue()))
     db = cards_of(c.get("/repo/db").text)
     assert list(db) == ["db#TD-5", "db#TD-7"]
-    assert 'id="TD-7"' in db["db#TD-7"] and ">samscrape#TD-40<" in db["db#TD-7"]
+    assert (
+        'id="TD-7"' in db["db#TD-7"] and ">samscrape#TD-40<" not in db["db#TD-7"]
+    )  # each page draws its own repo's rows
 
 
-def test_no_queue_reading_draws_the_kind_lists(tmp_path, monkeypatch):
+def test_no_queue_reading_draws_the_columns_with_no_number_and_no_grip(tmp_path, monkeypatch):
+    """§4.5 screen 11: where the home serves no Queue reading (a node, a home before its first tick) the
+    columns are the same, in the ledger's order, with no number and no grip."""
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), None))
     html = c.get("/repo/samscrape").text
-    assert 'id="qcards"' not in html and 'id="debt-pickable"' in html
+    assert 'id="board"' in html and "data-move" not in html and "qgrip" not in html and "bgut" not in html
+    assert 'id="TD-21"' in column(html, "build") and 'id="TD-20"' in column(html, "design")
 
 
 def test_a_move_posts_rank_move_with_its_neighbours(tmp_path, monkeypatch):
@@ -444,16 +456,14 @@ def _placed() -> dict:
 
 
 def test_the_repo_page_numbers_a_card_by_its_place_in_the_repo_and_sends_the_scope(tmp_path, monkeypatch):
-    """§4.5 screen 11 *Numbers, grips and moves are the card's*, §4.4 *A move lands* (TD-901): the Repo page
+    """§4.5 screen 11 *Numbers, grips and moves are the card's*, §4.4 *A move lands* (TD-901, TD-903): the board
     draws a card's place among the repo's own Up next cards, and its moves carry the repo as `scope`."""
     moves: list = []
     c = client(monkeypatch, tmp_path, fake(repos(tmp_path), _placed(), moves))
     html = c.get("/repo/samscrape").text
-    d = cards_of(html)
-    assert (
-        '<span class="qplace" title="' in d["db#TD-7"] and '">3</span>' in d["db#TD-7"]
-    )  # samscrape's 3, not the whole 4
-    assert re.search(r'id="qcards" data-upnext=\'[^\']*\' data-scope="samscrape"', html)
+    held = cards_of(html, "foryou")["samscrape#TD-30"]
+    assert '<span class="qplace" title="' in held and '">2</span>' in held  # samscrape's 2
+    assert re.search(r'class="qcards bcards" data-upnext=\'[^\']*\' data-scope="samscrape"', html)
     got = c.post(
         "/api/rank/move",
         json={"ids": ["db#TD-7"], "prev": "samscrape#TD-20", "next": "samscrape#TD-30", "scope": "samscrape"},
