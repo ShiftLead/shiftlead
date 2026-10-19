@@ -17063,6 +17063,6 @@ Then file the build entry and name it in `Blocked by:`.
 
 **Read live (2026-10-18, grinder-ao-2, #2159 live in b30ec19):** a headless GET of `/queue` numbers each repo's Up next cards from 1 with its chip — shiftlead 1, 2 …, samscrape 1, 2, 3, contractmatch 1, 2, 3, guardians-devenv 1 … 7, pneuma-ops 1 — and the one spanning card carries both numbers (*20 contractmatch · 4 shiftlead*); `ao repo` prints *up next n* on the pickable entries and `ao repo --json` carries `place`. The Repo page's ⤒ was pressed on a scratch home (`scripts/look_home.py`, two fixture repos interleaved in Up next): ⤒ on beta's last card from `/repo/beta` posted `{prev: repo#TD-001, next: beta#TD-002, scope: beta}`, the card landed at 3, directly above beta's first card and below the other repos' cards, and `ranks.json`'s intent carries `scope: beta` with only beta's cards remembered (`prevs: []`, `nexts: [beta#TD-004]`). The fixture repos have no origin, so the flush itself was not exercised there (`tests/test_rank_per_repo.py` covers the scoped re-derivation).
 
-**Resolved:** 2026-10-18, PR #NNNN (live check of #2159) — it holds: per-repo numbers and chips on the live Queue, both numbers on a spanning card, `ao repo`'s place, and a scoped Repo page ⤒ lands directly above the repo's first card.
+**Resolved:** 2026-10-18, PR #2161 (live check of #2159) — it holds: per-repo numbers and chips on the live Queue, both numbers on a spanning card, `ao repo`'s place, and a scoped Repo page ⤒ lands directly above the repo's first card.
 
 ---
