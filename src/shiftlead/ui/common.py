@@ -699,6 +699,8 @@ def live_unknown(p: Mapping[str, Any]) -> str:
         return str(p.get("live_why") or "no live reading yet")
     if not isinstance(p.get("pending"), list):
         return "live and main could not be compared"
+    if p.get("pending_more"):  # the reading stops at `build.PENDING_CAP`: an older close cannot be told
+        return f"main is over {build.PENDING_CAP} commits past live"
     return ""
 
 

@@ -1078,7 +1078,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   one — a run in flight, a failure — is in the intent files below. Beside the three, for the page's
   build chip (§4.5a; TD-539): **`live_at`**, the live commit's committer time, and **`pending`**, the
   commits of main past live as `{sha, subject}`, newest first — every commit of `live..main`, one `git log`
-  in the same pass, empty when live is main's head and absent when the two cannot be compared (the chip draws the first ten
+  in the same pass, empty when live is main's head and absent when the two cannot be compared; past a thousand commits it stops, `pending_more` saying so, and every close reads as unknown (the chip draws the first ten
   and the count of the rest; the Repo page's Merged column and the Queue's completed lines test a close's
   commit against the whole list, §4.5 screen 11 *Merged*, TD-900) — and **`promoted`**, `{sha, subject,
   at, by}`: the live commit, its subject, and when and by what it went live, read from `last.json` (*The

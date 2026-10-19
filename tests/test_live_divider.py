@@ -57,6 +57,7 @@ def test_a_close_is_not_yet_live_while_its_commit_is_in_live_dot_dot_main():
     unknown = promo("/r")
     del unknown["pending"]  # live and main could not be compared
     assert close_state(unknown, "c1") == ""
+    assert close_state(promo("/r", pending_more=1), "c1") == ""  # past the cap the list is not whole
 
 
 def test_the_divider_puts_what_is_not_yet_live_above_one_line():

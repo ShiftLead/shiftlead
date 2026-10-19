@@ -3472,7 +3472,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # the promote reading, read once: the completed lines' live mark (TD-904) and the top bar's build chip
         info: dict[str, Any] | None = None
         if not agent_down:
-            with contextlib.suppress(HTTPException):
+            with contextlib.suppress(Exception):  # display only, as the chip is: no mark, never a failed page
                 info = dict(await call("host"))
         promotes = (info or {}).get("promotes")
         # Recently completed sends the picked window's lines alone (§4.5 *Page loads*, TD-882)
@@ -3506,7 +3506,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Queue",
                 "volatile": hosts.local_host().volatile,
                 "usage": {} if agent_down else await chip_usage(call, fleet),
-                "build_chip": None if agent_down else await chip_build(call, info),
+                "build_chip": None if agent_down or info is None else await chip_build(call, info),
             },
         )
 

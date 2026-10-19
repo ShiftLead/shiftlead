@@ -183,6 +183,7 @@ def test_an_entry_closed_by_a_squash_merge_reads_its_pr_and_a_direct_push_none(r
     life = ledger.history(repo, "docs/technical_debt.md", (repo / "docs/technical_debt.md").read_text())
     assert life is not None
     assert (life["TD-001"].pr, life["TD-002"].pr) == (1290, None)
+    assert life["TD-001"].sha and life["TD-003"].sha is None  # reopened: no close, no commit
     assert (life["TD-003"].closed, life["TD-003"].pr) == (None, None)
     assert life["TD-004"].pr is None and life["TD-004"].closed is None
 
@@ -199,6 +200,7 @@ def test_an_entry_closed_by_a_squash_merge_reads_its_pr_and_a_direct_push_none(r
         "title": "t1",
         "closed": r["recent"][[e["id"] for e in r["recent"]].index("TD-001")]["closed"],
         "pr": 1290,
+        "sha": life["TD-001"].sha,  # the closing commit, the promote reading's test (TD-904)
         "author": "eyecantell",
         "branch": "td001-rest",
         "url": "https://x/pull/1290",

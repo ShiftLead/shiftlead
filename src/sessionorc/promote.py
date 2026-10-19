@@ -163,11 +163,11 @@ def promoter(last_run: dict[str, Any]) -> str:
 
 
 def read_since(root: str | Path, live: str | None, main: str | None, repo: str | None = None) -> dict[str, Any]:
-    """The build chip's readings (§6 *Promote*, §4.5a; TD-539) and the live divider's (TD-904):
-    `live_at`, live's committer time; `pending`, every commit of main past live as `{sha, subject}`,
-    newest first, `pending_more` 0 (the chip lists the first `build.PENDING_SHOWN`) — empty when live is
-    main's head; and `promoted`, `{sha, subject, at, by}`: the live commit and its subject, with when and
-    by what it went live from `repo`'s `last.json` when that names the live commit, else `at` and `by`
+    """The build chip's readings (§6 *Promote*, §4.5a; TD-539) and the live divider's (TD-904): `live_at`, live's
+    committer time; `pending`, every commit of main past live as `{sha, subject}`, newest first, up to
+    `build.PENDING_CAP` with `pending_more` 1 past it (the chip lists the first `build.PENDING_SHOWN`) — empty
+    when live is main's head; and `promoted`, `{sha, subject, at, by}`: the live commit and its subject, with
+    when and by what it went live from `repo`'s `last.json` when that names the live commit, else `at` and `by`
     None, as for a copy installed by hand. A failed read, or an unknown live or main, leaves a field absent."""
     out: dict[str, Any] = {}
     at, subject = build.commit_at(str(root), live)
