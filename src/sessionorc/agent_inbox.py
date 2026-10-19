@@ -7,7 +7,6 @@ dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgen
 from __future__ import annotations
 
 import asyncio
-import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,7 +47,6 @@ from sessionorc.models import (
 BOARD_HEAD_CHARS = 200
 # a ledger row's two roads and the fixed words each writes before the person's (§4.5 screen 12 *any open row*, TD-905)
 LEDGER_ROADS = {"done": "done", "design": "back to design"}
-TD_ID = re.compile(r"TD-\d+")
 
 
 def reply_note(sent: list[dict[str, str]], refused: list[str]) -> str:
@@ -883,10 +881,9 @@ class InboxMixin:
         stage's lane takes `design-first`, the page refuses before it calls (the home reads no `org.yml`)."""
         if road not in LEDGER_ROADS:
             raise RpcError(f"a ledger row's road is {' or '.join(LEDGER_ROADS)}, not {road!r}")
-        e = next(
-            (x for x in ((view.get("ledger") or {}).get("entries") or []) if isinstance(x, dict) and x.get("id") == id),
-            None,
-        )
+        listed = [x for x in ((view.get("ledger") or {}).get("entries") or []) if isinstance(x, dict)]
+        e = next((x for x in listed if x.get("id") == id), None)
+        open_ids = {str(x.get("id")) for x in listed}
         if e is None:
             raise RpcError(f"{id} is not an open entry of {name}'s ledger as the home last read it: reload the page")
         page = str(e.get("for_page") or "")
@@ -894,7 +891,8 @@ class InboxMixin:
             raise RpcError(f"{id} is yours to do: its own Done says what was done")
         if road == "design" and not (
             page in ("pickable", "live-check")
-            or (page == "blocked" and any(TD_ID.fullmatch(str(b)) for b in e.get("blocked_by") or ()))
+            # blocked by an id still open: the page's `blocked_open`, asked again here (review of #2162)
+            or (page == "blocked" and any(str(b) in open_ids for b in e.get("blocked_by") or ()))
         ):
             raise RpcError(f"{id} is {page or 'of no page kind'}: Back to design is on a pickable, live check or "
                            "id-blocked entry (design §4.5 screen 12)")  # fmt: skip
