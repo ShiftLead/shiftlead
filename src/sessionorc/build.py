@@ -80,6 +80,7 @@ def line(build: dict[str, Any], started_at: str = "", a: dict[str, Any] | None =
     return f"host agent: built from {commit}{dirty} at {build.get('built_at') or '?'}{started}{tail}"
 
 
+PENDING_CAP = 1000  # commits of main past live the reading holds; past it a close's state is unknown (TD-904)
 PENDING_SHOWN = 10  # commits of main past live listed on the chip's hover; the rest are a count (§4.5a)
 
 
@@ -114,16 +115,18 @@ def commit_at(source: Any, commit: Any) -> tuple[str, str]:
 
 
 def pending(source: Any, live: Any, main: Any) -> tuple[list[dict[str, str]], int] | None:
-    """The commits of `main` past `live`, newest first: `([{sha, subject}], more)` — the first
-    `PENDING_SHOWN` and how many more — or None when it cannot be read (§6 *Promote*, TD-539)."""
+    """The commits of `main` past `live`, newest first: `([{sha, subject}], 0)` — every one, since the
+    Repo page's Merged column and the Queue's completed lines test a close's commit against the whole
+    list (§6 *Promote*, TD-539, TD-904; the chip draws the first `PENDING_SHOWN`) — or None when it
+    cannot be read. Past `PENDING_CAP` the list stops and `more` is 1: the list is not whole."""
     if not live or not main or not isinstance(source, str) or not Path(source).is_dir():
         return None
-    out = _git(source, "log", "-n", str(PENDING_SHOWN), "--format=%H%x09%s", f"{live}..{main}", "--")
-    n = _git(source, "rev-list", "--count", f"{live}..{main}", "--")
-    if out is None or not (n or "").strip().isdigit():
+    out = _git(source, "log", "-n", str(PENDING_CAP + 1), "--format=%H%x09%s", f"{live}..{main}", "--")
+    if out is None:
         return None
     rows = [ln.split("\t", 1) for ln in out.splitlines() if "\t" in ln]
-    return [{"sha": s, "subject": t} for s, t in rows], max(0, int(n) - len(rows))
+    more = int(len(rows) > PENDING_CAP)
+    return [{"sha": s, "subject": t} for s, t in rows[:PENDING_CAP]], more
 
 
 def stamp(at: str, now: datetime | None = None) -> str:
@@ -171,7 +174,9 @@ def chip(build: dict[str, Any], started_at: str = "", a: dict[str, Any] | None =
         rest, cls = "", "live"
     when = stamp(at) if at else ""
     title = [f"{commit[:7]} {subject}".rstrip(), line(build, started_at, a)]
-    if rows:
+    if rows:  # the reading holds every pending commit (TD-904): the hover lists the first few
+        extra += max(0, len(rows) - PENDING_SHOWN)
+        rows = rows[:PENDING_SHOWN]
         title += ["", "not live yet:"] + [f"{r.get('sha', '')[:7]} {r.get('subject', '')}" for r in rows]
         if extra:
             title.append(f"… and {extra} more")

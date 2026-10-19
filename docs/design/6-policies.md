@@ -1078,12 +1078,14 @@ block. A policy is agent code and needs no grant; a session doing the same work 
   one — a run in flight, a failure — is in the intent files below. Beside the three, for the page's
   build chip (§4.5a; TD-539): **`live_at`**, the live commit's committer time, and **`pending`**, the
   commits of main past live as `{sha, subject}`, newest first — every commit of `live..main`, one `git log`
-  in the same pass, empty when live is main's head or cannot be compared (the chip draws the first ten
+  in the same pass, empty when live is main's head and absent when the two cannot be compared; past a thousand commits it stops, `pending_more` saying so, and every close reads as unknown (the chip draws the first ten
   and the count of the rest; the Repo page's Merged column and the Queue's completed lines test a close's
-  commit against the whole list, §4.5 screen 11 *Merged*, TD-900) — and **`live`**, `{sha, subject, at,
-  by}`: the live commit, its subject, and when and by what it went live, read from `last.json` (*The
-  outcome*, below: `at` and `by` — *auto*, *you*, *rollback*) when its `sha` is the live commit's, and
-  absent when it is not, as for a copy installed by hand (TD-900, built by TD-904). **Three preconditions** stand
+  commit against the whole list, §4.5 screen 11 *Merged*, TD-900) — and **`promoted`**, `{sha, subject,
+  at, by}`: the live commit, its subject, and when and by what it went live, read from `last.json` (*The
+  outcome*, below: `at`, and `by` — *auto* for the policy, *you* for a press, *rollback* for a rollback,
+  `last.json` keeping the run's `kind`) when its `sha` is the live commit's, and `at` and `by` null when
+  it is not, as for a copy installed by hand (TD-900, built by TD-904; named apart from **live**, which is
+  the commit itself). **Three preconditions** stand
   between the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
   `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree
   (the tree is a person's: the policy reads it and never makes it — no checkout, no reset, nothing
@@ -1139,7 +1141,7 @@ block. A policy is agent code and needs no grant; a session doing the same work 
     when it names no commit or more than one, when it is **not an ancestor of `origin/main`** (a
     branch is never promoted, CLAUDE.md; a hotfix is a merge and then a press), and when it is live
     already. Main's head is the plain press, by the path above. `--back` is `from` in
-    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by}`, written when a promote
+    `~/.shiftlead/promotes/<repo>/last.json` — `{sha, from, at, by, kind}`, written when a promote
     concludes, `from` being what `check` read before the run — and is refused when there is no such
     record or its `from` was never read, and **while a hold stands**: the last promote was then the
     rollback, and its `from` is the commit the person went back from.

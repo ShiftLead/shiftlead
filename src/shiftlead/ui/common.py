@@ -27,6 +27,7 @@ from markupsafe import Markup
 from sessionorc import build, hosts, identity, mail, paths, promote
 from sessionorc.client import AgentError
 from sessionorc.client import call_sync as _call_sync
+from sessionorc.ledger import SQUASH as SQUASH_PR
 from sessionorc.models import (
     tokens_short,
 )
@@ -672,6 +673,79 @@ def build_chip(info: dict[str, Any] | None) -> dict[str, str] | None:
         # *main +n* links to the Inbox's promote row, the chip's one pressable part: the press is the row's (TD-581)
         chip["link"], chip["href"] = f"main +{a['ahead']}", f"/inbox#promote-{quote(str(repo))}"
     return chip
+
+
+# ── what is live: the Repo page's divider and the Queue's mark (§4.5 screens 11, 12; TD-904) ──────────
+NOT_LIVE, LIVE = "not yet live", "live"
+
+
+def promote_reading(promotes: Any, root: Any = None, name: Any = None) -> dict[str, Any] | None:
+    """The home's promote reading of one repo (`host`'s `promotes`, §6 *Promote*), found by its checkout
+    `root` or else its `name`; None for a repo with no `promote:` block, where merged is as far as it goes."""
+    for n, r in (promotes or {}).items() if isinstance(promotes, Mapping) else ():
+        if not isinstance(r, Mapping):
+            continue
+        if root and r.get("root") and Path(str(r["root"])).resolve() == Path(str(root)).resolve():
+            return dict(r)
+        if not root and name and str(n) == str(name):
+            return dict(r)
+    return None
+
+
+def live_unknown(p: Mapping[str, Any]) -> str:
+    """Why live cannot be compared with a close, "" when it can: `check` not answering (a last good live
+    kept beside its why is not a reading), or no `pending` read in the pass."""
+    if p.get("live_why") or not p.get("live"):
+        return str(p.get("live_why") or "no live reading yet")
+    if not isinstance(p.get("pending"), list):
+        return "live and main could not be compared"
+    if p.get("pending_more"):  # the reading stops at `build.PENDING_CAP`: an older close cannot be told
+        return f"main is over {build.PENDING_CAP} commits past live"
+    return ""
+
+
+def close_state(p: Mapping[str, Any] | None, sha: Any) -> str:
+    """A close's promote state (§4.5 screen 11 *Merged*): *not yet live* when its closing commit is in
+    `live..main` — the reading's `pending`, read whole — else *live*; "" with no `promote:` block, while live
+    is unknown, or for a close whose commit is not known. The close's state, never the code's."""
+    if not p or not sha or live_unknown(p):
+        return ""
+    return NOT_LIVE if any(c.get("sha") == sha for c in p["pending"] if isinstance(c, Mapping)) else LIVE
+
+
+def live_divider(p: Mapping[str, Any] | None, rows: list[dict[str, Any]], name: str, now: datetime) -> dict[str, Any]:
+    """The Merged column's one line (§4.5 screen 11, §4.5a *Repo page, Merged: live divider*): each of `rows`
+    (newest first, each with its closing `sha`) gains `live`, its `close_state`, the rows not yet live are put
+    first, and the line is `{n, text, held, repo}` — `n` the rows above it, so the index it is drawn before
+    (the column's foot when live is older than every row; *not yet live (n)*, no words at 0), `text`
+    *live a1b2c3d · #2146 · promoted 15:10 by auto · 2h ago* (no promoter words when `by` is unknown), `held`
+    *rolled back to <sha>* while the repo holds. `{}` with no `promote:` block; `{unknown: why}` and no line
+    while live is unknown."""
+    if not p:
+        return {}
+    if why := live_unknown(p):
+        return {"unknown": why}
+    for r in rows:
+        r["live"] = close_state(p, r.get("sha"))
+    rows.sort(key=lambda r: r["live"] != NOT_LIVE)  # stable: newest first within each side
+    n = sum(1 for r in rows if r["live"] == NOT_LIVE)
+    live = str(p["live"])
+    got = p.get("promoted") if isinstance(p.get("promoted"), Mapping) else {}
+    words = [f"live {live[:7]}"]
+    m = SQUASH_PR.search(str(got.get("subject") or ""))
+    if m:
+        words.append(f"#{m.group(1)}")
+    if got.get("by") and (t := _instant(got.get("at"))):
+        here = t.astimezone()
+        clock = here.strftime("%H:%M" if here.date() == now.astimezone().date() else "%m-%d %H:%M")
+        words += [f"promoted {clock} by {got['by']}", _age(got.get("at"), now)]
+    held = p.get("held") if isinstance(p.get("held"), Mapping) else None
+    return {
+        "n": n,
+        "text": " · ".join(w for w in words if w),
+        "held": f"rolled back to {str(held.get('sha') or '')[:7]}" if held else "",
+        "repo": name,
+    }
 
 
 def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) -> str:

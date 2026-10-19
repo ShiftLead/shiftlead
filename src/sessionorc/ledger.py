@@ -634,13 +634,15 @@ def ledger_path(root: Path | str) -> str:
 class Change:
     """One entry's life in the file's history: when its section first appeared, and when it left
     (None while it is still there) — and `pr`, the PR whose squash merge removed it: the closing
-    commit's subject's `(#n)` (`SQUASH`), None for a commit with none, a direct push (TD-604)."""
+    commit's subject's `(#n)` (`SQUASH`), None for a commit with none, a direct push (TD-604) — and `sha`,
+    that closing commit, which the promote reading tests for *live* (§4.5 screen 11 *Merged*, TD-904)."""
 
     id: str
     title: str
     opened: datetime
     closed: datetime | None = None
     pr: int | None = None
+    sha: str | None = None
 
 
 def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
@@ -651,31 +653,33 @@ def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
     life: dict[str, Change] = {}
     present: set[str] = set()
 
-    def apply(at: datetime | None, pr: int | None, added: dict[str, str], removed: set[str]) -> None:
+    def apply(at: datetime | None, pr: int | None, sha: str | None, added: dict[str, str], removed: set[str]) -> None:
         if at is None:
             return
         for tid in removed - set(added):
             if tid in present:
                 present.discard(tid)
-                life[tid].closed, life[tid].pr = at, pr
+                life[tid].closed, life[tid].pr, life[tid].sha = at, pr, sha
         for tid, title in added.items():
             if tid not in life:
                 life[tid] = Change(tid, title, at)
             else:
                 life[tid].title = title or life[tid].title
                 if tid not in present:
-                    life[tid].closed, life[tid].pr = None, None
+                    life[tid].closed, life[tid].pr, life[tid].sha = None, None, None
             present.add(tid)
 
     at: datetime | None = None
     pr: int | None = None
+    sha: str | None = None
     added: dict[str, str] = {}
     removed: set[str] = set()
     for line in out.splitlines():
         if line.startswith("\x00C "):
-            apply(at, pr, added, removed)
+            apply(at, pr, sha, added, removed)
             added, removed = {}, set()
             parts = line.split(" ", 3)
+            sha = parts[1] if len(parts) > 1 else None
             try:
                 at = datetime.fromisoformat(parts[2].strip())
             except (IndexError, ValueError):
@@ -690,7 +694,7 @@ def _parse_log(out: str, skip: set[str]) -> dict[str, Change]:
                 added[tid] = line[1:].partition(":")[2].strip()
             else:
                 removed.add(tid)
-    apply(at, pr, added, removed)
+    apply(at, pr, sha, added, removed)
     return life
 
 
@@ -819,6 +823,7 @@ def reading(
             "opened": c.opened.isoformat(),
             "closed": c.closed and c.closed.isoformat(),
             "pr": c.pr if c.closed else None,
+            "sha": c.sha if c.closed else None,
         }
         for c in recent
     ]
@@ -827,10 +832,10 @@ def reading(
 
 def completed(recent: list[dict[str, Any]] | None, prs: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """*What closed, and by which PR* (design §4.4 *Repo facts*, TD-604): the ledger reading's `recent`
-    entries that closed, newest first, each `{id, title, closed, pr, author, branch, url}` — `pr` the
-    closing commit's squash number (None: a direct push), and `author`, `branch` and `url` the month's
-    PR reading's by that number (empty where it holds none), so a view can name the session whose
-    branch it was. The archive is not read."""
+    entries that closed, newest first, each `{id, title, closed, pr, sha, author, branch, url}` — `pr` the
+    closing commit's squash number (None: a direct push), `sha` that commit (TD-904), and `author`,
+    `branch` and `url` the month's PR reading's by that number (empty where it holds none), so a view can
+    name the session whose branch it was. The archive is not read."""
     by_number = {p.get("number"): p for p in prs or () if isinstance(p, dict)}
     out = []
     for e in recent or ():
@@ -844,6 +849,7 @@ def completed(recent: list[dict[str, Any]] | None, prs: list[dict[str, Any]] | N
                 "title": e.get("title") or "",
                 "closed": e["closed"],
                 "pr": pr,
+                "sha": e.get("sha"),
                 "author": str((p or {}).get("author") or ""),
                 "branch": str((p or {}).get("branch") or ""),
                 "url": str((p or {}).get("url") or ""),

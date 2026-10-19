@@ -24,7 +24,7 @@ from shiftlead import org as orgmod
 
 from . import uiconf
 from .cards import DEAD, NO_TEAM, card_order, group_place, prs_waiting, state_counts
-from .common import _age, host_name
+from .common import _age, host_name, live_divider, promote_reading
 from .inbox import work_note, work_started
 from .org import (
     FACETS,
@@ -259,19 +259,24 @@ COMPLETED_FOLD = 8  # Recently completed folds past this many rows, with *+n mor
 COMPLETED_WORD = {"day": "today", "week": "this week", "month": "this month"}  # the heading's window word
 
 
-def completed_rows(r: Mapping[str, Any], fleet: Collection[dict[str, Any]], now: datetime) -> dict[str, dict[str, Any]]:
+def completed_rows(
+    r: Mapping[str, Any], fleet: Collection[dict[str, Any]], now: datetime, promotes: Any = None
+) -> dict[str, dict[str, Any]]:
     """**Recently completed** (§4.5 screen 11 item 3, TD-604), one list per window of the page's one
     picker: `{rows, fold, word}` by *day*, *week* and *month*, each row the entry's id and title, the
     PR whose squash merge closed it (`pr`, a link: the PR reading's page, else the remote's; None —
     *no PR* — for a close by a commit that names none), who opened that PR — the session among
     `fleet`'s records whose branch is the PR's head (a link to its Focus), else the GitHub login —
-    and the close's age. Newest first, as the reading keeps them; nothing on it is a control."""
+    and the close's age. Newest first, as the reading keeps them; nothing on it is a control. `promotes` is
+    the `host` reading's: in a repo with a `promote:` block each window carries `divider`, the line between
+    what is not yet live and what is (`common.live_divider`, TD-904), its rows not yet live put first."""
     by_branch = {
         str((s.get("git") or {}).get("branch") or ""): s
         for s in fleet
         if isinstance(s.get("git"), dict) and (s.get("git") or {}).get("branch")
     }
     web = _https(str(r.get("remote") or ""))
+    p = promote_reading(promotes, r.get("root")) if r.get("root") else None
     out = {}
     for w in WINDOWS:
         rows = []
@@ -286,9 +291,16 @@ def completed_rows(r: Mapping[str, Any], fleet: Collection[dict[str, Any]], now:
                     "author": {"id": who["id"], "name": who.get("name") or who["id"]} if who else None,
                     "login": str(c.get("author") or ""),
                     "age": _age(c.get("closed"), now),
+                    "sha": c.get("sha"),
                 }
             )
-        out[w] = {"rows": rows, "fold": max(0, len(rows) - COMPLETED_FOLD), "word": COMPLETED_WORD[w]}
+        divider = live_divider(p, rows, Path(str(p.get("root") or "")).name, now) if p else {}
+        out[w] = {
+            "rows": rows,
+            "fold": max(0, len(rows) - COMPLETED_FOLD),
+            "word": COMPLETED_WORD[w],
+            "divider": divider,
+        }
     return out
 
 

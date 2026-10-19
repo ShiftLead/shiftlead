@@ -153,15 +153,34 @@ def ahead(root: str | Path, live: str | None, main: str | None) -> int | None:
     return int(n) if n and n.isdigit() else None
 
 
-def read_since(root: str | Path, live: str | None, main: str | None) -> dict[str, Any]:
-    """The build chip's two readings (§6 *Promote*, §4.5a; TD-539): `live_at`, live's committer
-    time, and `pending`, the commits of main past live as `{sha, subject}`, newest first, the first
-    `build.PENDING_SHOWN` with `pending_more` the count of the rest — empty when live is main's
-    head. A failed read, or an unknown live or main, leaves a field absent."""
+def promoter(last_run: dict[str, Any]) -> str:
+    """What a concluded run went live by, as the Repo page's divider words it (§6 *Promote*, TD-904):
+    *rollback* for a rollback (a `last.json` from before `kind` was kept: one a failed smoke started),
+    *auto* for the policy, *you* for a press — a person's, or a person's own shell by its name."""
+    if last_run.get("kind") == "rollback" or last_run.get("by") == "smoke":
+        return "rollback"
+    return "auto" if last_run.get("by") == "auto" else "you"
+
+
+def read_since(root: str | Path, live: str | None, main: str | None, repo: str | None = None) -> dict[str, Any]:
+    """The build chip's readings (§6 *Promote*, §4.5a; TD-539) and the live divider's (TD-904): `live_at`, live's
+    committer time; `pending`, every commit of main past live as `{sha, subject}`, newest first, up to
+    `build.PENDING_CAP` with `pending_more` 1 past it (the chip lists the first `build.PENDING_SHOWN`) — empty
+    when live is main's head; and `promoted`, `{sha, subject, at, by}`: the live commit and its subject, with
+    when and by what it went live from `repo`'s `last.json` when that names the live commit, else `at` and `by`
+    None, as for a copy installed by hand. A failed read, or an unknown live or main, leaves a field absent."""
     out: dict[str, Any] = {}
-    at, _ = build.commit_at(str(root), live)
+    at, subject = build.commit_at(str(root), live)
     if at:
         out["live_at"] = at
+        done = (last(repo) if repo else None) or {}
+        mine = bool(done.get("sha")) and done.get("sha") == live
+        out["promoted"] = {
+            "sha": live,
+            "subject": subject,
+            "at": done.get("at") if mine else None,
+            "by": promoter(done) if mine else None,
+        }
     got = build.pending(str(root), live, main)
     if got is not None:
         out["pending"], out["pending_more"] = got
@@ -322,7 +341,7 @@ def failed(repo: str) -> dict[str, Any] | None:
 
 
 def last(repo: str) -> dict[str, Any] | None:
-    """`last.json` `{sha, from, at, by}`: the promote that last concluded, `from` what `check` read
+    """`last.json` `{sha, from, at, by, kind}`: the promote that last concluded, `from` what `check` read
     before it — where `--back` goes (§6 *Which commit*)."""
     return _read(repo_dir(repo) / "last.json")
 
@@ -758,7 +777,11 @@ def _concluded(repo: str, intent: dict[str, Any], main: str | None, now: datetim
     is what the row goes on naming. A plain promote ends the hold when it concludes (`_passed`)."""
     d = repo_dir(repo)
     at = now.isoformat()
-    _write(d / "last.json", {"sha": intent.get("sha"), "from": intent.get("from"), "at": at, "by": intent.get("by")})
+    kind = intent.get("kind") or "promote"  # the Repo page's *by rollback* (TD-904)
+    _write(
+        d / "last.json",
+        {"sha": intent.get("sha"), "from": intent.get("from"), "at": at, "by": intent.get("by"), "kind": kind},
+    )
     if intent.get("kind") == "rollback":
         frm = (held(repo) or {}).get("from") or intent.get("from")
         hold = {"sha": intent.get("sha"), "from": frm, "main": main, "at": at}
@@ -820,9 +843,9 @@ def survey(
                 r["live_why"] = why
             r["ahead"] = ahead(root, r.get("live"), r.get("main"))
             r["ahead_since"] = read_ahead_since(root, r.get("live"), r.get("main"))
-            for k in ("live_at", "pending", "pending_more"):
+            for k in ("live_at", "pending", "pending_more", "promoted"):
                 r.pop(k, None)
-            r.update(read_since(root, r.get("live"), r.get("main")))
+            r.update(read_since(root, r.get("live"), r.get("main"), repo))
         if r["inflight"]:
             fl, note = _conclude(repo, r, now, b["run"])
             if note:  # a promote or rollback that succeeds clears a failure standing, as Dismiss does (§6)

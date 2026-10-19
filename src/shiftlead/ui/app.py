@@ -144,17 +144,21 @@ from .common import (  # re-exported: routes, templates and tests read these fro
     _usage_profiles,  # noqa: F401
     build_chip,  # noqa: F401
     checkout_of,  # noqa: F401
+    close_state,  # noqa: F401
     editor_file,  # noqa: F401
     editor_file_link,
     editor_link,  # noqa: F401
     host_name,  # noqa: F401
     identity_note,  # noqa: F401
+    live_divider,  # noqa: F401
+    live_unknown,  # noqa: F401
     log,  # noqa: F401
     md,  # noqa: F401
     node_banner,  # noqa: F401
     node_org_note,  # noqa: F401
     org_here,  # noqa: F401
     page_origin,  # noqa: F401
+    promote_reading,  # noqa: F401
     repos_of,  # noqa: F401
     restart_note,  # noqa: F401
     role_icons,  # noqa: F401
@@ -1755,7 +1759,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # the board's decided lines, the lanes' work orders, above the cards (§4.5a *Repo page: decided lines*)
                 "orders": [e for e in lists[0]["rows"] if e.get("work_order")] if lists else [],
                 # (3) Recently completed: the window's closed entries and the PRs that closed them (TD-604)
-                "completed": (completed := completed_rows(r, sessions, now)),
+                "completed": (completed := completed_rows(r, sessions, now, info.get("promotes"))),
                 # the count line's lanes line, once per team servicing the repo (§4.4 *In a team's lanes*, TD-361)
                 "lanes": [
                     ln
@@ -3469,9 +3473,16 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
         teams: dict[str, str] = {}
         with contextlib.suppress(Exception):
             teams = {n: t.repo for n, t in (await h.defs()).teams.items() if t.repo}
+        # the promote reading, read once: the completed lines' live mark (TD-904) and the top bar's build chip
+        info: dict[str, Any] | None = None
+        if not agent_down:
+            with contextlib.suppress(Exception):  # display only, as the chip is: no mark, never a failed page
+                info = dict(await call("host"))
+        promotes = (info or {}).get("promotes")
         # Recently completed sends the picked window's lines alone (§4.5 *Page loads*, TD-882)
         view = send_window(
-            apply_picks(queue_view(got, datetime.now(UTC), mail), picks, teams), queue_window(request.query_params)
+            apply_picks(queue_view(got, datetime.now(UTC), mail, promotes), picks, teams),
+            queue_window(request.query_params),
         )
         ctx = {
             "q": view,
@@ -3499,7 +3510,7 @@ def _settings_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Queue",
                 "volatile": hosts.local_host().volatile,
                 "usage": {} if agent_down else await chip_usage(call, fleet),
-                "build_chip": None if agent_down else await chip_build(call),
+                "build_chip": None if agent_down or info is None else await chip_build(call, info),
             },
         )
 
