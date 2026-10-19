@@ -705,6 +705,9 @@ def test_ao_td_hold_why_sends_the_holds_words_and_a_release_takes_none(repo, mon
     assert cli.main(["td", "hold", "TD-707", "--why", " after  Friday "]) == 0
     assert sent == [("td_hold", {"repo": str(repo), "id": "TD-707", "release": False, "why": "after Friday"})]
     assert capsys.readouterr().out.splitlines() == ["TD-707 held (after Friday): no lane takes it until you release it"]
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"id": kw["id"], "held": {"at": "t", "why": "cut"}})
+    assert cli.main(["td", "hold", "TD-707", "--why", "cut and more"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["TD-707 held (cut): no lane takes it until you release it"]
     assert cli.main(["td", "hold", "TD-707", "--release", "--why", "x"]) == 2
     assert len(sent) == 1 and "a release takes none" in capsys.readouterr().err
 

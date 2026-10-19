@@ -3223,7 +3223,8 @@ def cmd_td_hold(args: argparse.Namespace) -> int:
     if args.release:
         lines = [f"{tid} released: pickable now"]
     else:
-        lines = [f"{tid} held" + (f" ({why})" if why else "") + ": no lane takes it until you release it"]
+        said = str((got.get("held") or {}).get("why") or "") if isinstance(got.get("held"), dict) else why
+        lines = [f"{tid} held" + (f" ({said})" if said else "") + ": no lane takes it until you release it"]
         readers = set(got.get("readers") or ())
         for name in got.get("told") or ():
             if name in readers:
