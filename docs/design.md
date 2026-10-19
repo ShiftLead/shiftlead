@@ -5,7 +5,7 @@ packages, the state directory, the units, the config file or the command's home,
 still their names: the machine-side rename is TD-060's second step, at a release boundary. The command
 is `ao`.*
 
-Status: **past phase 1.** The host agent, the Claude Code adapter, the Org, Focus, Inbox and New
+Status: **past phase 1.** The host agent, the Claude Code adapter, the Sessions (Org until 2026-10-18), Focus, Inbox and New
 session pages, the CLI, teams, mail between sessions, a home/node split with one container node, and
 identity on one host are built, each with the parts still open under its ledger entry. §7 lists what each phase still lacks;
 [`technical_debt.md`](technical_debt.md) holds what is deferred;
@@ -28,7 +28,7 @@ grep the directory, read a section by its file.
 - **§4.3** [Adapter contract](design/4.3-adapter-contract.md) — what a tool adapter supplies: argv, hooks, pane classification, the composer.
 - **§4.4** [Host agent](design/4.4-host-agent.md) — the per-host process that owns tmux, the record, the tick and the RPC.
 - **§4.4a** [Home and nodes: one session graph across hosts](design/4.4a-home-and-nodes.md) — one session graph across hosts: the home, its nodes, and how a container node is made.
-- **§4.5** [UI](design/4.5-ui.md) — the pages — Org, Focus, Inbox, New session, Repo, Settings, Help — and what each shows.
+- **§4.5** [UI](design/4.5-ui.md) — the pages — Sessions (Org until 2026-10-18), Focus, Inbox, New session, Repo, Settings, Help — and what each shows.
 - **§4.5a** [Controls](design/4.5a-controls.md) — every control, what it does and who executes it; a control not in this table does not exist.
 - **§4.5b** [Reachability: the person's own route, and the shape of a hosted service](design/4.5b-reachability.md) — how the person reaches the page from anywhere over a route of their own (Tailscale first), the route port that checks who they are, and a hosted relay's shape.
 - **§4.5c** [Product direction](design/4.5c-product-direction.md) — the two products this architecture serves, and who owns the host in each.

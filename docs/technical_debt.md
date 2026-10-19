@@ -1499,3 +1499,105 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 ---
 
 ---
+
+## TD-900: The Repo page is a board by stage, the Org page is Sessions, the Queue numbers Up next per repo and marks what is live
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-18 (Paul, in an interactive session with the anchor)
+**Owner:** designer
+**Kind:** design-first
+**Status:** Designed (2026-10-18, Paul with the anchor session, in chat; the render Paul reviewed is `docs/mockups/reviews/2026-10-18-repo-stage-board.png`): §4.5 screen 1 (*Sessions*), screen 11 (*the board*, its columns, Review, Merged and the live divider), screen 12 (*Up next* per repo, the live mark on Recently completed); §4.4 *The Queue* (the reading's `places`) and *A move lands* (the Repo page's neighbours); §4.5a *Repo page: Technical debt cards* (now the board), *Repo page, Merged: live divider*, *Queue page, Recently completed: live mark*, *Queue page, Up next: the number*, the grip row; the glossary; design-history §4.4, §4.5, §4.5a. The builds are TD-901 (numbers per repo, first), TD-902 (the rename), TD-903 (the board, after TD-901) and TD-904 (the divider and the mark, beside TD-903).
+**Blocked by:** TD-901, TD-902, TD-903, TD-904
+**Location:** design §4.5 screens 1, 11, 12; §4.4 *The Queue*; §4.5a; `docs/mockups/reviews/2026-10-18-repo-stage-board.png` and `-live.png`
+
+**Why:** Paul, 2026-10-18: the Org page's name felt off — it is where the person sees what is running and starts interactions, so *Sessions*; and with the Queue built, the Repo page's Technical debt section was the Queue's cards drawn again in Queue order, its Open PRs and Recently completed lists beside them. *Redundant information isn't necessarily bad if it gives another perspective*: the Queue's axis is rank across repos, the Sessions page's is people by place, and nothing drew one repo **by stage** — the balance the page was designed to show (TD-176, §10). Two more asks fit the same page: the Queue's Up next numbers per repo (*ao-grind would have 1, 2, 3 and samscrape its own 1, 2, 3 … that is actually more truthful*), and *something to show the PR most recently promoted*, which on the board is a line across the Merged column, since one promote makes every PR merged before it live at once, and on the Queue a mark on each completed line. Checked before designing: no open PR touches the Queue or the Repo page; TD-888's three builds merged 2026-10-18; TD-772 (the Queue's two-week trial, until 2026-10-30) reads back lane behaviour and is not touched — the number's definition changes, the rank and the lanes' pick order do not.
+
+**Fix:** the design as written; the four builds in `Blocked by:`, TD-901 first.
+
+**Done when** the four builds are merged and the live Repo page is the board.
+
+**Related:** TD-748, TD-722, TD-740, TD-770, TD-604, TD-176, TD-772, TD-888.
+
+---
+
+## TD-901: Build TD-900 (1): the Queue numbers Up next per repo — a card's `places`, the repo chip, one number per repo on a spanning card — and a Repo page move's neighbours are the repo's own
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** the `queue` reading (§4.4 *The Queue*; `src/sessionorc/` where `{cards, completed, other_work, at}` is derived, the Up next numbering), `src/shiftlead/ui/queue.py`, `src/shiftlead/ui/templates/queue_card.html` (the number's column), `src/shiftlead/ui/static/app.js` (`rank_move`'s `prev`/`next` on the Repo page), `src/shiftlead/ui/repo.py`; `tests/test_ui_queue.py`, `tests/test_ui_queue_cards.py`
+
+**Why:** TD-900: design §4.5 screen 12 *Up next* — a card's number is its place among the Up next cards with an open member in its repo, from 1, so two repos' leaders both read *1*; §4.4 *The Queue* names the reading's `places` (`{repo, n}` per repo an open member is in); §4.4 *A move lands* makes a Repo page move's neighbours the adjacent Up next cards among the repo's own, the move still landing in the whole order.
+
+**Fix:** derive `places` on the reading beside the whole-order place; draw each place with its repo's chip where the home reads more than one repo, one number per repo on a spanning card (§4.5a *Queue page, Up next: the number*); on the Repo page name `prev` and `next` from the repo's own Up next cards. The rank file, the flush and the lanes' pick order are untouched (TD-772's trial reads lane behaviour and must see no change in it).
+
+**Done when** the live Queue shows ao-grind's and samscrape's cards each numbered from 1, a spanning card with both numbers, and a Repo page press changes the number shown, with tests for each.
+
+**Related:** TD-900, TD-748, TD-769, TD-772.
+
+---
+
+## TD-902: Build TD-900 (2): the Org page is named Sessions — the tab, the title, help.py's screen, the templates' keys, §4.5a's first cells, and *Org page* across the design and glossary
+
+**Priority:** Low
+**Type:** debt
+**Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** `src/shiftlead/ui/templates/base.html` (the tab, `active == 'Org'`), `org.html` (the `h1`), `src/shiftlead/ui/help.py` (`SCREENS`'s `"Org"`, the `"Org top bar…"` placements), design §4.5a's first cells (`Org`, `Org top bar`, `Org banner`) and the tests keyed on them (`grep -ln 4.5a tests`, `tests/test_help.py`), *Org page* / *the Org* where it names the page across `docs/design/*.md`, `docs/glossary.md`, the briefs and the mockups' notes
+
+**Why:** TD-900: design §4.5 screen 1 is *Sessions* from 2026-10-18 — the page is where the person sees what runs and steps in; *Org* named the aggregate it draws (§4.9), which keeps its name.
+
+**Fix:** one sweep: the page's visible name and route title, then the keys — §4.5a's first cells with the tests that bind to them, `help.py`'s screen — then *Org page* → *Sessions page* where the words mean the page and not the org (§4.9 *The Org page* becomes *The Sessions page*; *the org* as the aggregate stays). The route `/` and the `org` module names may stay; say in the PR what was left.
+
+**Done when** no page, tab, help paragraph or design sentence calls the page *Org*, and `pdm run test` passes.
+
+**Related:** TD-900, TD-060 (the other rename at a boundary).
+
+---
+
+## TD-903: Build TD-900 (3): the Repo page's board — one column per stage of the team's flow, who is on it, held / queued / blocked rows, Review with the PRs' standing, Merged in the window
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Blocked by:** TD-901
+**Location:** `src/shiftlead/ui/repo.py` (the Technical debt cards, Open PRs and Recently completed readings), `src/shiftlead/ui/templates/repo.html` and the partials it draws, `src/shiftlead/ui/static/app.js` (the Technical debt cards' `#TD-n` opening, ~4073), `app.css`; the flow's stages (§4.9c, `flow.yml`) for the columns' order and the roles each names; `tests/test_ui_repo_org.py`, `tests/test_ui_queue_cards.py`
+
+**Why:** TD-900: design §4.5 screen 11 *the board* — the one view of a repo by stage; the render is `docs/mockups/reviews/2026-10-18-repo-stage-board.png`.
+
+**Fix:** as screen 11 says: the columns from the servicing team's flow in its order (For you → Design → Grind → Review → Merged for `td`; a repo no team services draws the kind-based columns), each heading with its count, kinds and the members whose role the stage names with their lane's word; an open entry in exactly one column by kind, held rows first (stripe, holder, newest doing line), queued rows with the repo's number, grip and **⤒ ↑ ↓** (TD-901's neighbours), blocked rows folded at the foot with what blocks them; Review the open PRs with their standing, exactly the list's row; Merged the window's closes with the picker; `/repo/<name>#TD-n` opens the fold and scrolls; on a node the same columns with no number and no grip; narrow (below 1100 px two columns, below 720 one). Hold / Release stay on the row. Waiting on you and Doing stay under the board, unchanged. The page's budget holds (§4.5 *Page loads*: first byte under 500 ms, the Repo page's on-the-wire bound; TD-893, TD-896) — the board draws seven queued rows per column and folds the rest, in place of every card.
+
+**Done when** the live `/repo/shiftlead` is the board, its first byte within the budget, and a test per column, per row state and for the node fallback.
+
+**Related:** TD-900, TD-901, TD-740, TD-770, TD-745, TD-787, TD-604, TD-893.
+
+---
+
+## TD-904: Build TD-900 (4): the live divider in the Repo page's Merged column, and the Queue's *live* / *not yet live* mark on a completed line's PR
+
+**Priority:** Medium
+**Type:** feature
+**Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
+**Owner:** grinder
+**Kind:** build
+**Status:** Open
+**Location:** the promote reading (§6 *Promote*: `live_at`, `pending`, the hold; `src/sessionorc/` where the build chip's reading is served), `src/shiftlead/ui/repo.py` (Recently completed), `src/shiftlead/ui/queue.py` (the completed lines), their templates; `tests/test_ui_repo_org.py`, `tests/test_ui_queue.py`, the promote tests
+
+**Why:** TD-900: design §4.5 screen 11 *Merged* and §4.5a *Repo page, Merged: live divider*; screen 12 *Recently completed* and §4.5a *Queue page, Recently completed: live mark* — Paul, 2026-10-18: *something to show the PR most recently promoted*.
+
+**Fix:** in a repo with a `promote:` block, a close whose commit's committer time is after `live_at` is *not yet live*, else *live*; the Repo page draws the line between them — *live since <time> · #<pr> · auto / pressed / rolled back · <age>* under *not yet live (n)*, `n` = `pending`'s count — adding *held: rolled back to <sha>* and the Inbox row's **Dismiss** while the repo holds; the Queue marks each line's PR with the word. A repo with no `promote:` block draws nothing. Can be built beside TD-903: it touches the Merged column's rows and the Queue's lines only, and lands on today's Recently completed list if it merges first.
+
+**Done when** the live Repo page's Merged column shows the line at the live commit after a promote, the Queue's lines carry the mark, and a test per state (live, not yet live, held, no block).
+
+**Related:** TD-900, TD-903, TD-539 (the build chip's reading), TD-226 (the rollback and its hold).
+
+---
