@@ -72,6 +72,11 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-871 | Gemini CLI skips a launch layer root does not own, so no hook reaches a Gemini session | Medium | Designed — built by TD-875 |
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
+| TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-901, TD-902, TD-903, TD-904 |
+| TD-901 | Build TD-900 (1): the Queue numbers Up next per repo; a Repo page move's neighbours are the repo's own | Medium | Open |
+| TD-902 | Build TD-900 (2): the Org page is named Sessions — tab, title, help, keys, the design's words | Low | Open |
+| TD-903 | Build TD-900 (3): the Repo page's board — one column per stage of the team's flow | Medium | Open — blocked by TD-901 |
+| TD-904 | Build TD-900 (4): the live divider on Merged and the Queue's live / not yet live mark | Medium | Open |
 
 ---
 
