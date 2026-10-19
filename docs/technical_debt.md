@@ -1526,7 +1526,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 
 ---
 
-
 ## TD-903: Build TD-900 (3): the Repo page's board — For you, one column per worker stage of the flows, Review, Merged; who is on each; claimed / queued / blocked rows; the card's number and grip; bounded as the design says
 
 **Priority:** Medium
