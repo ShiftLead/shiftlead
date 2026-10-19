@@ -75,7 +75,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-902, TD-901, TD-903, TD-904, TD-905, TD-907 |
 | TD-901 | Build TD-900 (2): the Queue numbers Up next per repo; a Repo page move's neighbours are the repo's own, scoped; `ao repo` prints the place | Medium | Built (#2159) — live check |
 | TD-903 | Build TD-900 (3): the Repo page's board — For you, the flows' worker stages, Review, Merged; bounded | Medium | Open — blocked by TD-901 |
-| TD-904 | Build TD-900 (4): the promote reading's `promoted`, the divider on Merged and the Queue's mark by ancestry | Medium | Built, live check #2158 |
+| TD-904 | Build TD-900 (4): the promote reading's `promoted`, the divider on Merged and the Queue's mark by ancestry | Medium | Built (#2158) — live check |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Open — blocked by TD-902 |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
 
