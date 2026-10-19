@@ -163,18 +163,18 @@ def test_the_page_draws_the_line_and_the_back_link(tmp_path, monkeypatch):
         rec("g2", str(root), progress=[{"ref": "TD-102", "status": "claimed", "pr": 815}]),
     ]
     c = client(monkeypatch, tmp_path, fake({str(root): r}, fleet))
-    html = c.get("/repo/samscrape").text
-    assert 'class="rrow buildsline' in html
-    line = html[html.index("buildsline", html.index('id="TD-100"')) :]
+    html = c.get("/repo/samscrape?open=TD-103,TD-100").text  # both blocked: their folds sent (TD-903)
+    assert 'class="qbuilds"' in html
+    line = html[html.index("qbuilds", html.index('id="TD-100"')) :]
     line = line[: line.index("</div>")]
     assert "builds: TD-042 <span" in line, "an archived id is plain text"
     assert '<a href="#TD-101">TD-101</a> <span class="bstate">held by g1</span>' in line
     assert '<a href="#TD-102">TD-102</a> <span class="bstate">in review ' in line and "#815" in line
     assert '<a href="#TD-103">TD-103</a> <span class="bstate">open, blocked by TD-102</span>' in line
     assert "every build archived — archive this entry" in html  # TD-107
-    # a build's row says *builds TD-n* after its owner and before any *blocked by*
+    # a build's row says *builds TD-n* after its owner (TD-103 waits on the person: For you's Inbox row, TD-903)
     back = '· grinder</span><span class="meta">· builds <a href="#TD-100">TD-100</a></span>'
-    assert back + '<span class="meta">· blocked by' in html
+    assert back in html
 
 
 def test_an_id_named_twice_is_listed_once():
@@ -193,8 +193,8 @@ def test_a_build_in_review_links_its_pr(tmp_path, monkeypatch):
     }
     fleet = [rec("g2", str(root), progress=[{"ref": "TD-102", "status": "claimed", "pr": 815}])]
     c = client(monkeypatch, tmp_path, fake({str(root): r}, fleet))
-    html = c.get("/repo/samscrape").text
-    line = html[html.index("buildsline", html.index('id="TD-100"')) :]
+    html = c.get("/repo/samscrape?open=TD-100").text  # a design its builds block: folded until opened (TD-903)
+    line = html[html.index("qbuilds", html.index('id="TD-100"')) :]
     line = line[: line.index("</div>")]
     want = '<span class="bstate">in review <a href="https://github.com/o/samscrape/pull/815" target="_blank"'
     assert want in line and ">#815</a>" in line

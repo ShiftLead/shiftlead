@@ -122,9 +122,11 @@ def test_the_repo_page_draws_hold_and_release_and_the_press_reaches_td_hold(tmp_
     row = html[html.index('id="TD-301"') : html.index("</div>", html.index('id="TD-301"'))]
     assert "· settles in 7m</span>" in row and ">Hold</button>" in row
     assert 'data-tdhold="TD-301" data-repo="samscrape"' in row
-    row = html[html.index('id="TD-310"') : html.index("</div>", html.index('id="TD-310"'))]
-    assert "· held 2h</span>" in row and 'data-release="1"' in row and ">Release</button>" in row
-    assert html.count("data-tdhold=") == 6, "every pickable row, settled ones too; the for-you row none"
+    # the person's hold waits on them: For you's row, the Inbox's ledger row with its Release (TD-903)
+    at = html.index('id="TD-310"')
+    row = html[at : html.index('class="brow"', at + 1) if 'class="brow"' in html[at + 1 :] else at + 4000]
+    assert "held 2h" in row and 'data-act="ledger_release"' in row and ">Release</button>" in row
+    assert html.count("data-tdhold=") == 5, "every pickable row, settled ones too; For you's rows none"
     row = html[html.index('id="TD-311"') : html.index("</div>", html.index('id="TD-311"'))]
     assert ">Hold</button>" in row and "until you release it (design" in row and "text changes" not in row
     got = c.post("/api/ledger/hold", json={"repo": "samscrape", "id": "TD-301"})
