@@ -177,7 +177,7 @@ def cmd_wait(args: argparse.Namespace) -> int:
 
 
 def _identity_line() -> None:
-    """The host's identity mode, once (design §4.8a: *`ao status -v` and the Org's teams line say
+    """The host's identity mode, once (design §4.8a: *`ao status -v` and the Sessions page's teams line say
     which mode a host is in*, since `observe` is a host that is not yet protected). One line for
     the host, never one per session, and beside it whether the detached-process check is on — a
     host where it is off is not to be taken for one where it is on. An agent too old to answer

@@ -2,7 +2,7 @@
    its name, a link to its Repo page, and the Repo facet — the repo's numbers, drawn here once and on no
    team card, however many teams service it. Where its project holds only this repo the line is the
    heading (`g.heading`). The facet's entries selector is remembered per repo (`data-team` *repo:<name>*,
-   the key the client stores it under). A stop in the ring, before the repo's team cards (§4.5a *Org:
+   the key the client stores it under). A stop in the ring, before the repo's team cards (§4.5a *Sessions:
    keys*). Rendered on page load and re-sent with the groups on every delta. #}
 <div class="rline{% if g.heading %} rhead{% endif %}" data-key="{{ g.key }}" data-repo="{{ g.repo }}" data-project="{{ g.project }}" tabindex="0">
   <div class="row gap wrap rname"><a class="{{ 'h2' if g.heading else 'strong' }}" href="{{ g.url }}">{{ g.repo }}</a><span class="grow"></span><a class="meta" href="{{ g.url }}">open →</a></div>

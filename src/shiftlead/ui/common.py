@@ -695,7 +695,7 @@ def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) ->
 
 
 def identity_note(info: dict[str, Any] | None) -> str:
-    """The Org's teams line on who is calling (design §4.8a: *`ao status -v` and the Org's teams
+    """The Sessions page's teams line on who is calling (design §4.8a: *`ao status -v` and the Sessions page's teams
     line say which mode a host is in, since `observe` is a host that is not yet protected*). It
     says **identity: observe** as loudly as it says **identity: off**, and says nothing at all
     under `enforce`, which is the host that is protected — a note that was always there would stop

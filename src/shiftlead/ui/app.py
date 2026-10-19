@@ -1402,7 +1402,7 @@ def create_app() -> FastAPI:
             return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
 
         # off the loop (TD-670): a view of every record and every header rendered held the loop up to
-        # ~300 ms a regroup on the live home with an Sessions page open; the events run calls this under
+        # ~300 ms a regroup on the live home with a Sessions page open; the events run calls this under
         # its lock, so no delta changes `repos` or `doing` while the thread reads them
         return await asyncio.to_thread(build)
 
@@ -4749,7 +4749,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             log.warning(what, addr, n, at, page, serves)
         # `?light=1` is the Focus and Inbox pages' stream: no card markup and no groups, another
         # record's delta only when it can move something (`SHAPE_KEYS`), and `focus`'s own in full —
-        # one Focus tab was otherwise as costly to the UI as an Sessions page (TD-572). Every stream is fed
+        # one Focus tab was otherwise as costly to the UI as a Sessions page (TD-572). Every stream is fed
         # by the one subscriber (`fan`), which computes each delta once (TD-617).
         st = Stream(
             ws, light=ws.query_params.get("light") == "1", focus=ws.query_params.get("focus") or "", page=page, at=at
