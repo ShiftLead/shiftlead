@@ -101,7 +101,7 @@ def test_a_light_stream_without_a_focus_hears_only_moves(tmp_path, monkeypatch):
 
 def test_three_pages_share_one_subscription_and_each_delta_is_computed_once(tmp_path, monkeypatch):
     """§4.4 *Per-session views* (TD-617): one subscriber per UI process computes a delta's view, compact
-    form and card once, and every connected stream takes its part of that one result — two Org pages
+    form and card once, and every connected stream takes its part of that one result — two Sessions pages
     get what a lone one gets, and a Focus page its record whole, with the deltas computed once."""
     import threading
 

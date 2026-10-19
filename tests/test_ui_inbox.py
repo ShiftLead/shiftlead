@@ -515,7 +515,7 @@ def test_the_page_the_count_and_the_poll_agree_and_reading_marks_nothing(client,
 
 @pytest.mark.integration
 def test_the_counts_read_is_the_full_reads_numbers_and_renders_nothing(client, tmp_path, monkeypatch):
-    """§4.5a Org top bar **Inbox** (TD-611): every page but the Inbox polls `?counts=1` — the same
+    """§4.5a Sessions top bar **Inbox** (TD-611): every page but the Inbox polls `?counts=1` — the same
     `inbox_sections`, so the same numbers, but no template rendered and no entries sent, since the
     full read is megabytes of markup on the loop the Focus terminal shares."""
     import jinja2
@@ -1207,10 +1207,14 @@ def test_the_two_counts_say_how_they_differ(tmp_path, monkeypatch):
         sections=sections, person_needs=0, host="kmaster", active="Inbox",
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
-    for text in ("the session states the Org counts too", "open questions sessions asked you", "anything snoozed"):
+    for text in (
+        "the session states the Sessions page counts too",
+        "open questions sessions asked you",
+        "anything snoozed",
+    ):
         assert text in html, text
     base = (UI / "templates" / "base.html").read_text()
-    assert "the session states the Org counts too" in base and "the states alone" in base
+    assert "the session states the Sessions page counts too" in base and "the states alone" in base
 
 
 # -- the routes, against a live agent -------------------------------------------------------------
@@ -1417,7 +1421,7 @@ def test_one_poll_reads_the_fleet_once(tmp_path, monkeypatch):
 
 @pytest.mark.unit
 def test_every_session_the_org_counts_as_needs_you_has_exactly_one_row(tmp_path, monkeypatch):
-    """The Inbox says it counts *the session states the Org counts too*, so a `needs-you` record
+    """The Inbox says it counts *the session states the Sessions page counts too*, so a `needs-you` record
     the Inbox does not list would be the two pages disagreeing in public. One predicate
     (`state_kind`) answers for both — including the edges: an empty `pending`, a `pending` that is
     not a dict at all, and a kind this build does not know. A plain *needs you* row carries
@@ -2215,7 +2219,7 @@ def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_p
 
     def page(prefill):
         return templates.get_template("new.html").render(
-            host="kmaster", active="Org", profiles={}, default_profile="default", recent=[],
+            host="kmaster", active="Sessions", profiles={}, default_profile="default", recent=[],
             adapters=["claude-code"], control_holders=[{"id": "ao-lead", "name": "lead"}], grants_all=[],
             grant_notes={}, roles=[{"name": "plain", "source": "built-in", "lane": [], "controllers": [],
                                     "grants": []},
@@ -2245,7 +2249,7 @@ def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_p
     # who does not notice Starts a session with a controller the record never had (review of #290)
     def ctl(prefill):
         return templates.get_template("new.html").render(
-            host="kmaster", active="Org", profiles={}, default_profile="default", recent=[],
+            host="kmaster", active="Sessions", profiles={}, default_profile="default", recent=[],
             adapters=["claude-code"], control_holders=[{"id": "ao-lead", "name": "lead"}], grants_all=[],
             grant_notes={}, roles=[{"name": "plain", "source": "built-in", "lane": [], "controllers": [],
                                     "grants": []}],
@@ -2331,7 +2335,9 @@ def test_the_suspended_mark_is_drawn_wherever_the_record_is_and_is_never_a_contr
     assert v["suspended_note"]
 
     card = templates.get_template("card.html").render(s=v)
-    focus = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")
+    focus = templates.get_template("focus.html").render(
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions"
+    )
     row = rows("needs", [{"row": "alarm", "id": "ao-x:alarm", "sid": "ao-x", "name": "w", "alarms": [],
                           "mode": "enforce", "at": "", "suspended_note": v["suspended_note"]}])  # fmt: skip
     for where, html in (("card", card), ("focus", focus), ("inbox row", row)):
@@ -2344,7 +2350,7 @@ def test_the_suspended_mark_is_drawn_wherever_the_record_is_and_is_never_a_contr
     # mark is the suspension's only record (review of PR #306). Always drawn, hidden until true.
     assert 'id="fsuspended"' in focus and "hidden" not in focus.split('id="fsuspended"')[0][-60:]
     plain = templates.get_template("focus.html").render(
-        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org"
+        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Sessions"
     )
     assert 'id="fsuspended"' in plain and "suspendedmark hidden" in plain  # in the page, not shown
     js = (UI / "static" / "app.js").read_text()
@@ -3486,7 +3492,7 @@ def test_the_host_pick_lists_this_host_and_its_nodes(tmp_path, monkeypatch):
 
     def page(form_hosts, host=""):
         return templates.get_template("new.html").render(
-            host="kmaster", active="Org", profiles={}, default_profile="default", recent=[],
+            host="kmaster", active="Sessions", profiles={}, default_profile="default", recent=[],
             control_holders=[], grants_all=[], grant_notes={}, roles=[], default_controllers=[], projects=[],
             form_hosts=form_hosts, prefill={"dir": "", "adapter": "", "host": host, "controllers": []},
         )  # fmt: skip

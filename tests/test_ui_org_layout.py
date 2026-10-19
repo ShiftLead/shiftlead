@@ -1,4 +1,4 @@
-"""The Org page grouped **project → repo → team** (design §4.9 *The Org page*, §4.5a *team groups*,
+"""The Sessions page grouped **project → repo → team** (design §4.9 *The Sessions page*, §4.5a *team groups*,
 *team card: Repo facet*, TD-725): headings in the org file's order, a repo's line carrying the Repo
 facet once, its teams' cards in order, a no-team strip per repo, and *No repo* last."""
 
@@ -91,7 +91,7 @@ def page(items) -> str:
         counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
         strip={"teams": [], "source": "", "notes": []},
         host="kmaster",
-        active="Org",
+        active="Sessions",
         agent_down=False,
         volatile=False,
         usage={},
@@ -205,7 +205,7 @@ def test_an_undefined_badges_group_sits_under_the_repo_its_records_are_in(tmp_pa
 
 
 def test_the_ring_runs_repo_line_then_team_cards_then_the_strip(tmp_path, monkeypatch):
-    """§4.5a *Org: keys*: under a repo the ring runs its line, the team cards, the no-team strip's
+    """§4.5a *Sessions: keys*: under a repo the ring runs its line, the team cards, the no-team strip's
     cards — the page's own order, the line a stop of its own."""
     monkeypatch.setenv("SHIFTLEAD_HOME", str(tmp_path))
     views = [sess("t1", team="t", repo="/r/main"), sess("mine", repo="/r/main", unattended=False)]

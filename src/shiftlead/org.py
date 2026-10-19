@@ -65,7 +65,7 @@ ReposOf = Callable[[str], list[str]]
 @dataclass
 class Project:
     """A heading on repos (design §4.9 *Projects*, TD-722): its repos' names, each with its checkout
-    per host as the org file writes it, and the words the Org page draws (`title`, else the name)."""
+    per host as the org file writes it, and the words the Sessions page draws (`title`, else the name)."""
 
     name: str
     repos: dict[str, dict[str, Path]] = field(default_factory=dict)  # repo name → host name → checkout

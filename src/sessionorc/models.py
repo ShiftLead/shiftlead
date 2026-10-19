@@ -1011,7 +1011,7 @@ class Session:
     controllers: list[str] = field(default_factory=list)
     # Badges (design §4.9): the team and project a session was started under, two plain strings
     # the clients set from `org.yml` — the agent never reads that file, and nothing here keys on
-    # either (§9 invariant 9); the Org page derives its groups from the badge and `controllers`.
+    # either (§9 invariant 9); the Sessions page derives its groups from the badge and `controllers`.
     team: str = ""
     project: str = ""
     # The model actually in use, when the adapter can tell (TD-031): observed, never the profile's
@@ -1293,7 +1293,7 @@ class Session:
 
     def view(self, *, bookkeeping: bool = False) -> dict[str, Any]:
         """The record as `list`, `get` and the `subscribe` deltas hand it out: message bodies never
-        ride the push that reaches the Org page on every change (design §4.10 "A bounded body") —
+        ride the push that reaches the Sessions page on every change (design §4.10 "A bounded body") —
         those carry counts, and a body is fetched by `inbox`. `sends` (what `ao status` prints)
         stays. `threads` and `wakes` are the host agent's bookkeeping — their one visible part,
         `bound_hit`, is in `mail` — and ride only a `get` of one record (`bookkeeping=True`): they

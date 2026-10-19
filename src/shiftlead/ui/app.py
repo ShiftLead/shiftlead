@@ -461,7 +461,7 @@ def repo_boards(org: orgmod.Org, host: str) -> dict[str, dict[str, Any]]:
 # -- app -------------------------------------------------------------------------------------------
 
 
-# design §4.5a Org top bar **Inbox** (TD-611): what `/api/person/inbox?counts=1` answers — the top
+# design §4.5a Sessions top bar **Inbox** (TD-611): what `/api/person/inbox?counts=1` answers — the top
 # bar's numbers, the team headers' *answered for you* marks and the build chip, and nothing rendered
 INBOX_COUNTS = ("needs", "fyi_n", "overdue_n", "snoozed_n", "queue_n", "answered_marks", "build_chip", "agent_down")
 # The counts with the host agent down: not zero — nothing is *known* to be waiting, which is not
@@ -777,7 +777,7 @@ def render_heads(groups: list[dict[str, Any]] | None) -> list[dict[str, Any]] | 
     summary = templates.get_template("team_summary.html")
     plus = templates.get_template("plus_card.html")
     lanecount = templates.get_template("lanecount.html").module.span
-    # a project heading and a repo's line (§4.9 *The Org page*, TD-725): no cards, their markup whole
+    # a project heading and a repo's line (§4.9 *The Sessions page*, TD-725): no cards, their markup whole
     lines = {"heading": templates.get_template("project_head.html"), "repo": templates.get_template("repo_line.html")}
     return [
         {"kind": g["kind"], "key": g["key"], "team": "", "html": lines[g["kind"]].render(g=g)}
@@ -1322,7 +1322,7 @@ def create_app() -> FastAPI:
     flow_cache: dict[str, Any] = {"flows": {}}
 
     async def flow_views(sessions: list[dict[str, Any]], org: orgmod.Org | None = None) -> dict[str, Any]:
-        """Each team's `teamrun.flow_view` (§4.9c *What is shown*, *Switching*): read when the Org page
+        """Each team's `teamrun.flow_view` (§4.9c *What is shown*, *Switching*): read when the Sessions page
         is drawn and after an Apply, off the loop, and kept for the deltas — a plan reads files (a
         node team's over the link), so a delta never reads it. A node draws none: the org is the
         home's (§4.4a). A failed read keeps the last."""
@@ -1377,7 +1377,7 @@ def create_app() -> FastAPI:
         doing: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """What every delta carries for the page's layout: the groups (`group_heads`) and the
-        rollup's markup (§4.5a *Org: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
+        rollup's markup (§4.5a *Sessions: rollup*, TD-176 slice 4), both from one grouping of the fleet."""
         fleet = list(known.values())
         seats, waits = await seats_of(fleet), await person_waits()  # *waiting* (§4.2, TD-428)
         rows, marks = await team_rows(fleet), await work_marks()
@@ -1402,7 +1402,7 @@ def create_app() -> FastAPI:
             return {"groups": render_heads(org_layout(groups, repos, projects, vs)), "rollup": ro}
 
         # off the loop (TD-670): a view of every record and every header rendered held the loop up to
-        # ~300 ms a regroup on the live home with an Org page open; the events run calls this under
+        # ~300 ms a regroup on the live home with a Sessions page open; the events run calls this under
         # its lock, so no delta changes `repos` or `doing` while the thread reads them
         return await asyncio.to_thread(build)
 
@@ -1499,7 +1499,7 @@ def create_app() -> FastAPI:
 
 
 def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
-    """The Org page and Focus (design §4.5)."""
+    """The Sessions page and Focus (design §4.5)."""
     call, seats_of, identity_info, board_items = h.call, h.seats_of, h.identity_info, h.board_items
     repo_facts, board_view, flow_views = h.repo_facts, h.board_view, h.flow_views
 
@@ -1547,7 +1547,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             (view(s, sessions, icons=icons, seats=seats, repos=repos, waits=waits) for s in sessions), key=card_order
         )
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
-        # record the Org counts and the Inbox did not list was the two pages disagreeing in public
+        # record the Sessions page counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
         counts.update({k: sum(1 for v in vs if v["state"] == k) for k in ("limited", "stalled?")})
         strip = teams_view(sessions, (info or {}).get("waiting") or {})
@@ -1590,7 +1590,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "org.html",
             {
                 "sessions": vs,
-                # project → repo → team (§4.9 *The Org page*, TD-725), from the team groups
+                # project → repo → team (§4.9 *The Sessions page*, TD-725), from the team groups
                 "groups": org_layout(
                     groups := team_groups(
                         vs,
@@ -1611,7 +1611,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),
-                "active": "Org",
+                "active": "Sessions",
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
@@ -1699,7 +1699,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         strip = teams_view(sessions, info.get("waiting") or {})
         await h.with_lanes(strip["teams"], sessions)  # what a team with no record holds (TD-781)
         with timing.step("groups"):
-            # the Org's own groups and layout (§4.9 *The Org page*), cut to this repo's items (TD-740)
+            # the Org's own groups and layout (§4.9 *The Sessions page*), cut to this repo's items (TD-740)
             groups = team_groups(
                 vs,
                 strip["teams"],
@@ -1827,7 +1827,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 # map the `repos` push keeps (§4.4 *Per-session views*, TD-617)
                 "pr_marks": {v["pr_repo"]: repo_pr_marks(v["pr_repo"], repos[v["pr_repo"]])} if v["pr_repo"] else {},
                 "host": host_name(),
-                "active": "Org",
+                "active": "Sessions",
                 "usage": await chip_usage(call, fleet if known else None),
                 "build_chip": await chip_build(call),
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
@@ -1884,7 +1884,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "paths": transcript_paths(str(v.get("dir") or "")) if editor else None,
                 "at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "host": host_name(),
-                "active": "Org",
+                "active": "Sessions",
                 "usage": await chip_usage(call),
                 "build_chip": await chip_build(call),
             },
@@ -1958,7 +1958,7 @@ async def chip_build(call: Any, info: Any = None) -> dict[str, str] | None:
 
 
 async def chip_usage(call: Any, sessions: Any = None, usage: Any = None, gate: Any = None) -> dict[str, Any]:
-    """The top bar's **usage** chip on every page (§4.5a *Org top bar* **usage** chip, TD-287): the
+    """The top bar's **usage** chip on every page (§4.5a *Sessions top bar* **usage** chip, TD-287): the
     Org's reading — the accounts' windows, the gate's lines, one chip per account a live session's
     profile names. A page that already read `usage` and `gate` hands them over, and they are not read
     again (TD-884). Any failure is no chip, never a page that fails: the chip is display only."""
@@ -2188,7 +2188,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "new.html",
             {
                 "host": host_name(),
-                "active": "Org",
+                "active": "Sessions",
                 "usage": await chip_usage(call, sessions_now),
                 "build_chip": await chip_build(call),
                 "profiles": profs,
@@ -3178,7 +3178,7 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """Teams: the list, Start, and Stop / Wind down (design §4.9, §4.9a)."""
     call = h.call
 
-    # -- the Teams strip (design §4.5a Org **Teams** strip, §4.9) --------------------------------
+    # -- the Teams strip (design §4.5a Sessions **Teams** strip, §4.9) --------------------------------
     # Start and Stop are `shiftlead.teamrun`'s, the sequence `ao team start|stop` runs: every
     # pre-flight check before any create, and the wrap-up order on the way down. The runner blocks
     # (it waits on states), so it goes to a worker thread and the event loop stays free.
@@ -4178,7 +4178,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.get("/api/person/inbox")
     async def api_person_inbox(request: Request):
-        """design §4.5a Org top bar **Inbox** and the **Inbox page** (§4.10): the entries, which
+        """design §4.5a Sessions top bar **Inbox** and the **Inbox page** (§4.10): the entries, which
         section each is in, their rendered rows, and `needs` — the count, computed in the one place
         (`inbox_sections`) the page renders from, so the top bar's number and the page cannot
         disagree. Both poll this: the pushed stream carries session records only, and the person
@@ -4299,7 +4299,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
     @app.post("/api/person/{action}")
     async def api_person_action(action: str, request: Request):
-        """design §4.5a Org top bar **person inbox** → Reply and delete (§4.10): a person's reply
+        """design §4.5a Sessions top bar **person inbox** → Reply and delete (§4.10): a person's reply
         lands in the sender's inbox (the agent addresses it to the entry's sender and closes its
         `ask`); delete removes the entry from the person inbox only — the sender keeps its copy.
         From 2026-09-19 (TD-069 step 1) the Inbox page's own controls join it: **Snooze** and
@@ -4749,7 +4749,7 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             log.warning(what, addr, n, at, page, serves)
         # `?light=1` is the Focus and Inbox pages' stream: no card markup and no groups, another
         # record's delta only when it can move something (`SHAPE_KEYS`), and `focus`'s own in full —
-        # one Focus tab was otherwise as costly to the UI as an Org page (TD-572). Every stream is fed
+        # one Focus tab was otherwise as costly to the UI as a Sessions page (TD-572). Every stream is fed
         # by the one subscriber (`fan`), which computes each delta once (TD-617).
         st = Stream(
             ws, light=ws.query_params.get("light") == "1", focus=ws.query_params.get("focus") or "", page=page, at=at

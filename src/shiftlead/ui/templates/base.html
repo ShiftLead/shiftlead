@@ -23,10 +23,10 @@
 {% if not popped %}<div class="topbar">
   <a class="wordmark" href="/">Shift<b>Lead</b></a>
   <div class="tabs">
-    <a class="tab{% if active == 'Org' %} on{% endif %}" href="/">Org</a>
+    <a class="tab{% if active == 'Sessions' %} on{% endif %}" href="/">Sessions</a>
   </div>
   <div class="grow"></div>
-  {# design §4.5a Org top bar **usage** (TD-001, TD-073, TD-122): one chip per account a live
+  {# design §4.5a Sessions top bar **usage** (TD-001, TD-073, TD-122): one chip per account a live
      session's profile names — `<tool> · <account>`, grouped by `usage_accounts` — printing that
      account's **worst** window — the label and the number the adapter gave, never a field name of
      any one tool — with the rest, and the profiles sharing it, on hover. `app.js` re-sorts and
@@ -35,25 +35,25 @@
      (TD-233): `usage_chip`; `data-usage` is what `app.js` draws it again from as it ages. A press
      opens the Spend page on All (§4.5 screen 13, TD-832). #}
   <a class="mono dim" id="usagechip" href="/spend" title="subscription usage per account a live session is running under: the worst quota window the tool reports, the rest on hover; press it for the Spend page">{% for name, u in (usage or {}).items() %}{% set c = usage_chip(name, u) %}{% if c %}<span data-account="{{ name }}" data-usage='{{ u|tojson }}' data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></a>
-  {# design §4.5a Org top bar **build** chip (TD-539, TD-062): display only, on every page, always
+  {# design §4.5a Sessions top bar **build** chip (TD-539, TD-062): display only, on every page, always
      drawn — *live <MM-DD HH:MM>*, the live commit's time, `data-at` the instant `app.js` prints in
      the browser's zone, then `data-rest` (*· main +n*, *· promoting…*, *· held*, *· main unknown*).
      `build_chip` (`common.build_chip`): the home's promote reading where it holds the build, so the
      chip and the Inbox's Promote row agree; the hover lists what is not live yet. The Inbox poll
      redraws it, and draws it when the agent did not answer at load (an empty, hidden span). #}
   {% if build_chip %}<span class="mono {{ build_chip.cls }}" id="buildchip" title="{{ build_chip.title }}"{% if build_chip.at %} data-at="{{ build_chip.at }}" data-rest="{{ build_chip.rest }}"{% endif %}{% if build_chip.href %} data-href="{{ build_chip.href }}" data-link="{{ build_chip.link }}"{% endif %}>{% if build_chip.href and build_chip.text.endswith(build_chip.link) %}{{ build_chip.text[:build_chip.text|length - build_chip.link|length] }}<a href="{{ build_chip.href }}" title="the Inbox's promote row">{{ build_chip.link }}</a>{% else %}{{ build_chip.text }}{% endif %}</span>{% else %}<span class="mono hidden" id="buildchip"></span>{% endif %}
-  {# design §4.5a Org top bar **Inbox** / **Inbox page** (§4.5 screen 6, §4.10, TD-069 step 1): the
+  {# design §4.5a Sessions top bar **Inbox** / **Inbox page** (§4.5 screen 6, §4.10, TD-069 step 1): the
      nav item for `/inbox`, which replaced the dialog that hung here until 2026-09-19. Its number is
      that page's **Needs you** section — open questions to you plus `steer`s you have paused, minus
      anything snoozed — and never unread mail; it shows only above zero. Reading the page marks
      nothing and rings nothing: a person is not the session. The number alone, never the word, opens the
      Queue's needs-you filter while any counted row is drawn on a Queue card (`data-href`, §4.5 screen 6
      *Where a row is drawn*, TD-771): a link inside a link is no link, so the script follows it. #}
-  <a class="btn light{% if active == 'Inbox' %} on{% endif %}" href="/inbox" id="personinbox" title="what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you and steering you paused, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference.">✉ Inbox<span{% if person_queue_n %} data-href="/queue?filter=needs-you" title="some of these are drawn on their Queue cards: open the Queue's needs-you filter"{% endif %} class="badge needs{% if not person_needs %} hidden{% endif %}" id="personneeds">{{ person_needs or '' }}</span><span class="badge fyin{% if not person_fyi %} hidden{% endif %}" id="personfyi" title="what is in FYI: notes, outcomes, the trail, closed questions. It is never added to the number beside it — that one is what needs you (design §4.10)">· {{ person_fyi or '' }}</span></a>
-  {# design §4.5a Org top bar **Queue** tab (TD-748, built by TD-771; §4.5 screen 12): after Inbox, with
+  <a class="btn light{% if active == 'Inbox' %} on{% endif %}" href="/inbox" id="personinbox" title="what is waiting on you: the session states the Sessions page counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you and steering you paused, minus anything snoozed. The Sessions page's needs-you count is the states alone — that is the whole difference.">✉ Inbox<span{% if person_queue_n %} data-href="/queue?filter=needs-you" title="some of these are drawn on their Queue cards: open the Queue's needs-you filter"{% endif %} class="badge needs{% if not person_needs %} hidden{% endif %}" id="personneeds">{{ person_needs or '' }}</span><span class="badge fyin{% if not person_fyi %} hidden{% endif %}" id="personfyi" title="what is in FYI: notes, outcomes, the trail, closed questions. It is never added to the number beside it — that one is what needs you (design §4.10)">· {{ person_fyi or '' }}</span></a>
+  {# design §4.5a Sessions top bar **Queue** tab (TD-748, built by TD-771; §4.5 screen 12): after Inbox, with
      no number of its own — the top bar's one number is the Inbox's #}
   <a class="btn light{% if active == 'Queue' %} on{% endif %}" href="/queue" id="queuetab" title="one card per effort, in the order you rank them: what was done, what is in progress and what is up next">Queue</a>
-  {# design §4.5a Org top bar **Settings** tab (TD-148): last, after Queue — drawn now the page is built (TD-123) #}
+  {# design §4.5a Sessions top bar **Settings** tab (TD-148): last, after Queue — drawn now the page is built (TD-123) #}
   <a class="btn light{% if active == 'Settings' %} on{% endif %}" href="/settings" id="settingstab" title="the settings you move — reserves, a team's stop time and priority, the promote switch, your editor and terminal — and every other configured value with the file it lives in">Settings</a>
   <span class="mono dim" id="hostchip">{{ host }} <span id="hostdot">●</span></span>
   <button class="btn ghost light" id="theme" title="dark / light">◐</button>

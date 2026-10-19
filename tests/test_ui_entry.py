@@ -233,7 +233,7 @@ def test_focus_draws_told_at_start_folded_escaped_and_only_on_a_record_holding_o
     def page(**rec):
         v = view({**base, **rec})
         return templates.get_template("focus.html").render(
-            s={**v, "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+            s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions", popped=False
         )
 
     told = "The person asked for a new entry.\n\n- **Read** <b>first</b>\n- [the site](https://example.com) `code`"

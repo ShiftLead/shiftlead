@@ -131,7 +131,7 @@ def _org_html(monkeypatch, tmp_path) -> str:
         counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
         strip={"teams": [], "source": "", "notes": []},
         host="kmaster",
-        active="Org",
+        active="Sessions",
         agent_down=False,
         volatile=False,
         usage={},
@@ -195,7 +195,7 @@ def test_a_key_fires_only_when_nothing_editable_has_focus():
     e = got["entry"]
     assert e["org_a"].startswith("Allow") and e["inbox_x"].startswith("Dismiss")
     assert e["focus_j"] is None  # no ring on Focus: it shows one session (§4.5 screen 2)
-    assert e["focus_1"] == "Org"  # the page keys work there
+    assert e["focus_1"] == "Sessions"  # the page keys work there
     assert got["labels"] == ["Open", "Focus", "Snooze", "Open board", "Dismiss"]
 
 
@@ -207,7 +207,7 @@ def test_the_digits_yield_to_a_row_with_answer_buttons_and_g_is_go_with_it():
     got = _probe()
     js = (UI / "static" / "app.js").read_text()
     e = got["entry"]
-    assert e["inbox_1"] == "Org"
+    assert e["inbox_1"] == "Sessions"
     nth = e["inbox_1_answers"]
     assert nth["nth"] and nth["ring"] and nth["sel"] == ".btn.answer" and nth["keys"] == ["1", "2", "3", "4"]
     assert e["inbox_3"]["nth"]  # no page key: on a row without answers the handler leaves it alone

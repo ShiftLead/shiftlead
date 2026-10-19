@@ -230,8 +230,8 @@ def test_the_reach_loads_are_told_and_a_refusal_fails_nothing(tmp_path, stub, ca
     finally:
         srv_reach.close()
     assert code == 0
-    assert any(ln.startswith("reach Org / · 200") for ln in lines)
-    assert any(ln.startswith("reach (fails nothing): Org /: IncompleteRead") for ln in lines)
+    assert any(ln.startswith("reach Sessions / · 200") for ln in lines)
+    assert any(ln.startswith("reach (fails nothing): Sessions /: IncompleteRead") for ln in lines)
     assert "reach (fails nothing): Queue /queue: status 403" in lines
     assert lines[-1].startswith("smoke passed; reach refused /: IncompleteRead")
     assert lines[-1].endswith(f"; reach refused /queue: status 403; {sm.SKIPPED}")

@@ -74,7 +74,6 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-902, TD-901, TD-903, TD-904, TD-905, TD-907 |
 | TD-901 | Build TD-900 (2): the Queue numbers Up next per repo; a Repo page move's neighbours are the repo's own, scoped; `ao repo` prints the place | Medium | Open — blocked by TD-902 |
-| TD-902 | Build TD-900 (1): the Org page is named Sessions — tab, title, help, keys, the design's words | Low | Open — first |
 | TD-903 | Build TD-900 (3): the Repo page's board — For you, the flows' worker stages, Review, Merged; bounded | Medium | Open — blocked by TD-901 |
 | TD-904 | Build TD-900 (4): the promote reading's `live`, the divider on Merged and the Queue's mark by ancestry | Medium | Open — blocked by TD-902 |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Open — blocked by TD-902 |
@@ -1546,26 +1545,6 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Done when** the live Queue shows ao-grind's and samscrape's cards each numbered from 1, a spanning card with both numbers, a Repo page ⤒ lands directly above the repo's first card and never above another repo's, and `ao repo` prints the places, with tests for each.
 
 **Related:** TD-900, TD-748, TD-769, TD-772.
-
----
-
-## TD-902: Build TD-900 (1): the Org page is named Sessions — the tab, the title, help.py's screen, the templates' keys, §4.5a's first cells, and *Org page* across the design and glossary
-
-**Priority:** Low
-**Type:** debt
-**Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
-**Owner:** grinder
-**Kind:** build
-**Status:** Open — first of TD-900's builds: it sweeps the files the others edit, so it goes before them
-**Location:** `src/shiftlead/ui/templates/base.html` (the tab, `active == 'Org'`), `org.html` (the `h1`), `src/shiftlead/ui/help.py` (`SCREENS`'s `"Org"`, the `"Org top bar…"` placements), design §4.5a's first cells (`Org`, `Org top bar`, `Org banner`) and the tests keyed on them (`grep -ln 4.5a tests`, `tests/test_help.py`), *Org page* / *the Org* where it names the page across `docs/design/*.md` (§4.9 *The Org page* included), `docs/glossary.md`, the briefs and the mockups' notes
-
-**Why:** TD-900: design §4.5 screen 1 is *Sessions* — the page is where the person sees what runs and steps in; *Org* names the aggregate it draws (§4.9), which keeps its name.
-
-**Fix:** one sweep: the page's visible name and route title, then the keys — §4.5a's first cells with the tests that bind to them, `help.py`'s screen — then *Org page* → *Sessions page* where the words mean the page and not the org (§4.9 *The Org page* becomes *The Sessions page*; *the org* as the aggregate stays). The route `/` and the `org` module names may stay; say in the PR what was left.
-
-**Done when** no page, tab, help paragraph or design sentence calls the page *Org*, and `pdm run test` passes.
-
-**Related:** TD-900, TD-060 (the other rename at a boundary).
 
 ---
 

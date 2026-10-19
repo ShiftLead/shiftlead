@@ -17,7 +17,7 @@ see git status per checkout; press configured command buttons; jump to VS Code; 
 unattended workers with run windows and usage caps. Sessions live on the host, so closing the
 laptop changes nothing.
 
-**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Org, Focus and
+**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Sessions page, Focus and
 Inbox pages (mail and the sessions' states; due board items are still to come — TD-069), New session and the CLI are built and
 running; phase 2 (a second host over ssh) is not.
 Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is deferred is in
@@ -32,7 +32,7 @@ date — the live lists are [`docs/user_attention.md`](docs/user_attention.md) a
 [`docs/technical_debt.md`](docs/technical_debt.md))
 
 **Phase 1 is built** (PRs #1–#4; each was reviewed by a Sonnet subagent in the build session and
-the findings folded into the PR before merge — see the "review fixes" commits): host agent, Claude Code adapter, Org
+the findings folded into the PR before merge — see the "review fixes" commits): host agent, Claude Code adapter, Sessions
 and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, in order:
 
 1. **Use it** against a real repo and note what the flows get wrong (board item, due 2026-09-13).
@@ -45,7 +45,7 @@ and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, i
    sessions), then **phase 2** of [`docs/design.md`](docs/design.md) §7: second host, ssh
    transport, agent install script.
 4. Known gap in the phase 1 success test: only sessions ShiftLead launched (or hand-started
-   `ao-*` tmux sessions) appear in the Org. A Claude Code session opened in a VS Code terminal
+   `ao-*` tmux sessions) appear in the Sessions page. A Claude Code session opened in a VS Code terminal
    is not a tmux session and is invisible until Adopt (TD-010) exists.
 
 Mockups: https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04 (sources and

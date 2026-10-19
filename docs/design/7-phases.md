@@ -21,14 +21,14 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    as a node and a session started there from the UI, mail from a laptop worker to its kmaster
    manager through a laptop sleep, the laptop closed for an hour with the session still there
    (TD-057); the phone's route in (§4.5b: the route port and `ao connect`, Tailscale first,
-   TD-647 and TD-648) and the phone layout (Org + narrow Focus); the terminal over the link; attachment upload over ssh (drag
+   TD-647 and TD-648) and the phone layout (Sessions + narrow Focus); the terminal over the link; attachment upload over ssh (drag
    and drop, picker, paste — the copy path is the same plumbing).
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by samscrape's
    `.shiftlead.yml`; run both side by side for one window with tdgrind's cron disabled and the
    host agent's policies enabled; compare `tdgrind runs` reports against shiftlead run logs;
    then delete `tdgrind.sh` from samscrape (ledger a TD there for the swap and the cron line
    in `infra/kmaster/crontab`). **Capabilities, report channels and presets** (§4.8) open this
-   phase, because the migration is the first time several workers run at once and the Org has
+   phase, because the migration is the first time several workers run at once and the Sessions page has
    to say what each is doing and keep them off each other: the caller check and the `control`
    grant first, then `progress` / `findings` with `ao progress` / `ao finding`, the derived
    source on the tick, the card's report line and the Focus Reports panel, and last the
@@ -39,7 +39,7 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    credential-lapse, exit-reap and stranded-work policies; tdgrind's cron still runs, so the
    side-by-side window has not started.
 4. **Commands + board.** `.shiftlead.yml` buttons (cmdorc where it fits), command-kind sessions
-   and the Commands page, the Resumable page (§4.5 screen 4), the Due strip on the Org,
+   and the Commands page, the Resumable page (§4.5 screen 4), the Due strip on the Sessions page,
    stranded-work flags; each page gets its top-bar tab when it is built (TD-123). **Not
    started**, except the board's Snooze / Done write-back, built for the Inbox's board rows
    (TD-069 step 3); the Attention tab is struck (§4.5 screen 7).

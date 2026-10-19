@@ -1,6 +1,6 @@
 """Running a team definition: the RPC sequence `ao team start|stop|list` performs, in one place so
-the CLI and the Org page's **Teams** strip cannot drift (design §4.9 "Starting and stopping",
-§4.5a Org **Teams** strip).
+the CLI and the Sessions page's **Teams** strip cannot drift (design §4.9 "Starting and stopping",
+§4.5a Sessions **Teams** strip).
 
 `shiftlead.teams` decides what a start *means* (`plan`, which touches no RPC); this module is the
 one that talks to the agent, and it does so through an injected blocking `call(method, **params)`
@@ -393,7 +393,7 @@ def seat_names(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> set[str]
 def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
     """The ids among `sessions` that are a seat of the team whose badge they carry (`seat_names`,
     design §4.9b), each with what would make it come (*comes on the next question*, *runs after
-    10 PRs*) — what the Org page draws *on call* while nobody is in one, and its slot (§4.5 *The
+    10 PRs*) — what the Sessions page draws *on call* while nobody is in one, and its slot (§4.5 *The
     card's anatomy*, TD-097, TD-098). Keyed by the definition and the name, never by a role (§9
     invariant 9)."""
     out: dict[str, str] = {}
@@ -478,7 +478,7 @@ def wound_down_words(r: dict[str, Any]) -> str:
 
 
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]], waiting: Waiting | None = None) -> list[dict[str, Any]]:
-    """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
+    """One row per definition for `ao team list` and the Sessions page's **Teams** strip (design §4.5a):
     the name, the file it came from, its repo and project, how many sessions it starts, how many carrying
     its badge are live, and — when none are and every one of them said why — when it wound down;
     when some are and every one is idle and declared, when it concluded (TD-099), or else why it
@@ -1151,7 +1151,7 @@ def flow_changed(
     call: Call, org: orgmod.Org, name: str, host: str, sessions: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """What a client that reads a live team says of its records against its current flow (§4.9c
-    *Switching*: the Org page, `ao team list`, `ao team flow`), one `Difference.as_dict` per member;
+    *Switching*: the Sessions page, `ao team list`, `ao team flow`), one `Difference.as_dict` per member;
     with nothing live only the definition's renames and removals (TD-703), since a stopped team
     compiles nothing until its next start; a team with no `flows:` is read on its seats alone
     (TD-399). Raises what `teams.plan` raises: the caller says why the records were not compared."""
@@ -1164,7 +1164,7 @@ def flow_changed(
 
 def flow_view(call: Call, org: orgmod.Org, name: str, here: str, sessions: list[dict[str, Any]]) -> dict[str, Any]:
     """A team's flows as every client that reads a team shows them (design §4.9c *What is shown*,
-    *Switching*; `ao team list`, the Org page's team header): `flow`, the current one or None for a
+    *Switching*; `ao team list`, the Sessions page's team header): `flow`, the current one or None for a
     team that lists none; `flows`, `teams.flow_rows`; `flow_note`, `teams.flow_unlisted`; and
     `differences`, a live team's records against its current flow (`flow_changed`) — empty where the
     plan fails, which the flows' own lines say. Reads files: once per page load or listing, never
@@ -1564,7 +1564,7 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
     **Wrap up** sends — to every member, or a kill with `--now`. The lead is stopped by `stop_lead`
     once the members have settled, which is what makes the order the design's one.
 
-    Split in two so a caller that must not block (the Org page) can send this half and let the rest
+    Split in two so a caller that must not block (the Sessions page) can send this half and let the rest
     run behind it, while `ao team` runs both in a row.
 
     `caller` is the session running the command, if one is (`SHIFTLEAD_SESSION`). When it is the

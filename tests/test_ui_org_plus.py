@@ -1,5 +1,5 @@
 """A team's + card is no session to the client (design §4.5a *team card: + card*, TD-379; TD-390):
-the Org page's sort, filter and group swap run as themselves under node, over a small fake DOM —
+the Sessions page's sort, filter and group swap run as themselves under node, over a small fake DOM —
 the sort leaves the card last, a filter hides it and clearing the filter shows it again, a delta
 whose group lacks it removes it and one that carries it puts it back last, and a group the server
 no longer lists hands its sessions on and never the card."""
@@ -178,7 +178,7 @@ def test_the_plus_card_is_no_session_to_the_client(tmp_path):
 
 @pytest.mark.unit
 def test_the_enter_key_presses_the_plus_cards_link():
-    """§4.5a *Org: keys*: `Enter` / `o` on the ringed + card press its link."""
+    """§4.5a *Sessions: keys*: `Enter` / `o` on the ringed + card press its link."""
     js = APP.read_text()
     assert 'sel: "a[data-focus], a.plusgo" }' in js
     css = (APP.parent / "app.css").read_text()

@@ -123,8 +123,8 @@ RESTART_SUBJECTS = ("brief lost twice", "fills exhausted", "restarts exhausted",
 def state_kind(v: dict[str, Any]) -> str:
     """Which state row this session is, or "" for one that needs nobody (design §4.5a **Inbox row:
     state**). **The one predicate the Inbox and the Org's needs-you count both read**, so every
-    session the Org counts as `needs-you` has exactly one row on the Inbox and the page's hover
-    text — *the session states the Org counts too* — is true (review of PR #251).
+    session the Sessions page counts as `needs-you` has exactly one row on the Inbox and the page's hover
+    text — *the session states the Sessions page counts too* — is true (review of PR #251).
 
     A `needs-you` record whose `pending` is empty, is not a dict, or names a kind this build does
     not know is still a session stopped for a person: it becomes a plain **needs** row with
@@ -2047,7 +2047,7 @@ def inbox_sections(
     out["answered"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))
-    # the Org rollup's *m overdue* beside *in the Inbox* (§4.5 screen 1, §4.5a *Org: rollup*, TD-178):
+    # the Org rollup's *m overdue* beside *in the Inbox* (§4.5 screen 1, §4.5a *Sessions: rollup*, TD-178):
     # the Needs you board items past their `Due:` date — a civil date, so read in this host's calendar
     today = at.astimezone().date().isoformat()
     overdue = sum(1 for e in out["needs"] if e.get("row") == "board" and e.get("due") and str(e["due"]) < today)

@@ -1,4 +1,4 @@
-"""TD-224: the Org page threw its reader back to the top on a delta, once scrolled past the first
+"""TD-224: the Sessions page threw its reader back to the top on a delta, once scrolled past the first
 team. Every delta re-appended each section and card, and a layout forced halfway through the swap
 (a summary's scroll read) let the browser's scroll anchoring chase a section being moved. A node
 now moves only when it is out of the server's order, the reads come before anything moves, and a

@@ -59,7 +59,7 @@ def pane_bytes(ws, words=None):
 
 def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/")
-    assert r.status_code == 200 and "Org" in r.text and "No sessions" in r.text
+    assert r.status_code == 200 and "Sessions" in r.text and "No sessions" in r.text
     assert 'id="usagechip"' in r.text  # the per-profile usage figure (TD-001), empty until a poll lands
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
@@ -1242,7 +1242,7 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
 
 
 def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
-    """TD-052 step 8, design §4.5a Org top bar **Inbox** (§4.10): the Org page renders the top
+    """TD-052 step 8, design §4.5a Sessions top bar **Inbox** (§4.10): the Sessions page renders the top
     bar's number — the **Needs you** count since TD-069 step 1, so one open `ask` to the person
     makes it 1; the feed lists an entry a session sent with `ao msg person`, with its sender's id
     and name, as a person's read (no `read_at`); **Reply** lands a `reply` from the person in the
@@ -1406,7 +1406,7 @@ def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, t
     call_sync("progress", id=sid, status="none", why=why, caller=sid)
     page = client.get(f"/focus/{sid}").text
     assert shown(page) and why in page
-    assert "out of work" in client.get("/").text  # and the card on the Org page
+    assert "out of work" in client.get("/").text  # and the card on the Sessions page
 
     # a claim means it has work again — the record clears the declaration, and so does the header
     call_sync("progress", id=sid, ref="TD-053", status="claimed", caller=sid)
@@ -1479,7 +1479,7 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     # only for its fold (TD-176, TD-194): unfolded, CSS hides them, since the compact cards say it
     assert g["counts"] == ["1 working", "1 unseen"] and "▾ 2 sessions" in head  # the count once, on the fold (TD-418)
     assert 'class="meta counts foldonly">· 1 working · 1 unseen<' in head
-    # the host alone: the repo, or the directory, is not the header's (§4.9 *The Org page*, TD-725)
+    # the host alone: the repo, or the directory, is not the header's (§4.9 *The Sessions page*, TD-725)
     assert g["place"] and " / " not in g["place"] and f'<span class="meta">{g["place"]}</span>' in head
     card = templates.get_template("card.html").render(s=g["members"][0])
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
@@ -1561,7 +1561,7 @@ def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_d
 
 
 async def test_a_nodes_org_page_says_its_link_and_where_the_org_is(agent):
-    """TD-057 step 4b.3 (*Left for step 4*): the Org page on a node reads the `host` RPC and says
+    """TD-057 step 4b.3 (*Left for step 4*): the Sessions page on a node reads the `host` RPC and says
     whether its link to the home is up — here it has never dialed, so *offline* — and still
     renders this host's sessions although the node refuses the mailbox; the Teams strip names where
     the org is, and a Start or Stop pressed there answers with that note rather than *no team*."""
@@ -1618,7 +1618,7 @@ def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, mo
     assert v["flag"] == "", "308 ahead of origin/main is unmerged, not unpushed (TD-080)"
     assert ("branch pushed", True) in v["ready"]
     html = templates.get_template("focus.html").render(
-        s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Org"
+        s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Sessions"
     )  # noqa: E501
     assert "308 ahead" in html and "unpushed" not in html.split('id="gitline"')[1].split("</span>")[0]
 
@@ -1626,7 +1626,7 @@ def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, mo
     assert only_here["flag"] == "2 unpushed"
     assert ("branch pushed (vs origin/orc-1)", False) in only_here["ready"]
     html = templates.get_template("focus.html").render(
-        s={**only_here, "grants_all": [], "ready": only_here["ready"]}, host="h", active="Org"
+        s={**only_here, "grants_all": [], "ready": only_here["ready"]}, host="h", active="Sessions"
     )
     assert "2 unpushed vs origin/orc-1" in html
     # the page redraws that line itself on a delta, so it says the same thing (the chips' lesson)
@@ -1658,7 +1658,7 @@ def test_the_card_and_focus_show_the_tools_own_title_beside_the_name(tmp_path, m
     assert 'data-act="title' not in html and 'data-act="rename' not in html  # shiftlead has no rename
     # the whole of it is on hover, so the card may clip it; the Focus header carries it too
     assert "title=\"the session's name as its tool holds it" in html
-    assert "Error Checker" in focus.render(s={**titled, "grants_all": [], "ready": []}, host="h", active="Org")
+    assert "Error Checker" in focus.render(s={**titled, "grants_all": [], "ready": []}, host="h", active="Sessions")
     # it is a model's text: escaped, never markup
     marked = card.render(s=view({**base, "title": "<b>x</b> & y"}))
     assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in marked
@@ -1815,7 +1815,9 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
         "team": "ao-grind", "role": "grinder",
     }  # fmt: skip
     v = view(v_src)
-    html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")
+    html = templates.get_template("focus.html").render(
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions"
+    )
     head_html = html[html.index('id="fhead"') : html.index('id="facts"')]
     for piece in ("Error Checker", "out of work", "fstop"):
         assert piece in head_html, piece
@@ -1835,7 +1837,7 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     assert "hidden" in html[html.index('id="fready"') - 80 : html.index('id="fready"')] and not v["own"]
     own = view({**v_src, "unattended": False})
     html = templates.get_template("focus.html").render(
-        s={**own, "grants_all": [], "ready": [], "ready_ok": True}, host="h", active="Org"
+        s={**own, "grants_all": [], "ready": [], "ready_ok": True}, host="h", active="Sessions"
     )
     assert own["own"] and 'data-side="ready" open>' in html
     # the Working card's heading reads *says · <age> ago*, the words alone in its body (TD-156) —
@@ -1976,13 +1978,13 @@ def test_a_roles_saved_prompts_are_chips_on_focus_and_new_session(tmp_path, monk
     assert uiapp.role_prompts({**rec, "role": "grinder"}) == [] and uiapp.role_prompts({**rec, "role": ""}) == []
     v = uiapp.view(rec)
     html = uiapp.templates.get_template("focus.html").render(
-        s={**v, "grants_all": [], "ready": []}, host="h", active="Org", prompts=prompts
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions", prompts=prompts
     )
     chips = html[html.index('id="promptchips"') : html.index('id="send"')]
     assert chips.index(">review PR<") < chips.index(">sweep<")  # the file's order
     assert 'data-text="Review PR &lt;9&gt; now." title="Review PR &lt;9&gt; now."' in chips
     bare = uiapp.templates.get_template("focus.html").render(
-        s={**v, "grants_all": [], "ready": []}, host="h", active="Org"
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions"
     )
     assert 'id="promptchips"' not in bare  # a role without prompts, or an unattended record: no chips
     roles = {r.name: r for r in uiapp.repoconfig.roles(uiapp.repoconfig.load(tmp_path))}

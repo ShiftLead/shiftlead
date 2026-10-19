@@ -1,5 +1,5 @@
 # ruff: noqa: E501 — the fixture rows read as one line each
-"""TD-771 slice 1, design §4.5 screen 12 *Queue* and §4.5a *Queue page*, *Org top bar: Queue tab*: the
+"""TD-771 slice 1, design §4.5 screen 12 *Queue* and §4.5a *Queue page*, *Sessions top bar: Queue tab*: the
 page draws the home's `queue` reading in three groups — Recently completed with its window picker and
 its counts, In progress with the other work, Up next numbered with the grip and ⤒ ↑ ↓ — by the partials
 the Repo page shares; the top bar carries a Queue tab after Inbox, with no number of its own."""

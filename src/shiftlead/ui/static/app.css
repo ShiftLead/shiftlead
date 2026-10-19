@@ -451,7 +451,7 @@ details.more .menu button:disabled { opacity: .45; cursor: default; } details.mo
 .sc.s-waiting .sbar { background: var(--waiting); }
 .sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); }
 .sc.s-needs { box-shadow: 0 0 0 2px var(--needs); }  /* ringed: what to press, seen from across the room */
-/* the keyboard's ring (§4.5a Org **keys**, TD-124): the browser's focus ring, blue and offset
+/* the keyboard's ring (§4.5a Sessions **keys**, TD-124): the browser's focus ring, blue and offset
    outside the card, so it sits apart from the amber needs-you ring rather than replacing it */
 .sc:focus { outline: none; } .sc:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
 .meta { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -579,7 +579,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .tsum { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr) minmax(0, 1.2fr); gap: 12px; margin-bottom: 12px; }
 /* a team card's two facets, the Repo facet being its repo line's (§4.5a *team card: summary*, TD-725) */
 .tsum:not(:has(.frepo)) { grid-template-columns: minmax(0, .85fr) minmax(0, 1.2fr); }
-/* the Org page's project heading and repo line (§4.9 *The Org page*, TD-725): above the repo's teams */
+/* the Sessions page's project heading and repo line (§4.9 *The Sessions page*, TD-725): above the repo's teams */
 #groups > .phead { padding: 6px 2px 0; } #groups > .phead[hidden], #groups > .rline[hidden] { display: none; }
 #groups > .rline { display: flex; flex-direction: column; gap: 6px; margin-bottom: -10px; border-radius: 6px; }
 #groups > .rline:focus { outline: none; } #groups > .rline:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
@@ -587,7 +587,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 #groups > .rline .tsum.rsum { grid-template-columns: minmax(0, 1fr); max-width: 720px; margin-bottom: 0; }
 @media (max-width: 1100px) { .tsum { grid-template-columns: minmax(0, 1fr); } }
 .facet { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-/* every facet's head one height, the window picker's, whether it holds one or not (§4.5a *Org: rollup*, TD-418);
+/* every facet's head one height, the window picker's, whether it holds one or not (§4.5a *Sessions: rollup*, TD-418);
    a label never wraps: where the head runs out of room the selector drops to its own line, at the right */
 .facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
 .facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); white-space: nowrap; }
@@ -681,7 +681,7 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .sc.plus:hover { background: var(--hover); }
 .tsum .lv, .tsum .wv, .tsum .fv { display: flex; flex-direction: column; gap: 5px; }
 .tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden] { display: none; }
-/* the Org rollup (§4.5a *Org: rollup*, TD-176 slice 4) */
+/* the Org rollup (§4.5a *Sessions: rollup*, TD-176 slice 4) */
 .rollup { display: grid; grid-template-columns: 2fr 1.2fr 1.2fr 1fr; gap: 12px; margin: 12px 0 18px; }
 @media (max-width: 1100px) { .rollup { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 @media (max-width: 640px) { .rollup { grid-template-columns: minmax(0, 1fr); } }

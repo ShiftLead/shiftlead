@@ -547,7 +547,7 @@ def test_balance_card_reads_the_numbers_and_the_mark():
 
 
 def test_every_page_draws_the_usage_chip(client, subprocess_agent, monkeypatch):
-    """design §4.5a *Org top bar* **usage** chip (TD-287): the top bar is one bar, so Settings and the
+    """design §4.5a *Sessions top bar* **usage** chip (TD-287): the top bar is one bar, so Settings and the
     other pages draw the account's chip as the Org does, read by one helper."""
     from shiftlead.ui import app as appmod
 

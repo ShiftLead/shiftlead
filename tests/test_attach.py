@@ -252,7 +252,7 @@ def test_the_composer_draws_attach_beside_send(tmp_path, monkeypatch):
             "state": "idle", "since": "2026-10-07T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
             "created": "2026-10-07T15:00:00Z"}  # fmt: skip
     html = templates.get_template("focus.html").render(
-        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Sessions", popped=False
     )
     composer = html[html.index('id="composer"') :]
     composer = composer[: composer.index('id="send"')]
@@ -550,7 +550,7 @@ def test_the_focus_page_serves_the_piece_size_and_the_cancel(tmp_path, monkeypat
             "state": "idle", "since": "2026-10-07T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
             "created": "2026-10-07T15:00:00Z"}  # fmt: skip
     html = templates.get_template("focus.html").render(
-        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org", popped=False
+        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Sessions", popped=False
     )
     assert f'id="attach" data-piece="{paths.ATTACH_PIECE_BYTES}"' in html
     assert 'class="btn sm hidden" id="attachcancel"' in html

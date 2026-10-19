@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Org · ShiftLead{% endblock %}
+{% block title %}Sessions · ShiftLead{% endblock %}
 {% block body %}
 <div class="page">
   <div class="row gap wrap">
-    <span class="h1">Org</span>
+    <span class="h1">Sessions</span>
     <span class="muted" id="count">{{ sessions | length }} sessions</span>
     <span id="badges">
       {% if counts['needs-you'] %}<span class="pill s-needs"><span class="dot"></span>{{ counts['needs-you'] }} needs you</span>{% endif %}
@@ -11,12 +11,12 @@
       {% if counts['stalled?'] %}<span class="pill s-stalled"><span class="dot"></span>{{ counts['stalled?'] }} stalled</span>{% endif %}
     </span>
     <span class="grow"></span>
-    {# design §4.5a Org top bar **filter…** (TD-418, built by TD-428): words that compose — `team:`,
+    {# design §4.5a Sessions top bar **filter…** (TD-418, built by TD-428): words that compose — `team:`,
        `state:`, `mine` (the person's own, the interactive sessions) and `kind:command` (the command
        runs, hidden without it) — in place of the ***mine*** toggle and the *show command runs* box #}
     <input class="input" id="filter" placeholder="filter… team: state: mine kind:command" title="every word must match: team:<name>, state:<pill>, mine (your own sessions), kind:command (the command runs, hidden without it), or any text" style="width: 320px; max-width: 100%;">
   </div>
-  {# design §4.5a *Org: rollup* (TD-176 slice 4): sums over every live team, re-sent with the groups #}
+  {# design §4.5a *Sessions: rollup* (TD-176 slice 4): sums over every live team, re-sent with the groups #}
   <div id="rollup">{% with ro = rollup %}{% include "rollup.html" %}{% endwith %}</div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
   {# design §4.4a: a node's page says whose org it is part of and whether its link is up #}
@@ -40,7 +40,7 @@
     {% if migrate_note %}<span class="meta warnish" id="migratenote" title="{{ migrate_note }}">⚠ migrate: ui.yml is no longer read — move its open_in under person: in settings.yml</span>{% endif %}
   </div>
   {% endif %}
-  {# design §4.5a Org **team groups** (§4.9): a section per team when any session carries a badge
+  {# design §4.5a Sessions **team groups** (§4.9): a section per team when any session carries a badge
      or any team is defined, each a header plus its own grid; otherwise the one flat grid, no header
      anywhere. `data-live` is what the fold keys on: only a team with nothing live folds. Both
      shapes are the same element tree (`.tgroup` > `.grid`), so the client's layout code has one

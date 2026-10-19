@@ -614,7 +614,7 @@ def node_org_note() -> str:
 
 
 def node_banner(info: dict[str, Any] | None) -> str:
-    """The Org page's line on a node (design §4.4a "When a host cannot reach home"): whether its
+    """The Sessions page's line on a node (design §4.4a "When a host cannot reach home"): whether its
     link to the home is up, from the `host` RPC, and when it is not, what that means here."""
     if not info or info.get("mode") != "node":
         return ""
@@ -695,7 +695,7 @@ def restart_note(info: dict[str, Any] | None, id_info: dict[str, Any] | None) ->
 
 
 def identity_note(info: dict[str, Any] | None) -> str:
-    """The Org's teams line on who is calling (design §4.8a: *`ao status -v` and the Org's teams
+    """The Sessions page's teams line on who is calling (design §4.8a: *`ao status -v` and the Sessions page's teams
     line say which mode a host is in, since `observe` is a host that is not yet protected*). It
     says **identity: observe** as loudly as it says **identity: off**, and says nothing at all
     under `enforce`, which is the host that is protected — a note that was always there would stop
@@ -751,7 +751,7 @@ def repos_of(host: str) -> list[str]:
 
 
 def org_here() -> tuple[orgmod.Org, list[str]]:
-    """The definitions the Org page acts on (design §4.9 *The org is an aggregate*, TD-229):
+    """The definitions the Sessions page acts on (design §4.9 *The org is an aggregate*, TD-229):
     `~/.shiftlead/org.yml`, plus the `teams:` of every repo in this host's registry, by the one
     function `ao team` reads too. The org file wins a name collision, and a name two repos define
     is refused in both, a note; so is a team whose landing cannot be told. Read on every use and cached

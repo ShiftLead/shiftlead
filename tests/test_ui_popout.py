@@ -28,7 +28,7 @@ def _focus(monkeypatch, tmp_path, popped, **rec):
 
     v = view({**BASE, "dir": str(tmp_path), **rec})
     return templates.get_template("focus.html").render(
-        s={**v, "grants_all": [], "ready": []}, host="h", active="Org", popped=popped
+        s={**v, "grants_all": [], "ready": []}, host="h", active="Sessions", popped=popped
     )
 
 
@@ -38,10 +38,10 @@ def test_a_popped_out_focus_is_the_session_and_nothing_else(tmp_path, monkeypatc
     composer, the acts, the side panels: *a window that cannot answer a permission or wrap up is a
     worse Focus, not a lighter one*. A Focus in a tab keeps its chrome and offers Pop out."""
     tab = _focus(monkeypatch, tmp_path, False)
-    assert 'class="topbar"' in tab and "← Org" in tab and 'data-act="popout"' in tab
+    assert 'class="topbar"' in tab and "← Sessions" in tab and 'data-act="popout"' in tab
     assert "AO.focus(" in tab and ", false);" in tab
     win = _focus(monkeypatch, tmp_path, True)
-    assert 'class="topbar"' not in win and "← Org" not in win and 'data-act="popout"' not in win
+    assert 'class="topbar"' not in win and "← Sessions" not in win and 'data-act="popout"' not in win
     assert '<body data-host="h" class="popped">' in win and ", true);" in win
     for kept in (
         'id="composer"',

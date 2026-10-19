@@ -27,7 +27,7 @@
 9. Nothing keys on a session's role, team or project: policies key on `unattended`, `supervised` (§6), the
     schedule and a team's own settings (§5 `teams.<team>`: the stop time, the reserve, `on_work` — the badge says which sessions a person's setting is about, and grants nothing), and so do the person's `permissions:` rules per role (§5, §4.9b *The director seat*: the role badge only selects which rule applies to an unattended member's prompt, the host answers the prompt, and the session is granted nothing — a preset still sets nothing on the record beyond its start defaults), acting RPCs key on grants and `controllers`, displays key on the report channels
    (§4.8). A preset sets defaults at start and is a badge afterwards; `team` and `project` are
-   badges from the start (§4.9), and the Org page's grouping is derived from `controllers` and
+   badges from the start (§4.9), and the Sessions page's grouping is derived from `controllers` and
    the badge on each tick, never stored. **One named exception:** the message gate's sideways
    edge admits a session carrying the same `team` badge, and its cross-team edge one carrying the
    same `project` badge (§4.10; TD-582) — for a `manager: person` team the first is the only edge

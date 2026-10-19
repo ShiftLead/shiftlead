@@ -533,7 +533,7 @@ HELP: tuple[Help, ...] = (
     Help(
         "usage-chip",
         "usage",
-        "Org top bar, every page",
+        "Sessions top bar, every page",
         (
             "Opens the Spend page on All: which teams and which sessions spent the quota, over time. Press it "
             "when the chip's number climbs faster than you expected. The chip shows each account's worst quota "
@@ -571,7 +571,7 @@ GROUP_SCREEN = {"team": "org", "focus": "focus", "exited": "focus"}
 SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "org",
-        "Org",
+        "Sessions",
         (
             "start",
             "wind-down",
