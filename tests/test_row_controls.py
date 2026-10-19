@@ -42,3 +42,14 @@ def test_the_road_is_refused_where_nobody_would_read_the_line(tmp_path):
 
     org = orgmod.Org(teams={}, roles={})
     assert "no team services" in ui.road_refusal(org, str(tmp_path), "done", "h")
+
+
+def test_a_cards_top_entry_draws_the_controls_in_its_head():
+    """A one-entry card has no rows: its head is the entry's row, so the head draws the macro (found by the
+    scratch-home check, 2026-10-19)."""
+    top = {"id": "TD-7", "qid": "r#TD-7", "show": "TD-7", "title": "t", "repo": "r", "needs": None, "state": ""}
+    tpl = ui.templates.env.from_string('{% import "queue_card.html" as c %}{{ c.card(card) }}')
+    got = tpl.render(card={"id": "r#TD-7", "top": top | {"page": "pickable"}, "ids": ["r#TD-7"], "group": "up_next"})
+    assert got.count('data-road="done"') == 1 and 'data-road="design"' in got and "Hold…" in got
+    held = tpl.render(card={"id": "r#TD-7", "top": top | {"page": "pickable", "state": "held (person)"}, "ids": []})
+    assert "Hold…" not in held and 'data-road="done"' in held

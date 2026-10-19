@@ -792,7 +792,8 @@
     return new Promise((resolve) => {
       dlg.addEventListener("close", () => {
         const text = $("#mailtext").value;
-        resolve(dlg.returnValue === "send" && text.trim() ? { text, kind: $("#mailkind").value, about: $("#mailabout").value.trim() } : null);
+        // `empty`: a send with no words is still a send (Hold…'s line is optional, §4.4 *Hold*)
+        resolve(dlg.returnValue === "send" && (text.trim() || o.empty) ? { text, kind: $("#mailkind").value, about: $("#mailabout").value.trim() } : null);
       }, { once: true });
       dlg.returnValue = ""; dlg.showModal(); $("#mailtext").focus();
     });
@@ -1184,7 +1185,7 @@
       // **Hold…** (§4.4 *Hold*, §4.5 screen 12, TD-905): an optional line of words, the record's `why`,
       // drawn *held (person) — <why>*; the person's own act on the home's record, no ledger edit
       if (action === "ledger_hold") {
-        const m = await AO.compose({ to: `the hold on ${b.dataset.ref}`, reply: true, quote: b.dataset.quote });
+        const m = await AO.compose({ to: `the hold on ${b.dataset.ref}`, reply: true, quote: b.dataset.quote, empty: true });
         if (!m) return;
         pressed();
         const got = await fetch("/api/ledger/hold", {
