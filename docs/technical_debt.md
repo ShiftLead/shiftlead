@@ -73,7 +73,7 @@ Fields: Owner = designer | grinder | paul | dev-cadence; Kind = build | design-f
 | TD-875 | Build TD-871: the machine's Gemini layer — the wanted copy, `ao doctor`'s sudo line, a launch refused without it — and the walk's terminal answer to a permission | Medium | Built (#2110, #2113, #2115) — live check |
 | TD-888 | The live Queue's HTML is 148 KB on the wire against its 150 KB budget | Low | Designed — built by TD-890, TD-891, TD-892 |
 | TD-900 | The Repo page is a board by stage, the Org page is Sessions, Up next numbered per repo, a live divider on Merged | Medium | Designed — built by TD-902, TD-901, TD-903, TD-904, TD-905, TD-907 |
-| TD-903 | Build TD-900 (3): the Repo page's board — For you, the flows' worker stages, Review, Merged; bounded | Medium | Open |
+| TD-903 | Build TD-900 (3): the Repo page's board — For you, the flows' worker stages, Review, Merged; bounded | Medium | Built (#2163) — live check |
 | TD-904 | Build TD-900 (4): the promote reading's `promoted`, the divider on Merged and the Queue's mark by ancestry | Medium | Built (#2158) — live check |
 | TD-905 | Build TD-900 (5): the ledger row's controls, once — Done… with words, Back to design…, Hold… with words | Medium | Open — blocked by TD-902 |
 | TD-907 | Build TD-900 (6): the session side of *done — words* and *back to design — words* (a held path) | Medium | Open — blocked by TD-905 |
@@ -1532,8 +1532,8 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Type:** feature
 **Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
 **Owner:** grinder
-**Kind:** build
-**Status:** Open
+**Kind:** live-check #2163
+**Status:** Built in #2163 (2026-10-19, grinder-ao-2): `ui/repo_board.py` and the board in `repo_part.html` — the columns from the servicing teams' flows, placing by lane words, claimed / queued by card / blocked folded, the card's number and grip per column, the bounds, the help paragraph. Read once it is live (`ao promote status`): a headless GET of `/repo/shiftlead` is the board (For you, Design, Build with ao-grind's people, Review, Merged), and its first byte is within §4.5 *Page loads*' budget measured as TD-893 did.
 **Location:** `src/shiftlead/ui/repo.py` (the Technical debt cards, Open PRs and Recently completed readings), `src/shiftlead/ui/templates/repo.html` and the partials it draws (`queue_row.html` for the rows), `src/shiftlead/ui/static/app.js` (the Technical debt cards' `#TD-n` opening, ~4073; `part=1` with `open=<column>:<part>`), `app.css`; the flows' stages and lane words (§4.9c, `src/shiftlead/flows/*/flow.yml`, §6 rule 6's lane words) for the columns and the placing; `src/shiftlead/ui/help.py` (the paragraph for *Repo page: Technical debt cards*, now the board); `tests/test_ui_repo_org.py`, `tests/test_ui_repo_page.py`, `tests/test_ui_queue_cards.py`, `tests/test_help.py`
 
 **Why:** TD-900: design §4.5 screen 11 *the board* — the one view of a repo by stage; the render is `docs/mockups/reviews/2026-10-18-repo-stage-board.png` (drawn before the review's rules: it numbers a claimed row and names Build *Grind*).

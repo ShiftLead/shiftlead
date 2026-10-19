@@ -721,7 +721,40 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .repopage .dchips { margin-bottom: 8px; }
 .repopage .dchips .chip { border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
 .repopage .dchips .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-@media (max-width: 720px) { .repopage .rrow:not(.drow) { flex-wrap: wrap; } }  /* a Doing row keeps its columns: its words wrap inside the last (TD-296 #16) */
+@media (max-width: 720px) { .repopage .rrow:not(.drow) { flex-wrap: wrap; } }
+/* the board (§4.5 screen 11 *the board*, TD-903): one column per stage, at the Sessions page's width; two
+   columns below 1100 px, one below 720. A row is the Queue card's own, set in from the card's gutter */
+.repopage .board { display: grid; grid-template-columns: repeat(var(--bcols, 5), minmax(0, 1fr)); gap: 10px; align-items: start; margin-top: 10px; }
+.repopage .bcol { background: var(--card); border: 1px solid var(--line); border-radius: 6px; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.repopage .bhead { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: baseline; padding: 8px 10px 4px; }
+.repopage .bname { font-weight: 600; color: var(--strong); }
+.repopage .bhead .bwin { margin-left: auto; }
+.repopage .bpeople { padding: 0 10px 6px; font-size: var(--t-small); overflow-wrap: anywhere; }
+.repopage .bpeople .unstaffed { color: var(--needs-fg); }  /* an unstaffed lane's amber (§4.4 *In a team's lanes*) */
+.repopage .bpeople .bteam { color: var(--muted); }
+.repopage .bcol > .qcards { border: 0; border-top: 1px solid var(--line2); border-radius: 0; }
+.repopage .bcard { display: flex; gap: 2px; }
+.repopage .bgut { flex: none; width: 2.2em; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0 4px; }
+.repopage .bgut .qplace { font-size: calc(var(--t-body) * 1.4); text-align: center; }
+.repopage .bgut .qmoves { flex-direction: column; }
+.repopage .brows { flex: 1 1 auto; min-width: 0; }
+.repopage .bcol .qrow { padding: 6px 10px 6px 8px; }
+.repopage .bcol .qtitle { flex-basis: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }  /* wrapped to two lines */
+.repopage .bcol .qright { margin-left: 0; justify-content: flex-start; }
+.repopage .bcol .qbuilds, .repopage .bcol .qnote { padding-left: 0; }
+.repopage .bclaim { border-top: 1px solid var(--line2); border-left: 3px solid var(--working); }  /* claimed: green */
+.repopage .bdoing { padding: 0 10px 6px 8px; font-size: var(--t-small); overflow-wrap: anywhere; }
+.repopage .brow > * { margin: 4px 6px; }
+.repopage .bcol .rrow { padding: 7px 10px; gap: 4px 8px; flex-wrap: wrap; }
+.repopage .bcol .rtitle { white-space: normal; flex: 1 1 100%; }
+.repopage .bblocked { border-top: 1px solid var(--line2); }
+.repopage .bfoldh, .repopage .bempty, .repopage .bfold > summary { padding: 6px 10px; font-size: var(--t-small); }
+.repopage .bfold { border-top: 1px solid var(--line2); }
+.repopage .bfold > summary { cursor: pointer; }
+.repopage .bflag { padding: 0 10px 6px; }
+.repopage .rpanels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }  /* Waiting on you · Doing */
+@media (max-width: 1100px) { .repopage .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .repopage .board, .repopage .rpanels { grid-template-columns: minmax(0, 1fr); } }  /* a Doing row keeps its columns: its words wrap inside the last (TD-296 #16) */
 /* the Settings page (design §4.5 screen 8, §4.5a *Settings page*; TD-148): the Inbox's one centred
    column (TD-082) at a reading width — a section is a heading with its i mark, a row is a card; a
    field is a label, its input and what it makes today, on one line that wraps on a phone */

@@ -553,6 +553,17 @@ HELP: tuple[Help, ...] = (
         ),
     ),
     Help(
+        "board",
+        "the board",
+        "Repo page: Technical debt",
+        (
+            "Shows this repo's open work by stage: For you, one column per worker stage of the teams' flows, then "
+            "Review and Merged, each heading saying who is on that stage. Read it to see whether a stage holds more "
+            "work than people, or has nobody running at all. It moves nothing by itself — a card moves by its grip "
+            "or ⤒ ↑ ↓ among this repo's cards in the same column — and an entry is edited in its file, never here."
+        ),
+    ),
+    Help(
         "live-divider",
         "live divider",
         "Repo page: Merged",
@@ -645,7 +656,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
             "held-missed",
         ),
     ),
-    ("repo", "Repo page", ("live-divider",)),
+    ("repo", "Repo page", ("board", "live-divider")),
     ("queue", "Queue", ("up-next-number", "live-mark")),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),

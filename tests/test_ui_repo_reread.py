@@ -57,7 +57,7 @@ function page() {
   return {
     Q, QA, asked,
     pick: (win) => { kept["ao.win"] = JSON.stringify(win); press(".tsum .seg[data-pick] button"); },
-    anchor: (id) => { location.hash = "#" + id; Q["#debt .rlh"] = el(); hashchange(); },
+    anchor: (id) => { location.hash = "#" + id; Q["#board"] = el(); hashchange(); },
     unfold: (key, b) => { Q[`[data-unfold="${key}"]`] = b; press("[data-unfold]", el({ dataset: { unfold: key } })); },
     answer: async (ok) => {
       const a = answers.shift();

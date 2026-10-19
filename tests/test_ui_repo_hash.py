@@ -57,6 +57,7 @@ def test_the_repo_page_unfolds_the_list_its_hash_names():
     # only a ledger row of this page (it carries its list), unfolded before it is scrolled to
     assert "box.contains(row)" in show and "row.dataset.list" in show
     assert show.index("unfold(row.dataset.list)") < show.index("row.scrollIntoView(")
+    assert show.index("fold.open = true") < show.index("row.scrollIntoView(")  # the board's no-lane fold (TD-903)
     # on the first draw, and when a link on the page itself changes the hash
     assert body.index("showHash();") < body.index("setInterval(reread")
     assert 'window.addEventListener("hashchange", showHash)' in body
@@ -66,26 +67,28 @@ def test_the_repo_page_unfolds_the_list_its_hash_names():
     assert show.index("sought.add(id); want = id; return reread();") < show.index("box.contains(row)")
     assert 'if (ask.length) q.set("open", ask.join(","));' in body
     assert 'if (asked && want === asked) { want = ""; showHash(); }' in body
-    # …and the template gives each row the id the link names and the list the fold is keyed on
+    # …and the board's row is the Queue card's row partial, which carries the id the link names (TD-903)
     part = (UI / "templates" / "repo_part.html").read_text()
-    assert 'id="{{ e.id }}" data-list="{{ l.key }}"' in part
+    assert '{% from "queue_row.html" import row as qrow %}' in part
+    assert '{% if r.anchor %} id="{{ r.anchor }}"{% endif %}' in (UI / "templates" / "queue_row.html").read_text()
     assert 'href="/repo/{{ e.repo }}#{{ i }}"' in (UI / "templates" / "inbox_row.html").read_text()
 
 
 def test_an_anchor_to_a_row_past_the_fold_fetches_its_list(tmp_path, monkeypatch):
-    """TD-882, §4.5 *Page loads*: `/repo/<name>#TD-n` for a row past the fourth of its list — not sent at
-    load — is read by the lists' `open=TD-n`, which sends that list whole, and the row is there to land on."""
+    """TD-882, §4.5 *Page loads*: `/repo/<name>#TD-n` for a row past the seventh queued of its column (TD-903) —
+    not sent at load — is read by the lists' `open=TD-n`, which sends that column whole, and the row is there."""
     from test_ui_repo_page import client, fake, reading
 
     root = str(tmp_path / "samscrape")
     r = reading(root)
     r["ledger"]["entries"] = [
         {"id": f"TD-{700 + i}", "title": f"open {i}", "for_page": "pickable", "priority": "medium", "owner": "grinder"}
-        for i in range(6)
+        for i in range(9)
     ]
     c = client(monkeypatch, tmp_path, fake({root: r}, []))
-    assert 'id="TD-705"' not in c.get("/repo/samscrape").text
-    part = c.get("/repo/samscrape?part=1&open=TD-705").text
-    assert 'id="TD-705" data-list="pickable"' in part and 'data-unfold="pickable">+2 more' in part
-    # an id in no list opens nothing
-    assert 'id="TD-705"' not in c.get("/repo/samscrape?part=1&open=TD-999").text
+    html = c.get("/repo/samscrape").text
+    assert 'id="TD-706"' in html and 'id="TD-707"' not in html and "+2 more up next" in html
+    part = c.get("/repo/samscrape?part=1&open=TD-708").text
+    assert 'id="TD-708"' in part and "more up next" not in part
+    # an id in no column opens nothing
+    assert 'id="TD-708"' not in c.get("/repo/samscrape?part=1&open=TD-999").text

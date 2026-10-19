@@ -131,7 +131,7 @@ def test_the_repo_pages_row_draws_the_waits_mark():
     assert rows["TD-001"]["wait"] == "" and rows["TD-002"]["wait"] == f"waits until {TOMORROW[5:]}"
     assert rows["TD-002"]["wait_line"] == f"Waits: until {TOMORROW} — CI runs on or after then"
     assert rows["TD-003"]["wait"].startswith("waits: the next") and rows["TD-003"]["wait"].endswith("…")
-    src = (pathlib.Path(repo_ui.__file__).parent / "templates" / "repo_part.html").read_text(encoding="utf-8")
+    src = (pathlib.Path(repo_ui.__file__).parent / "templates" / "queue_row.html").read_text(encoding="utf-8")
     assert '<span class="meta waits" title="{{ e.wait_line }}">· {{ e.wait }}</span>' in src
 
 

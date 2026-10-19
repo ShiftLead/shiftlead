@@ -153,14 +153,25 @@ def test_a_priority_segment_keeps_its_word_apart_so_a_narrow_one_drops_it():
     assert '.bar .bseg::before { content: ""; height: 100%; }' in css
 
 
-def test_the_repo_page_draws_a_list_per_kind_and_flags_the_other(tmp_path, monkeypatch):
+def test_the_repo_page_board_places_each_kind_and_flags_the_other(tmp_path, monkeypatch):
+    """§4.5 screen 11 *The columns* (TD-903): with no team, the fixed columns — design to Design, pickable and
+    live check to Build, for you to For you, blocked folded at Build's foot as a count, and what no lane takes
+    in For you's fold with its flag's words."""
     root = str(tmp_path / "samscrape")
     html = client(monkeypatch, tmp_path, fake({root: _reading(root)}, [])).get("/repo/samscrape").text
-    for key, label in ui.LEDGER_LISTS:
-        n = sum(1 for k in KIND_OF.values() if k == key)
-        assert f'id="debt-{key}">{label} · {n}</div>' in html, key
-    for tid, key in KIND_OF.items():
-        assert f'id="{tid}" data-list="{key}"' in html, tid
+
+    def col(key: str) -> str:
+        at = html.index(f'id="col-{key}"')
+        return html[at : html.index('class="bcol"', at + 1)]
+
+    assert 'id="TD-012"' in col("foryou") and 'id="TD-011"' in col("design")
+    build = col("build")
+    assert all(f'id="{t}"' in build for t in ("TD-010", "TD-013", "TD-014", "TD-015"))
+    assert 'id="TD-016"' not in html and 'data-unfold="build:blocked" data-unsent>1 blocked' in build
+    fold = col("foryou")[col("foryou").index('class="bfold"') :]
+    assert "no lane takes these (2)" in fold and 'id="TD-017"' in fold and 'id="TD-018"' in fold
+    opened = client(monkeypatch, tmp_path, fake({root: _reading(root)}, [])).get("/repo/samscrape?open=TD-016").text
+    assert 'id="TD-016"' in opened  # an anchor's id sends its blocked fold
     row = html[html.index('id="TD-018"') :]
     assert (
         '<span class="meta flag">· fits no page kind — check its Owner, Kind and Blocked by</span>'

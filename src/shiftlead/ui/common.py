@@ -147,6 +147,7 @@ templates.env.globals["md"] = md
 # design §4.5a *The help text* (TD-167): a control's `title` is its paragraph's first sentence, and a
 # mark's panel the group's paragraphs — every one of them from `help.py`, the one table
 templates.env.globals["help_title"] = helpmod.first_sentence
+templates.env.globals["help_text"] = lambda k: helpmod.BY_KEY[k].text  # a panel's whole paragraph
 templates.env.globals["help_group"] = lambda g: [helpmod.BY_KEY[k] for k in helpmod.GROUPS[g]]
 templates.env.globals["help_names"] = lambda g: ", ".join(helpmod.BY_KEY[k].name for k in helpmod.GROUPS[g])
 templates.env.globals["help_screen"] = lambda g: helpmod.GROUP_SCREEN[g]

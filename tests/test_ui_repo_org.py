@@ -237,14 +237,14 @@ def test_the_debt_heading_says_what_needs_a_team_and_what_is_stale_and_the_row_i
     )
     html = client(monkeypatch, tmp_path, fake({root: r}, [seat])).get("/repo/samscrape?open=pickable").text
     debt = html[html.index('<section class="rsec" id="debt">') : html.index('id="completed"')]
-    head = debt[: debt.index('class="rlist"')]
+    head = debt[: debt.index('id="board"')]
     assert 'needs a team: <a href="#TD-320">TD-320</a>, <a href="#TD-321">TD-321</a> — handed to techlead-sam' in head
     assert 'the ledger declares db-old, which no definition holds: <a href="#TD-321">TD-321</a>' in head
     assert "the ledger leaves out sam-db, which this repo defines" in head
     assert "the ledger leaves out sam-grind" not in head
 
     def row(tid: str) -> str:
-        return re.search(rf'id="{tid}".*?(?=class="rrow|</section>)', debt, re.S).group(0)
+        return re.search(rf'id="{tid}".*?(?=class="qrow|$)', debt, re.S).group(0)
 
     assert row("TD-320").index("· grinder</span>") < row("TD-320").index("· needs a team</span>")
     assert "needs a team</span>" not in row("TD-301")
