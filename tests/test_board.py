@@ -1191,6 +1191,7 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         {"id": "TD-22", "title": "mine", "for_page": "for-you", "owner": "paul"},
         {"id": "TD-23", "title": "after a sibling", "for_page": "blocked", "blocked_by": ["TD-20"]},
         {"id": "TD-24", "title": "held build", "for_page": "pickable"},
+        {"id": "TD-25", "title": "after an archived one", "for_page": "blocked", "blocked_by": ["TD-9"]},
     ]
     settle.observe(entries, "o/r", {}, datetime.now(UTC))  # the repo's first reading: every id settled
     agent._repos = {
@@ -1204,6 +1205,7 @@ async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write
         for kw, why in (
             ({"id": "TD-22", "road": "done"}, "TD-22 is yours to do"),
             ({"id": "TD-21", "road": "design"}, "TD-21 is design: Back to design is on a pickable"),
+            ({"id": "TD-25", "road": "design"}, "TD-25 is blocked: Back to design is on a pickable"),
             ({"id": "TD-99", "road": "done"}, "TD-99 is not an open entry"),
             ({"id": "TD-20", "road": "close"}, "a ledger row's road is done or design, not 'close'"),
         ):
