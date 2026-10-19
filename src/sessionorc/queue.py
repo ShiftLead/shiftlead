@@ -388,6 +388,7 @@ def reading(
                 "needs": needs,
                 "pr": (prs.get(q) or {}).get("number"),
                 "holder": _holder(claim[0][0]) if claim else None,
+                "held": dict(e["held"]) if isinstance(e.get("held"), dict) else None,  # {at, why?} (TD-905)
                 "key": e.get("key") or "",
                 "lined": bool(e.get("lined")),
                 "archived": False,
@@ -404,6 +405,7 @@ def reading(
             "needs": None,
             "pr": pr,
             "holder": None,
+            "held": None,
             "key": "",
             "lined": False,
             "archived": True,

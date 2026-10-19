@@ -291,12 +291,14 @@ def test_review_findings_designer_wait_archived_claim_person_hold_one_flag(tmp_p
     ], archive=[_entry(9, "archived", Resolved=f"{TODAY} — (PR #9).")])  # fmt: skip
     ents = {e["id"]: e for e in r["ledger"]["entries"]}
     ents["TD-001"]["waiting"] = {"on": "event", "until": ""}
-    ents["TD-003"]["held"] = {"at": NOW.isoformat()}
+    ents["TD-003"]["held"] = {"at": NOW.isoformat(), "why": "after Friday"}
     w = _rec("w", root, "TD-005", "TD-006", "TD-009", lane=["free-pick"])
     q = _cards({root: r}, [w])
     cards = _by_id(q)
     assert cards["r#TD-001"]["status"] == "waiting"
-    assert cards["r#TD-003"]["top"]["state"] == "held (person)"
+    assert cards["r#TD-003"]["top"]["state"] == "held (person)", "the state word unchanged (TD-905)"
+    assert cards["r#TD-003"]["top"]["held"] == {"at": NOW.isoformat(), "why": "after Friday"}, "the hold's words"
+    assert cards["r#TD-004"]["top"]["held"] is None
     assert [f["by"] for f in cards["r#TD-004"]["passed_over"]] == ["w"]
     assert [o["ref"] for o in q["other_work"]] == ["TD-009"]
 

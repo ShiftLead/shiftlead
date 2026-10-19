@@ -1595,7 +1595,7 @@ Also for the design, once hooks run: the conformance walk's permission step allo
 **Added:** 2026-10-18 (TD-900's design, Paul with the anchor)
 **Owner:** grinder
 **Kind:** build
-**Status:** Open
+**Status:** Open — slice 1 (2026-10-18, grinder-ao-1): the hold's words — `settle.hold(why)`, `held: {at, by, why}` on the record and `held.why` on the `repos` and `queue` readings, new words replacing old and telling nobody again, quoted in the holder's note — `ao td hold --why`, and the drop notice `td_hold {tell}` (no hold written; the holders and the PR's reader told). Left: the Done… / Back to design… road at the home (tell, clear a hold, write the line, the refusals), the one macro and its presses, the help paragraphs.
 **Blocked by:** TD-902
 **Location:** `src/shiftlead/ui/templates/queue_row.html` (the one macro) and the Inbox's ledger-row renderer that imports it (`ledger_for_you.html`), `src/shiftlead/ui/static/app.js` (the words box; the Reply road's fixed words beside *done* and *go ahead*; the press's order: tell, clear the hold, write the line), `src/sessionorc/agent_inbox.py` (`rpc_board_reply`), `src/sessionorc/agent_ids.py` (`rpc_td_hold`: `why`, and `tell` — the drop notice of §4.4 *Hold*, no CLI form), the `queue` and `repos` readings (`held.why`), `src/shiftlead/cli.py` (`cmd_td_hold`, `--why`), `src/shiftlead/ui/help.py` (the paragraphs for *Queue card: what needs the person* and *Repo page: Hold / Release on an entry*); `tests/test_ui_queue.py`, `tests/test_ui_board.py`, `tests/test_settle.py`, `tests/test_cli.py`, `tests/test_help.py`
 

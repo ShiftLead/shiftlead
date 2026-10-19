@@ -3207,18 +3207,24 @@ def _td_next_send(args: argparse.Namespace, name: str) -> int:
 
 
 def cmd_td_hold(args: argparse.Namespace) -> int:
-    """`ao td hold <id> [--repo <name>] [--release]` (design §4.7 *Entries*, §4.4 *Hold*; TD-710 slice 2,
-    TD-731): the home's `td_hold` on the repo's main checkout, by path as `ao td add`'s — hold any open
-    entry, settling or settled, or release a held one. On a claimed entry, a line per holder and reader
+    """`ao td hold <id> [--repo <name>] [--release] [--why "…"]` (design §4.7 *Entries*, §4.4 *Hold*; TD-710
+    slice 2, TD-731): the home's `td_hold` on the repo's main checkout, by path as `ao td add`'s — hold any
+    open entry, settling or settled, or release a held one; `--why` is the hold's words (TD-905), on the
+    record and the row, new words replacing old on a held entry. On a claimed entry, a line per holder and reader
     the hold told (the reply's `told`) and per note it could not send (`untold`). A person's own: the host
     agent refuses every session but the person's own shell."""
     _, root = _td_repo(args.repo)
     tid = str(args.entry).strip().upper()
-    got = call_sync("td_hold", repo=root, id=tid, release=bool(args.release))
+    why = " ".join(str(args.why or "").split())
+    if why and args.release:
+        print("ao td hold: --why is a hold's words; a release takes none", file=sys.stderr)
+        return 2
+    got = call_sync("td_hold", repo=root, id=tid, release=bool(args.release), **({"why": why} if why else {}))
     if args.release:
         lines = [f"{tid} released: pickable now"]
     else:
-        lines = [f"{tid} held: no lane takes it until you release it"]
+        said = str((got.get("held") or {}).get("why") or "") if isinstance(got.get("held"), dict) else why
+        lines = [f"{tid} held" + (f" ({said})" if said else "") + ": no lane takes it until you release it"]
         readers = set(got.get("readers") or ())
         for name in got.get("told") or ():
             if name in readers:
@@ -4698,6 +4704,7 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("entry", metavar="id", help="the entry's id, TD-NNN")  # `id` is resolved as a session's
     q.add_argument("--repo", help="a registered repo's name (default: the one this directory is in)")
     q.add_argument("--release", action="store_true", help="release a held entry: pickable at once")
+    q.add_argument("--why", help="the hold's words, on the record and the row; on a held entry they replace the old")
     q.set_defaults(fn=cmd_td_hold)
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")

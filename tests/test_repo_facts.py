@@ -695,6 +695,23 @@ def test_ao_td_hold_sends_the_main_checkout_and_says_what_it_did(repo, monkeypat
     assert helps["hold"].startswith("hold any open entry, settling or settled, or release a held one (§4.4)")
 
 
+def test_ao_td_hold_why_sends_the_holds_words_and_a_release_takes_none(repo, monkeypatch, capsys):
+    """TD-905 (design §4.7 `ao td hold --why`): the words, one line, on the call and the printed line."""
+    from shiftlead import cli
+
+    sent = []
+    monkeypatch.setattr(cli, "_td_repo", lambda r: ("r", str(repo)))
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: sent.append((rpc, kw)) or {"id": kw["id"]})
+    assert cli.main(["td", "hold", "TD-707", "--why", " after  Friday "]) == 0
+    assert sent == [("td_hold", {"repo": str(repo), "id": "TD-707", "release": False, "why": "after Friday"})]
+    assert capsys.readouterr().out.splitlines() == ["TD-707 held (after Friday): no lane takes it until you release it"]
+    monkeypatch.setattr(cli, "call_sync", lambda rpc, **kw: {"id": kw["id"], "held": {"at": "t", "why": "cut"}})
+    assert cli.main(["td", "hold", "TD-707", "--why", "cut and more"]) == 0
+    assert capsys.readouterr().out.splitlines() == ["TD-707 held (cut): no lane takes it until you release it"]
+    assert cli.main(["td", "hold", "TD-707", "--release", "--why", "x"]) == 2
+    assert len(sent) == 1 and "a release takes none" in capsys.readouterr().err
+
+
 async def test_one_checkouts_failure_keeps_its_reading_and_costs_the_others_nothing(agent, tmp_path, monkeypatch):
     """Review of PR #595: a read that raises (not a `gh` outage — a surprise) is that checkout's
     error, its last reading kept; the other checkouts are read; and the clock does not advance past
