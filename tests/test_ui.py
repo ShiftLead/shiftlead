@@ -59,7 +59,7 @@ def pane_bytes(ws, words=None):
 
 def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/")
-    assert r.status_code == 200 and "Org" in r.text and "No sessions" in r.text
+    assert r.status_code == 200 and "Sessions" in r.text and "No sessions" in r.text
     assert 'id="usagechip"' in r.text  # the per-profile usage figure (TD-001), empty until a poll lands
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text

@@ -13,7 +13,7 @@ entries read (§4.10).
   absent or names no port.
 - A page fails on a status other than 200, a body that does not end its `</html>`, a load past
   `PAGE_BOUND`, and in the browser half an uncaught script error or a `load` that never fires.
-- Where `settings.yml` has `reach:`, the Org and the Queue load once more through `reach.url`: told in the
+- Where `settings.yml` has `reach:`, the Sessions page and the Queue load once more through `reach.url`: told in the
   log, failing nothing.
 - `ao status --json`, `ao repo --json` and `ao promote status --json` must each exit 0 with JSON.
 - Each page is loaded twice, the first printed *cold* and the second judged against §4.5 *Page loads*'
@@ -52,8 +52,8 @@ import zlib
 from pathlib import Path
 from typing import Any
 
-PAGES = (("Org", "/"), ("Inbox", "/inbox"), ("Queue", "/queue"), ("Repo", "/repo/shiftlead"), ("Settings", "/settings"))
-REACH_PAGES = (("Org", "/"), ("Queue", "/queue"))  # the route the person uses: told, failing nothing
+PAGES = (("Sessions", "/"), ("Inbox", "/inbox"), ("Queue", "/queue"), ("Repo", "/repo/shiftlead"), ("Settings", "/settings"))
+REACH_PAGES = (("Sessions", "/"), ("Queue", "/queue"))  # the route the person uses: told, failing nothing
 AO_READS = (("status", "--json"), ("repo", "--json"), ("promote", "status", "--json"))  # never `ao inbox`
 PAGE_BOUND = 20.0  # seconds a load may take: the smoke's own, not a page budget (those are TD-805's)
 WAIT_BOUND = 90.0  # seconds for the UI's port to answer: the run restarts the UI after the agent
