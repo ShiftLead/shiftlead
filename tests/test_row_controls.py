@@ -53,3 +53,22 @@ def test_a_cards_top_entry_draws_the_controls_in_its_head():
     assert got.count('data-road="done"') == 1 and 'data-road="design"' in got and "Hold…" in got
     held = tpl.render(card={"id": "r#TD-7", "top": top | {"page": "pickable", "state": "held (person)"}, "ids": []})
     assert "Hold…" not in held and 'data-road="done"' in held
+
+
+def test_back_to_design_is_refused_where_no_lane_takes_design_first(tmp_path):
+    from shiftlead import org as orgmod
+
+    def org(members: str):
+        f = tmp_path / "org.yml"
+        f.write_text(
+            f"projects:\n  p:\n    repos: {{r: {{h: {tmp_path}}}}}\n"
+            f"teams:\n  t:\n    repo: r\n    manager: {{role: person}}\n    members:\n{members}",
+            encoding="utf-8",
+        )
+        return orgmod.load(f)
+
+    grind = org("      - {role: grinder, lane: free-pick}\n")
+    assert ui.road_refusal(grind, str(tmp_path), "done", "h") == ""
+    assert "no lane of t takes design-first" in ui.road_refusal(grind, str(tmp_path), "design", "h")
+    both = org("      - {role: grinder, lane: free-pick}\n      - {role: designer, lane: design-first}\n")
+    assert ui.road_refusal(both, str(tmp_path), "design", "h") == ""

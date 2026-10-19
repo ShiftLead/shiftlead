@@ -908,6 +908,11 @@ class InboxMixin:
         key = f"ledger:{root}:{id}"
         if key in self._board_adding:
             raise RpcError(f"{id} is already being decided")
+        today = datetime.now().date().isoformat()
+        try:  # the line is made before anyone is told, so words the board refuses refuse the press whole
+            line = board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
+        except board_mod.Refused as err:
+            raise RpcError(str(err)) from None
         self._board_adding.add(key)
         try:
             tell = ("is closed by the person" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
@@ -919,9 +924,7 @@ class InboxMixin:
                 )
             if isinstance(e.get("held"), dict):
                 await self.rpc_td_hold(repo=root, id=id, release=True, caller=caller)
-            today = datetime.now().date().isoformat()
             try:
-                line = board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
                 done = await asyncio.to_thread(board_mod.add_decided, root, line)
             except board_mod.Refused as err:
                 raise RpcError(str(err)) from None

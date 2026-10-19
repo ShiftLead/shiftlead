@@ -1157,7 +1157,7 @@
         // one line of words, then the road — the home tells the entry's holders and its PR's reader, clears
         // a person's hold, and writes *done — <words>* or *back to design — <words>* as one decided line
         if (b.dataset.road) {
-          const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote });
+          const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote, empty: true });
           if (!m) return;
           want.road = b.dataset.road; want.words = m.text;
           pressed();
