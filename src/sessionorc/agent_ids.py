@@ -32,6 +32,7 @@ FILES_CAP = 3000  # GitHub lists at most this many files of a PR: a listing that
 PR_READERS = 4  # PRs read at once
 GIVEN_KEEP = 200
 COUNT_MAX = 10
+WHY_CHARS = 200  # a hold's words and a drop notice's, one line (TD-905)
 ADDED = re.compile(r"^\+## TD-(\d+):", re.M)
 GITHUB = re.compile(
     r"^(?:https?://(?:[^@/]+@)?|ssh://(?:[^@/]+@)?|[^@/]+@)github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?/?$"
@@ -98,16 +99,30 @@ def settle_key(root: str, remote: str) -> str:
 
 class IdsMixin:
     async def rpc_td_hold(
-        self, repo: str = "", id: str = "", release: bool = False, caller: Any = None
+        self,
+        repo: str = "",
+        id: str = "",
+        release: bool = False,
+        why: str = "",
+        tell: str = "",
+        caller: Any = None,
     ) -> dict[str, Any]:
         """`ao td hold` and the Repo page's **Hold** / **Release** (design §4.4 *Hold*, §4.7 *Entries*,
         TD-707, built by TD-710 slice 2, TD-731): the person holds any open entry, settling or settled, or
         releases a held one, on the home's settle clock — no ledger edit. `repo` is a checkout the home
         reads, by its path or its registered name. A person's own act (`mail.PERSON_ONLY`). The reading is
         marked again at once, so a lane and the page read the hold now. A hold on a claimed entry tells
-        its unattended holders, and the readers of their PRs (`_hold_tell`). Returns `{repo, id, held,
-        settling, told, readers, untold}`."""
+        its unattended holders, and the readers of their PRs (`_hold_tell`). `why` is the hold's optional
+        words (TD-905), quoted in those notes; on a held entry new words replace them and nobody is told
+        again. **A drop notice** is `tell` (§4.4 *Hold*, TD-905): no hold is written, and the same
+        holders and readers are told the entry `<tell>` — **Done…** and **Back to design…** send it
+        before their line. Returns `{repo, id, held, settling, told, readers, untold}`."""
         agent_common.person_only(caller, "hold a ledger entry", "§4.4 *Hold*", self._graph())
+        why, tell = " ".join(str(why or "").split())[:WHY_CHARS], " ".join(str(tell or "").split())[:WHY_CHARS]
+        if tell and (release or why):
+            raise RpcError("a drop notice (tell) writes no hold: it takes neither release nor why (design §4.4 *Hold*)")
+        if release and why:
+            raise RpcError("a release takes no words: why is a hold's (design §4.4 *Hold*)")
         want = str(repo or "").strip()
         roots = [
             r
@@ -128,12 +143,23 @@ class IdsMixin:
         remote = str(view.get("remote") or "")
         if not remote:
             raise RpcError(f"{name}'s origin is not read yet: its clock is keyed by it, so ask again in a minute")
+        if tell:
+            told, readers, untold = await self._hold_tell(tid, tell=tell)
+            return {
+                "repo": name,
+                "id": tid,
+                "held": entry.get("held"),
+                "settling": entry.get("settling"),
+                "told": told,
+                "readers": readers,
+                "untold": untold,
+            }
         key, spans = settle_key(root, remote), settle_mod.spans(root)
         now = datetime.now(UTC)
         by = PERSON if caller is None or mail.is_person(caller) else str(caller)
         was_held = isinstance(entry.get("held"), dict)
         try:
-            await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, release=bool(release))
+            await asyncio.to_thread(settle_mod.hold, key, entry, spans, now, by=by, release=bool(release), why=why)
         except settle_mod.Refused as e:
             raise RpcError(str(e)) from None
         settle_mod.mark(entries, key, spans, now)  # on the loop: the lanes and a claim read these dicts there
@@ -141,7 +167,7 @@ class IdsMixin:
         readers: list[str] = []
         untold: list[str] = []
         if not release and not was_held:  # a hold on a held entry tells nobody again
-            told, readers, untold = await self._hold_tell(tid)
+            told, readers, untold = await self._hold_tell(tid, why=why)
         return {
             "repo": name,
             "id": tid,
@@ -152,13 +178,15 @@ class IdsMixin:
             "untold": untold,
         }
 
-    async def _hold_tell(self, tid: str) -> tuple[list[str], list[str], list[str]]:
+    async def _hold_tell(self, tid: str, why: str = "", tell: str = "") -> tuple[list[str], list[str], list[str]]:
         """Tell a held entry's claimers (design §4.4 *A claimed entry is held all the same*, TD-731), the hold
         already written: a `note` from the person, `about` the id, to each **unattended** live holder of a
         declared lease (`_lease_holders`), and a second to each seat whose inbox holds an open `ask` carrying
         a PR one of those holders' claims names (`pr` or `review_pr`) — once a seat, the person never, being
-        no record. A note that cannot be sent is a line of `untold` and never refuses the hold. Returns
-        `(told, readers, untold)`: every name mailed, the readers among them, and the lines not sent."""
+        no record. A note that cannot be sent is a line of `untold` and never refuses the hold. `why` is the
+        hold's words, quoted; `tell` a drop notice's (TD-905), which says the entry `<tell>` in place of
+        *is held by the person*, with no Release to wait for. Returns `(told, readers, untold)`: every name
+        mailed, the readers among them, and the lines not sent."""
         graph = self._graph()
         holders: list[str] = []
         prs: set[int] = set()
@@ -182,7 +210,7 @@ class IdsMixin:
         readers: list[str] = []
         untold: list[str] = []
 
-        async def tell(to: str, text: str) -> bool:
+        async def tell_(to: str, text: str) -> bool:
             try:
                 await self._msg(PERSON, text, [to], "note", tid, None, None, None)
             except RpcError as e:
@@ -191,15 +219,17 @@ class IdsMixin:
             told.append(to)
             return True
 
+        said = f"{tid} {tell}" if tell else f"{tid} is held by the person" + (f" (“{why}”)" if why else "")
+        drop = "told by the person" if tell else "held by the person"
         for addr in holders:
-            await tell(
+            await tell_(
                 addr,
-                f"{tid} is held by the person: stop at the step in hand, push, leave its PR open and unmerged, "
-                f'and drop the entry: `ao progress drop {tid} --why "held by the person"`. A Release makes it '
-                "pickable again.",
+                f"{said}: stop at the step in hand, push, leave its PR open and unmerged, and drop the entry: "
+                f'`ao progress drop {tid} --why "{drop}"`.' + ("" if tell else " A Release makes it pickable again."),
             )
         for addr, pr in seats.items():
-            if await tell(addr, f"{tid} is held by the person: leave PR #{pr} unmerged until they release it."):
+            until = "" if tell else " until they release it"
+            if await tell_(addr, f"{said}: leave PR #{pr} unmerged{until}."):
                 readers.append(addr)
         return told, readers, untold
 

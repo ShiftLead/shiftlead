@@ -444,3 +444,52 @@ async def test_a_reviewers_pr_and_a_live_seat_are_read_once_and_a_holder_is_not_
     assert len(_notes(worker, "TD-003")) == 1 and "drop the entry" in _notes(worker, "TD-003")[0]
     assert _notes(reader, "TD-003") == ["TD-003 is held by the person: leave PR #1841 unmerged until they release it."]
     assert _notes(gone, "TD-003") == []
+
+
+# -- TD-905: a hold's words, and the drop notice (§4.4 *Hold*) ---------------------------------------------
+
+
+async def test_a_holds_words_are_on_the_record_the_reading_and_the_note_and_new_words_replace_them(agent, tmp_path):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", why="  wait for   the  vendor ")
+    assert got["held"] == {"at": got["held"]["at"], "why": "wait for the vendor"}, "one line, on the reading"
+    assert json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]["held"]["why"] == "wait for the vendor"
+    assert _notes(worker, "TD-003")[0].startswith("TD-003 is held by the person (“wait for the vendor”): stop")
+    again = await agent.rpc_td_hold(repo=root, id="TD-003", why="after Friday")
+    assert again["told"] == [] and len(_notes(worker, "TD-003")) == 1, "new words tell nobody again"
+    assert _by_id(entries)["TD-003"]["held"]["why"] == "after Friday"
+    rec = json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]["held"]
+    assert rec["why"] == "after Friday" and rec["at"] == got["held"]["at"], "the hold's start stands"
+    same = await agent.rpc_td_hold(repo=root, id="TD-003")  # no words: the old ones stand
+    assert same["held"]["why"] == "after Friday"
+    with pytest.raises(RpcError, match="a release takes no words"):
+        await agent.rpc_td_hold(repo=root, id="TD-003", release=True, why="x")
+    released = await agent.rpc_td_hold(repo=root, id="TD-003", release=True)
+    assert released["held"] is None and "held" not in _by_id(entries)["TD-003"]
+
+
+async def test_a_drop_notice_tells_the_holder_and_the_reader_and_writes_no_hold(agent, tmp_path):
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003", pr=1840)
+    reader = _put(agent, "ao-tl", unattended=True)
+    reader.inbox.append(MailEntry(id="m-a1", from_="ao-gw", to=["ao-tl"], at="t", kind="ask", text="read", pr=1840))
+    with pytest.raises(RpcError, match="writes no hold"):
+        await agent.rpc_td_hold(repo=root, id="TD-003", tell="goes back to design", why="x")
+    with pytest.raises(RpcError, match="writes no hold"):
+        await agent.rpc_td_hold(repo=root, id="TD-003", tell="goes back to design", release=True)
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", tell="goes back to design — split it")
+    assert got["held"] is None and got["told"] == ["ao-gw", "ao-tl"] and got["readers"] == ["ao-tl"]
+    seen = json.loads(paths.ledger_seen_file().read_text()) if paths.ledger_seen_file().exists() else {}
+    assert "held" not in _by_id(entries)["TD-003"] and "held" not in (seen.get("o/r") or {}).get("TD-003", {})
+    assert _notes(worker, "TD-003") == [
+        "TD-003 goes back to design — split it: stop at the step in hand, push, leave its PR open and unmerged, and "
+        'drop the entry: `ao progress drop TD-003 --why "told by the person"`.'
+    ]
+    assert _notes(reader, "TD-003") == ["TD-003 goes back to design — split it: leave PR #1840 unmerged."]
+    again = await agent.rpc_td_hold(repo=root, id="TD-003", tell="is closed by the person — done")
+    assert again["told"] == ["ao-gw", "ao-tl"], "a notice is no hold: each press tells"
+    with pytest.raises(RpcError, match="ao-w cannot hold a ledger entry"):
+        await agent.rpc_td_hold(repo=root, id="TD-003", tell="x", caller="ao-w")

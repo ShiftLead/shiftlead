@@ -147,7 +147,8 @@ def _marks(entries: list[dict[str, Any]], seen: dict[str, Any], spans: dict[str,
         if not isinstance(rec, dict):
             continue
         if isinstance(rec.get("held"), dict):
-            e["held"] = {"at": str(rec["held"].get("at") or "")}
+            why = str(rec["held"].get("why") or "")
+            e["held"] = {"at": str(rec["held"].get("at") or ""), **({"why": why} if why else {})}
             continue
         at = _when(rec.get("at"))
         if at is None:
@@ -225,14 +226,22 @@ class Refused(ValueError):
 
 
 def hold(
-    key: str, entry: dict[str, Any], spans: dict[str, int], now: datetime, *, by: str, release: bool = False
+    key: str,
+    entry: dict[str, Any],
+    spans: dict[str, int],
+    now: datetime,
+    *,
+    by: str,
+    release: bool = False,
+    why: str = "",
 ) -> dict[str, Any]:
     """The person's **Hold** or **Release** of one entry of origin `key` (design §4.4 *Hold*, TD-707,
-    built by TD-710 slice 2, TD-731): a hold writes `held: {at, by}` on the id's record, the home's and
-    not a ledger edit, so it holds at once, on any entry the clock holds, settling or settled; holding a
-    held one changes nothing. A release ends the hold and makes the entry pickable at once (its record
-    settled, at the epoch), so a later edit changes nothing. Returns the record as written; raises
-    `Refused`."""
+    built by TD-710 slice 2, TD-731): a hold writes `held: {at, by, why}` on the id's record, the home's
+    and not a ledger edit, so it holds at once, on any entry the clock holds, settling or settled; `why`
+    is the person's optional words (TD-905). Holding a held one changes nothing but its words: new words
+    replace `why`. A release ends the hold and makes the entry pickable at once (its record settled, at
+    the epoch), so a later edit changes nothing. Returns the record as written; raises `Refused`."""
+    why = " ".join(str(why or "").split())
     i = str(entry.get("id") or "")
     with _STORE:
         store = _load()
@@ -246,9 +255,11 @@ def hold(
                 raise Refused(f"{i} is not held: there is nothing to release")
             rec = {"at": EPOCH, "sig": rec.get("sig") or ""}
         elif held:
-            return dict(rec)
+            if not why or why == rec["held"].get("why"):
+                return dict(rec)
+            rec = {**rec, "held": {**rec["held"], "why": why}}
         else:
-            rec = {**rec, "held": {"at": now.isoformat(), "by": by}}
+            rec = {**rec, "held": {"at": now.isoformat(), "by": by, **({"why": why} if why else {})}}
         seen[i] = rec
         _atomic_write(paths.ledger_seen_file(), json.dumps(store, indent=1, sort_keys=True))
     return dict(rec)
