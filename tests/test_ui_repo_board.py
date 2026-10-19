@@ -162,3 +162,9 @@ def test_the_boards_row_and_the_queue_cards_row_are_one_partial():
     assert '{% from "queue_row.html" import row,' in card
     assert 'class="qrow' not in part  # no row markup of its own
     assert "{{ qrow(r, name) }}" in part
+
+
+def test_a_decided_line_with_no_pick_stage_waits_in_for_yous_fold():
+    design_only = [Stage("design", "designer", ["design-first", "owner:designer"]), Stage("review", "techlead")]
+    b = rb.board(None, lists(), [("grind", design_only)], [], "r", orders=[{"id": "board:ab12", "work_order": True}])
+    assert [(r["id"], w) for r, w in b["fold"]] == [("board:ab12", "no lane takes it")]

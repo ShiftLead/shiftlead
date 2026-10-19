@@ -66,7 +66,7 @@
   {% endif %}
   <div class="board" id="board" data-scope="{{ name }}" style="--bcols: {{ bd.stages | length + 3 }}">
     {% if not (seams and seams.ledger) %}
-    {% call col(bd.foryou) %}{% if bd.fold %}<details class="bfold"><summary class="meta">no lane takes these ({{ bd.fold | length }})</summary>{% for r, words in bd.fold %}{{ qrow(r, name) }}{% if words and not r.ext.flag %}<div class="meta bflag">{{ words }}</div>{% endif %}{% endfor %}</details>{% endif %}{% endcall %}
+    {% call col(bd.foryou) %}{% if bd.fold %}<details class="bfold"><summary class="meta">no lane takes these ({{ bd.fold | length }})</summary>{% for r, words in bd.fold %}{% if r.work_order %}{{ order_row(dict(r, repo_name=name), 'fold', false) }}{% else %}{{ qrow(r, name) }}{% endif %}{% if words and not r.ext.flag %}<div class="meta bflag">{{ words }}</div>{% endif %}{% endfor %}</details>{% endif %}{% endcall %}
     {% for c in bd.stages %}{{ col(c) }}{% endfor %}
     {% endif %}
     {# Review: the open PRs, each the old list's row with its standing (§4.5 screen 11 *Review*) #}

@@ -224,6 +224,8 @@ def test_the_page_puts_a_refused_card_back_and_says_why():
     body = body[: body.index("\n    }\n")]
     # moved at once, then back to the order before, the reason under the heading
     assert body.index("placeCards(m.order)") < body.index('fetch("/api/rank/move"') < body.index("placeCards(before)")
+    # every column of the board takes the order, so a card drawn in two columns moves in both (TD-903)
+    assert '$$(".qcards", box).forEach((q) => {' in js
     assert "why.textContent" in body and "why.hidden = false" in body
     # a link to an entry opens the card that holds it before it scrolls there
     show = js[js.index("function reveal(") :]

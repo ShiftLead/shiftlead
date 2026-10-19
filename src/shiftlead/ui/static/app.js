@@ -3557,13 +3557,14 @@
     // the cards' box: the Queue's one `#qcards`, or on the Repo page's board the column the card is in (TD-903)
     const boxOf = (card) => (card && card.closest(".qcards")) || $("#qcards", box);
     function upnext(q) { try { return JSON.parse((q && q.dataset.upnext) || "[]"); } catch (e) { return []; } }
-    function placeCards(order, q) {  // the box's Up next cards in `order`, after its In progress ones
-      if (!q) return;
-      const ups = $$(".qcard[data-up]", q), at = (c) => order.indexOf(c.dataset.card);
-      const anchor = ups.length ? ups[0].previousElementSibling : null;
-      let after = anchor;
-      ups.sort((a, b) => at(a) - at(b)).forEach((c) => { if (after) after.after(c); else q.prepend(c); after = c; });
-      $$(".qcards", box).forEach((x) => (x.dataset.upnext = JSON.stringify(order)));  // every column's whole order
+    function placeCards(order) {  // each box's Up next cards in `order`, after its In progress ones: every
+      // column of the board, so a card drawn in two columns moves in both (TD-903)
+      $$(".qcards", box).forEach((q) => {
+        const ups = $$(".qcard[data-up]", q), at = (c) => order.indexOf(c.dataset.card);
+        let after = ups.length ? ups[0].previousElementSibling : null;
+        ups.sort((a, b) => at(a) - at(b)).forEach((c) => { if (after) after.after(c); else q.prepend(c); after = c; });
+        q.dataset.upnext = JSON.stringify(order);
+      });
     }
     async function moveCard(card, how) {
       // on a Repo page the neighbours are the repo's own (`data-scope`, TD-901) in the card's column (TD-903):
@@ -3574,7 +3575,7 @@
       const m = scope ? AO.rankMoveScoped(before, own, card.dataset.card, how) : AO.rankMove(before, card.dataset.card, how);
       if (!m) return;
       const why = $("#qwhy", box); if (why) why.hidden = true;
-      placeCards(m.order, q);
+      placeCards(m.order);
       try {
         const r = await fetch("/api/rank/move", {
           method: "POST", headers: { "content-type": "application/json" },
@@ -3582,7 +3583,7 @@
         });
         if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (err) {} throw new Error(t); }
       } catch (err) {
-        placeCards(before, q);
+        placeCards(before);
         if (why) { why.textContent = `${card.dataset.card.replace(/^.*#/, "")} stays where it was: ${err.message}`; why.hidden = false; }
       }
     }

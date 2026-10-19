@@ -202,6 +202,8 @@ def board(
     pick = next((c["key"] for c in cols if PICK in c["kinds"]), "")
     if pick:
         by_key[pick]["orders"] = list(orders)
+    else:  # no stage takes free-pick: a decided line is in no lane, so it waits in For you's fold
+        fold.extend(({**o, "anchor": "", "ext": {}, "work_order": True}, "no lane takes it") for o in orders)
 
     if cards is not None:
         seq = []
