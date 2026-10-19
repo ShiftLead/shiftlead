@@ -855,7 +855,7 @@
   // row's by `board_<its action>`), the wire name itself the fallback; and what a refused press was not
   const PRESS_VERBS = {
     board_done: "checking off…", board_snooze: "snoozing…", board_decide: "deciding…", board_reply: "sending…",
-    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", ledger_release: "releasing…", snooze: "snoozing…", attention_snooze: "snoozing…",
+    board_notright: "deciding…", board_add: "writing…", ledger: "deciding…", ledger_reply: "deciding…", ledger_start: "starting…", ledger_release: "releasing…", ledger_hold: "holding…", snooze: "snoozing…", attention_snooze: "snoozing…",
     dismiss: "dismissing…", identity_ack: "dismissing…", clear_work: "dismissing…",
     clear_mark: "dismissing…", clear_promote: "dismissing…", unmail: "deleting…", allow: "sending…", deny: "sending…",
     reply: "sending…", answer: "sending…", gowithit: "sending…", hand_look: "sending…", identity_log: "logging…",
@@ -1152,6 +1152,20 @@
       // repo's board. The row stays, pending, until the reading lists that line and the refresh drops it.
       if (action === "ledger" || action === "ledger_reply") {
         const want = { repo: b.dataset.repo, id: b.dataset.ref };
+        // **Done…** / **Back to design…** on any open row (§4.5 screen 12 *any open row*, TD-905): a box for
+        // one line of words, then the road — the home tells the entry's holders and its PR's reader, clears
+        // a person's hold, and writes *done — <words>* or *back to design — <words>* as one decided line
+        if (b.dataset.road) {
+          const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote });
+          if (!m) return;
+          want.road = b.dataset.road; want.words = m.text;
+          pressed();
+          const res = await act("person", "ledger", want);
+          const told = (res.told || []).length ? ` · told ${res.told.join(", ")}` : "";
+          say(`decided: ${res.decided || b.dataset.road} — written on the board on origin, ${b.dataset.ref}'s work order${told}`, true);
+          if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+          return;
+        }
         if (action === "ledger_reply") {
           const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.quote });
           if (!m) return;
@@ -1167,6 +1181,21 @@
       }
       // design §4.5a *Inbox row: held entry* → **Release** (TD-736): the Repo page's `td_hold` with
       // `release`, the person's own act on the home's record; the row leaves on the refresh
+      // **Hold…** (§4.4 *Hold*, §4.5 screen 12, TD-905): an optional line of words, the record's `why`,
+      // drawn *held (person) — <why>*; the person's own act on the home's record, no ledger edit
+      if (action === "ledger_hold") {
+        const m = await AO.compose({ to: `the hold on ${b.dataset.ref}`, reply: true, quote: b.dataset.quote });
+        if (!m) return;
+        pressed();
+        const got = await fetch("/api/ledger/hold", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo: b.dataset.repo, id: b.dataset.ref, why: m.text || "" }),
+        });
+        if (!got.ok) { let t = got.statusText; try { t = (await got.json()).detail || t; } catch (e) {} throw new Error(t); }
+        say(AO.heldWords(b.dataset.ref, await got.json().catch(() => ({}))), true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       if (action === "ledger_release") {
         pressed();
         const got = await fetch("/api/ledger/hold", {
@@ -1285,7 +1314,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", ledger_release: "Release", "shell-here": "Open shell here" };
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board", board_notright: "Not right…", ledger: "Decide", ledger_reply: "Reply", ledger_start: "Start session", ledger_release: "Release", ledger_hold: "Hold", "shell-here": "Open shell here" };
       say(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       // §4.5a *Inbox row: orphaned question* (TD-216): a refused write is drawn on the row, which stays.
       // Only the presses that write the board line are writes (TD-234): a failed Snooze or Delete

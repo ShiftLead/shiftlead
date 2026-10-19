@@ -1164,6 +1164,77 @@ async def test_a_ledger_answer_is_the_persons_and_written_from_the_homes_reading
         await me.call("kill", id=w)
 
 
+async def test_done_and_back_to_design_tell_the_holder_clear_the_hold_then_write_the_line(
+    agent, repo, tmp_path, monkeypatch
+):
+    """TD-905 (§4.5 screen 12 *any open row*, §4.4 *Hold*): `ledger_decide` with `road` — Done… on a row
+    that is not *yours to do*, Back to design… on a pickable, live check or id-blocked one — tells the
+    entry's unattended holder first, clears a person's hold, then writes *done — <words>* or *back to design
+    — <words>* as one decided line; refused, writing nothing, where a holder could not be told."""
+    import shutil
+    from datetime import UTC, datetime
+
+    from sessionorc import settle
+    from sessionorc.agent_common import RpcError
+    from sessionorc.models import PERSON, ProgressEntry, Session
+
+    shutil.copytree(Path(__file__).resolve().parent.parent / "scripts", repo / "scripts", dirs_exist_ok=True)
+    root = str(repo)
+
+    async def held() -> None:
+        return None
+
+    monkeypatch.setattr(agent, "_refresh_repos", held)
+    entries = [
+        {"id": "TD-20", "title": "a build", "for_page": "pickable"},
+        {"id": "TD-21", "title": "a design", "for_page": "design"},
+        {"id": "TD-22", "title": "mine", "for_page": "for-you", "owner": "paul"},
+        {"id": "TD-23", "title": "after a sibling", "for_page": "blocked", "blocked_by": ["TD-20"]},
+        {"id": "TD-24", "title": "held build", "for_page": "pickable"},
+    ]
+    settle.observe(entries, "o/r", {}, datetime.now(UTC))  # the repo's first reading: every id settled
+    agent._repos = {
+        root: {"name": "repo", "root": root, "remote": "https://github.com/o/r.git",
+               "ledger": {"entries": entries}, "work_orders": {"orders": []}}
+    }  # fmt: skip
+    w = Session(id="ao-gw", name="gw", kind="agent", adapter="claude-code", dir="", unattended=True)
+    w.progress.append(ProgressEntry(ref="TD-20"))
+    agent.sessions["ao-gw"] = w
+    async with LocalClient() as me:
+        for kw, why in (
+            ({"id": "TD-22", "road": "done"}, "TD-22 is yours to do"),
+            ({"id": "TD-21", "road": "design"}, "TD-21 is design: Back to design is on a pickable"),
+            ({"id": "TD-99", "road": "done"}, "TD-99 is not an open entry"),
+            ({"id": "TD-20", "road": "close"}, "a ledger row's road is done or design, not 'close'"),
+        ):
+            with pytest.raises(AgentError, match=why):
+                await me.call("ledger_decide", repo=root, words="x", **kw)
+
+        async def refuse(*a, **k):
+            raise RpcError("gw's inbox is full")
+
+        real = agent._msg
+        monkeypatch.setattr(agent, "_msg", refuse)
+        with pytest.raises(AgentError, match="nothing was written: could not tell ao-gw: gw's inbox is full"):
+            await me.call("ledger_decide", repo=root, id="TD-20", road="design", words="split it")
+        assert "TD-20" not in origin_board(repo)
+        monkeypatch.setattr(agent, "_msg", real)
+        got = await me.call("ledger_decide", repo=root, id="TD-20", road="design", words=" split  it ")
+        assert got["decided"] == "back to design — split it" and got["told"] == ["ao-gw"]
+        assert "Context: TD-20. Due:" in origin_board(repo) and "Decided: back to design — split it (" in origin_board(
+            repo
+        )
+        notes = [e.text for e in w.inbox if e.from_ == PERSON and e.about == "TD-20"]
+        assert notes and notes[0].startswith("TD-20 goes back to design — split it: stop at the step in hand")
+        await me.call("td_hold", repo=root, id="TD-24", why="later")
+        got = await me.call("ledger_decide", repo=root, id="TD-24", road="done")
+        assert got["decided"] == "done" and got["told"] == [] and "held" not in entries[4], "the hold is cleared"
+        got = await me.call("ledger_decide", repo=root, id="TD-23", road="design", words="w")
+        assert got["decided"] == "back to design — w"
+        with pytest.raises(AgentError, match="already decided"):
+            await me.call("ledger_decide", repo=root, id="TD-23", road="done")
+
+
 async def test_a_ledger_answer_finds_its_repo_by_path_and_the_reading_after_it_lands(
     agent, repo, tmp_path, monkeypatch
 ):

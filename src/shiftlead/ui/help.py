@@ -585,6 +585,41 @@ HELP: tuple[Help, ...] = (
             " nothing in a repo that does not promote or while live cannot be read."
         ),
     ),
+    Help(
+        "row-done",
+        "Done…",
+        "Queue card and Inbox: any open row",
+        (
+            "Closes the entry: your one line is written on the repo's board as done followed by your words, the "
+            "sessions holding it and its PR's reader are told first, and its session archives it with your words."
+            " Press it when the work is finished or no longer wanted and you want the ledger to say so. It merges"
+            " no PR and edits no ledger by itself, and a design with open builds has none: it closes with its "
+            "last build."
+        ),
+    ),
+    Help(
+        "row-back-to-design",
+        "Back to design…",
+        "Queue card and Inbox: any open row",
+        (
+            "Sends the entry back to design: your one line is written on the repo's board as back to design "
+            "followed by your words, the sessions holding it and its PR's reader are told to stop first, and its "
+            "session makes it a design-first entry for the designer. Press it when a build, a live check or an "
+            "entry waiting on a sibling turns out to need its design settled again. It closes no PR — the build's"
+            " open one stays named on the entry — and it is refused where no team's lane takes design-first."
+        ),
+    ),
+    Help(
+        "row-hold",
+        "Hold…",
+        "Queue card and Inbox: any open row",
+        (
+            "Keeps every lane off the entry until you release it, with one optional line of why, drawn after held"
+            " (person) on the row. Press it to pause work on an entry with nothing to decide, or to change the "
+            "words on one already held. It edits no ledger and asks nobody anything: a question a session waits "
+            "on is a decision (paul) on the ledger, not a hold."
+        ),
+    ),
 )
 
 BY_KEY: dict[str, Help] = {h.key: h for h in HELP}
@@ -657,7 +692,7 @@ SCREENS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         ),
     ),
     ("repo", "Repo page", ("board", "live-divider")),
-    ("queue", "Queue", ("up-next-number", "live-mark")),
+    ("queue", "Queue", ("up-next-number", "live-mark", "row-done", "row-back-to-design", "row-hold")),
     ("settings", "Settings", ("on-work", "balance", "file-link", "telegram", "telegram-test")),
     ("spend", "Spend", ("usage-chip", "spend-view", "spend-picks", "spend-bar")),
 )

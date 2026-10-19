@@ -2364,6 +2364,9 @@ def ledger_for_you(
         ]
         if not entries:
             continue
+        every = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+        opened = {str(e.get("id")) for e in every}
+        blocking = {str(b) for e in every for b in e.get("blocked_by") or ()}  # a design's open builds name it
         here = Path(str(r.get("root") or root)).resolve()
         mine = [s for s in live if Path(str(s["repo"])).resolve() == here]
         tally: dict[str, int] = {}
@@ -2413,6 +2416,11 @@ def ledger_for_you(
                     "answers": answers,
                     "default": answers[d] if ok else "",
                     "root": str(r.get("root") or root),  # the checkout `ledger_decide` names the repo by
+                    # what the row's controls read, as a Queue row carries them (§4.5 screen 12 *any open row*, TD-905)
+                    "page": str(e.get("for_page") or ""),
+                    "blocked_open": any(str(b) in opened for b in e.get("blocked_by") or ()),
+                    "builds_open": e.get("for_page") == "design" and e["id"] in blocking,
+                    "hold_why": str((hold or {}).get("why") or ""),
                     "url": f"/repo/{quote(name)}#{quote(e['id'])}",
                 }
             )

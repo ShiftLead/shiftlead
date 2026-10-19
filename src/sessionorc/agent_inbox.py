@@ -7,6 +7,7 @@ dismiss, pause, resume, go with it, the attention store — as a mixin `HostAgen
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from sessionorc import (
 from sessionorc import board as board_mod
 from sessionorc import cadence as cadence_mod
 from sessionorc import held as held_mod
+from sessionorc import ledger as ledger_mod
 from sessionorc import settings as settings_mod
 from sessionorc.agent_common import (
     ENTRY_PRIORITIES,
@@ -44,6 +46,9 @@ from sessionorc.models import (
 
 # A board reply's note quotes the item's head, clipped where the SessionStart line clips an item (§4.4).
 BOARD_HEAD_CHARS = 200
+# a ledger row's two roads and the fixed words each writes before the person's (§4.5 screen 12 *any open row*, TD-905)
+LEDGER_ROADS = {"done": "done", "design": "back to design"}
+TD_ID = re.compile(r"TD-\d+")
 
 
 def reply_note(sent: list[dict[str, str]], refused: list[str]) -> str:
@@ -796,6 +801,7 @@ class InboxMixin:
         words: str = "",
         answer: int | None = None,
         go: bool = False,
+        road: str = "",
         caller: Any = None,
     ) -> dict[str, Any]:
         """The person's answer to a ledger entry that waits on them (design §4.5 screen 6 *The ledger's
@@ -806,13 +812,16 @@ class InboxMixin:
         is a work order at once. `repo` is the checkout the home's repo facts key it by; the entry is
         read from that reading, and refused when it no longer sorts *for you* or an open decided line
         already names it. The ledger itself is never written. The repo's work orders are read again
-        once the line lands, so the row leaves on the next poll."""
+        once the line lands, so the row leaves on the next poll. `road` is **Done…** (`done`) or **Back to
+        design…** (`design`) on any open row (`_ledger_road`, TD-905)."""
         agent_common.person_only(caller, "answer a ledger entry", "§4.5", self._graph())
         root = next((r for r in self._repos if r == repo or str(Path(r).resolve()) == str(Path(repo).resolve())), None)
         if root is None:
             raise RpcError(f"{repo} is not a repo this home reads (its repos registry)")
         view = self._repos.get(root) or {}
         name = str(view.get("name") or Path(root).name)
+        if road:
+            return await self._ledger_road(root, name, view, str(id or "").strip().upper(), road, words, caller)
         e = next(
             (
                 x
@@ -860,6 +869,67 @@ class InboxMixin:
         finally:
             self._board_adding.discard(key)
         return {"repo": root, "id": id, "decided": " ".join(said.split()), **done}
+
+    async def _ledger_road(
+        self, root: str, name: str, view: dict[str, Any], id: str, road: str, words: str, caller: Any
+    ) -> dict[str, Any]:
+        """**Done…** and **Back to design…** on any open ledger row (design §4.5 screen 12 *any open row*,
+        §4.4 *Hold*, TD-905): the Reply road with the fixed words *done — <words>* or *back to design —
+        <words>* — one decided board line, `Context:` the id, the session's work order. First the entry's
+        unattended holders and its PR's reader are told (`td_hold`'s drop notice), and the whole press is
+        refused where one could not be; then a person's hold on it is cleared; then the line is written.
+        Done is refused on *yours to do* (that row's own **Done** sends *done*), Back to design on a row that
+        is not *pickable*, *live check* or blocked by an open id. Where the repo has no servicing team, or no
+        stage's lane takes `design-first`, the page refuses before it calls (the home reads no `org.yml`)."""
+        if road not in LEDGER_ROADS:
+            raise RpcError(f"a ledger row's road is {' or '.join(LEDGER_ROADS)}, not {road!r}")
+        e = next(
+            (x for x in ((view.get("ledger") or {}).get("entries") or []) if isinstance(x, dict) and x.get("id") == id),
+            None,
+        )
+        if e is None:
+            raise RpcError(f"{id} is not an open entry of {name}'s ledger as the home last read it: reload the page")
+        page = str(e.get("for_page") or "")
+        if road == "done" and str(e.get("owner") or "").lower() == ledger_mod.PERSON_OWNER:
+            raise RpcError(f"{id} is yours to do: its own Done says what was done")
+        if road == "design" and not (
+            page in ("pickable", "live-check")
+            or (page == "blocked" and any(TD_ID.fullmatch(str(b)) for b in e.get("blocked_by") or ()))
+        ):
+            raise RpcError(f"{id} is {page or 'of no page kind'}: Back to design is on a pickable, live check or "
+                           "id-blocked entry (design §4.5 screen 12)")  # fmt: skip
+        if any(
+            id in (o.get("refs") or []) or f"{name}#{id}" in (o.get("refs") or [])
+            for o in ((view.get("work_orders") or {}).get("orders") or [])
+            if isinstance(o, dict)
+        ):
+            raise RpcError(f"{id} is already decided on {name}'s board: its session acts on it")
+        said = LEDGER_ROADS[road] + (f" — {w}" if (w := " ".join(str(words or "").split())) else "")
+        key = f"ledger:{root}:{id}"
+        if key in self._board_adding:
+            raise RpcError(f"{id} is already being decided")
+        self._board_adding.add(key)
+        try:
+            tell = ("is closed by the person" if road == "done" else "goes back to design") + (f" — {w}" if w else "")
+            told = await self.rpc_td_hold(repo=root, id=id, tell=tell, caller=caller)
+            if told.get("untold"):
+                raise RpcError(
+                    f"nothing was written: {'; '.join(told['untold'])} — a worker would run on against "
+                    f"{id} (design §4.4 *Hold*)"
+                )
+            if isinstance(e.get("held"), dict):
+                await self.rpc_td_hold(repo=root, id=id, release=True, caller=caller)
+            today = datetime.now().date().isoformat()
+            try:
+                line = board_mod.decided_line(str(e.get("title") or ""), id, [], None, said, today)
+                done = await asyncio.to_thread(board_mod.add_decided, root, line)
+            except board_mod.Refused as err:
+                raise RpcError(str(err)) from None
+            log.info("board %s: %s", root, done["message"])
+            await self._reread_board(root)
+        finally:
+            self._board_adding.discard(key)
+        return {"repo": root, "id": id, "decided": said, "told": told.get("told") or [], **done}
 
     async def _reread_board(self, root: str | Path) -> None:
         """The repo's board read again at once after a write-back the host agent made (§4.4 *Each
