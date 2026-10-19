@@ -493,3 +493,20 @@ async def test_a_drop_notice_tells_the_holder_and_the_reader_and_writes_no_hold(
     assert again["told"] == ["ao-gw", "ao-tl"], "a notice is no hold: each press tells"
     with pytest.raises(RpcError, match="ao-w cannot hold a ledger entry"):
         await agent.rpc_td_hold(repo=root, id="TD-003", tell="x", caller="ao-w")
+
+
+async def test_a_holds_words_and_a_drop_notice_are_cut_to_one_line_of_200(agent, tmp_path):
+    """TD-908: `WHY_CHARS` cuts a hold's words on the record, the reading and the note, and a drop notice's."""
+    await park_ticks(agent)
+    root, entries = await _home_with(agent, tmp_path, now=datetime.now(UTC))
+    worker = _put(agent, "ao-gw", unattended=True, claim="TD-003")
+    long = "w" * 300
+    got = await agent.rpc_td_hold(repo=root, id="TD-003", why=long)
+    assert got["held"]["why"] == long[:200]
+    assert json.loads(paths.ledger_seen_file().read_text())["o/r"]["TD-003"]["held"]["why"] == long[:200]
+    assert _by_id(entries)["TD-003"]["held"]["why"] == long[:200]
+    assert _notes(worker, "TD-003")[0].startswith(f"TD-003 is held by the person (“{long[:200]}”): stop")
+    await agent.rpc_td_hold(repo=root, id="TD-003", release=True)
+    tell = "t" * 300
+    await agent.rpc_td_hold(repo=root, id="TD-003", tell=tell)
+    assert _notes(worker, "TD-003")[-1].startswith(f"TD-003 {tell[:200]}: stop")
