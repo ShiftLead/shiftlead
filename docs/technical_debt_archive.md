@@ -17003,3 +17003,20 @@ Then file the build entry and name it in `Blocked by:`.
 **Related:** TD-891, TD-894.
 
 **Resolved:** 2026-10-18 (grinder-ao-2). `tests/test_ui_fill_fold.py` runs `app.js` under node with a fake fold and a scripted `fetch`: two opens read once and keep the summary; a re-read fold is filled from the kept body before its read returns; a 404 says *gone — reload* and forgets the body; a thrown read with nothing kept puts the retry line and the next open reads again; a non-ok read with a body kept leaves it; the `toggle` listener fills an open lazy fold and leaves a closed one. Removing the `filled` guard, the `catch`'s `delete d.dataset.filled`, or the 404 branch each fails a test (probed on this branch). The string test in `tests/test_ui_queue_cards.py` keeps only the wiring (`reopenFolds` calls `fillFold`, the Queue calls `reopenFolds` before `wire()`).
+
+## TD-906: `test_the_home_samples_a_running_team_and_serves_its_shape` sampled at a fixed 2026-10-14 and read it back through the `shape` RPC's real week, so CI went red for every PR on 2026-10-19 UTC
+
+**Priority:** High
+**Type:** bug
+**Added:** 2026-10-18 (the anchor session, from #2154's CI)
+**Owner:** grinder
+**Status:** Resolved (PR #2155)
+**Location:** `tests/test_shape.py` (`test_the_home_samples_a_running_team_and_serves_its_shape`); `src/sessionorc/agent_shape.py` `rpc_shape` (reads `datetime.now()`)
+
+**Why:** the test took the team's sample at the fixtures' `NOW` (2026-10-14 12:00Z) and asserted the `shape` RPC's `week` reading held its roles; the RPC bounds the week by the real clock (`spend.bounds`, Monday on), so from Monday 2026-10-19 UTC the sample day was outside the window and `roles` came back empty — `assert ('grind' == 'grind' and set() == {'grinder', 'techlead'})`, both Pythons, on a doc-only PR (#2154), twice. Local runs passed until the machine's zone (UTC−6) reached Monday too.
+
+**Fix:** the sample is taken at the real now, its ask three hours before; the pure-function tests keep the fixed `NOW`. **Known and left:** `test_a_role_merges_its_records_and_lists_its_seats_and_a_week_reads_back_to_monday` fails under `TZ=Pacific/Auckland` (NOW is a Thursday east of UTC+12) — a zone sensitivity CI's UTC never meets.
+
+**Resolved:** 2026-10-18, PR #2155 — the test reads the real clock as the RPC does; `test_shape.py` passes under `TZ=UTC` and `America/Denver`.
+
+---
